@@ -1,0 +1,82 @@
+dependencies {
+    // API DOCUMENTATION
+    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc:4.0.1'
+    testImplementation 'com.epages:restdocs-api-spec-mockmvc:0.20.0'
+    swaggerUI 'org.webjars:swagger-ui:5.32.6'
+}
+
+ext {
+    snippetsDir = file('build/generated-snippets')
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    outputs.dir snippetsDir
+    doFirst {
+        delete snippetsDir
+    }
+    doLast {
+        snippetsDir.mkdirs()
+    }
+}
+
+openapi3 {
+    server = 'http://localhost:8080'
+    title = 'Bibbidi API 문서'
+    description = 'Bibbidi 인증·회원 API 문서입니다.'
+    version = project.version
+    format = 'yaml'
+    outputDirectory = file('build/api-spec')
+}
+
+swaggerSources {
+    bibbidi {
+        inputFile = file('build/api-spec/openapi3.yaml')
+    }
+}
+
+tasks.matching { it.name.startsWith('generateSwaggerUI') }.configureEach {
+    dependsOn 'openapi3'
+    doLast {
+        def initializer = file('build/swagger-ui-bibbidi/swagger-initializer.js')
+        initializer.text = initializer.text.replace(
+            'https://petstore.swagger.io/v2/swagger.json',
+            '/docs/openapi3.yaml'
+        )
+    }
+}
+
+tasks.matching { it.name == 'openapi3' }.configureEach {
+    doFirst {
+        delete file('build/api-spec')
+    }
+    dependsOn test
+}
+
+tasks.register('copySwaggerUI', Copy) {
+    dependsOn 'generateSwaggerUIBibbidi'
+    into layout.buildDirectory.dir('generated-swagger-resources')
+    from(layout.buildDirectory.dir('swagger-ui-bibbidi')) {
+        into 'static/swagger-ui'
+    }
+    from(layout.buildDirectory.dir('api-spec')) {
+        into 'static/docs'
+    }
+}
+
+tasks.named('bootJar') {
+    dependsOn 'generateSwaggerUIBibbidi'
+    from(layout.buildDirectory.dir('swagger-ui-bibbidi')) {
+        into 'static/swagger-ui'
+    }
+    from('build/api-spec') {
+        into 'static/docs'
+    }
+}
+
+tasks.named('bootRun') {
+    dependsOn 'copySwaggerUI'
+    classpath = sourceSets.main.runtimeClasspath + files(
+        layout.buildDirectory.dir('generated-swagger-resources')
+    )
+}
