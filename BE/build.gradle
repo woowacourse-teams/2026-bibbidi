@@ -1,7 +1,7 @@
 buildscript {
     configurations.all {
         resolutionStrategy {
-            force 'org.springframework.boot:spring-boot-jackson2:4.0.5'
+            force 'org.springframework.boot:spring-boot-jackson2:4.1.0'
         }
     }
 }
