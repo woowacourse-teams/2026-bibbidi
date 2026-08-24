@@ -94,14 +94,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         if (type.status().is5xxServerError()) {
             log.error(
-                    "errorId={} method={} uri={} status={} message={}",
-                    type.id(), method, uri, status, exception.getMessage(), exception);
+                    "errorId={} method={} uri={} status={}",
+                    type.id(), method, uri, status, exception);
             return;
         }
 
         log.warn(
-                "errorId={} method={} uri={} status={} message={}",
-                type.id(), method, uri, status, exception.getMessage());
+                "errorId={} method={} uri={} status={}",
+                type.id(), method, uri, status);
     }
 
     private String extractUri(WebRequest request) {
