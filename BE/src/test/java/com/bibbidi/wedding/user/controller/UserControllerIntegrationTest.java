@@ -15,8 +15,11 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
+@ExtendWith(OutputCaptureExtension.class)
 class UserControllerIntegrationTest {
 
     @Autowired
@@ -67,13 +71,13 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    void rejectsInvalidNicknameAndPassword() throws Exception {
+    void rejectsInvalidNicknameAndPasswordWithoutLoggingRejectedValues(CapturedOutput output) throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "nickname": "12345678901",
-                                  "password": "123"
+                                  "password": "q!3"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -92,6 +96,13 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.title").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(jsonPath("$.instance").doesNotExist());
+
+        assertThat(output)
+                .contains("WARN")
+                .contains("errorId=102")
+                .contains("status=400")
+                .doesNotContain("12345678901")
+                .doesNotContain("q!3");
     }
 
     @Test

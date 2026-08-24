@@ -51,7 +51,6 @@ class GlobalExceptionHandlerTest {
                 .contains("ERROR")
                 .contains("errorId=901")
                 .contains("status=500")
-                .contains("message=unexpected-marker")
                 .contains("java.lang.IllegalStateException: unexpected-marker");
     }
 
