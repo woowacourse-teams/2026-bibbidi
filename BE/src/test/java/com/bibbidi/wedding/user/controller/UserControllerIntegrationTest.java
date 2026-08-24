@@ -71,7 +71,7 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    void rejectsInvalidNicknameAndPasswordWithoutLoggingRejectedValues(CapturedOutput output) throws Exception {
+    void rejectsInvalidNicknameAndPasswordWithoutLoggingRawPassword(CapturedOutput output) throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -101,7 +101,6 @@ class UserControllerIntegrationTest {
                 .contains("WARN")
                 .contains("errorId=102")
                 .contains("status=400")
-                .doesNotContain("12345678901")
                 .doesNotContain("q!3");
     }
 

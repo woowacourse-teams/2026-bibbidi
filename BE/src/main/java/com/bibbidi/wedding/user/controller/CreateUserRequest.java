@@ -12,9 +12,4 @@ public record CreateUserRequest(
         @Size(min = 4, message = "비밀번호는 4자 이상이어야 합니다.")
         String password
 ) {
-
-    @Override
-    public String toString() {
-        return "CreateUserRequest[nickname=" + nickname + ", password=[REDACTED]]";
-    }
 }
