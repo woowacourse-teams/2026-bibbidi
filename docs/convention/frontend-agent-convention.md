@@ -77,7 +77,10 @@ Page → Feature
 Feature → Component
 Feature → Hook
 Feature → API Client
+Component → API Client
 Component → Utility
+Hook → API Client
+Hook → Utility
 
 금지
 
@@ -85,6 +88,8 @@ Component → Page
 Shared Component → Feature
 Utility → React Component
 ```
+
+Component와 Hook은 API Client와 Utility를 참조할 수 있다. 실제 HTTP 요청은 API Client에서만 수행한다.
 
 재사용 가능성을 예상해서 코드를 성급하게 공통화하지 않는다. 두 곳 이상에서 실제로 같은 책임으로 사용되고 변경 이유도 같을 때 공통화를 검토한다.
 
@@ -154,7 +159,8 @@ API 계약이 확정되지 않은 경우 구현 전에 질문하거나 Mock 경�
 - 데이터가 없는 상태와 오류 상태를 구분한다.
 - 사용자가 복구할 수 있는 오류에는 재시도 방법을 제공한다.
 - 내부 오류 메시지와 서버 응답 원문을 사용자에게 그대로 노출하지 않는다.
-- 오류 코드와 공개 메시지는 합의된 API 계약을 따른다.
+- 오류 응답은 [Error Handling](./error-handling.md)에 정의된 `id`, `status`, `message`를 기본 필드로 사용하고, 검증 실패 시 `errors` 배열을 처리한다.
+- 오류·권한·재시도 UI는 오류 `id`로 처리 흐름을 분기하고 공개 `message`를 표시한다.
 - 낙관적 업데이트를 사용하면 실패 시 복구 방법을 함께 구현한다.
 
 ## 스타일과 디자인 시스템
@@ -207,6 +213,7 @@ ESLint 또는 Prettier 규칙 변경이 현재 Task의 목적이 아니라면 �
 - 순수한 도메인 계산은 React와 분리해 작은 단위 테스트로 검증한다.
 - 컴포넌트 테스트는 렌더링 결과와 사용자 상호작용을 검증한다.
 - 외부 API는 실제 호출하지 않고 API 경계에서 대체한다.
+- API 경계 테스트는 HTTP 요청·응답, 입력값 검증, 오류 응답 계약과 오류 변환을 검증한다.
 - 테스트를 통과시키기 위해 제품 코드를 테스트 전용 구조로 변경하지 않는다.
 - Snapshot 테스트를 기본 선택으로 사용하지 않는다.
 - 버그 수정 시 가능한 경우 동일한 문제가 재발하지 않도록 테스트를 추가한다.
