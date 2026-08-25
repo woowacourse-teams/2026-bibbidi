@@ -9,8 +9,13 @@ public record ValidationErrorResponse(
         List<FieldError> errors
 ) {
 
-    public static ValidationErrorResponse from(ProblemType type, List<FieldError> errors) {
-        return new ValidationErrorResponse(type.id(), type.status().value(), type.clientMessage(), errors);
+    public static ValidationErrorResponse from(ClientError clientError, List<FieldError> errors) {
+        return new ValidationErrorResponse(
+                clientError.id(),
+                clientError.status().value(),
+                clientError.clientMessage(),
+                errors
+        );
     }
 
     public record FieldError(String field, String message) {

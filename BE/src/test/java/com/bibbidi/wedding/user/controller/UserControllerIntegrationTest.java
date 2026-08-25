@@ -160,7 +160,7 @@ class UserControllerIntegrationTest {
 
     @Test
     @DisplayName("대소문자만 다른 닉네임이 이미 존재하면 가입을 거절한다")
-    void shouldRejectWhenNicknameAlreadyExists() throws Exception {
+    void shouldRejectWhenNicknameAlreadyExists(CapturedOutput output) throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -180,14 +180,20 @@ class UserControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.id").value(401))
+                .andExpect(jsonPath("$.id").value(403))
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."))
+                .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."))
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.title").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(jsonPath("$.instance").doesNotExist())
-                .andExpect(content().string(not(containsString("회원가입 실패: 닉네임 중복"))));
+                .andExpect(content().string(not(containsString("닉네임 중복으로 회원가입에 실패했습니다."))));
+
+        assertThat(output)
+                .contains("WARN")
+                .contains("errorId=403")
+                .contains("status=409")
+                .contains("message=닉네임 중복으로 회원가입에 실패했습니다.");
     }
 }

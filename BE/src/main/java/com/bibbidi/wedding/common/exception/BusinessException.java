@@ -1,15 +1,15 @@
 package com.bibbidi.wedding.common.exception;
 
-public abstract class BusinessException extends RuntimeException {
+public class BusinessException extends RuntimeException {
 
-    private final ProblemType problemType;
+    private final ClientError clientError;
 
-    protected BusinessException(ProblemType problemType, String logMessage) {
+    public BusinessException(ClientError clientError, String logMessage) {
         super(logMessage);
-        this.problemType = problemType;
+        this.clientError = clientError;
     }
 
-    public ProblemType problemType() {
-        return problemType;
+    public ClientError clientError() {
+        return clientError;
     }
 }

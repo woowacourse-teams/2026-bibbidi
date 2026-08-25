@@ -2,11 +2,11 @@ package com.bibbidi.wedding.common.exception;
 
 public record ErrorResponse(int id, int status, String message) {
 
-    public static ErrorResponse from(ProblemType type) {
+    public static ErrorResponse from(ClientError clientError) {
         return new ErrorResponse(
-                type.id(),
-                type.status().value(),
-                type.clientMessage()
+                clientError.id(),
+                clientError.status().value(),
+                clientError.clientMessage()
         );
     }
 }
