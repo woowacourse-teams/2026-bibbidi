@@ -1,13 +1,32 @@
 package com.bibbidi.wedding.user.repository;
 
 import com.bibbidi.wedding.user.domain.User;
+import com.bibbidi.wedding.user.persistence.JpaUserRepository;
+import com.bibbidi.wedding.user.persistence.UserEntity;
 import java.util.Optional;
+import org.springframework.stereotype.Repository;
 
-public interface UserRepository {
+@Repository
+public class UserRepository {
 
-    boolean existsByNickname(String nickname);
+    private final JpaUserRepository jpaUserRepository;
+    private final UserMapper userMapper;
 
-    User save(User user);
+    public UserRepository(JpaUserRepository jpaUserRepository, UserMapper userMapper) {
+        this.jpaUserRepository = jpaUserRepository;
+        this.userMapper = userMapper;
+    }
 
-    Optional<User> findByNickname(String nickname);
+    public boolean existsByNickname(String nickname) {
+        return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
+    }
+
+    public User save(User user) {
+        UserEntity saved = jpaUserRepository.save(userMapper.toEntity(user));
+        return userMapper.toDomain(saved);
+    }
+
+    public Optional<User> findByNickname(String nickname) {
+        return jpaUserRepository.findByNicknameIgnoreCase(nickname).map(userMapper::toDomain);
+    }
 }
