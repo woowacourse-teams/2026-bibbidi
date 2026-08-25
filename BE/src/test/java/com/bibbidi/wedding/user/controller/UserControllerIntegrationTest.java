@@ -177,7 +177,29 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
                         "닉네임은 비어 있을 수 없습니다.",
                         "비밀번호는 4자 이상 20자 이하여야 합니다."
-                )));
+                )))
+                .andDo(document(
+                        "users-create-empty-nickname-and-too-long-password",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("회원가입")
+                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .requestSchema(schema("CreateUserRequest"))
+                                .responseSchema(schema("ValidationErrorResponse"))
+                                .requestFields(
+                                        fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
+                                        fieldWithPath("password").description("사용자 비밀번호")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("오류 식별자"),
+                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("message").description("오류 메시지"),
+                                        fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
+                                        fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
+                                        fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
+                                )
+                                .build())
+                ));
     }
 
     @Test
