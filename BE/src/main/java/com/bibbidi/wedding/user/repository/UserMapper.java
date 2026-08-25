@@ -1,6 +1,7 @@
-package com.bibbidi.wedding.user.persistence;
+package com.bibbidi.wedding.user.repository;
 
 import com.bibbidi.wedding.user.domain.User;
+import com.bibbidi.wedding.user.persistence.UserEntity;
 import org.springframework.stereotype.Component;
 
 @Component

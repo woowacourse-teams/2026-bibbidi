@@ -1,6 +1,7 @@
-package com.bibbidi.wedding.checklist.persistence;
+package com.bibbidi.wedding.checklist.repository;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
+import com.bibbidi.wedding.checklist.persistence.ChecklistEntity;
 import org.springframework.stereotype.Component;
 
 @Component

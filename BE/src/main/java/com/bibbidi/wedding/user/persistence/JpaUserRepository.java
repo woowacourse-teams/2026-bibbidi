@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.user.persistence;
 
 import com.bibbidi.wedding.user.domain.User;
+import com.bibbidi.wedding.user.repository.UserMapper;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;

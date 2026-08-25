@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.checklist.persistence;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
+import com.bibbidi.wedding.checklist.repository.ChecklistMapper;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import java.util.Optional;
 import java.util.UUID;
