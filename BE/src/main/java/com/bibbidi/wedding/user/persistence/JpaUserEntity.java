@@ -10,7 +10,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "users")
-public class UserEntity extends BaseTimeEntity {
+public class JpaUserEntity extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,10 +23,10 @@ public class UserEntity extends BaseTimeEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    protected UserEntity() {
+    protected JpaUserEntity() {
     }
 
-    public UserEntity(Long id, String nickname, String passwordHash) {
+    public JpaUserEntity(Long id, String nickname, String passwordHash) {
         this.id = id;
         this.nickname = nickname;
         this.passwordHash = passwordHash;
