@@ -25,3 +25,12 @@ spring:
   sql:
     init:
       mode: never
+
+server:
+  servlet:
+    session:
+      cookie:
+        name: JSESSIONID
+        path: /
+        http-only: true
+        same-site: lax

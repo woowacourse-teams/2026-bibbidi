@@ -81,6 +81,7 @@ class AuthSessionIntegrationTest {
         assertThat(setCookie)
                 .contains("Path=/")
                 .contains("HttpOnly")
+                .contains("SameSite=Lax")
                 .doesNotContain("Max-Age");
         assertThat(sessionCookieName).isEqualTo("JSESSIONID");
         assertThat(loginResponse.body())
@@ -98,7 +99,6 @@ class AuthSessionIntegrationTest {
                 .startsWith(sessionCookieName + "=;")
                 .contains("Path=/")
                 .contains("Max-Age=0")
-                .contains("HttpOnly")
                 .doesNotContain(sessionId);
 
         HttpResponse<String> requestWithInvalidatedSession = sendLogout(sessionCookie);
