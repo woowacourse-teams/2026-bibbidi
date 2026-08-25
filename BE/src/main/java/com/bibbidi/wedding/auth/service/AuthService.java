@@ -6,7 +6,6 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -19,7 +18,6 @@ public class AuthService {
         this.passwordHasher = passwordHasher;
     }
 
-    @Transactional(readOnly = true)
     public AuthResult login(String nickname, String rawPassword) {
         User user = userRepository.findByNickname(nickname)
                 .orElseThrow(AuthService::loginFailed);
