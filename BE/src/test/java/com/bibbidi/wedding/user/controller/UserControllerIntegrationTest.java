@@ -9,8 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.checklist.domain.Checklist;
-import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
@@ -41,14 +39,11 @@ class UserControllerIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private ChecklistRepository checklistRepository;
-
-    @Autowired
     private PasswordHasher passwordHasher;
 
     @Test
-    @DisplayName("유효한 가입 요청이면 사용자와 빈 체크리스트를 함께 생성한다")
-    void shouldCreateUserWithChecklistWhenRequestIsValid() throws Exception {
+    @DisplayName("유효한 가입 요청이면 사용자를 생성한다")
+    void shouldCreateUserWhenRequestIsValid() throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -60,16 +55,14 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.nickname").value("bibbidi"))
-                .andExpect(jsonPath("$.checklistId").isNumber())
+                .andExpect(jsonPath("$.checklistId").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
 
         User user = userRepository.findByNickname("bibbidi").orElseThrow();
-        Checklist checklist = checklistRepository.findByOwnerId(user.id()).orElseThrow();
 
         assertThat(user.passwordHash()).isNotEqualTo("wish");
         assertThat(passwordHasher.matches("wish", user.passwordHash())).isTrue();
-        assertThat(checklist.ownerId()).isEqualTo(user.id());
     }
 
     @Test

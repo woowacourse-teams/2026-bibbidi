@@ -1,7 +1,5 @@
 package com.bibbidi.wedding.user.service;
 
-import com.bibbidi.wedding.checklist.domain.Checklist;
-import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.exception.DuplicateNicknameException;
 import com.bibbidi.wedding.user.repository.UserRepository;
@@ -12,16 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final ChecklistService checklistService;
     private final PasswordHasher passwordHasher;
 
-    public UserService(
-            UserRepository userRepository,
-            ChecklistService checklistService,
-            PasswordHasher passwordHasher
-    ) {
+    public UserService(UserRepository userRepository, PasswordHasher passwordHasher) {
         this.userRepository = userRepository;
-        this.checklistService = checklistService;
         this.passwordHasher = passwordHasher;
     }
 
@@ -33,8 +25,7 @@ public class UserService {
 
         String passwordHash = passwordHasher.hash(rawPassword);
         User user = userRepository.save(User.create(nickname, passwordHash));
-        Checklist checklist = checklistService.createChecklistFor(user.id());
 
-        return new UserCreationResult(user.id(), user.nickname(), checklist.id());
+        return new UserCreationResult(user.id(), user.nickname());
     }
 }
