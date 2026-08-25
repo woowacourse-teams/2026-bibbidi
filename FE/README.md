@@ -43,6 +43,10 @@ pnpm dev
 | 명령어 | 설명 |
 |---|---|
 | `pnpm dev` | Webpack development 모드로 개발 서버를 실행합니다. |
+| `pnpm lint` | ESLint로 코드를 검사하고 warning도 오류로 처리합니다. |
+| `pnpm lint:fix` | ESLint로 검사하면서 자동 수정 가능한 문제를 수정합니다. |
+| `pnpm format` | Prettier로 파일 형식을 자동 정리합니다. |
+| `pnpm format:check` | 파일을 수정하지 않고 Prettier 형식 준수 여부를 검사합니다. |
 | `pnpm typecheck` | 출력 파일 없이 TypeScript 타입만 검사합니다. |
 | `pnpm build` | 타입 검사 후 production 번들을 `dist/`에 생성합니다. |
 
