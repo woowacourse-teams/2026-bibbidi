@@ -4,7 +4,6 @@ import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
 import com.bibbidi.wedding.auth.service.AuthResult;
 import com.bibbidi.wedding.auth.service.AuthService;
-import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.AuthSessionCookieManager;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,10 +37,12 @@ public class AuthController {
         return ResponseEntity.ok(LoginResponse.from(result));
     }
 
-    @Auth
     @DeleteMapping("/api/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        request.getSession(false).invalidate();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
         sessionCookieManager.expire(response);
         return ResponseEntity.noContent().build();
     }

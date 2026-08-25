@@ -55,8 +55,8 @@ class AuthSessionIntegrationTest {
     }
 
     @Test
-    @DisplayName("로그인 쿠키는 안전 속성을 사용하고 로그아웃 후 같은 쿠키로 인증할 수 없다")
-    void shouldIssueSecurelyConfiguredCookieAndRejectItAfterLogout() throws Exception {
+    @DisplayName("로그인 쿠키는 안전 속성을 사용하고 로그아웃은 만료된 세션에도 멱등하게 동작한다")
+    void shouldIssueSecurelyConfiguredCookieAndLogoutIdempotently() throws Exception {
         HttpResponse<String> loginResponse = httpClient.send(
                 request("/api/login")
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -101,13 +101,14 @@ class AuthSessionIntegrationTest {
                 .contains("Max-Age=0")
                 .doesNotContain(sessionId);
 
-        HttpResponse<String> requestWithInvalidatedSession = sendLogout(sessionCookie);
+        HttpResponse<String> repeatedLogoutResponse = sendLogout(sessionCookie);
 
-        assertThat(requestWithInvalidatedSession.statusCode()).isEqualTo(401);
-        assertThat(requestWithInvalidatedSession.body())
-                .contains("\"id\":201")
-                .contains("\"status\":401")
-                .contains("\"message\":\"로그인이 필요합니다.\"")
+        assertThat(repeatedLogoutResponse.statusCode()).isEqualTo(204);
+        assertThat(repeatedLogoutResponse.body()).isEmpty();
+        assertThat(repeatedLogoutResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow())
+                .startsWith(sessionCookieName + "=;")
+                .contains("Path=/")
+                .contains("Max-Age=0")
                 .doesNotContain(sessionId);
     }
 

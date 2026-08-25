@@ -244,30 +244,6 @@ class AuthControllerIntegrationTest {
         assertThat(output).doesNotContain("sessionId=");
     }
 
-    @Test
-    @DisplayName("인증되지 않은 로그아웃 요청은 인증 필요 오류를 반환한다")
-    void shouldRequireAuthenticationWhenLoggingOut() throws Exception {
-        mockMvc.perform(delete("/api/logout"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.id").value(201))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
-                .andDo(document(
-                        "auth-logout-authentication-required",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Authentication")
-                                .summary("로그아웃")
-                                .description("현재 인증 세션을 무효화합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
-    }
-
     private MockHttpServletRequestBuilder loginRequest(String password) {
         return post("/api/login")
                 .contentType(MediaType.APPLICATION_JSON)
