@@ -15,3 +15,13 @@ spring:
       max-lifetime: 110000
       keepalive-time: 30000
       connection-test-query: "SELECT 1"
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+  sql:
+    init:
+      mode: never
