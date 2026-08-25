@@ -14,6 +14,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,8 @@ class UserControllerIntegrationTest {
     private PasswordHasher passwordHasher;
 
     @Test
-    void createsUserAndEmptyChecklistTogether() throws Exception {
+    @DisplayName("유효한 가입 요청이면 사용자와 빈 체크리스트를 함께 생성한다")
+    void shouldCreateUserWithChecklistWhenRequestIsValid() throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -71,7 +73,10 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    void rejectsInvalidNicknameAndPasswordWithoutLoggingRawPassword(CapturedOutput output) throws Exception {
+    @DisplayName("닉네임과 비밀번호가 유효하지 않으면 원문 비밀번호를 기록하지 않고 요청을 거절한다")
+    void shouldRejectWithoutPasswordLeakWhenRequestIsInvalid(
+            CapturedOutput output
+    ) throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -105,7 +110,8 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    void rejectsDuplicateNicknameIgnoringCase() throws Exception {
+    @DisplayName("대소문자만 다른 닉네임이 이미 존재하면 가입을 거절한다")
+    void shouldRejectWhenNicknameAlreadyExists() throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

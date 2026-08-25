@@ -2,6 +2,7 @@ package com.bibbidi.wedding.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -17,7 +18,8 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
-    void logsExpectedClientErrorAtWarnWithInternalMessage(CapturedOutput output) {
+    @DisplayName("예상 가능한 클라이언트 오류가 발생하면 내부 메시지를 WARN으로 기록한다")
+    void shouldLogWarnWhenBusinessExceptionOccurs(CapturedOutput output) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/users");
 
         ResponseEntity<ErrorResponse> response = handler.handleBusinessException(
@@ -37,7 +39,8 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void logsUnexpectedServerErrorAtErrorWithCause(CapturedOutput output) {
+    @DisplayName("예상하지 못한 서버 오류가 발생하면 원인 예외를 ERROR로 기록한다")
+    void shouldLogErrorWhenUnexpectedExceptionOccurs(CapturedOutput output) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/users");
 
         ResponseEntity<ErrorResponse> response = handler.handleUnexpected(
