@@ -9,7 +9,7 @@ public record CreateUserRequest(
         String nickname,
 
         @NotBlank(message = "비밀번호는 비어 있을 수 없습니다.")
-        @Size(min = 4, message = "비밀번호는 4자 이상이어야 합니다.")
+        @Size(min = 4, max = 20, message = "비밀번호는 4자 이상 20자 이하여야 합니다.")
         String password
 ) {
 }

@@ -88,7 +88,7 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
                 .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
                         "닉네임은 10자 이하여야 합니다.",
-                        "비밀번호는 4자 이상이어야 합니다."
+                        "비밀번호는 4자 이상 20자 이하여야 합니다."
                 )))
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.title").doesNotExist())
@@ -100,6 +100,26 @@ class UserControllerIntegrationTest {
                 .contains("errorId=102")
                 .contains("status=400")
                 .doesNotContain("q!3");
+    }
+
+    @Test
+    @DisplayName("닉네임이 비어 있거나 비밀번호가 20자를 초과하면 요청을 거절한다")
+    void shouldRejectRequestWhenNicknameIsEmptyAndPasswordIsTooLong() throws Exception {
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "",
+                                  "password": "123456789012345678901"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.length()").value(2))
+                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
+                .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
+                        "닉네임은 비어 있을 수 없습니다.",
+                        "비밀번호는 4자 이상 20자 이하여야 합니다."
+                )));
     }
 
     @Test

@@ -17,7 +17,7 @@ public class UserEntity extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "nickname", nullable = false, unique = true)
+    @Column(name = "nickname", nullable = false, unique = true, length = 10)
     private String nickname;
 
     @Column(name = "password_hash", nullable = false)

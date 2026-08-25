@@ -1,6 +1,6 @@
 CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    nickname VARCHAR(255) NOT NULL,
+    nickname VARCHAR(10) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
