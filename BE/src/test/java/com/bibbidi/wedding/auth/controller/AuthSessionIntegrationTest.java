@@ -80,6 +80,7 @@ class AuthSessionIntegrationTest {
 
         assertThat(setCookie)
                 .contains("Path=/")
+                .contains("Secure")
                 .contains("HttpOnly")
                 .contains("SameSite=Lax")
                 .doesNotContain("Max-Age");
@@ -99,6 +100,7 @@ class AuthSessionIntegrationTest {
                 .startsWith(sessionCookieName + "=;")
                 .contains("Path=/")
                 .contains("Max-Age=0")
+                .contains("Secure")
                 .doesNotContain(sessionId);
 
         HttpResponse<String> repeatedLogoutResponse = sendLogout(sessionCookie);
@@ -109,6 +111,7 @@ class AuthSessionIntegrationTest {
                 .startsWith(sessionCookieName + "=;")
                 .contains("Path=/")
                 .contains("Max-Age=0")
+                .contains("Secure")
                 .doesNotContain(sessionId);
     }
 

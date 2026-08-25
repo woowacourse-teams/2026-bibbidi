@@ -14,6 +14,7 @@ public class AuthSessionCookieManager {
 
     private final String cookieName;
     private final String cookiePath;
+    private final boolean cookieSecure;
 
     public AuthSessionCookieManager(ServerProperties serverProperties) {
         Cookie cookie = serverProperties.getServlet().getSession().getCookie();
@@ -26,11 +27,13 @@ public class AuthSessionCookieManager {
                 cookie.getPath(),
                 "Session Cookie 경로를 설정해야 합니다."
         );
+        this.cookieSecure = Boolean.TRUE.equals(cookie.getSecure());
     }
 
     public void expire(HttpServletResponse response) {
         ResponseCookie expiredCookie = ResponseCookie.from(cookieName, "")
                 .path(cookiePath)
+                .secure(cookieSecure)
                 .maxAge(Duration.ZERO)
                 .build();
 
