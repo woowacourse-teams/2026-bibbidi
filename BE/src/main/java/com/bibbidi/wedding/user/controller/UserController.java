@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.user.controller;
 
+import com.bibbidi.wedding.user.controller.dto.CreateUserRequest;
+import com.bibbidi.wedding.user.controller.dto.CreateUserResponse;
 import com.bibbidi.wedding.user.service.UserCreationResult;
 import com.bibbidi.wedding.user.service.UserService;
 import jakarta.validation.Valid;

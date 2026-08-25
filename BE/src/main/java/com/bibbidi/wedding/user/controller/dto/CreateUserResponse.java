@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.user.controller;
+package com.bibbidi.wedding.user.controller.dto;
 
 import com.bibbidi.wedding.user.service.UserCreationResult;
 import java.util.UUID;

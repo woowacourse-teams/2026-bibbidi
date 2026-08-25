@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.user.controller;
+package com.bibbidi.wedding.user.controller.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
