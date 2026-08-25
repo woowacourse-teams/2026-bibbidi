@@ -29,6 +29,7 @@ spring:
 server:
   servlet:
     session:
+      timeout: 24h
       cookie:
         name: JSESSIONID
         path: /
