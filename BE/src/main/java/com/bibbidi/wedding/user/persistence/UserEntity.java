@@ -3,20 +3,19 @@ package com.bibbidi.wedding.user.persistence;
 import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users")
 public class UserEntity extends BaseTimeEntity {
 
     @Id
-    @JdbcTypeCode(SqlTypes.BINARY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "nickname", nullable = false, unique = true)
     private String nickname;
@@ -27,13 +26,13 @@ public class UserEntity extends BaseTimeEntity {
     protected UserEntity() {
     }
 
-    public UserEntity(UUID id, String nickname, String passwordHash) {
+    public UserEntity(Long id, String nickname, String passwordHash) {
         this.id = id;
         this.nickname = nickname;
         this.passwordHash = passwordHash;
     }
 
-    public UUID id() {
+    public Long id() {
         return id;
     }
 

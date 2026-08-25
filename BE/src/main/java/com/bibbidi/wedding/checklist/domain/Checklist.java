@@ -1,23 +1,22 @@
 package com.bibbidi.wedding.checklist.domain;
 
 import java.util.Objects;
-import java.util.UUID;
 
 public final class Checklist {
 
     private final Long id;
-    private final UUID ownerId;
+    private final Long ownerId;
 
-    private Checklist(Long id, UUID ownerId) {
+    private Checklist(Long id, Long ownerId) {
         this.id = id;
         this.ownerId = Objects.requireNonNull(ownerId);
     }
 
-    public static Checklist createFor(UUID ownerId) {
+    public static Checklist createFor(Long ownerId) {
         return new Checklist(null, ownerId);
     }
 
-    public static Checklist restore(Long id, UUID ownerId) {
+    public static Checklist restore(Long id, Long ownerId) {
         return new Checklist(Objects.requireNonNull(id), ownerId);
     }
 
@@ -25,7 +24,7 @@ public final class Checklist {
         return id;
     }
 
-    public UUID ownerId() {
+    public Long ownerId() {
         return ownerId;
     }
 }

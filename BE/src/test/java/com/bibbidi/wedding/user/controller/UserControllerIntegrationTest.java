@@ -56,7 +56,7 @@ class UserControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isString())
+                .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.nickname").value("bibbidi"))
                 .andExpect(jsonPath("$.checklistId").isNumber())
                 .andExpect(jsonPath("$.password").doesNotExist())

@@ -2,7 +2,6 @@ package com.bibbidi.wedding.checklist.service;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +15,7 @@ public class ChecklistService {
     }
 
     @Transactional
-    public Checklist createChecklistFor(UUID ownerId) {
+    public Checklist createChecklistFor(Long ownerId) {
         return checklistRepository.save(Checklist.createFor(ownerId));
     }
 }

@@ -1,10 +1,9 @@
 package com.bibbidi.wedding.user.persistence;
 
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface UserDao extends JpaRepository<UserEntity, UUID> {
+public interface UserDao extends JpaRepository<UserEntity, Long> {
 
     boolean existsByNicknameIgnoreCase(String nickname);
 

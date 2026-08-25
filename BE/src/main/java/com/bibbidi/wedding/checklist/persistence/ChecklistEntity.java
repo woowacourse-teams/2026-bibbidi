@@ -7,9 +7,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "checklists")
@@ -20,14 +17,13 @@ public class ChecklistEntity extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "owner_id", nullable = false, unique = true)
-    private UUID ownerId;
+    private Long ownerId;
 
     protected ChecklistEntity() {
     }
 
-    public ChecklistEntity(Long id, UUID ownerId) {
+    public ChecklistEntity(Long id, Long ownerId) {
         this.id = id;
         this.ownerId = ownerId;
     }
@@ -36,7 +32,7 @@ public class ChecklistEntity extends BaseTimeEntity {
         return id;
     }
 
-    public UUID ownerId() {
+    public Long ownerId() {
         return ownerId;
     }
 }

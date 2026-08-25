@@ -4,7 +4,6 @@ import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.ChecklistMapper;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -25,7 +24,7 @@ public class JpaChecklistRepository implements ChecklistRepository {
     }
 
     @Override
-    public Optional<Checklist> findByOwnerId(UUID ownerId) {
+    public Optional<Checklist> findByOwnerId(Long ownerId) {
         return checklistDao.findByOwnerId(ownerId).map(checklistMapper::toDomain);
     }
 }
