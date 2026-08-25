@@ -6,13 +6,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_users_nickname",
+                columnNames = "nickname"
+        )
+)
 public class UserEntity {
 
     @Id
@@ -20,7 +27,7 @@ public class UserEntity {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @Column(name = "nickname", nullable = false, unique = true)
+    @Column(name = "nickname", nullable = false)
     private String nickname;
 
     @Column(name = "password_hash", nullable = false)

@@ -8,6 +8,7 @@ import com.bibbidi.wedding.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,5 +26,13 @@ class JpaUserRepositoryIntegrationTest {
 
         assertThatThrownBy(() -> userRepository.save(User.create("same-name", "hash-two")))
                 .isInstanceOf(DuplicateNicknameException.class);
+    }
+
+    @Test
+    void preservesOtherDataIntegrityViolations() {
+        String oversizedPasswordHash = "x".repeat(256);
+
+        assertThatThrownBy(() -> userRepository.save(User.create("valid-name", oversizedPasswordHash)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
