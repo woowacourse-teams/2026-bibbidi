@@ -20,15 +20,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception, WebRequest request) {
         ClientError clientError = exception.clientError();
-        logException(exception, clientError, request);
-        return ResponseEntity.status(clientError.status()).body(ErrorResponse.from(clientError));
+        HttpStatus status = convertToHttpStatus(clientError);
+        logException(exception, clientError, status, request);
+        return ResponseEntity.status(status).body(ErrorResponse.from(clientError));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception exception, WebRequest request) {
         ClientError clientError = ClientError.INTERNAL_ERROR;
-        logException(exception, clientError, request);
-        return ResponseEntity.status(clientError.status()).body(ErrorResponse.from(clientError));
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        logException(exception, clientError, status, request);
+        return ResponseEntity.status(status).body(ErrorResponse.from(clientError));
     }
 
     @Override
@@ -39,38 +41,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode statusCode,
             WebRequest request
     ) {
-        ClientError clientError = convertToClientError(exception, statusCode);
+        ClientError clientError = convertToClientError(statusCode);
         Object response = createResponse(clientError, exception);
-        logException(exception, clientError, request);
-        return super.handleExceptionInternal(exception, response, headers, clientError.status(), request);
+        logException(exception, clientError, statusCode, request);
+        return super.handleExceptionInternal(exception, response, headers, statusCode, request);
     }
 
-    private ClientError convertToClientError(Exception exception, HttpStatusCode statusCode) {
-        if (exception instanceof MethodArgumentNotValidException) {
-            return ClientError.VALIDATION_FAILED;
-        }
-        if (statusCode.equals(HttpStatus.NOT_FOUND)) {
-            return ClientError.RESOURCE_NOT_FOUND;
-        }
-        if (statusCode.equals(HttpStatus.FORBIDDEN)) {
-            return ClientError.ACCESS_DENIED;
-        }
-        if (statusCode.equals(HttpStatus.METHOD_NOT_ALLOWED)) {
-            return ClientError.METHOD_NOT_ALLOWED;
-        }
-        if (statusCode.equals(HttpStatus.UNSUPPORTED_MEDIA_TYPE)) {
-            return ClientError.UNSUPPORTED_MEDIA_TYPE;
-        }
-        if (statusCode.equals(HttpStatus.CONFLICT)) {
-            return ClientError.CONFLICT;
-        }
-        if (statusCode.equals(HttpStatus.UNPROCESSABLE_ENTITY)) {
-            return ClientError.UNPROCESSABLE_ENTITY;
-        }
+    private ClientError convertToClientError(HttpStatusCode statusCode) {
         if (statusCode.is4xxClientError()) {
             return ClientError.INVALID_REQUEST;
         }
         return ClientError.INTERNAL_ERROR;
+    }
+
+    private HttpStatus convertToHttpStatus(ClientError clientError) {
+        return switch (clientError) {
+            case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
+            case DUPLICATE_NICKNAME -> HttpStatus.CONFLICT;
+            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
     }
 
     private Object createResponse(ClientError clientError, Exception exception) {
@@ -87,28 +76,33 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ValidationErrorResponse.from(clientError, errors);
     }
 
-    private void logException(Exception exception, ClientError clientError, WebRequest request) {
+    private void logException(
+            Exception exception,
+            ClientError clientError,
+            HttpStatusCode statusCode,
+            WebRequest request
+    ) {
         String method = extractMethod(request);
         String uri = extractUri(request);
-        int status = clientError.status().value();
+        int status = statusCode.value();
 
-        if (clientError.status().is5xxServerError()) {
+        if (statusCode.is5xxServerError()) {
             log.error(
-                    "errorId={} method={} uri={} status={}",
-                    clientError.id(), method, uri, status, exception);
+                    "errorCode={} method={} uri={} status={}",
+                    clientError.errorCode(), method, uri, status, exception);
             return;
         }
 
         if (exception instanceof BusinessException) {
             log.warn(
-                    "errorId={} method={} uri={} status={} message={}",
-                    clientError.id(), method, uri, status, exception.getMessage());
+                    "errorCode={} method={} uri={} status={} message={}",
+                    clientError.errorCode(), method, uri, status, exception.getMessage());
             return;
         }
 
         log.warn(
-                "errorId={} method={} uri={} status={}",
-                clientError.id(), method, uri, status);
+                "errorCode={} method={} uri={} status={}",
+                clientError.errorCode(), method, uri, status);
     }
 
     private String extractUri(WebRequest request) {
