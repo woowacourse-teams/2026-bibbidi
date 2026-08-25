@@ -40,8 +40,7 @@ CREATE TABLE precedences (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE (item_id, preceding_item_id),
-    CHECK (item_id <> preceding_item_id)
+    UNIQUE (item_id, preceding_item_id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
@@ -86,15 +85,7 @@ CREATE TABLE appointments (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    INDEX idx_appointments_checklist_item_id (checklist_item_id),
-    CHECK (
-        (start_time IS NULL AND end_time IS NULL)
-        OR (
-            start_time IS NOT NULL
-            AND end_time IS NOT NULL
-            AND start_time < end_time
-        )
-    )
+    INDEX idx_appointments_checklist_item_id (checklist_item_id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
