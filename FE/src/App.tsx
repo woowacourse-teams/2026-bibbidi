@@ -1,10 +1,13 @@
 import "./App.css";
+import { LoginForm } from "./features/login";
 import { SignupForm } from "./features/signup";
 
 function App() {
+  const isLoginPage = window.location.pathname === "/login";
+
   return (
-    <main className="signup-page">
-      <SignupForm />
+    <main className="auth-page">
+      {isLoginPage ? <LoginForm /> : <SignupForm />}
     </main>
   );
 }

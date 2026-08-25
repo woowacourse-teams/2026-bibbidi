@@ -1,4 +1,4 @@
-.signup-page {
+.auth-page {
   display: grid;
   min-height: 100vh;
   place-items: center;
@@ -7,7 +7,7 @@
 }
 
 @media (max-width: 520px) {
-  .signup-page {
+  .auth-page {
     align-items: start;
     padding: 40px 20px;
   }
