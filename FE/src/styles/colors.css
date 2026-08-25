@@ -1,0 +1,17 @@
+:root {
+  /* SEED theme-light role tokens used by Bibidi */
+  --color-bg-layer-basement: #f3f4f5;
+  --color-bg-layer-default: #ffffff;
+  --color-bg-brand-solid: #ff6600;
+  --color-bg-brand-solid-pressed: #e14d00;
+  --color-fg-neutral: #1a1c20;
+  --color-fg-neutral-muted: #555d6d;
+  --color-fg-placeholder: #b0b3ba;
+  --color-fg-brand: #ff6600;
+  --color-fg-on-brand: #ffffff;
+  --color-fg-critical: #fa342c;
+  --color-stroke-neutral-weak: #dcdee3;
+  --color-stroke-neutral-contrast: #1a1c20;
+  --color-stroke-critical-solid: #fa342c;
+  --color-stroke-focus-ring: #5e98fe;
+}
