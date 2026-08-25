@@ -1,11 +1,14 @@
 package com.bibbidi.wedding.auth.controller;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
+import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
+import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
@@ -46,6 +50,8 @@ class AuthControllerIntegrationTest {
 
     private static final String NICKNAME = "bibbidi";
     private static final String PASSWORD = "wish";
+    private static final String DOCUMENTED_SESSION_COOKIE =
+            "JSESSIONID=<session-id>; Path=/; Secure; HttpOnly; SameSite=Lax";
 
     @Autowired
     private WebApplicationContext context;
@@ -83,10 +89,15 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.sessionId").doesNotExist())
                 .andDo(document(
                         "auth-login",
+                        preprocessResponse(modifyHeaders().set(
+                                HttpHeaders.SET_COOKIE,
+                                DOCUMENTED_SESSION_COOKIE
+                        )),
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Authentication")
                                 .summary("로그인")
-                                .description("닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다.")
+                                .description("닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다. "
+                                        + "성공 시 JSESSIONID Session Cookie를 발급합니다.")
                                 .requestSchema(schema("LoginRequest"))
                                 .responseSchema(schema("LoginResponse"))
                                 .requestFields(
@@ -96,6 +107,11 @@ class AuthControllerIntegrationTest {
                                 .responseFields(
                                         fieldWithPath("userId").description("로그인한 사용자 ID"),
                                         fieldWithPath("nickname").description("로그인한 사용자 닉네임")
+                                )
+                                .responseHeaders(
+                                        headerWithName(HttpHeaders.SET_COOKIE)
+                                                .description("인증에 사용할 JSESSIONID Session Cookie "
+                                                        + "(Path=/; Secure; HttpOnly; SameSite=Lax)")
                                 )
                                 .build())
                 ))
@@ -236,7 +252,11 @@ class AuthControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Authentication")
                                 .summary("로그아웃")
-                                .description("현재 인증 세션을 무효화합니다.")
+                                .description("현재 인증 세션을 무효화하고 JSESSIONID Cookie를 만료시킵니다.")
+                                .responseHeaders(
+                                        headerWithName(HttpHeaders.SET_COOKIE)
+                                                .description("즉시 만료되는 JSESSIONID Session Cookie")
+                                )
                                 .build())
                 ));
 
