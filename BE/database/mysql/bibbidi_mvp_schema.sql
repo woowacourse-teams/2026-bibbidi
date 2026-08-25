@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    id BINARY(16) NOT NULL,
+    id BIGINT NOT NULL AUTO_INCREMENT,
     nickname VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     created_at DATETIME NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE precedences (
 
 CREATE TABLE checklists (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    owner_id BINARY(16) NOT NULL,
+    owner_id BIGINT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
