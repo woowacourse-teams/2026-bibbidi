@@ -1,17 +1,25 @@
 package com.bibbidi.wedding.user.controller;
 
+import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
+import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,20 +27,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.restdocs.RestDocumentationContextProvider;
+import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-@AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-@ExtendWith(OutputCaptureExtension.class)
+@ExtendWith({OutputCaptureExtension.class, RestDocumentationExtension.class})
 class UserControllerIntegrationTest {
 
     @Autowired
+    private WebApplicationContext context;
+
     private MockMvc mockMvc;
 
     @Autowired
@@ -40,6 +51,13 @@ class UserControllerIntegrationTest {
 
     @Autowired
     private PasswordHasher passwordHasher;
+
+    @BeforeEach
+    void setUp(RestDocumentationContextProvider restDocumentation) {
+        mockMvc = webAppContextSetup(context)
+                .apply(documentationConfiguration(restDocumentation))
+                .build();
+    }
 
     @Test
     @DisplayName("유효한 가입 요청이면 사용자를 생성한다")
@@ -57,7 +75,25 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.nickname").value("bibbidi"))
                 .andExpect(jsonPath("$.checklistId").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
+                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
+                .andDo(document(
+                        "users-create",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("회원가입")
+                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .requestSchema(schema("CreateUserRequest"))
+                                .responseSchema(schema("CreateUserResponse"))
+                                .requestFields(
+                                        fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
+                                        fieldWithPath("password").description("사용자 비밀번호")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("생성된 사용자 ID"),
+                                        fieldWithPath("nickname").description("사용자 닉네임")
+                                )
+                                .build())
+                ));
 
         User user = userRepository.findByNickname("bibbidi").orElseThrow();
 
