@@ -1,20 +1,30 @@
-import { FormEvent } from "react";
+import { SubmitEvent } from "react";
 
-import { SignupValues } from "../model/signup";
+import { SignupResult } from "../model/signup";
 import { useSignupForm } from "../view-model/useSignupForm";
 import "./SignupForm.css";
 
 interface SignupFormProps {
-  onValidSubmit?: (values: SignupValues) => void;
+  onSuccess?: (result: SignupResult) => void;
 }
 
-export function SignupForm({ onValidSubmit }: SignupFormProps) {
-  const { errors, setFieldValue, submit, validateFieldOnBlur, values } =
-    useSignupForm({ onValidSubmit });
+export function SignupForm({ onSuccess }: SignupFormProps) {
+  const {
+    errors,
+    formError,
+    isSubmitting,
+    isSuccess,
+    setFieldValue,
+    submit,
+    validateFieldOnBlur,
+    values,
+  } = useSignupForm({ onSuccess });
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const isFormDisabled = isSubmitting || isSuccess;
+
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    submit();
+    void submit();
   };
 
   return (
@@ -31,6 +41,7 @@ export function SignupForm({ onValidSubmit }: SignupFormProps) {
             aria-invalid={Boolean(errors.nickname)}
             autoComplete="username"
             className="signup-form__input"
+            disabled={isFormDisabled}
             id="nickname"
             name="nickname"
             onBlur={() => validateFieldOnBlur("nickname")}
@@ -55,6 +66,7 @@ export function SignupForm({ onValidSubmit }: SignupFormProps) {
             aria-invalid={Boolean(errors.password)}
             autoComplete="new-password"
             className="signup-form__input"
+            disabled={isFormDisabled}
             id="password"
             name="password"
             onBlur={() => validateFieldOnBlur("password")}
@@ -81,6 +93,7 @@ export function SignupForm({ onValidSubmit }: SignupFormProps) {
             aria-invalid={Boolean(errors.passwordConfirm)}
             autoComplete="new-password"
             className="signup-form__input"
+            disabled={isFormDisabled}
             id="passwordConfirm"
             name="passwordConfirm"
             onBlur={() => validateFieldOnBlur("passwordConfirm")}
@@ -103,12 +116,25 @@ export function SignupForm({ onValidSubmit }: SignupFormProps) {
         </div>
       </div>
 
-      <button className="signup-form__submit" type="submit">
-        회원가입
-      </button>
+      <div className="signup-form__submit-area">
+        <button
+          aria-busy={isSubmitting}
+          className="signup-form__submit"
+          disabled={isFormDisabled}
+          type="submit"
+        >
+          {isSubmitting ? "가입 중..." : isSuccess ? "가입 완료" : "회원가입"}
+        </button>
+        {formError && (
+          <p className="signup-form__form-error" role="alert">
+            {formError}
+          </p>
+        )}
+      </div>
 
-      <p className="signup-form__login-prompt">
-        이미 계정이 있나요? <a href="/login">로그인</a>
+      <p aria-live="polite" className="signup-form__login-prompt">
+        {isSuccess ? "회원가입이 완료되었습니다. " : "이미 계정이 있나요? "}
+        <a href="/login">로그인</a>
       </p>
     </form>
   );

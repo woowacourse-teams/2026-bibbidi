@@ -26,6 +26,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "css-loader": "^7.1.4",
+    "dotenv": "^17.4.2",
     "eslint": "^10.9.0",
     "eslint-plugin-jsx-a11y-x": "^0.2.0",
     "eslint-plugin-react-hooks": "^7.1.1",

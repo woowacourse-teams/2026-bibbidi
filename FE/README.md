@@ -38,6 +38,22 @@ pnpm dev
 
 기본 주소는 `http://localhost:3000`입니다.
 
+## API 연결
+
+로컬 API 주소는 `FE/.env`에서 관리합니다. `.env`는 Git에 포함하지 않습니다.
+
+```dotenv
+BIBBIDI_API_BASE_URL=
+BIBBIDI_API_PROXY_TARGET=http://localhost:8080
+```
+
+개발 서버는 `/api` 요청을 `BIBBIDI_API_PROXY_TARGET`으로 전달합니다.
+해당 값이 없으면 설정 누락 오류와 함께 개발 서버 실행을 중단합니다.
+production에서 FE와 BE의 도메인이 다르면 `BIBBIDI_API_BASE_URL`에 API 기준 주소를 지정합니다.
+값을 지정하지 않으면 현재 웹과 같은 도메인으로 `/api` 요청을 전송합니다.
+
+CI와 배포 환경에서 직접 전달한 환경변수는 `.env`보다 우선합니다.
+
 ## 명령어
 
 | 명령어 | 설명 |

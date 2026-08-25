@@ -3,6 +3,11 @@ export interface SignupValues {
   password: string;
 }
 
+export interface SignupResult {
+  id: number;
+  nickname: string;
+}
+
 export interface SignupFormValues extends SignupValues {
   passwordConfirm: string;
 }

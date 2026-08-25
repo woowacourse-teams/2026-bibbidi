@@ -65,6 +65,11 @@
   border-color: var(--color-stroke-critical-solid);
 }
 
+.signup-form__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .signup-form__error {
   position: absolute;
   top: calc(100% + 1px);
@@ -74,6 +79,11 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 16px;
+}
+
+.signup-form__submit-area {
+  position: relative;
+  margin-bottom: 16px;
 }
 
 .signup-form__submit {
@@ -90,14 +100,19 @@
   transition: background-color 120ms ease;
 }
 
+.signup-form__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .signup-form__submit:hover {
+  .signup-form__submit:not(:disabled):hover {
     background: var(--color-bg-brand-solid-pressed);
   }
 }
 
 @media not all and (hover: hover) and (pointer: fine) {
-  .signup-form__submit:active {
+  .signup-form__submit:not(:disabled):active {
     background: var(--color-bg-brand-solid-pressed);
   }
 }
@@ -105,6 +120,18 @@
 .signup-form__submit:focus-visible {
   outline: 3px solid var(--color-stroke-focus-ring);
   outline-offset: 3px;
+}
+
+.signup-form__form-error {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  margin: 0;
+  color: var(--color-fg-critical);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
 }
 
 .signup-form__login-prompt {
