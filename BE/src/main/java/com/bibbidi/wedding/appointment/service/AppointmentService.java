@@ -29,16 +29,6 @@ public class AppointmentService {
                 request.endTime()
         );
         Appointment saved = appointmentRepository.save(appointment);
-        return new AppointmentCreationResult(
-                saved.id(),
-                saved.checklistItemId(),
-                saved.title(),
-                saved.date(),
-                saved.startTime(),
-                saved.endTime(),
-                saved.place(),
-                saved.memo(),
-                saved.isDone()
-        );
+        return AppointmentCreationResult.fromDomain(saved);
     }
 }

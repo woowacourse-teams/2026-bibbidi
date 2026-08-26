@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.appointment.repository;
 
 import com.bibbidi.wedding.appointment.domain.Appointment;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import org.springframework.stereotype.Repository;
 
@@ -19,8 +20,8 @@ public class AppointmentRepository {
     }
 
     public Appointment save(Appointment appointment) {
-        return appointmentMapper.toDomain(
-                jpaAppointmentRepository.save(appointmentMapper.toEntity(appointment))
-        );
+        JpaAppointmentEntity entity = appointmentMapper.toEntity(appointment);
+        JpaAppointmentEntity result = jpaAppointmentRepository.save(entity);
+        return appointmentMapper.toDomain(result);
     }
 }
