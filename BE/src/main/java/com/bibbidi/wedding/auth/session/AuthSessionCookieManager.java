@@ -2,7 +2,6 @@ package com.bibbidi.wedding.auth.session;
 
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
-import java.util.Objects;
 import org.springframework.boot.web.server.Cookie;
 import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.http.HttpHeaders;
@@ -19,14 +18,8 @@ public class AuthSessionCookieManager {
     public AuthSessionCookieManager(ServerProperties serverProperties) {
         Cookie cookie = serverProperties.getServlet().getSession().getCookie();
 
-        this.cookieName = Objects.requireNonNull(
-                cookie.getName(),
-                "Session Cookie 이름을 설정해야 합니다."
-        );
-        this.cookiePath = Objects.requireNonNull(
-                cookie.getPath(),
-                "Session Cookie 경로를 설정해야 합니다."
-        );
+        this.cookieName = cookie.getName();
+        this.cookiePath = cookie.getPath();
         this.cookieSecure = Boolean.TRUE.equals(cookie.getSecure());
     }
 
