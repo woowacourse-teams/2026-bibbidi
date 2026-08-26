@@ -9,12 +9,14 @@ import com.bibbidi.wedding.auth.config.AuthWebConfig;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
+import com.bibbidi.wedding.catalog.domain.Catalog;
+import com.bibbidi.wedding.catalog.domain.Category;
+import com.bibbidi.wedding.catalog.domain.Item;
+import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogQueryResult;
-import com.bibbidi.wedding.catalog.service.dto.CategoryResult;
-import com.bibbidi.wedding.catalog.service.dto.ItemResult;
-import com.bibbidi.wedding.catalog.service.dto.StepResult;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,9 +39,10 @@ class CatalogControllerTest {
     private CatalogService catalogService;
 
     private static CatalogQueryResult constructTestResult() {
-        ItemResult item = new ItemResult(100L, "계약서 확인", 1, true, true);
-        StepResult step = new StepResult(10L, "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1, List.of(item));
-        return new CatalogQueryResult(List.of(new CategoryResult(1L, "웨딩홀", 1, List.of(step))));
+        Item item = new Item(100L, "계약서 확인", 1, true);
+        Step step = new Step(10L, "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1, List.of(item));
+        Catalog catalog = new Catalog(List.of(new Category(1L, "웨딩홀", 1, List.of(step))));
+        return new CatalogQueryResult(catalog, Set.of(item.id()));
     }
 
     private static MockHttpSession authenticatedSession() {

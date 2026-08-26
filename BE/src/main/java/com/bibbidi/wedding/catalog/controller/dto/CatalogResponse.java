@@ -6,8 +6,11 @@ import java.util.List;
 public record CatalogResponse(List<CategoryResponse> categories) {
 
     public static CatalogResponse from(CatalogQueryResult result) {
-        return new CatalogResponse(result.categories().stream()
-                .map(CategoryResponse::from)
+        return new CatalogResponse(result.catalog().categories().stream()
+                .map(category -> CategoryResponse.fromDomain(
+                        category,
+                        result.includedCatalogItemIds()
+                ))
                 .toList());
     }
 }

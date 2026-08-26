@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.catalog.controller.dto;
 
-import com.bibbidi.wedding.catalog.service.dto.ItemResult;
+import com.bibbidi.wedding.catalog.domain.Item;
+import java.util.Set;
 
 public record ItemResponse(
         Long id,
@@ -10,13 +11,13 @@ public record ItemResponse(
         boolean included
 ) {
 
-    public static ItemResponse from(ItemResult item) {
+    public static ItemResponse fromDomain(Item item, Set<Long> includedCatalogItemIds) {
         return new ItemResponse(
                 item.id(),
                 item.title(),
                 item.displayOrder(),
                 item.essential(),
-                item.included()
+                includedCatalogItemIds.contains(item.id())
         );
     }
 }

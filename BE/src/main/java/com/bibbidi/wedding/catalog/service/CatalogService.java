@@ -25,8 +25,8 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public CatalogQueryResult find(Long userId) {
         Catalog catalog = catalogRepository.findCatalog();
-        Set<Long> includedItemIds = catalogItemInclusionRepository.findIncludedItemIds(userId);
+        Set<Long> includedCatalogItemIds = catalogItemInclusionRepository.findIncludedItemIds(userId);
 
-        return CatalogQueryResult.fromDomain(catalog, includedItemIds);
+        return new CatalogQueryResult(catalog, includedCatalogItemIds);
     }
 }

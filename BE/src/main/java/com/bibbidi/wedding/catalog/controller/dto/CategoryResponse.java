@@ -1,7 +1,8 @@
 package com.bibbidi.wedding.catalog.controller.dto;
 
-import com.bibbidi.wedding.catalog.service.dto.CategoryResult;
+import com.bibbidi.wedding.catalog.domain.Category;
 import java.util.List;
+import java.util.Set;
 
 public record CategoryResponse(
         Long id,
@@ -10,13 +11,13 @@ public record CategoryResponse(
         List<StepResponse> steps
 ) {
 
-    public static CategoryResponse from(CategoryResult category) {
+    public static CategoryResponse fromDomain(Category category, Set<Long> includedCatalogItemIds) {
         return new CategoryResponse(
                 category.id(),
                 category.name(),
                 category.displayOrder(),
                 category.steps().stream()
-                        .map(StepResponse::from)
+                        .map(step -> StepResponse.fromDomain(step, includedCatalogItemIds))
                         .toList()
         );
     }

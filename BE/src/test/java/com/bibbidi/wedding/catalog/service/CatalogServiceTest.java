@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,7 +11,6 @@ import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.repository.CatalogItemInclusionRepository;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogQueryResult;
-import com.bibbidi.wedding.catalog.service.dto.ItemResult;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -38,10 +36,11 @@ class CatalogServiceTest {
     }
 
     @Test
-    @DisplayName("준비 목록에 사용자의 체크리스트 포함 여부를 함께 표시한다")
-    void shouldMarkWhetherItemIsIncludedInUserChecklist() {
+    @DisplayName("준비 목록과 사용자의 체크리스트에 포함된 카탈로그 항목 ID를 조회한다")
+    void shouldFindCatalogAndIncludedCatalogItemIds() {
         // given
-        when(catalogRepository.findCatalog()).thenReturn(constructTestCatalog());
+        Catalog catalog = constructTestCatalog();
+        when(catalogRepository.findCatalog()).thenReturn(catalog);
         when(catalogItemInclusionRepository.findIncludedItemIds(USER_ID))
                 .thenReturn(Set.of(INCLUDED_ITEM_ID));
 
@@ -49,11 +48,7 @@ class CatalogServiceTest {
         CatalogQueryResult result = catalogService.find(USER_ID);
 
         // then
-        assertThat(result.categories().getFirst().steps().getFirst().items())
-                .extracting(ItemResult::id, ItemResult::included)
-                .containsExactly(
-                        tuple(INCLUDED_ITEM_ID, true),
-                        tuple(EXCLUDED_ITEM_ID, false)
-                );
+        assertThat(result.catalog()).isSameAs(catalog);
+        assertThat(result.includedCatalogItemIds()).containsExactly(INCLUDED_ITEM_ID);
     }
 }

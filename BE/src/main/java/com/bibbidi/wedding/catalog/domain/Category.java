@@ -3,15 +3,34 @@ package com.bibbidi.wedding.catalog.domain;
 import java.util.Comparator;
 import java.util.List;
 
-public record Category(
-        Long id,
-        String name,
-        int displayOrder,
-        List<Step> steps
-) {
+public final class Category {
 
-    public Category {
-        steps = sortByDisplayOrder(steps);
+    private final Long id;
+    private final String name;
+    private final int displayOrder;
+    private final List<Step> steps;
+
+    public Category(Long id, String name, int displayOrder, List<Step> steps) {
+        this.id = id;
+        this.name = name;
+        this.displayOrder = displayOrder;
+        this.steps = sortByDisplayOrder(steps);
+    }
+
+    public Long id() {
+        return id;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public int displayOrder() {
+        return displayOrder;
+    }
+
+    public List<Step> steps() {
+        return steps;
     }
 
     private static List<Step> sortByDisplayOrder(List<Step> steps) {
