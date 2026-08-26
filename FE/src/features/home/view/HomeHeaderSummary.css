@@ -1,0 +1,61 @@
+.home-header-summary,
+.home-header-summary__d-day,
+.home-header-summary__progress {
+  display: flex;
+  align-items: center;
+}
+
+.home-header-summary {
+  width: 360px;
+  max-width: 100%;
+  height: 48px;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.home-header-summary__d-day,
+.home-header-summary__progress {
+  gap: 8px;
+}
+
+.home-header-summary strong {
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-header-summary__d-day strong {
+  color: var(--color-fg-brand);
+}
+
+.home-header-summary time,
+.home-header-summary__progress > span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.home-header-summary__separator {
+  width: 1px;
+  height: 24px;
+  flex: none;
+  background: var(--color-stroke-neutral-weak);
+}
+
+.home-header-summary__progress-ring {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.home-header-summary__progress-ring circle {
+  fill: none;
+  stroke: var(--color-stroke-neutral-weak);
+  stroke-width: 4;
+}
+
+.home-header-summary__progress-ring .home-header-summary__progress-range {
+  stroke: var(--color-bg-brand-solid);
+}

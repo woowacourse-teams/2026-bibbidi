@@ -4,9 +4,10 @@ import "./AppHeader.css";
 
 interface AppHeaderProps {
   homeLink: ReactNode;
+  summary: ReactNode;
 }
 
-export function AppHeader({ homeLink }: AppHeaderProps) {
+export function AppHeader({ homeLink, summary }: AppHeaderProps) {
   return (
     <header className="app-header">
       <div className="app-header__inner">
@@ -23,9 +24,12 @@ export function AppHeader({ homeLink }: AppHeaderProps) {
           </nav>
         </div>
 
-        <span aria-label="현재 사용자 나" className="app-header__user">
-          나
-        </span>
+        <div className="app-header__right">
+          <div className="app-header__summary">{summary}</div>
+          <span aria-label="현재 사용자 나" className="app-header__user">
+            나
+          </span>
+        </div>
       </div>
     </header>
   );

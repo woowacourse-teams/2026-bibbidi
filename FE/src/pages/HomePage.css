@@ -1,19 +1,20 @@
 .home-page {
+  display: flex;
   min-width: 320px;
   min-height: 100vh;
+  flex-direction: column;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
 }
 
 .home-page__content {
   width: min(calc(100% - 48px), 1440px);
-  min-height: calc(100vh - 96px);
+  flex: 1;
   margin: 0 auto;
 }
 
 @media (max-width: 760px) {
   .home-page__content {
     width: min(calc(100% - 32px), 1440px);
-    min-height: calc(100vh - 72px);
   }
 }
