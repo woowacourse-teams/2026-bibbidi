@@ -105,10 +105,10 @@ class CatalogControllerIntegrationTest {
                 null, firstCategory.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1
         ));
         JpaCatalogItemEntity includedCatalogItem = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
-                null, firstStep.id(), "계약서 확인", null, 2, true
+                null, firstStep.id(), "계약서 확인", 2, true
         ));
         JpaCatalogItemEntity excludedCatalogItem = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
-                null, firstStep.id(), "견적 비교", null, 1, false
+                null, firstStep.id(), "견적 비교", 1, false
         ));
         JpaChecklistEntity checklist = jpaChecklistRepository.save(new JpaChecklistEntity(null, USER_ID));
         jpaChecklistItemRepository.save(new JpaChecklistItemEntity(

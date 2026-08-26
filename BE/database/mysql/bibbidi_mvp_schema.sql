@@ -25,7 +25,8 @@ CREATE TABLE categories (
     display_order INT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE (display_order)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
@@ -34,12 +35,12 @@ CREATE TABLE steps (
     id BIGINT NOT NULL AUTO_INCREMENT,
     category_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
-    description TEXT,
+    description VARCHAR(500),
     display_order INT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    INDEX idx_steps_category_id (category_id)
+    UNIQUE (category_id, display_order)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
@@ -48,13 +49,12 @@ CREATE TABLE catalog_items (
     id BIGINT NOT NULL AUTO_INCREMENT,
     step_id BIGINT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    description TEXT,
     display_order INT NOT NULL,
     essential BOOLEAN NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    INDEX idx_catalog_items_step_id (step_id)
+    UNIQUE (step_id, display_order)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
@@ -66,7 +66,8 @@ CREATE TABLE precedences (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE (item_id, preceding_item_id)
+    UNIQUE (item_id, preceding_item_id),
+    CONSTRAINT ck_precedences_not_self CHECK (item_id <> preceding_item_id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;

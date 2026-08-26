@@ -26,8 +26,8 @@ class CatalogMapperTest {
                 new JpaStepEntity(10L, 1L, "계약", "계약 단계", 1)
         );
         List<JpaCatalogItemEntity> itemEntities = List.of(
-                new JpaCatalogItemEntity(101L, 10L, "계약서 확인", null, 1, true),
-                new JpaCatalogItemEntity(102L, 10L, "계약금 납부", null, 2, true)
+                new JpaCatalogItemEntity(101L, 10L, "계약서 확인", 1, true),
+                new JpaCatalogItemEntity(102L, 10L, "계약금 납부", 2, true)
         );
 
         // when

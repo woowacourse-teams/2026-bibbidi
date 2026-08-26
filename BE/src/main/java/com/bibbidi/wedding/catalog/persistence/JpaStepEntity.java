@@ -23,7 +23,7 @@ public class JpaStepEntity extends BaseTimeEntity {
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description", length = 500)
     private String description;
 
     @Column(name = "display_order", nullable = false)

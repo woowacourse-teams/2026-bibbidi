@@ -23,9 +23,6 @@ public class JpaCatalogItemEntity extends BaseTimeEntity {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
-
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
@@ -39,14 +36,12 @@ public class JpaCatalogItemEntity extends BaseTimeEntity {
             Long id,
             Long stepId,
             String title,
-            String description,
             int displayOrder,
             boolean essential
     ) {
         this.id = id;
         this.stepId = stepId;
         this.title = title;
-        this.description = description;
         this.displayOrder = displayOrder;
         this.essential = essential;
     }
@@ -61,10 +56,6 @@ public class JpaCatalogItemEntity extends BaseTimeEntity {
 
     public String title() {
         return title;
-    }
-
-    public String description() {
-        return description;
     }
 
     public int displayOrder() {
