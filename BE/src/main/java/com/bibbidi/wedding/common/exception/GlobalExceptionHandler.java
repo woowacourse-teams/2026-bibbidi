@@ -59,7 +59,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
             case AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED;
             case AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
-            case CHECKLIST_ITEM_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case DUPLICATE_NICKNAME -> HttpStatus.CONFLICT;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
