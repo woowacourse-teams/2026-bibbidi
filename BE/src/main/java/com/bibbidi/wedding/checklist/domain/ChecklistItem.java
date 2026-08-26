@@ -1,7 +1,5 @@
 package com.bibbidi.wedding.checklist.domain;
 
-import java.util.Objects;
-
 public final class ChecklistItem {
 
     private final Long id;
@@ -20,9 +18,9 @@ public final class ChecklistItem {
             boolean done
     ) {
         this.id = id;
-        this.checklistId = Objects.requireNonNull(checklistId);
-        this.categoryId = Objects.requireNonNull(categoryId);
-        this.title = Objects.requireNonNull(title);
+        this.checklistId = checklistId;
+        this.categoryId = categoryId;
+        this.title = title;
         this.sourceCatalogItemId = sourceCatalogItemId;
         this.done = done;
     }
@@ -33,7 +31,7 @@ public final class ChecklistItem {
                 checklistId,
                 catalogItem.categoryId(),
                 catalogItem.title(),
-                Objects.requireNonNull(catalogItem.id()),
+                catalogItem.id(),
                 false
         );
     }
@@ -46,14 +44,7 @@ public final class ChecklistItem {
             Long sourceCatalogItemId,
             boolean done
     ) {
-        return new ChecklistItem(
-                Objects.requireNonNull(id),
-                checklistId,
-                categoryId,
-                title,
-                sourceCatalogItemId,
-                done
-        );
+        return new ChecklistItem(id, checklistId, categoryId, title, sourceCatalogItemId, done);
     }
 
     public void complete() {
