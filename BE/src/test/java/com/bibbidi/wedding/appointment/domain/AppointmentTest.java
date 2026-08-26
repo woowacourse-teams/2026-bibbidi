@@ -20,11 +20,11 @@ class AppointmentTest {
                 CHECKLIST_ITEM_ID,
                 "Consultation",
                 DATE,
+                START,
+                END,
                 "Wedding hall",
                 "Preparation",
-                isDone,
-                START,
-                END
+                isDone
         );
     }
 

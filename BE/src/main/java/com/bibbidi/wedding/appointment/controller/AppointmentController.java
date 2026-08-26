@@ -2,8 +2,9 @@ package com.bibbidi.wedding.appointment.controller;
 
 import com.bibbidi.wedding.appointment.controller.dto.AppointmentResponse;
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
-import com.bibbidi.wedding.appointment.service.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.AppointmentService;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.auth.session.Auth;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,8 @@ public class AppointmentController {
             @PathVariable Long itemId,
             @Valid @RequestBody CreateAppointmentRequest request
     ) {
-        AppointmentCreationResult result = appointmentService.create(itemId, request);
+        AppointmentCreationCommand command = AppointmentCreationCommand.fromRequest(itemId, request);
+        AppointmentCreationResult result = appointmentService.create(command);
         return AppointmentResponse.from(result);
     }
 }

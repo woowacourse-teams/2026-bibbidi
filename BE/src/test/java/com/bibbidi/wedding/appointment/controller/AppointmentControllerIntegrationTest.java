@@ -28,12 +28,14 @@ import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 @ExtendWith(RestDocumentationExtension.class)
 class AppointmentControllerIntegrationTest {
 

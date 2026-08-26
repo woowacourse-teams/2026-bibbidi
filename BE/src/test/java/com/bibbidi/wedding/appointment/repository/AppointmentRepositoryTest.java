@@ -34,11 +34,11 @@ class AppointmentRepositoryTest {
                 1L,
                 "웨딩홀 상담",
                 LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0),
+                LocalDateTime.of(2026, 9, 1, 11, 0),
                 "웨딩홀",
                 "상담 준비",
-                false,
-                LocalDateTime.of(2026, 9, 1, 10, 0),
-                LocalDateTime.of(2026, 9, 1, 11, 0)
+                false
         );
 
         // when

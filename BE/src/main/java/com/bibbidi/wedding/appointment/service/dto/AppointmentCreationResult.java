@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.appointment.service;
+package com.bibbidi.wedding.appointment.service.dto;
 
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import java.time.LocalDate;

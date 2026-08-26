@@ -2,9 +2,14 @@ package com.bibbidi.wedding.appointment.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.service.AppointmentService;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.auth.config.AuthWebConfig;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.AuthSession;
@@ -20,6 +25,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(AppointmentController.class)
@@ -37,6 +43,36 @@ class AppointmentControllerTest {
 
     @MockitoBean
     private AppointmentService appointmentService;
+
+    @Test
+    @DisplayName("컨트롤러 요청을 서비스 계층 전용 명령으로 변환한다")
+    void shouldConvertRequestToAppointmentCreationCommand() throws Exception {
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                "상담", LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0),
+                LocalDateTime.of(2026, 9, 1, 11, 0),
+                "상담실", "상담 준비"
+        );
+        AppointmentCreationResult result = new AppointmentCreationResult(
+                1L, 1L, "상담", LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0),
+                LocalDateTime.of(2026, 9, 1, 11, 0),
+                "상담실", "상담 준비", false
+        );
+        when(appointmentService.create(any(AppointmentCreationCommand.class))).thenReturn(result);
+
+        mockMvc.perform(post("/api/checklist-items/1/appointments")
+                .session(authenticatedSession())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(convertToStringValue(request))
+        ).andExpect(status().isCreated());
+
+        ArgumentCaptor<AppointmentCreationCommand> captor = ArgumentCaptor.forClass(AppointmentCreationCommand.class);
+        verify(appointmentService).create(captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue()).isEqualTo(new AppointmentCreationCommand(
+                1L, request.title(), request.date(), request.startTime(), request.endTime(), request.place(), request.memo()
+        ));
+    }
 
     @Test
     @DisplayName("제목이 비어 있으면 일정 생성 요청을 거부한다")

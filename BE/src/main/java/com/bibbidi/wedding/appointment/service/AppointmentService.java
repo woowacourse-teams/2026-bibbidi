@@ -1,8 +1,9 @@
 package com.bibbidi.wedding.appointment.service;
 
-import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,17 +17,17 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentCreationResult create(Long itemId, CreateAppointmentRequest request) {
+    public AppointmentCreationResult create(AppointmentCreationCommand command) {
         Appointment appointment = new Appointment(
                 null,
-                itemId,
-                request.title(),
-                request.date(),
-                request.place(),
-                request.memo(),
-                false,
-                request.startTime(),
-                request.endTime()
+                command.itemId(),
+                command.title(),
+                command.date(),
+                command.startTime(),
+                command.endTime(),
+                command.place(),
+                command.memo(),
+                false
         );
         Appointment saved = appointmentRepository.save(appointment);
         return AppointmentCreationResult.fromDomain(saved);

@@ -71,7 +71,7 @@ CREATE TABLE checklist_items (
     category_id BIGINT NOT NULL,
     source_catalog_item_id BIGINT,
     title VARCHAR(255) NOT NULL,
-    is_done BOOLEAN NOT NULL,
+    status VARCHAR(20) NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),

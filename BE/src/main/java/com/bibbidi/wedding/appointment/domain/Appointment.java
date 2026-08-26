@@ -11,67 +11,63 @@ public final class Appointment {
     private final Long checklistItemId;
     private final String title;
     private final LocalDate date;
+    private final LocalDateTime startTime;
+    private final LocalDateTime endTime;
     private final String place;
     private final String memo;
     private final boolean isDone;
-    private final LocalDateTime startTime;
-    private final LocalDateTime endTime;
 
     public Appointment(
             @Nullable Long id,
             @NonNull Long checklistItemId,
             @NonNull String title,
             @NonNull LocalDate date,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
             String place,
             String memo,
-            boolean isDone,
-            LocalDateTime startTime,
-            LocalDateTime endTime
+            boolean isDone
     ) {
         this.id = id;
         this.checklistItemId = checklistItemId;
         this.title = title;
         this.date = date;
+        this.startTime = startTime;
+        this.endTime = endTime;
         this.place = place;
         this.memo = memo;
         this.isDone = isDone;
-        this.startTime = startTime;
-        this.endTime = endTime;
     }
 
     private Appointment update(
             Long checklistItemId,
             String title,
             LocalDate date,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
             String place,
             String memo,
-            boolean isDone,
-            LocalDateTime startTime,
-            LocalDateTime endTime
+            boolean isDone
     ) {
         return new Appointment(
                 id,
                 checklistItemId,
                 title,
                 date,
+                startTime,
+                endTime,
                 place,
                 memo,
-                isDone,
-                startTime,
-                endTime
+                isDone
         );
     }
 
     public Appointment complete() {
-        return update(checklistItemId, title, date, place, memo, true, startTime, endTime);
+        return update(checklistItemId, title, date, startTime, endTime, place, memo, true);
     }
 
     public Appointment reopen() {
-        return update(checklistItemId, title, date, place, memo, false, startTime, endTime);
-    }
-
-    public boolean isFinished() {
-        return isDone;
+        return update(checklistItemId, title, date, startTime, endTime, place, memo, false);
     }
 
     public Long id() {

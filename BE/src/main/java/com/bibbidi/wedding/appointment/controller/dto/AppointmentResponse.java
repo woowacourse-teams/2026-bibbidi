@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.appointment.controller.dto;
 
-import com.bibbidi.wedding.appointment.service.AppointmentCreationResult;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -9,11 +9,11 @@ public record AppointmentResponse(
         Long checklistItemId,
         String title,
         LocalDate date,
+        LocalDateTime startTime,
+        LocalDateTime endTime,
         String place,
         String memo,
-        boolean isDone,
-        LocalDateTime startTime,
-        LocalDateTime endTime
+        boolean isDone
 ) {
 
     public static AppointmentResponse from(AppointmentCreationResult appointment) {
@@ -22,11 +22,11 @@ public record AppointmentResponse(
                 appointment.checklistItemId(),
                 appointment.title(),
                 appointment.date(),
+                appointment.startTime(),
+                appointment.endTime(),
                 appointment.place(),
                 appointment.memo(),
-                appointment.isDone(),
-                appointment.startTime(),
-                appointment.endTime()
+                appointment.isDone()
         );
     }
 }

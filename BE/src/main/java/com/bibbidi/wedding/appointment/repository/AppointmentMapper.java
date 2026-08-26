@@ -28,11 +28,11 @@ public class AppointmentMapper {
                 entity.checklistItemId(),
                 entity.title(),
                 entity.date(),
+                entity.startTime(),
+                entity.endTime(),
                 entity.place(),
                 entity.memo(),
-                entity.isDone(),
-                entity.startTime(),
-                entity.endTime()
+                entity.isDone()
         );
     }
 }
