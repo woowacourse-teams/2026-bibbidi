@@ -1,4 +1,4 @@
-import { SubmitEvent, useEffect, useRef } from "react";
+import { ReactNode, SubmitEvent, useEffect, useRef } from "react";
 
 import { LoginResult } from "../model/login";
 import { useLoginForm } from "../view-model/useLoginForm";
@@ -8,9 +8,10 @@ const LOGIN_FORM_ERROR_ID = "login-form-error";
 
 interface LoginFormProps {
   onSuccess?: (result: LoginResult) => void;
+  signupLink: ReactNode;
 }
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
   const {
     formError,
     formErrorRevision,
@@ -96,9 +97,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         )}
       </div>
 
-      <p className="login-form__signup-prompt">
-        계정이 없나요? <a href="/">회원가입</a>
-      </p>
+      <p className="login-form__signup-prompt">계정이 없나요? {signupLink}</p>
     </form>
   );
 }

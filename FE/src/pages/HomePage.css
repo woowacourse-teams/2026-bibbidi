@@ -1,0 +1,19 @@
+.home-page {
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--color-bg-layer-basement);
+  color: var(--color-fg-neutral);
+}
+
+.home-page__content {
+  width: min(calc(100% - 48px), 1440px);
+  min-height: calc(100vh - 96px);
+  margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .home-page__content {
+    width: min(calc(100% - 32px), 1440px);
+    min-height: calc(100vh - 72px);
+  }
+}

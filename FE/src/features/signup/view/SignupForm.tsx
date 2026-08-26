@@ -1,14 +1,15 @@
-import { SubmitEvent } from "react";
+import { ReactNode, SubmitEvent } from "react";
 
 import { SignupResult } from "../model/signup";
 import { useSignupForm } from "../view-model/useSignupForm";
 import "./SignupForm.css";
 
 interface SignupFormProps {
+  loginLink: ReactNode;
   onSuccess?: (result: SignupResult) => void;
 }
 
-export function SignupForm({ onSuccess }: SignupFormProps) {
+export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
   const {
     errors,
     formError,
@@ -134,7 +135,7 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
 
       <p aria-live="polite" className="signup-form__login-prompt">
         {isSuccess ? "회원가입이 완료되었습니다. " : "이미 계정이 있나요? "}
-        <a href="/login">로그인</a>
+        {loginLink}
       </p>
     </form>
   );
