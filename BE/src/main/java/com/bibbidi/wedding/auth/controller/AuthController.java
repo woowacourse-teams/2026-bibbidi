@@ -2,10 +2,10 @@ package com.bibbidi.wedding.auth.controller;
 
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
-import com.bibbidi.wedding.auth.service.AuthResult;
-import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.AuthSessionCookieManager;
+import com.bibbidi.wedding.user.authentication.AuthenticatedUser;
+import com.bibbidi.wedding.user.authentication.UserAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -19,11 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AuthController {
 
-    private final AuthService authService;
+    private final UserAuthenticationService userAuthenticationService;
     private final AuthSessionCookieManager sessionCookieManager;
 
-    public AuthController(AuthService authService, AuthSessionCookieManager sessionCookieManager) {
-        this.authService = authService;
+    public AuthController(
+            UserAuthenticationService userAuthenticationService,
+            AuthSessionCookieManager sessionCookieManager
+    ) {
+        this.userAuthenticationService = userAuthenticationService;
         this.sessionCookieManager = sessionCookieManager;
     }
 
@@ -32,7 +35,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        AuthResult result = authService.login(request.nickname(), request.password());
+        AuthenticatedUser result = userAuthenticationService.authenticate(request.nickname(), request.password());
         replaceSession(servletRequest, result.userId());
         return ResponseEntity.ok(LoginResponse.from(result));
     }
