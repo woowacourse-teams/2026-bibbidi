@@ -16,7 +16,7 @@ public final class Catalog {
     }
 
     private static List<Category> sortByDisplayOrder(List<Category> categories) {
-        return List.copyOf(categories).stream()
+        return categories.stream()
                 .sorted(Comparator.comparingInt(Category::displayOrder))
                 .toList();
     }
