@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -115,10 +116,10 @@ class UserControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.id").value(102))
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.errorCode").isNumber())
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(jsonPath("$.errors").isArray())
                 .andExpect(jsonPath("$.errors.length()").value(2))
                 .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
@@ -143,8 +144,7 @@ class UserControllerIntegrationTest {
                                         fieldWithPath("password").description("사용자 비밀번호")
                                 )
                                 .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("errorCode").description("오류 코드"),
                                         fieldWithPath("message").description("오류 메시지"),
                                         fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
                                         fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
@@ -155,7 +155,7 @@ class UserControllerIntegrationTest {
 
         assertThat(output)
                 .contains("WARN")
-                .contains("errorId=102")
+                .contains("errorCode=101")
                 .contains("status=400")
                 .doesNotContain("q!3");
     }
@@ -191,8 +191,7 @@ class UserControllerIntegrationTest {
                                         fieldWithPath("password").description("사용자 비밀번호")
                                 )
                                 .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("errorCode").description("오류 코드"),
                                         fieldWithPath("message").description("오류 메시지"),
                                         fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
                                         fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
@@ -224,10 +223,10 @@ class UserControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.id").value(403))
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.errorCode").value(403))
+                .andExpect(jsonPath("$.errorCode").isNumber())
                 .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.title").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
@@ -246,8 +245,7 @@ class UserControllerIntegrationTest {
                                         fieldWithPath("password").description("사용자 비밀번호")
                                 )
                                 .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("errorCode").description("오류 코드"),
                                         fieldWithPath("message").description("오류 메시지")
                                 )
                                 .build())
@@ -255,8 +253,19 @@ class UserControllerIntegrationTest {
 
         assertThat(output)
                 .contains("WARN")
-                .contains("errorId=403")
+                .contains("errorCode=403")
                 .contains("status=409")
                 .contains("message=닉네임 중복으로 회원가입에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("Spring MVC의 4xx 오류에도 공통 오류 응답 형식을 적용한다")
+    void shouldUseCommonErrorResponseWhenHttpMethodIsNotSupported() throws Exception {
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.errors").doesNotExist());
     }
 }

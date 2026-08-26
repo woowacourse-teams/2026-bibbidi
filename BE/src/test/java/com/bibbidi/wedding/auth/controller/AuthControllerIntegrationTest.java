@@ -146,11 +146,11 @@ class AuthControllerIntegrationTest {
                                   "nickname": "unknown",
                                   "password": "unknown-password"
                                 }
-                                """))
+                """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.id").value(202))
-                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.errorCode").value(202))
                 .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
@@ -167,8 +167,7 @@ class AuthControllerIntegrationTest {
                                         fieldWithPath("password").description("사용자 비밀번호")
                                 )
                                 .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("errorCode").description("오류 코드"),
                                         fieldWithPath("message").description("오류 메시지")
                                 )
                                 .build())
@@ -177,9 +176,9 @@ class AuthControllerIntegrationTest {
 
         MvcResult wrongPassword = mockMvc.perform(loginRequest("wrong-password"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.id").value(202))
-                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.errorCode").value(202))
                 .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
@@ -191,7 +190,7 @@ class AuthControllerIntegrationTest {
                 .doesNotContain("wrong-password")
                 .doesNotContain(user.passwordHash());
         assertThat(output)
-                .contains("errorId=202")
+                .contains("errorCode=202")
                 .contains("status=401")
                 .doesNotContain("unknown-password")
                 .doesNotContain("wrong-password")
@@ -210,8 +209,9 @@ class AuthControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.id").value(102))
-                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(jsonPath("$.errors.length()").value(2))
                 .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
                 .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
@@ -228,8 +228,7 @@ class AuthControllerIntegrationTest {
                                         fieldWithPath("password").description("사용자 비밀번호")
                                 )
                                 .responseFields(
-                                        fieldWithPath("id").description("오류 식별자"),
-                                        fieldWithPath("status").description("HTTP 상태 코드"),
+                                        fieldWithPath("errorCode").description("오류 코드"),
                                         fieldWithPath("message").description("오류 메시지"),
                                         fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
                                         fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
