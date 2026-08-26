@@ -1,23 +1,37 @@
 import { SubmitEvent, useEffect, useRef } from "react";
 
+import { LoginResult } from "../model/login";
 import { useLoginForm } from "../view-model/useLoginForm";
 import "./LoginForm.css";
 
 const LOGIN_FORM_ERROR_ID = "login-form-error";
 
-export function LoginForm() {
-  const { formError, setFieldValue, submit, values } = useLoginForm();
+interface LoginFormProps {
+  onSuccess?: (result: LoginResult) => void;
+}
+
+export function LoginForm({ onSuccess }: LoginFormProps) {
+  const {
+    formError,
+    formErrorRevision,
+    isSubmitting,
+    isSuccess,
+    setFieldValue,
+    submit,
+    values,
+  } = useLoginForm({ onSuccess });
   const formErrorRef = useRef<HTMLParagraphElement>(null);
+  const isFormDisabled = isSubmitting || isSuccess;
 
   useEffect(() => {
     if (formError) {
       formErrorRef.current?.focus();
     }
-  }, [formError]);
+  }, [formError, formErrorRevision]);
 
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    submit();
+    void submit();
   };
 
   return (
@@ -32,6 +46,7 @@ export function LoginForm() {
           <input
             autoComplete="username"
             className="login-form__input"
+            disabled={isFormDisabled}
             id="login-nickname"
             name="nickname"
             onChange={(event) => setFieldValue("nickname", event.target.value)}
@@ -48,6 +63,7 @@ export function LoginForm() {
           <input
             autoComplete="current-password"
             className="login-form__input"
+            disabled={isFormDisabled}
             id="login-password"
             name="password"
             onChange={(event) => setFieldValue("password", event.target.value)}
@@ -59,8 +75,13 @@ export function LoginForm() {
       </div>
 
       <div className="login-form__submit-area">
-        <button className="login-form__submit" type="submit">
-          로그인
+        <button
+          aria-busy={isSubmitting}
+          className="login-form__submit"
+          disabled={isFormDisabled}
+          type="submit"
+        >
+          {isSubmitting ? "로그인 중..." : isSuccess ? "로그인 완료" : "로그인"}
         </button>
         {formError && (
           <p

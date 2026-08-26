@@ -59,6 +59,11 @@
   border-color: var(--color-stroke-neutral-contrast);
 }
 
+.login-form__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .login-form__submit-area {
   position: relative;
 }
@@ -77,14 +82,19 @@
   transition: background-color 120ms ease;
 }
 
+.login-form__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .login-form__submit:hover {
+  .login-form__submit:not(:disabled):hover {
     background: var(--color-bg-brand-solid-pressed);
   }
 }
 
 @media not all and (hover: hover) and (pointer: fine) {
-  .login-form__submit:active {
+  .login-form__submit:not(:disabled):active {
     background: var(--color-bg-brand-solid-pressed);
   }
 }
