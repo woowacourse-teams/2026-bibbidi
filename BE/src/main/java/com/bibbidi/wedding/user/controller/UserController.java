@@ -28,6 +28,6 @@ public class UserController {
             @Valid @RequestBody ChangeNicknameRequest request
     ) {
         NicknameChangeResult result = userService.changeNickname(currentUserId, request.nickname());
-        return ResponseEntity.ok(ChangeNicknameResponse.from(result));
+        return ResponseEntity.ok(new ChangeNicknameResponse(result.id(), result.nickname()));
     }
 }
