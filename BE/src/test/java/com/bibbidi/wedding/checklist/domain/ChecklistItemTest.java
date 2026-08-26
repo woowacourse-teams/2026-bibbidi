@@ -7,100 +7,119 @@ import org.junit.jupiter.api.Test;
 
 class ChecklistItemTest {
 
-    private static final Long CHECKLIST_ID = 100L;
-    private static final Long CATALOG_ITEM_ID = 1L;
-    private static final Long CATEGORY_ID = 10L;
+    private static ChecklistItem constructTestItem() {
+        return new ChecklistItem(
+                1L,
+                100L,
+                10L,
+                "Wedding hall consultation",
+                1L,
+                ChecklistItemStatus.PREV
+        );
+    }
 
     @Test
-    @DisplayName("준비 항목에서 파생한 할 일은 카테고리와 제목을 물려받고 미완료로 시작한다")
-    void shouldInheritCategoryAndTitleWhenDerivedFromCatalogItem() {
+    @DisplayName("생성된 체크리스트 항목은 `시작 전` 상태다")
+    void shouldHaveBeforeStatusWhenCreated() {
         // given
-        CatalogItem catalogItem =
-                CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", "드레스 투어 이후 진행한다");
+        ChecklistItem item = constructTestItem();
 
         // when
-        ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
+        ChecklistItemStatus status = item.status();
 
         // then
-        assertThat(checklistItem)
+        assertThat(status).isEqualTo(ChecklistItemStatus.PREV);
+    }
+
+    @Test
+    @DisplayName("진행을 시작하면 `진행 중` 상태가 된다")
+    void shouldHaveContinueStatusWhenOnProgress() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when
+        ChecklistItem progressed = item.onProgress();
+
+        // then
+        assertThat(progressed.status()).isEqualTo(ChecklistItemStatus.CONTINUE);
+    }
+
+    @Test
+    @DisplayName("완료하면 `완료 상태`가 된다")
+    void shouldHaveDoneStatusWhenCompleted() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when
+        ChecklistItem completed = item.complete();
+
+        // then
+        assertThat(completed.status()).isEqualTo(ChecklistItemStatus.DONE);
+    }
+
+    @Test
+    @DisplayName("reset()하면 `시작 전` 상태로 돌아간다")
+    void shouldReturnToBeforeStatusWhenReset() {
+        // given
+        ChecklistItem item = constructTestItem().complete();
+
+        // when
+        item = item.reset();
+
+        // then
+        assertThat(item.status()).isEqualTo(ChecklistItemStatus.PREV);
+    }
+
+    @Test
+    @DisplayName("상태를 변경해도 체크리스트 항목 정보는 유지된다")
+    void shouldKeepChecklistInformationWhenStatusChanges() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when
+        ChecklistItem progressed = item.onProgress();
+
+        // then
+        assertThat(progressed)
                 .extracting(
                         ChecklistItem::id,
                         ChecklistItem::checklistId,
                         ChecklistItem::categoryId,
                         ChecklistItem::title,
-                        ChecklistItem::sourceCatalogItemId,
-                        ChecklistItem::isDone
+                        ChecklistItem::sourceCatalogItemId
                 )
-                .containsExactly(null, CHECKLIST_ID, CATEGORY_ID, "스튜디오 촬영", CATALOG_ITEM_ID, false);
+                .containsExactly(
+                        item.id(),
+                        item.checklistId(),
+                        item.categoryId(),
+                        item.title(),
+                        item.sourceCatalogItemId()
+                );
     }
 
     @Test
-    @DisplayName("파생한 할 일은 자신이 온 준비 항목을 출처로 인정한다")
-    void shouldComeFromSourceCatalogItemWhenDerived() {
+    @DisplayName("카탈로그 항목 ID가 같으면 원본 항목으로 식별한다")
+    void shouldIdentifySourceCatalogItemWhenIdsMatch() {
         // given
-        CatalogItem catalogItem = CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", null);
-        ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
+        ChecklistItem item = constructTestItem();
 
         // when
-        boolean cameFrom = checklistItem.cameFrom(CATALOG_ITEM_ID);
+        boolean cameFrom = item.cameFrom(1L);
 
         // then
         assertThat(cameFrom).isTrue();
     }
 
     @Test
-    @DisplayName("파생한 할 일은 다른 준비 항목을 출처로 인정하지 않는다")
-    void shouldNotComeFromOtherCatalogItemWhenDerived() {
+    @DisplayName("다른 카탈로그 항목 ID는 원본 항목으로 식별하지 않는다")
+    void shouldNotIdentifyOtherCatalogItemAsSource() {
         // given
-        CatalogItem catalogItem = CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", null);
-        ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
+        ChecklistItem item = constructTestItem();
 
         // when
-        boolean cameFrom = checklistItem.cameFrom(2L);
+        boolean cameFrom = item.cameFrom(2L);
 
         // then
         assertThat(cameFrom).isFalse();
-    }
-
-    @Test
-    @DisplayName("직접 만든 할 일은 출처가 없어 어떤 준비 항목도 출처로 인정하지 않는다")
-    void shouldNotComeFromAnyCatalogItemWhenSourceIsAbsent() {
-        // given
-        ChecklistItem checklistItem =
-                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, false);
-
-        // when
-        boolean cameFrom = checklistItem.cameFrom(CATALOG_ITEM_ID);
-
-        // then
-        assertThat(cameFrom).isFalse();
-    }
-
-    @Test
-    @DisplayName("미완료 할 일을 완료하면 완료 상태가 된다")
-    void shouldBeDoneWhenCompleted() {
-        // given
-        ChecklistItem checklistItem =
-                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, false);
-
-        // when
-        checklistItem.complete();
-
-        // then
-        assertThat(checklistItem.isDone()).isTrue();
-    }
-
-    @Test
-    @DisplayName("완료한 할 일을 되돌리면 미완료 상태가 된다")
-    void shouldNotBeDoneWhenReopened() {
-        // given
-        ChecklistItem checklistItem =
-                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, true);
-
-        // when
-        checklistItem.reopen();
-
-        // then
-        assertThat(checklistItem.isDone()).isFalse();
     }
 }

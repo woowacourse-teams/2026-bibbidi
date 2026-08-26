@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.checklist.domain;
 
+import org.jspecify.annotations.Nullable;
+
 public final class CatalogItem {
 
     private final Long id;
@@ -7,28 +9,16 @@ public final class CatalogItem {
     private final String title;
     private final String description;
 
-    private CatalogItem(Long id, Long categoryId, String title, String description) {
-        this.id = id;
-        this.categoryId = categoryId;
-        this.title = title;
-        this.description = description;
-    }
-
-    public static CatalogItem create(Long categoryId, String title, String description) {
-        return new CatalogItem(null, categoryId, title, description);
-    }
-
-    public static CatalogItem restore(
-            Long id,
+    public CatalogItem(
+            @Nullable Long id,
             Long categoryId,
             String title,
             String description
     ) {
-        return new CatalogItem(id, categoryId, title, description);
-    }
-
-    public ChecklistItem toChecklistItem(Long checklistId) {
-        return ChecklistItem.fromCatalogItem(checklistId, this);
+        this.id = id;
+        this.categoryId = categoryId;
+        this.title = title;
+        this.description = description;
     }
 
     public Long id() {
