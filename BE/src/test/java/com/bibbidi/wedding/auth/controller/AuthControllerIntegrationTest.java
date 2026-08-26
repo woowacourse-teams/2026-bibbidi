@@ -50,6 +50,10 @@ class AuthControllerIntegrationTest {
 
     private static final String NICKNAME = "bibbidi";
     private static final String PASSWORD = "wish";
+    private static final String LOGIN_DESCRIPTION =
+            "닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다. "
+                    + "성공 시 JSESSIONID Session Cookie를 발급하며, "
+                    + "이후 인증이 필요한 요청은 발급된 JSESSIONID Cookie를 그대로 전송합니다.";
     private static final String DOCUMENTED_SESSION_COOKIE =
             "JSESSIONID=<session-id>; Path=/; Secure; HttpOnly; SameSite=Lax";
 
@@ -96,8 +100,7 @@ class AuthControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Authentication")
                                 .summary("로그인")
-                                .description("닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다. "
-                                        + "성공 시 JSESSIONID Session Cookie를 발급합니다.")
+                                .description(LOGIN_DESCRIPTION)
                                 .requestSchema(schema("LoginRequest"))
                                 .responseSchema(schema("LoginResponse"))
                                 .requestFields(
@@ -156,7 +159,7 @@ class AuthControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Authentication")
                                 .summary("로그인")
-                                .description("닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다.")
+                                .description(LOGIN_DESCRIPTION)
                                 .requestSchema(schema("LoginRequest"))
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestFields(
@@ -217,7 +220,7 @@ class AuthControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Authentication")
                                 .summary("로그인")
-                                .description("닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다.")
+                                .description(LOGIN_DESCRIPTION)
                                 .requestSchema(schema("LoginRequest"))
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
