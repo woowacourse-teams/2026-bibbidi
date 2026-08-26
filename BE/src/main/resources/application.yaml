@@ -34,6 +34,5 @@ server:
         name: JSESSIONID
         path: /
         http-only: true
-        # 로컬 HTTP에서는 SERVER_SERVLET_SESSION_COOKIE_SECURE=false로 재정의한다.
         secure: true
         same-site: lax

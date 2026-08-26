@@ -1,15 +1,19 @@
 package com.bibbidi.wedding.auth.controller;
 
+import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
+import com.bibbidi.wedding.auth.controller.dto.CreateUserResponse;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
+import com.bibbidi.wedding.auth.service.AuthResult;
+import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.AuthSessionCookieManager;
-import com.bibbidi.wedding.user.authentication.AuthenticatedUser;
-import com.bibbidi.wedding.user.authentication.UserAuthenticationService;
+import com.bibbidi.wedding.user.service.UserCreationResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,15 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AuthController {
 
-    private final UserAuthenticationService userAuthenticationService;
+    private final AuthService authService;
     private final AuthSessionCookieManager sessionCookieManager;
 
     public AuthController(
-            UserAuthenticationService userAuthenticationService,
+            AuthService authService,
             AuthSessionCookieManager sessionCookieManager
     ) {
-        this.userAuthenticationService = userAuthenticationService;
+        this.authService = authService;
         this.sessionCookieManager = sessionCookieManager;
+    }
+
+    @PostMapping("/api/users")
+    public ResponseEntity<CreateUserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
+        UserCreationResult result = authService.register(request.nickname(), request.password());
+        return ResponseEntity.status(HttpStatus.CREATED).body(CreateUserResponse.from(result));
     }
 
     @PostMapping("/api/login")
@@ -35,7 +45,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        AuthenticatedUser result = userAuthenticationService.authenticate(request.nickname(), request.password());
+        AuthResult result = authService.login(request.nickname(), request.password());
         replaceSession(servletRequest, result.userId());
         return ResponseEntity.ok(LoginResponse.from(result));
     }

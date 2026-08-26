@@ -11,25 +11,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordHasher passwordHasher;
 
-    public UserService(UserRepository userRepository, PasswordHasher passwordHasher) {
+    public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.passwordHasher = passwordHasher;
     }
 
     @Transactional
-    public UserCreationResult createUser(String nickname, String rawPassword) {
+    public UserCreationResult createUser(String nickname, String passwordHash) {
         if (userRepository.existsByNickname(nickname)) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "닉네임 중복으로 회원가입에 실패했습니다."
-            );
+            throw new BusinessException(ClientError.DUPLICATE_NICKNAME, "닉네임 중복으로 회원가입에 실패했습니다.");
         }
 
-        String passwordHash = passwordHasher.hash(rawPassword);
         User user = userRepository.save(User.create(nickname, passwordHash));
 
         return new UserCreationResult(user.id(), user.nickname());
+    }
+
+    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
+        User user = userRepository.findByNickname(nickname);
+        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 }

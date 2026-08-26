@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.user.service;
+package com.bibbidi.wedding.auth.password;
 
 public interface PasswordHasher {
 

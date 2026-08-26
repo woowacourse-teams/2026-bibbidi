@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.user.controller;
+package com.bibbidi.wedding.auth.controller;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
@@ -16,9 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import com.bibbidi.wedding.user.service.PasswordHasher;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +40,7 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Transactional
 @ExtendWith({OutputCaptureExtension.class, RestDocumentationExtension.class})
-class UserControllerIntegrationTest {
+class RegistrationControllerIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;

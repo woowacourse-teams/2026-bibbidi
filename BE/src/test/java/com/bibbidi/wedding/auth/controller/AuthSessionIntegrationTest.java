@@ -2,10 +2,10 @@ package com.bibbidi.wedding.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import com.bibbidi.wedding.user.service.PasswordHasher;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
