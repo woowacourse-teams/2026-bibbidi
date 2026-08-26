@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.checklist.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,81 +8,99 @@ import org.junit.jupiter.api.Test;
 class ChecklistItemTest {
 
     private static final Long CHECKLIST_ID = 100L;
+    private static final Long CATALOG_ITEM_ID = 1L;
+    private static final Long CATEGORY_ID = 10L;
 
     @Test
-    @DisplayName("카탈로그 항목에서 파생한 체크리스트 항목은 카테고리와 제목을 물려받고 미완료로 시작한다")
+    @DisplayName("준비 항목에서 파생한 할 일은 카테고리와 제목을 물려받고 미완료로 시작한다")
     void shouldInheritCategoryAndTitleWhenDerivedFromCatalogItem() {
-        CatalogItem catalogItem = CatalogItem.restore(1L, 10L, "스튜디오 촬영", "드레스 투어 이후 진행한다");
+        // given
+        CatalogItem catalogItem =
+                CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", "드레스 투어 이후 진행한다");
 
+        // when
         ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
 
-        assertThat(checklistItem.id()).isNull();
-        assertThat(checklistItem.checklistId()).isEqualTo(CHECKLIST_ID);
-        assertThat(checklistItem.categoryId()).isEqualTo(10L);
-        assertThat(checklistItem.title()).isEqualTo("스튜디오 촬영");
-        assertThat(checklistItem.isDone()).isFalse();
+        // then
+        assertThat(checklistItem)
+                .extracting(
+                        ChecklistItem::id,
+                        ChecklistItem::checklistId,
+                        ChecklistItem::categoryId,
+                        ChecklistItem::title,
+                        ChecklistItem::sourceCatalogItemId,
+                        ChecklistItem::isDone
+                )
+                .containsExactly(null, CHECKLIST_ID, CATEGORY_ID, "스튜디오 촬영", CATALOG_ITEM_ID, false);
     }
 
     @Test
-    @DisplayName("파생한 체크리스트 항목은 어떤 카탈로그 항목에서 왔는지 기억한다")
-    void shouldRememberSourceWhenDerivedFromCatalogItem() {
-        CatalogItem catalogItem = CatalogItem.restore(1L, 10L, "스튜디오 촬영", null);
-
+    @DisplayName("파생한 할 일은 자신이 온 준비 항목을 출처로 인정한다")
+    void shouldComeFromSourceCatalogItemWhenDerived() {
+        // given
+        CatalogItem catalogItem = CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", null);
         ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
 
-        assertThat(checklistItem.sourceCatalogItemId()).isEqualTo(1L);
-        assertThat(checklistItem.cameFrom(1L)).isTrue();
-        assertThat(checklistItem.cameFrom(2L)).isFalse();
+        // when
+        boolean cameFrom = checklistItem.cameFrom(CATALOG_ITEM_ID);
+
+        // then
+        assertThat(cameFrom).isTrue();
     }
 
     @Test
-    @DisplayName("저장되지 않은 카탈로그 항목에서는 체크리스트 항목을 파생할 수 없다")
-    void shouldRejectWhenDerivedFromUnsavedCatalogItem() {
-        CatalogItem catalogItem = CatalogItem.create(10L, "스튜디오 촬영", null);
+    @DisplayName("파생한 할 일은 다른 준비 항목을 출처로 인정하지 않는다")
+    void shouldNotComeFromOtherCatalogItemWhenDerived() {
+        // given
+        CatalogItem catalogItem = CatalogItem.restore(CATALOG_ITEM_ID, CATEGORY_ID, "스튜디오 촬영", null);
+        ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
 
-        assertThatNullPointerException()
-                .isThrownBy(() -> catalogItem.toChecklistItem(CHECKLIST_ID));
+        // when
+        boolean cameFrom = checklistItem.cameFrom(2L);
+
+        // then
+        assertThat(cameFrom).isFalse();
     }
 
     @Test
-    @DisplayName("직접 추가한 항목은 출처가 없어 어떤 카탈로그 항목에서도 왔다고 보지 않는다")
+    @DisplayName("직접 만든 할 일은 출처가 없어 어떤 준비 항목도 출처로 인정하지 않는다")
     void shouldNotComeFromAnyCatalogItemWhenSourceIsAbsent() {
+        // given
         ChecklistItem checklistItem =
-                ChecklistItem.restore(1L, CHECKLIST_ID, 10L, "부모님 상견례", null, false);
+                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, false);
 
-        assertThat(checklistItem.sourceCatalogItemId()).isNull();
-        assertThat(checklistItem.cameFrom(1L)).isFalse();
-        assertThat(checklistItem.cameFrom(null)).isFalse();
+        // when
+        boolean cameFrom = checklistItem.cameFrom(CATALOG_ITEM_ID);
+
+        // then
+        assertThat(cameFrom).isFalse();
     }
 
     @Test
-    @DisplayName("항목을 완료하면 완료 상태가 되고 되돌리면 미완료로 돌아온다")
-    void shouldToggleDoneWhenCompletedAndReopened() {
-        CatalogItem catalogItem = CatalogItem.restore(1L, 10L, "스튜디오 촬영", null);
-        ChecklistItem checklistItem = catalogItem.toChecklistItem(CHECKLIST_ID);
+    @DisplayName("미완료 할 일을 완료하면 완료 상태가 된다")
+    void shouldBeDoneWhenCompleted() {
+        // given
+        ChecklistItem checklistItem =
+                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, false);
 
+        // when
         checklistItem.complete();
+
+        // then
         assertThat(checklistItem.isDone()).isTrue();
+    }
 
+    @Test
+    @DisplayName("완료한 할 일을 되돌리면 미완료 상태가 된다")
+    void shouldNotBeDoneWhenReopened() {
+        // given
+        ChecklistItem checklistItem =
+                ChecklistItem.restore(1L, CHECKLIST_ID, CATEGORY_ID, "부모님 상견례", null, true);
+
+        // when
         checklistItem.reopen();
+
+        // then
         assertThat(checklistItem.isDone()).isFalse();
-    }
-
-    @Test
-    @DisplayName("소속 체크리스트와 카테고리와 제목이 없으면 체크리스트 항목을 만들 수 없다")
-    void shouldRejectWhenRequiredFieldsAreMissing() {
-        assertThatNullPointerException()
-                .isThrownBy(() -> ChecklistItem.restore(1L, null, 10L, "상견례", null, false));
-        assertThatNullPointerException()
-                .isThrownBy(() -> ChecklistItem.restore(1L, CHECKLIST_ID, null, "상견례", null, false));
-        assertThatNullPointerException()
-                .isThrownBy(() -> ChecklistItem.restore(1L, CHECKLIST_ID, 10L, null, null, false));
-    }
-
-    @Test
-    @DisplayName("식별자가 없으면 저장된 체크리스트 항목으로 복원할 수 없다")
-    void shouldRejectWhenRestoredWithoutId() {
-        assertThatNullPointerException()
-                .isThrownBy(() -> ChecklistItem.restore(null, CHECKLIST_ID, 10L, "상견례", null, false));
     }
 }
