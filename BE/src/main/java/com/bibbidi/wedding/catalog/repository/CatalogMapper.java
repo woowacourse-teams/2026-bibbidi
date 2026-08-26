@@ -4,7 +4,9 @@ import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
-import com.bibbidi.wedding.catalog.persistence.CatalogRow;
+import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,100 +16,65 @@ import org.springframework.stereotype.Component;
 @Component
 public class CatalogMapper {
 
-    public Catalog toDomain(List<CatalogRow> rows) {
-        Map<Long, CategoryBuilder> categories = new LinkedHashMap<>();
+    public Catalog toDomain(
+            List<JpaCategoryEntity> categoryEntities,
+            List<JpaStepEntity> stepEntities,
+            List<JpaCatalogItemEntity> itemEntities
+    ) {
+        Map<Long, List<Item>> itemsByStepId = groupItemsByStepId(itemEntities);
+        Map<Long, List<Step>> stepsByCategoryId = groupStepsByCategoryId(stepEntities, itemsByStepId);
 
-        for (CatalogRow row : rows) {
-            CategoryBuilder category = categories.computeIfAbsent(
-                    row.categoryId(),
-                    ignored -> new CategoryBuilder(
-                            row.categoryId(),
-                            row.categoryName(),
-                            row.categoryDisplayOrder()
-                    )
-            );
-
-            category.add(row);
-        }
-
-        return new Catalog(categories.values().stream()
-                .map(CategoryBuilder::build)
+        return new Catalog(categoryEntities.stream()
+                .map(entity -> toCategory(entity, stepsByCategoryId))
                 .toList());
     }
 
-    private static final class CategoryBuilder {
-
-        private final Long id;
-        private final String name;
-        private final int displayOrder;
-        private final Map<Long, StepBuilder> steps = new LinkedHashMap<>();
-
-        private CategoryBuilder(Long id, String name, int displayOrder) {
-            this.id = id;
-            this.name = name;
-            this.displayOrder = displayOrder;
+    private Map<Long, List<Item>> groupItemsByStepId(List<JpaCatalogItemEntity> itemEntities) {
+        Map<Long, List<Item>> itemsByStepId = new LinkedHashMap<>();
+        for (JpaCatalogItemEntity entity : itemEntities) {
+            itemsByStepId.computeIfAbsent(entity.stepId(), ignored -> new ArrayList<>())
+                    .add(toItem(entity));
         }
-
-        private void add(CatalogRow row) {
-            if (row.stepId() == null) {
-                return;
-            }
-
-            StepBuilder step = steps.computeIfAbsent(
-                    row.stepId(),
-                    ignored -> new StepBuilder(
-                            row.stepId(),
-                            row.stepName(),
-                            row.stepDescription(),
-                            row.stepDisplayOrder()
-                    )
-            );
-
-            step.add(row);
-        }
-
-        private Category build() {
-            return new Category(
-                    id,
-                    name,
-                    displayOrder,
-                    steps.values().stream()
-                            .map(StepBuilder::build)
-                            .toList()
-            );
-        }
+        return itemsByStepId;
     }
 
-    private static final class StepBuilder {
-
-        private final Long id;
-        private final String name;
-        private final String description;
-        private final int displayOrder;
-        private final List<Item> items = new ArrayList<>();
-
-        private StepBuilder(Long id, String name, String description, int displayOrder) {
-            this.id = id;
-            this.name = name;
-            this.description = description;
-            this.displayOrder = displayOrder;
+    private Map<Long, List<Step>> groupStepsByCategoryId(
+            List<JpaStepEntity> stepEntities,
+            Map<Long, List<Item>> itemsByStepId
+    ) {
+        Map<Long, List<Step>> stepsByCategoryId = new LinkedHashMap<>();
+        for (JpaStepEntity entity : stepEntities) {
+            stepsByCategoryId.computeIfAbsent(entity.categoryId(), ignored -> new ArrayList<>())
+                    .add(toStep(entity, itemsByStepId.getOrDefault(entity.id(), List.of())));
         }
+        return stepsByCategoryId;
+    }
 
-        private void add(CatalogRow row) {
-            if (row.itemId() == null) {
-                return;
-            }
+    private Category toCategory(JpaCategoryEntity entity, Map<Long, List<Step>> stepsByCategoryId) {
+        return new Category(
+                entity.id(),
+                entity.name(),
+                entity.displayOrder(),
+                stepsByCategoryId.getOrDefault(entity.id(), List.of())
+        );
+    }
 
-            items.add(new Item(
-                    row.itemId(),
-                    row.itemTitle(),
-                    row.itemDisplayOrder(),
-                    row.itemEssential()
-            ));
-        }
+    private Step toStep(JpaStepEntity entity, List<Item> items) {
+        return new Step(
+                entity.id(),
+                entity.name(),
+                entity.description(),
+                entity.displayOrder(),
+                items
+        );
+    }
 
-        private Step build() {
-            return new Step(id, name, description, displayOrder, items);
-        }
+    private Item toItem(JpaCatalogItemEntity entity) {
+        return new Item(
+                entity.id(),
+                entity.title(),
+                entity.displayOrder(),
+                entity.essential()
+        );
     }
 }

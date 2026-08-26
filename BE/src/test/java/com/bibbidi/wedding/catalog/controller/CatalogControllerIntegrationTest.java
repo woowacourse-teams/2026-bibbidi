@@ -11,6 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
+import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,13 +29,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -32,7 +41,6 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@Sql("/catalog-schema.sql")
 @ExtendWith(RestDocumentationExtension.class)
 class CatalogControllerIntegrationTest {
 
@@ -42,9 +50,25 @@ class CatalogControllerIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private JpaCategoryRepository jpaCategoryRepository;
+
+    @Autowired
+    private JpaStepRepository jpaStepRepository;
+
+    @Autowired
+    private JpaCatalogItemRepository jpaCatalogItemRepository;
+
+    @Autowired
+    private JpaChecklistRepository jpaChecklistRepository;
+
+    @Autowired
+    private JpaChecklistItemRepository jpaChecklistItemRepository;
 
     private MockMvc mockMvc;
+
+    private Long categoryId;
+    private Long stepId;
+    private Long catalogItemId;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
@@ -52,20 +76,21 @@ class CatalogControllerIntegrationTest {
                 .apply(documentationConfiguration(restDocumentation))
                 .build();
 
-        jdbcTemplate.update("INSERT INTO categories(id, name, display_order) VALUES (1, '웨딩홀', 1)");
-        jdbcTemplate.update("""
-                INSERT INTO steps(id, category_id, name, description, display_order)
-                VALUES (10, 1, '웨딩홀 계약', '웨딩홀을 결정하고 계약한다.', 1)
-                """);
-        jdbcTemplate.update("""
-                INSERT INTO catalog_items(id, step_id, title, display_order, essential)
-                VALUES (100, 10, '계약서 확인', 1, TRUE)
-                """);
-        jdbcTemplate.update("INSERT INTO checklists(id, owner_id) VALUES (1000, 7)");
-        jdbcTemplate.update("""
-                INSERT INTO checklist_items(id, checklist_id, source_catalog_item_id)
-                VALUES (10000, 1000, 100)
-                """);
+        JpaCategoryEntity category = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        JpaStepEntity step = jpaStepRepository.save(new JpaStepEntity(
+                null, category.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1
+        ));
+        JpaCatalogItemEntity catalogItem = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, step.id(), "계약서 확인", null, 1, true
+        ));
+        JpaChecklistEntity checklist = jpaChecklistRepository.save(new JpaChecklistEntity(null, USER_ID));
+        jpaChecklistItemRepository.save(new JpaChecklistItemEntity(
+                null, checklist.id(), category.id(), catalogItem.id(), "계약서 확인", ChecklistItemStatus.PREV
+        ));
+
+        categoryId = category.id();
+        stepId = step.id();
+        catalogItemId = catalogItem.id();
     }
 
     @Test
@@ -74,9 +99,9 @@ class CatalogControllerIntegrationTest {
         // when & then
         mockMvc.perform(get("/api/catalog").session(authenticatedSession()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.categories[0].id").value(1))
-                .andExpect(jsonPath("$.categories[0].steps[0].id").value(10))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(100))
+                .andExpect(jsonPath("$.categories[0].id").value(categoryId))
+                .andExpect(jsonPath("$.categories[0].steps[0].id").value(stepId))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(catalogItemId))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").value(true))
                 .andDo(document(
                         "catalog-find",

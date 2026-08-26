@@ -5,54 +5,59 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
-import com.bibbidi.wedding.catalog.persistence.CatalogDao;
-import org.junit.jupiter.api.BeforeEach;
+import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
+import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
+import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.jdbc.Sql;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({CatalogRepository.class, CatalogMapper.class, CatalogDao.class})
-@Sql("/catalog-schema.sql")
+@Import({CatalogRepository.class, CatalogMapper.class})
 class CatalogRepositoryTest {
 
     @Autowired
     private CatalogRepository catalogRepository;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private JpaCategoryRepository jpaCategoryRepository;
 
-    @BeforeEach
-    void setUp() {
-        jdbcTemplate.update("INSERT INTO categories(id, name, display_order) VALUES (1, '웨딩홀', 1)");
-        jdbcTemplate.update("INSERT INTO categories(id, name, display_order) VALUES (2, '스드메', 2)");
-        jdbcTemplate.update("""
-                INSERT INTO steps(id, category_id, name, description, display_order)
-                VALUES (10, 1, '웨딩홀 계약', '웨딩홀을 결정하고 계약한다.', 1)
-                """);
-        jdbcTemplate.update("""
-                INSERT INTO catalog_items(id, step_id, title, display_order, essential)
-                VALUES (100, 10, '계약서 확인', 1, TRUE)
-                """);
-    }
+    @Autowired
+    private JpaStepRepository jpaStepRepository;
+
+    @Autowired
+    private JpaCatalogItemRepository jpaCatalogItemRepository;
 
     @Test
     @DisplayName("단계가 없는 준비 영역까지 포함해 준비 목록을 조회한다")
     void shouldFindCatalogIncludingCategoryWithoutStep() {
+        // given
+        JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        JpaCategoryEntity studio = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
+        JpaStepEntity contract = jpaStepRepository.save(new JpaStepEntity(
+                null, weddingHall.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1
+        ));
+        JpaCatalogItemEntity item = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, contract.id(), "계약서 확인", null, 1, true
+        ));
+
         // when
         Catalog catalog = catalogRepository.findCatalog();
 
         // then
-        assertThat(catalog.categories()).extracting(Category::id).containsExactly(1L, 2L);
+        assertThat(catalog.categories())
+                .extracting(Category::id)
+                .containsExactly(weddingHall.id(), studio.id());
         assertThat(catalog.categories().getFirst().steps().getFirst().items())
                 .extracting(Item::id)
-                .containsExactly(100L);
+                .containsExactly(item.id());
         assertThat(catalog.categories().getLast().steps()).isEmpty();
     }
 }
