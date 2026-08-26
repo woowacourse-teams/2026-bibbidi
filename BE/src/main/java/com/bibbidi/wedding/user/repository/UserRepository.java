@@ -5,7 +5,6 @@ import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class UserRepository {
@@ -27,7 +26,6 @@ public class UserRepository {
         return userMapper.toDomain(saved);
     }
 
-    @Transactional(readOnly = true)
     public Optional<User> findByNickname(String nickname) {
         return jpaUserRepository.findByNicknameIgnoreCase(nickname).map(userMapper::toDomain);
     }
