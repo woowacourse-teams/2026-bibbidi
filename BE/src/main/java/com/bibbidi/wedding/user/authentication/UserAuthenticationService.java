@@ -19,8 +19,7 @@ public class UserAuthenticationService {
     }
 
     public AuthenticatedUser authenticate(String nickname, String rawPassword) {
-        User user = userRepository.findByNickname(nickname)
-                .orElseThrow(UserAuthenticationService::authenticationFailed);
+        User user = userRepository.findByNickname(nickname);
 
         if (!passwordHasher.matches(rawPassword, user.passwordHash())) {
             throw authenticationFailed();

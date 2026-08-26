@@ -95,7 +95,7 @@ class UserControllerIntegrationTest {
                                 .build())
                 ));
 
-        User user = userRepository.findByNickname("bibbidi").orElseThrow();
+        User user = userRepository.findByNickname("bibbidi");
 
         assertThat(user.passwordHash()).isNotEqualTo("wish");
         assertThat(passwordHasher.matches("wish", user.passwordHash())).isTrue();

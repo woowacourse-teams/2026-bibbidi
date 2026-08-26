@@ -9,7 +9,6 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.bibbidi.wedding.user.service.PasswordHasher;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,7 @@ class UserAuthenticationServiceTest {
     @DisplayName("닉네임과 비밀번호가 일치하면 인증된 사용자 정보만 반환한다")
     void shouldReturnAuthenticatedUserWhenCredentialsAreValid() {
         User user = User.restore(1L, "비비디", "password-hash");
-        given(userRepository.findByNickname("비비디")).willReturn(Optional.of(user));
+        given(userRepository.findByNickname("비비디")).willReturn(user);
         given(passwordHasher.matches("password", "password-hash")).willReturn(true);
 
         AuthenticatedUser result = userAuthenticationService.authenticate("비비디", "password");
@@ -48,10 +47,14 @@ class UserAuthenticationServiceTest {
     @Test
     @DisplayName("존재하지 않는 닉네임은 인증 실패로 처리한다")
     void shouldFailAuthenticationWhenNicknameDoesNotExist() {
-        given(userRepository.findByNickname("없는 사용자")).willReturn(Optional.empty());
+        given(userRepository.findByNickname("없는 사용자")).willThrow(new BusinessException(
+                ClientError.AUTHENTICATION_FAILED,
+                "로그인 인증에 실패했습니다."
+        ));
 
         assertThatThrownBy(() -> userAuthenticationService.authenticate("없는 사용자", "password"))
                 .isInstanceOf(BusinessException.class)
+                .hasMessage("로그인 인증에 실패했습니다.")
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
     }
@@ -60,11 +63,12 @@ class UserAuthenticationServiceTest {
     @DisplayName("잘못된 비밀번호는 사용자 부재와 동일한 인증 실패로 처리한다")
     void shouldFailAuthenticationWhenPasswordDoesNotMatch() {
         User user = User.restore(1L, "비비디", "password-hash");
-        given(userRepository.findByNickname("비비디")).willReturn(Optional.of(user));
+        given(userRepository.findByNickname("비비디")).willReturn(user);
         given(passwordHasher.matches("wrong-password", "password-hash")).willReturn(false);
 
         assertThatThrownBy(() -> userAuthenticationService.authenticate("비비디", "wrong-password"))
                 .isInstanceOf(BusinessException.class)
+                .hasMessage("로그인 인증에 실패했습니다.")
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
     }

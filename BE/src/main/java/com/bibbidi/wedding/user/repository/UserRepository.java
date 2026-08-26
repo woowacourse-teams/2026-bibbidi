@@ -1,9 +1,10 @@
 package com.bibbidi.wedding.user.repository;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
-import java.util.Optional;
+import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -26,7 +27,9 @@ public class UserRepository {
         return userMapper.toDomain(saved);
     }
 
-    public Optional<User> findByNickname(String nickname) {
-        return jpaUserRepository.findByNicknameIgnoreCase(nickname).map(userMapper::toDomain);
+    public User findByNickname(String nickname) {
+        return jpaUserRepository.findByNicknameIgnoreCase(nickname)
+                .map(userMapper::toDomain)
+                .orElseThrow(() -> new BusinessException(ClientError.AUTHENTICATION_FAILED, "로그인 인증에 실패했습니다."));
     }
 }
