@@ -5,7 +5,7 @@ import java.util.Objects;
 public final class User {
 
     private final Long id;
-    private final String nickname;
+    private String nickname;
     private final String passwordHash;
 
     private User(Long id, String nickname, String passwordHash) {
@@ -20,6 +20,10 @@ public final class User {
 
     public static User restore(Long id, String nickname, String passwordHash) {
         return new User(Objects.requireNonNull(id), nickname, passwordHash);
+    }
+
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
     }
 
     public Long id() {

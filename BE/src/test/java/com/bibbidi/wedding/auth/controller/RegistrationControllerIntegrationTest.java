@@ -223,7 +223,7 @@ class RegistrationControllerIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value(403))
+                .andExpect(jsonPath("$.errorCode").value(401))
                 .andExpect(jsonPath("$.errorCode").isNumber())
                 .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."))
                 .andExpect(jsonPath("$.status").doesNotExist())
@@ -253,7 +253,7 @@ class RegistrationControllerIntegrationTest {
 
         assertThat(output)
                 .contains("WARN")
-                .contains("errorCode=403")
+                .contains("errorCode=401")
                 .contains("status=409")
                 .contains("message=닉네임 중복으로 회원가입에 실패했습니다.");
     }

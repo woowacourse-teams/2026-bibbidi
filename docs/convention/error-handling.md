@@ -16,7 +16,7 @@
 
 ```json
 {
-  "errorCode": 403,
+  "errorCode": 401,
   "message": "이미 사용 중인 닉네임입니다."
 }
 ```

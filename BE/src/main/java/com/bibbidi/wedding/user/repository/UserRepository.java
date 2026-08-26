@@ -21,6 +21,10 @@ public class UserRepository {
         return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
     }
 
+    public boolean existsByNicknameExcludingUser(String nickname, Long userId) {
+        return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
+    }
+
     public User save(User user) {
         JpaUserEntity saved = jpaUserRepository.save(userMapper.toEntity(user));
         return userMapper.toDomain(saved);
@@ -30,5 +34,19 @@ public class UserRepository {
         return jpaUserRepository.findByNicknameIgnoreCase(nickname)
                 .map(userMapper::toDomain)
                 .orElseThrow(NoSuchElementException::new);
+    }
+
+    public User findById(Long userId) {
+        return jpaUserRepository.findById(userId)
+                .map(userMapper::toDomain)
+                .orElseThrow(NoSuchElementException::new);
+    }
+
+    public User updateNickname(User user) {
+        JpaUserEntity entity = jpaUserRepository.findById(user.id())
+                .orElseThrow(NoSuchElementException::new);
+        entity.changeNickname(user.nickname());
+        JpaUserEntity updated = jpaUserRepository.save(entity);
+        return userMapper.toDomain(updated);
     }
 }
