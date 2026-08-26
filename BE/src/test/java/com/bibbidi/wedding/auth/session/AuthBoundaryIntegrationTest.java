@@ -45,9 +45,9 @@ class AuthBoundaryIntegrationTest {
     void shouldRejectProtectedApiWithoutSession() throws Exception {
         mockMvc.perform(get("/api/auth-boundary/owned-resources"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.id").value(201))
-                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
 
         assertThat(ownedResourceTestService.lastOwnerId()).isNull();
@@ -60,7 +60,9 @@ class AuthBoundaryIntegrationTest {
 
         mockMvc.perform(get("/api/auth-boundary/owned-resources").session(session))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.id").value(201));
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+                .andExpect(jsonPath("$.status").doesNotExist());
 
         assertThat(ownedResourceTestService.lastOwnerId()).isNull();
     }
