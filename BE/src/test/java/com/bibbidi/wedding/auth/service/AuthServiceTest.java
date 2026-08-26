@@ -8,10 +8,10 @@ import static org.mockito.BDDMockito.then;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.user.exception.UserNotFoundException;
 import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
 import com.bibbidi.wedding.user.service.UserCreationResult;
 import com.bibbidi.wedding.user.service.UserService;
+import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,7 +63,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("존재하지 않는 닉네임은 인증 실패로 처리한다")
     void shouldFailAuthenticationWhenNicknameDoesNotExist() {
-        given(userService.findAuthenticationInfo("없는 사용자")).willThrow(new UserNotFoundException());
+        given(userService.findAuthenticationInfo("없는 사용자")).willThrow(new NoSuchElementException());
 
         assertThatThrownBy(() -> authService.login("없는 사용자", "password"))
                 .isInstanceOf(BusinessException.class)

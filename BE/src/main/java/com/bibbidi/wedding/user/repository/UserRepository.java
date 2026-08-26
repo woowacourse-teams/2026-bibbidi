@@ -1,9 +1,9 @@
 package com.bibbidi.wedding.user.repository;
 
 import com.bibbidi.wedding.user.domain.User;
-import com.bibbidi.wedding.user.exception.UserNotFoundException;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
+import java.util.NoSuchElementException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -29,6 +29,6 @@ public class UserRepository {
     public User findByNickname(String nickname) {
         return jpaUserRepository.findByNicknameIgnoreCase(nickname)
                 .map(userMapper::toDomain)
-                .orElseThrow(UserNotFoundException::new);
+                .orElseThrow(NoSuchElementException::new);
     }
 }
