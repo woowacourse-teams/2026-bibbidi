@@ -9,6 +9,10 @@ interface HomeScheduleDashboardLoadingProps {
   loadingLabel: string;
 }
 
+function assertNever(value: never): never {
+  throw new Error(`처리하지 않은 홈 일정 대시보드 상태: ${String(value)}`);
+}
+
 function SkeletonSectionHeader() {
   return (
     <div className="home-dashboard-loading__section-header">
@@ -108,10 +112,14 @@ function HomeScheduleDashboardLoading({
 export function HomeScheduleDashboard({
   viewModel,
 }: HomeScheduleDashboardProps) {
-  switch (viewModel.status) {
+  const { status } = viewModel;
+
+  switch (status) {
     case "loading":
       return (
         <HomeScheduleDashboardLoading loadingLabel={viewModel.loadingLabel} />
       );
+    default:
+      return assertNever(status);
   }
 }
