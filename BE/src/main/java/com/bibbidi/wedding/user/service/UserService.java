@@ -48,8 +48,8 @@ public class UserService {
             );
         }
 
-        user.changeNickname(nickname);
-        return NicknameChangeResult.from(userRepository.updateNickname(user));
+        userRepository.updateNickname(currentUserId, nickname);
+        return new NicknameChangeResult(currentUserId, nickname);
     }
 
     private User findCurrentUser(Long currentUserId) {

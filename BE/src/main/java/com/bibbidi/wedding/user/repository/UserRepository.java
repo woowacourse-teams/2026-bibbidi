@@ -42,11 +42,10 @@ public class UserRepository {
                 .orElseThrow(NoSuchElementException::new);
     }
 
-    public User updateNickname(User user) {
-        JpaUserEntity entity = jpaUserRepository.findById(user.id())
+    public void updateNickname(Long userId, String nickname) {
+        JpaUserEntity entity = jpaUserRepository.findById(userId)
                 .orElseThrow(NoSuchElementException::new);
-        entity.changeNickname(user.nickname());
-        JpaUserEntity updated = jpaUserRepository.save(entity);
-        return userMapper.toDomain(updated);
+        entity.changeNickname(nickname);
+        jpaUserRepository.save(entity);
     }
 }

@@ -37,13 +37,12 @@ class UserServiceTest {
         User user = User.restore(1L, "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
         given(userRepository.existsByNicknameExcludingUser("bibbidi", 1L)).willReturn(false);
-        given(userRepository.updateNickname(user)).willReturn(user);
 
         NicknameChangeResult result = userService.changeNickname(1L, "bibbidi");
 
         assertThat(result).isEqualTo(new NicknameChangeResult(1L, "bibbidi"));
         then(userRepository).should().existsByNicknameExcludingUser("bibbidi", 1L);
-        then(userRepository).should().updateNickname(user);
+        then(userRepository).should().updateNickname(1L, "bibbidi");
     }
 
     @Test
@@ -56,7 +55,7 @@ class UserServiceTest {
 
         assertThat(result).isEqualTo(new NicknameChangeResult(1L, "Bibbidi"));
         then(userRepository).should(never()).existsByNicknameExcludingUser("Bibbidi", 1L);
-        then(userRepository).should(never()).updateNickname(user);
+        then(userRepository).should(never()).updateNickname(1L, "Bibbidi");
     }
 
     @Test
@@ -71,7 +70,7 @@ class UserServiceTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_NICKNAME);
 
-        then(userRepository).should(never()).updateNickname(user);
+        then(userRepository).should(never()).updateNickname(1L, "TAKEN");
     }
 
     @Test

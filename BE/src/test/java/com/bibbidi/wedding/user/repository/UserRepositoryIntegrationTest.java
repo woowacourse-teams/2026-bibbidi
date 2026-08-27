@@ -32,9 +32,9 @@ class UserRepositoryIntegrationTest {
     @DisplayName("닉네임만 변경하고 사용자 ID와 비밀번호 해시는 유지한다")
     void shouldUpdateOnlyNickname() {
         User user = userRepository.save(User.create("Bibbidi", "password-hash"));
-        user.changeNickname("bibbidi");
 
-        User updated = userRepository.updateNickname(user);
+        userRepository.updateNickname(user.id(), "bibbidi");
+        User updated = userRepository.findById(user.id());
 
         assertThat(updated.id()).isEqualTo(user.id());
         assertThat(updated.nickname()).isEqualTo("bibbidi");
