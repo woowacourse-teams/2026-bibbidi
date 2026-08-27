@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.catalog.domain;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 public final class Item {
 
@@ -10,7 +11,7 @@ public final class Item {
     private final boolean essential;
 
     public Item(
-            @NonNull Long id,
+            @Nullable Long id,
             @NonNull String title,
             int displayOrder,
             boolean essential

@@ -3,6 +3,7 @@ package com.bibbidi.wedding.catalog.domain;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 public final class Category {
 
@@ -12,7 +13,7 @@ public final class Category {
     private final List<Step> steps;
 
     public Category(
-            @NonNull Long id,
+            @Nullable Long id,
             @NonNull String name,
             int displayOrder,
             @NonNull List<Step> steps

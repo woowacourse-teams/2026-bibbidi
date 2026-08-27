@@ -14,7 +14,7 @@ public final class Step {
     private final List<Item> items;
 
     public Step(
-            @NonNull Long id,
+            @Nullable Long id,
             @NonNull String name,
             @Nullable String description,
             int displayOrder,
