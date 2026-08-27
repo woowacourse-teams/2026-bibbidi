@@ -7,10 +7,6 @@ public final class Checklist {
     private final Long id;
     private final Long ownerId;
 
-    public Checklist(Long ownerId) {
-        this(null, ownerId);
-    }
-
     public Checklist(@Nullable Long id, Long ownerId) {
         this.id = id;
         this.ownerId = ownerId;

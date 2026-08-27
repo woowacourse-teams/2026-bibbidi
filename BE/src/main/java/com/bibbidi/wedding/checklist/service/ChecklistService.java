@@ -25,7 +25,7 @@ public class ChecklistService {
         }
 
         try {
-            Checklist checklist = checklistRepository.save(new Checklist(ownerId));
+            Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
             return ChecklistCreationResult.from(checklist);
         } catch (DataIntegrityViolationException exception) {
             throw duplicateChecklist(ownerId);

@@ -29,7 +29,7 @@ class ChecklistRepositoryTest {
     @DisplayName("빈 체크리스트를 저장하고 생성된 식별자를 채워 반환한다")
     void shouldSaveChecklistAndReturnGeneratedId() {
         // given
-        Checklist checklist = new Checklist(OWNER_ID);
+        Checklist checklist = new Checklist(null, OWNER_ID);
 
         // when
         Checklist saved = checklistRepository.save(checklist);
@@ -47,7 +47,7 @@ class ChecklistRepositoryTest {
     @DisplayName("소유자별로 체크리스트 존재 여부를 판단한다")
     void shouldDecideWhetherOwnerHasChecklist() {
         // given
-        checklistRepository.save(new Checklist(OWNER_ID));
+        checklistRepository.save(new Checklist(null, OWNER_ID));
 
         // when, then
         assertThat(checklistRepository.existsByOwnerId(OWNER_ID)).isTrue();
