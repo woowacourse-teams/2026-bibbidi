@@ -32,6 +32,11 @@ public class UserService {
         }
     }
 
+    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+    }
+
     public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
         User user = userRepository.findByNickname(nickname);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());

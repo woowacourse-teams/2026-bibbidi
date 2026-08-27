@@ -84,6 +84,26 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
+    void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
+        given(userRepository.existsByNickname("bibbidi")).willReturn(false);
+
+        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+
+        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", true));
+    }
+
+    @Test
+    @DisplayName("이미 사용 중인 닉네임은 사용할 수 없다고 응답한다")
+    void shouldReportNicknameAsUnavailableWhenSomebodyUsesIt() {
+        given(userRepository.existsByNickname("bibbidi")).willReturn(true);
+
+        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+
+        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
+    }
+
+    @Test
     @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
     void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
         given(userRepository.save(any(User.class)))
