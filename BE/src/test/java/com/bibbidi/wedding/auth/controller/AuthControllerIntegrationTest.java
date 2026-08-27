@@ -105,7 +105,7 @@ class AuthControllerIntegrationTest {
                                 .responseSchema(schema("LoginResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("가입한 사용자 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
                                 )
                                 .responseFields(
                                         fieldWithPath("userId").description("로그인한 사용자 ID"),
@@ -164,7 +164,7 @@ class AuthControllerIntegrationTest {
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("가입한 사용자 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -225,7 +225,7 @@ class AuthControllerIntegrationTest {
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("가입한 사용자 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
