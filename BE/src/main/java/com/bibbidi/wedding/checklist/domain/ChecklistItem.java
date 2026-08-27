@@ -27,15 +27,6 @@ public final class ChecklistItem {
         this.status = status;
     }
 
-    public ChecklistItem(Long checklistId, CatalogItem catalogItem) {
-        this.id = null;
-        this.checklistId = checklistId;
-        this.categoryId = catalogItem.categoryId();
-        this.title = catalogItem.title();
-        this.sourceCatalogItemId = catalogItem.id();
-        this.status = ChecklistItemStatus.PREV;
-    }
-
     public ChecklistItem onProgress() {
         return withStatus(ChecklistItemStatus.CONTINUE);
     }
