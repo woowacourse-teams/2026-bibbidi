@@ -15,4 +15,6 @@ public interface JpaChecklistItemRepository extends JpaRepository<JpaChecklistIt
               AND item.sourceCatalogItemId IS NOT NULL
             """)
     List<Long> findIncludedCatalogItemIds(@Param("userId") Long userId);
+
+    List<JpaChecklistItemEntity> findByChecklistId(Long checklistId);
 }
