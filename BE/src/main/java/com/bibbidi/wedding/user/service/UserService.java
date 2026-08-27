@@ -4,7 +4,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,8 +65,6 @@ public class UserService {
     private User findCurrentUser(Long currentUserId) {
         try {
             return userRepository.findById(currentUserId);
-        } catch (NoSuchElementException exception) {
-            throw authenticationRequired(currentUserId);
         } catch (BusinessException exception) {
             if (exception.clientError() != ClientError.USER_NOT_FOUND) {
                 throw exception;
