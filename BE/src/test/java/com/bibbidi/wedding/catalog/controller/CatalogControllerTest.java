@@ -59,7 +59,7 @@ class CatalogControllerTest {
 
         // when, then
         mockMvc.perform(get("/api/catalog").session(authenticatedSession()))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories[0].id").value(1))
                 .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))
                 .andExpect(jsonPath("$.categories[0].displayOrder").value(1))
