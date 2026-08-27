@@ -8,6 +8,18 @@ import org.springframework.data.repository.query.Param;
 public interface JpaChecklistItemRepository extends JpaRepository<JpaChecklistItemEntity, Long> {
 
     @Query("""
+            SELECT CASE WHEN COUNT(item) > 0 THEN true ELSE false END
+            FROM JpaChecklistItemEntity item
+            JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId
+            WHERE item.id = :checklistItemId
+              AND checklist.ownerId = :ownerId
+            """)
+    boolean existsByIdAndOwnerId(
+            @Param("checklistItemId") Long checklistItemId,
+            @Param("ownerId") Long ownerId
+    );
+
+    @Query("""
             SELECT item.sourceCatalogItemId
             FROM JpaChecklistItemEntity item
             JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId

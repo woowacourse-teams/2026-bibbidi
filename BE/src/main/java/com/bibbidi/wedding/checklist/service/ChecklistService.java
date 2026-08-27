@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
-import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
@@ -41,10 +40,7 @@ public class ChecklistService {
 
     @Transactional(readOnly = true)
     public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
-        return checklistItemRepository.findById(checklistItemId)
-                .flatMap(checklistItem -> checklistRepository.findByOwnerId(ownerId)
-                        .map(checklist -> checklist.owns(checklistItem)))
-                .orElse(false);
+        return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
     }
 
     private BusinessException duplicateChecklist(Long ownerId) {

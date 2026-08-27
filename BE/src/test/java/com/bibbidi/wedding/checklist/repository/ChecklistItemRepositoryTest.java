@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,13 @@ class ChecklistItemRepositoryTest {
 
     @Autowired
     private ChecklistItemRepository checklistItemRepository;
+
+    @Autowired
+    private JpaChecklistRepository jpaChecklistRepository;
+
+    private JpaChecklistEntity saveChecklist(Long ownerId) {
+        return jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, ownerId));
+    }
 
     private ChecklistItem saveItem(Long checklistId, Long sourceCatalogItemId) {
         return checklistItemRepository.save(new ChecklistItem(
@@ -74,6 +83,39 @@ class ChecklistItemRepositoryTest {
     void shouldReturnEmptyWhenChecklistItemDoesNotExist() {
         // when, then
         assertThat(checklistItemRepository.findById(999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("할 일이 사용자의 체크리스트에 속하면 소유권을 인정한다")
+    void shouldConfirmOwnershipWhenItemBelongsToOwner() {
+        // given
+        JpaChecklistEntity checklist = saveChecklist(1L);
+        ChecklistItem saved = saveItem(checklist.id(), 100L);
+
+        // when, then
+        assertThat(checklistItemRepository.existsByIdAndOwnerId(saved.id(), 1L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("할 일이 다른 사용자의 체크리스트에 속하면 소유권을 인정하지 않는다")
+    void shouldDenyOwnershipWhenItemBelongsToAnotherOwner() {
+        // given
+        saveChecklist(1L);
+        JpaChecklistEntity checklist = saveChecklist(2L);
+        ChecklistItem saved = saveItem(checklist.id(), 100L);
+
+        // when, then
+        assertThat(checklistItemRepository.existsByIdAndOwnerId(saved.id(), 1L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("할 일이 존재하지 않으면 소유권을 인정하지 않는다")
+    void shouldDenyOwnershipWhenItemDoesNotExist() {
+        // given
+        saveChecklist(1L);
+
+        // when, then
+        assertThat(checklistItemRepository.existsByIdAndOwnerId(999L, 1L)).isFalse();
     }
 
     @Test
