@@ -29,4 +29,9 @@ public class CatalogService {
 
         return new CatalogQueryResult(catalog, includedCatalogItemIds);
     }
+
+    @Transactional(readOnly = true)
+    public Catalog findPublicCatalog() {
+        return catalogRepository.findCatalog();
+    }
 }

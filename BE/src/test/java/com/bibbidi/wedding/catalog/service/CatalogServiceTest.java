@@ -2,6 +2,7 @@ package com.bibbidi.wedding.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
@@ -50,5 +51,20 @@ class CatalogServiceTest {
         // then
         assertThat(result.catalog()).isSameAs(catalog);
         assertThat(result.includedCatalogItemIds()).containsExactly(INCLUDED_ITEM_ID);
+    }
+
+    @Test
+    @DisplayName("사용자 없이 준비 목록만 조회한다")
+    void shouldFindCatalogWithoutUser() {
+        // given
+        Catalog catalog = constructTestCatalog();
+        when(catalogRepository.findCatalog()).thenReturn(catalog);
+
+        // when
+        Catalog publicCatalog = catalogService.findPublicCatalog();
+
+        // then
+        assertThat(publicCatalog).isSameAs(catalog);
+        verifyNoInteractions(catalogItemInclusionRepository);
     }
 }

@@ -52,6 +52,11 @@ class CatalogControllerIntegrationTest {
             "로그인으로 발급받은 JSESSIONID Session Cookie가 필요합니다. "
                     + "준비 영역, 단계, 항목을 각각 displayOrder 오름차순으로 반환합니다. "
                     + "각 항목의 included는 현재 사용자의 체크리스트 포함 여부를 나타냅니다.";
+    private static final String CATALOG_PUBLIC_SUMMARY = "준비 목록 공개 조회";
+    private static final String CATALOG_PUBLIC_DESCRIPTION =
+            "로그인 없이 조회할 수 있습니다. "
+                    + "준비 영역, 단계, 항목을 각각 displayOrder 오름차순으로 반환합니다. "
+                    + "ID와 체크리스트 포함 여부는 내려주지 않습니다.";
     private static final String SESSION_COOKIE_DESCRIPTION =
             "로그인 API가 발급한 인증 Session Cookie. 형식: JSESSIONID=<session-id>";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -163,6 +168,47 @@ class CatalogControllerIntegrationTest {
                 ));
     }
 
+    @Test
+    @DisplayName("로그인하지 않은 사용자가 준비 목록 공개 조회에 성공한다")
+    void shouldFindPublicCatalogWithoutAuthentication() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/catalog/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))
+                .andExpect(jsonPath("$.categories[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.categories[0].steps.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].steps[0].name").value("웨딩홀 계약"))
+                .andExpect(jsonPath("$.categories[0].steps[0].description")
+                        .value("웨딩홀을 결정하고 계약한다."))
+                .andExpect(jsonPath("$.categories[0].steps[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.categories[0].steps[0].items.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("견적 비교"))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(false))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[1].title").value("계약서 확인"))
+                .andExpect(jsonPath("$.categories[0].steps[1].name").value("웨딩홀 상담"))
+                .andExpect(jsonPath("$.categories[0].steps[1].description").value(nullValue()))
+                .andExpect(jsonPath("$.categories[0].steps[1].items").isEmpty())
+                .andExpect(jsonPath("$.categories[1].name").value("신혼여행"))
+                .andExpect(jsonPath("$.categories[1].displayOrder").value(2))
+                .andExpect(jsonPath("$.categories[1].steps").isEmpty())
+                .andExpect(jsonPath("$.categories[0].id").doesNotExist())
+                .andExpect(jsonPath("$.categories[0].steps[0].id").doesNotExist())
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").doesNotExist())
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
+                .andDo(document(
+                        "catalog-public",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Catalog")
+                                .summary(CATALOG_PUBLIC_SUMMARY)
+                                .description(CATALOG_PUBLIC_DESCRIPTION)
+                                .responseSchema(schema("PublicCatalogResponse"))
+                                .responseFields(publicCatalogResponseFields())
+                                .build())
+                ));
+    }
+
     private static MockHttpSession authenticatedSession() {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, USER_ID);
@@ -197,6 +243,31 @@ class CatalogControllerIntegrationTest {
                         .description("필수 준비 항목이면 true, 선택 준비 항목이면 false"),
                 fieldWithPath("categories[].steps[].items[].included")
                         .description("현재 사용자의 체크리스트에 같은 카탈로그 항목이 있으면 true, 없으면 false")
+        };
+    }
+
+    private static FieldDescriptor[] publicCatalogResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("categories")
+                        .description("displayOrder 오름차순으로 정렬된 준비 영역 목록. 없으면 빈 배열"),
+                fieldWithPath("categories[].name").description("준비 영역 이름"),
+                fieldWithPath("categories[].displayOrder")
+                        .description("전체 준비 영역에서의 노출 순서. 값이 작을수록 먼저 노출"),
+                fieldWithPath("categories[].steps")
+                        .description("현재 준비 영역의 단계 목록. displayOrder 오름차순이며 없으면 빈 배열"),
+                fieldWithPath("categories[].steps[].name").description("준비 단계 이름"),
+                fieldWithPath("categories[].steps[].description")
+                        .description("준비 단계 설명. 설명이 없으면 null")
+                        .optional(),
+                fieldWithPath("categories[].steps[].displayOrder")
+                        .description("현재 준비 영역 안에서의 단계 노출 순서. 값이 작을수록 먼저 노출"),
+                fieldWithPath("categories[].steps[].items")
+                        .description("현재 단계의 준비 항목 목록. displayOrder 오름차순이며 없으면 빈 배열"),
+                fieldWithPath("categories[].steps[].items[].title").description("준비 항목 제목"),
+                fieldWithPath("categories[].steps[].items[].displayOrder")
+                        .description("현재 준비 단계 안에서의 항목 노출 순서. 값이 작을수록 먼저 노출"),
+                fieldWithPath("categories[].steps[].items[].essential")
+                        .description("필수 준비 항목이면 true, 선택 준비 항목이면 false")
         };
     }
 }
