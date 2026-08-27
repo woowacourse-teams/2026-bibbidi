@@ -1,9 +1,12 @@
 package com.bibbidi.wedding.catalog.service;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.repository.CatalogItemInclusionRepository;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogQueryResult;
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +31,11 @@ public class CatalogService {
         Set<Long> includedCatalogItemIds = catalogItemInclusionRepository.findIncludedItemIds(userId);
 
         return new CatalogQueryResult(catalog, includedCatalogItemIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogItemSnapshot> findItems(Collection<Long> itemIds) {
+        return catalogRepository.findItemSnapshots(itemIds);
     }
 
     @Transactional(readOnly = true)

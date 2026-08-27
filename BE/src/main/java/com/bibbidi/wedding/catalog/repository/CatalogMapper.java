@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.catalog.repository;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
@@ -27,6 +28,14 @@ public class CatalogMapper {
         return new Catalog(categoryEntities.stream()
                 .map(entity -> toCategory(entity, stepsByCategoryId))
                 .toList());
+    }
+
+    public CatalogItemSnapshot toSnapshot(JpaCatalogItemEntity entity, Long categoryId) {
+        return new CatalogItemSnapshot(
+                entity.id(),
+                categoryId,
+                entity.title()
+        );
     }
 
     private Map<Long, List<Item>> groupItemsByStepId(List<JpaCatalogItemEntity> itemEntities) {
