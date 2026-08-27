@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.appointment.controller.dto;
 
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -29,4 +30,19 @@ public record AppointmentResponse(
                 appointment.isDone()
         );
     }
+
+    public static AppointmentResponse from(AppointmentUpdateResult appointment) {
+        return new AppointmentResponse(
+                appointment.id(),
+                appointment.checklistItemId(),
+                appointment.title(),
+                appointment.date(),
+                appointment.startTime(),
+                appointment.endTime(),
+                appointment.place(),
+                appointment.memo(),
+                appointment.isDone()
+        );
+    }
+
 }

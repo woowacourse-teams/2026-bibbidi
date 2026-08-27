@@ -53,4 +53,43 @@ class AppointmentTest {
         // then
         assertThat(reopened.isDone()).isFalse();
     }
+
+    @Test
+    @DisplayName("수정해도 완료 상태는 유지된다")
+    void shouldPreserveDoneStatusWhenUpdated() {
+        Appointment appointment = constructTestAppointment(true);
+
+        Appointment updated = appointment.update(
+                "Updated consultation",
+                LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertThat(updated)
+                .extracting(
+                        Appointment::id,
+                        Appointment::checklistItemId,
+                        Appointment::title,
+                        Appointment::date,
+                        Appointment::startTime,
+                        Appointment::endTime,
+                        Appointment::place,
+                        Appointment::memo,
+                        Appointment::isDone
+                )
+                .containsExactly(
+                        appointment.id(),
+                        CHECKLIST_ITEM_ID,
+                        "Updated consultation",
+                        LocalDate.of(2026, 10, 1),
+                        null,
+                        null,
+                        null,
+                        null,
+                        true
+                );
+    }
 }

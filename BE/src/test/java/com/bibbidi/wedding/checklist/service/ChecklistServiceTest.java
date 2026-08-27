@@ -77,4 +77,39 @@ class ChecklistServiceTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_CHECKLIST);
     }
+
+    @Test
+    @DisplayName("소유자의 체크리스트이면 소유권을 인정한다")
+    void shouldConfirmOwnershipWhenChecklistBelongsToOwner() {
+        // given
+        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+
+        // when, then
+        assertThat(checklistService.checkOwnership(1L, 10L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 체크리스트이면 소유권을 인정하지 않는다")
+    void shouldDenyOwnershipWhenChecklistIsNotOwners() {
+        // given
+        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+
+        // when, then
+        assertThat(checklistService.checkOwnership(1L, 99L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("소유자의 체크리스트가 없으면 소유권 확인에 실패한다")
+    void shouldFailOwnershipCheckWhenOwnerHasNoChecklist() {
+        // given
+        willThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "not found"))
+                .given(checklistRepository)
+                .findByOwnerId(1L);
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.checkOwnership(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
+    }
 }

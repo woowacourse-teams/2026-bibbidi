@@ -1,10 +1,13 @@
 package com.bibbidi.wedding.checklist.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import(ChecklistRepository.class)
+@Import({ChecklistRepository.class, ChecklistMapper.class})
 class ChecklistRepositoryTest {
 
     private static final Long OWNER_ID = 1L;
@@ -52,5 +55,30 @@ class ChecklistRepositoryTest {
         // when, then
         assertThat(checklistRepository.existsByOwnerId(OWNER_ID)).isTrue();
         assertThat(checklistRepository.existsByOwnerId(2L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("소유자의 체크리스트를 조회하면 도메인으로 변환해 반환한다")
+    void shouldFindChecklistByOwnerId() {
+        // given
+        Checklist saved = checklistRepository.save(new Checklist(null, OWNER_ID));
+
+        // when
+        Checklist found = checklistRepository.findByOwnerId(OWNER_ID);
+
+        // then
+        assertThat(found)
+                .extracting(Checklist::id, Checklist::ownerId)
+                .containsExactly(saved.id(), OWNER_ID);
+    }
+
+    @Test
+    @DisplayName("소유자의 체크리스트가 없으면 조회에 실패한다")
+    void shouldFailToFindChecklistWhenOwnerHasNone() {
+        // when, then
+        assertThatThrownBy(() -> checklistRepository.findByOwnerId(OWNER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
     }
 }

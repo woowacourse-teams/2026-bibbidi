@@ -39,7 +39,26 @@ public final class Appointment {
         this.isDone = isDone;
     }
 
-    private Appointment update(
+    public Appointment complete() {
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true);
+    }
+
+    public Appointment reopen() {
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, false);
+    }
+
+    public Appointment update(
+            String title,
+            LocalDate date,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            String place,
+            String memo
+    ) {
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, isDone);
+    }
+
+    private Appointment copy(
             Long checklistItemId,
             String title,
             LocalDate date,
@@ -60,14 +79,6 @@ public final class Appointment {
                 memo,
                 isDone
         );
-    }
-
-    public Appointment complete() {
-        return update(checklistItemId, title, date, startTime, endTime, place, memo, true);
-    }
-
-    public Appointment reopen() {
-        return update(checklistItemId, title, date, startTime, endTime, place, memo, false);
     }
 
     public Long id() {

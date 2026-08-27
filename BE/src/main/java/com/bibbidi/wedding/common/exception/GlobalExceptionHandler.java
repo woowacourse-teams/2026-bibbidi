@@ -20,7 +20,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception, WebRequest request) {
         ClientError clientError = exception.clientError();
-        HttpStatus status = convertToHttpStatus(clientError);
+        HttpStatus status = clientError.httpStatus();
         logException(exception, clientError, status, request);
         return ResponseEntity.status(status).body(ErrorResponse.from(clientError));
     }
@@ -52,17 +52,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             return ClientError.INVALID_REQUEST;
         }
         return ClientError.INTERNAL_ERROR;
-    }
-
-    private HttpStatus convertToHttpStatus(ClientError clientError) {
-        return switch (clientError) {
-            case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
-            case AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED;
-            case AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
-            case DUPLICATE_NICKNAME -> HttpStatus.CONFLICT;
-            case DUPLICATE_CHECKLIST -> HttpStatus.CONFLICT;
-            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-        };
     }
 
     private Object createResponse(ClientError clientError, Exception exception) {
