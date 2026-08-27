@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameResponse;
+import com.bibbidi.wedding.user.controller.dto.ChangePasswordRequest;
 import com.bibbidi.wedding.user.service.NicknameChangeResult;
 import com.bibbidi.wedding.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,11 +25,14 @@ class UserControllerTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private AuthService authService;
+
     private UserController userController;
 
     @BeforeEach
     void setUp() {
-        userController = new UserController(userService);
+        userController = new UserController(userService, authService);
     }
 
     @Test
@@ -44,5 +49,16 @@ class UserControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(new ChangeNicknameResponse(1L, "new-name"));
         then(userService).should().changeNickname(1L, "new-name");
+    }
+
+    @Test
+    @DisplayName("현재 사용자의 비밀번호 변경을 요청한다")
+    void shouldChangeCurrentUserPassword() {
+        userController.changePassword(
+                1L,
+                new ChangePasswordRequest("current-password", "new-password")
+        );
+
+        then(authService).should().changePassword(1L, "current-password", "new-password");
     }
 }

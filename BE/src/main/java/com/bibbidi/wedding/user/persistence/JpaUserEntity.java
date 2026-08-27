@@ -36,6 +36,10 @@ public class JpaUserEntity extends BaseTimeEntity {
         this.nickname = nickname;
     }
 
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public Long id() {
         return id;
     }

@@ -41,4 +41,17 @@ class UserRepositoryIntegrationTest {
         assertThat(updated.passwordHash()).isEqualTo("password-hash");
         assertThat(userRepository.findByNickname("BIBBIDI").nickname()).isEqualTo("bibbidi");
     }
+
+    @Test
+    @DisplayName("비밀번호 해시만 변경하고 사용자 ID와 닉네임은 유지한다")
+    void shouldUpdateOnlyPasswordHash() {
+        User user = userRepository.save(User.create("Bibbidi", "current-hash"));
+
+        userRepository.updatePasswordHash(user.id(), "new-hash");
+        User updated = userRepository.findById(user.id());
+
+        assertThat(updated.id()).isEqualTo(user.id());
+        assertThat(updated.nickname()).isEqualTo("Bibbidi");
+        assertThat(updated.passwordHash()).isEqualTo("new-hash");
+    }
 }

@@ -2,8 +2,11 @@ package com.bibbidi.wedding.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -84,5 +87,63 @@ class AuthServiceTest {
                 .hasMessage("로그인 인증에 실패했습니다.")
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호를 확인하고 새 비밀번호를 해시해 저장한다")
+    void shouldVerifyAndHashPasswordBeforeUpdating() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+        given(passwordHasher.matches("new-password", "current-hash")).willReturn(false);
+        given(passwordHasher.hash("new-password")).willReturn("new-hash");
+
+        authService.changePassword(1L, "current-password", "new-password");
+
+        then(userService).should().updatePasswordHash(1L, "new-hash");
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호가 일치하지 않으면 기존 비밀번호 해시를 유지한다")
+    void shouldNotUpdateWhenCurrentPasswordDoesNotMatch() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("wrong-password", "current-hash")).willReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword(1L, "wrong-password", "new-password"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+
+        then(passwordHasher).should(never()).hash("new-password");
+        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("새 비밀번호가 기존 비밀번호와 같으면 저장하지 않고 성공한다")
+    void shouldSucceedWithoutUpdatingWhenNewPasswordIsSameAsCurrentPassword() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+
+        authService.changePassword(1L, "current-password", "current-password");
+
+        then(passwordHasher).should(never()).hash("current-password");
+        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("새 비밀번호 해시에 실패하면 기존 비밀번호 해시를 유지한다")
+    void shouldNotUpdateWhenHashingNewPasswordFails() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+        given(passwordHasher.matches("new-password", "current-hash")).willReturn(false);
+        given(passwordHasher.hash("new-password")).willThrow(new IllegalStateException("hashing failed"));
+
+        assertThatThrownBy(() -> authService.changePassword(1L, "current-password", "new-password"))
+                .isInstanceOf(IllegalStateException.class);
+
+        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
     }
 }

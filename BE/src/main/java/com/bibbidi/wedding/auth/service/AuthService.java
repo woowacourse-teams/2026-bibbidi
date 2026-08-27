@@ -39,4 +39,22 @@ public class AuthService {
 
         return new AuthResult(user.userId(), user.nickname());
     }
+
+    public void changePassword(Long currentUserId, String currentPassword, String newPassword) {
+        UserAuthenticationInfo user = userService.findCurrentUserAuthenticationInfo(currentUserId);
+
+        if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
+            throw new BusinessException(
+                    ClientError.AUTHENTICATION_FAILED,
+                    "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
+            );
+        }
+
+        if (passwordHasher.matches(newPassword, user.passwordHash())) {
+            return;
+        }
+
+        String newPasswordHash = passwordHasher.hash(newPassword);
+        userService.updatePasswordHash(currentUserId, newPasswordHash);
+    }
 }

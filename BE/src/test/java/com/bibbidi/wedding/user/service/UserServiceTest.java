@@ -10,7 +10,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -76,11 +75,21 @@ class UserServiceTest {
     @Test
     @DisplayName("Session의 사용자 ID로 사용자를 찾을 수 없으면 인증 필요 오류를 반환한다")
     void shouldRequireAuthenticationWhenSessionUserDoesNotExist() {
-        given(userRepository.findById(1L)).willThrow(new NoSuchElementException());
+        given(userRepository.findById(1L)).willThrow(
+                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+        );
 
         assertThatThrownBy(() -> userService.changeNickname(1L, "new-name"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("현재 사용자의 비밀번호 해시를 저장한다")
+    void shouldUpdateCurrentUserPasswordHash() {
+        userService.updatePasswordHash(1L, "new-password-hash");
+
+        then(userRepository).should().updatePasswordHash(1L, "new-password-hash");
     }
 }

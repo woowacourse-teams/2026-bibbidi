@@ -33,6 +33,17 @@ public class UserService {
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
+    @Transactional(readOnly = true)
+    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
+        User user = findCurrentUser(currentUserId);
+        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+    }
+
+    @Transactional
+    public void updatePasswordHash(Long currentUserId, String passwordHash) {
+        userRepository.updatePasswordHash(currentUserId, passwordHash);
+    }
+
     @Transactional
     public NicknameChangeResult changeNickname(Long currentUserId, String nickname) {
         User user = findCurrentUser(currentUserId);
@@ -56,10 +67,19 @@ public class UserService {
         try {
             return userRepository.findById(currentUserId);
         } catch (NoSuchElementException exception) {
-            throw new BusinessException(
-                    ClientError.AUTHENTICATION_REQUIRED,
-                    "Session 사용자 조회에 실패했습니다. userId=" + currentUserId
-            );
+            throw authenticationRequired(currentUserId);
+        } catch (BusinessException exception) {
+            if (exception.clientError() != ClientError.USER_NOT_FOUND) {
+                throw exception;
+            }
+            throw authenticationRequired(currentUserId);
         }
+    }
+
+    private BusinessException authenticationRequired(Long currentUserId) {
+        return new BusinessException(
+                ClientError.AUTHENTICATION_REQUIRED,
+                "Session 사용자 조회에 실패했습니다. userId=" + currentUserId
+        );
     }
 }

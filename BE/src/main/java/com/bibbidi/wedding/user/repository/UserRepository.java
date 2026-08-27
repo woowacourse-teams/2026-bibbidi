@@ -52,6 +52,12 @@ public class UserRepository {
         jpaUserRepository.save(entity);
     }
 
+    public void updatePasswordHash(Long userId, String passwordHash) {
+        JpaUserEntity entity = getJpaUserEntity(userId);
+        entity.changePasswordHash(passwordHash);
+        jpaUserRepository.save(entity);
+    }
+
     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {
         return jpaUserRepository.findById(userId)
                 .orElseThrow(
