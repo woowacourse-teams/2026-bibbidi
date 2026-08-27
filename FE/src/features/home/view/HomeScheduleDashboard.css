@@ -400,6 +400,20 @@
     height: auto;
   }
 
+  .home-dashboard-state__section--recommended {
+    height: auto;
+  }
+
+  .home-dashboard-state__section--recommended .home-dashboard-state__result {
+    height: auto;
+    min-height: 184px;
+  }
+
+  .home-dashboard-state__section--recommended.home-dashboard-state__section--error
+    .home-dashboard-state__result {
+    min-height: 220px;
+  }
+
   .home-dashboard-loading__upcoming-list,
   .home-dashboard-loading__recommended-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
