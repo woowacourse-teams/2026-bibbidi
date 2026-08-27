@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { BibidiBrand } from "../components/BibidiBrand/BibidiBrand";
 import {
   HomeHeaderSummaryFeature,
+  RecommendedScheduleFeature,
   UnscheduledTaskFeature,
   UpcomingScheduleFeature,
 } from "../features/home";
@@ -29,6 +30,7 @@ export function HomePage() {
           <UpcomingScheduleFeature />
           <UnscheduledTaskFeature />
         </div>
+        <RecommendedScheduleFeature />
       </main>
     </div>
   );
