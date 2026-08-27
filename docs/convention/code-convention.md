@@ -65,6 +65,9 @@ Controller → Service → Repository → Dao / Mapper
 - 순수 조회에는 `@Transactional(readOnly = true)`를 사용한다.
 - 락은 기본적으로 추가하지 않는다.
 - 동시성 정합성 문제가 있으면 발생 가능성·피해·대안을 먼저 설명하고 결정받는다.
+- 값의 유일성은 DB의 UNIQUE 제약으로 보장한다. 조회로 먼저 확인하고 저장하는 방식은 두 요청 사이의 경합을 막지 못한다.
+- 제약 위반은 Service에서 `DataIntegrityViolationException`을 잡아 해당 `ClientError`의 `BusinessException`으로 변환한다.
+- 사용 가능 여부를 미리 알려주는 조회 API는 UX 목적으로만 둔다. 최종 판단은 저장 요청의 응답이 한다.
 
 ## Lombok
 

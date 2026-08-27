@@ -2,6 +2,7 @@ package com.bibbidi.wedding.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -39,13 +41,16 @@ class AuthSessionIntegrationTest {
     @Autowired
     private PasswordHasher passwordHasher;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private HttpClient httpClient;
     private User user;
 
     @BeforeEach
     void setUp() {
         jpaUserRepository.deleteAll();
-        user = userRepository.save(User.create("bibbidi", passwordHasher.hash(PASSWORD)));
+        user = userRepository.save(new User(null, "bibbidi", passwordHasher.hash(PASSWORD)));
         httpClient = HttpClient.newHttpClient();
     }
 
@@ -57,15 +62,12 @@ class AuthSessionIntegrationTest {
     @Test
     @DisplayName("로그인 쿠키는 안전 속성을 사용하고 로그아웃은 만료된 세션에도 멱등하게 동작한다")
     void shouldIssueSecurelyConfiguredCookieAndLogoutIdempotently() throws Exception {
+        LoginRequest loginRequest = new LoginRequest("bibbidi", PASSWORD);
+
         HttpResponse<String> loginResponse = httpClient.send(
                 request("/api/login")
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .POST(HttpRequest.BodyPublishers.ofString("""
-                                {
-                                  "nickname": "bibbidi",
-                                  "password": "wish"
-                                }
-                                """))
+                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(loginRequest)))
                         .build(),
                 HttpResponse.BodyHandlers.ofString()
         );

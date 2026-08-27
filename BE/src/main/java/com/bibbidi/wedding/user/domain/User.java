@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.user.domain;
 
-import java.util.Objects;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 public final class User {
 
@@ -8,18 +9,10 @@ public final class User {
     private final String nickname;
     private final String passwordHash;
 
-    private User(Long id, String nickname, String passwordHash) {
+    public User(@Nullable Long id, @NonNull String nickname, @NonNull String passwordHash) {
         this.id = id;
-        this.nickname = Objects.requireNonNull(nickname);
-        this.passwordHash = Objects.requireNonNull(passwordHash);
-    }
-
-    public static User create(String nickname, String passwordHash) {
-        return new User(null, nickname, passwordHash);
-    }
-
-    public static User restore(Long id, String nickname, String passwordHash) {
-        return new User(Objects.requireNonNull(id), nickname, passwordHash);
+        this.nickname = nickname;
+        this.passwordHash = passwordHash;
     }
 
     public Long id() {

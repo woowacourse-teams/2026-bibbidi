@@ -49,7 +49,7 @@ public class UserRepository {
     public void updateNickname(Long userId, String nickname) {
         JpaUserEntity entity = getJpaUserEntity(userId);
         entity.changeNickname(nickname);
-        jpaUserRepository.save(entity);
+        jpaUserRepository.saveAndFlush(entity);
     }
 
     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {

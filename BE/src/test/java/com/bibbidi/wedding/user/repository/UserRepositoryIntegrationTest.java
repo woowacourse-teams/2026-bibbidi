@@ -21,8 +21,8 @@ class UserRepositoryIntegrationTest {
     @Test
     @DisplayName("닉네임 중복 검사에서 현재 사용자는 제외하고 다른 사용자는 대소문자 없이 찾는다")
     void shouldIgnoreCaseAndExcludeCurrentUserWhenCheckingNickname() {
-        User currentUser = userRepository.save(User.create("Bibbidi", "hash-one"));
-        userRepository.save(User.create("Magic", "hash-two"));
+        User currentUser = userRepository.save(new User(null, "Bibbidi", "hash-one"));
+        userRepository.save(new User(null, "Magic", "hash-two"));
 
         assertThat(userRepository.existsByNicknameExcludingUser("bibbidi", currentUser.id())).isFalse();
         assertThat(userRepository.existsByNicknameExcludingUser("MAGIC", currentUser.id())).isTrue();
@@ -31,7 +31,7 @@ class UserRepositoryIntegrationTest {
     @Test
     @DisplayName("닉네임만 변경하고 사용자 ID와 비밀번호 해시는 유지한다")
     void shouldUpdateOnlyNickname() {
-        User user = userRepository.save(User.create("Bibbidi", "password-hash"));
+        User user = userRepository.save(new User(null, "Bibbidi", "password-hash"));
 
         userRepository.updateNickname(user.id(), "bibbidi");
         User updated = userRepository.findById(user.id());

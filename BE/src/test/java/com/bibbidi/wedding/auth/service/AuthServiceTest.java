@@ -9,7 +9,7 @@ import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
-import com.bibbidi.wedding.user.service.UserCreationResult;
+import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +38,11 @@ class AuthServiceTest {
     @Test
     @DisplayName("회원가입 비밀번호를 해시한 뒤 사용자 생성을 요청한다")
     void shouldHashPasswordBeforeCreatingUser() {
-        UserCreationResult creationResult = new UserCreationResult(1L, "비비디");
+        UserResult creationResult = new UserResult(1L, "비비디");
         given(passwordHasher.hash("password")).willReturn("password-hash");
         given(userService.createUser("비비디", "password-hash")).willReturn(creationResult);
 
-        UserCreationResult result = authService.register("비비디", "password");
+        UserResult result = authService.register("비비디", "password");
 
         assertThat(result).isEqualTo(creationResult);
         then(userService).should().createUser("비비디", "password-hash");
