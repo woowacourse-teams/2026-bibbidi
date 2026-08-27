@@ -10,9 +10,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "checklist_items")
+@Table(
+        name = "checklist_items",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"checklist_id", "source_catalog_item_id"})
+)
 public class JpaChecklistItemEntity extends BaseTimeEntity {
 
     @Id
