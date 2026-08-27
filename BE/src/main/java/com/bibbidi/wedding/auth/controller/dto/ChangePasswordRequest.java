@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.user.controller.dto;
+package com.bibbidi.wedding.auth.controller.dto;
 
 import com.bibbidi.wedding.auth.password.ValidPassword;
 import jakarta.validation.constraints.NotBlank;
