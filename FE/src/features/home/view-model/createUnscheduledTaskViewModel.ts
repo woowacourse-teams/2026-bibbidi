@@ -15,6 +15,7 @@ export interface UnscheduledTaskItemViewModel {
 }
 
 export interface UnscheduledTaskViewModel {
+  addScheduleLabel: string;
   countLabel: string;
   items: UnscheduledTaskItemViewModel[];
   title: string;
@@ -24,6 +25,7 @@ export function createUnscheduledTaskViewModel(
   model: UnscheduledTaskListModel,
 ): UnscheduledTaskViewModel {
   return {
+    addScheduleLabel: "일정 추가",
     countLabel: `${model.tasks.length}개`,
     items: model.tasks.map((task) => ({
       categoryLabel: task.category,

@@ -5,6 +5,21 @@ interface UnscheduledTaskProps {
   viewModel: UnscheduledTaskViewModel;
 }
 
+function CalendarPlusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="unscheduled-task-card__calendar-icon"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path d="M7 3v3M17 3v3M4 9h16" />
+      <rect height="16" rx="2" width="16" x="4" y="5" />
+      <path d="M15 13v6M12 16h6" />
+    </svg>
+  );
+}
+
 export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
   return (
     <section
@@ -33,6 +48,14 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
                 </span>
               </div>
               <h3 className="unscheduled-task-card__title">{item.title}</h3>
+              <button
+                className="unscheduled-task-card__add-schedule"
+                disabled
+                type="button"
+              >
+                <CalendarPlusIcon />
+                {viewModel.addScheduleLabel}
+              </button>
             </li>
           ))}
         </ul>
