@@ -1,0 +1,164 @@
+.upcoming-schedule {
+  width: min(100%, 996px);
+  padding: 24px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+}
+
+.upcoming-schedule__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.upcoming-schedule__header h2 {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.upcoming-schedule__count {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.upcoming-schedule__list {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+.upcoming-schedule-card {
+  display: flex;
+  min-width: 0;
+  min-height: 174px;
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--color-bg-neutral-weak);
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upcoming-schedule-card__top,
+.upcoming-schedule-card__date-group,
+.upcoming-schedule-card__detail {
+  display: flex;
+  align-items: center;
+}
+
+.upcoming-schedule-card__top {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.upcoming-schedule-card__date-group {
+  min-width: 0;
+  gap: 7px;
+}
+
+.upcoming-schedule-card__relative-date {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.upcoming-schedule-card__date {
+  color: var(--color-fg-neutral);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.upcoming-schedule-card__status {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.upcoming-schedule-card__status--upcoming {
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+}
+
+.upcoming-schedule-card__status--in-progress {
+  background: var(--color-bg-informative-weak);
+  color: var(--color-fg-informative);
+}
+
+.upcoming-schedule-card__title {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.upcoming-schedule-card__detail {
+  min-width: 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 500;
+  gap: 7px;
+}
+
+.upcoming-schedule-card__detail span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upcoming-schedule-card__clock {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+@media (hover: hover) {
+  .upcoming-schedule-card:hover {
+    border-color: var(--color-stroke-brand-solid);
+    background: var(--color-bg-brand-weak);
+  }
+
+  .upcoming-schedule-card:hover .upcoming-schedule-card__relative-date {
+    color: var(--color-fg-brand);
+  }
+}
+
+@media (max-width: 900px) {
+  .upcoming-schedule__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .upcoming-schedule {
+    padding: 20px;
+  }
+
+  .upcoming-schedule__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
