@@ -9,6 +9,9 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
+import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -27,11 +30,18 @@ class ChecklistServiceTest {
     @Mock
     private ChecklistRepository checklistRepository;
 
+    @Mock
+    private ChecklistItemRepository checklistItemRepository;
+
     private ChecklistService checklistService;
 
     @BeforeEach
     void setUp() {
-        checklistService = new ChecklistService(checklistRepository);
+        checklistService = new ChecklistService(checklistRepository, checklistItemRepository);
+    }
+
+    private static ChecklistItem itemOf(Long checklistId) {
+        return new ChecklistItem(200L, checklistId, 2L, "계약서 확인", 100L, ChecklistItemStatus.PREV);
     }
 
     @Test
@@ -111,5 +121,43 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권을 인정한다")
+    void shouldConfirmItemOwnershipWhenItemBelongsToOwnersChecklist() {
+        // given
+        given(checklistItemRepository.findById(200L)).willReturn(itemOf(10L));
+        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+
+        // when, then
+        assertThat(checklistService.checkItemOwnership(1L, 200L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 체크리스트에 속한 할 일이면 소유권을 인정하지 않는다")
+    void shouldDenyItemOwnershipWhenItemBelongsToAnotherChecklist() {
+        // given
+        given(checklistItemRepository.findById(200L)).willReturn(itemOf(99L));
+        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+
+        // when, then
+        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 할 일은 소유권 판단 이전에 실패한다")
+    void shouldFailItemOwnershipCheckWhenItemDoesNotExist() {
+        // given
+        willThrow(new BusinessException(ClientError.CHECKLIST_ITEM_NOT_FOUND, "not found"))
+                .given(checklistItemRepository)
+                .findById(999L);
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.checkItemOwnership(1L, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
+        then(checklistRepository).should(never()).findByOwnerId(1L);
     }
 }
