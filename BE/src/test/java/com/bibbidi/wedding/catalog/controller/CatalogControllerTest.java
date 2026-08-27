@@ -79,7 +79,7 @@ class CatalogControllerTest {
     }
 
     @Test
-    @DisplayName("로그인하지 않아도 ID와 포함 여부 없이 준비 목록을 응답한다")
+    @DisplayName("로그인하지 않아도 포함 여부 없이 준비 목록을 응답한다")
     void shouldRespondPublicCatalogWithoutAuthentication() throws Exception {
         // given
         when(catalogService.findPublicCatalog()).thenReturn(constructTestResult().catalog());
@@ -87,18 +87,18 @@ class CatalogControllerTest {
         // when, then
         mockMvc.perform(get("/api/catalog/public"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[0].id").value(1))
                 .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))
                 .andExpect(jsonPath("$.categories[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.categories[0].steps[0].id").value(10))
                 .andExpect(jsonPath("$.categories[0].steps[0].name").value("웨딩홀 계약"))
                 .andExpect(jsonPath("$.categories[0].steps[0].description")
                         .value("웨딩홀을 결정하고 계약한다."))
                 .andExpect(jsonPath("$.categories[0].steps[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(100))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("계약서 확인"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(true))
-                .andExpect(jsonPath("$.categories[0].id").doesNotExist())
-                .andExpect(jsonPath("$.categories[0].steps[0].id").doesNotExist())
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist());
     }
 

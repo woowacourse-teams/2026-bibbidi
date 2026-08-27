@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Set;
 
 public record ItemResponse(
-        @JsonInclude(JsonInclude.Include.NON_NULL) Long id,
+        Long id,
         String title,
         int displayOrder,
         boolean essential,
@@ -24,7 +24,7 @@ public record ItemResponse(
 
     public static ItemResponse forPublic(Item item) {
         return new ItemResponse(
-                null,
+                item.id(),
                 item.title(),
                 item.displayOrder(),
                 item.essential(),

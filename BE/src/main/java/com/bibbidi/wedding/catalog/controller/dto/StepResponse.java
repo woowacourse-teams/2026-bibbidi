@@ -1,12 +1,11 @@
 package com.bibbidi.wedding.catalog.controller.dto;
 
 import com.bibbidi.wedding.catalog.domain.Step;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.Set;
 
 public record StepResponse(
-        @JsonInclude(JsonInclude.Include.NON_NULL) Long id,
+        Long id,
         String name,
         String description,
         int displayOrder,
@@ -27,7 +26,7 @@ public record StepResponse(
 
     public static StepResponse forPublic(Step step) {
         return new StepResponse(
-                null,
+                step.id(),
                 step.name(),
                 step.description(),
                 step.displayOrder(),

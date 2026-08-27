@@ -56,7 +56,7 @@ class CatalogControllerIntegrationTest {
     private static final String CATALOG_PUBLIC_DESCRIPTION =
             "로그인 없이 조회할 수 있습니다. "
                     + "준비 영역, 단계, 항목을 각각 displayOrder 오름차순으로 반환합니다. "
-                    + "ID와 체크리스트 포함 여부는 내려주지 않습니다.";
+                    + "체크리스트 포함 여부(included)는 내려주지 않습니다.";
     private static final String SESSION_COOKIE_DESCRIPTION =
             "로그인 API가 발급한 인증 Session Cookie. 형식: JSESSIONID=<session-id>";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -175,28 +175,32 @@ class CatalogControllerIntegrationTest {
         mockMvc.perform(get("/api/catalog/public"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].id").value(WEDDING_HALL_CATEGORY_ID))
                 .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))
                 .andExpect(jsonPath("$.categories[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].steps[0].id").value(CONTRACT_STEP_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].name").value("웨딩홀 계약"))
                 .andExpect(jsonPath("$.categories[0].steps[0].description")
                         .value("웨딩홀을 결정하고 계약한다."))
                 .andExpect(jsonPath("$.categories[0].steps[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(EXCLUDED_ITEM_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("견적 비교"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(false))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[1].id").value(INCLUDED_ITEM_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].title").value("계약서 확인"))
+                .andExpect(jsonPath("$.categories[0].steps[1].id").value(CONSULTING_STEP_ID))
                 .andExpect(jsonPath("$.categories[0].steps[1].name").value("웨딩홀 상담"))
                 .andExpect(jsonPath("$.categories[0].steps[1].description").value(nullValue()))
                 .andExpect(jsonPath("$.categories[0].steps[1].items").isEmpty())
+                .andExpect(jsonPath("$.categories[1].id").value(HONEYMOON_CATEGORY_ID))
                 .andExpect(jsonPath("$.categories[1].name").value("신혼여행"))
                 .andExpect(jsonPath("$.categories[1].displayOrder").value(2))
                 .andExpect(jsonPath("$.categories[1].steps").isEmpty())
-                .andExpect(jsonPath("$.categories[0].id").doesNotExist())
-                .andExpect(jsonPath("$.categories[0].steps[0].id").doesNotExist())
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
+                .andExpect(jsonPath("$.categories[0].steps[0].items[1].included").doesNotExist())
                 .andDo(document(
                         "catalog-public",
                         resource(ResourceSnippetParameters.builder()
@@ -250,11 +254,13 @@ class CatalogControllerIntegrationTest {
         return new FieldDescriptor[]{
                 fieldWithPath("categories")
                         .description("displayOrder 오름차순으로 정렬된 준비 영역 목록. 없으면 빈 배열"),
+                fieldWithPath("categories[].id").description("카탈로그 준비 영역 ID"),
                 fieldWithPath("categories[].name").description("준비 영역 이름"),
                 fieldWithPath("categories[].displayOrder")
                         .description("전체 준비 영역에서의 노출 순서. 값이 작을수록 먼저 노출"),
                 fieldWithPath("categories[].steps")
                         .description("현재 준비 영역의 단계 목록. displayOrder 오름차순이며 없으면 빈 배열"),
+                fieldWithPath("categories[].steps[].id").description("카탈로그 준비 단계 ID"),
                 fieldWithPath("categories[].steps[].name").description("준비 단계 이름"),
                 fieldWithPath("categories[].steps[].description")
                         .description("준비 단계 설명. 설명이 없으면 null")
@@ -263,6 +269,8 @@ class CatalogControllerIntegrationTest {
                         .description("현재 준비 영역 안에서의 단계 노출 순서. 값이 작을수록 먼저 노출"),
                 fieldWithPath("categories[].steps[].items")
                         .description("현재 단계의 준비 항목 목록. displayOrder 오름차순이며 없으면 빈 배열"),
+                fieldWithPath("categories[].steps[].items[].id")
+                        .description("카탈로그 준비 항목 ID. 사용자 체크리스트 항목 ID와는 다른 값"),
                 fieldWithPath("categories[].steps[].items[].title").description("준비 항목 제목"),
                 fieldWithPath("categories[].steps[].items[].displayOrder")
                         .description("현재 준비 단계 안에서의 항목 노출 순서. 값이 작을수록 먼저 노출"),
