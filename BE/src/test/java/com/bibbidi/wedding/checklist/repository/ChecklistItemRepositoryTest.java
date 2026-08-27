@@ -7,6 +7,7 @@ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -135,6 +136,25 @@ class ChecklistItemRepositoryTest {
         assertThat(checklistItemRepository.findByChecklistId(2000L))
                 .extracting(ChecklistItem::sourceCatalogItemId)
                 .containsExactly(102L);
+    }
+
+    @Test
+    @DisplayName("여러 할 일을 한 번에 저장하고 생성된 식별자를 채워 반환한다")
+    void shouldSaveAllItemsAndReturnGeneratedIds() {
+        // given
+        List<ChecklistItem> items = List.of(
+                new ChecklistItem(null, CHECKLIST_ID, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
+                new ChecklistItem(null, CHECKLIST_ID, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
+        );
+
+        // when
+        List<ChecklistItem> saved = checklistItemRepository.saveAll(items);
+
+        // then
+        assertThat(saved).hasSize(2).allSatisfy(item -> assertThat(item.id()).isNotNull());
+        assertThat(checklistItemRepository.findByChecklistId(CHECKLIST_ID))
+                .extracting(ChecklistItem::sourceCatalogItemId)
+                .containsExactly(100L, 101L);
     }
 
     @Test
