@@ -6,13 +6,13 @@ import com.bibbidi.wedding.user.domain.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@DataJpaTest
 @ActiveProfiles("test")
-@Transactional
+@Import({UserRepository.class, UserMapper.class})
 class UserRepositoryIntegrationTest {
 
     @Autowired
