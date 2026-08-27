@@ -15,17 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemEntity;
-import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
-import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
-import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
-import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
-import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
-import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +28,7 @@ import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -46,10 +36,17 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@Sql("/catalog-fixture.sql")
 @ExtendWith(RestDocumentationExtension.class)
 class CatalogControllerIntegrationTest {
 
     private static final Long USER_ID = 7L;
+    private static final long WEDDING_HALL_CATEGORY_ID = 2L;
+    private static final long HONEYMOON_CATEGORY_ID = 1L;
+    private static final long CONTRACT_STEP_ID = 11L;
+    private static final long CONSULTING_STEP_ID = 10L;
+    private static final long INCLUDED_ITEM_ID = 100L;
+    private static final long EXCLUDED_ITEM_ID = 101L;
     private static final String CATALOG_FIND_SUMMARY = "준비 목록 조회";
     private static final String CATALOG_FIND_DESCRIPTION =
             "로그인으로 발급받은 JSESSIONID Session Cookie가 필요합니다. "
@@ -62,70 +59,13 @@ class CatalogControllerIntegrationTest {
     @Autowired
     private WebApplicationContext context;
 
-    @Autowired
-    private JpaCategoryRepository jpaCategoryRepository;
-
-    @Autowired
-    private JpaStepRepository jpaStepRepository;
-
-    @Autowired
-    private JpaCatalogItemRepository jpaCatalogItemRepository;
-
-    @Autowired
-    private JpaChecklistRepository jpaChecklistRepository;
-
-    @Autowired
-    private JpaChecklistItemRepository jpaChecklistItemRepository;
-
     private MockMvc mockMvc;
-
-    private Long firstCategoryId;
-    private Long secondCategoryId;
-    private Long firstStepId;
-    private Long secondStepId;
-    private Long includedCatalogItemId;
-    private Long excludedCatalogItemId;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         mockMvc = webAppContextSetup(context)
                 .apply(documentationConfiguration(restDocumentation))
                 .build();
-
-        JpaCategoryEntity secondCategory = jpaCategoryRepository.save(
-                new JpaCategoryEntity(null, "신혼여행", 2)
-        );
-        JpaCategoryEntity firstCategory = jpaCategoryRepository.save(
-                new JpaCategoryEntity(null, "웨딩홀", 1)
-        );
-        JpaStepEntity secondStep = jpaStepRepository.save(new JpaStepEntity(
-                null, firstCategory.id(), "웨딩홀 상담", null, 2
-        ));
-        JpaStepEntity firstStep = jpaStepRepository.save(new JpaStepEntity(
-                null, firstCategory.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1
-        ));
-        JpaCatalogItemEntity includedCatalogItem = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
-                null, firstStep.id(), "계약서 확인", 2, true
-        ));
-        JpaCatalogItemEntity excludedCatalogItem = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
-                null, firstStep.id(), "견적 비교", 1, false
-        ));
-        JpaChecklistEntity checklist = jpaChecklistRepository.save(new JpaChecklistEntity(null, USER_ID));
-        jpaChecklistItemRepository.save(new JpaChecklistItemEntity(
-                null,
-                checklist.id(),
-                firstCategory.id(),
-                includedCatalogItem.id(),
-                "계약서 확인",
-                ChecklistItemStatus.PREV
-        ));
-
-        firstCategoryId = firstCategory.id();
-        secondCategoryId = secondCategory.id();
-        firstStepId = firstStep.id();
-        secondStepId = secondStep.id();
-        includedCatalogItemId = includedCatalogItem.id();
-        excludedCatalogItemId = excludedCatalogItem.id();
     }
 
     @Test
@@ -140,34 +80,32 @@ class CatalogControllerIntegrationTest {
                         .header(HttpHeaders.COOKIE, "JSESSIONID=" + session.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories.length()").value(2))
-                .andExpect(jsonPath("$.categories[0].id").value(firstCategoryId))
+                .andExpect(jsonPath("$.categories[0].id").value(WEDDING_HALL_CATEGORY_ID))
                 .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))
                 .andExpect(jsonPath("$.categories[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps.length()").value(2))
-                .andExpect(jsonPath("$.categories[0].steps[0].id").value(firstStepId))
+                .andExpect(jsonPath("$.categories[0].steps[0].id").value(CONTRACT_STEP_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].name").value("웨딩홀 계약"))
                 .andExpect(jsonPath("$.categories[0].steps[0].description")
                         .value("웨딩홀을 결정하고 계약한다."))
                 .andExpect(jsonPath("$.categories[0].steps[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items.length()").value(2))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id")
-                        .value(excludedCatalogItemId))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(EXCLUDED_ITEM_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("견적 비교"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(false))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").value(false))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[1].id")
-                        .value(includedCatalogItemId))
+                .andExpect(jsonPath("$.categories[0].steps[0].items[1].id").value(INCLUDED_ITEM_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].title").value("계약서 확인"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].displayOrder").value(2))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].essential").value(true))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].included").value(true))
-                .andExpect(jsonPath("$.categories[0].steps[1].id").value(secondStepId))
+                .andExpect(jsonPath("$.categories[0].steps[1].id").value(CONSULTING_STEP_ID))
                 .andExpect(jsonPath("$.categories[0].steps[1].name").value("웨딩홀 상담"))
                 .andExpect(jsonPath("$.categories[0].steps[1].description").value(nullValue()))
                 .andExpect(jsonPath("$.categories[0].steps[1].displayOrder").value(2))
                 .andExpect(jsonPath("$.categories[0].steps[1].items").isEmpty())
-                .andExpect(jsonPath("$.categories[1].id").value(secondCategoryId))
+                .andExpect(jsonPath("$.categories[1].id").value(HONEYMOON_CATEGORY_ID))
                 .andExpect(jsonPath("$.categories[1].name").value("신혼여행"))
                 .andExpect(jsonPath("$.categories[1].displayOrder").value(2))
                 .andExpect(jsonPath("$.categories[1].steps").isEmpty())
