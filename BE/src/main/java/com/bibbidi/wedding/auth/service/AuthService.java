@@ -4,7 +4,7 @@ import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
-import com.bibbidi.wedding.user.service.UserCreationResult;
+import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ public class AuthService {
         this.passwordHasher = passwordHasher;
     }
 
-    public UserCreationResult register(String nickname, String rawPassword) {
+    public UserResult register(String nickname, String rawPassword) {
         String passwordHash = passwordHasher.hash(rawPassword);
         return userService.createUser(nickname, passwordHash);
     }
