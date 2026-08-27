@@ -2,12 +2,13 @@ package com.bibbidi.wedding.catalog.domain;
 
 import java.util.Comparator;
 import java.util.List;
+import org.jspecify.annotations.NonNull;
 
 public final class Catalog {
 
     private final List<Category> categories;
 
-    public Catalog(List<Category> categories) {
+    public Catalog(@NonNull List<Category> categories) {
         this.categories = sortByDisplayOrder(categories);
     }
 

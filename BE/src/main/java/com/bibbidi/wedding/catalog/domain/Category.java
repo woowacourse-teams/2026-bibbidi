@@ -2,6 +2,7 @@ package com.bibbidi.wedding.catalog.domain;
 
 import java.util.Comparator;
 import java.util.List;
+import org.jspecify.annotations.NonNull;
 
 public final class Category {
 
@@ -10,7 +11,12 @@ public final class Category {
     private final int displayOrder;
     private final List<Step> steps;
 
-    public Category(Long id, String name, int displayOrder, List<Step> steps) {
+    public Category(
+            @NonNull Long id,
+            @NonNull String name,
+            int displayOrder,
+            @NonNull List<Step> steps
+    ) {
         this.id = id;
         this.name = name;
         this.displayOrder = displayOrder;

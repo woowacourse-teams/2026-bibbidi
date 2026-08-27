@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.catalog.domain;
 
+import org.jspecify.annotations.NonNull;
+
 public final class Item {
 
     private final Long id;
@@ -7,7 +9,12 @@ public final class Item {
     private final int displayOrder;
     private final boolean essential;
 
-    public Item(Long id, String title, int displayOrder, boolean essential) {
+    public Item(
+            @NonNull Long id,
+            @NonNull String title,
+            int displayOrder,
+            boolean essential
+    ) {
         this.id = id;
         this.title = title;
         this.displayOrder = displayOrder;
