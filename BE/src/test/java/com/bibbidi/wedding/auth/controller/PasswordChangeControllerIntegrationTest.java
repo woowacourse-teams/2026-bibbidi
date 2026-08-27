@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.session.AuthSession;
@@ -74,6 +75,7 @@ class PasswordChangeControllerIntegrationTest {
     @Test
     @DisplayName("현재 사용자의 비밀번호를 변경하고 현재 Session을 유지한다")
     void shouldChangeCurrentUserPasswordAndKeepSession() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, NEW_PASSWORD);
         MockHttpSession session = authenticatedSession(currentUserId);
         String sessionId = session.getId();
 
@@ -82,12 +84,7 @@ class PasswordChangeControllerIntegrationTest {
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .param("userId", otherUserId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "wish",
-                                  "newPassword": "magic"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""))
                 .andDo(document(
@@ -137,16 +134,13 @@ class PasswordChangeControllerIntegrationTest {
     @Test
     @DisplayName("현재 비밀번호가 일치하지 않으면 기존 비밀번호를 유지한다")
     void shouldKeepCurrentPasswordWhenCurrentPasswordDoesNotMatch(CapturedOutput output) throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest("incorrect-current", NEW_PASSWORD);
+
         MvcResult result = mockMvc.perform(put("/api/users/me/password")
                         .session(authenticatedSession(currentUserId))
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "incorrect-current",
-                                  "newPassword": "magic"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(202))
                 .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
@@ -195,17 +189,13 @@ class PasswordChangeControllerIntegrationTest {
     @Test
     @DisplayName("새 비밀번호가 기존 비밀번호와 같으면 저장하지 않고 성공한다")
     void shouldSucceedWithoutUpdatingWhenNewPasswordIsSameAsCurrentPassword() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, PASSWORD);
         MockHttpSession session = authenticatedSession(currentUserId);
 
         mockMvc.perform(put("/api/users/me/password")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "wish",
-                                  "newPassword": "wish"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
@@ -221,16 +211,13 @@ class PasswordChangeControllerIntegrationTest {
     @Test
     @DisplayName("현재 비밀번호가 없거나 새 비밀번호가 회원가입 정책에 맞지 않으면 변경하지 않는다")
     void shouldRejectInvalidPasswordChangeRequestWithoutUpdating() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest("", "123");
+
         mockMvc.perform(put("/api/users/me/password")
                         .session(authenticatedSession(currentUserId))
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "",
-                                  "newPassword": "123"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
@@ -275,14 +262,11 @@ class PasswordChangeControllerIntegrationTest {
     @Test
     @DisplayName("인증 Session이 없으면 비밀번호를 변경할 수 없다")
     void shouldRequireAuthenticationToChangePassword() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, NEW_PASSWORD);
+
         mockMvc.perform(put("/api/users/me/password")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "wish",
-                                  "newPassword": "magic"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
