@@ -1,6 +1,8 @@
 package com.bibbidi.wedding.checklist.service;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
+import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -14,9 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChecklistService {
 
     private final ChecklistRepository checklistRepository;
+    private final ChecklistItemRepository checklistItemRepository;
 
-    public ChecklistService(ChecklistRepository checklistRepository) {
+    public ChecklistService(
+            ChecklistRepository checklistRepository,
+            ChecklistItemRepository checklistItemRepository
+    ) {
         this.checklistRepository = checklistRepository;
+        this.checklistItemRepository = checklistItemRepository;
     }
 
     @Transactional
@@ -33,6 +40,7 @@ public class ChecklistService {
         }
     }
 
+    @Transactional(readOnly = true)
     public boolean checkOwnership(Long ownerId, Long checklistId) {
         Checklist target = checklistRepository.findByOwnerId(ownerId);
         return (
@@ -40,6 +48,13 @@ public class ChecklistService {
                         target.id(), checklistId
                 )
         );
+    }
+
+    @Transactional(readOnly = true)
+    public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
+        ChecklistItem checklistItem = checklistItemRepository.findById(checklistItemId);
+
+        return checkOwnership(ownerId, checklistItem.checklistId());
     }
 
     private BusinessException duplicateChecklist(Long ownerId) {
