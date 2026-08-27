@@ -78,7 +78,7 @@ class CatalogControllerIntegrationTest {
         mockMvc.perform(get("/api/catalog")
                         .session(session)
                         .header(HttpHeaders.COOKIE, "JSESSIONID=" + session.getId()))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.categories.length()").value(2))
                 .andExpect(jsonPath("$.categories[0].id").value(WEDDING_HALL_CATEGORY_ID))
                 .andExpect(jsonPath("$.categories[0].name").value("웨딩홀"))

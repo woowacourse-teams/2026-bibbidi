@@ -18,7 +18,7 @@ public class CatalogController {
         this.catalogService = catalogService;
     }
 
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.CREATED)
     @GetMapping("/api/catalog")
     public CatalogResponse find(@Auth Long userId) {
         CatalogQueryResult result = catalogService.find(userId);
