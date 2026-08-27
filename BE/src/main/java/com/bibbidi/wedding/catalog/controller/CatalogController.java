@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.catalog.controller;
 
 import com.bibbidi.wedding.auth.session.Auth;
-import com.bibbidi.wedding.catalog.controller.dto.PublicCatalogResponse;
 import com.bibbidi.wedding.catalog.controller.dto.CatalogResponse;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.service.CatalogService;
@@ -28,8 +27,8 @@ public class CatalogController {
     }
 
     @GetMapping("/api/catalog/public")
-    public PublicCatalogResponse findPublicCatalog() {
+    public CatalogResponse findPublicCatalog() {
         Catalog catalog = catalogService.findPublicCatalog();
-        return PublicCatalogResponse.from(catalog);
+        return CatalogResponse.forPublic(catalog);
     }
 }
