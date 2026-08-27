@@ -17,8 +17,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
+import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
@@ -32,6 +33,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.test.context.ActiveProfiles;
@@ -39,8 +41,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -60,6 +62,9 @@ class AuthControllerIntegrationTest {
     @Autowired
     private WebApplicationContext context;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private MockMvc mockMvc;
 
     @Autowired
@@ -75,7 +80,7 @@ class AuthControllerIntegrationTest {
         mockMvc = webAppContextSetup(context)
                 .apply(documentationConfiguration(restDocumentation))
                 .build();
-        user = userRepository.save(User.create(NICKNAME, passwordHasher.hash(PASSWORD)));
+        user = userRepository.save(new User(null, NICKNAME, passwordHasher.hash(PASSWORD)));
     }
 
     @Test
@@ -139,14 +144,11 @@ class AuthControllerIntegrationTest {
     @Test
     @DisplayName("존재하지 않는 닉네임과 잘못된 비밀번호는 동일한 인증 실패를 반환한다")
     void shouldReturnSameFailureForUnknownNicknameAndWrongPassword(CapturedOutput output) throws Exception {
+        LoginRequest unknownNicknameRequest = new LoginRequest("unknown", "unknown-password");
+
         MvcResult unknownNickname = mockMvc.perform(post("/api/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "unknown",
-                                  "password": "unknown-password"
-                                }
-                """))
+                        .content(objectMapper.writeValueAsString(unknownNicknameRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(202))
                 .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
@@ -200,14 +202,11 @@ class AuthControllerIntegrationTest {
     @Test
     @DisplayName("로그인 입력이 유효하지 않으면 세션을 생성하지 않고 요청을 거절한다")
     void shouldRejectInvalidLoginRequestWithoutCreatingSession() throws Exception {
+        LoginRequest request = new LoginRequest("", "123");
+
         mockMvc.perform(post("/api/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "",
-                                  "password": "123"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
@@ -266,14 +265,11 @@ class AuthControllerIntegrationTest {
         assertThat(output).doesNotContain("sessionId=");
     }
 
-    private MockHttpServletRequestBuilder loginRequest(String password) {
+    private MockHttpServletRequestBuilder loginRequest(String password) throws Exception {
+        LoginRequest request = new LoginRequest(NICKNAME, password);
+
         return post("/api/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                          "nickname": "%s",
-                          "password": "%s"
-                        }
-                        """.formatted(NICKNAME, password));
+                .content(objectMapper.writeValueAsString(request));
     }
 }

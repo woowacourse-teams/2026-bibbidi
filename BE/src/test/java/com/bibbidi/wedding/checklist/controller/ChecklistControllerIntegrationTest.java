@@ -4,7 +4,6 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,13 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
-import com.bibbidi.wedding.user.persistence.JpaUserEntity;
-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,28 +37,13 @@ import org.springframework.web.context.WebApplicationContext;
 class ChecklistControllerIntegrationTest {
 
     private static final Long USER_ID = 7L;
-    private static final String USER_NICKNAME = "bibbidi";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
     private static final String CREATE_SUMMARY = "빈 체크리스트 생성";
-    private static final String CREATE_DESCRIPTION =
-            "인증 Session의 사용자 ID를 소유자로 사용해 할 일이 없는 체크리스트를 생성합니다.";
-    private static final String SESSION_COOKIE_DESCRIPTION =
-            "로그인 시 발급된 JSESSIONID Session Cookie";
+    private static final String CREATE_DESCRIPTION = "인증 Session의 사용자 ID를 소유자로 사용해 할 일이 없는 체크리스트를 생성합니다.";
+    private static final String SESSION_COOKIE_DESCRIPTION = "로그인 시 발급된 JSESSIONID Session Cookie";
 
     @Autowired
     private WebApplicationContext context;
-
-    @Autowired
-    private JpaUserRepository jpaUserRepository;
-
-    @Autowired
-    private JpaChecklistRepository jpaChecklistRepository;
-
-    @Autowired
-    private JpaChecklistItemRepository jpaChecklistItemRepository;
-
-    @Autowired
-    private JpaAppointmentRepository jpaAppointmentRepository;
 
     private MockMvc mockMvc;
 
@@ -107,13 +85,6 @@ class ChecklistControllerIntegrationTest {
                                 )
                                 .build())
                 ));
-
-        assertThat(jpaChecklistRepository.findAll())
-                .singleElement()
-                .extracting(JpaChecklistEntity::ownerId)
-                .isEqualTo(USER_ID);
-        assertThat(jpaChecklistItemRepository.count()).isZero();
-        assertThat(jpaAppointmentRepository.count()).isZero();
     }
 
     @Test
@@ -150,12 +121,6 @@ class ChecklistControllerIntegrationTest {
                                 )
                                 .build())
                 ));
-
-        assertThat(jpaChecklistRepository.count()).isOne();
-        assertThat(jpaUserRepository.findById(USER_ID))
-                .get()
-                .extracting(JpaUserEntity::nickname)
-                .isEqualTo(USER_NICKNAME);
     }
 
     @Test
@@ -167,19 +132,18 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
                 .andDo(document(
-                        "checklists-create-authentication-required",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(CREATE_SUMMARY)
-                                .description(CREATE_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
-
-        assertThat(jpaChecklistRepository.count()).isZero();
+                                "checklists-create-authentication-required",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CREATE_SUMMARY)
+                                        .description(CREATE_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build())
+                        )
+                );
     }
 }

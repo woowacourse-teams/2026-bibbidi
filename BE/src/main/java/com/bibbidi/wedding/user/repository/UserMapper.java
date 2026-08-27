@@ -12,6 +12,6 @@ public class UserMapper {
     }
 
     public User toDomain(JpaUserEntity entity) {
-        return User.restore(entity.id(), entity.nickname(), entity.passwordHash());
+        return new User(entity.id(), entity.nickname(), entity.passwordHash());
     }
 }

@@ -2,8 +2,10 @@ package com.bibbidi.wedding.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -33,43 +36,39 @@ class UserServiceTest {
     @Test
     @DisplayName("대소문자만 다른 닉네임도 요청한 표기로 변경한다")
     void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
-        User user = User.restore(1L, "Bibbidi", "password-hash");
+        User user = new User(1L, "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
-        given(userRepository.existsByNicknameExcludingUser("bibbidi", 1L)).willReturn(false);
 
-        NicknameChangeResult result = userService.changeNickname(1L, "bibbidi");
+        UserResult result = userService.changeNickname(1L, "bibbidi");
 
-        assertThat(result).isEqualTo(new NicknameChangeResult(1L, "bibbidi"));
-        then(userRepository).should().existsByNicknameExcludingUser("bibbidi", 1L);
+        assertThat(result).isEqualTo(new UserResult(1L, "bibbidi"));
         then(userRepository).should().updateNickname(1L, "bibbidi");
     }
 
     @Test
     @DisplayName("현재 닉네임과 정확히 같으면 저장하지 않고 현재 정보를 반환한다")
     void shouldReturnCurrentUserWithoutSavingWhenNicknameIsExactlySame() {
-        User user = User.restore(1L, "Bibbidi", "password-hash");
+        User user = new User(1L, "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
 
-        NicknameChangeResult result = userService.changeNickname(1L, "Bibbidi");
+        UserResult result = userService.changeNickname(1L, "Bibbidi");
 
-        assertThat(result).isEqualTo(new NicknameChangeResult(1L, "Bibbidi"));
-        then(userRepository).should(never()).existsByNicknameExcludingUser("Bibbidi", 1L);
+        assertThat(result).isEqualTo(new UserResult(1L, "Bibbidi"));
         then(userRepository).should(never()).updateNickname(1L, "Bibbidi");
     }
 
     @Test
-    @DisplayName("다른 사용자가 대소문자만 다른 닉네임을 사용하면 변경하지 않는다")
-    void shouldRejectWithoutUpdatingWhenAnotherUserHasNicknameIgnoringCase() {
-        User user = User.restore(1L, "current", "password-hash");
+    @DisplayName("다른 사용자가 이미 사용하는 닉네임이면 변경을 거절한다")
+    void shouldRejectWhenAnotherUserAlreadyHasNickname() {
+        User user = new User(1L, "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
-        given(userRepository.existsByNicknameExcludingUser("TAKEN", 1L)).willReturn(true);
+        willThrow(new DataIntegrityViolationException("uk_users_nickname"))
+                .given(userRepository).updateNickname(1L, "TAKEN");
 
         assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_NICKNAME);
-
-        then(userRepository).should(never()).updateNickname(1L, "TAKEN");
     }
 
     @Test
@@ -83,6 +82,38 @@ class UserServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
+    void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
+        given(userRepository.existsByNickname("bibbidi")).willReturn(false);
+
+        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+
+        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", true));
+    }
+
+    @Test
+    @DisplayName("이미 사용 중인 닉네임은 사용할 수 없다고 응답한다")
+    void shouldReportNicknameAsUnavailableWhenSomebodyUsesIt() {
+        given(userRepository.existsByNickname("bibbidi")).willReturn(true);
+
+        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+
+        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
+    }
+
+    @Test
+    @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
+    void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
+        given(userRepository.save(any(User.class)))
+                .willThrow(new DataIntegrityViolationException("uk_users_nickname"));
+
+        assertThatThrownBy(() -> userService.createUser("bibbidi", "password-hash"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
     }
 
     @Test

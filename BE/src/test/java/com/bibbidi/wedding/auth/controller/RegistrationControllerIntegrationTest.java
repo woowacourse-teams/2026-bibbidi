@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
@@ -35,6 +36,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -42,8 +44,13 @@ import org.springframework.web.context.WebApplicationContext;
 @ExtendWith({OutputCaptureExtension.class, RestDocumentationExtension.class})
 class RegistrationControllerIntegrationTest {
 
+    private static final String CREATE_USER_DESCRIPTION = "닉네임과 비밀번호로 사용자를 생성합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
+
     @Autowired
     private WebApplicationContext context;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private MockMvc mockMvc;
 
@@ -63,14 +70,11 @@ class RegistrationControllerIntegrationTest {
     @Test
     @DisplayName("유효한 가입 요청이면 사용자를 생성한다")
     void shouldCreateUserWhenRequestIsValid() throws Exception {
+        CreateUserRequest request = new CreateUserRequest("bibbidi", "wish");
+
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "bibbidi",
-                                  "password": "wish"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.nickname").value("bibbidi"))
@@ -82,7 +86,7 @@ class RegistrationControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("User")
                                 .summary("회원가입")
-                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .description(CREATE_USER_DESCRIPTION)
                                 .requestSchema(schema("CreateUserRequest"))
                                 .responseSchema(schema("CreateUserResponse"))
                                 .requestFields(
@@ -107,14 +111,11 @@ class RegistrationControllerIntegrationTest {
     void shouldRejectWithoutPasswordLeakWhenRequestIsInvalid(
             CapturedOutput output
     ) throws Exception {
+        CreateUserRequest request = new CreateUserRequest("12345678901", "q!3");
+
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "12345678901",
-                                  "password": "q!3"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.errorCode").isNumber())
@@ -136,7 +137,7 @@ class RegistrationControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("User")
                                 .summary("회원가입")
-                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .description(CREATE_USER_DESCRIPTION)
                                 .requestSchema(schema("CreateUserRequest"))
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
@@ -163,14 +164,11 @@ class RegistrationControllerIntegrationTest {
     @Test
     @DisplayName("닉네임이 비어 있거나 비밀번호가 20자를 초과하면 요청을 거절한다")
     void shouldRejectRequestWhenNicknameIsEmptyAndPasswordIsTooLong() throws Exception {
+        CreateUserRequest request = new CreateUserRequest("", "123456789012345678901");
+
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "",
-                                  "password": "123456789012345678901"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.length()").value(2))
                 .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
@@ -183,7 +181,7 @@ class RegistrationControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("User")
                                 .summary("회원가입")
-                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .description(CREATE_USER_DESCRIPTION)
                                 .requestSchema(schema("CreateUserRequest"))
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
@@ -204,24 +202,17 @@ class RegistrationControllerIntegrationTest {
     @Test
     @DisplayName("대소문자만 다른 닉네임이 이미 존재하면 가입을 거절한다")
     void shouldRejectWhenNicknameAlreadyExists(CapturedOutput output) throws Exception {
+        CreateUserRequest firstRequest = new CreateUserRequest("BibbidiTwo", "wish");
+        CreateUserRequest duplicateRequest = new CreateUserRequest("bibbiditwo", "wish");
+
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "BibbidiTwo",
-                                  "password": "wish"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "bibbiditwo",
-                                  "password": "wish"
-                                }
-                                """))
+                        .content(objectMapper.writeValueAsString(duplicateRequest)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(401))
                 .andExpect(jsonPath("$.errorCode").isNumber())
@@ -237,7 +228,7 @@ class RegistrationControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("User")
                                 .summary("회원가입")
-                                .description("닉네임과 비밀번호로 사용자를 생성합니다.")
+                                .description(CREATE_USER_DESCRIPTION)
                                 .requestSchema(schema("CreateUserRequest"))
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestFields(
@@ -255,7 +246,8 @@ class RegistrationControllerIntegrationTest {
                 .contains("WARN")
                 .contains("errorCode=401")
                 .contains("status=409")
-                .contains("message=닉네임 중복으로 회원가입에 실패했습니다.");
+                .contains("message=이미 사용 중인 닉네임입니다.")
+                .contains("nickname=bibbiditwo");
     }
 
     @Test

@@ -34,16 +34,16 @@ reviews:
     - path: "BE/**/*Exception*.java"
       instructions: |
         내부 예외 메시지와 클라이언트 공개 정보를 분리한다.
-        BusinessException은 ProblemType과 로그용 message를 가진다.
-        ErrorResponse에는 ProblemType의 숫자형 id, status, clientMessage만 전달한다.
+        BusinessException은 ClientError와 로그용 message를 가진다.
+        ErrorResponse에는 ClientError의 숫자형 errorCode와 공개 message만 전달한다.
         ErrorResponse.message에 ex.getMessage(), stack trace, SQL, 외부 API 원문을 넣지 않는다.
-        오류 ID는 docs/ERROR_CODES.md의 3자리 코드를 사용하며 임의로 추가·변경하지 않는다.
+        오류 코드는 docs/convention/error-handling.md와 Notion 오류 코드 데이터베이스를 확인하고 임의로 추가·변경하지 않는다.
 
     - path: "BE/**/*ExceptionHandler*.java"
       instructions: |
         ResponseEntityExceptionHandler를 상속하고 super.handleExceptionInternal(...) 처리 경로를 유지한다.
-        실제 HTTP status와 ErrorResponse.status는 같아야 한다.
-        일반 오류 응답은 id, status, message만 사용한다.
+        실제 HTTP status는 ClientError.httpStatus와 같아야 한다.
+        일반 오류 응답은 errorCode와 message만 사용한다.
         검증 오류만 문서화된 errors 확장 필드를 사용할 수 있다.
         예상 가능한 4xx는 WARN, 예상하지 못한 5xx는 원인 예외와 함께 ERROR로 기록한다.
 
@@ -53,13 +53,13 @@ reviews:
         테스트 메서드는 should[ExpectedBehavior]When[Condition] 형식의 lowerCamelCase를 사용한다.
         @DisplayName은 자연스러운 한국어로 작성한다.
         예외 테스트는 예외 타입과 hasMessage를 검증한다.
-        ErrorResponse의 id, status, message와 내부 메시지 비노출을 검증한다.
+        ErrorResponse의 errorCode, message와 내부 메시지 비노출을 검증한다.
         DB 테스트는 H2를 사용하고 외부 Provider는 실제 호출하지 않는다.
 
     - path: "docs/convention/**/*.md"
       instructions: |
         code-convention.md, error-handling.md, test-strategy.md, git-convention.md를 기준으로 문서를 검토한다.
-        오류 코드 추가·변경 시 docs/ERROR_CODES.md도 함께 확인한다.
+        오류 코드 추가·변경 시 error-handling.md와 Notion 오류 코드 데이터베이스도 함께 확인한다.
 
   pre_merge_checks:
     title:

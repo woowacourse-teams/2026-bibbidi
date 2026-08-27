@@ -4,10 +4,12 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
@@ -17,14 +19,21 @@ public class UserService {
     }
 
     @Transactional
-    public UserCreationResult createUser(String nickname, String passwordHash) {
-        if (userRepository.existsByNickname(nickname)) {
-            throw new BusinessException(ClientError.DUPLICATE_NICKNAME, "닉네임 중복으로 회원가입에 실패했습니다.");
+    public UserResult createUser(String nickname, String passwordHash) {
+        try {
+            User user = userRepository.save(new User(null, nickname, passwordHash));
+            return UserResult.from(user);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException(
+                    ClientError.DUPLICATE_NICKNAME,
+                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
+            );
         }
+    }
 
-        User user = userRepository.save(User.create(nickname, passwordHash));
-
-        return new UserCreationResult(user.id(), user.nickname());
+    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
     }
 
     public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
@@ -32,7 +41,6 @@ public class UserService {
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
-    @Transactional(readOnly = true)
     public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
         User user = findCurrentUser(currentUserId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
@@ -44,22 +52,22 @@ public class UserService {
     }
 
     @Transactional
-    public NicknameChangeResult changeNickname(Long currentUserId, String nickname) {
+    public UserResult changeNickname(Long currentUserId, String nickname) {
         User user = findCurrentUser(currentUserId);
 
         if (user.nickname().equals(nickname)) {
-            return NicknameChangeResult.from(user);
+            return UserResult.from(user);
         }
 
-        if (userRepository.existsByNicknameExcludingUser(nickname, currentUserId)) {
+        try {
+            userRepository.updateNickname(currentUserId, nickname);
+            return new UserResult(currentUserId, nickname);
+        } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     ClientError.DUPLICATE_NICKNAME,
-                    "닉네임 중복으로 변경에 실패했습니다. userId=" + currentUserId
+                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
             );
         }
-
-        userRepository.updateNickname(currentUserId, nickname);
-        return new NicknameChangeResult(currentUserId, nickname);
     }
 
     private User findCurrentUser(Long currentUserId) {
