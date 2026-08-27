@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChecklistService {
 
+    private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
+
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
 
@@ -27,26 +29,25 @@ public class ChecklistService {
     @Transactional
     public ChecklistCreationResult create(Long ownerId) {
         if (checklistRepository.existsByOwnerId(ownerId)) {
-            throw duplicateChecklist(ownerId);
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST,
+                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
+            );
         }
 
         try {
             Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
             return ChecklistCreationResult.from(checklist);
         } catch (DataIntegrityViolationException exception) {
-            throw duplicateChecklist(ownerId);
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST,
+                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
+            );
         }
     }
 
     @Transactional(readOnly = true)
     public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
         return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
-    }
-
-    private BusinessException duplicateChecklist(Long ownerId) {
-        return new BusinessException(
-                ClientError.DUPLICATE_CHECKLIST,
-                "체크리스트 중복 생성에 실패했습니다. ownerId=" + ownerId
-        );
     }
 }
