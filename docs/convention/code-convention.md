@@ -69,6 +69,12 @@ Controller → Service → Repository → Dao / Mapper
 - 제약 위반은 Service에서 `DataIntegrityViolationException`을 잡아 해당 `ClientError`의 `BusinessException`으로 변환한다.
 - 사용 가능 여부를 미리 알려주는 조회 API는 UX 목적으로만 둔다. 최종 판단은 저장 요청의 응답이 한다.
 
+## 예외
+
+- 예외는 던지는 자리에서 만든다. `BusinessException`을 만들어 돌려주는 private 헬퍼로 빼지 않는다. 어떤 `ClientError`로 왜 터졌는지가 그 줄에서 바로 읽혀야 한다.
+- 같은 메시지를 여러 곳에서 쓰면 상수로 뺀다. 메서드로 묶지 않는다.
+- 응답에 실패 원인을 자세히 적지 않는다. 어떤 값이 문제였는지는 `BusinessException`의 로그용 메시지에만 남긴다.
+
 ## Lombok
 
 - `Slf4j` 를 제외한 `Lombok` 제공 기능은 사용하지 않는다.
