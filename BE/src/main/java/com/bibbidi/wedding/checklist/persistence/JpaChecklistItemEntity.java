@@ -23,7 +23,7 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
     @Column(name = "checklist_id", nullable = false)
     private Long checklistId;
 
-    @Column(name = "category_id", nullable = false)
+    @Column(name = "category_id")
     private Long categoryId;
 
     @Column(name = "source_catalog_item_id")

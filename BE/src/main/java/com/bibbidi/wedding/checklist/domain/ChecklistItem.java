@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.domain;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public final class ChecklistItem {
@@ -13,11 +14,11 @@ public final class ChecklistItem {
 
     public ChecklistItem(
             @Nullable Long id,
-            Long checklistId,
-            Long categoryId,
-            String title,
-            Long sourceCatalogItemId,
-            ChecklistItemStatus status
+            @NonNull Long checklistId,
+            @Nullable Long categoryId,
+            @NonNull String title,
+            @Nullable Long sourceCatalogItemId,
+            @NonNull ChecklistItemStatus status
     ) {
         this.id = id;
         this.checklistId = checklistId;
