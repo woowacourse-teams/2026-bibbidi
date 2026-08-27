@@ -55,7 +55,7 @@ Controller → Service → Repository → Dao / Mapper
 ## 도메인 널 표기
 
 - 도메인 생성자 파라미터에 jSpecify `@NonNull`, `@Nullable`을 붙여 널 허용 여부를 드러낸다.
-- null을 돌려줄 수 있는 접근자에도 `@Nullable`을 붙인다.
+- 접근자에는 생성자에서 이미 드러낸 널 허용 여부를 반복해서 표기하지 않는다.
 - 생성자를 오버로딩해 널 허용 여부를 표현하지 않는다.
 - `Objects.requireNonNull`처럼 방어적인 널 검증 코드는 넣지 않는다. 표기로만 드러낸다.
 
