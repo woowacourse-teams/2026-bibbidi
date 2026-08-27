@@ -1,12 +1,10 @@
 package com.bibbidi.wedding.checklist.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,22 +60,20 @@ class ChecklistItemRepositoryTest {
         ChecklistItem saved = saveItem(CHECKLIST_ID, 100L);
 
         // when
-        ChecklistItem found = checklistItemRepository.findById(saved.id());
+        Optional<ChecklistItem> found = checklistItemRepository.findById(saved.id());
 
         // then
         assertThat(found)
+                .get()
                 .extracting(ChecklistItem::id, ChecklistItem::checklistId, ChecklistItem::title)
                 .containsExactly(saved.id(), CHECKLIST_ID, "계약서 확인");
     }
 
     @Test
-    @DisplayName("존재하지 않는 할 일을 조회하면 실패한다")
-    void shouldFailToFindChecklistItemWhenNotExists() {
+    @DisplayName("존재하지 않는 할 일을 조회하면 빈 결과를 반환한다")
+    void shouldReturnEmptyWhenChecklistItemDoesNotExist() {
         // when, then
-        assertThatThrownBy(() -> checklistItemRepository.findById(999L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
+        assertThat(checklistItemRepository.findById(999L)).isEmpty();
     }
 
     @Test

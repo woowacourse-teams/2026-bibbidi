@@ -1,13 +1,11 @@
 package com.bibbidi.wedding.checklist.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,21 +62,19 @@ class ChecklistRepositoryTest {
         Checklist saved = checklistRepository.save(new Checklist(null, OWNER_ID));
 
         // when
-        Checklist found = checklistRepository.findByOwnerId(OWNER_ID);
+        Optional<Checklist> found = checklistRepository.findByOwnerId(OWNER_ID);
 
         // then
         assertThat(found)
+                .get()
                 .extracting(Checklist::id, Checklist::ownerId)
                 .containsExactly(saved.id(), OWNER_ID);
     }
 
     @Test
-    @DisplayName("소유자의 체크리스트가 없으면 조회에 실패한다")
-    void shouldFailToFindChecklistWhenOwnerHasNone() {
+    @DisplayName("소유자의 체크리스트가 없으면 빈 결과를 반환한다")
+    void shouldReturnEmptyWhenOwnerHasNoChecklist() {
         // when, then
-        assertThatThrownBy(() -> checklistRepository.findByOwnerId(OWNER_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
+        assertThat(checklistRepository.findByOwnerId(OWNER_ID)).isEmpty();
     }
 }

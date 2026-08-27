@@ -16,6 +16,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,46 +90,22 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("소유자의 체크리스트이면 소유권을 인정한다")
-    void shouldConfirmOwnershipWhenChecklistBelongsToOwner() {
+    @DisplayName("체크리스트가 없는 사용자는 소유권을 인정받지 못한다")
+    void shouldDenyItemOwnershipWhenOwnerHasNoChecklist() {
         // given
-        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOf(10L)));
+        given(checklistRepository.findByOwnerId(1L)).willReturn(Optional.empty());
 
         // when, then
-        assertThat(checklistService.checkOwnership(1L, 10L)).isTrue();
-    }
-
-    @Test
-    @DisplayName("다른 체크리스트이면 소유권을 인정하지 않는다")
-    void shouldDenyOwnershipWhenChecklistIsNotOwners() {
-        // given
-        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
-
-        // when, then
-        assertThat(checklistService.checkOwnership(1L, 99L)).isFalse();
-    }
-
-    @Test
-    @DisplayName("소유자의 체크리스트가 없으면 소유권 확인에 실패한다")
-    void shouldFailOwnershipCheckWhenOwnerHasNoChecklist() {
-        // given
-        willThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "not found"))
-                .given(checklistRepository)
-                .findByOwnerId(1L);
-
-        // when, then
-        assertThatThrownBy(() -> checklistService.checkOwnership(1L, 10L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
+        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
     }
 
     @Test
     @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권을 인정한다")
     void shouldConfirmItemOwnershipWhenItemBelongsToOwnersChecklist() {
         // given
-        given(checklistItemRepository.findById(200L)).willReturn(itemOf(10L));
-        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOf(10L)));
+        given(checklistRepository.findByOwnerId(1L)).willReturn(Optional.of(new Checklist(10L, 1L)));
 
         // when, then
         assertThat(checklistService.checkItemOwnership(1L, 200L)).isTrue();
@@ -138,26 +115,21 @@ class ChecklistServiceTest {
     @DisplayName("다른 사용자의 체크리스트에 속한 할 일이면 소유권을 인정하지 않는다")
     void shouldDenyItemOwnershipWhenItemBelongsToAnotherChecklist() {
         // given
-        given(checklistItemRepository.findById(200L)).willReturn(itemOf(99L));
-        given(checklistRepository.findByOwnerId(1L)).willReturn(new Checklist(10L, 1L));
+        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOf(99L)));
+        given(checklistRepository.findByOwnerId(1L)).willReturn(Optional.of(new Checklist(10L, 1L)));
 
         // when, then
         assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
     }
 
     @Test
-    @DisplayName("존재하지 않는 할 일은 소유권 판단 이전에 실패한다")
-    void shouldFailItemOwnershipCheckWhenItemDoesNotExist() {
+    @DisplayName("존재하지 않는 할 일은 소유권을 인정하지 않고 체크리스트를 조회하지 않는다")
+    void shouldDenyItemOwnershipWhenItemDoesNotExist() {
         // given
-        willThrow(new BusinessException(ClientError.CHECKLIST_ITEM_NOT_FOUND, "not found"))
-                .given(checklistItemRepository)
-                .findById(999L);
+        given(checklistItemRepository.findById(999L)).willReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> checklistService.checkItemOwnership(1L, 999L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
+        assertThat(checklistService.checkItemOwnership(1L, 999L)).isFalse();
         then(checklistRepository).should(never()).findByOwnerId(1L);
     }
 }
