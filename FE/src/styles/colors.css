@@ -5,8 +5,10 @@
   --color-bg-brand-solid: #ff6600;
   --color-bg-brand-solid-pressed: #e14d00;
   --color-bg-brand-weak: #fff2ec;
+  --color-bg-critical-weak: #fdf0f0;
   --color-bg-informative-weak: #eff6ff;
   --color-bg-neutral-weak: #f3f4f5;
+  --color-bg-positive-weak: #edfaf6;
   --color-fg-neutral: #1a1c20;
   --color-fg-neutral-muted: #555d6d;
   --color-fg-placeholder: #b0b3ba;
@@ -14,6 +16,7 @@
   --color-fg-informative: #217cf9;
   --color-fg-on-brand: #ffffff;
   --color-fg-critical: #fa342c;
+  --color-fg-positive: #079171;
   --color-stroke-neutral: #d5d7db;
   --color-stroke-neutral-weak: #dcdee3;
   --color-stroke-brand-solid: #ff6600;
