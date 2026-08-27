@@ -1,0 +1,135 @@
+.unscheduled-task {
+  display: flex;
+  width: min(100%, 420px);
+  height: 456px;
+  padding: 24px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+  flex-direction: column;
+  gap: 20px;
+}
+
+.unscheduled-task__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.unscheduled-task__header h2 {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.unscheduled-task__count {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.unscheduled-task__scroll-area {
+  min-height: 0;
+  flex: 1;
+  padding-right: 8px;
+  overflow-y: auto;
+  scrollbar-color: var(--color-stroke-neutral-weak) transparent;
+  scrollbar-width: thin;
+}
+
+.unscheduled-task__scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.unscheduled-task__scroll-area::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--color-stroke-neutral-weak);
+}
+
+.unscheduled-task__scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.unscheduled-task__list {
+  display: flex;
+  padding: 0 0 72px;
+  margin: 0;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.unscheduled-task-card {
+  display: flex;
+  min-width: 0;
+  min-height: 78px;
+  padding: 15px;
+  border-radius: 8px;
+  background: var(--color-bg-neutral-weak);
+  flex-direction: column;
+  gap: 10px;
+}
+
+.unscheduled-task-card__top,
+.unscheduled-task-card__status {
+  display: flex;
+  align-items: center;
+}
+
+.unscheduled-task-card__top {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.unscheduled-task-card__category {
+  overflow: hidden;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unscheduled-task-card__status {
+  flex: none;
+  color: var(--color-fg-informative);
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.unscheduled-task-card__status-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.unscheduled-task-card__title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-fg-neutral);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .unscheduled-task {
+    padding: 20px;
+  }
+}

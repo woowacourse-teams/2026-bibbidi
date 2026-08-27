@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { BibidiBrand } from "../components/BibidiBrand/BibidiBrand";
 import {
   HomeHeaderSummaryFeature,
+  UnscheduledTaskFeature,
   UpcomingScheduleFeature,
 } from "../features/home";
 import { AppHeader } from "../layouts/AppHeader";
@@ -24,7 +25,10 @@ export function HomePage() {
     <div className="home-page">
       <AppHeader homeLink={homeLink} summary={<HomeHeaderSummaryFeature />} />
       <main aria-label="홈 콘텐츠" className="home-page__content">
-        <UpcomingScheduleFeature />
+        <div className="home-page__dashboard-top">
+          <UpcomingScheduleFeature />
+          <UnscheduledTaskFeature />
+        </div>
       </main>
     </div>
   );
