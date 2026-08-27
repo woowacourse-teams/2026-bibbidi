@@ -37,9 +37,24 @@ Controller → Service → Repository → Dao / Mapper
 
 - URI는 행위가 아닌 리소스를 표현한다.
 - 조회·생성·전체 수정·삭제는 각각 `GET`·`POST`·`PUT`·`DELETE`를 사용한다.
-- Controller는 HTTP 상태를 명시하기 위해 `ResponseEntity`를 반환한다.
+- Controller는 응답 본문 타입을 그대로 반환한다. 상태는 `@ResponseStatus`로 표시한다.
+- 기본값인 `200 OK`는 명시하지 않는다. 기본값이 아닌 상태만 `@ResponseStatus`로 드러낸다.
 - 상태 코드는 RFC 9110을 기준으로 결정한다.
 - 상태 코드가 애매하면 근거와 선택 이유를 먼저 제시한다.
+
+## 인증
+
+- 인증이 필요한 핸들러는 `@Auth Long userId`를 파라미터로 받는다.
+- `AuthArgumentResolver`가 세션을 확인하고, 유효한 사용자 ID가 없으면 401을 던진다.
+- 인증 경계는 인터셉터가 아니라 이 파라미터에 걸려 있다. `@Auth`를 받지 않는 핸들러는 로그인 없이 접근할 수 있다.
+- 로그인 여부에 따라 응답 필드가 달라져야 하면, 한 경로에서 필드를 빼지 말고 경로와 응답 DTO를 나눈다.
+
+## 도메인 널 표기
+
+- 도메인 생성자 파라미터에 jSpecify `@NonNull`, `@Nullable`을 붙여 널 허용 여부를 드러낸다.
+- null을 돌려줄 수 있는 접근자에도 `@Nullable`을 붙인다.
+- 생성자를 오버로딩해 널 허용 여부를 표현하지 않는다.
+- `Objects.requireNonNull`처럼 방어적인 널 검증 코드는 넣지 않는다. 표기로만 드러낸다.
 
 ## 트랜잭션과 동시성
 
@@ -65,6 +80,8 @@ Controller → Service → Repository → Dao / Mapper
 - [ ] 도메인 모델과 Entity를 분리했다.
 - [ ] request DTO 검증을 적용했다.
 - [ ] REST 경로·메서드·상태 코드에 근거가 있다.
+- [ ] 기본값이 아닌 응답 상태만 명시했다.
+- [ ] 도메인 생성자에 널 허용 여부를 표기했다.
 - [ ] 오류 응답을 정해진 계약으로 통일했다.
 - [ ] 조회 트랜잭션에 readOnly를 적용했다.
 - [ ] 락을 임의로 추가하지 않았다.
