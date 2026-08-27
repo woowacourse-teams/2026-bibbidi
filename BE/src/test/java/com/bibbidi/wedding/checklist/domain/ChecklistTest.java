@@ -18,4 +18,5 @@ class ChecklistTest {
                 .extracting(Checklist::id, Checklist::ownerId)
                 .containsExactly(null, 1L);
     }
+
 }

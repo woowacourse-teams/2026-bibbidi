@@ -14,6 +14,7 @@ public enum ClientError {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, 301, "사용자를 찾을 수 없습니다."),
     APPOINTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, 302, "일정을 찾을 수 없습니다."),
     CHECKLIST_NOT_FOUND(HttpStatus.NOT_FOUND, 303, "체크리스트를 찾을 수 없습니다."),
+    CHECKLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 304, "할 일을 찾을 수 없습니다."),
 
     // 400: 비즈니스 오류
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, 401, "이미 사용 중인 닉네임입니다."),
