@@ -78,4 +78,24 @@ export const preparationRoadmapData = {
     ],
     title: "웨딩홀 준비 로드맵",
   },
+  stepDetails: [
+    {
+      description: "본식 사진과 영상 업체를 비교하고 계약해요.",
+      stepId: "photo-video-contract",
+      tasks: [
+        {
+          id: "wedding-snapshot-contract",
+          title: "본식 스냅 계약",
+        },
+        {
+          id: "wedding-video-vendor-comparison",
+          title: "본식 영상 업체 비교",
+        },
+        {
+          id: "wedding-video-contract",
+          title: "본식 영상 계약",
+        },
+      ],
+    },
+  ],
 } satisfies PreparationCatalogModel;

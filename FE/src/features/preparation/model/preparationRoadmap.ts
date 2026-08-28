@@ -13,6 +13,17 @@ export interface PreparationStepModel {
   title: string;
 }
 
+export interface PreparationDetailTaskModel {
+  id: string;
+  title: string;
+}
+
+export interface PreparationStepDetailModel {
+  description: string;
+  stepId: string;
+  tasks: PreparationDetailTaskModel[];
+}
+
 export interface PreparationRoadmapModel {
   categoryId: string;
   defaultStepId: string;
@@ -23,4 +34,5 @@ export interface PreparationRoadmapModel {
 export interface PreparationCatalogModel {
   categories: PreparationCategoryModel[];
   roadmap: PreparationRoadmapModel;
+  stepDetails: PreparationStepDetailModel[];
 }
