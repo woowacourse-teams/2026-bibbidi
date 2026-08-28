@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.catalog.domain;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -38,6 +39,13 @@ public final class Category {
 
     public List<Step> steps() {
         return steps;
+    }
+
+    public List<Item> findItems(Collection<Long> itemIds) {
+        return steps.stream()
+                .flatMap(step -> step.items().stream())
+                .filter(item -> itemIds.contains(item.id()))
+                .toList();
     }
 
     private static List<Step> sortByDisplayOrder(List<Step> steps) {

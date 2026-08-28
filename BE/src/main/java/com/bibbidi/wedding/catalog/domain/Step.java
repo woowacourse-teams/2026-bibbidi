@@ -35,7 +35,6 @@ public final class Step {
         return name;
     }
 
-    @Nullable
     public String description() {
         return description;
     }

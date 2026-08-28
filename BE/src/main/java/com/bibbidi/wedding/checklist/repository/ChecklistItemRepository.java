@@ -42,4 +42,14 @@ public class ChecklistItemRepository {
 
         return checklistMapper.toDomain(saved);
     }
+
+    public List<ChecklistItem> saveAll(List<ChecklistItem> checklistItems) {
+        List<JpaChecklistItemEntity> entities = checklistItems.stream()
+                .map(checklistMapper::toEntity)
+                .toList();
+
+        return jpaChecklistItemRepository.saveAllAndFlush(entities).stream()
+                .map(checklistMapper::toDomain)
+                .toList();
+    }
 }

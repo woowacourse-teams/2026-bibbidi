@@ -55,7 +55,7 @@ Controller → Service → Repository → Dao / Mapper
 ## 도메인 널 표기
 
 - 도메인 생성자 파라미터에 jSpecify `@NonNull`, `@Nullable`을 붙여 널 허용 여부를 드러낸다.
-- null을 돌려줄 수 있는 접근자에도 `@Nullable`을 붙인다.
+- 접근자에는 같은 표기를 반복하지 않는다. 널 허용 여부는 생성자 파라미터 한 곳에서만 드러낸다.
 - 생성자를 오버로딩해 널 허용 여부를 표현하지 않는다.
 - `Objects.requireNonNull`처럼 방어적인 널 검증 코드는 넣지 않는다. 표기로만 드러낸다.
 
@@ -68,6 +68,19 @@ Controller → Service → Repository → Dao / Mapper
 - 값의 유일성은 DB의 UNIQUE 제약으로 보장한다. 조회로 먼저 확인하고 저장하는 방식은 두 요청 사이의 경합을 막지 못한다.
 - 제약 위반은 Service에서 `DataIntegrityViolationException`을 잡아 해당 `ClientError`의 `BusinessException`으로 변환한다.
 - 사용 가능 여부를 미리 알려주는 조회 API는 UX 목적으로만 둔다. 최종 판단은 저장 요청의 응답이 한다.
+
+## 스키마 변경
+
+- `bibbidi_mvp_schema.sql`은 DB를 처음 만들 때만 실행된다. 이 파일만 고치면 이미 만들어진 DB는 바뀌지 않는다.
+- 이미 만들어진 DB까지 바꿔야 하는 변경은 `BE/database/mysql/migration/`에 실행 순서대로 번호를 붙인 SQL로 함께 남긴다.
+- 새 DB는 스키마 파일로, 기존 DB는 마이그레이션으로 같은 상태에 도달하도록 두 파일을 맞춘다.
+- `ddl-auto: validate`는 널 허용 여부까지 검사하지 않는다. 스키마 변경은 이 설정에 기대지 않고 SQL로 명시한다.
+
+## 예외
+
+- 예외는 던지는 자리에서 만든다. `BusinessException`을 만들어 돌려주는 private 헬퍼로 빼지 않는다. 어떤 `ClientError`로 왜 터졌는지가 그 줄에서 바로 읽혀야 한다.
+- 같은 메시지를 여러 곳에서 쓰면 상수로 뺀다. 메서드로 묶지 않는다.
+- 응답에 실패 원인을 자세히 적지 않는다. 어떤 값이 문제였는지는 `BusinessException`의 로그용 메시지에만 남긴다.
 
 ## Lombok
 
