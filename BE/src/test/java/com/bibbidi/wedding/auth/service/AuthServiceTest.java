@@ -95,11 +95,12 @@ class AuthServiceTest {
         UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
         given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
         given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
-        given(passwordHasher.matches("new-password", "current-hash")).willReturn(false);
         given(passwordHasher.hash("new-password")).willReturn("new-hash");
 
         authService.changePassword(1L, "current-password", "new-password");
 
+        then(passwordHasher).should().matches("current-password", "current-hash");
+        then(passwordHasher).should(never()).matches("new-password", "current-hash");
         then(userService).should().changePasswordHash(1L, "new-hash");
     }
 
@@ -128,6 +129,7 @@ class AuthServiceTest {
 
         authService.changePassword(1L, "current-password", "current-password");
 
+        then(passwordHasher).should().matches("current-password", "current-hash");
         then(passwordHasher).should(never()).hash("current-password");
         then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
@@ -138,12 +140,12 @@ class AuthServiceTest {
         UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
         given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
         given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
-        given(passwordHasher.matches("new-password", "current-hash")).willReturn(false);
         given(passwordHasher.hash("new-password")).willThrow(new IllegalStateException("hashing failed"));
 
         assertThatThrownBy(() -> authService.changePassword(1L, "current-password", "new-password"))
                 .isInstanceOf(IllegalStateException.class);
 
+        then(passwordHasher).should(never()).matches("new-password", "current-hash");
         then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
 }

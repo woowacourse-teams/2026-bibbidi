@@ -50,7 +50,7 @@ public class AuthService {
             );
         }
 
-        if (passwordHasher.matches(newPassword, user.passwordHash())) {
+        if (currentPassword.equals(newPassword)) {
             return;
         }
 
