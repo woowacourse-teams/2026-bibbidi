@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.appointment.persistence;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,7 +17,7 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             SET appointment.checklistItemId = :newChecklistItemId
             WHERE appointment.id IN :targetAppointmentIds
             """)
-    int changeAllToNewChecklistItemIds(
+    void changeAllToNewChecklistItemIds(
             Long newChecklistItemId,
             List<Long> targetAppointmentIds
     );
@@ -26,5 +27,20 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             DELETE FROM JpaAppointmentEntity appointment
             WHERE appointment.id IN :targetAppointmentIds
             """)
-    int deleteAll(List<Long> targetAppointmentIds);
+    void deleteAll(List<Long> targetAppointmentIds);
+
+    @Query("""
+            SELECT appointment
+            FROM JpaAppointmentEntity appointment
+            JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
+            JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId
+            WHERE checklist.ownerId = :userId
+              AND appointment.startTime <= :endTime
+              AND appointment.endTime >= :startTime
+            """)
+    List<JpaAppointmentEntity> findOverlapCandidates(
+            Long userId,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    );
 }

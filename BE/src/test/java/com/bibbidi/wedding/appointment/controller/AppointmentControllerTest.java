@@ -91,7 +91,13 @@ class AppointmentControllerTest {
     @DisplayName("제목이 비어 있으면 생성 요청을 거부한다")
     void shouldRejectCreateRequestWhenTitleIsBlank() throws Exception {
         CreateAppointmentRequest request = new CreateAppointmentRequest(
-                " ", LocalDate.of(2026, 9, 1), null, null, null, null);
+                " ",
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null
+        );
 
         mockMvc.perform(post("/api/checklist-items/1/appointments")
                         .session(authenticatedSession())
@@ -160,7 +166,13 @@ class AppointmentControllerTest {
     @DisplayName("미인증 수정 요청을 거부한다")
     void shouldRejectUpdateRequestWhenUnauthenticated() throws Exception {
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
-                "appointment", LocalDate.of(2026, 9, 1), null, null, null, null);
+                "appointment",
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null
+        );
 
         mockMvc.perform(put("/api/appointments/1")
                         .contentType(MediaType.APPLICATION_JSON)

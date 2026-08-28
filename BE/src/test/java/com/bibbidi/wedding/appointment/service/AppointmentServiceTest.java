@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.appointment.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.never;
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -115,10 +117,53 @@ class AppointmentServiceTest {
         then(appointmentRepository).shouldHaveNoInteractions();
     }
 
+    @Test
+    void shouldReturnConflictsAfterCreatingAppointment() {
+        Appointment saved = new Appointment(
+                200L,
+                CHECKLIST_ITEM_ID,
+                "new appointment",
+                LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0),
+                LocalDateTime.of(2026, 9, 1, 11, 0),
+                "place",
+                "memo",
+                false
+        );
+        AppointmentConflict conflict = new AppointmentConflict(
+                300L, 20L, "conflict", saved.date(),
+                LocalDateTime.of(2026, 9, 1, 10, 30),
+                LocalDateTime.of(2026, 9, 1, 11, 30), "other place");
+        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(true);
+        given(appointmentRepository.save(any(Appointment.class))).willReturn(saved);
+        given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
+                .willReturn(List.of(new Appointment(
+                        conflict.appointmentId(),
+                        conflict.checklistItemId(),
+                        conflict.title(),
+                        conflict.date(),
+                        conflict.startTime(),
+                        conflict.endTime(),
+                        conflict.place(),
+                        null,
+                        false
+                )));
+
+        assertThat(appointmentService.create(createCommand()).conflicts()).containsExactly(conflict);
+    }
+
     private static Appointment appointment() {
-        return new Appointment(APPOINTMENT_ID, CHECKLIST_ITEM_ID, "title",
-                LocalDate.of(2026, 9, 1), LocalDateTime.of(2026, 9, 1, 10, 0),
-                LocalDateTime.of(2026, 9, 1, 11, 0), "place", "memo", false);
+        return new Appointment(
+                APPOINTMENT_ID,
+                CHECKLIST_ITEM_ID,
+                "title",
+                LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0),
+                LocalDateTime.of(2026, 9, 1, 11, 0),
+                "place",
+                "memo",
+                false
+        );
     }
 
     private static AppointmentCreationCommand createCommand() {

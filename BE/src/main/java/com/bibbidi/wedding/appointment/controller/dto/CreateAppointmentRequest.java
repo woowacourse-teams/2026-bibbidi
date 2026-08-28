@@ -20,8 +20,8 @@ public record CreateAppointmentRequest(
         String memo
 ) {
 
-    @AssertTrue(message = "startTime은 endTime보다 빨라야 합니다.")
+    @AssertTrue(message = "startTime은 endTime보다 늦을 수 없습니다.")
     public boolean hasValidTimeRange() {
-        return startTime == null || endTime == null || startTime.isBefore(endTime);
+        return startTime == null || endTime == null || !startTime.isAfter(endTime);
     }
 }

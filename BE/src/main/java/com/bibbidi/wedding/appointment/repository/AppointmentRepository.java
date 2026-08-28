@@ -46,6 +46,17 @@ public class AppointmentRepository {
         jpaAppointmentRepository.deleteAll(targetAppointmentIds);
     }
 
+    public List<Appointment> findOverlapCandidates(Long userId, Appointment appointment) {
+        return jpaAppointmentRepository.findOverlapCandidates(
+                        userId,
+                        appointment.startTime(),
+                        appointment.endTime()
+                )
+                .stream()
+                .map(appointmentMapper::toDomain)
+                .toList();
+    }
+
     private @NonNull JpaAppointmentEntity getJpaAppointmentEntity(Long id) {
         return jpaAppointmentRepository.findById(id)
                 .orElseThrow(
