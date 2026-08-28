@@ -43,7 +43,11 @@
 }
 
 .preparation-roadmap__workspace {
-  width: 820px;
+  display: grid;
+  width: 1260px;
+  grid-template-columns: 740px 404px;
+  align-items: start;
+  gap: 24px;
   padding: 28px 40px;
 }
 
@@ -224,4 +228,91 @@
   color: var(--color-fg-neutral-muted);
   font-size: 14px;
   line-height: 1.4;
+}
+
+.preparation-step-detail {
+  padding-top: 52px;
+}
+
+.preparation-step-detail__header h2,
+.preparation-step-detail__header p {
+  margin: 0;
+}
+
+.preparation-step-detail__panel {
+  min-height: 606px;
+  padding: 24px 0 16px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+}
+
+.preparation-step-detail__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 24px 16px;
+}
+
+.preparation-step-detail__category {
+  color: var(--color-fg-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-step-detail__header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-step-detail__header p {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.preparation-step-detail__status {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-step-detail__divider {
+  height: 1px;
+  background: var(--color-stroke-neutral-weak);
+}
+
+.preparation-step-detail__tasks {
+  padding: 12px 0 0;
+  margin: 0;
+  list-style: none;
+}
+
+.preparation-step-detail__tasks li {
+  display: flex;
+  height: 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.preparation-step-detail__tasks li > span {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-bg-brand-solid);
 }
