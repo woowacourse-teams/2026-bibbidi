@@ -55,6 +55,6 @@ public class AuthService {
         }
 
         String newPasswordHash = passwordHasher.hash(newPassword);
-        userService.updatePasswordHash(currentUserId, newPasswordHash);
+        userService.changePasswordHash(currentUserId, newPasswordHash);
     }
 }

@@ -30,7 +30,7 @@ public class UserRepository {
     }
 
     public User save(User user) {
-        JpaUserEntity saved = jpaUserRepository.save(userMapper.toEntity(user));
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
         return userMapper.toDomain(saved);
     }
 
@@ -44,18 +44,6 @@ public class UserRepository {
         return userMapper.toDomain(
                 getJpaUserEntity(userId)
         );
-    }
-
-    public void updateNickname(Long userId, String nickname) {
-        JpaUserEntity entity = getJpaUserEntity(userId);
-        entity.changeNickname(nickname);
-        jpaUserRepository.saveAndFlush(entity);
-    }
-
-    public void updatePasswordHash(Long userId, String passwordHash) {
-        JpaUserEntity entity = getJpaUserEntity(userId);
-        entity.changePasswordHash(passwordHash);
-        jpaUserRepository.save(entity);
     }
 
     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {

@@ -100,7 +100,7 @@ class AuthServiceTest {
 
         authService.changePassword(1L, "current-password", "new-password");
 
-        then(userService).should().updatePasswordHash(1L, "new-hash");
+        then(userService).should().changePasswordHash(1L, "new-hash");
     }
 
     @Test
@@ -116,7 +116,7 @@ class AuthServiceTest {
                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
 
         then(passwordHasher).should(never()).hash("new-password");
-        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
+        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
 
     @Test
@@ -129,7 +129,7 @@ class AuthServiceTest {
         authService.changePassword(1L, "current-password", "current-password");
 
         then(passwordHasher).should(never()).hash("current-password");
-        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
+        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
 
     @Test
@@ -144,6 +144,6 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.changePassword(1L, "current-password", "new-password"))
                 .isInstanceOf(IllegalStateException.class);
 
-        then(userService).should(never()).updatePasswordHash(anyLong(), anyString());
+        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
 }

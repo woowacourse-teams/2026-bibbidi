@@ -47,8 +47,10 @@ public class UserService {
     }
 
     @Transactional
-    public void updatePasswordHash(Long currentUserId, String passwordHash) {
-        userRepository.updatePasswordHash(currentUserId, passwordHash);
+    public void changePasswordHash(Long currentUserId, String passwordHash) {
+        User user = findCurrentUser(currentUserId);
+        User changedUser = user.changePasswordHash(passwordHash);
+        userRepository.save(changedUser);
     }
 
     @Transactional
@@ -60,8 +62,9 @@ public class UserService {
         }
 
         try {
-            userRepository.updateNickname(currentUserId, nickname);
-            return new UserResult(currentUserId, nickname);
+            User changedUser = user.changeNickname(nickname);
+            User savedUser = userRepository.save(changedUser);
+            return UserResult.from(savedUser);
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     ClientError.DUPLICATE_NICKNAME,

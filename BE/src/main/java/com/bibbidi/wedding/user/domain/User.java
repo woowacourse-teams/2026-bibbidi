@@ -15,6 +15,14 @@ public final class User {
         this.passwordHash = passwordHash;
     }
 
+    public User changeNickname(String nickname) {
+        return new User(id, nickname, passwordHash);
+    }
+
+    public User changePasswordHash(String passwordHash) {
+        return new User(id, nickname, passwordHash);
+    }
+
     public Long id() {
         return id;
     }

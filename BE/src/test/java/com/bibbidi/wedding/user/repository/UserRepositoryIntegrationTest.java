@@ -33,7 +33,7 @@ class UserRepositoryIntegrationTest {
     void shouldUpdateOnlyNickname() {
         User user = userRepository.save(new User(null, "Bibbidi", "password-hash"));
 
-        userRepository.updateNickname(user.id(), "bibbidi");
+        userRepository.save(user.changeNickname("bibbidi"));
         User updated = userRepository.findById(user.id());
 
         assertThat(updated.id()).isEqualTo(user.id());
@@ -47,7 +47,7 @@ class UserRepositoryIntegrationTest {
     void shouldUpdateOnlyPasswordHash() {
         User user = userRepository.save(new User(null, "Bibbidi", "current-hash"));
 
-        userRepository.updatePasswordHash(user.id(), "new-hash");
+        userRepository.save(user.changePasswordHash("new-hash"));
         User updated = userRepository.findById(user.id());
 
         assertThat(updated.id()).isEqualTo(user.id());
