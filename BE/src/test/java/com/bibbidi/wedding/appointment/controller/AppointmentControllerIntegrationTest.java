@@ -184,7 +184,7 @@ class AppointmentControllerIntegrationTest {
     @DisplayName("인증된 사용자가 소유하지 않은 체크리스트 항목으로 일정 생성을 요청하면 거부한다")
     void shouldRejectAppointmentWhenUserDoesNotOwnChecklistItem() throws Exception {
         CreateAppointmentRequest request = new CreateAppointmentRequest(
-                "?⑤뵫? ?곷떞", LocalDate.of(2026, 9, 1), null, null, null, null
+                "웨딩홀 상담", LocalDate.of(2026, 9, 1), null, null, null, null
         );
 
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 999L)
