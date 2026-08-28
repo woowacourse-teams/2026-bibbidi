@@ -7,11 +7,14 @@ import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AppointmentService {
+public class AppointmentService implements AppointmentDeleteServiceInterface {
 
     private final AppointmentRepository appointmentRepository;
     private final ChecklistService checklistService;
@@ -23,9 +26,11 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentCreationResult create(AppointmentCreationCommand command) {
+        validateItemOwnership(command.userId(), command.checklistItemId());
+
         Appointment appointment = new Appointment(
                 null,
-                command.itemId(),
+                command.checklistItemId(),
                 command.title(),
                 command.date(),
                 command.startTime(),
@@ -34,6 +39,7 @@ public class AppointmentService {
                 command.memo(),
                 false
         );
+
         Appointment saved = appointmentRepository.save(appointment);
         return AppointmentCreationResult.fromDomain(saved);
     }
@@ -41,7 +47,8 @@ public class AppointmentService {
     @Transactional
     public AppointmentUpdateResult update(AppointmentUpdateCommand command) {
         Appointment appointment = appointmentRepository.findById(command.appointmentId());
-        // TODO : Checklist 소유권자와 비교하는 작업 필요.
+        validateItemOwnership(command.userId(), appointment.checklistItemId());
+
         Appointment updated = appointment.update(
                 command.title(),
                 command.date(),
@@ -50,7 +57,44 @@ public class AppointmentService {
                 command.place(),
                 command.memo()
         );
+
         Appointment saved = appointmentRepository.save(updated);
         return AppointmentUpdateResult.fromDomain(saved);
+    }
+
+    @Override
+    @Transactional
+    public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
+        if (targetAppointmentIds.isEmpty()) {
+            return;
+        }
+        appointmentRepository.changeAllToNewChecklistItemIds(newChecklistItemId, targetAppointmentIds);
+    }
+
+    @Transactional
+    public void delete(Long userId, Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId);
+        validateItemOwnership(userId, appointment.checklistItemId());
+        appointmentRepository.deleteById(appointmentId);
+    }
+
+
+    @Override
+    @Transactional
+    public void deleteAll(List<Long> targetAppointmentIds) {
+        if (targetAppointmentIds.isEmpty()) {
+            return;
+        }
+        appointmentRepository.deleteAll(targetAppointmentIds);
+    }
+
+    private void validateItemOwnership(Long userId, Long checklistItemId) {
+        if (!checklistService.checkItemOwnership(userId, checklistItemId)) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
+                    "현재 사용자 계정에 속한 할 일이 아닙니다. userId=" + userId
+                            + ", checklistItemId=" + checklistItemId
+            );
+        }
     }
 }

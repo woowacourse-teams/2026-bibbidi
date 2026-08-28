@@ -5,7 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record AppointmentCreationCommand(
-        Long itemId,
+        Long userId,
+        Long checklistItemId,
         String title,
         LocalDate date,
         LocalDateTime startTime,
@@ -14,8 +15,9 @@ public record AppointmentCreationCommand(
         String memo
 ) {
 
-    public static AppointmentCreationCommand fromRequest(Long itemId, CreateAppointmentRequest request) {
+    public static AppointmentCreationCommand fromRequest(Long userId, Long itemId, CreateAppointmentRequest request) {
         return new AppointmentCreationCommand(
+                userId,
                 itemId,
                 request.title(),
                 request.date(),
