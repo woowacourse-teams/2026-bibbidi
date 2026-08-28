@@ -14,10 +14,12 @@ import static org.mockito.Mockito.never;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.checklist.domain.Checklist;
+import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
@@ -219,5 +221,59 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);
+    }
+
+    @Test
+    @DisplayName("직접 적은 할 일을 사용자의 체크리스트에 추가한다")
+    void shouldWriteCustomItemToChecklist() {
+        // given
+        given(checklistRepository.findByOwnerId(OWNER_ID))
+                .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID)));
+        given(catalogService.existsCategory(CATEGORY_ID)).willReturn(true);
+        given(checklistItemRepository.save(any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        ChecklistItemCreationResult result = checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
+
+        // then
+        assertThat(result)
+                .extracting(
+                        ChecklistItemCreationResult::catalogItemId,
+                        ChecklistItemCreationResult::categoryId,
+                        ChecklistItemCreationResult::title,
+                        ChecklistItemCreationResult::isDone
+                )
+                .containsExactly(null, CATEGORY_ID, "청첩장 문구 정하기", false);
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없는 사용자의 직접 추가 요청은 체크리스트를 찾지 못해 실패한다")
+    void shouldFailToWriteItemWhenChecklistDoesNotExist() {
+        // given
+        given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
+        then(checklistItemRepository).should(never()).save(any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("준비 목록에 없는 카테고리로는 직접 할 일을 저장하지 않는다")
+    void shouldRejectWriteWhenCategoryDoesNotExist() {
+        // given
+        given(checklistRepository.findByOwnerId(OWNER_ID))
+                .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID)));
+        given(catalogService.existsCategory(999L)).willReturn(false);
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
+        then(checklistItemRepository).should(never()).save(any(ChecklistItem.class));
     }
 }

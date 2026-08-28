@@ -4,6 +4,7 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
+import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,10 @@ class ChecklistControllerIntegrationTest {
             "인증 Session의 사용자 ID를 소유자로 사용해 할 일이 없는 체크리스트를 생성합니다.";
     private static final String SESSION_COOKIE_DESCRIPTION =
             "로그인 시 발급된 JSESSIONID Session Cookie";
+    private static final String WRITE_SUMMARY = "직접 할 일 생성";
+    private static final String WRITE_DESCRIPTION =
+            "준비 목록에 없는 할 일을 제목과 카테고리만으로 현재 사용자의 체크리스트에 추가합니다. "
+                    + "원본 준비 항목이 없으므로 제목이 같은 할 일도 여러 번 추가할 수 있습니다.";
     private static final String ADD_SUMMARY = "준비 목록의 항목을 체크리스트에 추가";
     private static final String ADD_DESCRIPTION =
             "선택한 준비 항목의 제목과 카테고리를 복사해 현재 사용자의 체크리스트에 할 일로 추가합니다. "
@@ -290,5 +296,164 @@ class ChecklistControllerIntegrationTest {
                                 )
                                 .build())
                 ));
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("준비 목록에 없는 할 일을 자신의 체크리스트에 직접 추가한다")
+    void shouldWriteCustomItemToOwnChecklist() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
+                .andExpect(jsonPath("$.categoryId").value(2))
+                .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
+                .andExpect(jsonPath("$.isDone").value(false))
+                .andDo(document(
+                        "checklists-write-item",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(WRITE_SUMMARY)
+                                .description(WRITE_DESCRIPTION)
+                                .requestSchema(schema("CreateChecklistItemRequest"))
+                                .responseSchema(schema("CreateChecklistItemResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .requestFields(
+                                        fieldWithPath("title").description("할 일 제목. 앞뒤 공백을 제거한 뒤 1자 이상 50자 이하"),
+                                        fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("생성된 할 일 ID"),
+                                        fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
+                                        fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
+                                        fieldWithPath("title").description("할 일 제목"),
+                                        fieldWithPath("isDone").description("완료 여부")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("직접 만든 할 일은 제목이 같아도 여러 번 추가할 수 있다")
+    void shouldAllowDuplicateTitleForCustomItems() throws Exception {
+        // given
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
+                .andExpect(status().isCreated());
+
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"));
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("준비 목록에 없는 카테고리로는 직접 할 일을 만들 수 없다")
+    void shouldRejectWriteWhenCategoryDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 999L))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(305))
+                .andExpect(jsonPath("$.message").value("카테고리를 찾을 수 없습니다."))
+                .andDo(document(
+                        "checklists-write-item-category-not-found",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(WRITE_SUMMARY)
+                                .description(WRITE_DESCRIPTION)
+                                .responseSchema(schema("ErrorResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .requestFields(
+                                        fieldWithPath("title").description("할 일 제목"),
+                                        fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("공백만 있는 제목은 저장하지 않는다")
+    void shouldRejectBlankTitle() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("   ", 2L))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("50자를 넘는 제목은 저장하지 않는다")
+    void shouldRejectTooLongTitle() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("가".repeat(51), 2L))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없는 사용자는 직접 할 일을 만들 수 없다")
+    void shouldRejectWriteWhenChecklistDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(303))
+                .andExpect(jsonPath("$.message").value("체크리스트를 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 직접 할 일을 만들 수 없다")
+    void shouldRequireAuthenticationToWriteItem() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/checklists/me/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 }
