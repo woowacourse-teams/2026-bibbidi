@@ -12,17 +12,6 @@ public final class Checklist {
         this.ownerId = ownerId;
     }
 
-    public ChecklistItem take(Long categoryId, String title, Long catalogItemId) {
-        return new ChecklistItem(
-                null,
-                id,
-                categoryId,
-                title,
-                catalogItemId,
-                ChecklistItemStatus.PREV
-        );
-    }
-
     public Long id() {
         return id;
     }

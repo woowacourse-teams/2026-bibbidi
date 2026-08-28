@@ -4,6 +4,7 @@ import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -97,10 +98,13 @@ public class ChecklistService {
         }
 
         return catalogItems.stream()
-                .map(catalogItem -> checklist.take(
+                .map(catalogItem -> new ChecklistItem(
+                        null,
+                        checklist.id(),
                         catalogItem.categoryId(),
                         catalogItem.title(),
-                        catalogItem.id()
+                        catalogItem.id(),
+                        ChecklistItemStatus.PREV
                 ))
                 .toList();
     }
