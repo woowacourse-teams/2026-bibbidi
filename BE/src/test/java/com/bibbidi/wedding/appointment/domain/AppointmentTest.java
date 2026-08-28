@@ -1,7 +1,11 @@
 package com.bibbidi.wedding.appointment.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -91,5 +95,43 @@ class AppointmentTest {
                         null,
                         true
                 );
+    }
+
+    @Test
+    @DisplayName("시작 시각과 종료 시각이 모두 없거나 한쪽만 있으면 선후 검증을 하지 않는다")
+    void shouldAllowPartiallySpecifiedTime() {
+        assertThatCode(() -> appointmentWithTime(null, null)).doesNotThrowAnyException();
+        assertThatCode(() -> appointmentWithTime(START, null)).doesNotThrowAnyException();
+        assertThatCode(() -> appointmentWithTime(null, END)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("시작 시각과 종료 시각이 같은 0분짜리 일정도 허용한다")
+    void shouldAllowZeroLengthTime() {
+        assertThatCode(() -> appointmentWithTime(START, START)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("시작 시각이 종료 시각보다 늦으면 생성할 수 없다")
+    void shouldRejectReversedTimeWhenBothSpecified() {
+        assertThatCode(() -> appointmentWithTime(START, END)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> appointmentWithTime(END, START))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.INVALID_APPOINTMENT_TIME_RANGE);
+    }
+
+    private static Appointment appointmentWithTime(LocalDateTime startTime, LocalDateTime endTime) {
+        return new Appointment(
+                null,
+                CHECKLIST_ITEM_ID,
+                "Consultation",
+                DATE,
+                startTime,
+                endTime,
+                "Wedding hall",
+                "Preparation",
+                false
+        );
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 public enum ClientError {
     // 100: 요청 오류
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, 101, "요청 값이 올바르지 않습니다."),
+    INVALID_APPOINTMENT_TIME_RANGE(HttpStatus.BAD_REQUEST, 102, "일정의 시작 시각은 종료 시각보다 늦을 수 없습니다."),
 
     // 200: 인증/인가 오류
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, 201, "로그인이 필요합니다."),

@@ -46,6 +46,19 @@ public class AppointmentRepository {
         jpaAppointmentRepository.deleteAll(targetAppointmentIds);
     }
 
+    public List<Appointment> findConflictingWithNewAppointment(Long userId, Appointment appointment) {
+        return jpaAppointmentRepository.findConflictingWithNewAppointment(
+                        userId,
+                        appointment.date(),
+                        appointment.startTime(),
+                        appointment.endTime(),
+                        appointment.id()
+                )
+                .stream()
+                .map(appointmentMapper::toDomain)
+                .toList();
+    }
+
     private @NonNull JpaAppointmentEntity getJpaAppointmentEntity(Long id) {
         return jpaAppointmentRepository.findById(id)
                 .orElseThrow(

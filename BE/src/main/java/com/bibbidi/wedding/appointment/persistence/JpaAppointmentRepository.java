@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.appointment.persistence;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,7 +18,7 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             SET appointment.checklistItemId = :newChecklistItemId
             WHERE appointment.id IN :targetAppointmentIds
             """)
-    int changeAllToNewChecklistItemIds(
+    void changeAllToNewChecklistItemIds(
             Long newChecklistItemId,
             List<Long> targetAppointmentIds
     );
@@ -26,5 +28,33 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             DELETE FROM JpaAppointmentEntity appointment
             WHERE appointment.id IN :targetAppointmentIds
             """)
-    int deleteAll(List<Long> targetAppointmentIds);
+    void deleteAll(List<Long> targetAppointmentIds);
+
+    @Query("""
+            SELECT appointment
+            FROM JpaAppointmentEntity appointment
+            JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
+            JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId
+            WHERE checklist.ownerId = :userId
+              AND appointment.date = :date
+              AND appointment.startTime IS NOT NULL
+              AND appointment.endTime IS NOT NULL
+              AND appointment.place IS NOT NULL
+              AND appointment.id <> :excludedAppointmentId
+              AND (
+                    (appointment.startTime < :endTime AND :startTime < appointment.endTime)
+                 OR (:startTime = :endTime
+                     AND appointment.startTime <= :startTime AND :startTime <= appointment.endTime)
+                 OR (appointment.startTime = appointment.endTime
+                     AND :startTime <= appointment.startTime AND appointment.startTime <= :endTime)
+              )
+            ORDER BY appointment.startTime ASC, appointment.id ASC
+            """)
+    List<JpaAppointmentEntity> findConflictingWithNewAppointment(
+            Long userId,
+            LocalDate date,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            Long excludedAppointmentId
+    );
 }
