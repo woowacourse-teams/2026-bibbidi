@@ -26,6 +26,10 @@ public class CatalogRepository {
         this.catalogMapper = catalogMapper;
     }
 
+    public boolean existsCategory(Long categoryId) {
+        return jpaCategoryRepository.existsById(categoryId);
+    }
+
     public Catalog findCatalog() {
         return catalogMapper.toDomain(
                 jpaCategoryRepository.findAll(),

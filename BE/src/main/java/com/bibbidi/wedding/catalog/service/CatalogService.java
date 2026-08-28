@@ -44,6 +44,11 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
+    public boolean existsCategory(Long categoryId) {
+        return catalogRepository.existsCategory(categoryId);
+    }
+
+    @Transactional(readOnly = true)
     public Catalog findPublicCatalog() {
         return catalogRepository.findCatalog();
     }
