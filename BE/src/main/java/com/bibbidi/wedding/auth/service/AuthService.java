@@ -8,6 +8,7 @@ import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -40,6 +41,7 @@ public class AuthService {
         return new AuthResult(user.userId(), user.nickname());
     }
 
+    @Transactional
     public void changePassword(Long currentUserId, String currentPassword, String newPassword) {
         UserAuthenticationInfo user = userService.findCurrentUserAuthenticationInfo(currentUserId);
 
