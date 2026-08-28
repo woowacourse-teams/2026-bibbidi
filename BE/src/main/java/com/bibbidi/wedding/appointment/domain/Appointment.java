@@ -121,6 +121,31 @@ public final class Appointment {
         return endTime;
     }
 
+    public boolean conflictsWith(Appointment other) {
+        if (!hasConfirmedSchedule() || !other.hasConfirmedSchedule()) {
+            return false;
+        }
+        if (isInstant()) {
+            return other.covers(startTime);
+        }
+        if (other.isInstant()) {
+            return covers(other.startTime);
+        }
+        return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
+    }
+
+    public boolean hasConfirmedSchedule() {
+        return startTime != null && endTime != null && place != null;
+    }
+
+    private boolean isInstant() {
+        return startTime.equals(endTime);
+    }
+
+    private boolean covers(LocalDateTime instant) {
+        return !instant.isBefore(startTime) && !instant.isAfter(endTime);
+    }
+
     private static void validateTime(LocalDateTime startTime, LocalDateTime endTime) {
         if (startTime == null || endTime == null) {
             return;

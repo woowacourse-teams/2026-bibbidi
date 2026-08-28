@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.appointment.persistence;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -36,25 +35,12 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
             JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId
             WHERE checklist.ownerId = :userId
-              AND appointment.date = :date
-              AND appointment.startTime IS NOT NULL
-              AND appointment.endTime IS NOT NULL
-              AND appointment.place IS NOT NULL
-              AND appointment.id <> :excludedAppointmentId
-              AND (
-                    (appointment.startTime < :endTime AND :startTime < appointment.endTime)
-                 OR (:startTime = :endTime
-                     AND appointment.startTime <= :startTime AND :startTime <= appointment.endTime)
-                 OR (appointment.startTime = appointment.endTime
-                     AND :startTime <= appointment.startTime AND appointment.startTime <= :endTime)
-              )
-            ORDER BY appointment.startTime ASC, appointment.id ASC
+              AND appointment.startTime <= :endTime
+              AND appointment.endTime >= :startTime
             """)
-    List<JpaAppointmentEntity> findConflictingWithNewAppointment(
+    List<JpaAppointmentEntity> findOverlapCandidates(
             Long userId,
-            LocalDate date,
             LocalDateTime startTime,
-            LocalDateTime endTime,
-            Long excludedAppointmentId
+            LocalDateTime endTime
     );
 }

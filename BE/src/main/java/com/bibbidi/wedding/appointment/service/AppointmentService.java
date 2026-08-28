@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.appointment.service;
 
+import static java.util.Comparator.comparing;
+
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
@@ -107,15 +109,14 @@ public class AppointmentService implements AppointmentDeleteService {
     }
 
     private List<AppointmentConflict> findConflictingWithNewAppointment(Long userId, Appointment savedAppointment) {
-        if (savedAppointment.startTime() == null || savedAppointment.endTime() == null
-                || savedAppointment.place() == null) {
+        if (!savedAppointment.hasConfirmedSchedule()) {
             return List.of();
         }
 
-        List<Appointment> conflictingAppointments =
-                appointmentRepository.findConflictingWithNewAppointment(userId, savedAppointment);
-
-        return conflictingAppointments.stream()
+        return appointmentRepository.findOverlapCandidates(userId, savedAppointment).stream()
+                .filter(candidate -> !candidate.id().equals(savedAppointment.id()))
+                .filter(savedAppointment::conflictsWith)
+                .sorted(comparing(Appointment::startTime).thenComparing(Appointment::id))
                 .map(AppointmentConflict::fromDomain)
                 .toList();
     }

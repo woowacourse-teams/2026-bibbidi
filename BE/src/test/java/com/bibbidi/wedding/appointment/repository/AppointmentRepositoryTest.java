@@ -131,66 +131,35 @@ class AppointmentRepositoryTest {
     }
 
     @Test
-    void shouldFindOverlappingAppointmentsOwnedByUserInTimeOrder() {
-        JpaChecklistEntity firstChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 1L));
+    @DisplayName("시간이 겹칠 수 있는 본인 소유 일정만 후보로 조회한다")
+    void shouldFindOverlapCandidatesOwnedByUser() {
+        JpaChecklistEntity ownChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 1L));
         JpaChecklistEntity otherUsersChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 2L));
-        Long firstItemId = saveChecklistItem(firstChecklist.id());
-        Long secondItemId = saveChecklistItem(firstChecklist.id());
+        Long firstItemId = saveChecklistItem(ownChecklist.id());
+        Long secondItemId = saveChecklistItem(ownChecklist.id());
         Long otherUsersItemId = saveChecklistItem(otherUsersChecklist.id());
 
-        Appointment later = saveAppointment(firstItemId, 11, 0, 12, 0, "later");
-        Appointment earlier = saveAppointment(secondItemId, 10, 0, 11, 30, "earlier");
+        Appointment overlapping = saveAppointment(firstItemId, 11, 0, 12, 0, "overlapping");
+        Appointment touching = saveAppointment(secondItemId, 10, 0, 11, 30, "touching");
 
         saveAppointment(otherUsersItemId, 10, 30, 11, 30, "other user");
-        saveAppointment(firstItemId, 12, 0, 13, 0, "boundary");
+        saveAppointment(firstItemId, 13, 0, 14, 0, "apart");
         saveAppointment(firstItemId, null, null, null, null, "no time");
 
-        assertThat(appointmentRepository.findConflictingWithNewAppointment(1L, probe(10, 30, 11, 15)))
+        assertThat(appointmentRepository.findOverlapCandidates(1L, probe(10, 30, 11, 15)))
                 .extracting(Appointment::id)
-                .containsExactly(earlier.id(), later.id());
+                .containsExactlyInAnyOrder(overlapping.id(), touching.id());
     }
 
     @Test
-    @DisplayName("0분짜리 새 일정이 기존 일정 구간 안에 있으면 충돌로 잡힌다")
-    void shouldDetectConflictWhenNewAppointmentIsZeroLength() {
+    @DisplayName("경계 시각만 맞닿은 일정도 후보에는 포함된다")
+    void shouldIncludeBoundaryTouchingAppointmentAsCandidate() {
         Long itemId = saveOwnedChecklistItem();
-        Appointment surrounding = saveAppointment(itemId, 10, 0, 12, 0, "surrounding");
+        Appointment before = saveAppointment(itemId, 10, 0, 11, 0, "before");
 
-        assertThat(appointmentRepository.findConflictingWithNewAppointment(1L, probe(11, 0, 11, 0)))
+        assertThat(appointmentRepository.findOverlapCandidates(1L, probe(11, 0, 12, 0)))
                 .extracting(Appointment::id)
-                .containsExactly(surrounding.id());
-    }
-
-    @Test
-    @DisplayName("0분짜리 기존 일정이 새 일정 구간 안에 있으면 충돌로 잡힌다")
-    void shouldDetectConflictWhenExistingAppointmentIsZeroLength() {
-        Long itemId = saveOwnedChecklistItem();
-        Appointment zeroLength = saveAppointment(itemId, 11, 0, 11, 0, "zero length");
-
-        assertThat(appointmentRepository.findConflictingWithNewAppointment(1L, probe(10, 0, 12, 0)))
-                .extracting(Appointment::id)
-                .containsExactly(zeroLength.id());
-    }
-
-    @Test
-    @DisplayName("같은 시각의 0분짜리 일정끼리도 충돌로 잡힌다")
-    void shouldDetectConflictBetweenZeroLengthAppointmentsAtSameInstant() {
-        Long itemId = saveOwnedChecklistItem();
-        Appointment zeroLength = saveAppointment(itemId, 11, 0, 11, 0, "zero length");
-
-        assertThat(appointmentRepository.findConflictingWithNewAppointment(1L, probe(11, 0, 11, 0)))
-                .extracting(Appointment::id)
-                .containsExactly(zeroLength.id());
-    }
-
-    @Test
-    @DisplayName("끝나는 시각과 시작 시각만 맞닿은 일정은 충돌이 아니다")
-    void shouldNotDetectConflictWhenAppointmentsOnlyTouchAtBoundary() {
-        Long itemId = saveOwnedChecklistItem();
-        saveAppointment(itemId, 10, 0, 11, 0, "before");
-        saveAppointment(itemId, 12, 0, 13, 0, "after");
-
-        assertThat(appointmentRepository.findConflictingWithNewAppointment(1L, probe(11, 0, 12, 0))).isEmpty();
+                .containsExactly(before.id());
     }
 
     private Long saveOwnedChecklistItem() {

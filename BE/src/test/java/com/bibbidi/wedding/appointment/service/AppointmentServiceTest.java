@@ -136,7 +136,7 @@ class AppointmentServiceTest {
                 LocalDateTime.of(2026, 9, 1, 11, 30), "other place");
         given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(true);
         given(appointmentRepository.save(any(Appointment.class))).willReturn(saved);
-        given(appointmentRepository.findConflictingWithNewAppointment(USER_ID, saved))
+        given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
                 .willReturn(List.of(new Appointment(
                         conflict.appointmentId(),
                         conflict.checklistItemId(),

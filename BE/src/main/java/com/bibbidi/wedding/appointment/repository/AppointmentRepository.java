@@ -46,13 +46,11 @@ public class AppointmentRepository {
         jpaAppointmentRepository.deleteAll(targetAppointmentIds);
     }
 
-    public List<Appointment> findConflictingWithNewAppointment(Long userId, Appointment appointment) {
-        return jpaAppointmentRepository.findConflictingWithNewAppointment(
+    public List<Appointment> findOverlapCandidates(Long userId, Appointment appointment) {
+        return jpaAppointmentRepository.findOverlapCandidates(
                         userId,
-                        appointment.date(),
                         appointment.startTime(),
-                        appointment.endTime(),
-                        appointment.id()
+                        appointment.endTime()
                 )
                 .stream()
                 .map(appointmentMapper::toDomain)
