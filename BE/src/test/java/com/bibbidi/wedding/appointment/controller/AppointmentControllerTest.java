@@ -77,6 +77,7 @@ class AppointmentControllerTest {
         verify(appointmentService).create(captor.capture());
         assertThat(captor.getValue()).isEqualTo(new AppointmentCreationCommand(
                 1L,
+                1L,
                 request.title(),
                 request.date(),
                 request.startTime(),

@@ -32,6 +32,7 @@ import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -41,6 +42,7 @@ import tools.jackson.databind.node.ObjectNode;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@Sql("/appointment-fixture.sql")
 @ExtendWith(RestDocumentationExtension.class)
 class AppointmentControllerIntegrationTest {
 
@@ -76,7 +78,7 @@ class AppointmentControllerIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(post("/api/checklist-items/{itemId}/appointments", 1L)
+        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
@@ -94,7 +96,7 @@ class AppointmentControllerIntegrationTest {
                                 .description("체크리스트 항목에 수행 일정을 추가합니다.")
                                 .requestSchema(schema("CreateAppointmentRequest"))
                                 .responseSchema(schema("AppointmentResponse"))
-                                .pathParameters(parameterWithName("itemId").description("체크리스트 항목 ID"))
+                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
                                 .requestFields(requestFields())
                                 .responseFields(appointmentResponseFields())
                                 .build())
@@ -115,7 +117,7 @@ class AppointmentControllerIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(post("/api/checklist-items/{itemId}/appointments", 1L)
+        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
@@ -130,7 +132,7 @@ class AppointmentControllerIntegrationTest {
                                 .description("입력값이 유효하지 않으면 요청을 거부합니다.")
                                 .requestSchema(schema("CreateAppointmentRequest"))
                                 .responseSchema(schema("ValidationErrorResponse"))
-                                .pathParameters(parameterWithName("itemId").description("체크리스트 항목 ID"))
+                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
                                 .requestFields(requestFields())
                                 .responseFields(validationResponseFields())
                                 .build())
@@ -146,7 +148,7 @@ class AppointmentControllerIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(post("/api/checklist-items/{itemId}/appointments", 1L)
+        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isUnauthorized())
@@ -158,7 +160,7 @@ class AppointmentControllerIntegrationTest {
                                 .description("인증되지 않은 요청은 거부합니다.")
                                 .requestSchema(schema("CreateAppointmentRequest"))
                                 .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("itemId").description("체크리스트 항목 ID"))
+                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
                                 .requestFields(
                                         fieldWithPath("title").description("일정 제목"),
                                         fieldWithPath("date").description("일정 날짜")
@@ -166,6 +168,21 @@ class AppointmentControllerIntegrationTest {
                                 .responseFields(errorResponseFields())
                                 .build())
                 ));
+    }
+
+    @Test
+    @DisplayName("인증된 사용자가 소유하지 않은 체크리스트 항목으로 일정 생성을 요청하면 거부한다")
+    void shouldRejectAppointmentWhenUserDoesNotOwnChecklistItem() throws Exception {
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                "?⑤뵫? ?곷떞", LocalDate.of(2026, 9, 1), null, null, null, null
+        );
+
+        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(convertToStringValue(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203));
     }
 
     @Test
@@ -307,6 +324,22 @@ class AppointmentControllerIntegrationTest {
                 ));
     }
 
+    @Test
+    @DisplayName("다른 사용자의 체크리스트 항목에 속한 일정 수정은 거부한다")
+    void shouldRejectUpdateWhenUserDoesNotOwnChecklistItem() throws Exception {
+        Long appointmentId = saveAppointment().id();
+        UpdateAppointmentRequest request = new UpdateAppointmentRequest(
+                "updated title", LocalDate.of(2026, 10, 1), null, null, null, null
+        );
+
+        mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
+                        .session(sessionOf(2L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(convertToStringValue(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203));
+    }
+
     private Appointment saveAppointment() {
         return appointmentRepository.save(new Appointment(
                 null,
@@ -337,8 +370,12 @@ class AppointmentControllerIntegrationTest {
     }
 
     private static MockHttpSession authenticatedSession() {
+        return sessionOf(1L);
+    }
+
+    private static MockHttpSession sessionOf(Long userId) {
         MockHttpSession session = new MockHttpSession();
-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, 1L);
+        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
         return session;
     }
 

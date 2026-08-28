@@ -6,9 +6,10 @@ public enum ClientError {
     // 100: 요청 오류
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, 101, "요청 값이 올바르지 않습니다."),
 
-    // 200: 인증 오류
+    // 200: 인증/인가 오류
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, 201, "로그인이 필요합니다."),
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, 202, "인증 정보가 올바르지 않습니다."),
+    CHECKLIST_ITEM_ACCESS_DENIED(HttpStatus.FORBIDDEN, 203, "해당 할 일에 대한 작업 권한이 없습니다."),
 
     // 300 : 리소스 오류
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, 301, "사용자를 찾을 수 없습니다."),

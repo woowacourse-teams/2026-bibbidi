@@ -28,13 +28,13 @@ public class AppointmentController {
     }
 
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/api/checklist-items/{itemId}/appointments")
+    @PostMapping("/api/checklist-items/{checklistItemId}/appointments")
     public AppointmentResponse create(
             @Auth Long userId,
-            @PathVariable Long itemId,
+            @PathVariable Long checklistItemId,
             @Valid @RequestBody CreateAppointmentRequest request
     ) {
-        AppointmentCreationCommand command = AppointmentCreationCommand.fromRequest(itemId, request);
+        AppointmentCreationCommand command = AppointmentCreationCommand.fromRequest(userId, checklistItemId, request);
         AppointmentCreationResult result = appointmentService.create(command);
         return AppointmentResponse.from(result);
     }
