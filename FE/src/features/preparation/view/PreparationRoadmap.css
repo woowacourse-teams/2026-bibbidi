@@ -1,0 +1,227 @@
+.preparation-roadmap {
+  isolation: isolate;
+  display: grid;
+  min-height: calc(100vh - 96px);
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+
+.preparation-roadmap__categories {
+  padding: 32px 12px;
+  background: var(--color-bg-layer-default);
+}
+
+.preparation-roadmap__category-list,
+.preparation-roadmap__steps {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.preparation-roadmap__category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preparation-roadmap__category {
+  display: flex;
+  width: 156px;
+  height: 48px;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.preparation-roadmap__category--current {
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+  font-weight: 700;
+}
+
+.preparation-roadmap__workspace {
+  width: 820px;
+  padding: 28px 40px;
+}
+
+.preparation-roadmap__header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.preparation-roadmap__header h1,
+.preparation-roadmap__step h2,
+.preparation-roadmap__step p {
+  margin: 0;
+}
+
+.preparation-roadmap__header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-roadmap__grid-wrap,
+.preparation-roadmap__steps {
+  position: relative;
+  width: 740px;
+  height: 604px;
+}
+
+.preparation-roadmap__steps {
+  z-index: 1;
+  display: grid;
+  grid-template-areas:
+    "step01 step02 step03"
+    "step06 step05 step04"
+    "step07 step08 step09";
+  grid-template-columns: repeat(3, 236px);
+  grid-template-rows: repeat(3, 188px);
+  gap: 20px 16px;
+}
+
+.preparation-roadmap__step {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 5%);
+}
+
+.preparation-roadmap__step::after {
+  position: absolute;
+  z-index: -1;
+  display: block;
+  background: #f2c4aa;
+  content: "";
+}
+
+.preparation-roadmap__step--01::after,
+.preparation-roadmap__step--02::after,
+.preparation-roadmap__step--05::after,
+.preparation-roadmap__step--06::after,
+.preparation-roadmap__step--07::after,
+.preparation-roadmap__step--08::after {
+  top: 92px;
+  right: -17px;
+  width: 16px;
+  height: 2px;
+}
+
+.preparation-roadmap__step--03::after {
+  bottom: -21px;
+  left: 116px;
+  width: 2px;
+  height: 20px;
+}
+
+.preparation-roadmap__step--06::before {
+  position: absolute;
+  z-index: -1;
+  bottom: -21px;
+  left: 116px;
+  display: block;
+  width: 2px;
+  height: 20px;
+  background: #f2c4aa;
+  content: "";
+}
+
+.preparation-roadmap__step--09::after {
+  display: none;
+}
+
+.preparation-roadmap__step[aria-current="step"] {
+  padding: 19px;
+  border: 2px solid var(--color-stroke-brand-solid);
+}
+
+.preparation-roadmap__step--01 {
+  grid-area: step01;
+}
+
+.preparation-roadmap__step--02 {
+  grid-area: step02;
+}
+
+.preparation-roadmap__step--03 {
+  grid-area: step03;
+}
+
+.preparation-roadmap__step--04 {
+  grid-area: step04;
+}
+
+.preparation-roadmap__step--05 {
+  grid-area: step05;
+}
+
+.preparation-roadmap__step--06 {
+  grid-area: step06;
+}
+
+.preparation-roadmap__step--07 {
+  grid-area: step07;
+}
+
+.preparation-roadmap__step--08 {
+  grid-area: step08;
+}
+
+.preparation-roadmap__step--09 {
+  grid-area: step09;
+}
+
+.preparation-roadmap__step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preparation-roadmap__step-number {
+  display: grid;
+  width: 44px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-roadmap__step-status {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-roadmap__step-status--in-progress {
+  color: var(--color-fg-brand);
+}
+
+.preparation-roadmap__step h2 {
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preparation-roadmap__step p {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
