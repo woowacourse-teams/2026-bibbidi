@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.BDDMockito.then;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -164,6 +166,16 @@ class AppointmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("일정 삭제 요청을 서비스 명령으로 전달한다")
+    void shouldDeleteAppointment() throws Exception {
+        mockMvc.perform(delete("/api/appointments/1")
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        then(appointmentService).should().delete(1L, 1L);
     }
 
     private static MockHttpSession authenticatedSession() {

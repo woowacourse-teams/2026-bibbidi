@@ -11,6 +11,7 @@ import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
 import com.bibbidi.wedding.auth.session.Auth;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -48,5 +49,14 @@ public class AppointmentController {
         AppointmentUpdateCommand command = AppointmentUpdateCommand.fromRequest(appointmentId, userId, request);
         AppointmentUpdateResult result = appointmentService.update(command);
         return AppointmentResponse.from(result);
+    }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/api/appointments/{appointmentId}")
+    public void delete(
+            @Auth Long userId,
+            @PathVariable Long appointmentId
+    ) {
+        appointmentService.delete(userId, appointmentId);
     }
 }

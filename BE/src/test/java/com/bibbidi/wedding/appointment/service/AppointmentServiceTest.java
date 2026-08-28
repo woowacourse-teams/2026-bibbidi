@@ -15,6 +15,7 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,51 @@ class AppointmentServiceTest {
                 .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
 
         then(appointmentRepository).should(never()).save(any(Appointment.class));
+    }
+
+    @Test
+    @DisplayName("자신이 소유한 일정은 삭제할 수 있다")
+    void shouldDeleteAppointmentWhenUserOwnsChecklistItem() {
+        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment());
+        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(true);
+
+        appointmentService.delete(USER_ID, APPOINTMENT_ID);
+
+        then(appointmentRepository).should().deleteById(APPOINTMENT_ID);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 일정은 삭제할 수 없다")
+    void shouldFailWhenAppointmentDoesNotExist() {
+        BusinessException exception = new BusinessException(ClientError.APPOINTMENT_NOT_FOUND, "not found");
+        given(appointmentRepository.findById(APPOINTMENT_ID)).willThrow(exception);
+
+        assertThatThrownBy(() -> appointmentService.delete(USER_ID, APPOINTMENT_ID))
+                .isSameAs(exception);
+
+        then(appointmentRepository).should(never()).deleteById(any());
+    }
+
+    @Test
+    void shouldChangeChecklistItemIdsInBulk() {
+        appointmentService.changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
+
+        then(appointmentRepository).should().changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
+    }
+
+    @Test
+    void shouldDeleteAppointmentsInBulk() {
+        appointmentService.deleteAll(List.of(1L, 2L));
+
+        then(appointmentRepository).should().deleteAll(List.of(1L, 2L));
+    }
+
+    @Test
+    void shouldSkipBulkOperationsWhenTargetIdsAreEmpty() {
+        appointmentService.changeAllToNewChecklistItemIds(20L, List.of());
+        appointmentService.deleteAll(List.of());
+
+        then(appointmentRepository).shouldHaveNoInteractions();
     }
 
     private static Appointment appointment() {

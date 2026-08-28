@@ -4,10 +4,12 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
@@ -16,6 +18,8 @@ import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.controller.dto.UpdateAppointmentRequest;
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
+import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.time.LocalDate;
@@ -54,6 +58,12 @@ class AppointmentControllerIntegrationTest {
 
     @Autowired
     private AppointmentRepository appointmentRepository;
+
+    @Autowired
+    private JpaAppointmentRepository jpaAppointmentRepository;
+
+    @Autowired
+    private ChecklistItemRepository checklistItemRepository;
 
     private MockMvc mockMvc;
 
@@ -338,6 +348,89 @@ class AppointmentControllerIntegrationTest {
                         .content(convertToStringValue(request)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203));
+    }
+
+    @Test
+    @DisplayName("자신의 일정은 삭제할 수 있다")
+    void shouldDeleteOwnAppointment() throws Exception {
+        Long appointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        assertThat(jpaAppointmentRepository.findById(appointmentId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 일정은 삭제할 수 없다")
+    void shouldRejectDeletingAnotherUsersAppointment() throws Exception {
+        Long appointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
+                        .session(sessionOf(2L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203));
+
+        assertThat(jpaAppointmentRepository.findById(appointmentId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 일정 삭제 요청은 404를 반환한다")
+    void shouldRejectDeletingNonexistentAppointment() throws Exception {
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", 99999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(302));
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자의 일정 삭제 요청은 거부한다")
+    void shouldRejectDeletingAppointmentWhenUserIsUnauthenticated() throws Exception {
+        Long appointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("일정을 삭제해도 같은 할 일의 다른 일정은 유지된다")
+    void shouldKeepOtherAppointmentWhenDeletingAnAppointment() throws Exception {
+        Long deletedAppointmentId = saveAppointment().id();
+        Long remainingAppointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", deletedAppointmentId)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        assertThat(jpaAppointmentRepository.findById(deletedAppointmentId)).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(remainingAppointmentId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("완료된 할 일의 일정을 삭제해도 할 일은 완료 상태로 유지된다")
+    void shouldKeepChecklistItemDoneWhenDeletingAppointment() throws Exception {
+        var checklistItem = checklistItemRepository.findById(1L).orElseThrow().complete();
+        checklistItemRepository.save(checklistItem);
+        Long appointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        assertThat(checklistItemRepository.findById(1L).orElseThrow().isDone()).isTrue();
+    }
+
+    @Test
+    @DisplayName("미완료 할 일의 마지막 일정을 삭제해도 할 일은 미완료 상태로 유지된다")
+    void shouldKeepChecklistItemIncompleteWhenDeletingLastAppointment() throws Exception {
+        Long appointmentId = saveAppointment().id();
+
+        mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        assertThat(checklistItemRepository.findById(1L).orElseThrow().isDone()).isFalse();
     }
 
     private Appointment saveAppointment() {
