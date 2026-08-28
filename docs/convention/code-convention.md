@@ -69,6 +69,13 @@ Controller → Service → Repository → Dao / Mapper
 - 제약 위반은 Service에서 `DataIntegrityViolationException`을 잡아 해당 `ClientError`의 `BusinessException`으로 변환한다.
 - 사용 가능 여부를 미리 알려주는 조회 API는 UX 목적으로만 둔다. 최종 판단은 저장 요청의 응답이 한다.
 
+## 스키마 변경
+
+- `bibbidi_mvp_schema.sql`은 DB를 처음 만들 때만 실행된다. 이 파일만 고치면 이미 만들어진 DB는 바뀌지 않는다.
+- 이미 만들어진 DB까지 바꿔야 하는 변경은 `BE/database/mysql/migration/`에 실행 순서대로 번호를 붙인 SQL로 함께 남긴다.
+- 새 DB는 스키마 파일로, 기존 DB는 마이그레이션으로 같은 상태에 도달하도록 두 파일을 맞춘다.
+- `ddl-auto: validate`는 널 허용 여부까지 검사하지 않는다. 스키마 변경은 이 설정에 기대지 않고 SQL로 명시한다.
+
 ## 예외
 
 - 예외는 던지는 자리에서 만든다. `BusinessException`을 만들어 돌려주는 private 헬퍼로 빼지 않는다. 어떤 `ClientError`로 왜 터졌는지가 그 줄에서 바로 읽혀야 한다.
