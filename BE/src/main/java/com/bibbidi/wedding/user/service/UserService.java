@@ -4,7 +4,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import java.util.NoSuchElementException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +41,18 @@ public class UserService {
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
+    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
+        User user = findCurrentUser(currentUserId);
+        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+    }
+
+    @Transactional
+    public void changePasswordHash(Long currentUserId, String passwordHash) {
+        User user = findCurrentUser(currentUserId);
+        User changedUser = user.changePasswordHash(passwordHash);
+        userRepository.save(changedUser);
+    }
+
     @Transactional
     public UserResult changeNickname(Long currentUserId, String nickname) {
         User user = findCurrentUser(currentUserId);
@@ -51,8 +62,9 @@ public class UserService {
         }
 
         try {
-            userRepository.updateNickname(currentUserId, nickname);
-            return new UserResult(currentUserId, nickname);
+            User changedUser = user.changeNickname(nickname);
+            User savedUser = userRepository.save(changedUser);
+            return UserResult.from(savedUser);
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     ClientError.DUPLICATE_NICKNAME,
@@ -64,11 +76,18 @@ public class UserService {
     private User findCurrentUser(Long currentUserId) {
         try {
             return userRepository.findById(currentUserId);
-        } catch (NoSuchElementException exception) {
-            throw new BusinessException(
-                    ClientError.AUTHENTICATION_REQUIRED,
-                    "Session 사용자 조회에 실패했습니다. userId=" + currentUserId
-            );
+        } catch (BusinessException exception) {
+            if (exception.clientError() != ClientError.USER_NOT_FOUND) {
+                throw exception;
+            }
+            throw authenticationRequired(currentUserId);
         }
+    }
+
+    private BusinessException authenticationRequired(Long currentUserId) {
+        return new BusinessException(
+                ClientError.AUTHENTICATION_REQUIRED,
+                "Session 사용자 조회에 실패했습니다. userId=" + currentUserId
+        );
     }
 }

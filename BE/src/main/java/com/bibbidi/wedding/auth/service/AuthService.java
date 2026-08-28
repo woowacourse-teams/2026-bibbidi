@@ -8,6 +8,7 @@ import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -38,5 +39,24 @@ public class AuthService {
         }
 
         return new AuthResult(user.userId(), user.nickname());
+    }
+
+    @Transactional
+    public void changePassword(Long currentUserId, String currentPassword, String newPassword) {
+        UserAuthenticationInfo user = userService.findCurrentUserAuthenticationInfo(currentUserId);
+
+        if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
+            throw new BusinessException(
+                    ClientError.AUTHENTICATION_FAILED,
+                    "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
+            );
+        }
+
+        if (currentPassword.equals(newPassword)) {
+            return;
+        }
+
+        String newPasswordHash = passwordHasher.hash(newPassword);
+        userService.changePasswordHash(currentUserId, newPasswordHash);
     }
 }

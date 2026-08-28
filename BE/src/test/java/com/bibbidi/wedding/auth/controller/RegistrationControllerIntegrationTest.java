@@ -91,7 +91,7 @@ class RegistrationControllerIntegrationTest {
                                 .responseSchema(schema("CreateUserResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
                                 )
                                 .responseFields(
                                         fieldWithPath("id").description("생성된 사용자 ID"),
@@ -142,7 +142,7 @@ class RegistrationControllerIntegrationTest {
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -186,7 +186,7 @@ class RegistrationControllerIntegrationTest {
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -233,7 +233,7 @@ class RegistrationControllerIntegrationTest {
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestFields(
                                         fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                        fieldWithPath("password").description("사용자 비밀번호")
+                                        fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),

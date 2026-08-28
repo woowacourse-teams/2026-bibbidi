@@ -1,11 +1,13 @@
 package com.bibbidi.wedding.auth.controller;
 
+import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserResponse;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
 import com.bibbidi.wedding.auth.service.AuthResult;
 import com.bibbidi.wedding.auth.service.AuthService;
+import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.AuthSessionCookieManager;
 import com.bibbidi.wedding.user.service.UserResult;
@@ -16,6 +18,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,6 +62,15 @@ public class AuthController {
             session.invalidate();
         }
         sessionCookieManager.expire(response);
+    }
+
+    @PutMapping("/api/users/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(
+            @Auth Long currentUserId,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        authService.changePassword(currentUserId, request.currentPassword(), request.newPassword());
     }
 
     private void replaceSession(HttpServletRequest request, Long userId) {

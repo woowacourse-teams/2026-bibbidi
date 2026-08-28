@@ -3,6 +3,7 @@ package com.bibbidi.wedding.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -12,7 +13,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,11 +39,17 @@ class UserServiceTest {
     void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
         User user = new User(1L, "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
+        given(userRepository.save(any(User.class)))
+                .willReturn(new User(1L, "bibbidi", "password-hash"));
 
         UserResult result = userService.changeNickname(1L, "bibbidi");
 
         assertThat(result).isEqualTo(new UserResult(1L, "bibbidi"));
-        then(userRepository).should().updateNickname(1L, "bibbidi");
+        then(userRepository).should().save(argThat(changedUser ->
+                changedUser.id().equals(1L)
+                        && changedUser.nickname().equals("bibbidi")
+                        && changedUser.passwordHash().equals("password-hash")
+        ));
     }
 
     @Test
@@ -55,7 +61,7 @@ class UserServiceTest {
         UserResult result = userService.changeNickname(1L, "Bibbidi");
 
         assertThat(result).isEqualTo(new UserResult(1L, "Bibbidi"));
-        then(userRepository).should(never()).updateNickname(1L, "Bibbidi");
+        then(userRepository).should(never()).save(any(User.class));
     }
 
     @Test
@@ -64,7 +70,7 @@ class UserServiceTest {
         User user = new User(1L, "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
         willThrow(new DataIntegrityViolationException("uk_users_nickname"))
-                .given(userRepository).updateNickname(1L, "TAKEN");
+                .given(userRepository).save(any(User.class));
 
         assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
                 .isInstanceOf(BusinessException.class)
@@ -75,7 +81,9 @@ class UserServiceTest {
     @Test
     @DisplayName("Session의 사용자 ID로 사용자를 찾을 수 없으면 인증 필요 오류를 반환한다")
     void shouldRequireAuthenticationWhenSessionUserDoesNotExist() {
-        given(userRepository.findById(1L)).willThrow(new NoSuchElementException());
+        given(userRepository.findById(1L)).willThrow(
+                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+        );
 
         assertThatThrownBy(() -> userService.changeNickname(1L, "new-name"))
                 .isInstanceOf(BusinessException.class)
@@ -113,5 +121,22 @@ class UserServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+    }
+
+    @Test
+    @DisplayName("현재 사용자의 비밀번호 해시를 도메인에서 변경하고 저장한다")
+    void shouldChangeAndSaveCurrentUserPasswordHash() {
+        User user = new User(1L, "current", "current-hash");
+        given(userRepository.findById(1L)).willReturn(user);
+        given(userRepository.save(any(User.class)))
+                .willReturn(new User(1L, "current", "new-password-hash"));
+
+        userService.changePasswordHash(1L, "new-password-hash");
+
+        then(userRepository).should().save(argThat(changedUser ->
+                changedUser.id().equals(1L)
+                        && changedUser.nickname().equals("current")
+                        && changedUser.passwordHash().equals("new-password-hash")
+        ));
     }
 }
