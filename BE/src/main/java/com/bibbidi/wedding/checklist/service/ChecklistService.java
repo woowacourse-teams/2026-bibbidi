@@ -9,6 +9,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.LinkedHashSet;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChecklistService {
 
     private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
+    private static final String CHECKLIST_NOT_FOUND_MESSAGE = "현재 사용자 계정에 속한 체크리스트를 찾을 수 없습니다. ownerId=";
 
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
@@ -62,7 +64,7 @@ public class ChecklistService {
         Checklist checklist = checklistRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new BusinessException(
                         ClientError.CHECKLIST_NOT_FOUND,
-                        "현재 사용자 계정에 속한 체크리스트를 찾을 수 없습니다. ownerId=" + ownerId
+                        CHECKLIST_NOT_FOUND_MESSAGE + ownerId
                 ));
 
         List<ChecklistItem> candidates = selectCatalogItems(checklist, catalogItemIds);
@@ -76,6 +78,33 @@ public class ChecklistService {
                             + ", catalogItemIds=" + catalogItemIds
             );
         }
+    }
+
+    @Transactional
+    public ChecklistItemCreationResult writeItem(Long ownerId, String title, Long categoryId) {
+        Checklist checklist = checklistRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_NOT_FOUND,
+                        CHECKLIST_NOT_FOUND_MESSAGE + ownerId
+                ));
+
+        if (!catalogService.existsCategory(categoryId)) {
+            throw new BusinessException(
+                    ClientError.CATEGORY_NOT_FOUND,
+                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
+            );
+        }
+
+        ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
+                null,
+                checklist.id(),
+                categoryId,
+                title,
+                null,
+                ChecklistItemStatus.PREV
+        ));
+
+        return ChecklistItemCreationResult.from(item);
     }
 
     @Transactional(readOnly = true)
