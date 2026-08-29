@@ -73,7 +73,7 @@ class UserDeletionTransactionIntegrationTest {
         JpaChecklistItemEntity checklistItem = jpaChecklistItemRepository.saveAndFlush(
                 new JpaChecklistItemEntity(
                         null,
-                        checklist.id(),
+                        checklist,
                         1L,
                         100L,
                         "계약서 확인",

@@ -38,8 +38,7 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             SELECT appointment
             FROM JpaAppointmentEntity appointment
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
-            JOIN JpaChecklistEntity checklist ON checklist.id = item.checklistId
-            WHERE checklist.ownerId = :userId
+            WHERE item.checklist.ownerId = :userId
               AND appointment.startTime <= :endTime
               AND appointment.endTime >= :startTime
             """)

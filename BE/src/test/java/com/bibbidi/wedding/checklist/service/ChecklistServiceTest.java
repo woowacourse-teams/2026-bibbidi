@@ -17,6 +17,7 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -121,43 +122,44 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("체크리스트가 없는 사용자는 소유권을 인정받지 못한다")
-    void shouldDenyItemOwnershipWhenOwnerHasNoChecklist() {
-        // given
-        given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(false);
-
-        // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
-    }
-
-    @Test
     @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권을 인정한다")
     void shouldConfirmItemOwnershipWhenItemBelongsToOwnersChecklist() {
         // given
-        given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(true);
+        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOwnedBy(OWNER_ID)));
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isTrue();
+        assertThat(checklistService.checkItemOwnership(200L, OWNER_ID)).isTrue();
     }
 
     @Test
     @DisplayName("다른 사용자의 체크리스트에 속한 할 일이면 소유권을 인정하지 않는다")
     void shouldDenyItemOwnershipWhenItemBelongsToAnotherChecklist() {
         // given
-        given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(false);
+        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOwnedBy(2L)));
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
+        assertThat(checklistService.checkItemOwnership(200L, OWNER_ID)).isFalse();
     }
 
     @Test
     @DisplayName("존재하지 않는 할 일은 소유권을 인정하지 않는다")
     void shouldDenyItemOwnershipWhenItemDoesNotExist() {
         // given
-        given(checklistItemRepository.existsByIdAndOwnerId(999L, 1L)).willReturn(false);
+        given(checklistItemRepository.findById(999L)).willReturn(Optional.empty());
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 999L)).isFalse();
+        assertThat(checklistService.checkItemOwnership(999L, OWNER_ID)).isFalse();
+    }
+
+    private static ChecklistItem itemOwnedBy(Long ownerId) {
+        return new ChecklistItem(
+                200L,
+                new Checklist(CHECKLIST_ID, ownerId),
+                CATEGORY_ID,
+                "계약서 확인",
+                null,
+                ChecklistItemStatus.PREV
+        );
     }
 
     @Test

@@ -56,7 +56,7 @@ class UserDeletionTestFixture {
         JpaChecklistItemEntity otherUsersItem = checklistItemRepository.saveAndFlush(
                 new JpaChecklistItemEntity(
                         null,
-                        otherUser.checklistId(),
+                        otherUser.checklist(),
                         catalog.categoryId(),
                         catalog.catalogItemId(),
                         "계약서 확인",
@@ -123,7 +123,7 @@ class UserDeletionTestFixture {
                 new JpaChecklistEntity(null, user.id())
         );
 
-        return new UserChecklistData(user.id(), checklist.id());
+        return new UserChecklistData(user.id(), checklist);
     }
 
     record Scenario(
@@ -142,8 +142,12 @@ class UserDeletionTestFixture {
 
     record UserChecklistData(
             Long userId,
-            Long checklistId
+            JpaChecklistEntity checklist
     ) {
+
+        Long checklistId() {
+            return checklist.id();
+        }
     }
 
     record UserWeddingData(

@@ -8,7 +8,10 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -24,8 +27,9 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "checklist_id", nullable = false)
-    private Long checklistId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "checklist_id", nullable = false)
+    private JpaChecklistEntity checklist;
 
     @Column(name = "category_id")
     private Long categoryId;
@@ -45,14 +49,14 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
 
     public JpaChecklistItemEntity(
             Long id,
-            Long checklistId,
+            JpaChecklistEntity checklist,
             Long categoryId,
             Long sourceCatalogItemId,
             String title,
             ChecklistItemStatus status
     ) {
         this.id = id;
-        this.checklistId = checklistId;
+        this.checklist = checklist;
         this.categoryId = categoryId;
         this.sourceCatalogItemId = sourceCatalogItemId;
         this.title = title;
@@ -63,8 +67,8 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
         return id;
     }
 
-    public Long checklistId() {
-        return checklistId;
+    public JpaChecklistEntity checklist() {
+        return checklist;
     }
 
     public Long categoryId() {

@@ -1,16 +1,21 @@
 package com.bibbidi.wedding.checklist.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ChecklistItemTest {
 
+    private static final Checklist CHECKLIST = new Checklist(100L, 1L);
+
     private static ChecklistItem constructTestItem() {
         return new ChecklistItem(
                 1L,
-                100L,
+                CHECKLIST,
                 10L,
                 "Wedding hall consultation",
                 1L,
@@ -83,14 +88,14 @@ class ChecklistItemTest {
         assertThat(progressed)
                 .extracting(
                         ChecklistItem::id,
-                        ChecklistItem::checklistId,
+                        extracted -> extracted.checklist().id(),
                         ChecklistItem::categoryId,
                         ChecklistItem::title,
                         ChecklistItem::sourceCatalogItemId
                 )
                 .containsExactly(
                         item.id(),
-                        item.checklistId(),
+                        item.checklist().id(),
                         item.categoryId(),
                         item.title(),
                         item.sourceCatalogItemId()
@@ -121,5 +126,85 @@ class ChecklistItemTest {
 
         // then
         assertThat(cameFrom).isFalse();
+    }
+
+    @Test
+    @DisplayName("카테고리를 변경해도 제목과 완료 상태는 그대로다")
+    void shouldKeepOtherInformationWhenCategoryChanges() {
+        // given
+        ChecklistItem item = new ChecklistItem(
+                1L,
+                CHECKLIST,
+                10L,
+                "Wedding hall consultation",
+                null,
+                ChecklistItemStatus.DONE
+        );
+
+        // when
+        ChecklistItem changed = item.changeCategory(20L);
+
+        // then
+        assertThat(changed)
+                .extracting(
+                        ChecklistItem::id,
+                        extracted -> extracted.checklist().id(),
+                        ChecklistItem::categoryId,
+                        ChecklistItem::title,
+                        ChecklistItem::sourceCatalogItemId,
+                        ChecklistItem::status
+                )
+                .containsExactly(
+                        item.id(),
+                        item.checklist().id(),
+                        20L,
+                        item.title(),
+                        item.sourceCatalogItemId(),
+                        item.status()
+                );
+    }
+
+    @Test
+    @DisplayName("체크리스트의 주인만 할 일의 주인으로 인정한다")
+    void shouldBeOwnedByChecklistOwner() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when, then
+        assertThat(item.isOwnedBy(1L)).isTrue();
+        assertThat(item.isOwnedBy(2L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없다")
+    void shouldRejectCategoryChangeWhenAddedFromCatalog() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.changeCategory(20L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE);
+    }
+
+    @Test
+    @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 카테고리를 변경할 수 있다")
+    void shouldAllowCategoryChangeWhenSourceCatalogItemIsGone() {
+        // given
+        ChecklistItem item = new ChecklistItem(
+                1L,
+                CHECKLIST,
+                10L,
+                "Wedding hall consultation",
+                null,
+                ChecklistItemStatus.PREV
+        );
+
+        // when
+        ChecklistItem changed = item.changeCategory(20L);
+
+        // then
+        assertThat(changed.categoryId()).isEqualTo(20L);
     }
 }
