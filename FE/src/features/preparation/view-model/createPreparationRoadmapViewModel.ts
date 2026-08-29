@@ -1,5 +1,6 @@
 import {
   PreparationCatalogModel,
+  PreparationRoadmapModel,
   PreparationStepProgressModel,
   PreparationStepStatus,
 } from "../model/preparationRoadmap";
@@ -27,6 +28,10 @@ export interface PreparationStepViewModel {
 }
 
 export interface PreparationRoadmapViewModel {
+  categoryNavigation: {
+    canNavigateNext: boolean;
+    canNavigatePrevious: boolean;
+  };
   categories: PreparationCategoryViewModel[];
   selectedStepDetail: PreparationStepDetailViewModel;
   steps: PreparationStepViewModel[];
@@ -45,12 +50,50 @@ export interface PreparationStepDetailViewModel {
   title: string;
 }
 
+export interface PreparationRoadmapSelection {
+  categoryId: string;
+  stepId: string;
+}
+
+export type PreparationCategoryNavigationDirection = "next" | "previous";
+
+function getRoadmap(
+  model: PreparationCatalogModel,
+  categoryId: string,
+): PreparationRoadmapModel {
+  const roadmap = model.roadmaps.find(
+    (candidate) => candidate.categoryId === categoryId,
+  );
+
+  if (!roadmap) {
+    throw new Error("선택한 준비 카테고리의 로드맵이 없습니다.");
+  }
+
+  return roadmap;
+}
+
+export function getInitialSelectedCategoryId(
+  model: PreparationCatalogModel,
+): string {
+  const initialCategory = model.categories.find((category) =>
+    model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
+  );
+
+  if (!initialCategory) {
+    throw new Error("선택할 준비 카테고리가 없습니다.");
+  }
+
+  return initialCategory.id;
+}
+
 export function getInitialSelectedStepId(
   model: PreparationCatalogModel,
+  categoryId: string,
   stepProgress: PreparationStepProgressModel[] = [],
 ): string {
+  const roadmap = getRoadmap(model, categoryId);
   const statusByStepId = createStatusByStepId(stepProgress);
-  const orderedSteps = [...model.roadmap.steps].sort(
+  const orderedSteps = [...roadmap.steps].sort(
     (firstStep, secondStep) => firstStep.order - secondStep.order,
   );
   const firstStep = orderedSteps[0];
@@ -74,6 +117,69 @@ export function getInitialSelectedStepId(
   );
 }
 
+export function createInitialPreparationRoadmapSelection(
+  model: PreparationCatalogModel,
+  stepProgress: PreparationStepProgressModel[] = [],
+): PreparationRoadmapSelection {
+  const categoryId = getInitialSelectedCategoryId(model);
+
+  return {
+    categoryId,
+    stepId: getInitialSelectedStepId(model, categoryId, stepProgress),
+  };
+}
+
+export function selectPreparationCategory(
+  model: PreparationCatalogModel,
+  currentSelection: PreparationRoadmapSelection,
+  categoryId: string,
+  stepProgress: PreparationStepProgressModel[] = [],
+): PreparationRoadmapSelection {
+  if (currentSelection.categoryId === categoryId) {
+    return currentSelection;
+  }
+
+  return {
+    categoryId,
+    stepId: getInitialSelectedStepId(model, categoryId, stepProgress),
+  };
+}
+
+export function selectAdjacentPreparationCategory(
+  model: PreparationCatalogModel,
+  currentSelection: PreparationRoadmapSelection,
+  direction: PreparationCategoryNavigationDirection,
+  stepProgress: PreparationStepProgressModel[] = [],
+): PreparationRoadmapSelection {
+  const availableCategoryIds = model.categories
+    .filter((category) =>
+      model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
+    )
+    .map((category) => category.id);
+  const currentCategoryIndex = availableCategoryIds.indexOf(
+    currentSelection.categoryId,
+  );
+
+  if (currentCategoryIndex < 0) {
+    throw new Error("현재 선택된 준비 카테고리가 올바르지 않습니다.");
+  }
+
+  const indexOffset = direction === "next" ? 1 : -1;
+  const targetCategoryId =
+    availableCategoryIds[currentCategoryIndex + indexOffset];
+
+  if (!targetCategoryId) {
+    return currentSelection;
+  }
+
+  return selectPreparationCategory(
+    model,
+    currentSelection,
+    targetCategoryId,
+    stepProgress,
+  );
+}
+
 function createStatusByStepId(stepProgress: PreparationStepProgressModel[]) {
   return new Map(
     stepProgress.map((progress) => [progress.stepId, progress.status]),
@@ -89,14 +195,13 @@ function getStepStatus(
 
 function createSelectedStepDetailViewModel(
   model: PreparationCatalogModel,
+  roadmap: PreparationRoadmapModel,
   selectedStepId: string,
   statusByStepId: Map<string, PreparationStepStatus>,
 ): PreparationStepDetailViewModel {
-  const selectedStep = model.roadmap.steps.find(
-    (step) => step.id === selectedStepId,
-  );
+  const selectedStep = roadmap.steps.find((step) => step.id === selectedStepId);
   const selectedCategory = model.categories.find(
-    (category) => category.id === model.roadmap.categoryId,
+    (category) => category.id === roadmap.categoryId,
   );
   const selectedDetail = model.stepDetails.find(
     (detail) => detail.stepId === selectedStepId,
@@ -120,23 +225,35 @@ function createSelectedStepDetailViewModel(
 
 export function createPreparationRoadmapViewModel(
   model: PreparationCatalogModel,
+  selectedCategoryId: string,
   selectedStepId: string,
   stepProgress: PreparationStepProgressModel[] = [],
 ): PreparationRoadmapViewModel {
+  const roadmap = getRoadmap(model, selectedCategoryId);
   const statusByStepId = createStatusByStepId(stepProgress);
+  const selectedCategoryIndex = model.categories.findIndex(
+    (category) => category.id === selectedCategoryId,
+  );
 
   return {
+    categoryNavigation: {
+      canNavigateNext:
+        selectedCategoryIndex >= 0 &&
+        selectedCategoryIndex < model.categories.length - 1,
+      canNavigatePrevious: selectedCategoryIndex > 0,
+    },
     categories: model.categories.map((category) => ({
       id: category.id,
-      isCurrent: category.id === model.roadmap.categoryId,
+      isCurrent: category.id === selectedCategoryId,
       label: category.label,
     })),
     selectedStepDetail: createSelectedStepDetailViewModel(
       model,
+      roadmap,
       selectedStepId,
       statusByStepId,
     ),
-    steps: model.roadmap.steps.map((step) => {
+    steps: roadmap.steps.map((step) => {
       const status = getStepStatus(statusByStepId, step.id);
 
       return {
@@ -149,6 +266,6 @@ export function createPreparationRoadmapViewModel(
         title: step.title,
       };
     }),
-    title: model.roadmap.title,
+    title: roadmap.title,
   };
 }

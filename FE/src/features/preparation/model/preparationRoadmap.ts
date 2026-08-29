@@ -36,6 +36,6 @@ export interface PreparationRoadmapModel {
 
 export interface PreparationCatalogModel {
   categories: PreparationCategoryModel[];
-  roadmap: PreparationRoadmapModel;
+  roadmaps: PreparationRoadmapModel[];
   stepDetails: PreparationStepDetailModel[];
 }
