@@ -8,12 +8,12 @@ import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
 import com.bibbidi.wedding.auth.service.AuthResult;
 import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.auth.session.Auth;
-import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.auth.session.AuthSessionCookieManager;
+import com.bibbidi.wedding.auth.session.AuthSessionManager;
+import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
+import com.bibbidi.wedding.user.service.UserDeletionService;
 import com.bibbidi.wedding.user.service.UserResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,14 +27,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
-    private final AuthSessionCookieManager sessionCookieManager;
+    private final UserDeletionService userDeletionService;
+    private final AuthSessionManager sessionManager;
 
     public AuthController(
             AuthService authService,
-            AuthSessionCookieManager sessionCookieManager
+            UserDeletionService userDeletionService,
+            AuthSessionManager sessionManager
     ) {
         this.authService = authService;
-        this.sessionCookieManager = sessionCookieManager;
+        this.userDeletionService = userDeletionService;
+        this.sessionManager = sessionManager;
     }
 
     @ResponseStatus(HttpStatus.CREATED)
@@ -50,18 +53,14 @@ public class AuthController {
             HttpServletRequest servletRequest
     ) {
         AuthResult result = authService.login(request.nickname(), request.password());
-        replaceSession(servletRequest, result.userId());
+        sessionManager.replaceWithAuthenticatedSession(servletRequest, result.userId());
         return LoginResponse.from(result);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/api/logout")
     public void logout(HttpServletRequest request, HttpServletResponse response) {
-        HttpSession session = request.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
-        sessionCookieManager.expire(response);
+        sessionManager.invalidate(request, response);
     }
 
     @PutMapping("/api/users/me/password")
@@ -73,13 +72,15 @@ public class AuthController {
         authService.changePassword(currentUserId, request.currentPassword(), request.newPassword());
     }
 
-    private void replaceSession(HttpServletRequest request, Long userId) {
-        HttpSession previousSession = request.getSession(false);
-        if (previousSession != null) {
-            previousSession.invalidate();
-        }
-
-        HttpSession authenticatedSession = request.getSession(true);
-        authenticatedSession.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/api/users/me")
+    public void deleteCurrentUser(
+            @Auth Long currentUserId,
+            @Valid @RequestBody DeleteUserRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
+        userDeletionService.delete(currentUserId, request.password());
+        sessionManager.invalidate(servletRequest, servletResponse);
     }
 }
