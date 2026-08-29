@@ -128,14 +128,6 @@ public class ChecklistService {
             );
         }
 
-        if (item.hasSourceCatalogItem()) {
-            throw new BusinessException(
-                    ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE,
-                    "준비 목록에서 추가한 할 일입니다. checklistItemId=" + checklistItemId
-                            + ", sourceCatalogItemId=" + item.sourceCatalogItemId()
-            );
-        }
-
         if (!catalogService.existsCategory(categoryId)) {
             throw new BusinessException(
                     ClientError.CATEGORY_NOT_FOUND,

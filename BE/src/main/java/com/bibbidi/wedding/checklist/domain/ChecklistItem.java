@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.checklist.domain;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -41,6 +43,13 @@ public final class ChecklistItem {
     }
 
     public ChecklistItem changeCategory(Long categoryId) {
+        if (hasSourceCatalogItem()) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE,
+                    "준비 목록에서 추가한 할 일입니다. checklistItemId=" + id
+                            + ", sourceCatalogItemId=" + sourceCatalogItemId
+            );
+        }
         return new ChecklistItem(
                 id,
                 checklistId,
@@ -66,7 +75,7 @@ public final class ChecklistItem {
         return catalogItemId != null && catalogItemId.equals(sourceCatalogItemId);
     }
 
-    public boolean hasSourceCatalogItem() {
+    private boolean hasSourceCatalogItem() {
         return sourceCatalogItemId != null;
     }
 

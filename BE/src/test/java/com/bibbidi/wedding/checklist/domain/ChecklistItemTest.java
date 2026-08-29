@@ -1,7 +1,10 @@
 package com.bibbidi.wedding.checklist.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -160,21 +163,21 @@ class ChecklistItemTest {
     }
 
     @Test
-    @DisplayName("준비 목록에서 추가한 할 일은 원본 준비 항목을 가지고 있다")
-    void shouldHaveSourceCatalogItemWhenAddedFromCatalog() {
+    @DisplayName("준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없다")
+    void shouldRejectCategoryChangeWhenAddedFromCatalog() {
         // given
         ChecklistItem item = constructTestItem();
 
-        // when
-        boolean hasSourceCatalogItem = item.hasSourceCatalogItem();
-
-        // then
-        assertThat(hasSourceCatalogItem).isTrue();
+        // when, then
+        assertThatThrownBy(() -> item.changeCategory(20L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE);
     }
 
     @Test
-    @DisplayName("직접 만든 할 일은 원본 준비 항목을 가지고 있지 않다")
-    void shouldNotHaveSourceCatalogItemWhenCreatedDirectly() {
+    @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 카테고리를 변경할 수 있다")
+    void shouldAllowCategoryChangeWhenSourceCatalogItemIsGone() {
         // given
         ChecklistItem item = new ChecklistItem(
                 1L,
@@ -186,9 +189,9 @@ class ChecklistItemTest {
         );
 
         // when
-        boolean hasSourceCatalogItem = item.hasSourceCatalogItem();
+        ChecklistItem changed = item.changeCategory(20L);
 
         // then
-        assertThat(hasSourceCatalogItem).isFalse();
+        assertThat(changed.categoryId()).isEqualTo(20L);
     }
 }
