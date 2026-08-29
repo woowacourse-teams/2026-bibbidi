@@ -149,7 +149,7 @@ public class ChecklistService {
     }
 
     @Transactional(readOnly = true)
-    public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
+    public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
         return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
     }
 

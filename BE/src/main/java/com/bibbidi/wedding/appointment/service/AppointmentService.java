@@ -99,7 +99,7 @@ public class AppointmentService implements AppointmentDeleteService {
     }
 
     private void validateItemOwnership(Long userId, Long checklistItemId) {
-        if (!checklistService.checkItemOwnership(userId, checklistItemId)) {
+        if (!checklistService.checkItemOwnership(checklistItemId, userId)) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
                     "현재 사용자 계정에 속한 할 일이 아닙니다. userId=" + userId

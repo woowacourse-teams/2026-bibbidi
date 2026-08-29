@@ -116,7 +116,7 @@ class ChecklistServiceTest {
         given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(false);
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
+        assertThat(checklistService.checkItemOwnership(200L, 1L)).isFalse();
     }
 
     @Test
@@ -126,7 +126,7 @@ class ChecklistServiceTest {
         given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(true);
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isTrue();
+        assertThat(checklistService.checkItemOwnership(200L, 1L)).isTrue();
     }
 
     @Test
@@ -136,7 +136,7 @@ class ChecklistServiceTest {
         given(checklistItemRepository.existsByIdAndOwnerId(200L, 1L)).willReturn(false);
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 200L)).isFalse();
+        assertThat(checklistService.checkItemOwnership(200L, 1L)).isFalse();
     }
 
     @Test
@@ -146,7 +146,7 @@ class ChecklistServiceTest {
         given(checklistItemRepository.existsByIdAndOwnerId(999L, 1L)).willReturn(false);
 
         // when, then
-        assertThat(checklistService.checkItemOwnership(1L, 999L)).isFalse();
+        assertThat(checklistService.checkItemOwnership(999L, 1L)).isFalse();
     }
 
     @Test
