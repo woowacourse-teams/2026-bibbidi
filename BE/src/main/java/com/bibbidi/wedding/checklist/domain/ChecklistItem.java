@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 public final class ChecklistItem {
 
     private final Long id;
-    private final Long checklistId;
+    private final Checklist checklist;
     private final Long categoryId;
     private final String title;
     private final Long sourceCatalogItemId;
@@ -16,14 +16,14 @@ public final class ChecklistItem {
 
     public ChecklistItem(
             @Nullable Long id,
-            @NonNull Long checklistId,
+            @NonNull Checklist checklist,
             @Nullable Long categoryId,
             @NonNull String title,
             @Nullable Long sourceCatalogItemId,
             @NonNull ChecklistItemStatus status
     ) {
         this.id = id;
-        this.checklistId = checklistId;
+        this.checklist = checklist;
         this.categoryId = categoryId;
         this.title = title;
         this.sourceCatalogItemId = sourceCatalogItemId;
@@ -52,7 +52,7 @@ public final class ChecklistItem {
         }
         return new ChecklistItem(
                 id,
-                checklistId,
+                checklist,
                 categoryId,
                 title,
                 sourceCatalogItemId,
@@ -63,7 +63,7 @@ public final class ChecklistItem {
     private ChecklistItem withStatus(ChecklistItemStatus status) {
         return new ChecklistItem(
                 id,
-                checklistId,
+                checklist,
                 categoryId,
                 title,
                 sourceCatalogItemId,
@@ -83,8 +83,8 @@ public final class ChecklistItem {
         return id;
     }
 
-    public Long checklistId() {
-        return checklistId;
+    public Checklist checklist() {
+        return checklist;
     }
 
     public Long categoryId() {

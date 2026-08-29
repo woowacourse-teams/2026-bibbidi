@@ -98,7 +98,7 @@ public class ChecklistService {
 
         ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
                 null,
-                checklist.id(),
+                checklist,
                 categoryId,
                 title,
                 null,
@@ -162,7 +162,7 @@ public class ChecklistService {
         return catalogItems.stream()
                 .map(catalogItem -> new ChecklistItem(
                         null,
-                        checklist.id(),
+                        checklist,
                         catalogItem.categoryId(),
                         catalogItem.title(),
                         catalogItem.id(),

@@ -10,10 +10,12 @@ import org.junit.jupiter.api.Test;
 
 class ChecklistItemTest {
 
+    private static final Checklist CHECKLIST = new Checklist(100L, 1L);
+
     private static ChecklistItem constructTestItem() {
         return new ChecklistItem(
                 1L,
-                100L,
+                CHECKLIST,
                 10L,
                 "Wedding hall consultation",
                 1L,
@@ -86,14 +88,14 @@ class ChecklistItemTest {
         assertThat(progressed)
                 .extracting(
                         ChecklistItem::id,
-                        ChecklistItem::checklistId,
+                        extracted -> extracted.checklist().id(),
                         ChecklistItem::categoryId,
                         ChecklistItem::title,
                         ChecklistItem::sourceCatalogItemId
                 )
                 .containsExactly(
                         item.id(),
-                        item.checklistId(),
+                        item.checklist().id(),
                         item.categoryId(),
                         item.title(),
                         item.sourceCatalogItemId()
@@ -132,7 +134,7 @@ class ChecklistItemTest {
         // given
         ChecklistItem item = new ChecklistItem(
                 1L,
-                100L,
+                CHECKLIST,
                 10L,
                 "Wedding hall consultation",
                 null,
@@ -146,7 +148,7 @@ class ChecklistItemTest {
         assertThat(changed)
                 .extracting(
                         ChecklistItem::id,
-                        ChecklistItem::checklistId,
+                        extracted -> extracted.checklist().id(),
                         ChecklistItem::categoryId,
                         ChecklistItem::title,
                         ChecklistItem::sourceCatalogItemId,
@@ -154,7 +156,7 @@ class ChecklistItemTest {
                 )
                 .containsExactly(
                         item.id(),
-                        item.checklistId(),
+                        item.checklist().id(),
                         20L,
                         item.title(),
                         item.sourceCatalogItemId(),
@@ -181,7 +183,7 @@ class ChecklistItemTest {
         // given
         ChecklistItem item = new ChecklistItem(
                 1L,
-                100L,
+                CHECKLIST,
                 10L,
                 "Wedding hall consultation",
                 null,
