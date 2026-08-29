@@ -9,6 +9,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCategoryChangeResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -105,6 +106,46 @@ public class ChecklistService {
         ));
 
         return ChecklistItemCreationResult.from(item);
+    }
+
+    @Transactional
+    public ChecklistItemCategoryChangeResult changeItemCategory(
+            Long ownerId,
+            Long checklistItemId,
+            Long categoryId
+    ) {
+        ChecklistItem item = checklistItemRepository.findById(checklistItemId)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
+                ));
+
+        if (!checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId)) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
+                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
+                            + ", checklistItemId=" + checklistItemId
+            );
+        }
+
+        if (item.hasSourceCatalogItem()) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE,
+                    "준비 목록에서 추가한 할 일입니다. checklistItemId=" + checklistItemId
+                            + ", sourceCatalogItemId=" + item.sourceCatalogItemId()
+            );
+        }
+
+        if (!catalogService.existsCategory(categoryId)) {
+            throw new BusinessException(
+                    ClientError.CATEGORY_NOT_FOUND,
+                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
+            );
+        }
+
+        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(categoryId));
+
+        return ChecklistItemCategoryChangeResult.from(changed);
     }
 
     @Transactional(readOnly = true)
