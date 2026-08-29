@@ -60,6 +60,24 @@ public final class ChecklistItem {
         );
     }
 
+    public ChecklistItem changeTitle(String title) {
+        if (hasSourceCatalogItem()) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE,
+                    "준비 목록에서 추가한 할 일입니다. checklistItemId=" + id
+                            + ", sourceCatalogItemId=" + sourceCatalogItemId
+            );
+        }
+        return new ChecklistItem(
+                id,
+                checklist,
+                categoryId,
+                title,
+                sourceCatalogItemId,
+                status
+        );
+    }
+
     private ChecklistItem withStatus(ChecklistItemStatus status) {
         return new ChecklistItem(
                 id,

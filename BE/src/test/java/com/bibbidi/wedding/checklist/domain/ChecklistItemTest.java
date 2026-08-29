@@ -165,6 +165,42 @@ class ChecklistItemTest {
     }
 
     @Test
+    @DisplayName("제목을 변경해도 카테고리와 완료 상태는 그대로다")
+    void shouldKeepOtherInformationWhenTitleChanges() {
+        // given
+        ChecklistItem item = new ChecklistItem(
+                1L,
+                CHECKLIST,
+                10L,
+                "Wedding hall consultation",
+                null,
+                ChecklistItemStatus.DONE
+        );
+
+        // when
+        ChecklistItem changed = item.changeTitle("Invitation wording");
+
+        // then
+        assertThat(changed)
+                .extracting(
+                        ChecklistItem::id,
+                        extracted -> extracted.checklist().id(),
+                        ChecklistItem::categoryId,
+                        ChecklistItem::title,
+                        ChecklistItem::sourceCatalogItemId,
+                        ChecklistItem::status
+                )
+                .containsExactly(
+                        item.id(),
+                        item.checklist().id(),
+                        item.categoryId(),
+                        "Invitation wording",
+                        item.sourceCatalogItemId(),
+                        item.status()
+                );
+    }
+
+    @Test
     @DisplayName("체크리스트의 주인만 할 일의 주인으로 인정한다")
     void shouldBeOwnedByChecklistOwner() {
         // given
@@ -189,6 +225,19 @@ class ChecklistItemTest {
     }
 
     @Test
+    @DisplayName("준비 목록에서 추가한 할 일은 제목을 변경할 수 없다")
+    void shouldRejectTitleChangeWhenAddedFromCatalog() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.changeTitle("Invitation wording"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE);
+    }
+
+    @Test
     @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 카테고리를 변경할 수 있다")
     void shouldAllowCategoryChangeWhenSourceCatalogItemIsGone() {
         // given
@@ -206,5 +255,25 @@ class ChecklistItemTest {
 
         // then
         assertThat(changed.categoryId()).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 제목을 변경할 수 있다")
+    void shouldAllowTitleChangeWhenSourceCatalogItemIsGone() {
+        // given
+        ChecklistItem item = new ChecklistItem(
+                1L,
+                CHECKLIST,
+                10L,
+                "Wedding hall consultation",
+                null,
+                ChecklistItemStatus.PREV
+        );
+
+        // when
+        ChecklistItem changed = item.changeTitle("Invitation wording");
+
+        // then
+        assertThat(changed.title()).isEqualTo("Invitation wording");
     }
 }
