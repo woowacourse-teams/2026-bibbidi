@@ -16,6 +16,7 @@
 - 외부 Provider는 실제 호출하지 않는다.
 - 외부 연동이 추가되면 Adapter 경계와 오류 변환만 테스트한다.
 - 모듈 경계와 API 문서도 테스트 대상으로 본다.
+- Controller 테스트의 요청 본문은 JSON 문자열로 쓰지 않는다. 실제 Request DTO를 만들어 `ObjectMapper`로 직렬화한다. 필드 이름이나 타입이 바뀌면 테스트가 컴파일 단계에서 깨져야 한다.
 - Controller 통합 테스트의 준비 데이터는 가능하면 공개 API와 실제 Request DTO로 만든다.
 - 대량·정적 조회 데이터이거나 준비 API가 없는 경우에는 SQL 스크립트를 `@Sql`로 적재한다.
 - 픽스처를 만들기 위해 Controller 통합 테스트에 Repository를 주입하지 않는다.

@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.appointment.domain;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.jspecify.annotations.NonNull;
@@ -28,13 +30,15 @@ public final class Appointment {
             String memo,
             boolean isDone
     ) {
+        validateTime(startTime, endTime);
+
         this.id = id;
         this.checklistItemId = checklistItemId;
         this.title = title;
         this.date = date;
         this.startTime = startTime;
         this.endTime = endTime;
-        this.place = place;
+        this.place = normalizePlace(place);
         this.memo = memo;
         this.isDone = isDone;
     }
@@ -117,4 +121,47 @@ public final class Appointment {
         return endTime;
     }
 
+    public boolean conflictsWith(Appointment other) {
+        if (!hasConfirmedSchedule() || !other.hasConfirmedSchedule()) {
+            return false;
+        }
+        if (isInstant()) {
+            return other.covers(startTime);
+        }
+        if (other.isInstant()) {
+            return covers(other.startTime);
+        }
+        return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
+    }
+
+    public boolean hasConfirmedSchedule() {
+        return startTime != null && endTime != null && place != null;
+    }
+
+    private boolean isInstant() {
+        return startTime.equals(endTime);
+    }
+
+    private boolean covers(LocalDateTime instant) {
+        return !instant.isBefore(startTime) && !instant.isAfter(endTime);
+    }
+
+    private static void validateTime(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime == null || endTime == null) {
+            return;
+        }
+        if (startTime.isAfter(endTime)) {
+            throw new BusinessException(
+                    ClientError.INVALID_APPOINTMENT_TIME_RANGE,
+                    "시작 시각은 종료 시각보다 늦을 수 없습니다. startTime=" + startTime + ", endTime=" + endTime
+            );
+        }
+    }
+
+    private static String normalizePlace(String place) {
+        if (place == null || place.isBlank()) {
+            return null;
+        }
+        return place.trim();
+    }
 }

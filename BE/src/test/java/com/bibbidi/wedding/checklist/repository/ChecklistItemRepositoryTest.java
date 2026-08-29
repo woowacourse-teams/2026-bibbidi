@@ -1,17 +1,20 @@
 package com.bibbidi.wedding.checklist.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
@@ -159,5 +162,48 @@ class ChecklistItemRepositoryTest {
         assertThat(checklistItemRepository.findById(first.id())).isEmpty();
         assertThat(checklistItemRepository.findById(second.id())).isEmpty();
         assertThat(checklistItemRepository.findById(other.id())).isPresent();
+    }
+
+    @Test
+    @DisplayName("여러 할 일을 한 번에 저장하고 생성된 식별자를 채워 반환한다")
+    void shouldSaveAllItemsAndReturnGeneratedIds() {
+        // given
+        List<ChecklistItem> items = List.of(
+                new ChecklistItem(null, CHECKLIST_ID, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
+                new ChecklistItem(null, CHECKLIST_ID, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
+        );
+
+        // when
+        List<ChecklistItem> saved = checklistItemRepository.saveAll(items);
+
+        // then
+        assertThat(saved).hasSize(2).allSatisfy(item -> assertThat(item.id()).isNotNull());
+        assertThat(checklistItemRepository.findByChecklistId(CHECKLIST_ID))
+                .extracting(ChecklistItem::sourceCatalogItemId)
+                .containsExactly(100L, 101L);
+    }
+
+    @Test
+    @DisplayName("같은 체크리스트에 같은 준비 항목을 두 번 저장하면 UNIQUE 제약을 위반한다")
+    void shouldViolateUniqueConstraintWhenSameCatalogItemSavedTwice() {
+        // given
+        saveItem(CHECKLIST_ID, 100L);
+
+        // when, then
+        assertThatThrownBy(() -> saveItem(CHECKLIST_ID, 100L))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("직접 만든 할 일은 원본 준비 항목이 없어 여러 번 저장할 수 있다")
+    void shouldAllowMultipleItemsWithoutSourceCatalogItem() {
+        // given
+        saveItem(CHECKLIST_ID, null);
+
+        // when
+        saveItem(CHECKLIST_ID, null);
+
+        // then
+        assertThat(checklistItemRepository.findByChecklistId(CHECKLIST_ID)).hasSize(2);
     }
 }

@@ -11,6 +11,7 @@ import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.repository.CatalogItemInclusionRepository;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogQueryResult;
 import java.util.List;
 import java.util.Set;
@@ -66,5 +67,22 @@ class CatalogServiceTest {
         // then
         assertThat(publicCatalog).isSameAs(catalog);
         verifyNoInteractions(catalogItemInclusionRepository);
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 선택한 항목을 조회한다")
+    void shouldFindItems() {
+        // given
+        Catalog catalog = constructTestCatalog();
+        when(catalogRepository.findCatalog()).thenReturn(catalog);
+
+        // when
+        List<CatalogItemSnapshot> snapshots = catalogService.findItems(List.of(INCLUDED_ITEM_ID));
+
+        // then
+        assertThat(snapshots)
+                .singleElement()
+                .extracting(CatalogItemSnapshot::id, CatalogItemSnapshot::categoryId, CatalogItemSnapshot::title)
+                .containsExactly(INCLUDED_ITEM_ID, 1L, "포함된 할 일");
     }
 }

@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.domain;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public final class ChecklistItem {
@@ -13,11 +14,11 @@ public final class ChecklistItem {
 
     public ChecklistItem(
             @Nullable Long id,
-            Long checklistId,
-            Long categoryId,
-            String title,
-            Long sourceCatalogItemId,
-            ChecklistItemStatus status
+            @NonNull Long checklistId,
+            @Nullable Long categoryId,
+            @NonNull String title,
+            @Nullable Long sourceCatalogItemId,
+            @NonNull ChecklistItemStatus status
     ) {
         this.id = id;
         this.checklistId = checklistId;
@@ -25,15 +26,6 @@ public final class ChecklistItem {
         this.title = title;
         this.sourceCatalogItemId = sourceCatalogItemId;
         this.status = status;
-    }
-
-    public ChecklistItem(Long checklistId, CatalogItem catalogItem) {
-        this.id = null;
-        this.checklistId = checklistId;
-        this.categoryId = catalogItem.categoryId();
-        this.title = catalogItem.title();
-        this.sourceCatalogItemId = catalogItem.id();
-        this.status = ChecklistItemStatus.PREV;
     }
 
     public ChecklistItem onProgress() {

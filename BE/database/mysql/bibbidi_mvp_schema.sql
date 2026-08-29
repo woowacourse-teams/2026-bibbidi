@@ -86,7 +86,7 @@ CREATE TABLE checklists (
 CREATE TABLE checklist_items (
     id BIGINT NOT NULL AUTO_INCREMENT,
     checklist_id BIGINT NOT NULL,
-    category_id BIGINT NOT NULL,
+    category_id BIGINT,
     source_catalog_item_id BIGINT,
     title VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL,

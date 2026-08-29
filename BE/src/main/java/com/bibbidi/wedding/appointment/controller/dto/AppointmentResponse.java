@@ -2,8 +2,10 @@ package com.bibbidi.wedding.appointment.controller.dto;
 
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record AppointmentResponse(
         Long id,
@@ -14,7 +16,8 @@ public record AppointmentResponse(
         LocalDateTime endTime,
         String place,
         String memo,
-        boolean isDone
+        boolean isDone,
+        List<AppointmentConflict> conflicts
 ) {
 
     public static AppointmentResponse from(AppointmentCreationResult appointment) {
@@ -27,7 +30,8 @@ public record AppointmentResponse(
                 appointment.endTime(),
                 appointment.place(),
                 appointment.memo(),
-                appointment.isDone()
+                appointment.isDone(),
+                appointment.conflicts()
         );
     }
 
@@ -41,7 +45,8 @@ public record AppointmentResponse(
                 appointment.endTime(),
                 appointment.place(),
                 appointment.memo(),
-                appointment.isDone()
+                appointment.isDone(),
+                appointment.conflicts()
         );
     }
 
