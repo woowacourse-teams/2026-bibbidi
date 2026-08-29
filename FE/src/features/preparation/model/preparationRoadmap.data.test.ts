@@ -15,6 +15,9 @@ describe("preparationRoadmapData", () => {
     const stepIds = preparationRoadmapData.roadmaps.flatMap(({ steps }) =>
       steps.map(({ id }) => id),
     );
+    const detailStepIds = preparationRoadmapData.stepDetails.map(
+      ({ stepId }) => stepId,
+    );
     const taskIds = preparationRoadmapData.stepDetails.flatMap(({ tasks }) =>
       tasks.map(({ id }) => id),
     );
@@ -22,6 +25,7 @@ describe("preparationRoadmapData", () => {
     expect(stepIds).toHaveLength(43);
     expect(new Set(stepIds).size).toBe(43);
     expect(preparationRoadmapData.stepDetails).toHaveLength(43);
+    expect(new Set(detailStepIds)).toEqual(new Set(stepIds));
     expect(taskIds).toHaveLength(169);
     expect(new Set(taskIds).size).toBe(169);
   });

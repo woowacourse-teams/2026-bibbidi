@@ -72,12 +72,16 @@ function getRoadmap(
   return roadmap;
 }
 
+function getAvailableCategories(model: PreparationCatalogModel) {
+  return model.categories.filter((category) =>
+    model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
+  );
+}
+
 export function getInitialSelectedCategoryId(
   model: PreparationCatalogModel,
 ): string {
-  const initialCategory = model.categories.find((category) =>
-    model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
-  );
+  const initialCategory = getAvailableCategories(model)[0];
 
   if (!initialCategory) {
     throw new Error("선택할 준비 카테고리가 없습니다.");
@@ -151,11 +155,9 @@ export function selectAdjacentPreparationCategory(
   direction: PreparationCategoryNavigationDirection,
   stepProgress: PreparationStepProgressModel[] = [],
 ): PreparationRoadmapSelection {
-  const availableCategoryIds = model.categories
-    .filter((category) =>
-      model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
-    )
-    .map((category) => category.id);
+  const availableCategoryIds = getAvailableCategories(model).map(
+    (category) => category.id,
+  );
   const currentCategoryIndex = availableCategoryIds.indexOf(
     currentSelection.categoryId,
   );
@@ -231,7 +233,8 @@ export function createPreparationRoadmapViewModel(
 ): PreparationRoadmapViewModel {
   const roadmap = getRoadmap(model, selectedCategoryId);
   const statusByStepId = createStatusByStepId(stepProgress);
-  const selectedCategoryIndex = model.categories.findIndex(
+  const availableCategories = getAvailableCategories(model);
+  const selectedCategoryIndex = availableCategories.findIndex(
     (category) => category.id === selectedCategoryId,
   );
 
@@ -239,10 +242,10 @@ export function createPreparationRoadmapViewModel(
     categoryNavigation: {
       canNavigateNext:
         selectedCategoryIndex >= 0 &&
-        selectedCategoryIndex < model.categories.length - 1,
+        selectedCategoryIndex < availableCategories.length - 1,
       canNavigatePrevious: selectedCategoryIndex > 0,
     },
-    categories: model.categories.map((category) => ({
+    categories: availableCategories.map((category) => ({
       id: category.id,
       isCurrent: category.id === selectedCategoryId,
       label: category.label,

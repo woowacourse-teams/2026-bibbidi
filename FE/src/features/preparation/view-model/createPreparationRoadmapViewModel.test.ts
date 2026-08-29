@@ -246,4 +246,43 @@ describe("createPreparationRoadmapViewModel", () => {
       statusLabel: "진행 중",
     });
   });
+
+  it("로드맵이 없는 카테고리를 표시와 이동 경계에서 제외한다", () => {
+    const model = createCatalog(unorderedSteps);
+    model.categories.push({ id: "without-roadmap", label: "준비 중" });
+    addInvitationRoadmap(model);
+
+    const firstCategoryViewModel = createPreparationRoadmapViewModel(
+      model,
+      "wedding-hall",
+      "step-1",
+    );
+    const lastCategoryViewModel = createPreparationRoadmapViewModel(
+      model,
+      "invitation",
+      "invitation-step-1",
+    );
+
+    expect(
+      firstCategoryViewModel.categories.map((category) => category.id),
+    ).toEqual(["wedding-hall", "invitation"]);
+    expect(firstCategoryViewModel.categoryNavigation).toEqual({
+      canNavigateNext: true,
+      canNavigatePrevious: false,
+    });
+    expect(lastCategoryViewModel.categoryNavigation).toEqual({
+      canNavigateNext: false,
+      canNavigatePrevious: true,
+    });
+    expect(
+      selectAdjacentPreparationCategory(
+        model,
+        { categoryId: "wedding-hall", stepId: "step-1" },
+        "next",
+      ),
+    ).toEqual({
+      categoryId: "invitation",
+      stepId: "invitation-step-1",
+    });
+  });
 });
