@@ -12,6 +12,10 @@ public final class Checklist {
         this.ownerId = ownerId;
     }
 
+    public boolean isOwnedBy(Long ownerId) {
+        return this.ownerId.equals(ownerId);
+    }
+
     public Long id() {
         return id;
     }

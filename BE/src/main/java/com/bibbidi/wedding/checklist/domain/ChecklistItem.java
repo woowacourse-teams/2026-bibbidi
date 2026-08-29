@@ -71,6 +71,10 @@ public final class ChecklistItem {
         );
     }
 
+    public boolean isOwnedBy(Long ownerId) {
+        return checklist.isOwnedBy(ownerId);
+    }
+
     public boolean cameFrom(Long catalogItemId) {
         return catalogItemId != null && catalogItemId.equals(sourceCatalogItemId);
     }

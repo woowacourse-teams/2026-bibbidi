@@ -106,30 +106,19 @@ class ChecklistItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("할 일이 사용자의 체크리스트에 속하면 소유권을 인정한다")
-    void shouldConfirmOwnershipWhenItemBelongsToOwner() {
-        // given
-        ChecklistItem saved = saveItem(checklist, 100L);
-
-        // when, then
-        assertThat(checklistItemRepository.existsByIdAndOwnerId(saved.id(), OWNER_ID)).isTrue();
-    }
-
-    @Test
-    @DisplayName("할 일이 다른 사용자의 체크리스트에 속하면 소유권을 인정하지 않는다")
-    void shouldDenyOwnershipWhenItemBelongsToAnotherOwner() {
+    @DisplayName("다른 사용자의 체크리스트에 속한 할 일은 그 사용자를 소유자로 답한다")
+    void shouldAnswerOwnerOfItemBelongingToAnotherChecklist() {
         // given
         ChecklistItem saved = saveItem(saveChecklist(OTHER_OWNER_ID), 100L);
 
-        // when, then
-        assertThat(checklistItemRepository.existsByIdAndOwnerId(saved.id(), OWNER_ID)).isFalse();
-    }
+        // when
+        Optional<ChecklistItem> found = checklistItemRepository.findById(saved.id());
 
-    @Test
-    @DisplayName("할 일이 존재하지 않으면 소유권을 인정하지 않는다")
-    void shouldDenyOwnershipWhenItemDoesNotExist() {
-        // when, then
-        assertThat(checklistItemRepository.existsByIdAndOwnerId(999L, OWNER_ID)).isFalse();
+        // then
+        assertThat(found).get().satisfies(item -> {
+            assertThat(item.isOwnedBy(OTHER_OWNER_ID)).isTrue();
+            assertThat(item.isOwnedBy(OWNER_ID)).isFalse();
+        });
     }
 
     @Test

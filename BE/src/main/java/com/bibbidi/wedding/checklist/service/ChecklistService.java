@@ -120,7 +120,7 @@ public class ChecklistService {
                         "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
                 ));
 
-        if (!checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId)) {
+        if (!item.isOwnedBy(ownerId)) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
                     "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
@@ -142,7 +142,9 @@ public class ChecklistService {
 
     @Transactional(readOnly = true)
     public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
-        return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
+        return checklistItemRepository.findById(checklistItemId)
+                .map(item -> item.isOwnedBy(ownerId))
+                .orElse(false);
     }
 
     private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {

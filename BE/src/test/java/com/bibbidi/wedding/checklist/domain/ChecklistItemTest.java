@@ -165,6 +165,17 @@ class ChecklistItemTest {
     }
 
     @Test
+    @DisplayName("체크리스트의 주인이 곧 할 일의 주인이다")
+    void shouldBeOwnedByChecklistOwner() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when, then
+        assertThat(item.isOwnedBy(1L)).isTrue();
+        assertThat(item.isOwnedBy(2L)).isFalse();
+    }
+
+    @Test
     @DisplayName("준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없다")
     void shouldRejectCategoryChangeWhenAddedFromCatalog() {
         // given

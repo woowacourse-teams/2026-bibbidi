@@ -17,17 +17,6 @@ public interface JpaChecklistItemRepository extends JpaRepository<JpaChecklistIt
     Optional<JpaChecklistItemEntity> findByIdWithChecklist(@Param("checklistItemId") Long checklistItemId);
 
     @Query("""
-            SELECT CASE WHEN COUNT(item) > 0 THEN true ELSE false END
-            FROM JpaChecklistItemEntity item
-            WHERE item.id = :checklistItemId
-              AND item.checklist.ownerId = :ownerId
-            """)
-    boolean existsByIdAndOwnerId(
-            @Param("checklistItemId") Long checklistItemId,
-            @Param("ownerId") Long ownerId
-    );
-
-    @Query("""
             SELECT item.sourceCatalogItemId
             FROM JpaChecklistItemEntity item
             WHERE item.checklist.ownerId = :userId

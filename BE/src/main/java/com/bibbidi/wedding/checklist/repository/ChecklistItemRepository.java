@@ -32,10 +32,6 @@ public class ChecklistItemRepository {
                 .map(checklistMapper::toDomain);
     }
 
-    public boolean existsByIdAndOwnerId(Long checklistItemId, Long ownerId) {
-        return jpaChecklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
-    }
-
     public List<ChecklistItem> findByChecklistId(Long checklistId) {
         return jpaChecklistItemRepository.findByChecklistId(checklistId).stream()
                 .map(checklistMapper::toDomain)
