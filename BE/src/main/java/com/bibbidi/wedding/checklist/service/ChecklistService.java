@@ -139,6 +139,31 @@ public class ChecklistService {
         return ChecklistItemResult.from(changed);
     }
 
+    @Transactional
+    public ChecklistItemResult changeItemTitle(
+            Long ownerId,
+            Long checklistItemId,
+            String title
+    ) {
+        ChecklistItem item = checklistItemRepository.findById(checklistItemId)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
+                ));
+
+        if (!item.isOwnedBy(ownerId)) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
+                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
+                            + ", checklistItemId=" + checklistItemId
+            );
+        }
+
+        ChecklistItem changed = checklistItemRepository.save(item.changeTitle(title));
+
+        return ChecklistItemResult.from(changed);
+    }
+
     @Transactional(readOnly = true)
     public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
         return checklistItemRepository.findById(checklistItemId)
