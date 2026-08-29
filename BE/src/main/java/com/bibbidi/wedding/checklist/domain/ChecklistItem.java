@@ -40,6 +40,17 @@ public final class ChecklistItem {
         return withStatus(ChecklistItemStatus.PREV);
     }
 
+    public ChecklistItem changeCategory(Long categoryId) {
+        return new ChecklistItem(
+                id,
+                checklistId,
+                categoryId,
+                title,
+                sourceCatalogItemId,
+                status
+        );
+    }
+
     private ChecklistItem withStatus(ChecklistItemStatus status) {
         return new ChecklistItem(
                 id,
@@ -53,6 +64,10 @@ public final class ChecklistItem {
 
     public boolean cameFrom(Long catalogItemId) {
         return catalogItemId != null && catalogItemId.equals(sourceCatalogItemId);
+    }
+
+    public boolean hasSourceCatalogItem() {
+        return sourceCatalogItemId != null;
     }
 
     public Long id() {
