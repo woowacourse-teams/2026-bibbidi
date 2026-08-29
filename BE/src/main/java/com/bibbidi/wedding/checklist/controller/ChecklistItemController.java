@@ -2,9 +2,9 @@ package com.bibbidi.wedding.checklist.controller;
 
 import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryResponse;
+import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCategoryChangeResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,17 +21,17 @@ public class ChecklistItemController {
     }
 
     @PutMapping("/api/checklist-items/{itemId}/category")
-    public ChangeChecklistItemCategoryResponse changeCategory(
+    public ChecklistItemResponse changeCategory(
             @Auth Long userId,
             @PathVariable Long itemId,
             @Valid @RequestBody ChangeChecklistItemCategoryRequest request
     ) {
-        ChecklistItemCategoryChangeResult result = checklistService.changeItemCategory(
+        ChecklistItemResult result = checklistService.changeItemCategory(
                 userId,
                 itemId,
                 request.categoryId()
         );
 
-        return ChangeChecklistItemCategoryResponse.from(result);
+        return ChecklistItemResponse.from(result);
     }
 }

@@ -105,7 +105,7 @@ class ChecklistItemControllerIntegrationTest {
                                 .summary(CHANGE_CATEGORY_SUMMARY)
                                 .description(CHANGE_CATEGORY_DESCRIPTION)
                                 .requestSchema(schema("ChangeChecklistItemCategoryRequest"))
-                                .responseSchema(schema("ChangeChecklistItemCategoryResponse"))
+                                .responseSchema(schema("ChecklistItemResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)

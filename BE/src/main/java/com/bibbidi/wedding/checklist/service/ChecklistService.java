@@ -9,8 +9,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCategoryChangeResult;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.LinkedHashSet;
@@ -82,7 +81,7 @@ public class ChecklistService {
     }
 
     @Transactional
-    public ChecklistItemCreationResult writeItem(Long ownerId, String title, Long categoryId) {
+    public ChecklistItemResult writeItem(Long ownerId, String title, Long categoryId) {
         Checklist checklist = checklistRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new BusinessException(
                         ClientError.CHECKLIST_NOT_FOUND,
@@ -105,11 +104,11 @@ public class ChecklistService {
                 ChecklistItemStatus.PREV
         ));
 
-        return ChecklistItemCreationResult.from(item);
+        return ChecklistItemResult.from(item);
     }
 
     @Transactional
-    public ChecklistItemCategoryChangeResult changeItemCategory(
+    public ChecklistItemResult changeItemCategory(
             Long ownerId,
             Long checklistItemId,
             Long categoryId
@@ -137,7 +136,7 @@ public class ChecklistService {
 
         ChecklistItem changed = checklistItemRepository.save(item.changeCategory(categoryId));
 
-        return ChecklistItemCategoryChangeResult.from(changed);
+        return ChecklistItemResult.from(changed);
     }
 
     @Transactional(readOnly = true)

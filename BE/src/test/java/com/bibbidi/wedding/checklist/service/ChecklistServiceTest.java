@@ -20,7 +20,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
@@ -236,15 +236,15 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        ChecklistItemCreationResult result = checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
+        ChecklistItemResult result = checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
 
         // then
         assertThat(result)
                 .extracting(
-                        ChecklistItemCreationResult::catalogItemId,
-                        ChecklistItemCreationResult::categoryId,
-                        ChecklistItemCreationResult::title,
-                        ChecklistItemCreationResult::isDone
+                        ChecklistItemResult::catalogItemId,
+                        ChecklistItemResult::categoryId,
+                        ChecklistItemResult::title,
+                        ChecklistItemResult::isDone
                 )
                 .containsExactly(null, CATEGORY_ID, "청첩장 문구 정하기", false);
     }

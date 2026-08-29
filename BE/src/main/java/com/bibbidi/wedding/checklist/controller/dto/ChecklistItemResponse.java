@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.checklist.controller.dto;
 
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCategoryChangeResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 
-public record ChangeChecklistItemCategoryResponse(
+public record ChecklistItemResponse(
         Long id,
         Long catalogItemId,
         Long categoryId,
@@ -10,8 +10,8 @@ public record ChangeChecklistItemCategoryResponse(
         boolean isDone
 ) {
 
-    public static ChangeChecklistItemCategoryResponse from(ChecklistItemCategoryChangeResult result) {
-        return new ChangeChecklistItemCategoryResponse(
+    public static ChecklistItemResponse from(ChecklistItemResult result) {
+        return new ChecklistItemResponse(
                 result.id(),
                 result.catalogItemId(),
                 result.categoryId(),
