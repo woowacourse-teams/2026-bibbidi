@@ -9,6 +9,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCategoryChangeResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -97,7 +98,7 @@ public class ChecklistService {
 
         ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
                 null,
-                checklist.id(),
+                checklist,
                 categoryId,
                 title,
                 null,
@@ -107,9 +108,43 @@ public class ChecklistService {
         return ChecklistItemCreationResult.from(item);
     }
 
+    @Transactional
+    public ChecklistItemCategoryChangeResult changeItemCategory(
+            Long ownerId,
+            Long checklistItemId,
+            Long categoryId
+    ) {
+        ChecklistItem item = checklistItemRepository.findById(checklistItemId)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
+                ));
+
+        if (!item.isOwnedBy(ownerId)) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
+                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
+                            + ", checklistItemId=" + checklistItemId
+            );
+        }
+
+        if (!catalogService.existsCategory(categoryId)) {
+            throw new BusinessException(
+                    ClientError.CATEGORY_NOT_FOUND,
+                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
+            );
+        }
+
+        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(categoryId));
+
+        return ChecklistItemCategoryChangeResult.from(changed);
+    }
+
     @Transactional(readOnly = true)
-    public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
-        return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
+    public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
+        return checklistItemRepository.findById(checklistItemId)
+                .map(item -> item.isOwnedBy(ownerId))
+                .orElse(false);
     }
 
     private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {
@@ -129,7 +164,7 @@ public class ChecklistService {
         return catalogItems.stream()
                 .map(catalogItem -> new ChecklistItem(
                         null,
-                        checklist.id(),
+                        checklist,
                         catalogItem.categoryId(),
                         catalogItem.title(),
                         catalogItem.id(),

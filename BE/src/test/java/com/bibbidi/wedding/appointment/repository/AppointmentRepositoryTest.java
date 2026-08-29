@@ -135,9 +135,9 @@ class AppointmentRepositoryTest {
     void shouldFindOverlapCandidatesOwnedByUser() {
         JpaChecklistEntity ownChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 1L));
         JpaChecklistEntity otherUsersChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 2L));
-        Long firstItemId = saveChecklistItem(ownChecklist.id());
-        Long secondItemId = saveChecklistItem(ownChecklist.id());
-        Long otherUsersItemId = saveChecklistItem(otherUsersChecklist.id());
+        Long firstItemId = saveChecklistItem(ownChecklist);
+        Long secondItemId = saveChecklistItem(ownChecklist);
+        Long otherUsersItemId = saveChecklistItem(otherUsersChecklist);
 
         Appointment overlapping = saveAppointment(firstItemId, 11, 0, 12, 0, "overlapping");
         Appointment touching = saveAppointment(secondItemId, 10, 0, 11, 30, "touching");
@@ -164,7 +164,7 @@ class AppointmentRepositoryTest {
 
     private Long saveOwnedChecklistItem() {
         JpaChecklistEntity checklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 1L));
-        return saveChecklistItem(checklist.id());
+        return saveChecklistItem(checklist);
     }
 
     private static Appointment probe(int startHour, int startMinute, int endHour, int endMinute) {
@@ -181,9 +181,9 @@ class AppointmentRepositoryTest {
         );
     }
 
-    private Long saveChecklistItem(Long checklistId) {
+    private Long saveChecklistItem(JpaChecklistEntity checklist) {
         return jpaChecklistItemRepository.saveAndFlush(new JpaChecklistItemEntity(
-                null, checklistId, 1L, null, "item", ChecklistItemStatus.PREV)).id();
+                null, checklist, 1L, null, "item", ChecklistItemStatus.PREV)).id();
     }
 
     private Appointment saveAppointment(Long checklistItemId, Integer startHour, Integer startMinute,

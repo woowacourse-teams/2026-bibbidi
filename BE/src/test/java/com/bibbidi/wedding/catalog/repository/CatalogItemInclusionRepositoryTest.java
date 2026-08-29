@@ -38,10 +38,10 @@ class CatalogItemInclusionRepositoryTest {
     void setUp() {
         JpaChecklistEntity checklist = jpaChecklistRepository.save(new JpaChecklistEntity(null, OWNER_ID));
         jpaChecklistItemRepository.save(new JpaChecklistItemEntity(
-                null, checklist.id(), CATEGORY_ID, CATALOG_ITEM_ID, "계약서 확인", ChecklistItemStatus.PREV
+                null, checklist, CATEGORY_ID, CATALOG_ITEM_ID, "계약서 확인", ChecklistItemStatus.PREV
         ));
         jpaChecklistItemRepository.save(new JpaChecklistItemEntity(
-                null, checklist.id(), CATEGORY_ID, null, "직접 만든 할 일", ChecklistItemStatus.PREV
+                null, checklist, CATEGORY_ID, null, "직접 만든 할 일", ChecklistItemStatus.PREV
         ));
     }
 

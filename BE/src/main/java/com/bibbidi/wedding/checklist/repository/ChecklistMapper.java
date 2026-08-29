@@ -23,10 +23,10 @@ public class ChecklistMapper {
         );
     }
 
-    public JpaChecklistItemEntity toEntity(ChecklistItem checklistItem) {
+    public JpaChecklistItemEntity toEntity(ChecklistItem checklistItem, JpaChecklistEntity checklist) {
         return new JpaChecklistItemEntity(
                 checklistItem.id(),
-                checklistItem.checklistId(),
+                checklist,
                 checklistItem.categoryId(),
                 checklistItem.sourceCatalogItemId(),
                 checklistItem.title(),
@@ -37,7 +37,7 @@ public class ChecklistMapper {
     public ChecklistItem toDomain(JpaChecklistItemEntity entity) {
         return new ChecklistItem(
                 entity.id(),
-                entity.checklistId(),
+                toDomain(entity.checklist()),
                 entity.categoryId(),
                 entity.title(),
                 entity.sourceCatalogItemId(),

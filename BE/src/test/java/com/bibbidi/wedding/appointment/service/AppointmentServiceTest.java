@@ -48,7 +48,7 @@ class AppointmentServiceTest {
     @Test
     @DisplayName("소유하지 않은 체크리스트 항목에는 일정을 생성할 수 없다")
     void shouldDenyCreateWhenUserDoesNotOwnChecklistItem() {
-        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(false);
+        given(checklistService.checkItemOwnership(CHECKLIST_ITEM_ID, USER_ID)).willReturn(false);
 
         assertThatThrownBy(() -> appointmentService.create(createCommand()))
                 .isInstanceOf(BusinessException.class)
@@ -62,7 +62,7 @@ class AppointmentServiceTest {
     @DisplayName("소유하지 않은 체크리스트 항목의 일정은 수정할 수 없다")
     void shouldDenyUpdateWhenUserDoesNotOwnAppointmentChecklistItem() {
         given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment());
-        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(false);
+        given(checklistService.checkItemOwnership(CHECKLIST_ITEM_ID, USER_ID)).willReturn(false);
 
         assertThatThrownBy(() -> appointmentService.update(updateCommand()))
                 .isInstanceOf(BusinessException.class)
@@ -76,7 +76,7 @@ class AppointmentServiceTest {
     @DisplayName("자신이 소유한 일정은 삭제할 수 있다")
     void shouldDeleteAppointmentWhenUserOwnsChecklistItem() {
         given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment());
-        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(true);
+        given(checklistService.checkItemOwnership(CHECKLIST_ITEM_ID, USER_ID)).willReturn(true);
 
         appointmentService.delete(USER_ID, APPOINTMENT_ID);
 
@@ -134,7 +134,7 @@ class AppointmentServiceTest {
                 300L, 20L, "conflict", saved.date(),
                 LocalDateTime.of(2026, 9, 1, 10, 30),
                 LocalDateTime.of(2026, 9, 1, 11, 30), "other place");
-        given(checklistService.checkItemOwnership(USER_ID, CHECKLIST_ITEM_ID)).willReturn(true);
+        given(checklistService.checkItemOwnership(CHECKLIST_ITEM_ID, USER_ID)).willReturn(true);
         given(appointmentRepository.save(any(Appointment.class))).willReturn(saved);
         given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
                 .willReturn(List.of(new Appointment(
