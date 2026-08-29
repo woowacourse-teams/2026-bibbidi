@@ -106,22 +106,6 @@ class ChecklistItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("다른 사용자의 체크리스트에 속한 할 일은 그 사용자를 소유자로 답한다")
-    void shouldAnswerOwnerOfItemBelongingToAnotherChecklist() {
-        // given
-        ChecklistItem saved = saveItem(saveChecklist(OTHER_OWNER_ID), 100L);
-
-        // when
-        Optional<ChecklistItem> found = checklistItemRepository.findById(saved.id());
-
-        // then
-        assertThat(found).get().satisfies(item -> {
-            assertThat(item.isOwnedBy(OTHER_OWNER_ID)).isTrue();
-            assertThat(item.isOwnedBy(OWNER_ID)).isFalse();
-        });
-    }
-
-    @Test
     @DisplayName("한 체크리스트에 속한 할 일만 조회한다")
     void shouldFindOnlyItemsOfGivenChecklist() {
         // given

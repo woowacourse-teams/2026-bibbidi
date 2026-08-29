@@ -165,7 +165,7 @@ class ChecklistItemTest {
     }
 
     @Test
-    @DisplayName("체크리스트의 주인이 곧 할 일의 주인이다")
+    @DisplayName("체크리스트의 주인만 할 일의 주인으로 인정한다")
     void shouldBeOwnedByChecklistOwner() {
         // given
         ChecklistItem item = constructTestItem();
