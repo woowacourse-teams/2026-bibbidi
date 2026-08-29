@@ -5,6 +5,7 @@ import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +32,10 @@ public class AppointmentRepository {
     public Appointment findById(Long id) {
         JpaAppointmentEntity queryResult = getJpaAppointmentEntity(id);
         return appointmentMapper.toDomain(queryResult);
+    }
+
+    public int deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
+        return jpaAppointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
     }
 
     private @NonNull JpaAppointmentEntity getJpaAppointmentEntity(Long id) {
