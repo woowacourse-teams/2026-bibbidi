@@ -96,28 +96,6 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void shouldChangeChecklistItemIdsInBulk() {
-        appointmentService.changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
-
-        then(appointmentRepository).should().changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
-    }
-
-    @Test
-    void shouldDeleteAppointmentsInBulk() {
-        appointmentService.deleteAll(List.of(1L, 2L));
-
-        then(appointmentRepository).should().deleteAll(List.of(1L, 2L));
-    }
-
-    @Test
-    void shouldSkipBulkOperationsWhenTargetIdsAreEmpty() {
-        appointmentService.changeAllToNewChecklistItemIds(20L, List.of());
-        appointmentService.deleteAll(List.of());
-
-        then(appointmentRepository).shouldHaveNoInteractions();
-    }
-
-    @Test
     void shouldReturnConflictsAfterCreatingAppointment() {
         Appointment saved = new Appointment(
                 200L,

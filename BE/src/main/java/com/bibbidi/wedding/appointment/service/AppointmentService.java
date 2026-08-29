@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AppointmentService implements AppointmentDeleteService {
+public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
     private final ChecklistService checklistService;
@@ -72,30 +72,11 @@ public class AppointmentService implements AppointmentDeleteService {
                 .withConflicts(conflicts);
     }
 
-    @Override
-    @Transactional
-    public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
-        if (targetAppointmentIds.isEmpty()) {
-            return;
-        }
-        appointmentRepository.changeAllToNewChecklistItemIds(newChecklistItemId, targetAppointmentIds);
-    }
-
     @Transactional
     public void delete(Long userId, Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId);
         validateItemOwnership(userId, appointment.checklistItemId());
         appointmentRepository.deleteById(appointmentId);
-    }
-
-
-    @Override
-    @Transactional
-    public void deleteAll(List<Long> targetAppointmentIds) {
-        if (targetAppointmentIds.isEmpty()) {
-            return;
-        }
-        appointmentRepository.deleteAll(targetAppointmentIds);
     }
 
     private void validateItemOwnership(Long userId, Long checklistItemId) {
