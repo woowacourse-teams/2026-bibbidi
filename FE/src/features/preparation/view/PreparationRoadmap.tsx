@@ -3,10 +3,14 @@ import { PreparationStepDetail } from "./PreparationStepDetail";
 import "./PreparationRoadmap.css";
 
 interface PreparationRoadmapProps {
+  onStepSelect: (stepId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
-export function PreparationRoadmap({ viewModel }: PreparationRoadmapProps) {
+export function PreparationRoadmap({
+  onStepSelect,
+  viewModel,
+}: PreparationRoadmapProps) {
   return (
     <div className="preparation-roadmap">
       <nav
@@ -44,22 +48,33 @@ export function PreparationRoadmap({ viewModel }: PreparationRoadmapProps) {
             <ol className="preparation-roadmap__steps">
               {viewModel.steps.map((step) => (
                 <li
-                  aria-current={step.isSelected ? "step" : undefined}
                   className={`preparation-roadmap__step preparation-roadmap__step--${step.numberLabel}`}
                   key={step.id}
                 >
-                  <div className="preparation-roadmap__step-header">
-                    <span className="preparation-roadmap__step-number">
-                      {step.numberLabel}
+                  <button
+                    aria-controls="preparation-step-detail"
+                    aria-pressed={step.isSelected}
+                    className="preparation-roadmap__step-button"
+                    onClick={() => onStepSelect(step.id)}
+                    type="button"
+                  >
+                    <span className="preparation-roadmap__step-header">
+                      <span className="preparation-roadmap__step-number">
+                        {step.numberLabel}
+                      </span>
+                      <span
+                        className={`preparation-roadmap__step-status preparation-roadmap__step-status--${step.status}`}
+                      >
+                        {step.statusLabel}
+                      </span>
                     </span>
-                    <span
-                      className={`preparation-roadmap__step-status preparation-roadmap__step-status--${step.status}`}
-                    >
-                      {step.statusLabel}
+                    <span className="preparation-roadmap__step-title">
+                      {step.title}
                     </span>
-                  </div>
-                  <h2>{step.title}</h2>
-                  <p>{step.description}</p>
+                    <span className="preparation-roadmap__step-description">
+                      {step.description}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ol>

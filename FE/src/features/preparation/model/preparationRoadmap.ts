@@ -9,8 +9,12 @@ export interface PreparationStepModel {
   description: string;
   id: string;
   order: number;
-  status: PreparationStepStatus;
   title: string;
+}
+
+export interface PreparationStepProgressModel {
+  status: PreparationStepStatus;
+  stepId: string;
 }
 
 export interface PreparationDetailTaskModel {
@@ -26,7 +30,6 @@ export interface PreparationStepDetailModel {
 
 export interface PreparationRoadmapModel {
   categoryId: string;
-  defaultStepId: string;
   steps: PreparationStepModel[];
   title: string;
 }
