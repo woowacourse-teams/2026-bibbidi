@@ -29,17 +29,27 @@
   height: 48px;
   align-items: center;
   padding: 0 14px;
+  border: 0;
   border-radius: 10px;
+  background: transparent;
   color: var(--color-fg-neutral-muted);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 15px;
   font-weight: 500;
   line-height: 1.4;
+  text-align: left;
 }
 
 .preparation-roadmap__category--current {
   background: var(--color-bg-brand-weak);
   color: var(--color-fg-brand);
   font-weight: 700;
+}
+
+.preparation-roadmap__category:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
 }
 
 .preparation-roadmap__workspace {
@@ -150,7 +160,7 @@
   content: "";
 }
 
-.preparation-roadmap__step--09::after {
+.preparation-roadmap__step:last-child::after {
   display: none;
 }
 
@@ -262,6 +272,9 @@
 }
 
 .preparation-step-detail__panel {
+  display: flex;
+  height: 606px;
+  flex-direction: column;
   min-height: 606px;
   padding: 24px 0 16px;
   border: 1px solid var(--color-stroke-neutral-weak);
@@ -315,6 +328,9 @@
 }
 
 .preparation-step-detail__tasks {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
   padding: 12px 0 0;
   margin: 0;
   list-style: none;
