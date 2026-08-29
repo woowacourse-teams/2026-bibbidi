@@ -7,8 +7,10 @@ interface PreparationStepDetailProps {
 export function PreparationStepDetail({ detail }: PreparationStepDetailProps) {
   return (
     <aside
+      aria-live="polite"
       aria-label="이 단계에서 준비할 일"
       className="preparation-step-detail"
+      id="preparation-step-detail"
     >
       <div className="preparation-step-detail__panel">
         <header className="preparation-step-detail__header">

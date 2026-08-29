@@ -1,9 +1,24 @@
+import { useState } from "react";
 import { preparationRoadmapData } from "./model/preparationRoadmap.data";
-import { createPreparationRoadmapViewModel } from "./view-model/createPreparationRoadmapViewModel";
+import {
+  createPreparationRoadmapViewModel,
+  getInitialSelectedStepId,
+} from "./view-model/createPreparationRoadmapViewModel";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
 
-const viewModel = createPreparationRoadmapViewModel(preparationRoadmapData);
-
 export function PreparationRoadmapFeature() {
-  return <PreparationRoadmap viewModel={viewModel} />;
+  const [selectedStepId, setSelectedStepId] = useState(() =>
+    getInitialSelectedStepId(preparationRoadmapData),
+  );
+  const viewModel = createPreparationRoadmapViewModel(
+    preparationRoadmapData,
+    selectedStepId,
+  );
+
+  return (
+    <PreparationRoadmap
+      onStepSelect={setSelectedStepId}
+      viewModel={viewModel}
+    />
+  );
 }
