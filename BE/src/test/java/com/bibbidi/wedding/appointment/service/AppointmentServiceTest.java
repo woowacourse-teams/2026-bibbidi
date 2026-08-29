@@ -1,10 +1,11 @@
 package com.bibbidi.wedding.appointment.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.appointment.domain.Appointment;
@@ -12,16 +13,19 @@ import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
+import com.bibbidi.wedding.checklist.service.ChecklistDeletionTarget;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AppointmentServiceTest {
 
     private static final Long USER_ID = 1L;
+    private static final Long CHECKLIST_ID = 5L;
     private static final Long CHECKLIST_ITEM_ID = 10L;
     private static final Long APPOINTMENT_ID = 100L;
 
@@ -93,6 +98,66 @@ class AppointmentServiceTest {
                 .isSameAs(exception);
 
         then(appointmentRepository).should(never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("일정 삭제 후 체크리스트 데이터 삭제를 요청한다")
+    void shouldDeleteWeddingDataInForeignKeyOrder() {
+        List<Long> checklistItemIds = List.of(10L, 11L);
+        ChecklistDeletionTarget target = new ChecklistDeletionTarget(CHECKLIST_ID, checklistItemIds);
+        given(checklistService.findDeletionTarget(USER_ID)).willReturn(Optional.of(target));
+
+        appointmentService.deleteWeddingDataByOwnerId(USER_ID);
+
+        InOrder order = inOrder(checklistService, appointmentRepository);
+        order.verify(checklistService).findDeletionTarget(USER_ID);
+        order.verify(appointmentRepository).deleteAllByChecklistItemIds(checklistItemIds);
+        order.verify(checklistService).delete(CHECKLIST_ID);
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없으면 결혼 준비 데이터 삭제를 요청하지 않는다")
+    void shouldSkipWeddingDataDeletionWhenChecklistDoesNotExist() {
+        given(checklistService.findDeletionTarget(USER_ID)).willReturn(Optional.empty());
+
+        appointmentService.deleteWeddingDataByOwnerId(USER_ID);
+
+        then(appointmentRepository).shouldHaveNoInteractions();
+        then(checklistService).should(never()).delete(CHECKLIST_ID);
+    }
+
+    @Test
+    @DisplayName("지정한 일정들을 새 할 일로 이동한다")
+    void shouldChangeChecklistItemIdsInBulk() {
+        appointmentService.changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
+
+        then(appointmentRepository).should().changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("지정한 일정들을 모두 삭제한다")
+    void shouldDeleteAppointmentsInBulk() {
+        appointmentService.deleteAll(List.of(1L, 2L));
+
+        then(appointmentRepository).should().deleteAll(List.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("지정한 할 일들에 속한 일정을 모두 삭제한다")
+    void shouldDeleteAppointmentsByChecklistItemIds() {
+        appointmentService.deleteAllByChecklistItemIds(List.of(10L, 11L));
+
+        then(appointmentRepository).should().deleteAllByChecklistItemIds(List.of(10L, 11L));
+    }
+
+    @Test
+    @DisplayName("삭제하거나 이동할 일정이 없으면 저장소를 호출하지 않는다")
+    void shouldSkipBulkOperationsWhenTargetIdsAreEmpty() {
+        appointmentService.changeAllToNewChecklistItemIds(20L, List.of());
+        appointmentService.deleteAll(List.of());
+        appointmentService.deleteAllByChecklistItemIds(List.of());
+
+        then(appointmentRepository).shouldHaveNoInteractions();
     }
 
     @Test

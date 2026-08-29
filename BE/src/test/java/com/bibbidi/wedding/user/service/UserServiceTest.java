@@ -10,7 +10,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
-import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.appointment.service.AppointmentService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
@@ -31,13 +31,13 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ChecklistService checklistService;
+    private AppointmentService appointmentService;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, checklistService);
+        userService = new UserService(userRepository, appointmentService);
     }
 
     @Test
@@ -160,12 +160,12 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("체크리스트 데이터를 삭제한 뒤 사용자를 삭제한다")
+    @DisplayName("결혼 준비 데이터를 삭제한 뒤 사용자를 삭제한다")
     void shouldDeleteUser() {
         userService.delete(1L);
 
-        InOrder order = inOrder(checklistService, userRepository);
-        order.verify(checklistService).deleteByOwnerId(1L);
+        InOrder order = inOrder(appointmentService, userRepository);
+        order.verify(appointmentService).deleteWeddingDataByOwnerId(1L);
         order.verify(userRepository).deleteById(1L);
     }
 }

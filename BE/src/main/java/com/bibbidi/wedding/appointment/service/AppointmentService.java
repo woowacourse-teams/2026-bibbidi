@@ -9,6 +9,7 @@ import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
+import com.bibbidi.wedding.checklist.service.ChecklistDeletionTarget;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AppointmentService {
+public class AppointmentService implements AppointmentDeleteService {
 
     private final AppointmentRepository appointmentRepository;
     private final ChecklistService checklistService;
@@ -77,6 +78,48 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId);
         validateItemOwnership(userId, appointment.checklistItemId());
         appointmentRepository.deleteById(appointmentId);
+    }
+
+    @Transactional
+    public void deleteWeddingDataByOwnerId(Long ownerId) {
+        checklistService.findDeletionTarget(ownerId)
+                .ifPresent(this::deleteWeddingData);
+    }
+
+    @Override
+    @Transactional
+    public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
+        if (targetAppointmentIds.isEmpty()) {
+            return;
+        }
+        appointmentRepository.changeAllToNewChecklistItemIds(newChecklistItemId, targetAppointmentIds);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAll(List<Long> targetAppointmentIds) {
+        if (targetAppointmentIds.isEmpty()) {
+            return;
+        }
+        appointmentRepository.deleteAll(targetAppointmentIds);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
+        deleteAppointmentsByChecklistItemIds(checklistItemIds);
+    }
+
+    private void deleteWeddingData(ChecklistDeletionTarget target) {
+        deleteAppointmentsByChecklistItemIds(target.checklistItemIds());
+        checklistService.delete(target.checklistId());
+    }
+
+    private void deleteAppointmentsByChecklistItemIds(List<Long> checklistItemIds) {
+        if (checklistItemIds.isEmpty()) {
+            return;
+        }
+        appointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
     }
 
     private void validateItemOwnership(Long userId, Long checklistItemId) {

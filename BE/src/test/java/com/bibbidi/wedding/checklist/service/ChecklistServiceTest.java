@@ -12,7 +12,6 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
-import com.bibbidi.wedding.appointment.service.AppointmentDeleteService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -54,9 +53,6 @@ class ChecklistServiceTest {
     @Mock
     private CatalogService catalogService;
 
-    @Mock
-    private AppointmentDeleteService appointmentDeleteService;
-
     private ChecklistService checklistService;
 
     @BeforeEach
@@ -64,8 +60,7 @@ class ChecklistServiceTest {
         checklistService = new ChecklistService(
                 checklistRepository,
                 checklistItemRepository,
-                catalogService,
-                appointmentDeleteService
+                catalogService
         );
     }
 
@@ -291,30 +286,36 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("일정, 할 일, 체크리스트 순서로 체크리스트 하위 데이터를 삭제한다")
-    void shouldDeleteChecklistDataInOrder() {
+    @DisplayName("사용자의 체크리스트와 할 일 ID를 삭제 대상으로 조회한다")
+    void shouldFindChecklistDeletionTarget() {
         Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID);
         List<Long> checklistItemIds = List.of(100L, 101L);
         given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.of(checklist));
         given(checklistItemRepository.findIdsByChecklistId(CHECKLIST_ID)).willReturn(checklistItemIds);
 
-        checklistService.deleteByOwnerId(OWNER_ID);
+        Optional<ChecklistDeletionTarget> target = checklistService.findDeletionTarget(OWNER_ID);
 
-        InOrder order = inOrder(appointmentDeleteService, checklistItemRepository, checklistRepository);
-        order.verify(appointmentDeleteService).deleteAllByChecklistItemIds(checklistItemIds);
+        assertThat(target).contains(new ChecklistDeletionTarget(CHECKLIST_ID, checklistItemIds));
+    }
+
+    @Test
+    @DisplayName("할 일과 체크리스트 순서로 삭제한다")
+    void shouldDeleteChecklistInOrder() {
+        checklistService.delete(CHECKLIST_ID);
+
+        InOrder order = inOrder(checklistItemRepository, checklistRepository);
         order.verify(checklistItemRepository).deleteAllByChecklistId(CHECKLIST_ID);
         order.verify(checklistRepository).deleteById(CHECKLIST_ID);
     }
 
     @Test
-    @DisplayName("체크리스트가 없으면 하위 데이터 삭제를 요청하지 않는다")
-    void shouldSkipDeletionWhenChecklistDoesNotExist() {
+    @DisplayName("체크리스트가 없으면 삭제 대상을 반환하지 않는다")
+    void shouldReturnEmptyDeletionTargetWhenChecklistDoesNotExist() {
         given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.empty());
 
-        checklistService.deleteByOwnerId(OWNER_ID);
+        Optional<ChecklistDeletionTarget> target = checklistService.findDeletionTarget(OWNER_ID);
 
-        then(appointmentDeleteService).shouldHaveNoInteractions();
+        assertThat(target).isEmpty();
         then(checklistItemRepository).shouldHaveNoInteractions();
-        then(checklistRepository).should(never()).deleteById(CHECKLIST_ID);
     }
 }
