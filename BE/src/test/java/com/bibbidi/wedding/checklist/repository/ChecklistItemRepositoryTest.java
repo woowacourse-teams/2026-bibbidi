@@ -134,4 +134,30 @@ class ChecklistItemRepositoryTest {
                 .extracting(ChecklistItem::sourceCatalogItemId)
                 .containsExactly(102L);
     }
+
+    @Test
+    @DisplayName("한 체크리스트의 할 일 ID만 조회한다")
+    void shouldFindOnlyItemIdsOfGivenChecklist() {
+        ChecklistItem first = saveItem(CHECKLIST_ID, 100L);
+        ChecklistItem second = saveItem(CHECKLIST_ID, 101L);
+        saveItem(2000L, 102L);
+
+        assertThat(checklistItemRepository.findIdsByChecklistId(CHECKLIST_ID))
+                .containsExactlyInAnyOrder(first.id(), second.id());
+    }
+
+    @Test
+    @DisplayName("한 체크리스트에 속한 할 일만 모두 삭제한다")
+    void shouldDeleteOnlyItemsOfGivenChecklist() {
+        ChecklistItem first = saveItem(CHECKLIST_ID, 100L);
+        ChecklistItem second = saveItem(CHECKLIST_ID, 101L);
+        ChecklistItem other = saveItem(2000L, 102L);
+
+        int deletedCount = checklistItemRepository.deleteAllByChecklistId(CHECKLIST_ID);
+
+        assertThat(deletedCount).isEqualTo(2);
+        assertThat(checklistItemRepository.findById(first.id())).isEmpty();
+        assertThat(checklistItemRepository.findById(second.id())).isEmpty();
+        assertThat(checklistItemRepository.findById(other.id())).isPresent();
+    }
 }

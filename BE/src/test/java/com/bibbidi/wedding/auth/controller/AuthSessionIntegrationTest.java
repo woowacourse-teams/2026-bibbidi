@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
+import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import com.bibbidi.wedding.user.repository.UserRepository;
@@ -115,6 +116,53 @@ class AuthSessionIntegrationTest {
                 .contains("Max-Age=0")
                 .contains("Secure")
                 .doesNotContain(sessionId);
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 후 기존 Session Cookie로 보호 API에 다시 접근할 수 없다")
+    void shouldRejectPreviousSessionCookieAfterUserDeletion() throws Exception {
+        LoginRequest loginRequest = new LoginRequest("bibbidi", PASSWORD);
+        HttpResponse<String> loginResponse = httpClient.send(
+                request("/api/login")
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(loginRequest)))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+        String setCookie = loginResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow();
+        String sessionCookie = setCookie.substring(0, setCookie.indexOf(';'));
+        DeleteUserRequest deleteUserRequest = new DeleteUserRequest(PASSWORD);
+
+        HttpResponse<String> deletionResponse = httpClient.send(
+                request("/api/users/me")
+                        .header(HttpHeaders.COOKIE, sessionCookie)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .method(
+                                "DELETE",
+                                HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(deleteUserRequest))
+                        )
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(deletionResponse.statusCode()).isEqualTo(204);
+        assertThat(deletionResponse.body()).isEmpty();
+        assertThat(deletionResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow())
+                .contains("Max-Age=0");
+        assertThat(jpaUserRepository.findById(user.id())).isEmpty();
+
+        HttpResponse<String> previousSessionResponse = httpClient.send(
+                request("/api/checklists")
+                        .header(HttpHeaders.COOKIE, sessionCookie)
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(previousSessionResponse.statusCode()).isEqualTo(401);
+        assertThat(previousSessionResponse.body())
+                .contains("\"errorCode\":201")
+                .contains("\"message\":\"로그인이 필요합니다.\"");
     }
 
     private HttpResponse<String> sendLogout(String sessionCookie) throws Exception {

@@ -7,6 +7,7 @@ import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,5 +70,34 @@ class AppointmentRepositoryTest {
                         "상담 준비",
                         false
                 );
+    }
+
+    @Test
+    @DisplayName("지정한 할 일들에 속한 일정만 모두 삭제한다")
+    void shouldDeleteOnlyAppointmentsOfGivenChecklistItems() {
+        Appointment firstTarget = saveAppointment(10L, "첫 번째 대상 일정");
+        Appointment secondTarget = saveAppointment(11L, "두 번째 대상 일정");
+        Appointment other = saveAppointment(20L, "다른 일정");
+
+        int deletedCount = appointmentRepository.deleteAllByChecklistItemIds(List.of(10L, 11L));
+
+        assertThat(deletedCount).isEqualTo(2);
+        assertThat(jpaAppointmentRepository.findById(firstTarget.id())).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(secondTarget.id())).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(other.id())).isPresent();
+    }
+
+    private Appointment saveAppointment(Long checklistItemId, String title) {
+        return appointmentRepository.save(new Appointment(
+                null,
+                checklistItemId,
+                title,
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null,
+                false
+        ));
     }
 }

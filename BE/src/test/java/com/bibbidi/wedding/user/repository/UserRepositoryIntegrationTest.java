@@ -54,4 +54,17 @@ class UserRepositoryIntegrationTest {
         assertThat(updated.nickname()).isEqualTo("Bibbidi");
         assertThat(updated.passwordHash()).isEqualTo("new-hash");
     }
+
+    @Test
+    @DisplayName("사용자를 삭제하면 같은 닉네임을 다시 저장할 수 있다")
+    void shouldAllowNicknameReuseAfterDeletingUser() {
+        User user = userRepository.save(new User(null, "Bibbidi", "password-hash"));
+
+        int deletedCount = userRepository.deleteById(user.id());
+        User registeredAgain = userRepository.save(new User(null, "bibbidi", "new-password-hash"));
+
+        assertThat(deletedCount).isOne();
+        assertThat(registeredAgain.id()).isNotEqualTo(user.id());
+        assertThat(registeredAgain.nickname()).isEqualTo("bibbidi");
+    }
 }
