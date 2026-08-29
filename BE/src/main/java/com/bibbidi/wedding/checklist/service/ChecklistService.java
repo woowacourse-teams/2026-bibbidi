@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
+import com.bibbidi.wedding.appointment.service.AppointmentDeleteService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -28,15 +29,18 @@ public class ChecklistService {
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
     private final CatalogService catalogService;
+    private final AppointmentDeleteService appointmentDeleteService;
 
     public ChecklistService(
             ChecklistRepository checklistRepository,
             ChecklistItemRepository checklistItemRepository,
-            CatalogService catalogService
+            CatalogService catalogService,
+            AppointmentDeleteService appointmentDeleteService
     ) {
         this.checklistRepository = checklistRepository;
         this.checklistItemRepository = checklistItemRepository;
         this.catalogService = catalogService;
+        this.appointmentDeleteService = appointmentDeleteService;
     }
 
     @Transactional
@@ -110,6 +114,19 @@ public class ChecklistService {
     @Transactional(readOnly = true)
     public boolean checkItemOwnership(Long ownerId, Long checklistItemId) {
         return checklistItemRepository.existsByIdAndOwnerId(checklistItemId, ownerId);
+    }
+
+    @Transactional
+    public void deleteByOwnerId(Long ownerId) {
+        checklistRepository.findByOwnerId(ownerId)
+                .ifPresent(this::deleteChecklistData);
+    }
+
+    private void deleteChecklistData(Checklist checklist) {
+        List<Long> checklistItemIds = checklistItemRepository.findIdsByChecklistId(checklist.id());
+        appointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
+        checklistItemRepository.deleteAllByChecklistId(checklist.id());
+        checklistRepository.deleteById(checklist.id());
     }
 
     private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {

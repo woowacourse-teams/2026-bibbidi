@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.willThrow;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
+import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
@@ -32,7 +33,7 @@ class UserDeletionTransactionIntegrationTest {
     private static final String PASSWORD = "wish";
 
     @Autowired
-    private UserDeletionService userDeletionService;
+    private AuthService authService;
 
     @Autowired
     private PasswordHasher passwordHasher;
@@ -96,7 +97,7 @@ class UserDeletionTransactionIntegrationTest {
                 .given(checklistRepository)
                 .deleteById(checklist.id());
 
-        assertThatThrownBy(() -> userDeletionService.delete(user.id(), PASSWORD))
+        assertThatThrownBy(() -> authService.deleteUser(user.id(), PASSWORD))
                 .isInstanceOf(DataAccessException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("checklist deletion failed");

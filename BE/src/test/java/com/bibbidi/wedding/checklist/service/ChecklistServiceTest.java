@@ -9,8 +9,10 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
+import com.bibbidi.wedding.appointment.service.AppointmentDeleteService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,11 +53,19 @@ class ChecklistServiceTest {
     @Mock
     private CatalogService catalogService;
 
+    @Mock
+    private AppointmentDeleteService appointmentDeleteService;
+
     private ChecklistService checklistService;
 
     @BeforeEach
     void setUp() {
-        checklistService = new ChecklistService(checklistRepository, checklistItemRepository, catalogService);
+        checklistService = new ChecklistService(
+                checklistRepository,
+                checklistItemRepository,
+                catalogService,
+                appointmentDeleteService
+        );
     }
 
     private static CatalogItemSnapshot contractItem() {
@@ -275,5 +286,33 @@ class ChecklistServiceTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
         then(checklistItemRepository).should(never()).save(any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("일정, 할 일, 체크리스트 순서로 체크리스트 하위 데이터를 삭제한다")
+    void shouldDeleteChecklistDataInOrder() {
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID);
+        List<Long> checklistItemIds = List.of(100L, 101L);
+        given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.of(checklist));
+        given(checklistItemRepository.findIdsByChecklistId(CHECKLIST_ID)).willReturn(checklistItemIds);
+
+        checklistService.deleteByOwnerId(OWNER_ID);
+
+        InOrder order = inOrder(appointmentDeleteService, checklistItemRepository, checklistRepository);
+        order.verify(appointmentDeleteService).deleteAllByChecklistItemIds(checklistItemIds);
+        order.verify(checklistItemRepository).deleteAllByChecklistId(CHECKLIST_ID);
+        order.verify(checklistRepository).deleteById(CHECKLIST_ID);
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없으면 하위 데이터 삭제를 요청하지 않는다")
+    void shouldSkipDeletionWhenChecklistDoesNotExist() {
+        given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.empty());
+
+        checklistService.deleteByOwnerId(OWNER_ID);
+
+        then(appointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistItemRepository).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).deleteById(CHECKLIST_ID);
     }
 }

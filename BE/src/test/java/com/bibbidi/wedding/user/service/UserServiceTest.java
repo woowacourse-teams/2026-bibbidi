@@ -7,8 +7,10 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,11 +30,14 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ChecklistService checklistService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository);
+        userService = new UserService(userRepository, checklistService);
     }
 
     @Test
@@ -92,6 +98,19 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("탈퇴 인증 정보 조회에서 사용자가 없으면 사용자 없음 오류를 유지한다")
+    void shouldKeepUserNotFoundWhenDeletionAuthenticationUserDoesNotExist() {
+        given(userRepository.findById(1L)).willThrow(
+                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+        );
+
+        assertThatThrownBy(() -> userService.findAuthenticationInfo(1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.USER_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
     void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
         given(userRepository.existsByNickname("bibbidi")).willReturn(false);
@@ -138,5 +157,15 @@ class UserServiceTest {
                         && changedUser.nickname().equals("current")
                         && changedUser.passwordHash().equals("new-password-hash")
         ));
+    }
+
+    @Test
+    @DisplayName("체크리스트 데이터를 삭제한 뒤 사용자를 삭제한다")
+    void shouldDeleteUser() {
+        userService.delete(1L);
+
+        InOrder order = inOrder(checklistService, userRepository);
+        order.verify(checklistService).deleteByOwnerId(1L);
+        order.verify(userRepository).deleteById(1L);
     }
 }

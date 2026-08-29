@@ -10,7 +10,6 @@ import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.auth.session.AuthSessionManager;
 import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
-import com.bibbidi.wedding.user.service.UserDeletionService;
 import com.bibbidi.wedding.user.service.UserResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,16 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
-    private final UserDeletionService userDeletionService;
     private final AuthSessionManager sessionManager;
 
     public AuthController(
             AuthService authService,
-            UserDeletionService userDeletionService,
             AuthSessionManager sessionManager
     ) {
         this.authService = authService;
-        this.userDeletionService = userDeletionService;
         this.sessionManager = sessionManager;
     }
 
@@ -80,7 +76,7 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
-        userDeletionService.delete(currentUserId, request.password());
+        authService.deleteUser(currentUserId, request.password());
         sessionManager.invalidate(servletRequest, servletResponse);
     }
 }

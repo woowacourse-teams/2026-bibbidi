@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.user.service;
 
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
@@ -13,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ChecklistService checklistService;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, ChecklistService checklistService) {
         this.userRepository = userRepository;
+        this.checklistService = checklistService;
     }
 
     @Transactional
@@ -41,6 +44,11 @@ public class UserService {
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
+    public UserAuthenticationInfo findAuthenticationInfo(Long userId) {
+        User user = userRepository.findById(userId);
+        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+    }
+
     public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
         User user = findCurrentUser(currentUserId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
@@ -51,6 +59,12 @@ public class UserService {
         User user = findCurrentUser(currentUserId);
         User changedUser = user.changePasswordHash(passwordHash);
         userRepository.save(changedUser);
+    }
+
+    @Transactional
+    public void delete(Long userId) {
+        checklistService.deleteByOwnerId(userId);
+        userRepository.deleteById(userId);
     }
 
     @Transactional
