@@ -1,0 +1,158 @@
+name: Discord PR Notification
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    name: Notify Discord
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Select webhook channel by release branch
+        id: route
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          case "$BASE_BRANCH" in
+            release-be)  CHANNEL="BE" ;;
+            release-fe)  CHANNEL="FE" ;;
+            release-app) CHANNEL="APP" ;;
+            *)           CHANNEL="" ;;
+          esac
+
+          echo "base=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+
+      - name: Build Discord payload
+        if: steps.route.outputs.channel != ''
+        id: payload
+        shell: bash
+        env:
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          ACTOR: ${{ github.actor }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          COMMITS: ${{ github.event.pull_request.commits }}
+          FILES: ${{ github.event.pull_request.changed_files }}
+          ADDITIONS: ${{ github.event.pull_request.additions }}
+          DELETIONS: ${{ github.event.pull_request.deletions }}
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          case "$ACTION" in
+            opened)
+              ICON="🆕"
+              EVENT="PR을 생성했습니다"
+              ;;
+            synchronize)
+              ICON="🔄"
+              EVENT="PR에 새로운 커밋을 추가했습니다"
+              ;;
+            reopened)
+              ICON="🔁"
+              EVENT="PR을 다시 열었습니다"
+              ;;
+            ready_for_review)
+              ICON="📢"
+              EVENT="PR을 리뷰 요청 상태로 전환했습니다"
+              ;;
+            closed)
+              if [ "$MERGED" = "true" ]; then
+                ICON="✅"
+                EVENT="PR을 머지했습니다"
+              else
+                ICON="❌"
+                EVENT="PR을 닫았습니다"
+              fi
+              ;;
+            *)
+              ICON="ℹ️"
+              EVENT="PR 상태를 변경했습니다"
+              ;;
+          esac
+
+          nickname() {
+            case "$1" in
+              kdongsu5509)   echo "라티" ;;
+              byunghyunkim0) echo "바드" ;;
+              boyekim)       echo "보예" ;;
+              JohnPrk)       echo "티뉴" ;;
+              *)             echo "$1" ;;
+            esac
+          }
+
+          ACTOR_NAME=$(nickname "$ACTOR")
+          AUTHOR_NAME=$(nickname "$AUTHOR")
+
+          LABELS=$(jq -r 'map(.name) | join(", ") | .[0:1000]' <<< "${LABELS_JSON:-[]}")
+          jq -n \
+            --arg event "$EVENT" \
+            --arg icon "$ICON" \
+            --arg number "#$NUMBER" \
+            --arg title "$TITLE" \
+            --arg actor_name "$ACTOR_NAME" \
+            --arg author "$AUTHOR_NAME (@$AUTHOR)" \
+            --arg branch "$HEAD → $BASE" \
+            --arg stats "commits: $COMMITS | files: $FILES | +$ADDITIONS / -$DELETIONS" \
+            --arg labels "$LABELS" \
+            --arg url "$URL" \
+            '{
+              embeds: [{
+                title: ($icon + " " + $actor_name + "님이 " + $event),
+                url: $url,
+                description: ($number + " " + $title),
+                fields: (
+                  [
+                    {name: "작성자", value: ("`" + $author + "`"), inline: true},
+                    {name: "브랜치", value: ("`" + $branch + "`"), inline: true},
+                    {name: "변경 내역", value: ("`" + $stats + "`"), inline: false}
+                  ]
+                  + (if $labels != "" then [{name: "라벨", value: $labels, inline: false}] else [] end)
+                )
+              }]
+            }' > payload.json
+
+      - name: Send notification to Discord
+        if: steps.route.outputs.channel != ''
+        shell: bash
+        env:
+          CHANNEL: ${{ steps.route.outputs.channel }}
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+          DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+        run: |
+          WEBHOOK_VAR="DISCORD_WEBHOOK_${CHANNEL}"
+          WEBHOOK="${!WEBHOOK_VAR}"
+
+          if [ -z "$WEBHOOK" ]; then
+            echo "::warning::no webhook secret configured for channel $CHANNEL"
+            exit 0
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data-binary @payload.json \
+            "$WEBHOOK"
