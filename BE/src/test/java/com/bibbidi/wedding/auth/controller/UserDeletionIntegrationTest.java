@@ -11,8 +11,8 @@ import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
+import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
-import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemResponse;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
@@ -149,9 +149,9 @@ class UserDeletionIntegrationTest {
                 new CreateChecklistItemRequest("청첩장 문구 정하기", scenario.catalog().categoryId())
         );
         assertThat(checklistItemResponse.statusCode()).isEqualTo(201);
-        CreateChecklistItemResponse checklistItem = objectMapper.readValue(
+        ChecklistItemResponse checklistItem = objectMapper.readValue(
                 checklistItemResponse.body(),
-                CreateChecklistItemResponse.class
+                ChecklistItemResponse.class
         );
         assertThat(checklistItem.catalogItemId()).isNull();
 

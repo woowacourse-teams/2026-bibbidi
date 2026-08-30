@@ -5,6 +5,8 @@ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +14,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ChecklistItemRepository {
+
+    private static final String CHECKLIST_ITEM_NOT_FOUND_MESSAGE = "할 일을 찾을 수 없습니다. checklistItemId=";
 
     private final JpaChecklistItemRepository jpaChecklistItemRepository;
     private final ChecklistMapper checklistMapper;
@@ -25,6 +29,14 @@ public class ChecklistItemRepository {
         this.jpaChecklistItemRepository = jpaChecklistItemRepository;
         this.checklistMapper = checklistMapper;
         this.entityManager = entityManager;
+    }
+
+    public ChecklistItem getById(Long checklistItemId) {
+        return findById(checklistItemId)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        CHECKLIST_ITEM_NOT_FOUND_MESSAGE + checklistItemId
+                ));
     }
 
     public Optional<ChecklistItem> findById(Long checklistItemId) {
@@ -61,6 +73,10 @@ public class ChecklistItemRepository {
         return jpaChecklistItemRepository.saveAllAndFlush(entities).stream()
                 .map(checklistMapper::toDomain)
                 .toList();
+    }
+
+    public void deleteById(Long checklistItemId) {
+        jpaChecklistItemRepository.deleteById(checklistItemId);
     }
 
     private JpaChecklistEntity referenceOf(ChecklistItem checklistItem) {

@@ -97,6 +97,12 @@ public class AppointmentService implements AppointmentDeleteService {
         appointmentRepository.deleteAll(targetAppointmentIds);
     }
 
+    @Override
+    @Transactional
+    public void deleteAllByChecklistItemId(Long checklistItemId) {
+        appointmentRepository.deleteAllByChecklistItemId(checklistItemId);
+    }
+
     private void validateItemOwnership(Long userId, Long checklistItemId) {
         if (!checklistService.checkItemOwnership(checklistItemId, userId)) {
             throw new BusinessException(

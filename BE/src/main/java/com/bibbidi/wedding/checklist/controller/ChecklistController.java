@@ -4,12 +4,12 @@ import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
 import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsResponse;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistCreationResponse;
+import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
-import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistItemCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,16 +45,16 @@ public class ChecklistController {
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklists/me/items")
-    public CreateChecklistItemResponse writeItem(
+    public ChecklistItemResponse writeItem(
             @Auth Long userId,
             @Valid @RequestBody CreateChecklistItemRequest request
     ) {
-        ChecklistItemCreationResult result = checklistService.writeItem(
+        ChecklistItemResult result = checklistService.writeItem(
                 userId,
                 request.title(),
                 request.categoryId()
         );
 
-        return CreateChecklistItemResponse.from(result);
+        return ChecklistItemResponse.from(result);
     }
 }

@@ -322,7 +322,7 @@ class ChecklistControllerIntegrationTest {
                                 .summary(WRITE_SUMMARY)
                                 .description(WRITE_DESCRIPTION)
                                 .requestSchema(schema("CreateChecklistItemRequest"))
-                                .responseSchema(schema("CreateChecklistItemResponse"))
+                                .responseSchema(schema("ChecklistItemResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)
