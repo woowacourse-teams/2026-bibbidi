@@ -27,6 +27,8 @@ public enum ClientError {
             HttpStatus.UNPROCESSABLE_CONTENT, 404, "준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없습니다."),
     CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE(
             HttpStatus.UNPROCESSABLE_CONTENT, 405, "준비 목록에서 추가한 할 일은 제목을 변경할 수 없습니다."),
+    COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE(
+            HttpStatus.UNPROCESSABLE_CONTENT, 406, "완료된 할 일은 삭제할 수 없습니다."),
 
     // 900: 서버 오류
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 901, "요청을 처리하는 중 오류가 발생했습니다.");

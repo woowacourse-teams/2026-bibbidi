@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChecklistService {
 
     private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
-    private static final String CHECKLIST_NOT_FOUND_MESSAGE = "현재 사용자 계정에 속한 체크리스트를 찾을 수 없습니다. ownerId=";
 
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
@@ -61,11 +60,7 @@ public class ChecklistService {
 
     @Transactional
     public CatalogItemAdditionResult addCatalogItems(Long ownerId, List<Long> catalogItemIds) {
-        Checklist checklist = checklistRepository.findByOwnerId(ownerId)
-                .orElseThrow(() -> new BusinessException(
-                        ClientError.CHECKLIST_NOT_FOUND,
-                        CHECKLIST_NOT_FOUND_MESSAGE + ownerId
-                ));
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
         List<ChecklistItem> candidates = selectCatalogItems(checklist, catalogItemIds);
 
@@ -82,18 +77,9 @@ public class ChecklistService {
 
     @Transactional
     public ChecklistItemResult writeItem(Long ownerId, String title, Long categoryId) {
-        Checklist checklist = checklistRepository.findByOwnerId(ownerId)
-                .orElseThrow(() -> new BusinessException(
-                        ClientError.CHECKLIST_NOT_FOUND,
-                        CHECKLIST_NOT_FOUND_MESSAGE + ownerId
-                ));
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        if (!catalogService.existsCategory(categoryId)) {
-            throw new BusinessException(
-                    ClientError.CATEGORY_NOT_FOUND,
-                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
-            );
-        }
+        validateCategoryExists(categoryId);
 
         ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
                 null,
@@ -113,28 +99,11 @@ public class ChecklistService {
             Long checklistItemId,
             Long categoryId
     ) {
-        ChecklistItem item = checklistItemRepository.findById(checklistItemId)
-                .orElseThrow(() -> new BusinessException(
-                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
-                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
-                ));
+        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
 
-        if (!item.isOwnedBy(ownerId)) {
-            throw new BusinessException(
-                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
-                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
-                            + ", checklistItemId=" + checklistItemId
-            );
-        }
+        validateCategoryExists(categoryId);
 
-        if (!catalogService.existsCategory(categoryId)) {
-            throw new BusinessException(
-                    ClientError.CATEGORY_NOT_FOUND,
-                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
-            );
-        }
-
-        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(categoryId));
+        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(ownerId, categoryId));
 
         return ChecklistItemResult.from(changed);
     }
@@ -145,21 +114,9 @@ public class ChecklistService {
             Long checklistItemId,
             String title
     ) {
-        ChecklistItem item = checklistItemRepository.findById(checklistItemId)
-                .orElseThrow(() -> new BusinessException(
-                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
-                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
-                ));
+        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
 
-        if (!item.isOwnedBy(ownerId)) {
-            throw new BusinessException(
-                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
-                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
-                            + ", checklistItemId=" + checklistItemId
-            );
-        }
-
-        ChecklistItem changed = checklistItemRepository.save(item.changeTitle(title));
+        ChecklistItem changed = checklistItemRepository.save(item.changeTitle(ownerId, title));
 
         return ChecklistItemResult.from(changed);
     }
@@ -169,6 +126,15 @@ public class ChecklistService {
         return checklistItemRepository.findById(checklistItemId)
                 .map(item -> item.isOwnedBy(ownerId))
                 .orElse(false);
+    }
+
+    private void validateCategoryExists(Long categoryId) {
+        if (!catalogService.existsCategory(categoryId)) {
+            throw new BusinessException(
+                    ClientError.CATEGORY_NOT_FOUND,
+                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
+            );
+        }
     }
 
     private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {

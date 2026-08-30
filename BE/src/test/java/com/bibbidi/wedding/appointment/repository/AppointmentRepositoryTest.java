@@ -131,6 +131,20 @@ class AppointmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("할 일에 연결된 일정을 한 번에 삭제한다")
+    void shouldDeleteAllAppointmentsByChecklistItemId() {
+        Appointment first = saveAppointment(1L);
+        Appointment second = saveAppointment(1L);
+        Appointment remaining = saveAppointment(2L);
+
+        appointmentRepository.deleteAllByChecklistItemId(1L);
+
+        assertThat(jpaAppointmentRepository.findById(first.id())).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(second.id())).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(remaining.id())).isPresent();
+    }
+
+    @Test
     @DisplayName("시간이 겹칠 수 있는 본인 소유 일정만 후보로 조회한다")
     void shouldFindOverlapCandidatesOwnedByUser() {
         JpaChecklistEntity ownChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 1L));

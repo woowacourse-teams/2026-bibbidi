@@ -8,6 +8,7 @@ import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,10 +16,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
 import java.util.Set;
@@ -49,6 +52,7 @@ class ChecklistItemControllerIntegrationTest {
 
     private static final String CHANGE_CATEGORY_URL = "/api/checklist-items/{itemId}/category";
     private static final String CHANGE_TITLE_URL = "/api/checklist-items/{itemId}/title";
+    private static final String DELETE_ITEM_URL = "/api/checklist-items/{itemId}";
     private static final Long USER_ID = 7L;
     private static final Long CUSTOM_ITEM_ID = 500L;
     private static final Long CATALOG_SOURCED_ITEM_ID = 501L;
@@ -57,6 +61,10 @@ class ChecklistItemControllerIntegrationTest {
     private static final Long CURRENT_CATEGORY_ID = 2L;
     private static final Long NEW_CATEGORY_ID = 3L;
     private static final Long SOURCE_CATALOG_ITEM_ID = 100L;
+    private static final Long FIRST_CUSTOM_ITEM_APPOINTMENT_ID = 800L;
+    private static final Long SECOND_CUSTOM_ITEM_APPOINTMENT_ID = 801L;
+    private static final Long CATALOG_SOURCED_ITEM_APPOINTMENT_ID = 802L;
+    private static final Long DONE_ITEM_APPOINTMENT_ID = 803L;
     private static final String NEW_TITLE = "청첩장 문구 최종 확정";
 
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -70,6 +78,10 @@ class ChecklistItemControllerIntegrationTest {
     private static final String CHANGE_TITLE_DESCRIPTION =
             "직접 만든 할 일의 제목만 바꿉니다. 카테고리와 완료 상태, 연결된 일정은 그대로 유지합니다. "
                     + "준비 목록에서 추가한 할 일은 원본 제목을 따라야 하므로 변경할 수 없습니다.";
+    private static final String DELETE_ITEM_SUMMARY = "미완료 할 일 삭제";
+    private static final String DELETE_ITEM_DESCRIPTION =
+            "자신이 소유한 미완료 할 일과 연결된 일정을 함께 삭제합니다. "
+                    + "완료된 할 일은 삭제할 수 없고, 이미 없는 할 일은 삭제된 것으로 처리합니다.";
 
     @Autowired
     private WebApplicationContext context;
@@ -79,6 +91,12 @@ class ChecklistItemControllerIntegrationTest {
 
     @Autowired
     private CatalogService catalogService;
+
+    @Autowired
+    private JpaChecklistItemRepository jpaChecklistItemRepository;
+
+    @Autowired
+    private JpaAppointmentRepository jpaAppointmentRepository;
 
     private MockMvc mockMvc;
 
@@ -192,6 +210,7 @@ class ChecklistItemControllerIntegrationTest {
                                 .tag("Checklist")
                                 .summary(CHANGE_CATEGORY_SUMMARY)
                                 .description(CHANGE_CATEGORY_DESCRIPTION)
+                                .requestSchema(schema("ChangeChecklistItemCategoryRequest"))
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
@@ -363,6 +382,7 @@ class ChecklistItemControllerIntegrationTest {
                                 .tag("Checklist")
                                 .summary(CHANGE_TITLE_SUMMARY)
                                 .description(CHANGE_TITLE_DESCRIPTION)
+                                .requestSchema(schema("ChangeChecklistItemTitleRequest"))
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
@@ -456,6 +476,122 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("미완료 할 일과 연결된 일정을 함께 삭제한다")
+    void shouldDeleteIncompleteItemAndAppointments() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isNoContent())
+                .andDo(document(
+                        "checklist-items-delete",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(DELETE_ITEM_SUMMARY)
+                                .description(DELETE_ITEM_DESCRIPTION)
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("삭제할 미완료 할 일 ID")
+                                )
+                                .build())
+                ));
+
+        // then
+        assertThat(jpaChecklistItemRepository.findById(CUSTOM_ITEM_ID)).isEmpty();
+        assertThat(jpaAppointmentRepository.findAllById(List.of(
+                FIRST_CUSTOM_ITEM_APPOINTMENT_ID,
+                SECOND_CUSTOM_ITEM_APPOINTMENT_ID
+        ))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 가져온 미완료 할 일은 삭제하지만 원본 준비 항목은 유지한다")
+    void shouldDeleteCatalogSourcedItemAndKeepCatalogItem() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CATALOG_SOURCED_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(jpaChecklistItemRepository.findById(CATALOG_SOURCED_ITEM_ID)).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(CATALOG_SOURCED_ITEM_APPOINTMENT_ID)).isEmpty();
+        assertThat(catalogService.findItems(Set.of(SOURCE_CATALOG_ITEM_ID)))
+                .extracting(CatalogItemSnapshot::id)
+                .containsExactly(SOURCE_CATALOG_ITEM_ID);
+    }
+
+    @Test
+    @DisplayName("완료된 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemIsDone() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, DONE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value(406))
+                .andExpect(jsonPath("$.message").value("완료된 할 일은 삭제할 수 없습니다."))
+                .andDo(document(
+                        "checklist-items-delete-completed",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(DELETE_ITEM_SUMMARY)
+                                .description(DELETE_ITEM_DESCRIPTION)
+                                .responseSchema(schema("ErrorResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("삭제할 할 일 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
+        assertThat(jpaChecklistItemRepository.findById(DONE_CUSTOM_ITEM_ID)).isPresent();
+        assertThat(jpaAppointmentRepository.findById(DONE_ITEM_APPOINTMENT_ID)).isPresent();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemBelongsToAnotherUser() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+        assertThat(jpaChecklistItemRepository.findById(OTHER_USERS_ITEM_ID)).isPresent();
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 이미 삭제된 것으로 처리한다")
+    void shouldTreatMissingItemAsAlreadyDeleted() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 할 일을 삭제할 수 없다")
+    void shouldRequireAuthenticationToDeleteItem() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));

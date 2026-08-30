@@ -42,7 +42,8 @@ public final class ChecklistItem {
         return withStatus(ChecklistItemStatus.PREV);
     }
 
-    public ChecklistItem changeCategory(Long categoryId) {
+    public ChecklistItem changeCategory(Long ownerId, Long categoryId) {
+        validateOwnedBy(ownerId);
         if (hasSourceCatalogItem()) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE,
@@ -60,7 +61,8 @@ public final class ChecklistItem {
         );
     }
 
-    public ChecklistItem changeTitle(String title) {
+    public ChecklistItem changeTitle(Long ownerId, String title) {
+        validateOwnedBy(ownerId);
         if (hasSourceCatalogItem()) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE,
@@ -76,6 +78,26 @@ public final class ChecklistItem {
                 sourceCatalogItemId,
                 status
         );
+    }
+
+    public void validateDeletableBy(Long ownerId) {
+        validateOwnedBy(ownerId);
+        if (isDone()) {
+            throw new BusinessException(
+                    ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE,
+                    "완료된 할 일입니다. checklistItemId=" + id
+            );
+        }
+    }
+
+    private void validateOwnedBy(Long ownerId) {
+        if (!isOwnedBy(ownerId)) {
+            throw new BusinessException(
+                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
+                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
+                            + ", checklistItemId=" + id
+            );
+        }
     }
 
     private ChecklistItem withStatus(ChecklistItemStatus status) {

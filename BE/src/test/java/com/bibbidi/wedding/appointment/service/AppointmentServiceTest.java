@@ -110,6 +110,14 @@ class AppointmentServiceTest {
     }
 
     @Test
+    @DisplayName("할 일에 연결된 일정을 모두 삭제한다")
+    void shouldDeleteAllAppointmentsByChecklistItemId() {
+        appointmentService.deleteAllByChecklistItemId(CHECKLIST_ITEM_ID);
+
+        then(appointmentRepository).should().deleteAllByChecklistItemId(CHECKLIST_ITEM_ID);
+    }
+
+    @Test
     void shouldSkipBulkOperationsWhenTargetIdsAreEmpty() {
         appointmentService.changeAllToNewChecklistItemIds(20L, List.of());
         appointmentService.deleteAll(List.of());

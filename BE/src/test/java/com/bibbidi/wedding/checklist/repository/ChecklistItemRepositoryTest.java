@@ -8,6 +8,8 @@ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +105,36 @@ class ChecklistItemRepositoryTest {
     void shouldReturnEmptyWhenChecklistItemDoesNotExist() {
         // when, then
         assertThat(checklistItemRepository.findById(999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("할 일을 반드시 가져올 때는 도메인을 그대로 반환한다")
+    void shouldGetChecklistItemById() {
+        // given
+        ChecklistItem saved = saveItem(checklist, 100L);
+
+        // when
+        ChecklistItem found = checklistItemRepository.getById(saved.id());
+
+        // then
+        assertThat(found)
+                .extracting(
+                        ChecklistItem::id,
+                        item -> item.checklist().id(),
+                        item -> item.checklist().ownerId(),
+                        ChecklistItem::title
+                )
+                .containsExactly(saved.id(), checklist.id(), OWNER_ID, "계약서 확인");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 할 일은 조회 단계에서 오류를 던진다")
+    void shouldThrowWhenChecklistItemDoesNotExist() {
+        // when, then
+        assertThatThrownBy(() -> checklistItemRepository.getById(999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.checklist.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -10,7 +11,10 @@ import org.junit.jupiter.api.Test;
 
 class ChecklistItemTest {
 
-    private static final Checklist CHECKLIST = new Checklist(100L, 1L);
+    private static final Long OWNER_ID = 1L;
+    private static final Long OTHER_USER_ID = 2L;
+
+    private static final Checklist CHECKLIST = new Checklist(100L, OWNER_ID);
 
     private static ChecklistItem constructTestItem() {
         return new ChecklistItem(
@@ -142,7 +146,7 @@ class ChecklistItemTest {
         );
 
         // when
-        ChecklistItem changed = item.changeCategory(20L);
+        ChecklistItem changed = item.changeCategory(OWNER_ID, 20L);
 
         // then
         assertThat(changed)
@@ -178,7 +182,7 @@ class ChecklistItemTest {
         );
 
         // when
-        ChecklistItem changed = item.changeTitle("Invitation wording");
+        ChecklistItem changed = item.changeTitle(OWNER_ID, "Invitation wording");
 
         // then
         assertThat(changed)
@@ -207,8 +211,8 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem();
 
         // when, then
-        assertThat(item.isOwnedBy(1L)).isTrue();
-        assertThat(item.isOwnedBy(2L)).isFalse();
+        assertThat(item.isOwnedBy(OWNER_ID)).isTrue();
+        assertThat(item.isOwnedBy(OTHER_USER_ID)).isFalse();
     }
 
     @Test
@@ -218,7 +222,7 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem();
 
         // when, then
-        assertThatThrownBy(() -> item.changeCategory(20L))
+        assertThatThrownBy(() -> item.changeCategory(OWNER_ID, 20L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE);
@@ -231,37 +235,117 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem();
 
         // when, then
-        assertThatThrownBy(() -> item.changeTitle("Invitation wording"))
+        assertThatThrownBy(() -> item.changeTitle(OWNER_ID, "Invitation wording"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE);
     }
 
     @Test
-    @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 카테고리를 변경할 수 있다")
-    void shouldAllowCategoryChangeWhenSourceCatalogItemIsGone() {
+    @DisplayName("직접 만든 할 일은 카테고리를 변경할 수 있다")
+    void shouldAllowCategoryChangeForCustomItem() {
         // given
-        ChecklistItem item = new ChecklistItem(
-                1L,
-                CHECKLIST,
-                10L,
-                "Wedding hall consultation",
-                null,
-                ChecklistItemStatus.PREV
-        );
+        ChecklistItem item = constructCustomItem();
 
         // when
-        ChecklistItem changed = item.changeCategory(20L);
+        ChecklistItem changed = item.changeCategory(OWNER_ID, 20L);
 
         // then
         assertThat(changed.categoryId()).isEqualTo(20L);
     }
 
     @Test
-    @DisplayName("원본 준비 항목과의 연결이 끊긴 할 일은 제목을 변경할 수 있다")
-    void shouldAllowTitleChangeWhenSourceCatalogItemIsGone() {
+    @DisplayName("직접 만든 할 일은 제목을 변경할 수 있다")
+    void shouldAllowTitleChangeForCustomItem() {
         // given
-        ChecklistItem item = new ChecklistItem(
+        ChecklistItem item = constructCustomItem();
+
+        // when
+        ChecklistItem changed = item.changeTitle(OWNER_ID, "Invitation wording");
+
+        // then
+        assertThat(changed.title()).isEqualTo("Invitation wording");
+    }
+
+    @Test
+    @DisplayName("미완료 할 일은 삭제할 수 있다")
+    void shouldAllowDeletionWhenItemIsIncomplete() {
+        // given
+        ChecklistItem item = constructTestItem();
+        ChecklistItem progressed = item.onProgress();
+
+        // when, then
+        assertThatCode(() -> item.validateDeletableBy(OWNER_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> progressed.validateDeletableBy(OWNER_ID)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("완료된 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemIsDone() {
+        // given
+        ChecklistItem item = constructTestItem().complete();
+
+        // when, then
+        assertThatThrownBy(() -> item.validateDeletableBy(OWNER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
+    }
+
+    @Test
+    @DisplayName("다른 사용자는 할 일의 카테고리를 변경할 수 없다")
+    void shouldRejectCategoryChangeByAnotherUser() {
+        // given
+        ChecklistItem item = constructCustomItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.changeCategory(OTHER_USER_ID, 20L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("다른 사용자는 할 일의 제목을 변경할 수 없다")
+    void shouldRejectTitleChangeByAnotherUser() {
+        // given
+        ChecklistItem item = constructCustomItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.changeTitle(OTHER_USER_ID, "Invitation wording"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 추가한 할 일이어도 다른 사용자의 요청이면 소유권부터 거절한다")
+    void shouldRejectByOwnershipBeforeCatalogSourceRule() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.changeTitle(OTHER_USER_ID, "Invitation wording"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("다른 사용자는 할 일을 삭제할 수 없다")
+    void shouldRejectDeletionByAnotherUser() {
+        // given
+        ChecklistItem item = constructCustomItem();
+
+        // when, then
+        assertThatThrownBy(() -> item.validateDeletableBy(OTHER_USER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+    }
+
+    private static ChecklistItem constructCustomItem() {
+        return new ChecklistItem(
                 1L,
                 CHECKLIST,
                 10L,
@@ -269,11 +353,5 @@ class ChecklistItemTest {
                 null,
                 ChecklistItemStatus.PREV
         );
-
-        // when
-        ChecklistItem changed = item.changeTitle("Invitation wording");
-
-        // then
-        assertThat(changed.title()).isEqualTo("Invitation wording");
     }
 }
