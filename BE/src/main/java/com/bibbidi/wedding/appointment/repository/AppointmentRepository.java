@@ -34,6 +34,10 @@ public class AppointmentRepository {
         return appointmentMapper.toDomain(queryResult);
     }
 
+    public int deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
+        return jpaAppointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
+    }
+
     public void deleteById(Long id) {
         jpaAppointmentRepository.deleteById(id);
     }

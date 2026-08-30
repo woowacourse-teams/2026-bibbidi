@@ -44,7 +44,6 @@ public class AuthService {
     @Transactional
     public void changePassword(Long currentUserId, String currentPassword, String newPassword) {
         UserAuthenticationInfo user = userService.findCurrentUserAuthenticationInfo(currentUserId);
-
         if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
             throw new BusinessException(
                     ClientError.AUTHENTICATION_FAILED,
@@ -58,5 +57,17 @@ public class AuthService {
 
         String newPasswordHash = passwordHasher.hash(newPassword);
         userService.changePasswordHash(currentUserId, newPasswordHash);
+    }
+
+    @Transactional
+    public void deleteUser(Long currentUserId, String currentPassword) {
+        UserAuthenticationInfo user = userService.findAuthenticationInfo(currentUserId);
+        if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
+            throw new BusinessException(
+                    ClientError.AUTHENTICATION_FAILED,
+                    "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
+            );
+        }
+        userService.delete(currentUserId);
     }
 }

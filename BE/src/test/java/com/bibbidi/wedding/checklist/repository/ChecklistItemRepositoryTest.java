@@ -124,6 +124,34 @@ class ChecklistItemRepositoryTest {
     }
 
     @Test
+    @DisplayName("한 체크리스트의 할 일 ID만 조회한다")
+    void shouldFindOnlyItemIdsOfGivenChecklist() {
+        Checklist otherChecklist = saveChecklist(OTHER_OWNER_ID);
+        ChecklistItem first = saveItem(checklist, 100L);
+        ChecklistItem second = saveItem(checklist, 101L);
+        saveItem(otherChecklist, 102L);
+
+        assertThat(checklistItemRepository.findIdsByChecklistId(checklist.id()))
+                .containsExactlyInAnyOrder(first.id(), second.id());
+    }
+
+    @Test
+    @DisplayName("한 체크리스트에 속한 할 일만 모두 삭제한다")
+    void shouldDeleteOnlyItemsOfGivenChecklist() {
+        Checklist otherChecklist = saveChecklist(OTHER_OWNER_ID);
+        ChecklistItem first = saveItem(checklist, 100L);
+        ChecklistItem second = saveItem(checklist, 101L);
+        ChecklistItem other = saveItem(otherChecklist, 102L);
+
+        int deletedCount = checklistItemRepository.deleteAllByChecklistId(checklist.id());
+
+        assertThat(deletedCount).isEqualTo(2);
+        assertThat(checklistItemRepository.findById(first.id())).isEmpty();
+        assertThat(checklistItemRepository.findById(second.id())).isEmpty();
+        assertThat(checklistItemRepository.findById(other.id())).isPresent();
+    }
+
+    @Test
     @DisplayName("여러 할 일을 한 번에 저장하고 생성된 식별자를 채워 반환한다")
     void shouldSaveAllItemsAndReturnGeneratedIds() {
         // given

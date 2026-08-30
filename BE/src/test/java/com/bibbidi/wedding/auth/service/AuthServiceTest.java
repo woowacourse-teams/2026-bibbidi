@@ -148,4 +148,47 @@ class AuthServiceTest {
         then(passwordHasher).should(never()).matches("new-password", "current-hash");
         then(userService).should(never()).changePasswordHash(anyLong(), anyString());
     }
+
+    @Test
+    @DisplayName("현재 비밀번호가 일치하면 사용자 삭제를 요청한다")
+    void shouldDeleteUserWhenCurrentPasswordMatches() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+        given(userService.findAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("password", "password-hash")).willReturn(true);
+
+        authService.deleteUser(1L, "password");
+
+        then(userService).should().delete(1L);
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호가 일치하지 않으면 사용자 삭제를 요청하지 않는다")
+    void shouldNotDeleteUserWhenCurrentPasswordDoesNotMatch() {
+        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+        given(userService.findAuthenticationInfo(1L)).willReturn(user);
+        given(passwordHasher.matches("wrong-password", "password-hash")).willReturn(false);
+
+        assertThatThrownBy(() -> authService.deleteUser(1L, "wrong-password"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+
+        then(userService).should(never()).delete(anyLong());
+    }
+
+    @Test
+    @DisplayName("탈퇴할 사용자가 없으면 사용자 없음 오류를 유지한다")
+    void shouldKeepUserNotFoundWhenDeletingMissingUser() {
+        given(userService.findAuthenticationInfo(1L)).willThrow(
+                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+        );
+
+        assertThatThrownBy(() -> authService.deleteUser(1L, "password"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.USER_NOT_FOUND);
+
+        then(passwordHasher).shouldHaveNoInteractions();
+        then(userService).should(never()).delete(anyLong());
+    }
 }
