@@ -1,4 +1,5 @@
 import {
+  PreparationCategoryNavigationDirection,
   PreparationCatalogModel,
   PreparationRoadmapModel,
   PreparationStepProgressModel,
@@ -22,6 +23,7 @@ export interface PreparationStepViewModel {
   id: string;
   isSelected: boolean;
   numberLabel: string;
+  order: number;
   status: PreparationStepStatus;
   statusLabel: string;
   title: string;
@@ -54,8 +56,6 @@ export interface PreparationRoadmapSelection {
   categoryId: string;
   stepId: string;
 }
-
-export type PreparationCategoryNavigationDirection = "next" | "previous";
 
 function getRoadmap(
   model: PreparationCatalogModel,
@@ -264,6 +264,7 @@ export function createPreparationRoadmapViewModel(
         id: step.id,
         isSelected: step.id === selectedStepId,
         numberLabel: String(step.order).padStart(2, "0"),
+        order: step.order,
         status,
         statusLabel: statusLabels[status],
         title: step.title,

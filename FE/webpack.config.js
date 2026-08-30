@@ -13,6 +13,8 @@ module.exports = (_environment, arguments_) => {
   const isProduction = arguments_.mode === "production";
   const apiBaseUrl = process.env.BIBBIDI_API_BASE_URL ?? "";
   const apiProxyTarget = process.env.BIBBIDI_API_PROXY_TARGET;
+  const googleAnalyticsMeasurementId =
+    process.env.BIBBIDI_GA_MEASUREMENT_ID ?? "";
 
   if (!isProduction && !apiProxyTarget) {
     throw new Error("BIBBIDI_API_PROXY_TARGET 환경변수가 필요합니다.");
@@ -70,6 +72,9 @@ module.exports = (_environment, arguments_) => {
       }),
       new webpack.DefinePlugin({
         __BIBBIDI_API_BASE_URL__: JSON.stringify(apiBaseUrl),
+        __BIBBIDI_GA_MEASUREMENT_ID__: JSON.stringify(
+          googleAnalyticsMeasurementId,
+        ),
       }),
       ...(isProduction
         ? [
