@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.user.service;
 
-import com.bibbidi.wedding.appointment.service.AppointmentService;
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
@@ -14,11 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final AppointmentService appointmentService;
+    private final ChecklistService checklistService;
 
-    public UserService(UserRepository userRepository, AppointmentService appointmentService) {
+    public UserService(UserRepository userRepository, ChecklistService checklistService) {
         this.userRepository = userRepository;
-        this.appointmentService = appointmentService;
+        this.checklistService = checklistService;
     }
 
     @Transactional
@@ -63,7 +63,7 @@ public class UserService {
 
     @Transactional
     public void delete(Long userId) {
-        appointmentService.deleteWeddingDataByOwnerId(userId);
+        checklistService.deleteByOwnerId(userId);
         userRepository.deleteById(userId);
     }
 

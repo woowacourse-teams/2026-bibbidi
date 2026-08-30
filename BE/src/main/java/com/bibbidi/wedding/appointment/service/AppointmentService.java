@@ -9,7 +9,6 @@ import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
-import com.bibbidi.wedding.checklist.service.ChecklistDeletionTarget;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -80,12 +79,6 @@ public class AppointmentService implements AppointmentDeleteService {
         appointmentRepository.deleteById(appointmentId);
     }
 
-    @Transactional
-    public void deleteWeddingDataByOwnerId(Long ownerId) {
-        checklistService.findDeletionTarget(ownerId)
-                .ifPresent(this::deleteWeddingData);
-    }
-
     @Override
     @Transactional
     public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
@@ -102,24 +95,6 @@ public class AppointmentService implements AppointmentDeleteService {
             return;
         }
         appointmentRepository.deleteAll(targetAppointmentIds);
-    }
-
-    @Override
-    @Transactional
-    public void deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
-        deleteAppointmentsByChecklistItemIds(checklistItemIds);
-    }
-
-    private void deleteWeddingData(ChecklistDeletionTarget target) {
-        deleteAppointmentsByChecklistItemIds(target.checklistItemIds());
-        checklistService.delete(target.checklistId());
-    }
-
-    private void deleteAppointmentsByChecklistItemIds(List<Long> checklistItemIds) {
-        if (checklistItemIds.isEmpty()) {
-            return;
-        }
-        appointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
     }
 
     private void validateItemOwnership(Long userId, Long checklistItemId) {
