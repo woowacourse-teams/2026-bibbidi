@@ -1,0 +1,150 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    S3_BUCKET_NAME: techcourse-project-2026
+    S3_PREFIX: bibbidi/fe/production
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 24
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.20.0 --activate
+      - node --version
+      - pnpm --version
+
+  pre_build:
+    commands:
+      - |
+        set -euo pipefail
+
+        required_variables=(
+          CLOUDFRONT_DISTRIBUTION_ID
+          FE_SERVICE_URL
+          BIBBIDI_GA_MEASUREMENT_ID
+        )
+
+        for variable_name in "${required_variables[@]}"; do
+          if [ -z "${!variable_name:-}" ]; then
+            echo "Missing CodeBuild environment variable: ${variable_name}" >&2
+            exit 1
+          fi
+        done
+
+        if [ "$S3_BUCKET_NAME" != "techcourse-project-2026" ]; then
+          echo "Unexpected deployment bucket: ${S3_BUCKET_NAME}" >&2
+          exit 1
+        fi
+
+        if [ "$S3_PREFIX" != "bibbidi/fe/production" ]; then
+          echo "Unexpected deployment prefix: ${S3_PREFIX}" >&2
+          exit 1
+        fi
+
+        pnpm install --frozen-lockfile
+
+  build:
+    commands:
+      - |
+        set -euo pipefail
+
+        pnpm --filter bibbidi-fe lint
+        pnpm --filter bibbidi-fe format:check
+        pnpm --filter bibbidi-fe typecheck
+
+        pnpm --filter bibbidi-fe test
+
+        BIBBIDI_API_BASE_URL="${BIBBIDI_API_BASE_URL:-}" \
+          pnpm --filter bibbidi-fe build
+
+        export BUILD_COMMIT="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
+        export BUILD_ID="${CODEBUILD_BUILD_ID:-unknown}"
+
+        node -e '
+          const fs = require("node:fs");
+          fs.writeFileSync(
+            "FE/dist/version.json",
+            JSON.stringify({
+              commit: process.env.BUILD_COMMIT,
+              buildId: process.env.BUILD_ID,
+            }),
+          );
+        '
+
+        aws s3 sync FE/dist/assets \
+          "s3://${S3_BUCKET_NAME}/${S3_PREFIX}/assets" \
+          --cache-control "public,max-age=31536000,immutable" \
+          --only-show-errors
+
+        aws s3 sync FE/dist \
+          "s3://${S3_BUCKET_NAME}/${S3_PREFIX}" \
+          --exclude "assets/*" \
+          --exclude "index.html" \
+          --exclude "version.json" \
+          --cache-control "public,max-age=3600" \
+          --only-show-errors
+
+        aws s3 cp FE/dist/version.json \
+          "s3://${S3_BUCKET_NAME}/${S3_PREFIX}/version.json" \
+          --cache-control "no-cache,max-age=0,must-revalidate" \
+          --content-type "application/json" \
+          --only-show-errors
+
+        aws s3 cp FE/dist/index.html \
+          "s3://${S3_BUCKET_NAME}/${S3_PREFIX}/index.html" \
+          --cache-control "no-cache,max-age=0,must-revalidate" \
+          --content-type "text/html; charset=utf-8" \
+          --only-show-errors
+
+        invalidation_id=$(aws cloudfront create-invalidation \
+          --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+          --paths "/*" \
+          --query 'Invalidation.Id' \
+          --output text)
+
+        aws cloudfront wait invalidation-completed \
+          --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+          --id "$invalidation_id"
+
+        service_url="${FE_SERVICE_URL%/}"
+        curl \
+          --fail \
+          --silent \
+          --show-error \
+          --retry 5 \
+          --retry-all-errors \
+          --retry-delay 5 \
+          "${service_url}/" \
+          > /dev/null
+
+        deployed_commit=$(curl \
+          --fail \
+          --silent \
+          --show-error \
+          --retry 5 \
+          --retry-all-errors \
+          --retry-delay 5 \
+          "${service_url}/version.json" \
+          | node -e '
+              const fs = require("node:fs");
+              const version = JSON.parse(fs.readFileSync(0, "utf8"));
+              process.stdout.write(version.commit);
+            ')
+
+        if [ "$deployed_commit" != "$BUILD_COMMIT" ]; then
+          echo "Expected ${BUILD_COMMIT}, but ${deployed_commit} is deployed." >&2
+          exit 1
+        fi
+
+        echo "Frontend deployment completed."
+        echo "Commit: ${BUILD_COMMIT}"
+        echo "Service URL: ${service_url}"
+        echo "S3 URI: s3://${S3_BUCKET_NAME}/${S3_PREFIX}/"
+        echo "CloudFront invalidation: ${invalidation_id}"
+
+cache:
+  paths:
+    - /root/.local/share/pnpm/store/**/*

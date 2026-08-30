@@ -10,6 +10,7 @@ on:
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
+      - infra/frontend/**
       - .github/workflows/fe-ci.yml
 
 permissions:
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, format, typecheck, and build
+    name: Lint, format, typecheck, test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -51,6 +52,9 @@ jobs:
 
       - name: Type check
         run: pnpm --filter bibbidi-fe typecheck
+
+      - name: Test
+        run: pnpm --filter bibbidi-fe test
 
       - name: Build
         run: pnpm --filter bibbidi-fe build
