@@ -105,4 +105,17 @@ class ChecklistRepositoryTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("식별자가 일치하는 체크리스트만 삭제한다")
+    void shouldDeleteOnlyChecklistWithGivenId() {
+        Checklist target = checklistRepository.save(new Checklist(null, OWNER_ID));
+        Checklist other = checklistRepository.save(new Checklist(null, 2L));
+
+        int deletedCount = checklistRepository.deleteById(target.id());
+
+        assertThat(deletedCount).isOne();
+        assertThat(jpaChecklistRepository.findById(target.id())).isEmpty();
+        assertThat(jpaChecklistRepository.findById(other.id())).isPresent();
+    }
 }

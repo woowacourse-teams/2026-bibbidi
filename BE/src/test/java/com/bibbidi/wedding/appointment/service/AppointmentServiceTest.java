@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.appointment.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -96,6 +96,7 @@ class AppointmentServiceTest {
     }
 
     @Test
+    @DisplayName("지정한 일정들을 새 할 일로 이동한다")
     void shouldChangeChecklistItemIdsInBulk() {
         appointmentService.changeAllToNewChecklistItemIds(20L, List.of(1L, 2L));
 
@@ -103,6 +104,7 @@ class AppointmentServiceTest {
     }
 
     @Test
+    @DisplayName("지정한 일정들을 모두 삭제한다")
     void shouldDeleteAppointmentsInBulk() {
         appointmentService.deleteAll(List.of(1L, 2L));
 
@@ -118,6 +120,7 @@ class AppointmentServiceTest {
     }
 
     @Test
+    @DisplayName("삭제하거나 이동할 일정이 없으면 저장소를 호출하지 않는다")
     void shouldSkipBulkOperationsWhenTargetIdsAreEmpty() {
         appointmentService.changeAllToNewChecklistItemIds(20L, List.of());
         appointmentService.deleteAll(List.of());

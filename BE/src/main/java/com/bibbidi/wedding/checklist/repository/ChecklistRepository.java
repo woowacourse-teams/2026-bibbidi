@@ -47,4 +47,8 @@ public class ChecklistRepository {
         return jpaChecklistRepository.findByOwnerId(ownerId)
                 .map(checklistMapper::toDomain);
     }
+
+    public int deleteById(Long checklistId) {
+        return jpaChecklistRepository.deleteByChecklistId(checklistId);
+    }
 }

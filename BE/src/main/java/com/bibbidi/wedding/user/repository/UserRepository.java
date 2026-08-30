@@ -46,6 +46,10 @@ public class UserRepository {
         );
     }
 
+    public int deleteById(Long userId) {
+        return jpaUserRepository.deleteByUserId(userId);
+    }
+
     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {
         return jpaUserRepository.findById(userId)
                 .orElseThrow(

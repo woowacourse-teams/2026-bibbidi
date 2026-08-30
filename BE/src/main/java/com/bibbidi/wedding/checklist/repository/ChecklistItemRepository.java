@@ -50,6 +50,14 @@ public class ChecklistItemRepository {
                 .toList();
     }
 
+    public List<Long> findIdsByChecklistId(Long checklistId) {
+        return jpaChecklistItemRepository.findIdsByChecklistId(checklistId);
+    }
+
+    public int deleteAllByChecklistId(Long checklistId) {
+        return jpaChecklistItemRepository.deleteAllByChecklistId(checklistId);
+    }
+
     public ChecklistItem save(ChecklistItem checklistItem) {
         JpaChecklistItemEntity entity = checklistMapper.toEntity(checklistItem, referenceOf(checklistItem));
         JpaChecklistItemEntity saved = jpaChecklistItemRepository.saveAndFlush(entity);

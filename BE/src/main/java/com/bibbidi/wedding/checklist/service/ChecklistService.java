@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
+import com.bibbidi.wedding.appointment.service.ChecklistAppointmentDeleteService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -27,15 +28,18 @@ public class ChecklistService {
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
     private final CatalogService catalogService;
+    private final ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
 
     public ChecklistService(
             ChecklistRepository checklistRepository,
             ChecklistItemRepository checklistItemRepository,
-            CatalogService catalogService
+            CatalogService catalogService,
+            ChecklistAppointmentDeleteService checklistAppointmentDeleteService
     ) {
         this.checklistRepository = checklistRepository;
         this.checklistItemRepository = checklistItemRepository;
         this.catalogService = catalogService;
+        this.checklistAppointmentDeleteService = checklistAppointmentDeleteService;
     }
 
     @Transactional
@@ -126,6 +130,19 @@ public class ChecklistService {
         return checklistItemRepository.findById(checklistItemId)
                 .map(item -> item.isOwnedBy(ownerId))
                 .orElse(false);
+    }
+
+    @Transactional
+    public void deleteByOwnerId(Long ownerId) {
+        checklistRepository.findByOwnerId(ownerId)
+                .ifPresent(this::deleteChecklistData);
+    }
+
+    private void deleteChecklistData(Checklist checklist) {
+        List<Long> checklistItemIds = checklistItemRepository.findIdsByChecklistId(checklist.id());
+        checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
+        checklistItemRepository.deleteAllByChecklistId(checklist.id());
+        checklistRepository.deleteById(checklist.id());
     }
 
     private void validateCategoryExists(Long categoryId) {

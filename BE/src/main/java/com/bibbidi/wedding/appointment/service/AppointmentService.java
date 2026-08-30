@@ -72,6 +72,13 @@ public class AppointmentService implements AppointmentDeleteService {
                 .withConflicts(conflicts);
     }
 
+    @Transactional
+    public void delete(Long userId, Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId);
+        validateItemOwnership(userId, appointment.checklistItemId());
+        appointmentRepository.deleteById(appointmentId);
+    }
+
     @Override
     @Transactional
     public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
@@ -80,14 +87,6 @@ public class AppointmentService implements AppointmentDeleteService {
         }
         appointmentRepository.changeAllToNewChecklistItemIds(newChecklistItemId, targetAppointmentIds);
     }
-
-    @Transactional
-    public void delete(Long userId, Long appointmentId) {
-        Appointment appointment = appointmentRepository.findById(appointmentId);
-        validateItemOwnership(userId, appointment.checklistItemId());
-        appointmentRepository.deleteById(appointmentId);
-    }
-
 
     @Override
     @Transactional
