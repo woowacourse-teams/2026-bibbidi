@@ -1,8 +1,6 @@
 import { useEffect, useRef } from "react";
-import {
-  PreparationCategoryNavigationDirection,
-  PreparationRoadmapViewModel,
-} from "../view-model/createPreparationRoadmapViewModel";
+import { PreparationCategoryNavigationDirection } from "../model/preparationRoadmap";
+import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepDetail } from "./PreparationStepDetail";
 import "./PreparationRoadmap.css";
 
