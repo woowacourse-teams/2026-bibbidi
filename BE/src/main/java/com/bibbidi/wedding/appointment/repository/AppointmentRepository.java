@@ -50,10 +50,6 @@ public class AppointmentRepository {
         jpaAppointmentRepository.deleteAll(targetAppointmentIds);
     }
 
-    public void deleteAllByChecklistItemId(Long checklistItemId) {
-        jpaAppointmentRepository.deleteAllByChecklistItemId(checklistItemId);
-    }
-
     public List<Appointment> findOverlapCandidates(Long userId, Appointment appointment) {
         return jpaAppointmentRepository.findOverlapCandidates(
                         userId,

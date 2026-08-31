@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AppointmentService implements AppointmentDeleteService {
+public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
     private final ChecklistService checklistService;
@@ -77,7 +77,6 @@ public class AppointmentService implements AppointmentDeleteService {
         appointmentRepository.deleteById(appointmentId);
     }
 
-    @Override
     @Transactional
     public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
         if (targetAppointmentIds.isEmpty()) {
@@ -86,19 +85,12 @@ public class AppointmentService implements AppointmentDeleteService {
         appointmentRepository.changeAllToNewChecklistItemIds(newChecklistItemId, targetAppointmentIds);
     }
 
-    @Override
     @Transactional
     public void deleteAll(List<Long> targetAppointmentIds) {
         if (targetAppointmentIds.isEmpty()) {
             return;
         }
         appointmentRepository.deleteAll(targetAppointmentIds);
-    }
-
-    @Override
-    @Transactional
-    public void deleteAllByChecklistItemId(Long checklistItemId) {
-        appointmentRepository.deleteAllByChecklistItemId(checklistItemId);
     }
 
     private List<AppointmentConflict> findConflictingWithNewAppointment(Long userId, Appointment savedAppointment) {
