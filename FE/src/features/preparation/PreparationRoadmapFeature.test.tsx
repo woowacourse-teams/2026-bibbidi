@@ -498,9 +498,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     });
 
     expect(
-      screen
-        .getByRole("button", { name: "초대" })
-        .getAttribute("aria-current"),
+      screen.getByRole("button", { name: "초대" }).getAttribute("aria-current"),
     ).toBe("page");
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
