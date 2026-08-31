@@ -105,11 +105,52 @@ phases:
           --query 'Invalidation.Id' \
           --output text)
 
-        aws cloudfront wait invalidation-completed \
-          --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-          --id "$invalidation_id"
-
         service_url="${FE_SERVICE_URL%/}"
+        deployed_commit=""
+        polling_deadline=$((SECONDS + 300))
+
+        while (( SECONDS < polling_deadline )); do
+          remaining_seconds=$((polling_deadline - SECONDS))
+          request_timeout=10
+
+          if (( remaining_seconds < request_timeout )); then
+            request_timeout=$remaining_seconds
+          fi
+
+          deployed_commit=$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            --connect-timeout 5 \
+            --max-time "$request_timeout" \
+            "${service_url}/version.json" \
+            | node -e '
+                const fs = require("node:fs");
+                const version = JSON.parse(fs.readFileSync(0, "utf8"));
+                process.stdout.write(version.commit ?? "");
+              ' \
+            2> /dev/null \
+            || true)
+
+          if [ "$deployed_commit" = "$BUILD_COMMIT" ]; then
+            break
+          fi
+
+          echo "Waiting for CloudFront propagation..."
+          remaining_seconds=$((polling_deadline - SECONDS))
+
+          if (( remaining_seconds > 20 )); then
+            sleep 20
+          elif (( remaining_seconds > 0 )); then
+            sleep "$remaining_seconds"
+          fi
+        done
+
+        if [ "$deployed_commit" != "$BUILD_COMMIT" ]; then
+          echo "Expected ${BUILD_COMMIT}, but ${deployed_commit:-unknown} is deployed." >&2
+          exit 1
+        fi
+
         curl \
           --fail \
           --silent \
@@ -119,25 +160,6 @@ phases:
           --retry-delay 5 \
           "${service_url}/" \
           > /dev/null
-
-        deployed_commit=$(curl \
-          --fail \
-          --silent \
-          --show-error \
-          --retry 5 \
-          --retry-all-errors \
-          --retry-delay 5 \
-          "${service_url}/version.json" \
-          | node -e '
-              const fs = require("node:fs");
-              const version = JSON.parse(fs.readFileSync(0, "utf8"));
-              process.stdout.write(version.commit);
-            ')
-
-        if [ "$deployed_commit" != "$BUILD_COMMIT" ]; then
-          echo "Expected ${BUILD_COMMIT}, but ${deployed_commit} is deployed." >&2
-          exit 1
-        fi
 
         echo "Frontend deployment completed."
         echo "Commit: ${BUILD_COMMIT}"
