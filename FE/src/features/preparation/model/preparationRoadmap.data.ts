@@ -12,7 +12,6 @@ interface PreparationStepData extends PreparationStepModel {
 interface PreparationCategoryRoadmapData {
   category: PreparationCategoryModel;
   steps: PreparationStepData[];
-  title: string;
 }
 
 const categoryRoadmaps = [
@@ -134,7 +133,6 @@ const categoryRoadmaps = [
         title: "예식 비용 정산과 사례비 전달",
       },
     ],
-    title: "웨딩홀 준비 로드맵",
   },
   {
     category: { id: "studio-dress-makeup", label: "스드메" },
@@ -265,7 +263,6 @@ const categoryRoadmaps = [
         title: "대여 물품 반납",
       },
     ],
-    title: "스드메 준비 로드맵",
   },
   {
     category: { id: "invitation", label: "초대" },
@@ -365,7 +362,6 @@ const categoryRoadmaps = [
         title: "하객 감사 인사 전달",
       },
     ],
-    title: "초대 준비 로드맵",
   },
   {
     category: { id: "family", label: "가족" },
@@ -458,7 +454,6 @@ const categoryRoadmaps = [
         title: "가족 대여 물품 반납",
       },
     ],
-    title: "가족 준비 로드맵",
   },
   {
     category: { id: "other", label: "기타" },
@@ -570,13 +565,12 @@ const categoryRoadmaps = [
         title: "혼인신고 접수",
       },
     ],
-    title: "기타 준비 로드맵",
   },
 ] satisfies PreparationCategoryRoadmapData[];
 
 export const preparationRoadmapData = {
   categories: categoryRoadmaps.map(({ category }) => category),
-  roadmaps: categoryRoadmaps.map(({ category, steps, title }) => ({
+  roadmaps: categoryRoadmaps.map(({ category, steps }) => ({
     categoryId: category.id,
     steps: steps.map(({ description, id, order, title: stepTitle }) => ({
       description,
@@ -584,7 +578,6 @@ export const preparationRoadmapData = {
       order,
       title: stepTitle,
     })),
-    title,
   })),
   stepDetails: categoryRoadmaps.flatMap(({ steps }) =>
     steps.map(({ description, id, tasks }) => ({

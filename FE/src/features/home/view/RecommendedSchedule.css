@@ -122,7 +122,7 @@
 
 .recommended-schedule-card__add-task {
   align-self: flex-start;
-  color: var(--color-fg-brand);
+  color: var(--color-fg-neutral);
   font-size: 12px;
   font-weight: 700;
   gap: 5px;

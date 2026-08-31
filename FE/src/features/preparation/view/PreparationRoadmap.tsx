@@ -267,7 +267,6 @@ export function PreparationRoadmap({
             <li key={category.id}>
               <button
                 aria-controls="preparation-roadmap-content"
-                aria-current={category.isCurrent ? "page" : undefined}
                 aria-pressed={category.isCurrent}
                 className={`preparation-roadmap__category${
                   category.isCurrent

@@ -39,9 +39,6 @@ export function PreparationStepDetail({
     >
       <div className="preparation-step-detail__panel">
         <header className="preparation-step-detail__header">
-          <span className="preparation-step-detail__category">
-            {detail.categoryLabel}
-          </span>
           <h2>{detail.title}</h2>
           <p>{detail.description}</p>
           <span

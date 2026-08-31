@@ -145,7 +145,7 @@
 
 .signup-form__login-prompt a {
   border-radius: 4px;
-  color: var(--color-fg-brand);
+  color: var(--color-fg-neutral);
   font-weight: 700;
   text-underline-offset: 3px;
 }
