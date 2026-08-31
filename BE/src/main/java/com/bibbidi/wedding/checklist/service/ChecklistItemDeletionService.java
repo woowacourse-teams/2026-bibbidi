@@ -2,7 +2,6 @@ package com.bibbidi.wedding.checklist.service;
 
 import com.bibbidi.wedding.appointment.service.AppointmentDeleteService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,16 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChecklistItemDeletionService {
 
     private final ChecklistRepository checklistRepository;
-    private final ChecklistItemRepository checklistItemRepository;
     private final AppointmentDeleteService appointmentDeleteService;
 
     public ChecklistItemDeletionService(
             ChecklistRepository checklistRepository,
-            ChecklistItemRepository checklistItemRepository,
             AppointmentDeleteService appointmentDeleteService
     ) {
         this.checklistRepository = checklistRepository;
-        this.checklistItemRepository = checklistItemRepository;
         this.appointmentDeleteService = appointmentDeleteService;
     }
 
@@ -32,7 +28,7 @@ public class ChecklistItemDeletionService {
                     checklist.validateOwnedBy(ownerId);
                     item.validateDeletable();
                     appointmentDeleteService.deleteAllByChecklistItemId(checklistItemId);
-                    checklistItemRepository.deleteById(checklistItemId);
+                    checklistRepository.deleteItem(item);
                 });
     }
 }

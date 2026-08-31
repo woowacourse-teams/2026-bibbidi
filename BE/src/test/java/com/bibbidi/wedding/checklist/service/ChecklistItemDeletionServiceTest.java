@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -12,7 +13,6 @@ import com.bibbidi.wedding.appointment.service.AppointmentDeleteService;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -36,9 +36,6 @@ class ChecklistItemDeletionServiceTest {
     private ChecklistRepository checklistRepository;
 
     @Mock
-    private ChecklistItemRepository checklistItemRepository;
-
-    @Mock
     private AppointmentDeleteService appointmentDeleteService;
 
     private ChecklistItemDeletionService checklistItemDeletionService;
@@ -47,7 +44,6 @@ class ChecklistItemDeletionServiceTest {
     void setUp() {
         checklistItemDeletionService = new ChecklistItemDeletionService(
                 checklistRepository,
-                checklistItemRepository,
                 appointmentDeleteService
         );
     }
@@ -60,7 +56,7 @@ class ChecklistItemDeletionServiceTest {
         checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID);
 
         then(appointmentDeleteService).shouldHaveNoInteractions();
-        then(checklistItemRepository).should(never()).deleteById(any());
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
     @Test
@@ -74,7 +70,7 @@ class ChecklistItemDeletionServiceTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
         then(appointmentDeleteService).shouldHaveNoInteractions();
-        then(checklistItemRepository).should(never()).deleteById(any());
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
     @Test
@@ -88,7 +84,7 @@ class ChecklistItemDeletionServiceTest {
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
         then(appointmentDeleteService).shouldHaveNoInteractions();
-        then(checklistItemRepository).should(never()).deleteById(any());
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
     @Test
@@ -99,9 +95,9 @@ class ChecklistItemDeletionServiceTest {
 
         checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID);
 
-        InOrder deletionOrder = inOrder(appointmentDeleteService, checklistItemRepository);
+        InOrder deletionOrder = inOrder(appointmentDeleteService, checklistRepository);
         deletionOrder.verify(appointmentDeleteService).deleteAllByChecklistItemId(CHECKLIST_ITEM_ID);
-        deletionOrder.verify(checklistItemRepository).deleteById(CHECKLIST_ITEM_ID);
+        deletionOrder.verify(checklistRepository).deleteItem(argThat(item -> CHECKLIST_ITEM_ID.equals(item.id())));
     }
 
     @Test
@@ -115,7 +111,7 @@ class ChecklistItemDeletionServiceTest {
 
         assertThatThrownBy(() -> checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID))
                 .isInstanceOf(IllegalStateException.class);
-        then(checklistItemRepository).should(never()).deleteById(any());
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
     private static Checklist checklist(Long ownerId, ChecklistItemStatus status, Long sourceCatalogItemId) {

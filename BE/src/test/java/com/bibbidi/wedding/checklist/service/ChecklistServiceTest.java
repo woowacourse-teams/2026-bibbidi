@@ -19,7 +19,6 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
@@ -49,9 +48,6 @@ class ChecklistServiceTest {
     private ChecklistRepository checklistRepository;
 
     @Mock
-    private ChecklistItemRepository checklistItemRepository;
-
-    @Mock
     private CatalogService catalogService;
 
     @Mock
@@ -63,7 +59,6 @@ class ChecklistServiceTest {
     void setUp() {
         checklistService = new ChecklistService(
                 checklistRepository,
-                checklistItemRepository,
                 catalogService,
                 checklistAppointmentDeleteService
         );
@@ -152,7 +147,7 @@ class ChecklistServiceTest {
         given(checklistRepository.getByOwnerId(OWNER_ID))
                 .willReturn(checklistOwnedBy(OWNER_ID));
         given(catalogService.findItems(anyCollection())).willReturn(List.of(contractItem(), estimateItem()));
-        given(checklistItemRepository.saveAll(any(), anyList()))
+        given(checklistRepository.saveItems(any(Checklist.class), anyList()))
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
@@ -185,7 +180,7 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
-        then(checklistItemRepository).should(never()).saveAll(any(), anyList());
+        then(checklistRepository).should(never()).saveItems(any(Checklist.class), anyList());
     }
 
     @Test
@@ -201,7 +196,7 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.INVALID_REQUEST);
-        then(checklistItemRepository).should(never()).saveAll(any(), anyList());
+        then(checklistRepository).should(never()).saveItems(any(Checklist.class), anyList());
     }
 
     @Test
@@ -210,7 +205,7 @@ class ChecklistServiceTest {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
                 .willReturn(checklistOwnedBy(OWNER_ID));
-        given(checklistItemRepository.save(any(), any(ChecklistItem.class)))
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
@@ -240,7 +235,7 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
-        then(checklistItemRepository).should(never()).save(any(), any(ChecklistItem.class));
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
     @Test
@@ -258,12 +253,12 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
-        then(checklistItemRepository).should(never()).save(any(), any(ChecklistItem.class));
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
     @Test
-    @DisplayName("일정, 할 일, 체크리스트 순서로 삭제한다")
-    void shouldDeleteChecklistDataInForeignKeyOrder() {
+    @DisplayName("연결된 일정을 먼저 삭제한 뒤 체크리스트를 통째로 삭제한다")
+    void shouldDeleteAppointmentsBeforeChecklist() {
         List<Long> checklistItemIds = List.of(100L, 101L);
         Checklist checklist = new Checklist(
                 CHECKLIST_ID,
@@ -274,10 +269,9 @@ class ChecklistServiceTest {
 
         checklistService.deleteByOwnerId(OWNER_ID);
 
-        InOrder order = inOrder(checklistAppointmentDeleteService, checklistItemRepository, checklistRepository);
+        InOrder order = inOrder(checklistAppointmentDeleteService, checklistRepository);
         order.verify(checklistAppointmentDeleteService).deleteAllByChecklistItemIds(checklistItemIds);
-        order.verify(checklistItemRepository).deleteAllByChecklistId(CHECKLIST_ID);
-        order.verify(checklistRepository).deleteById(CHECKLIST_ID);
+        order.verify(checklistRepository).delete(checklist);
     }
 
     @Test
@@ -287,7 +281,7 @@ class ChecklistServiceTest {
 
         checklistService.deleteByOwnerId(OWNER_ID);
 
-        then(checklistItemRepository).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).delete(any(Checklist.class));
         then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
     }
 }

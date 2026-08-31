@@ -6,7 +6,6 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
@@ -23,18 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChecklistService {
 
     private final ChecklistRepository checklistRepository;
-    private final ChecklistItemRepository checklistItemRepository;
     private final CatalogService catalogService;
     private final ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
 
     public ChecklistService(
             ChecklistRepository checklistRepository,
-            ChecklistItemRepository checklistItemRepository,
             CatalogService catalogService,
             ChecklistAppointmentDeleteService checklistAppointmentDeleteService
     ) {
         this.checklistRepository = checklistRepository;
-        this.checklistItemRepository = checklistItemRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentDeleteService = checklistAppointmentDeleteService;
     }
@@ -52,7 +48,7 @@ public class ChecklistService {
 
         List<ChecklistItem> candidates = selectCatalogItems(catalogItemIds);
 
-        return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(checklist.id(), candidates));
+        return CatalogItemAdditionResult.from(checklistRepository.saveItems(checklist, candidates));
     }
 
     @Transactional
@@ -61,7 +57,7 @@ public class ChecklistService {
 
         catalogService.validateCategoryExists(categoryId);
 
-        ChecklistItem item = checklistItemRepository.save(checklist.id(), new ChecklistItem(
+        ChecklistItem item = checklistRepository.saveItem(checklist, new ChecklistItem(
                 null,
                 categoryId,
                 title,
@@ -85,8 +81,8 @@ public class ChecklistService {
         checklist.validateOwnedBy(ownerId);
         ChecklistItem item = checklist.item(checklistItemId);
 
-        ChecklistItem changed = checklistItemRepository.save(
-                checklist.id(),
+        ChecklistItem changed = checklistRepository.saveItem(
+                checklist,
                 item.changeCategory(categoryId)
         );
 
@@ -104,8 +100,8 @@ public class ChecklistService {
         checklist.validateOwnedBy(ownerId);
         ChecklistItem item = checklist.item(checklistItemId);
 
-        ChecklistItem changed = checklistItemRepository.save(
-                checklist.id(),
+        ChecklistItem changed = checklistRepository.saveItem(
+                checklist,
                 item.changeTitle(title)
         );
 
@@ -129,8 +125,7 @@ public class ChecklistService {
                 .map(ChecklistItem::id)
                 .toList();
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
-        checklistItemRepository.deleteAllByChecklistId(checklist.id());
-        checklistRepository.deleteById(checklist.id());
+        checklistRepository.delete(checklist);
     }
 
     private List<ChecklistItem> selectCatalogItems(List<Long> catalogItemIds) {
