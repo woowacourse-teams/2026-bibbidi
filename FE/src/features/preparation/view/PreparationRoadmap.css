@@ -500,7 +500,15 @@
   }
 
   .preparation-roadmap__step > .preparation-step-detail {
-    padding-top: 12px;
+    height: 100%;
+    padding-top: 0;
+  }
+
+  .preparation-roadmap__step
+    > .preparation-step-detail
+    .preparation-step-detail__panel {
+    height: 100%;
+    border: 2px solid var(--color-stroke-brand-solid);
   }
 
   .preparation-step-detail__header {

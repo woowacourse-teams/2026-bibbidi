@@ -58,15 +58,89 @@ function getNormalizedWheelDelta(
 }
 
 interface PreparationRoadmapProps {
+  mobileExpandedStepId: string | null;
   onCategoryNavigate: (
     direction: PreparationCategoryNavigationDirection,
   ) => void;
   onCategorySelect: (categoryId: string) => void;
-  onStepSelect: (stepId: string) => void;
+  onStepSelect: (
+    stepId: string,
+    options: { expandsMobileDetail: boolean },
+  ) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
+interface PreparationRoadmapStepsProps {
+  isMobileLayout: boolean;
+  mobileExpandedStepId: string | null;
+  onStepSelect: (
+    stepId: string,
+    options: { expandsMobileDetail: boolean },
+  ) => void;
+  viewModel: PreparationRoadmapViewModel;
+}
+
+function PreparationRoadmapSteps({
+  isMobileLayout,
+  mobileExpandedStepId,
+  onStepSelect,
+  viewModel,
+}: PreparationRoadmapStepsProps) {
+  return (
+    <ol className="preparation-roadmap__steps">
+      {viewModel.steps.map((step) => {
+        const showsMobileDetail =
+          isMobileLayout && mobileExpandedStepId === step.id;
+
+        return (
+          <li
+            className={`preparation-roadmap__step preparation-roadmap__step--${step.numberLabel}`}
+            key={step.id}
+          >
+            {showsMobileDetail ? (
+              <PreparationStepDetail
+                detail={viewModel.selectedStepDetail}
+                focusOnMount
+              />
+            ) : (
+              <button
+                aria-controls="preparation-step-detail"
+                aria-pressed={!isMobileLayout && step.isSelected}
+                className="preparation-roadmap__step-button"
+                onClick={() =>
+                  onStepSelect(step.id, {
+                    expandsMobileDetail: isMobileLayout,
+                  })
+                }
+                type="button"
+              >
+                <span className="preparation-roadmap__step-header">
+                  <span className="preparation-roadmap__step-number">
+                    {step.numberLabel}
+                  </span>
+                  <span
+                    className={`preparation-roadmap__step-status preparation-roadmap__step-status--${step.status}`}
+                  >
+                    {step.statusLabel}
+                  </span>
+                </span>
+                <span className="preparation-roadmap__step-title">
+                  {step.title}
+                </span>
+                <span className="preparation-roadmap__step-description">
+                  {step.description}
+                </span>
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function PreparationRoadmap({
+  mobileExpandedStepId,
   onCategoryNavigate,
   onCategorySelect,
   onStepSelect,
@@ -221,45 +295,12 @@ export function PreparationRoadmap({
           </header>
 
           <div className="preparation-roadmap__grid-wrap">
-            <ol className="preparation-roadmap__steps">
-              {viewModel.steps.map((step) => (
-                <li
-                  className={`preparation-roadmap__step preparation-roadmap__step--${step.numberLabel}`}
-                  key={step.id}
-                >
-                  <button
-                    aria-controls="preparation-step-detail"
-                    aria-pressed={step.isSelected}
-                    className="preparation-roadmap__step-button"
-                    onClick={() => onStepSelect(step.id)}
-                    type="button"
-                  >
-                    <span className="preparation-roadmap__step-header">
-                      <span className="preparation-roadmap__step-number">
-                        {step.numberLabel}
-                      </span>
-                      <span
-                        className={`preparation-roadmap__step-status preparation-roadmap__step-status--${step.status}`}
-                      >
-                        {step.statusLabel}
-                      </span>
-                    </span>
-                    <span className="preparation-roadmap__step-title">
-                      {step.title}
-                    </span>
-                    <span className="preparation-roadmap__step-description">
-                      {step.description}
-                    </span>
-                  </button>
-
-                  {isMobileLayout && step.isSelected ? (
-                    <PreparationStepDetail
-                      detail={viewModel.selectedStepDetail}
-                    />
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+            <PreparationRoadmapSteps
+              isMobileLayout={isMobileLayout}
+              mobileExpandedStepId={mobileExpandedStepId}
+              onStepSelect={onStepSelect}
+              viewModel={viewModel}
+            />
           </div>
         </div>
 
