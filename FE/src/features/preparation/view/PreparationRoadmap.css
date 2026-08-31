@@ -356,11 +356,12 @@
 
 .preparation-step-detail__tasks li {
   display: flex;
-  height: 52px;
+  height: auto;
   min-width: 0;
+  min-height: 52px;
   align-items: center;
   gap: 12px;
-  padding: 0 24px;
+  padding: 8px 24px;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
