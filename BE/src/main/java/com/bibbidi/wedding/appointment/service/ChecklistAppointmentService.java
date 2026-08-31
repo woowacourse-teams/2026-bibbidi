@@ -14,6 +14,11 @@ public class ChecklistAppointmentService {
         this.appointmentRepository = appointmentRepository;
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasRemainingAppointment(Long checklistItemId) {
+        return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+    }
+
     @Transactional
     public void deleteAllByChecklistItemId(Long checklistItemId) {
         appointmentRepository.deleteAllByChecklistItemIds(List.of(checklistItemId));

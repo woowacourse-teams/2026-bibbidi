@@ -34,6 +34,10 @@ public class AppointmentRepository {
         return appointmentMapper.toDomain(queryResult);
     }
 
+    public boolean existsRemainingByChecklistItemId(Long checklistItemId) {
+        return jpaAppointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+    }
+
     public int deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
         return jpaAppointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
     }
