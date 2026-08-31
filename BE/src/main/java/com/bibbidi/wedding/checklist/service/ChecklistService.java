@@ -6,7 +6,6 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
@@ -16,120 +15,83 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChecklistService {
 
-    private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
-
     private final ChecklistRepository checklistRepository;
-    private final ChecklistItemRepository checklistItemRepository;
     private final CatalogService catalogService;
     private final ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
 
-    public ChecklistService(
-            ChecklistRepository checklistRepository,
-            ChecklistItemRepository checklistItemRepository,
-            CatalogService catalogService,
-            ChecklistAppointmentDeleteService checklistAppointmentDeleteService
-    ) {
+    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService, ChecklistAppointmentDeleteService checklistAppointmentDeleteService) {
         this.checklistRepository = checklistRepository;
-        this.checklistItemRepository = checklistItemRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentDeleteService = checklistAppointmentDeleteService;
     }
 
     @Transactional
     public ChecklistCreationResult create(Long ownerId) {
-        if (checklistRepository.existsByOwnerId(ownerId)) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST,
-                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
-            );
-        }
+        Checklist checklist = new Checklist(null, ownerId, List.of());
+        Checklist saved = checklistRepository.save(checklist);
 
-        try {
-            Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
-            return ChecklistCreationResult.from(checklist);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST,
-                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
-            );
-        }
+        return ChecklistCreationResult.from(saved);
     }
 
     @Transactional
-    public CatalogItemAdditionResult addCatalogItems(Long ownerId, List<Long> catalogItemIds) {
+    public CatalogItemAdditionResult addItemsFromCatalog(Long ownerId, List<Long> catalogItemIds) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        List<ChecklistItem> candidates = selectCatalogItems(checklist, catalogItemIds);
+        List<ChecklistItem> items = copyFromCatalog(catalogItemIds);
+        List<ChecklistItem> saved = checklistRepository.saveItems(checklist, items);
 
-        try {
-            return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(candidates));
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST_ITEM,
-                    "이미 추가된 준비 항목이 포함되었습니다. checklistId=" + checklist.id()
-                            + ", catalogItemIds=" + catalogItemIds
-            );
-        }
+        return CatalogItemAdditionResult.from(saved);
     }
 
     @Transactional
-    public ChecklistItemResult writeItem(Long ownerId, String title, Long categoryId) {
+    public ChecklistItemResult addCustomItem(Long ownerId, String title, Long categoryId) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        validateCategoryExists(categoryId);
+        catalogService.validateCategoryExists(categoryId);
 
-        ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
+        ChecklistItem checklistItem = new ChecklistItem(
                 null,
-                checklist,
                 categoryId,
                 title,
                 null,
                 ChecklistItemStatus.PREV
-        ));
+        );
+        ChecklistItem saved = checklistRepository.saveItem(checklist, checklistItem);
 
-        return ChecklistItemResult.from(item);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional
-    public ChecklistItemResult changeItemCategory(
-            Long ownerId,
-            Long checklistItemId,
-            Long categoryId
-    ) {
-        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
+    public ChecklistItemResult changeItemCategory(Long ownerId, Long checklistItemId, Long categoryId) {
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
+        catalogService.validateCategoryExists(categoryId);
 
-        validateCategoryExists(categoryId);
+        ChecklistItem changed = checklist.changeItemCategory(ownerId, checklistItemId, categoryId);
+        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
 
-        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(ownerId, categoryId));
-
-        return ChecklistItemResult.from(changed);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional
-    public ChecklistItemResult changeItemTitle(
-            Long ownerId,
-            Long checklistItemId,
-            String title
-    ) {
-        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
+    public ChecklistItemResult changeItemTitle(Long ownerId, Long checklistItemId, String title) {
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
 
-        ChecklistItem changed = checklistItemRepository.save(item.changeTitle(ownerId, title));
+        ChecklistItem changed = checklist.changeItemTitle(ownerId, checklistItemId, title);
+        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
 
-        return ChecklistItemResult.from(changed);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional(readOnly = true)
-    public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
-        return checklistItemRepository.findById(checklistItemId)
-                .map(item -> item.isOwnedBy(ownerId))
-                .orElse(false);
+    public void validateItemOwnership(Long checklistItemId, Long ownerId) {
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
+        checklist.validateOwnedBy(ownerId);
     }
 
     @Transactional
@@ -139,22 +101,13 @@ public class ChecklistService {
     }
 
     private void deleteChecklistData(Checklist checklist) {
-        List<Long> checklistItemIds = checklistItemRepository.findIdsByChecklistId(checklist.id());
+        List<Long> checklistItemIds = checklist.itemIds();
+
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
-        checklistItemRepository.deleteAllByChecklistId(checklist.id());
-        checklistRepository.deleteById(checklist.id());
+        checklistRepository.delete(checklist);
     }
 
-    private void validateCategoryExists(Long categoryId) {
-        if (!catalogService.existsCategory(categoryId)) {
-            throw new BusinessException(
-                    ClientError.CATEGORY_NOT_FOUND,
-                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
-            );
-        }
-    }
-
-    private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {
+    private List<ChecklistItem> copyFromCatalog(List<Long> catalogItemIds) {
         Set<Long> requestedIds = new LinkedHashSet<>(catalogItemIds);
         List<CatalogItemSnapshot> catalogItems = catalogService.findItems(requestedIds);
 
@@ -171,7 +124,6 @@ public class ChecklistService {
         return catalogItems.stream()
                 .map(catalogItem -> new ChecklistItem(
                         null,
-                        checklist,
                         catalogItem.categoryId(),
                         catalogItem.title(),
                         catalogItem.id(),

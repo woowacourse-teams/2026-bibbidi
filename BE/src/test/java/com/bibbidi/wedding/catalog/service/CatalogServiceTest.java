@@ -2,6 +2,7 @@ package com.bibbidi.wedding.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -84,5 +85,15 @@ class CatalogServiceTest {
                 .singleElement()
                 .extracting(CatalogItemSnapshot::id, CatalogItemSnapshot::categoryId, CatalogItemSnapshot::title)
                 .containsExactly(INCLUDED_ITEM_ID, 1L, "포함된 할 일");
+    }
+
+    @Test
+    @DisplayName("카테고리 존재 검증을 카탈로그 저장소에 위임한다")
+    void shouldValidateCategoryExists() {
+        // when
+        catalogService.validateCategoryExists(1L);
+
+        // then
+        verify(catalogRepository).validateCategoryExists(1L);
     }
 }

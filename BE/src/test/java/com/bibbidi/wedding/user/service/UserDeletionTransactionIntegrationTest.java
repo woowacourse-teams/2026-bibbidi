@@ -13,7 +13,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
-import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import java.time.LocalDate;
@@ -41,7 +40,7 @@ class UserDeletionTransactionIntegrationTest {
     @Autowired
     private JpaUserRepository jpaUserRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private JpaChecklistRepository jpaChecklistRepository;
 
     @Autowired
@@ -49,9 +48,6 @@ class UserDeletionTransactionIntegrationTest {
 
     @Autowired
     private JpaAppointmentRepository jpaAppointmentRepository;
-
-    @MockitoSpyBean
-    private ChecklistRepository checklistRepository;
 
     @AfterEach
     void cleanUp() {
@@ -94,8 +90,8 @@ class UserDeletionTransactionIntegrationTest {
                 )
         );
         willThrow(new IllegalStateException("checklist deletion failed"))
-                .given(checklistRepository)
-                .deleteById(checklist.id());
+                .given(jpaChecklistRepository)
+                .deleteByChecklistId(checklist.id());
 
         assertThatThrownBy(() -> authService.deleteUser(user.id(), PASSWORD))
                 .isInstanceOf(DataAccessException.class)

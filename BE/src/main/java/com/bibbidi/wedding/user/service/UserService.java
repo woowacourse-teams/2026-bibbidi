@@ -24,8 +24,10 @@ public class UserService {
     @Transactional
     public UserResult createUser(String nickname, String passwordHash) {
         try {
-            User user = userRepository.save(new User(null, nickname, passwordHash));
-            return UserResult.from(user);
+            User user = new User(null, nickname, passwordHash);
+            User savedUser = userRepository.save(user);
+
+            return UserResult.from(savedUser);
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     ClientError.DUPLICATE_NICKNAME,

@@ -44,8 +44,8 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
-    public boolean existsCategory(Long categoryId) {
-        return catalogRepository.existsCategory(categoryId);
+    public void validateCategoryExists(Long categoryId) {
+        catalogRepository.validateCategoryExists(categoryId);
     }
 
     @Transactional(readOnly = true)

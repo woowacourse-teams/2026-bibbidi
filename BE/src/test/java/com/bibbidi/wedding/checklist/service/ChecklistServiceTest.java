@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.checklist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,12 +14,11 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.appointment.service.ChecklistAppointmentDeleteService;
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
-import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
@@ -34,7 +34,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class ChecklistServiceTest {
@@ -49,9 +48,6 @@ class ChecklistServiceTest {
     private ChecklistRepository checklistRepository;
 
     @Mock
-    private ChecklistItemRepository checklistItemRepository;
-
-    @Mock
     private CatalogService catalogService;
 
     @Mock
@@ -63,7 +59,6 @@ class ChecklistServiceTest {
     void setUp() {
         checklistService = new ChecklistService(
                 checklistRepository,
-                checklistItemRepository,
                 catalogService,
                 checklistAppointmentDeleteService
         );
@@ -79,10 +74,9 @@ class ChecklistServiceTest {
 
     @Test
     @DisplayName("소유자 ID로 빈 체크리스트를 생성한다")
-    void shouldCreateChecklistForOwner() {
+    void shouldCreateForOwner() {
         // given
-        given(checklistRepository.existsByOwnerId(1L)).willReturn(false);
-        given(checklistRepository.save(any(Checklist.class))).willReturn(new Checklist(10L, 1L));
+        given(checklistRepository.save(any(Checklist.class))).willReturn(new Checklist(10L, 1L, List.of()));
 
         // when
         ChecklistCreationResult result = checklistService.create(1L);
@@ -92,74 +86,47 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("소유자의 체크리스트가 이미 존재하면 생성을 거절한다")
-    void shouldRejectWhenChecklistAlreadyExists() {
+    @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권 검증을 통과한다")
+    void shouldValidateItemOwnershipWhenItemBelongsToOwnersChecklist() {
         // given
-        given(checklistRepository.existsByOwnerId(1L)).willReturn(true);
+        given(checklistRepository.getByChecklistItemId(200L))
+                .willReturn(checklistOwnedBy(OWNER_ID));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.create(1L))
+        assertThatCode(() -> checklistService.validateItemOwnership(200L, OWNER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 체크리스트에 속한 할 일이면 소유권 검증에 실패한다")
+    void shouldRejectItemOwnershipWhenItemBelongsToAnotherChecklist() {
+        // given
+        given(checklistRepository.getByChecklistItemId(200L))
+                .willReturn(checklistOwnedBy(2L));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.validateItemOwnership(200L, OWNER_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_CHECKLIST);
-        then(checklistRepository).should(never()).save(any(Checklist.class));
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
     }
 
     @Test
-    @DisplayName("동시 생성으로 UNIQUE 제약을 위반하면 중복 체크리스트 오류로 변환한다")
-    void shouldConvertUniqueConstraintViolationToDuplicateChecklistError() {
+    @DisplayName("존재하지 않는 할 일의 소유권 검증은 조회 오류를 그대로 전달한다")
+    void shouldPropagateNotFoundWhenValidatingItemOwnership() {
         // given
-        given(checklistRepository.existsByOwnerId(1L)).willReturn(false);
-        willThrow(new DataIntegrityViolationException("duplicate owner"))
-                .given(checklistRepository)
-                .save(any(Checklist.class));
+        given(checklistRepository.getByChecklistItemId(999L))
+                .willThrow(new BusinessException(ClientError.CHECKLIST_ITEM_NOT_FOUND, "not found"));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.create(1L))
+        assertThatThrownBy(() -> checklistService.validateItemOwnership(999L, OWNER_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_CHECKLIST);
+                .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
     }
 
-    @Test
-    @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권을 인정한다")
-    void shouldConfirmItemOwnershipWhenItemBelongsToOwnersChecklist() {
-        // given
-        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOwnedBy(OWNER_ID)));
-
-        // when, then
-        assertThat(checklistService.checkItemOwnership(200L, OWNER_ID)).isTrue();
-    }
-
-    @Test
-    @DisplayName("다른 사용자의 체크리스트에 속한 할 일이면 소유권을 인정하지 않는다")
-    void shouldDenyItemOwnershipWhenItemBelongsToAnotherChecklist() {
-        // given
-        given(checklistItemRepository.findById(200L)).willReturn(Optional.of(itemOwnedBy(2L)));
-
-        // when, then
-        assertThat(checklistService.checkItemOwnership(200L, OWNER_ID)).isFalse();
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 할 일은 소유권을 인정하지 않는다")
-    void shouldDenyItemOwnershipWhenItemDoesNotExist() {
-        // given
-        given(checklistItemRepository.findById(999L)).willReturn(Optional.empty());
-
-        // when, then
-        assertThat(checklistService.checkItemOwnership(999L, OWNER_ID)).isFalse();
-    }
-
-    private static ChecklistItem itemOwnedBy(Long ownerId) {
-        return new ChecklistItem(
-                200L,
-                new Checklist(CHECKLIST_ID, ownerId),
-                CATEGORY_ID,
-                "계약서 확인",
-                null,
-                ChecklistItemStatus.PREV
-        );
+    private static Checklist checklistOwnedBy(Long ownerId) {
+        return new Checklist(CHECKLIST_ID, ownerId, List.of(item(200L)));
     }
 
     @Test
@@ -167,13 +134,14 @@ class ChecklistServiceTest {
     void shouldAddSelectedCatalogItemsToChecklist() {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
+                .willReturn(checklistOwnedBy(OWNER_ID));
         given(catalogService.findItems(anyCollection())).willReturn(List.of(contractItem(), estimateItem()));
-        given(checklistItemRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+        given(checklistRepository.saveItems(any(Checklist.class), anyList()))
+                .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
         CatalogItemAdditionResult result =
-                checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID, ESTIMATE_ITEM_ID));
+                checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID, ESTIMATE_ITEM_ID));
 
         // then
         assertThat(result.items())
@@ -197,11 +165,11 @@ class ChecklistServiceTest {
                 .getByOwnerId(OWNER_ID);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID)))
+        assertThatThrownBy(() -> checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
-        then(checklistItemRepository).should(never()).saveAll(anyList());
+        then(checklistRepository).should(never()).saveItems(any(Checklist.class), anyList());
     }
 
     @Test
@@ -209,33 +177,15 @@ class ChecklistServiceTest {
     void shouldRejectWhenCatalogItemDoesNotExist() {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
+                .willReturn(checklistOwnedBy(OWNER_ID));
         given(catalogService.findItems(anyCollection())).willReturn(List.of(contractItem()));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID, 999L)))
+        assertThatThrownBy(() -> checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID, 999L)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.INVALID_REQUEST);
-        then(checklistItemRepository).should(never()).saveAll(anyList());
-    }
-
-    @Test
-    @DisplayName("이미 추가된 준비 항목이라 UNIQUE 제약을 위반하면 중복 오류로 변환한다")
-    void shouldConvertUniqueConstraintViolationToDuplicateChecklistItemError() {
-        // given
-        given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
-        given(catalogService.findItems(anyCollection())).willReturn(List.of(contractItem()));
-        willThrow(new DataIntegrityViolationException("duplicate checklist item"))
-                .given(checklistItemRepository)
-                .saveAll(anyList());
-
-        // when, then
-        assertThatThrownBy(() -> checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);
+        then(checklistRepository).should(never()).saveItems(any(Checklist.class), anyList());
     }
 
     @Test
@@ -243,13 +193,12 @@ class ChecklistServiceTest {
     void shouldWriteCustomItemToChecklist() {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
-        given(catalogService.existsCategory(CATEGORY_ID)).willReturn(true);
-        given(checklistItemRepository.save(any(ChecklistItem.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
+                .willReturn(checklistOwnedBy(OWNER_ID));
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
+        ChecklistItemResult result = checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
 
         // then
         assertThat(result)
@@ -271,11 +220,11 @@ class ChecklistServiceTest {
                 .getByOwnerId(OWNER_ID);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID))
+        assertThatThrownBy(() -> checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
-        then(checklistItemRepository).should(never()).save(any(ChecklistItem.class));
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
     @Test
@@ -283,31 +232,35 @@ class ChecklistServiceTest {
     void shouldRejectWriteWhenCategoryDoesNotExist() {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
-        given(catalogService.existsCategory(999L)).willReturn(false);
+                .willReturn(checklistOwnedBy(OWNER_ID));
+        willThrow(new BusinessException(ClientError.CATEGORY_NOT_FOUND, "not found"))
+                .given(catalogService)
+                .validateCategoryExists(999L);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", 999L))
+        assertThatThrownBy(() -> checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", 999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
-        then(checklistItemRepository).should(never()).save(any(ChecklistItem.class));
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
     @Test
-    @DisplayName("일정, 할 일, 체크리스트 순서로 삭제한다")
-    void shouldDeleteChecklistDataInForeignKeyOrder() {
-        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID);
+    @DisplayName("연결된 일정을 먼저 삭제한 뒤 체크리스트를 통째로 삭제한다")
+    void shouldDeleteAppointmentsBeforeChecklist() {
         List<Long> checklistItemIds = List.of(100L, 101L);
+        Checklist checklist = new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(item(100L), item(101L))
+        );
         given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.of(checklist));
-        given(checklistItemRepository.findIdsByChecklistId(CHECKLIST_ID)).willReturn(checklistItemIds);
 
         checklistService.deleteByOwnerId(OWNER_ID);
 
-        InOrder order = inOrder(checklistAppointmentDeleteService, checklistItemRepository, checklistRepository);
+        InOrder order = inOrder(checklistAppointmentDeleteService, checklistRepository);
         order.verify(checklistAppointmentDeleteService).deleteAllByChecklistItemIds(checklistItemIds);
-        order.verify(checklistItemRepository).deleteAllByChecklistId(CHECKLIST_ID);
-        order.verify(checklistRepository).deleteById(CHECKLIST_ID);
+        order.verify(checklistRepository).delete(checklist);
     }
 
     @Test
@@ -317,7 +270,17 @@ class ChecklistServiceTest {
 
         checklistService.deleteByOwnerId(OWNER_ID);
 
-        then(checklistItemRepository).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).delete(any(Checklist.class));
         then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+    }
+
+    private static ChecklistItem item(Long id) {
+        return new ChecklistItem(
+                id,
+                CATEGORY_ID,
+                "계약서 확인",
+                null,
+                ChecklistItemStatus.PREV
+        );
     }
 }

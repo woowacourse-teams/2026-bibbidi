@@ -12,6 +12,13 @@ public interface JpaChecklistRepository extends JpaRepository<JpaChecklistEntity
 
     Optional<JpaChecklistEntity> findByOwnerId(Long ownerId);
 
+    @Query("""
+            SELECT item.checklist
+            FROM JpaChecklistItemEntity item
+            WHERE item.id = :checklistItemId
+            """)
+    Optional<JpaChecklistEntity> findByChecklistItemId(@Param("checklistItemId") Long checklistItemId);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM JpaChecklistEntity checklist WHERE checklist.id = :checklistId")
     int deleteByChecklistId(@Param("checklistId") Long checklistId);

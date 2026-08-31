@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.catalog.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
@@ -11,6 +12,8 @@ import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,5 +62,25 @@ class CatalogRepositoryTest {
                 .extracting(Item::id)
                 .containsExactly(item.id());
         assertThat(catalog.categories().getLast().steps()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("존재하는 카테고리의 검증을 통과시킨다")
+    void shouldValidateExistingCategory() {
+        // given
+        JpaCategoryEntity category = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+
+        // when, then
+        catalogRepository.validateCategoryExists(category.id());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 카테고리 검증에서 오류를 던진다")
+    void shouldThrowWhenCategoryDoesNotExist() {
+        // when, then
+        assertThatThrownBy(() -> catalogRepository.validateCategoryExists(999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
     }
 }
