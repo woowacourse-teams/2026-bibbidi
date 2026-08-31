@@ -99,6 +99,46 @@ class AppointmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("할 일에 완료하지 않은 일정이 하나라도 있으면 남은 일정이 있다고 판단한다")
+    void shouldFindRemainingAppointmentWhenAnyAppointmentIsNotDone() {
+        saveDoneAppointment(10L, "이미 끝낸 일정");
+        saveAppointment(10L, "아직 안 끝낸 일정");
+
+        boolean hasRemaining = appointmentRepository.existsRemainingByChecklistItemId(10L);
+
+        assertThat(hasRemaining).isTrue();
+    }
+
+    @Test
+    @DisplayName("할 일의 일정이 모두 완료되었으면 남은 일정이 없다고 판단한다")
+    void shouldNotFindRemainingAppointmentWhenEveryAppointmentIsDone() {
+        saveDoneAppointment(10L, "첫 번째로 끝낸 일정");
+        saveDoneAppointment(10L, "두 번째로 끝낸 일정");
+
+        boolean hasRemaining = appointmentRepository.existsRemainingByChecklistItemId(10L);
+
+        assertThat(hasRemaining).isFalse();
+    }
+
+    @Test
+    @DisplayName("할 일에 일정이 하나도 없으면 남은 일정이 없다고 판단한다")
+    void shouldNotFindRemainingAppointmentWhenChecklistItemHasNoAppointment() {
+        boolean hasRemaining = appointmentRepository.existsRemainingByChecklistItemId(10L);
+
+        assertThat(hasRemaining).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 할 일에 달린 미완료 일정은 남은 일정으로 세지 않는다")
+    void shouldNotCountRemainingAppointmentOfOtherChecklistItem() {
+        saveAppointment(20L, "다른 할 일의 일정");
+
+        boolean hasRemaining = appointmentRepository.existsRemainingByChecklistItemId(10L);
+
+        assertThat(hasRemaining).isFalse();
+    }
+
+    @Test
     void shouldDeleteAppointment() {
         Appointment testAppointment = new Appointment(
                 null,
@@ -241,6 +281,20 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 false
+        ));
+    }
+
+    private Appointment saveDoneAppointment(Long checklistItemId, String title) {
+        return appointmentRepository.save(new Appointment(
+                null,
+                checklistItemId,
+                title,
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null,
+                true
         ));
     }
 

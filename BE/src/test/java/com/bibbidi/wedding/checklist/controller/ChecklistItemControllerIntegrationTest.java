@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,12 +54,14 @@ class ChecklistItemControllerIntegrationTest {
     private static final String CHANGE_CATEGORY_URL = "/api/checklist-items/{itemId}/category";
     private static final String CHANGE_TITLE_URL = "/api/checklist-items/{itemId}/title";
     private static final String DELETE_ITEM_URL = "/api/checklist-items/{itemId}";
+    private static final String REMAINING_APPOINTMENTS_URL = "/api/checklist-items/{itemId}/remaining-appointments";
     private static final Long USER_ID = 7L;
     private static final Long CUSTOM_ITEM_ID = 500L;
     private static final Long CATALOG_SOURCED_ITEM_ID = 501L;
     private static final Long DONE_CUSTOM_ITEM_ID = 502L;
     private static final Long OTHER_USERS_ITEM_ID = 503L;
     private static final Long CONTINUE_CUSTOM_ITEM_ID = 504L;
+    private static final Long ALL_APPOINTMENTS_DONE_ITEM_ID = 505L;
     private static final Long CURRENT_CATEGORY_ID = 2L;
     private static final Long NEW_CATEGORY_ID = 3L;
     private static final Long SOURCE_CATALOG_ITEM_ID = 100L;
@@ -80,6 +83,10 @@ class ChecklistItemControllerIntegrationTest {
     private static final String CHANGE_TITLE_DESCRIPTION =
             "직접 만든 할 일의 제목만 바꿉니다. 카테고리와 완료 상태, 연결된 일정은 그대로 유지합니다. "
                     + "준비 목록에서 추가한 할 일은 원본 제목을 따라야 하므로 변경할 수 없습니다.";
+    private static final String REMAINING_APPOINTMENTS_SUMMARY = "할 일에 남은 일정 확인";
+    private static final String REMAINING_APPOINTMENTS_DESCRIPTION =
+            "할 일에 아직 완료하지 않은 일정이 남아 있는지 알려줍니다. "
+                    + "이미 완료한 일정은 세지 않으므로, 일정이 있어도 모두 완료했다면 false 입니다.";
     private static final String DELETE_ITEM_SUMMARY = "미완료 할 일 삭제";
     private static final String DELETE_ITEM_DESCRIPTION =
             "자신이 소유한 미완료 할 일과 연결된 일정을 함께 삭제합니다. "
@@ -121,6 +128,92 @@ class ChecklistItemControllerIntegrationTest {
 
     private String titleRequestBody(String title) {
         return objectMapper.writeValueAsString(new ChangeChecklistItemTitleRequest(title));
+    }
+
+    @Test
+    @DisplayName("완료하지 않은 일정이 남아 있으면 남은 일정이 있다고 응답한다")
+    void shouldReportRemainingAppointmentsWhenAppointmentIsNotDone() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasRemainingAppointments").value(true))
+                .andDo(document(
+                        "checklist-items-remaining-appointments",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(REMAINING_APPOINTMENTS_SUMMARY)
+                                .description(REMAINING_APPOINTMENTS_DESCRIPTION)
+                                .responseSchema(schema("RemainingAppointmentResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("남은 일정을 확인할 할 일 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("hasRemainingAppointments")
+                                                .description("완료하지 않은 일정이 남아 있는지 여부")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("일정을 모두 완료한 할 일은 남은 일정이 없다고 응답한다")
+    void shouldReportNoRemainingAppointmentsWhenEveryAppointmentIsDone() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasRemainingAppointments").value(false));
+    }
+
+    @Test
+    @DisplayName("일정이 하나도 없는 할 일은 남은 일정이 없다고 응답한다")
+    void shouldReportNoRemainingAppointmentsWhenItemHasNoAppointment() throws Exception {
+        // given
+        jpaAppointmentRepository.deleteAllByChecklistItemIds(List.of(CUSTOM_ITEM_ID));
+
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasRemainingAppointments").value(false));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 남은 일정을 확인할 수 없다")
+    void shouldRejectRemainingAppointmentsLookupForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 남은 일정을 확인할 수 없다")
+    void shouldRejectRemainingAppointmentsLookupWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 남은 일정을 확인할 수 없다")
+    void shouldRequireAuthenticationToLookUpRemainingAppointments() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 
     @Test

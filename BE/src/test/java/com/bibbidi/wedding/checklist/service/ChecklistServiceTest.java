@@ -40,6 +40,7 @@ class ChecklistServiceTest {
 
     private static final Long OWNER_ID = 1L;
     private static final Long CHECKLIST_ID = 10L;
+    private static final Long OTHER_OWNER_ID = 2L;
     private static final Long CATEGORY_ID = 2L;
     private static final Long CONTRACT_ITEM_ID = 100L;
     private static final Long ESTIMATE_ITEM_ID = 101L;
@@ -353,6 +354,38 @@ class ChecklistServiceTest {
         checklistService.deleteByOwnerId(OWNER_ID);
 
         then(checklistRepository).should(never()).delete(any(Checklist.class));
+        then(checklistAppointmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("남은 일정 조회는 소유권을 확인한 뒤 일정 쪽 판단을 그대로 돌려준다")
+    void shouldReturnRemainingAppointmentResultAfterOwnershipCheck() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        given(checklistAppointmentService.hasRemainingAppointment(item.id())).willReturn(true);
+
+        // when
+        boolean hasRemaining = checklistService.hasRemainingAppointments(OWNER_ID, item.id());
+
+        // then
+        assertThat(hasRemaining).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 남은 일정을 조회할 수 없다")
+    void shouldRejectRemainingAppointmentLookupForOtherUsersItem() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.hasRemainingAppointments(OTHER_OWNER_ID, item.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
         then(checklistAppointmentService).shouldHaveNoInteractions();
     }
 
