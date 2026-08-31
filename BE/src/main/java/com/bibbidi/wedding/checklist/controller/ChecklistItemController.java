@@ -4,7 +4,6 @@ import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
-import com.bibbidi.wedding.checklist.service.ChecklistItemDeletionService;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import jakarta.validation.Valid;
@@ -20,14 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChecklistItemController {
 
     private final ChecklistService checklistService;
-    private final ChecklistItemDeletionService checklistItemDeletionService;
 
-    public ChecklistItemController(
-            ChecklistService checklistService,
-            ChecklistItemDeletionService checklistItemDeletionService
-    ) {
+    public ChecklistItemController(ChecklistService checklistService) {
         this.checklistService = checklistService;
-        this.checklistItemDeletionService = checklistItemDeletionService;
     }
 
     @PutMapping("/api/checklist-items/{itemId}/category")
@@ -66,6 +60,6 @@ public class ChecklistItemController {
             @Auth Long userId,
             @PathVariable Long itemId
     ) {
-        checklistItemDeletionService.delete(userId, itemId);
+        checklistService.deleteItem(userId, itemId);
     }
 }
