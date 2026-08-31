@@ -32,6 +32,13 @@ public final class Checklist {
         return item.changeTitle(title);
     }
 
+    public ChecklistItem completeItem(Long ownerId, Long checklistItemId) {
+        validateOwnedBy(ownerId);
+        ChecklistItem item = item(checklistItemId);
+
+        return item.complete();
+    }
+
     public ChecklistItem deletableItem(Long ownerId, Long checklistItemId) {
         validateOwnedBy(ownerId);
         ChecklistItem item = item(checklistItemId);
