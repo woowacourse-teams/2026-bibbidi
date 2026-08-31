@@ -10,12 +10,14 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class ChecklistItemRepository {
 
     private static final String CHECKLIST_ITEM_NOT_FOUND_MESSAGE = "할 일을 찾을 수 없습니다. checklistItemId=";
+    private static final String DUPLICATE_CHECKLIST_ITEM_MESSAGE = "이미 추가된 준비 항목이 포함되었습니다. checklistId=";
 
     private final JpaChecklistItemRepository jpaChecklistItemRepository;
     private final ChecklistMapper checklistMapper;
@@ -60,9 +62,18 @@ public class ChecklistItemRepository {
 
     public ChecklistItem save(ChecklistItem checklistItem) {
         JpaChecklistItemEntity entity = checklistMapper.toEntity(checklistItem, referenceOf(checklistItem));
-        JpaChecklistItemEntity saved = jpaChecklistItemRepository.saveAndFlush(entity);
 
-        return checklistMapper.toDomain(saved);
+        try {
+            JpaChecklistItemEntity saved = jpaChecklistItemRepository.saveAndFlush(entity);
+
+            return checklistMapper.toDomain(saved);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST_ITEM,
+                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistItem.checklist().id()
+                            + ", catalogItemId=" + checklistItem.sourceCatalogItemId()
+            );
+        }
     }
 
     public List<ChecklistItem> saveAll(List<ChecklistItem> checklistItems) {
@@ -70,9 +81,25 @@ public class ChecklistItemRepository {
                 .map(item -> checklistMapper.toEntity(item, referenceOf(item)))
                 .toList();
 
-        return jpaChecklistItemRepository.saveAllAndFlush(entities).stream()
-                .map(checklistMapper::toDomain)
-                .toList();
+        try {
+            return jpaChecklistItemRepository.saveAllAndFlush(entities).stream()
+                    .map(checklistMapper::toDomain)
+                    .toList();
+        } catch (DataIntegrityViolationException exception) {
+            List<Long> catalogItemIds = checklistItems.stream()
+                    .map(ChecklistItem::sourceCatalogItemId)
+                    .toList();
+
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST_ITEM,
+                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistIdOf(checklistItems)
+                            + ", catalogItemIds=" + catalogItemIds
+            );
+        }
+    }
+
+    private Long checklistIdOf(List<ChecklistItem> checklistItems) {
+        return checklistItems.getFirst().checklist().id();
     }
 
     public void deleteById(Long checklistItemId) {

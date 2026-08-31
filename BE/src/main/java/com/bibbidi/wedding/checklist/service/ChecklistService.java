@@ -16,14 +16,11 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChecklistService {
-
-    private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
 
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
@@ -44,22 +41,9 @@ public class ChecklistService {
 
     @Transactional
     public ChecklistCreationResult create(Long ownerId) {
-        if (checklistRepository.existsByOwnerId(ownerId)) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST,
-                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
-            );
-        }
+        Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
 
-        try {
-            Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
-            return ChecklistCreationResult.from(checklist);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST,
-                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
-            );
-        }
+        return ChecklistCreationResult.from(checklist);
     }
 
     @Transactional
@@ -68,15 +52,7 @@ public class ChecklistService {
 
         List<ChecklistItem> candidates = selectCatalogItems(checklist, catalogItemIds);
 
-        try {
-            return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(candidates));
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_CHECKLIST_ITEM,
-                    "이미 추가된 준비 항목이 포함되었습니다. checklistId=" + checklist.id()
-                            + ", catalogItemIds=" + catalogItemIds
-            );
-        }
+        return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(candidates));
     }
 
     @Transactional

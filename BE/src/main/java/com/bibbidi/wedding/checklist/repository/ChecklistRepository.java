@@ -6,12 +6,14 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class ChecklistRepository {
 
     private static final String CHECKLIST_NOT_FOUND_MESSAGE = "현재 사용자 계정에 속한 체크리스트를 찾을 수 없습니다. ownerId=";
+    private static final String DUPLICATE_CHECKLIST_MESSAGE = "체크리스트 중복 생성에 실패했습니다. ownerId=";
 
     private final JpaChecklistRepository jpaChecklistRepository;
     private final ChecklistMapper checklistMapper;
@@ -24,15 +26,20 @@ public class ChecklistRepository {
         this.checklistMapper = checklistMapper;
     }
 
-    public boolean existsByOwnerId(Long ownerId) {
-        return jpaChecklistRepository.existsByOwnerId(ownerId);
-    }
-
     public Checklist save(Checklist checklist) {
+        validateNotDuplicated(checklist.ownerId());
         JpaChecklistEntity entity = checklistMapper.toEntity(checklist);
-        JpaChecklistEntity saved = jpaChecklistRepository.saveAndFlush(entity);
 
-        return checklistMapper.toDomain(saved);
+        try {
+            JpaChecklistEntity saved = jpaChecklistRepository.saveAndFlush(entity);
+
+            return checklistMapper.toDomain(saved);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST,
+                    DUPLICATE_CHECKLIST_MESSAGE + checklist.ownerId()
+            );
+        }
     }
 
     public Checklist getByOwnerId(Long ownerId) {
@@ -50,5 +57,14 @@ public class ChecklistRepository {
 
     public int deleteById(Long checklistId) {
         return jpaChecklistRepository.deleteByChecklistId(checklistId);
+    }
+
+    private void validateNotDuplicated(Long ownerId) {
+        if (jpaChecklistRepository.existsByOwnerId(ownerId)) {
+            throw new BusinessException(
+                    ClientError.DUPLICATE_CHECKLIST,
+                    DUPLICATE_CHECKLIST_MESSAGE + ownerId
+            );
+        }
     }
 }

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
@@ -203,14 +202,32 @@ class ChecklistItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("같은 체크리스트에 같은 준비 항목을 두 번 저장하면 UNIQUE 제약을 위반한다")
-    void shouldViolateUniqueConstraintWhenSameCatalogItemSavedTwice() {
+    @DisplayName("같은 체크리스트에 같은 준비 항목을 두 번 저장하면 중복 준비 항목 오류를 던진다")
+    void shouldRejectSaveWhenSameCatalogItemSavedTwice() {
         // given
         saveItem(checklist, 100L);
 
         // when, then
         assertThatThrownBy(() -> saveItem(checklist, 100L))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);
+    }
+
+    @Test
+    @DisplayName("이미 추가된 준비 항목이 포함된 채로 한 번에 저장하면 중복 준비 항목 오류를 던진다")
+    void shouldRejectSaveAllWhenCatalogItemAlreadyAdded() {
+        // given
+        saveItem(checklist, 100L);
+        List<ChecklistItem> items = List.of(
+                new ChecklistItem(null, checklist, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
+        );
+
+        // when, then
+        assertThatThrownBy(() -> checklistItemRepository.saveAll(items))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);
     }
 
     @Test

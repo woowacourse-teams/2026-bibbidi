@@ -48,14 +48,17 @@ class ChecklistRepositoryTest {
     }
 
     @Test
-    @DisplayName("소유자별로 체크리스트 존재 여부를 판단한다")
-    void shouldDecideWhetherOwnerHasChecklist() {
+    @DisplayName("소유자의 체크리스트가 이미 있으면 중복 체크리스트 오류를 던진다")
+    void shouldRejectSaveWhenOwnerAlreadyHasChecklist() {
         // given
         checklistRepository.save(new Checklist(null, OWNER_ID));
 
         // when, then
-        assertThat(checklistRepository.existsByOwnerId(OWNER_ID)).isTrue();
-        assertThat(checklistRepository.existsByOwnerId(2L)).isFalse();
+        assertThatThrownBy(() -> checklistRepository.save(new Checklist(null, OWNER_ID)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_CHECKLIST);
+        assertThat(jpaChecklistRepository.findAll()).hasSize(1);
     }
 
     @Test
