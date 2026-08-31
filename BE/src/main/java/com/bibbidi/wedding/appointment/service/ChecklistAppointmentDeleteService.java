@@ -15,6 +15,11 @@ public class ChecklistAppointmentDeleteService {
     }
 
     @Transactional
+    public void deleteAllByChecklistItemId(Long checklistItemId) {
+        appointmentRepository.deleteAllByChecklistItemIds(List.of(checklistItemId));
+    }
+
+    @Transactional
     public void deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
         if (checklistItemIds.isEmpty()) {
             return;
