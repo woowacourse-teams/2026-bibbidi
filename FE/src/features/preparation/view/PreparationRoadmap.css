@@ -395,7 +395,7 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    padding: 16px 24px;
+    padding: 16px 24px 0;
   }
 
   .preparation-roadmap__category-list {
@@ -451,7 +451,7 @@
 
 @media (max-width: 760px) {
   .preparation-roadmap__categories {
-    padding: 12px 16px;
+    padding: 12px 16px 0;
   }
 
   .preparation-roadmap__category--current {
