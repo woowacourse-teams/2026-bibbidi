@@ -52,7 +52,7 @@ class ChecklistControllerTest {
     @DisplayName("인증된 사용자의 요청에 생성된 체크리스트 식별자를 응답한다")
     void shouldRespondCreatedChecklistId() throws Exception {
         // given
-        when(checklistService.createChecklist(USER_ID)).thenReturn(new ChecklistCreationResult(10L));
+        when(checklistService.create(USER_ID)).thenReturn(new ChecklistCreationResult(10L));
 
         // when, then
         mockMvc.perform(post("/api/checklists").session(authenticatedSession()))
@@ -64,7 +64,7 @@ class ChecklistControllerTest {
     @DisplayName("이미 체크리스트를 가진 사용자의 생성 요청을 중복 오류로 응답한다")
     void shouldRespondConflictWhenChecklistAlreadyExists() throws Exception {
         // given
-        when(checklistService.createChecklist(USER_ID)).thenThrow(new BusinessException(
+        when(checklistService.create(USER_ID)).thenThrow(new BusinessException(
                 ClientError.DUPLICATE_CHECKLIST,
                 "체크리스트 중복 생성에 실패했습니다. ownerId=" + USER_ID
         ));

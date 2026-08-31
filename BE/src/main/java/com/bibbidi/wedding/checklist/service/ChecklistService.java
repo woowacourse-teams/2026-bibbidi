@@ -32,7 +32,7 @@ public class ChecklistService {
     }
 
     @Transactional
-    public ChecklistCreationResult createChecklist(Long ownerId) {
+    public ChecklistCreationResult create(Long ownerId) {
         Checklist checklist = new Checklist(null, ownerId, List.of());
         Checklist saved = checklistRepository.save(checklist);
 

@@ -29,7 +29,7 @@ public class ChecklistController {
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklists")
     public ChecklistCreationResponse create(@Auth Long userId) {
-        ChecklistCreationResult result = checklistService.createChecklist(userId);
+        ChecklistCreationResult result = checklistService.create(userId);
         return ChecklistCreationResponse.from(result);
     }
 

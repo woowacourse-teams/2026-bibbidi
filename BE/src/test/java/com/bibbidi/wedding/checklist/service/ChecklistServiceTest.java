@@ -74,12 +74,12 @@ class ChecklistServiceTest {
 
     @Test
     @DisplayName("소유자 ID로 빈 체크리스트를 생성한다")
-    void shouldCreateChecklistForOwner() {
+    void shouldCreateForOwner() {
         // given
         given(checklistRepository.save(any(Checklist.class))).willReturn(new Checklist(10L, 1L, List.of()));
 
         // when
-        ChecklistCreationResult result = checklistService.createChecklist(1L);
+        ChecklistCreationResult result = checklistService.create(1L);
 
         // then
         assertThat(result).isEqualTo(new ChecklistCreationResult(10L));

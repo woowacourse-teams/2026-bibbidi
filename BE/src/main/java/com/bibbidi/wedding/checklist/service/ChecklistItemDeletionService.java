@@ -20,11 +20,12 @@ public class ChecklistItemDeletionService {
     @Transactional
     public void delete(Long ownerId, Long checklistItemId) {
         checklistRepository.findByChecklistItemId(checklistItemId)
-                .ifPresent(checklist -> {
-                    ChecklistItem item = checklist.deletableItem(ownerId, checklistItemId);
+                .map(checklist -> checklist.deletableItem(ownerId, checklistItemId))
+                .ifPresent(this::deleteItemWithAppointments);
+    }
 
-                    appointmentDeleteService.deleteAllByChecklistItemId(checklistItemId);
-                    checklistRepository.deleteItem(item);
-                });
+    private void deleteItemWithAppointments(ChecklistItem item) {
+        appointmentDeleteService.deleteAllByChecklistItemId(item.id());
+        checklistRepository.deleteItem(item);
     }
 }
