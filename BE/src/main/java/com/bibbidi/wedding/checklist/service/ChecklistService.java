@@ -83,7 +83,7 @@ public class ChecklistService {
     public ChecklistItemResult writeItem(Long ownerId, String title, Long categoryId) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        validateCategoryExists(categoryId);
+        catalogService.validateCategoryExists(categoryId);
 
         ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
                 null,
@@ -105,7 +105,7 @@ public class ChecklistService {
     ) {
         ChecklistItem item = checklistItemRepository.getById(checklistItemId);
 
-        validateCategoryExists(categoryId);
+        catalogService.validateCategoryExists(categoryId);
 
         ChecklistItem changed = checklistItemRepository.save(item.changeCategory(ownerId, categoryId));
 
@@ -143,15 +143,6 @@ public class ChecklistService {
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
         checklistItemRepository.deleteAllByChecklistId(checklist.id());
         checklistRepository.deleteById(checklist.id());
-    }
-
-    private void validateCategoryExists(Long categoryId) {
-        if (!catalogService.existsCategory(categoryId)) {
-            throw new BusinessException(
-                    ClientError.CATEGORY_NOT_FOUND,
-                    "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
-            );
-        }
     }
 
     private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {

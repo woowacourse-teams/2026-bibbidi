@@ -244,7 +244,6 @@ class ChecklistServiceTest {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
-        given(catalogService.existsCategory(CATEGORY_ID)).willReturn(true);
         given(checklistItemRepository.save(any(ChecklistItem.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -284,7 +283,9 @@ class ChecklistServiceTest {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID));
-        given(catalogService.existsCategory(999L)).willReturn(false);
+        willThrow(new BusinessException(ClientError.CATEGORY_NOT_FOUND, "카테고리 없음"))
+                .given(catalogService)
+                .validateCategoryExists(999L);
 
         // when, then
         assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", 999L))
