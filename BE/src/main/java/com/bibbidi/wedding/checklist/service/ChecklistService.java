@@ -94,6 +94,13 @@ public class ChecklistService {
         checklist.validateOwnedBy(ownerId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasRemainingAppointments(Long ownerId, Long checklistItemId) {
+        validateItemOwnership(checklistItemId, ownerId);
+
+        return checklistAppointmentService.hasRemainingAppointment(checklistItemId);
+    }
+
     @Transactional
     public void deleteItem(Long ownerId, Long checklistItemId) {
         checklistRepository.findByChecklistItemId(checklistItemId)
