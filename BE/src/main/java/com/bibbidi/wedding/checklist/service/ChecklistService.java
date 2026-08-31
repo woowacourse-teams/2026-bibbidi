@@ -25,57 +25,51 @@ public class ChecklistService {
     private final CatalogService catalogService;
     private final ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
 
-    public ChecklistService(
-            ChecklistRepository checklistRepository,
-            CatalogService catalogService,
-            ChecklistAppointmentDeleteService checklistAppointmentDeleteService
-    ) {
+    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService, ChecklistAppointmentDeleteService checklistAppointmentDeleteService) {
         this.checklistRepository = checklistRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentDeleteService = checklistAppointmentDeleteService;
     }
 
     @Transactional
-    public ChecklistCreationResult create(Long ownerId) {
-        Checklist checklist = checklistRepository.save(new Checklist(null, ownerId, List.of()));
+    public ChecklistCreationResult createChecklist(Long ownerId) {
+        Checklist checklist = new Checklist(null, ownerId, List.of());
+        Checklist saved = checklistRepository.save(checklist);
 
-        return ChecklistCreationResult.from(checklist);
+        return ChecklistCreationResult.from(saved);
     }
 
     @Transactional
-    public CatalogItemAdditionResult addCatalogItems(Long ownerId, List<Long> catalogItemIds) {
+    public CatalogItemAdditionResult addItemsFromCatalog(Long ownerId, List<Long> catalogItemIds) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        List<ChecklistItem> candidates = selectCatalogItems(catalogItemIds);
+        List<ChecklistItem> items = copyFromCatalog(catalogItemIds);
+        List<ChecklistItem> saved = checklistRepository.saveItems(checklist, items);
 
-        return CatalogItemAdditionResult.from(checklistRepository.saveItems(checklist, candidates));
+        return CatalogItemAdditionResult.from(saved);
     }
 
     @Transactional
-    public ChecklistItemResult writeItem(Long ownerId, String title, Long categoryId) {
+    public ChecklistItemResult addCustomItem(Long ownerId, String title, Long categoryId) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
         catalogService.validateCategoryExists(categoryId);
 
-        ChecklistItem item = checklistRepository.saveItem(checklist, new ChecklistItem(
+        ChecklistItem checklistItem = new ChecklistItem(
                 null,
                 categoryId,
                 title,
                 null,
                 ChecklistItemStatus.PREV
-        ));
+        );
+        ChecklistItem saved = checklistRepository.saveItem(checklist, checklistItem);
 
-        return ChecklistItemResult.from(item);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional
-    public ChecklistItemResult changeItemCategory(
-            Long ownerId,
-            Long checklistItemId,
-            Long categoryId
-    ) {
+    public ChecklistItemResult changeItemCategory(Long ownerId, Long checklistItemId, Long categoryId) {
         Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
-
         catalogService.validateCategoryExists(categoryId);
 
         ChecklistItem changed = checklist.changeItemCategory(ownerId, checklistItemId, categoryId);
@@ -85,11 +79,7 @@ public class ChecklistService {
     }
 
     @Transactional
-    public ChecklistItemResult changeItemTitle(
-            Long ownerId,
-            Long checklistItemId,
-            String title
-    ) {
+    public ChecklistItemResult changeItemTitle(Long ownerId, Long checklistItemId, String title) {
         Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
 
         ChecklistItem changed = checklist.changeItemTitle(ownerId, checklistItemId, title);
@@ -117,7 +107,7 @@ public class ChecklistService {
         checklistRepository.delete(checklist);
     }
 
-    private List<ChecklistItem> selectCatalogItems(List<Long> catalogItemIds) {
+    private List<ChecklistItem> copyFromCatalog(List<Long> catalogItemIds) {
         Set<Long> requestedIds = new LinkedHashSet<>(catalogItemIds);
         List<CatalogItemSnapshot> catalogItems = catalogService.findItems(requestedIds);
 

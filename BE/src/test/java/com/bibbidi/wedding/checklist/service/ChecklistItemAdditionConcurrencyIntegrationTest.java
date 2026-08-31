@@ -67,7 +67,7 @@ class ChecklistItemAdditionConcurrencyIntegrationTest {
         start.await();
 
         try {
-            checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID));
+            checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID));
             return true;
         } catch (BusinessException exception) {
             assertThat(exception.clientError()).isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);

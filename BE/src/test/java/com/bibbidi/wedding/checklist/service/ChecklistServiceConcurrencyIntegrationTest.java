@@ -44,8 +44,8 @@ class ChecklistServiceConcurrencyIntegrationTest {
 
         // when
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<Boolean> first = executor.submit(() -> tryCreate(ready, start));
-            Future<Boolean> second = executor.submit(() -> tryCreate(ready, start));
+            Future<Boolean> first = executor.submit(() -> tryCreateChecklist(ready, start));
+            Future<Boolean> second = executor.submit(() -> tryCreateChecklist(ready, start));
 
             boolean allRequestsAreReady = ready.await(5, TimeUnit.SECONDS);
             start.countDown();
@@ -64,12 +64,12 @@ class ChecklistServiceConcurrencyIntegrationTest {
         assertThat(jpaChecklistRepository.findAll().getFirst().ownerId()).isEqualTo(OWNER_ID);
     }
 
-    private boolean tryCreate(CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+    private boolean tryCreateChecklist(CountDownLatch ready, CountDownLatch start) throws InterruptedException {
         ready.countDown();
         start.await();
 
         try {
-            checklistService.create(OWNER_ID);
+            checklistService.createChecklist(OWNER_ID);
             return true;
         } catch (BusinessException exception) {
             assertThat(exception.clientError()).isEqualTo(ClientError.DUPLICATE_CHECKLIST);

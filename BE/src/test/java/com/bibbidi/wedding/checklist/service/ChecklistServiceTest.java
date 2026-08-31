@@ -72,29 +72,14 @@ class ChecklistServiceTest {
         return new CatalogItemSnapshot(ESTIMATE_ITEM_ID, CATEGORY_ID, "견적 비교");
     }
 
-    private static Checklist checklistOwnedBy(Long ownerId) {
-        return new Checklist(CHECKLIST_ID, ownerId, List.of(item(200L)));
-    }
-
-    private static ChecklistItem item(Long id) {
-        return new ChecklistItem(
-                id,
-                CATEGORY_ID,
-                "계약서 확인",
-                null,
-                ChecklistItemStatus.PREV
-        );
-    }
-
     @Test
     @DisplayName("소유자 ID로 빈 체크리스트를 생성한다")
     void shouldCreateChecklistForOwner() {
         // given
-        given(checklistRepository.save(any(Checklist.class)))
-                .willReturn(new Checklist(10L, 1L, List.of()));
+        given(checklistRepository.save(any(Checklist.class))).willReturn(new Checklist(10L, 1L, List.of()));
 
         // when
-        ChecklistCreationResult result = checklistService.create(1L);
+        ChecklistCreationResult result = checklistService.createChecklist(1L);
 
         // then
         assertThat(result).isEqualTo(new ChecklistCreationResult(10L));
@@ -140,6 +125,10 @@ class ChecklistServiceTest {
                 .isEqualTo(ClientError.CHECKLIST_ITEM_NOT_FOUND);
     }
 
+    private static Checklist checklistOwnedBy(Long ownerId) {
+        return new Checklist(CHECKLIST_ID, ownerId, List.of(item(200L)));
+    }
+
     @Test
     @DisplayName("선택한 준비 항목을 사용자의 체크리스트에 할 일로 추가한다")
     void shouldAddSelectedCatalogItemsToChecklist() {
@@ -152,7 +141,7 @@ class ChecklistServiceTest {
 
         // when
         CatalogItemAdditionResult result =
-                checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID, ESTIMATE_ITEM_ID));
+                checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID, ESTIMATE_ITEM_ID));
 
         // then
         assertThat(result.items())
@@ -176,7 +165,7 @@ class ChecklistServiceTest {
                 .getByOwnerId(OWNER_ID);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID)))
+        assertThatThrownBy(() -> checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
@@ -192,7 +181,7 @@ class ChecklistServiceTest {
         given(catalogService.findItems(anyCollection())).willReturn(List.of(contractItem()));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.addCatalogItems(OWNER_ID, List.of(CONTRACT_ITEM_ID, 999L)))
+        assertThatThrownBy(() -> checklistService.addItemsFromCatalog(OWNER_ID, List.of(CONTRACT_ITEM_ID, 999L)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.INVALID_REQUEST);
@@ -209,7 +198,7 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
+        ChecklistItemResult result = checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID);
 
         // then
         assertThat(result)
@@ -231,7 +220,7 @@ class ChecklistServiceTest {
                 .getByOwnerId(OWNER_ID);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID))
+        assertThatThrownBy(() -> checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", CATEGORY_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_NOT_FOUND);
@@ -244,12 +233,12 @@ class ChecklistServiceTest {
         // given
         given(checklistRepository.getByOwnerId(OWNER_ID))
                 .willReturn(checklistOwnedBy(OWNER_ID));
-        willThrow(new BusinessException(ClientError.CATEGORY_NOT_FOUND, "카테고리 없음"))
+        willThrow(new BusinessException(ClientError.CATEGORY_NOT_FOUND, "not found"))
                 .given(catalogService)
                 .validateCategoryExists(999L);
 
         // when, then
-        assertThatThrownBy(() -> checklistService.writeItem(OWNER_ID, "청첩장 문구 정하기", 999L))
+        assertThatThrownBy(() -> checklistService.addCustomItem(OWNER_ID, "청첩장 문구 정하기", 999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
@@ -283,5 +272,15 @@ class ChecklistServiceTest {
 
         then(checklistRepository).should(never()).delete(any(Checklist.class));
         then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+    }
+
+    private static ChecklistItem item(Long id) {
+        return new ChecklistItem(
+                id,
+                CATEGORY_ID,
+                "계약서 확인",
+                null,
+                ChecklistItemStatus.PREV
+        );
     }
 }

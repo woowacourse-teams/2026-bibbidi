@@ -29,31 +29,21 @@ public class ChecklistController {
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklists")
     public ChecklistCreationResponse create(@Auth Long userId) {
-        ChecklistCreationResult result = checklistService.create(userId);
+        ChecklistCreationResult result = checklistService.createChecklist(userId);
         return ChecklistCreationResponse.from(result);
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklists/me/catalog-items")
-    public AddCatalogItemsResponse addCatalogItems(
-            @Auth Long userId,
-            @Valid @RequestBody AddCatalogItemsRequest request
-    ) {
-        CatalogItemAdditionResult result = checklistService.addCatalogItems(userId, request.catalogItemIds());
+    public AddCatalogItemsResponse addItemsFromCatalog(@Auth Long userId, @Valid @RequestBody AddCatalogItemsRequest request) {
+        CatalogItemAdditionResult result = checklistService.addItemsFromCatalog(userId, request.catalogItemIds());
         return AddCatalogItemsResponse.from(result);
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklists/me/items")
-    public ChecklistItemResponse writeItem(
-            @Auth Long userId,
-            @Valid @RequestBody CreateChecklistItemRequest request
-    ) {
-        ChecklistItemResult result = checklistService.writeItem(
-                userId,
-                request.title(),
-                request.categoryId()
-        );
+    public ChecklistItemResponse addCustomItem(@Auth Long userId, @Valid @RequestBody CreateChecklistItemRequest request) {
+        ChecklistItemResult result = checklistService.addCustomItem(userId, request.title(), request.categoryId());
 
         return ChecklistItemResponse.from(result);
     }

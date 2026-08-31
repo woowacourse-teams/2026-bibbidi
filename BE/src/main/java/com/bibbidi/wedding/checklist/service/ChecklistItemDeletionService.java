@@ -12,10 +12,7 @@ public class ChecklistItemDeletionService {
     private final ChecklistRepository checklistRepository;
     private final AppointmentDeleteService appointmentDeleteService;
 
-    public ChecklistItemDeletionService(
-            ChecklistRepository checklistRepository,
-            AppointmentDeleteService appointmentDeleteService
-    ) {
+    public ChecklistItemDeletionService(ChecklistRepository checklistRepository, AppointmentDeleteService appointmentDeleteService) {
         this.checklistRepository = checklistRepository;
         this.appointmentDeleteService = appointmentDeleteService;
     }

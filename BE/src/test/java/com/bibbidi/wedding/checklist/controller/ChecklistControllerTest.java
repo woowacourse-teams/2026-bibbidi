@@ -52,7 +52,7 @@ class ChecklistControllerTest {
     @DisplayName("인증된 사용자의 요청에 생성된 체크리스트 식별자를 응답한다")
     void shouldRespondCreatedChecklistId() throws Exception {
         // given
-        when(checklistService.create(USER_ID)).thenReturn(new ChecklistCreationResult(10L));
+        when(checklistService.createChecklist(USER_ID)).thenReturn(new ChecklistCreationResult(10L));
 
         // when, then
         mockMvc.perform(post("/api/checklists").session(authenticatedSession()))
@@ -64,7 +64,7 @@ class ChecklistControllerTest {
     @DisplayName("이미 체크리스트를 가진 사용자의 생성 요청을 중복 오류로 응답한다")
     void shouldRespondConflictWhenChecklistAlreadyExists() throws Exception {
         // given
-        when(checklistService.create(USER_ID)).thenThrow(new BusinessException(
+        when(checklistService.createChecklist(USER_ID)).thenThrow(new BusinessException(
                 ClientError.DUPLICATE_CHECKLIST,
                 "체크리스트 중복 생성에 실패했습니다. ownerId=" + USER_ID
         ));
@@ -90,7 +90,7 @@ class ChecklistControllerTest {
     @DisplayName("선택한 준비 항목을 할 일로 추가하고 생성 결과를 응답한다")
     void shouldRespondAddedChecklistItems() throws Exception {
         // given
-        when(checklistService.addCatalogItems(USER_ID, List.of(100L, 101L)))
+        when(checklistService.addItemsFromCatalog(USER_ID, List.of(100L, 101L)))
                 .thenReturn(new CatalogItemAdditionResult(List.of(
                         new CatalogItemAdditionResult.AddedChecklistItem(201L, 100L, 2L, "계약서 확인", false),
                         new CatalogItemAdditionResult.AddedChecklistItem(202L, 101L, 2L, "견적 비교", false)
@@ -126,7 +126,7 @@ class ChecklistControllerTest {
     @DisplayName("체크리스트가 없는 사용자의 추가 요청을 거절한다")
     void shouldRespondNotFoundWhenChecklistDoesNotExist() throws Exception {
         // given
-        when(checklistService.addCatalogItems(USER_ID, List.of(100L)))
+        when(checklistService.addItemsFromCatalog(USER_ID, List.of(100L)))
                 .thenThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "체크리스트가 없습니다."));
 
         // when, then
@@ -143,7 +143,7 @@ class ChecklistControllerTest {
     @DisplayName("이미 추가된 준비 항목이 포함되면 요청을 거절한다")
     void shouldRespondConflictWhenCatalogItemAlreadyAdded() throws Exception {
         // given
-        when(checklistService.addCatalogItems(USER_ID, List.of(100L)))
+        when(checklistService.addItemsFromCatalog(USER_ID, List.of(100L)))
                 .thenThrow(new BusinessException(ClientError.DUPLICATE_CHECKLIST_ITEM, "이미 추가된 항목입니다."));
 
         // when, then
@@ -160,7 +160,7 @@ class ChecklistControllerTest {
     @DisplayName("준비 목록에 없는 항목이 포함되면 요청을 거절한다")
     void shouldRespondNotFoundWhenCatalogItemDoesNotExist() throws Exception {
         // given
-        when(checklistService.addCatalogItems(USER_ID, List.of(999L)))
+        when(checklistService.addItemsFromCatalog(USER_ID, List.of(999L)))
                 .thenThrow(new BusinessException(ClientError.INVALID_REQUEST, "준비 목록에 없는 항목이 포함되었습니다."));
 
         // when, then
