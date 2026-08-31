@@ -6,7 +6,7 @@
 
 .auth-page {
   display: grid;
-  min-height: calc(100vh - 96px);
+  min-height: calc(100vh - 80px);
   place-items: center;
   padding: 48px 24px;
 }

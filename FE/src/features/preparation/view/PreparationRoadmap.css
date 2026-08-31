@@ -1,7 +1,7 @@
 .preparation-roadmap {
   isolation: isolate;
   display: grid;
-  min-height: calc(100vh - 96px);
+  min-height: calc(100vh - 80px);
   grid-template-columns: 180px minmax(0, 1fr);
 }
 
@@ -59,7 +59,7 @@
   grid-template-columns: 740px 404px;
   align-items: start;
   gap: 24px;
-  padding: 28px 40px;
+  padding: 38px 40px 28px 48px;
 }
 
 .preparation-roadmap__main {
@@ -70,6 +70,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
+  padding-left: 1px;
   margin-bottom: 20px;
 }
 
@@ -133,7 +134,7 @@
   position: absolute;
   z-index: -1;
   display: block;
-  background: #f2c4aa;
+  background: #36383D;
   content: "";
 }
 
@@ -164,7 +165,7 @@
   display: block;
   width: 2px;
   height: 20px;
-  background: #f2c4aa;
+  background: #36383d;
   content: "";
 }
 
@@ -302,6 +303,10 @@
   padding: 0 24px 16px;
 }
 
+.preparation-step-detail__header--without-category {
+  padding-top: 8px;
+}
+
 .preparation-step-detail__category {
   color: var(--color-fg-brand);
   font-size: 12px;
@@ -362,7 +367,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 24px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -390,7 +395,7 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    padding: 16px 24px 0;
+    padding: 16px 24px;
   }
 
   .preparation-roadmap__category-list {
@@ -446,7 +451,7 @@
 
 @media (max-width: 760px) {
   .preparation-roadmap__categories {
-    padding: 12px 16px 0;
+    padding: 12px 16px;
   }
 
   .preparation-roadmap__category--current {
