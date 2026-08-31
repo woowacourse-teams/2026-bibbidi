@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PreparationCategoryNavigationDirection } from "../model/preparationRoadmap";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepDetail } from "./PreparationStepDetail";
@@ -7,6 +7,35 @@ import "./PreparationRoadmap.css";
 const WHEEL_DELTA_THRESHOLD = 80;
 const WHEEL_GESTURE_RESET_MS = 160;
 const WHEEL_LINE_HEIGHT_PX = 16;
+const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1439px)";
+const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window.matchMedia === "function"
+      ? window.matchMedia(query).matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia(query);
+    const handleChange = (event: MediaQueryListEvent) => {
+      setMatches(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [query]);
+
+  return matches;
+}
 
 interface WheelGestureState {
   accumulatedDelta: number;
@@ -43,6 +72,8 @@ export function PreparationRoadmap({
   onStepSelect,
   viewModel,
 }: PreparationRoadmapProps) {
+  const isCompactLayout = useMediaQuery(COMPACT_LAYOUT_MEDIA_QUERY);
+  const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
   const categoryNavigationRef = useRef(viewModel.categoryNavigation);
   const gestureResetTimerRef = useRef<number | undefined>(undefined);
   const onCategoryNavigateRef = useRef(onCategoryNavigate);
@@ -63,7 +94,7 @@ export function PreparationRoadmap({
   useEffect(() => {
     const roadmapMain = roadmapMainRef.current;
 
-    if (!roadmapMain) {
+    if (!roadmapMain || isCompactLayout) {
       return;
     }
 
@@ -146,8 +177,10 @@ export function PreparationRoadmap({
       if (gestureResetTimerRef.current !== undefined) {
         window.clearTimeout(gestureResetTimerRef.current);
       }
+
+      resetWheelGesture();
     };
-  }, []);
+  }, [isCompactLayout]);
 
   return (
     <div className="preparation-roadmap">
@@ -218,13 +251,21 @@ export function PreparationRoadmap({
                       {step.description}
                     </span>
                   </button>
+
+                  {isMobileLayout && step.isSelected ? (
+                    <PreparationStepDetail
+                      detail={viewModel.selectedStepDetail}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ol>
           </div>
         </div>
 
-        <PreparationStepDetail detail={viewModel.selectedStepDetail} />
+        {!isMobileLayout ? (
+          <PreparationStepDetail detail={viewModel.selectedStepDetail} />
+        ) : null}
       </section>
     </div>
   );

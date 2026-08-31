@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const analyticsMocks = vi.hoisted(() => ({
   track: vi.fn(),
@@ -23,6 +23,45 @@ function renderFeature({ strictMode = false } = {}) {
 
 function getRoadmapTitle(name: string) {
   return screen.getByRole("heading", { name });
+}
+
+function setViewportMatches(initialMatches = true) {
+  const listeners = new Set<(event: MediaQueryListEvent) => void>();
+  let matches = initialMatches;
+
+  const matchMedia = vi
+    .fn()
+    .mockImplementation((media: string): MediaQueryList => ({
+      addEventListener: (
+        _type: string,
+        listener: EventListenerOrEventListenerObject,
+      ) => {
+        listeners.add(listener as (event: MediaQueryListEvent) => void);
+      },
+      addListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      matches,
+      media,
+      onchange: null,
+      removeEventListener: (
+        _type: string,
+        listener: EventListenerOrEventListenerObject,
+      ) => {
+        listeners.delete(listener as (event: MediaQueryListEvent) => void);
+      },
+      removeListener: vi.fn(),
+    }));
+
+  vi.stubGlobal("matchMedia", matchMedia);
+
+  return {
+    change(matchesNext: boolean) {
+      matches = matchesNext;
+      listeners.forEach((listener) =>
+        listener({ matches: matchesNext } as MediaQueryListEvent),
+      );
+    },
+  };
 }
 
 describe("PreparationRoadmapFeature Analytics", () => {
@@ -138,5 +177,119 @@ describe("PreparationRoadmapFeature Analytics", () => {
     });
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("모바일에서는 선택한 단계 카드 바로 아래에 상세 패널을 표시한다", () => {
+    setViewportMatches();
+    renderFeature();
+
+    const firstStep = screen
+      .getByRole("button", { name: /01.*예정.*웨딩홀 투어와 계약/ })
+      .closest("li");
+
+    expect(firstStep).not.toBeNull();
+    expect(
+      within(firstStep!).getByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeTruthy();
+
+    const secondStepButton = screen.getByRole("button", {
+      name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+    });
+    fireEvent.click(secondStepButton);
+
+    expect(
+      within(firstStep!).queryByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeNull();
+    expect(
+      within(secondStepButton.closest("li")!).getByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("viewport 변경 후에도 선택 상태를 유지하고 이벤트를 전송하지 않는다", () => {
+    const viewport = setViewportMatches();
+    renderFeature();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+      }),
+    );
+    analyticsMocks.track.mockClear();
+
+    act(() => {
+      viewport.change(false);
+    });
+
+    expect(
+      screen
+        .getByRole("button", {
+          name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+        })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("모바일에서는 세로 스크롤로 카테고리를 변경하지 않는다", () => {
+    setViewportMatches();
+    renderFeature();
+    analyticsMocks.track.mockClear();
+
+    fireEvent.wheel(getRoadmapTitle("웨딩홀 준비 로드맵"), {
+      deltaX: 0,
+      deltaY: 100,
+    });
+
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    expect(getRoadmapTitle("웨딩홀 준비 로드맵")).toBeTruthy();
+  });
+
+  it("viewport 복귀 후 첫 wheel 제스처로 카테고리를 변경한다", () => {
+    const viewport = setViewportMatches(false);
+    renderFeature();
+    analyticsMocks.track.mockClear();
+
+    fireEvent.wheel(getRoadmapTitle("웨딩홀 준비 로드맵"), {
+      deltaX: 0,
+      deltaY: 100,
+    });
+    expect(getRoadmapTitle("스드메 준비 로드맵")).toBeTruthy();
+
+    act(() => {
+      viewport.change(true);
+    });
+    act(() => {
+      viewport.change(false);
+    });
+    analyticsMocks.track.mockClear();
+
+    fireEvent.wheel(getRoadmapTitle("스드메 준비 로드맵"), {
+      deltaX: 0,
+      deltaY: 100,
+    });
+
+    expect(getRoadmapTitle("초대 준비 로드맵")).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,5 @@
 .preparation-catalog-page {
-  min-width: 1180px;
+  min-width: 320px;
   min-height: 100vh;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
