@@ -12,22 +12,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ChecklistAppointmentDeleteServiceTest {
+class ChecklistAppointmentServiceTest {
 
     @Mock
     private AppointmentRepository appointmentRepository;
 
-    private ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
+    private ChecklistAppointmentService checklistAppointmentService;
 
     @BeforeEach
     void setUp() {
-        checklistAppointmentDeleteService = new ChecklistAppointmentDeleteService(appointmentRepository);
+        checklistAppointmentService = new ChecklistAppointmentService(appointmentRepository);
     }
 
     @Test
     @DisplayName("지정한 할 일 하나에 속한 일정을 모두 삭제한다")
     void shouldDeleteAppointmentsByChecklistItemId() {
-        checklistAppointmentDeleteService.deleteAllByChecklistItemId(10L);
+        checklistAppointmentService.deleteAllByChecklistItemId(10L);
 
         then(appointmentRepository).should().deleteAllByChecklistItemIds(List.of(10L));
     }
@@ -35,7 +35,7 @@ class ChecklistAppointmentDeleteServiceTest {
     @Test
     @DisplayName("지정한 할 일들에 속한 일정을 모두 삭제한다")
     void shouldDeleteAppointmentsByChecklistItemIds() {
-        checklistAppointmentDeleteService.deleteAllByChecklistItemIds(List.of(10L, 11L));
+        checklistAppointmentService.deleteAllByChecklistItemIds(List.of(10L, 11L));
 
         then(appointmentRepository).should().deleteAllByChecklistItemIds(List.of(10L, 11L));
     }
@@ -43,7 +43,7 @@ class ChecklistAppointmentDeleteServiceTest {
     @Test
     @DisplayName("삭제할 할 일이 없으면 저장소를 호출하지 않는다")
     void shouldSkipDeletionWhenChecklistItemIdsAreEmpty() {
-        checklistAppointmentDeleteService.deleteAllByChecklistItemIds(List.of());
+        checklistAppointmentService.deleteAllByChecklistItemIds(List.of());
 
         then(appointmentRepository).shouldHaveNoInteractions();
     }

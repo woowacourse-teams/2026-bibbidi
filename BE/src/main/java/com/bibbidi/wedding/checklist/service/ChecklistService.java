@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
-import com.bibbidi.wedding.appointment.service.ChecklistAppointmentDeleteService;
+import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -23,12 +23,12 @@ public class ChecklistService {
 
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
-    private final ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
+    private final ChecklistAppointmentService checklistAppointmentService;
 
-    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService, ChecklistAppointmentDeleteService checklistAppointmentDeleteService) {
+    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService, ChecklistAppointmentService checklistAppointmentService) {
         this.checklistRepository = checklistRepository;
         this.catalogService = catalogService;
-        this.checklistAppointmentDeleteService = checklistAppointmentDeleteService;
+        this.checklistAppointmentService = checklistAppointmentService;
     }
 
     @Transactional
@@ -102,7 +102,7 @@ public class ChecklistService {
     }
 
     private void deleteItemWithAppointments(ChecklistItem item) {
-        checklistAppointmentDeleteService.deleteAllByChecklistItemId(item.id());
+        checklistAppointmentService.deleteAllByChecklistItemId(item.id());
         checklistRepository.deleteItem(item);
     }
 
@@ -115,7 +115,7 @@ public class ChecklistService {
     private void deleteChecklistData(Checklist checklist) {
         List<Long> checklistItemIds = checklist.itemIds();
 
-        checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
+        checklistAppointmentService.deleteAllByChecklistItemIds(checklistItemIds);
         checklistRepository.delete(checklist);
     }
 
