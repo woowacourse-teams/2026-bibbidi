@@ -4,6 +4,7 @@ import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,10 +17,16 @@ public class ChecklistMapper {
         );
     }
 
-    public Checklist toDomain(JpaChecklistEntity entity) {
+    public Checklist toDomain(
+            JpaChecklistEntity entity,
+            List<JpaChecklistItemEntity> checklistItems
+    ) {
         return new Checklist(
                 entity.id(),
-                entity.ownerId()
+                entity.ownerId(),
+                checklistItems.stream()
+                        .map(this::toDomain)
+                        .toList()
         );
     }
 
@@ -37,7 +44,6 @@ public class ChecklistMapper {
     public ChecklistItem toDomain(JpaChecklistItemEntity entity) {
         return new ChecklistItem(
                 entity.id(),
-                toDomain(entity.checklist()),
                 entity.categoryId(),
                 entity.title(),
                 entity.sourceCatalogItemId(),

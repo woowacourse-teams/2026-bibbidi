@@ -219,8 +219,8 @@ class AppointmentControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("인증된 사용자가 소유하지 않은 체크리스트 항목으로 일정 생성을 요청하면 거부한다")
-    void shouldRejectAppointmentWhenUserDoesNotOwnChecklistItem() throws Exception {
+    @DisplayName("존재하지 않는 체크리스트 항목으로 일정 생성을 요청하면 찾을 수 없다고 응답한다")
+    void shouldRejectAppointmentWhenChecklistItemDoesNotExist() throws Exception {
         CreateAppointmentRequest request = new CreateAppointmentRequest(
                 "웨딩홀 상담",
                 LocalDate.of(2026, 9, 1),
@@ -234,8 +234,8 @@ class AppointmentControllerIntegrationTest {
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value(203));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304));
     }
 
     @Test

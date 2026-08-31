@@ -45,13 +45,12 @@ class ChecklistItemRepositoryTest {
     private Checklist saveChecklist(Long ownerId) {
         JpaChecklistEntity saved = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, ownerId));
 
-        return new Checklist(saved.id(), saved.ownerId());
+        return new Checklist(saved.id(), saved.ownerId(), List.of());
     }
 
     private ChecklistItem saveItem(Checklist owner, Long sourceCatalogItemId) {
-        return checklistItemRepository.save(new ChecklistItem(
+        return checklistItemRepository.save(owner.id(), new ChecklistItem(
                 null,
-                owner,
                 CATEGORY_ID,
                 "계약서 확인",
                 sourceCatalogItemId,
@@ -69,17 +68,16 @@ class ChecklistItemRepositoryTest {
         assertThat(saved.id()).isNotNull();
         assertThat(saved)
                 .extracting(
-                        item -> item.checklist().id(),
                         ChecklistItem::categoryId,
                         ChecklistItem::title,
                         ChecklistItem::sourceCatalogItemId,
                         ChecklistItem::isDone
                 )
-                .containsExactly(checklist.id(), CATEGORY_ID, "계약서 확인", 100L, false);
+                .containsExactly(CATEGORY_ID, "계약서 확인", 100L, false);
     }
 
     @Test
-    @DisplayName("식별자로 할 일을 조회하면 체크리스트까지 채운 도메인으로 변환해 반환한다")
+    @DisplayName("식별자로 할 일을 조회하면 도메인으로 변환해 반환한다")
     void shouldFindChecklistItemById() {
         // given
         ChecklistItem saved = saveItem(checklist, 100L);
@@ -92,11 +90,9 @@ class ChecklistItemRepositoryTest {
                 .get()
                 .extracting(
                         ChecklistItem::id,
-                        item -> item.checklist().id(),
-                        item -> item.checklist().ownerId(),
                         ChecklistItem::title
                 )
-                .containsExactly(saved.id(), checklist.id(), OWNER_ID, "계약서 확인");
+                .containsExactly(saved.id(), "계약서 확인");
     }
 
     @Test
@@ -119,11 +115,9 @@ class ChecklistItemRepositoryTest {
         assertThat(found)
                 .extracting(
                         ChecklistItem::id,
-                        item -> item.checklist().id(),
-                        item -> item.checklist().ownerId(),
                         ChecklistItem::title
                 )
-                .containsExactly(saved.id(), checklist.id(), OWNER_ID, "계약서 확인");
+                .containsExactly(saved.id(), "계약서 확인");
     }
 
     @Test
@@ -187,12 +181,12 @@ class ChecklistItemRepositoryTest {
     void shouldSaveAllItemsAndReturnGeneratedIds() {
         // given
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, checklist, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
-                new ChecklistItem(null, checklist, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
+                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
         );
 
         // when
-        List<ChecklistItem> saved = checklistItemRepository.saveAll(items);
+        List<ChecklistItem> saved = checklistItemRepository.saveAll(checklist.id(), items);
 
         // then
         assertThat(saved).hasSize(2).allSatisfy(item -> assertThat(item.id()).isNotNull());
@@ -220,11 +214,11 @@ class ChecklistItemRepositoryTest {
         // given
         saveItem(checklist, 100L);
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, checklist, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
         );
 
         // when, then
-        assertThatThrownBy(() -> checklistItemRepository.saveAll(items))
+        assertThatThrownBy(() -> checklistItemRepository.saveAll(checklist.id(), items))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.DUPLICATE_CHECKLIST_ITEM);

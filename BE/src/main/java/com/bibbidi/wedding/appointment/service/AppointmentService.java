@@ -10,8 +10,6 @@ import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +27,7 @@ public class AppointmentService implements AppointmentDeleteService {
 
     @Transactional
     public AppointmentCreationResult create(AppointmentCreationCommand command) {
-        validateItemOwnership(command.userId(), command.checklistItemId());
+        checklistService.validateItemOwnership(command.checklistItemId(), command.userId());
 
         Appointment appointment = new Appointment(
                 null,
@@ -54,7 +52,7 @@ public class AppointmentService implements AppointmentDeleteService {
     @Transactional
     public AppointmentUpdateResult update(AppointmentUpdateCommand command) {
         Appointment appointment = appointmentRepository.findById(command.appointmentId());
-        validateItemOwnership(command.userId(), appointment.checklistItemId());
+        checklistService.validateItemOwnership(appointment.checklistItemId(), command.userId());
 
         Appointment updated = appointment.update(
                 command.title(),
@@ -75,7 +73,7 @@ public class AppointmentService implements AppointmentDeleteService {
     @Transactional
     public void delete(Long userId, Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId);
-        validateItemOwnership(userId, appointment.checklistItemId());
+        checklistService.validateItemOwnership(appointment.checklistItemId(), userId);
         appointmentRepository.deleteById(appointmentId);
     }
 
@@ -101,16 +99,6 @@ public class AppointmentService implements AppointmentDeleteService {
     @Transactional
     public void deleteAllByChecklistItemId(Long checklistItemId) {
         appointmentRepository.deleteAllByChecklistItemId(checklistItemId);
-    }
-
-    private void validateItemOwnership(Long userId, Long checklistItemId) {
-        if (!checklistService.checkItemOwnership(checklistItemId, userId)) {
-            throw new BusinessException(
-                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
-                    "현재 사용자 계정에 속한 할 일이 아닙니다. userId=" + userId
-                            + ", checklistItemId=" + checklistItemId
-            );
-        }
     }
 
     private List<AppointmentConflict> findConflictingWithNewAppointment(Long userId, Appointment savedAppointment) {

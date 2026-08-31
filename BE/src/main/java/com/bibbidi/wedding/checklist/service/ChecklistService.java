@@ -41,7 +41,7 @@ public class ChecklistService {
 
     @Transactional
     public ChecklistCreationResult create(Long ownerId) {
-        Checklist checklist = checklistRepository.save(new Checklist(null, ownerId));
+        Checklist checklist = checklistRepository.save(new Checklist(null, ownerId, List.of()));
 
         return ChecklistCreationResult.from(checklist);
     }
@@ -50,9 +50,9 @@ public class ChecklistService {
     public CatalogItemAdditionResult addCatalogItems(Long ownerId, List<Long> catalogItemIds) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
-        List<ChecklistItem> candidates = selectCatalogItems(checklist, catalogItemIds);
+        List<ChecklistItem> candidates = selectCatalogItems(catalogItemIds);
 
-        return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(candidates));
+        return CatalogItemAdditionResult.from(checklistItemRepository.saveAll(checklist.id(), candidates));
     }
 
     @Transactional
@@ -61,9 +61,8 @@ public class ChecklistService {
 
         catalogService.validateCategoryExists(categoryId);
 
-        ChecklistItem item = checklistItemRepository.save(new ChecklistItem(
+        ChecklistItem item = checklistItemRepository.save(checklist.id(), new ChecklistItem(
                 null,
-                checklist,
                 categoryId,
                 title,
                 null,
@@ -79,11 +78,17 @@ public class ChecklistService {
             Long checklistItemId,
             Long categoryId
     ) {
-        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
 
         catalogService.validateCategoryExists(categoryId);
 
-        ChecklistItem changed = checklistItemRepository.save(item.changeCategory(ownerId, categoryId));
+        checklist.validateOwnedBy(ownerId);
+        ChecklistItem item = checklist.item(checklistItemId);
+
+        ChecklistItem changed = checklistItemRepository.save(
+                checklist.id(),
+                item.changeCategory(categoryId)
+        );
 
         return ChecklistItemResult.from(changed);
     }
@@ -94,18 +99,23 @@ public class ChecklistService {
             Long checklistItemId,
             String title
     ) {
-        ChecklistItem item = checklistItemRepository.getById(checklistItemId);
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
 
-        ChecklistItem changed = checklistItemRepository.save(item.changeTitle(ownerId, title));
+        checklist.validateOwnedBy(ownerId);
+        ChecklistItem item = checklist.item(checklistItemId);
+
+        ChecklistItem changed = checklistItemRepository.save(
+                checklist.id(),
+                item.changeTitle(title)
+        );
 
         return ChecklistItemResult.from(changed);
     }
 
     @Transactional(readOnly = true)
-    public boolean checkItemOwnership(Long checklistItemId, Long ownerId) {
-        return checklistItemRepository.findById(checklistItemId)
-                .map(item -> item.isOwnedBy(ownerId))
-                .orElse(false);
+    public void validateItemOwnership(Long checklistItemId, Long ownerId) {
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
+        checklist.validateOwnedBy(ownerId);
     }
 
     @Transactional
@@ -115,13 +125,15 @@ public class ChecklistService {
     }
 
     private void deleteChecklistData(Checklist checklist) {
-        List<Long> checklistItemIds = checklistItemRepository.findIdsByChecklistId(checklist.id());
+        List<Long> checklistItemIds = checklist.items().stream()
+                .map(ChecklistItem::id)
+                .toList();
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
         checklistItemRepository.deleteAllByChecklistId(checklist.id());
         checklistRepository.deleteById(checklist.id());
     }
 
-    private List<ChecklistItem> selectCatalogItems(Checklist checklist, List<Long> catalogItemIds) {
+    private List<ChecklistItem> selectCatalogItems(List<Long> catalogItemIds) {
         Set<Long> requestedIds = new LinkedHashSet<>(catalogItemIds);
         List<CatalogItemSnapshot> catalogItems = catalogService.findItems(requestedIds);
 
@@ -138,7 +150,6 @@ public class ChecklistService {
         return catalogItems.stream()
                 .map(catalogItem -> new ChecklistItem(
                         null,
-                        checklist,
                         catalogItem.categoryId(),
                         catalogItem.title(),
                         catalogItem.id(),

@@ -13,8 +13,10 @@ import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.repository.ChecklistItemRepository;
+import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +33,9 @@ class ChecklistItemDeletionServiceTest {
     private static final Long CHECKLIST_ITEM_ID = 10L;
 
     @Mock
+    private ChecklistRepository checklistRepository;
+
+    @Mock
     private ChecklistItemRepository checklistItemRepository;
 
     @Mock
@@ -41,6 +46,7 @@ class ChecklistItemDeletionServiceTest {
     @BeforeEach
     void setUp() {
         checklistItemDeletionService = new ChecklistItemDeletionService(
+                checklistRepository,
                 checklistItemRepository,
                 appointmentDeleteService
         );
@@ -49,7 +55,7 @@ class ChecklistItemDeletionServiceTest {
     @Test
     @DisplayName("없는 할 일 삭제는 이미 삭제된 것으로 처리한다")
     void shouldIgnoreDeletionWhenItemDoesNotExist() {
-        given(checklistItemRepository.findById(CHECKLIST_ITEM_ID)).willReturn(Optional.empty());
+        given(checklistRepository.findByChecklistItemId(CHECKLIST_ITEM_ID)).willReturn(Optional.empty());
 
         checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID);
 
@@ -60,8 +66,8 @@ class ChecklistItemDeletionServiceTest {
     @Test
     @DisplayName("다른 사용자의 할 일은 삭제할 수 없다")
     void shouldRejectDeletionWhenItemBelongsToAnotherUser() {
-        given(checklistItemRepository.findById(CHECKLIST_ITEM_ID))
-                .willReturn(Optional.of(item(2L, ChecklistItemStatus.PREV, null)));
+        given(checklistRepository.findByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(Optional.of(checklist(2L, ChecklistItemStatus.PREV, null)));
 
         assertThatThrownBy(() -> checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID))
                 .isInstanceOf(BusinessException.class)
@@ -74,8 +80,8 @@ class ChecklistItemDeletionServiceTest {
     @Test
     @DisplayName("완료된 할 일은 삭제할 수 없다")
     void shouldRejectDeletionWhenItemIsDone() {
-        given(checklistItemRepository.findById(CHECKLIST_ITEM_ID))
-                .willReturn(Optional.of(item(OWNER_ID, ChecklistItemStatus.DONE, null)));
+        given(checklistRepository.findByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(Optional.of(checklist(OWNER_ID, ChecklistItemStatus.DONE, null)));
 
         assertThatThrownBy(() -> checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID))
                 .isInstanceOf(BusinessException.class)
@@ -88,8 +94,8 @@ class ChecklistItemDeletionServiceTest {
     @Test
     @DisplayName("준비 목록에서 가져온 미완료 할 일과 연결된 일정을 함께 삭제한다")
     void shouldDeleteIncompleteCatalogSourcedItemAndAppointments() {
-        given(checklistItemRepository.findById(CHECKLIST_ITEM_ID))
-                .willReturn(Optional.of(item(OWNER_ID, ChecklistItemStatus.PREV, 100L)));
+        given(checklistRepository.findByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(Optional.of(checklist(OWNER_ID, ChecklistItemStatus.PREV, 100L)));
 
         checklistItemDeletionService.delete(OWNER_ID, CHECKLIST_ITEM_ID);
 
@@ -101,8 +107,8 @@ class ChecklistItemDeletionServiceTest {
     @Test
     @DisplayName("일정 삭제가 실패하면 할 일을 삭제하지 않는다")
     void shouldNotDeleteItemWhenAppointmentDeletionFails() {
-        given(checklistItemRepository.findById(CHECKLIST_ITEM_ID))
-                .willReturn(Optional.of(item(OWNER_ID, ChecklistItemStatus.PREV, null)));
+        given(checklistRepository.findByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(Optional.of(checklist(OWNER_ID, ChecklistItemStatus.PREV, null)));
         willThrow(new IllegalStateException("appointment deletion failed"))
                 .given(appointmentDeleteService)
                 .deleteAllByChecklistItemId(CHECKLIST_ITEM_ID);
@@ -112,14 +118,14 @@ class ChecklistItemDeletionServiceTest {
         then(checklistItemRepository).should(never()).deleteById(any());
     }
 
-    private static ChecklistItem item(Long ownerId, ChecklistItemStatus status, Long sourceCatalogItemId) {
-        return new ChecklistItem(
+    private static Checklist checklist(Long ownerId, ChecklistItemStatus status, Long sourceCatalogItemId) {
+        ChecklistItem item = new ChecklistItem(
                 CHECKLIST_ITEM_ID,
-                new Checklist(100L, ownerId),
                 2L,
                 "청첩장 문구 정하기",
                 sourceCatalogItemId,
                 status
         );
+        return new Checklist(100L, ownerId, List.of(item));
     }
 }

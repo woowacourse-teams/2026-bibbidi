@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.repository;
 
-import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
@@ -42,7 +41,7 @@ public class ChecklistItemRepository {
     }
 
     public Optional<ChecklistItem> findById(Long checklistItemId) {
-        return jpaChecklistItemRepository.findByIdWithChecklist(checklistItemId)
+        return jpaChecklistItemRepository.findById(checklistItemId)
                 .map(checklistMapper::toDomain);
     }
 
@@ -60,25 +59,23 @@ public class ChecklistItemRepository {
         return jpaChecklistItemRepository.deleteAllByChecklistId(checklistId);
     }
 
-    public ChecklistItem save(ChecklistItem checklistItem) {
-        JpaChecklistItemEntity entity = checklistMapper.toEntity(checklistItem, referenceOf(checklistItem));
+    public ChecklistItem save(Long checklistId, ChecklistItem checklistItem) {
+        JpaChecklistItemEntity entity = checklistMapper.toEntity(checklistItem, referenceOf(checklistId));
 
         try {
-            JpaChecklistItemEntity saved = jpaChecklistItemRepository.saveAndFlush(entity);
-
-            return checklistMapper.toDomain(saved);
+            return checklistMapper.toDomain(jpaChecklistItemRepository.saveAndFlush(entity));
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     ClientError.DUPLICATE_CHECKLIST_ITEM,
-                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistItem.checklist().id()
+                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistId
                             + ", catalogItemId=" + checklistItem.sourceCatalogItemId()
             );
         }
     }
 
-    public List<ChecklistItem> saveAll(List<ChecklistItem> checklistItems) {
+    public List<ChecklistItem> saveAll(Long checklistId, List<ChecklistItem> checklistItems) {
         List<JpaChecklistItemEntity> entities = checklistItems.stream()
-                .map(item -> checklistMapper.toEntity(item, referenceOf(item)))
+                .map(item -> checklistMapper.toEntity(item, referenceOf(checklistId)))
                 .toList();
 
         try {
@@ -92,23 +89,16 @@ public class ChecklistItemRepository {
 
             throw new BusinessException(
                     ClientError.DUPLICATE_CHECKLIST_ITEM,
-                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistIdOf(checklistItems)
-                            + ", catalogItemIds=" + catalogItemIds
+                    DUPLICATE_CHECKLIST_ITEM_MESSAGE + checklistId + ", catalogItemIds=" + catalogItemIds
             );
         }
-    }
-
-    private Long checklistIdOf(List<ChecklistItem> checklistItems) {
-        return checklistItems.getFirst().checklist().id();
     }
 
     public void deleteById(Long checklistItemId) {
         jpaChecklistItemRepository.deleteById(checklistItemId);
     }
 
-    private JpaChecklistEntity referenceOf(ChecklistItem checklistItem) {
-        Checklist checklist = checklistItem.checklist();
-
-        return entityManager.getReference(JpaChecklistEntity.class, checklist.id());
+    private JpaChecklistEntity referenceOf(Long checklistId) {
+        return entityManager.getReference(JpaChecklistEntity.class, checklistId);
     }
 }

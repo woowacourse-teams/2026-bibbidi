@@ -8,7 +8,6 @@ import org.jspecify.annotations.Nullable;
 public final class ChecklistItem {
 
     private final Long id;
-    private final Checklist checklist;
     private final Long categoryId;
     private final String title;
     private final Long sourceCatalogItemId;
@@ -16,14 +15,12 @@ public final class ChecklistItem {
 
     public ChecklistItem(
             @Nullable Long id,
-            @NonNull Checklist checklist,
             @Nullable Long categoryId,
             @NonNull String title,
             @Nullable Long sourceCatalogItemId,
             @NonNull ChecklistItemStatus status
     ) {
         this.id = id;
-        this.checklist = checklist;
         this.categoryId = categoryId;
         this.title = title;
         this.sourceCatalogItemId = sourceCatalogItemId;
@@ -42,8 +39,7 @@ public final class ChecklistItem {
         return withStatus(ChecklistItemStatus.PREV);
     }
 
-    public ChecklistItem changeCategory(Long ownerId, Long categoryId) {
-        validateOwnedBy(ownerId);
+    public ChecklistItem changeCategory(Long categoryId) {
         if (hasSourceCatalogItem()) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_CATEGORY_NOT_CHANGEABLE,
@@ -53,7 +49,6 @@ public final class ChecklistItem {
         }
         return new ChecklistItem(
                 id,
-                checklist,
                 categoryId,
                 title,
                 sourceCatalogItemId,
@@ -61,8 +56,7 @@ public final class ChecklistItem {
         );
     }
 
-    public ChecklistItem changeTitle(Long ownerId, String title) {
-        validateOwnedBy(ownerId);
+    public ChecklistItem changeTitle(String title) {
         if (hasSourceCatalogItem()) {
             throw new BusinessException(
                     ClientError.CHECKLIST_ITEM_TITLE_NOT_CHANGEABLE,
@@ -72,7 +66,6 @@ public final class ChecklistItem {
         }
         return new ChecklistItem(
                 id,
-                checklist,
                 categoryId,
                 title,
                 sourceCatalogItemId,
@@ -80,8 +73,7 @@ public final class ChecklistItem {
         );
     }
 
-    public void validateDeletableBy(Long ownerId) {
-        validateOwnedBy(ownerId);
+    public void validateDeletable() {
         if (isDone()) {
             throw new BusinessException(
                     ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE,
@@ -90,29 +82,14 @@ public final class ChecklistItem {
         }
     }
 
-    private void validateOwnedBy(Long ownerId) {
-        if (!isOwnedBy(ownerId)) {
-            throw new BusinessException(
-                    ClientError.CHECKLIST_ITEM_ACCESS_DENIED,
-                    "현재 사용자 계정에 속한 할 일이 아닙니다. ownerId=" + ownerId
-                            + ", checklistItemId=" + id
-            );
-        }
-    }
-
     private ChecklistItem withStatus(ChecklistItemStatus status) {
         return new ChecklistItem(
                 id,
-                checklist,
                 categoryId,
                 title,
                 sourceCatalogItemId,
                 status
         );
-    }
-
-    public boolean isOwnedBy(Long ownerId) {
-        return checklist.isOwnedBy(ownerId);
     }
 
     public boolean cameFrom(Long catalogItemId) {
@@ -125,10 +102,6 @@ public final class ChecklistItem {
 
     public Long id() {
         return id;
-    }
-
-    public Checklist checklist() {
-        return checklist;
     }
 
     public Long categoryId() {
