@@ -248,9 +248,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       name: "이 단계에서 준비할 일",
     });
 
-    expect(
-      detail.querySelector(".preparation-step-detail__category"),
-    ).toBeNull();
+    expect(within(detail).queryByText("웨딩홀")).toBeNull();
   });
 
   it("모바일 최초 진입 시에는 단계를 자동 선택하지 않는다", () => {
@@ -481,8 +479,8 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       screen
         .getByRole("button", { name: "스드메" })
-        .getAttribute("aria-current"),
-    ).toBe("page");
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
 
     act(() => {
       viewport.change(true);
@@ -498,8 +496,8 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: "초대" }).getAttribute("aria-current"),
-    ).toBe("page");
+      screen.getByRole("button", { name: "초대" }).getAttribute("aria-pressed"),
+    ).toBe("true");
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 });

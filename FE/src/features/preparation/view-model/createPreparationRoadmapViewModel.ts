@@ -42,7 +42,6 @@ export interface PreparationRoadmapViewModel {
 }
 
 export interface PreparationStepDetailViewModel {
-  categoryLabel: string;
   description: string;
   status: PreparationStepStatus;
   statusLabel: string;
@@ -203,21 +202,17 @@ function createSelectedStepDetailViewModel(
   statusByStepId: Map<string, PreparationStepStatus>,
 ): PreparationStepDetailViewModel {
   const selectedStep = roadmap.steps.find((step) => step.id === selectedStepId);
-  const selectedCategory = model.categories.find(
-    (category) => category.id === roadmap.categoryId,
-  );
   const selectedDetail = model.stepDetails.find(
     (detail) => detail.stepId === selectedStepId,
   );
 
-  if (!selectedStep || !selectedCategory || !selectedDetail) {
+  if (!selectedStep || !selectedDetail) {
     throw new Error("준비 로드맵의 선택 단계 상세 데이터가 올바르지 않습니다.");
   }
 
   const status = getStepStatus(statusByStepId, selectedStep.id);
 
   return {
-    categoryLabel: selectedCategory.label,
     description: selectedDetail.description,
     status,
     statusLabel: statusLabels[status],

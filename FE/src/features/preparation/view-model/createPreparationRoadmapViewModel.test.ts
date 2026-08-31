@@ -30,7 +30,6 @@ function createCatalog(steps: StepFixture[]): PreparationCatalogModel {
           order: step.order,
           title: `${step.id} 제목`,
         })),
-        title: "웨딩홀 준비 로드맵",
       },
     ],
     stepDetails: steps.map((step) => ({
@@ -59,7 +58,6 @@ function addInvitationRoadmap(model: PreparationCatalogModel) {
         title: "초대 제목",
       },
     ],
-    title: "초대 준비 로드맵",
   });
   model.stepDetails.push({
     description: "초대 상세 설명",

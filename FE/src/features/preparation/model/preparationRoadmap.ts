@@ -32,7 +32,6 @@ export interface PreparationStepDetailModel {
 export interface PreparationRoadmapModel {
   categoryId: string;
   steps: PreparationStepModel[];
-  title: string;
 }
 
 export interface PreparationCatalogModel {

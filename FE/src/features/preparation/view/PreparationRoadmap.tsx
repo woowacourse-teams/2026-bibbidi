@@ -101,7 +101,6 @@ function PreparationRoadmapSteps({
               <PreparationStepDetail
                 detail={viewModel.selectedStepDetail}
                 focusOnMount
-                showCategoryLabel={false}
               />
             ) : (
               <button
@@ -268,7 +267,6 @@ export function PreparationRoadmap({
             <li key={category.id}>
               <button
                 aria-controls="preparation-roadmap-content"
-                aria-current={category.isCurrent ? "page" : undefined}
                 aria-pressed={category.isCurrent}
                 className={`preparation-roadmap__category${
                   category.isCurrent
@@ -306,10 +304,7 @@ export function PreparationRoadmap({
         </div>
 
         {!isMobileLayout ? (
-          <PreparationStepDetail
-            detail={viewModel.selectedStepDetail}
-            showCategoryLabel={false}
-          />
+          <PreparationStepDetail detail={viewModel.selectedStepDetail} />
         ) : null}
       </section>
     </div>

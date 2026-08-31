@@ -1,25 +1,24 @@
 :root {
-  /* SEED theme-light role tokens used by Bibidi */
   --color-bg-layer-basement: #f3f4f5;
   --color-bg-layer-default: #ffffff;
-  --color-bg-brand-solid: #e9c34f; /*불릿*/
-  --color-bg-brand-solid-pressed: #cfa72f; /*버튼을 누르고 있을 때 색상이라 현재 화면에서는 거의 안 보임*/
-  --color-bg-brand-weak: #fff6d8; /*글씨써진 네모 배경색*/
+  --color-bg-brand-solid: #e9c34f;
+  --color-bg-brand-solid-pressed: #cfa72f;
+  --color-bg-brand-weak: #fff6d8;
   --color-bg-critical-weak: #fdf0f0;
   --color-bg-informative-weak: #eff6ff;
-  --color-bg-neutral-weak: #f3f4f5; /*카드 테두리와 구분선*/
+  --color-bg-neutral-weak: #f3f4f5;
   --color-bg-positive-weak: #edfaf6;
   --color-fg-neutral: #36383d;
   --color-fg-neutral-muted: #555d6d;
   --color-fg-placeholder: #b0b3ba;
-  --color-fg-brand: #36383d; /* 글씨*/ /*선택 메뉴 글자, 번호 글자, 카테고리와 배지 글자*/
   --color-fg-informative: #217cf9;
   --color-fg-on-brand: #ffffff;
   --color-fg-critical: #fa342c;
   --color-fg-positive: #079171;
   --color-stroke-neutral: #d5d7db;
+  --color-stroke-neutral-solid: #36383d;
   --color-stroke-neutral-weak: #dcdee3;
-  --color-stroke-brand-solid: #ffcc3a; /*선택된 05 카드의 진한 테두리*/
+  --color-stroke-brand-solid: #ffcc3a;
   --color-stroke-neutral-contrast: #1a1c20;
   --color-stroke-critical-solid: #fa342c;
   --color-stroke-focus-ring: #5e98fe;
