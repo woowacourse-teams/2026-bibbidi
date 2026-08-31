@@ -24,9 +24,8 @@ public class ChecklistItemDeletionService {
     public void delete(Long ownerId, Long checklistItemId) {
         checklistRepository.findByChecklistItemId(checklistItemId)
                 .ifPresent(checklist -> {
-                    ChecklistItem item = checklist.item(checklistItemId);
-                    checklist.validateOwnedBy(ownerId);
-                    item.validateDeletable();
+                    ChecklistItem item = checklist.deletableItem(ownerId, checklistItemId);
+
                     appointmentDeleteService.deleteAllByChecklistItemId(checklistItemId);
                     checklistRepository.deleteItem(item);
                 });

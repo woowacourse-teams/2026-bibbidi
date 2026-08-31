@@ -18,6 +18,28 @@ public final class Checklist {
         this.items = List.copyOf(items);
     }
 
+    public ChecklistItem changeItemCategory(Long ownerId, Long checklistItemId, Long categoryId) {
+        validateOwnedBy(ownerId);
+        ChecklistItem item = item(checklistItemId);
+
+        return item.changeCategory(categoryId);
+    }
+
+    public ChecklistItem changeItemTitle(Long ownerId, Long checklistItemId, String title) {
+        validateOwnedBy(ownerId);
+        ChecklistItem item = item(checklistItemId);
+
+        return item.changeTitle(title);
+    }
+
+    public ChecklistItem deletableItem(Long ownerId, Long checklistItemId) {
+        validateOwnedBy(ownerId);
+        ChecklistItem item = item(checklistItemId);
+        item.validateDeletable();
+
+        return item;
+    }
+
     public void validateOwnedBy(Long ownerId) {
         if (!this.ownerId.equals(ownerId)) {
             throw new BusinessException(
@@ -28,14 +50,10 @@ public final class Checklist {
         }
     }
 
-    public ChecklistItem item(Long checklistItemId) {
+    public List<Long> itemIds() {
         return items.stream()
-                .filter(item -> Objects.equals(item.id(), checklistItemId))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(
-                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
-                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
-                ));
+                .map(ChecklistItem::id)
+                .toList();
     }
 
     public Long id() {
@@ -48,5 +66,15 @@ public final class Checklist {
 
     public List<ChecklistItem> items() {
         return items;
+    }
+
+    private ChecklistItem item(Long checklistItemId) {
+        return items.stream()
+                .filter(item -> Objects.equals(item.id(), checklistItemId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItemId
+                ));
     }
 }

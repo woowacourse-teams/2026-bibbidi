@@ -78,15 +78,10 @@ public class ChecklistService {
 
         catalogService.validateCategoryExists(categoryId);
 
-        checklist.validateOwnedBy(ownerId);
-        ChecklistItem item = checklist.item(checklistItemId);
+        ChecklistItem changed = checklist.changeItemCategory(ownerId, checklistItemId, categoryId);
+        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
 
-        ChecklistItem changed = checklistRepository.saveItem(
-                checklist,
-                item.changeCategory(categoryId)
-        );
-
-        return ChecklistItemResult.from(changed);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional
@@ -97,15 +92,10 @@ public class ChecklistService {
     ) {
         Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
 
-        checklist.validateOwnedBy(ownerId);
-        ChecklistItem item = checklist.item(checklistItemId);
+        ChecklistItem changed = checklist.changeItemTitle(ownerId, checklistItemId, title);
+        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
 
-        ChecklistItem changed = checklistRepository.saveItem(
-                checklist,
-                item.changeTitle(title)
-        );
-
-        return ChecklistItemResult.from(changed);
+        return ChecklistItemResult.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -121,9 +111,8 @@ public class ChecklistService {
     }
 
     private void deleteChecklistData(Checklist checklist) {
-        List<Long> checklistItemIds = checklist.items().stream()
-                .map(ChecklistItem::id)
-                .toList();
+        List<Long> checklistItemIds = checklist.itemIds();
+
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(checklistItemIds);
         checklistRepository.delete(checklist);
     }
