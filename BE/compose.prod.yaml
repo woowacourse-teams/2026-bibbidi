@@ -1,0 +1,14 @@
+services:
+  backend:
+    image: "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/bibbidi-backend:${IMAGE_TAG:?IMAGE_TAG is required}"
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 1200m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

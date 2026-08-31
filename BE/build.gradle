@@ -31,6 +31,7 @@ repositories {
 dependencies {
     // APPLICATION
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.security:spring-security-crypto'
@@ -51,3 +52,7 @@ dependencies {
 
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
+
+tasks.named('bootJar') {
+    archiveFileName = 'app.jar'
+}

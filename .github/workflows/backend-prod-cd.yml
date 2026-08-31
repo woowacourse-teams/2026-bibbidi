@@ -1,0 +1,100 @@
+name: Bibbidi Backend PROD CD
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [release-be]
+    paths:
+      - "BE/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-prod-deploy
+
+jobs:
+  build-and-push:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04-arm
+
+    defaults:
+      run:
+        working-directory: BE
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and test
+        run: ./gradlew clean build
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./BE
+          file: ./BE/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: [self-hosted, linux, ARM64, prod]
+
+    steps:
+      - name: Checkout deployment configuration
+        uses: actions/checkout@v7
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Install deployment configuration
+        run: install -m 0644 BE/compose.prod.yaml /opt/bibbidi/app/compose.yaml
+
+      - name: Deploy and verify health
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd /opt/bibbidi/app
+
+          docker compose pull backend
+          docker compose up -d backend
+
+          if ! curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 30 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --retry-all-errors \
+            http://127.0.0.1:8080/actuator/health \
+            | grep --quiet '"status":"UP"'; then
+            docker compose logs --tail=200 backend
+            exit 1
+          fi
+
+          docker image prune --all --force
