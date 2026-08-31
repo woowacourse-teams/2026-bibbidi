@@ -95,6 +95,18 @@ public class ChecklistService {
     }
 
     @Transactional
+    public void deleteItem(Long ownerId, Long checklistItemId) {
+        checklistRepository.findByChecklistItemId(checklistItemId)
+                .map(checklist -> checklist.deletableItem(ownerId, checklistItemId))
+                .ifPresent(this::deleteItemWithAppointments);
+    }
+
+    private void deleteItemWithAppointments(ChecklistItem item) {
+        checklistAppointmentDeleteService.deleteAllByChecklistItemId(item.id());
+        checklistRepository.deleteItem(item);
+    }
+
+    @Transactional
     public void deleteByOwnerId(Long ownerId) {
         checklistRepository.findByOwnerId(ownerId)
                 .ifPresent(this::deleteChecklistData);

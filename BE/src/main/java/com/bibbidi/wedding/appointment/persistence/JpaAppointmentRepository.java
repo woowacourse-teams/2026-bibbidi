@@ -34,13 +34,6 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             """)
     void deleteAll(List<Long> targetAppointmentIds);
 
-    @Modifying(clearAutomatically = true)
-    @Query("""
-            DELETE FROM JpaAppointmentEntity appointment
-            WHERE appointment.checklistItemId = :checklistItemId
-            """)
-    void deleteAllByChecklistItemId(Long checklistItemId);
-
     @Query("""
             SELECT appointment
             FROM JpaAppointmentEntity appointment

@@ -58,6 +58,7 @@ class ChecklistItemControllerIntegrationTest {
     private static final Long CATALOG_SOURCED_ITEM_ID = 501L;
     private static final Long DONE_CUSTOM_ITEM_ID = 502L;
     private static final Long OTHER_USERS_ITEM_ID = 503L;
+    private static final Long CONTINUE_CUSTOM_ITEM_ID = 504L;
     private static final Long CURRENT_CATEGORY_ID = 2L;
     private static final Long NEW_CATEGORY_ID = 3L;
     private static final Long SOURCE_CATALOG_ITEM_ID = 100L;
@@ -65,6 +66,7 @@ class ChecklistItemControllerIntegrationTest {
     private static final Long SECOND_CUSTOM_ITEM_APPOINTMENT_ID = 801L;
     private static final Long CATALOG_SOURCED_ITEM_APPOINTMENT_ID = 802L;
     private static final Long DONE_ITEM_APPOINTMENT_ID = 803L;
+    private static final Long CONTINUE_ITEM_APPOINTMENT_ID = 805L;
     private static final String NEW_TITLE = "청첩장 문구 최종 확정";
 
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -511,6 +513,19 @@ class ChecklistItemControllerIntegrationTest {
                 FIRST_CUSTOM_ITEM_APPOINTMENT_ID,
                 SECOND_CUSTOM_ITEM_APPOINTMENT_ID
         ))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("진행 중인 할 일과 연결된 일정도 함께 삭제한다")
+    void shouldDeleteContinueItemAndAppointments() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CONTINUE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(jpaChecklistItemRepository.findById(CONTINUE_CUSTOM_ITEM_ID)).isEmpty();
+        assertThat(jpaAppointmentRepository.findById(CONTINUE_ITEM_APPOINTMENT_ID)).isEmpty();
     }
 
     @Test

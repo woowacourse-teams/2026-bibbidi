@@ -246,6 +246,88 @@ class ChecklistServiceTest {
     }
 
     @Test
+    @DisplayName("준비 목록에서 가져온 미완료 할 일과 연결된 일정을 함께 삭제한다")
+    void shouldDeleteIncompleteCatalogSourcedItemAndAppointments() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, 100L);
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item));
+        given(checklistRepository.findByChecklistItemId(item.id())).willReturn(Optional.of(checklist));
+
+        // when
+        checklistService.deleteItem(OWNER_ID, item.id());
+
+        // then
+        InOrder deletionOrder = inOrder(checklistAppointmentDeleteService, checklistRepository);
+        deletionOrder.verify(checklistAppointmentDeleteService).deleteAllByChecklistItemId(item.id());
+        deletionOrder.verify(checklistRepository).deleteItem(item);
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 이미 삭제된 것으로 처리한다")
+    void shouldIgnoreDeletionWhenItemDoesNotExist() {
+        // given
+        given(checklistRepository.findByChecklistItemId(200L)).willReturn(Optional.empty());
+
+        // when
+        checklistService.deleteItem(OWNER_ID, 200L);
+
+        // then
+        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemBelongsToAnotherUser() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, null);
+        given(checklistRepository.findByChecklistItemId(item.id()))
+                .willReturn(Optional.of(new Checklist(CHECKLIST_ID, 2L, List.of(item))));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.deleteItem(OWNER_ID, item.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("완료된 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemIsDone() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        given(checklistRepository.findByChecklistItemId(item.id()))
+                .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item))));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.deleteItem(OWNER_ID, item.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
+        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("일정 삭제가 실패하면 할 일을 삭제하지 않는다")
+    void shouldNotDeleteItemWhenAppointmentDeletionFails() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, null);
+        given(checklistRepository.findByChecklistItemId(item.id()))
+                .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item))));
+        willThrow(new IllegalStateException("appointment deletion failed"))
+                .given(checklistAppointmentDeleteService)
+                .deleteAllByChecklistItemId(item.id());
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.deleteItem(OWNER_ID, item.id()))
+                .isInstanceOf(IllegalStateException.class);
+        then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
+    }
+
+    @Test
     @DisplayName("연결된 일정을 먼저 삭제한 뒤 체크리스트를 통째로 삭제한다")
     void shouldDeleteAppointmentsBeforeChecklist() {
         List<Long> checklistItemIds = List.of(100L, 101L);
@@ -275,12 +357,20 @@ class ChecklistServiceTest {
     }
 
     private static ChecklistItem item(Long id) {
+        return item(id, ChecklistItemStatus.PREV, null);
+    }
+
+    private static ChecklistItem item(
+            Long id,
+            ChecklistItemStatus status,
+            Long sourceCatalogItemId
+    ) {
         return new ChecklistItem(
                 id,
                 CATEGORY_ID,
                 "계약서 확인",
-                null,
-                ChecklistItemStatus.PREV
+                sourceCatalogItemId,
+                status
         );
     }
 }

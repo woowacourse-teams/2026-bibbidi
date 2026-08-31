@@ -25,6 +25,14 @@ class ChecklistAppointmentDeleteServiceTest {
     }
 
     @Test
+    @DisplayName("지정한 할 일 하나에 속한 일정을 모두 삭제한다")
+    void shouldDeleteAppointmentsByChecklistItemId() {
+        checklistAppointmentDeleteService.deleteAllByChecklistItemId(10L);
+
+        then(appointmentRepository).should().deleteAllByChecklistItemIds(List.of(10L));
+    }
+
+    @Test
     @DisplayName("지정한 할 일들에 속한 일정을 모두 삭제한다")
     void shouldDeleteAppointmentsByChecklistItemIds() {
         checklistAppointmentDeleteService.deleteAllByChecklistItemIds(List.of(10L, 11L));

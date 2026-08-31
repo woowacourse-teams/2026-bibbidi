@@ -152,7 +152,7 @@ class AppointmentRepositoryTest {
         Appointment second = saveAppointment(1L);
         Appointment remaining = saveAppointment(2L);
 
-        appointmentRepository.deleteAllByChecklistItemId(1L);
+        appointmentRepository.deleteAllByChecklistItemIds(List.of(1L));
 
         assertThat(jpaAppointmentRepository.findById(first.id())).isEmpty();
         assertThat(jpaAppointmentRepository.findById(second.id())).isEmpty();
