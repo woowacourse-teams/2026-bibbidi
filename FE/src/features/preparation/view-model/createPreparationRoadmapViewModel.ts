@@ -11,6 +11,7 @@ const statusLabels: Record<PreparationStepStatus, string> = {
   "in-progress": "진행 중",
   upcoming: "예정",
 };
+const ROADMAP_TITLE = "준비 로드맵";
 
 export interface PreparationCategoryViewModel {
   id: string;
@@ -270,6 +271,6 @@ export function createPreparationRoadmapViewModel(
         title: step.title,
       };
     }),
-    title: roadmap.title,
+    title: ROADMAP_TITLE,
   };
 }

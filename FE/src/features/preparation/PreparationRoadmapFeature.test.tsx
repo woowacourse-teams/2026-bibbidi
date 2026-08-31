@@ -21,8 +21,8 @@ function renderFeature({ strictMode = false } = {}) {
   return render(strictMode ? <StrictMode>{feature}</StrictMode> : feature);
 }
 
-function getRoadmapTitle(name: string) {
-  return screen.getByRole("heading", { name });
+function getRoadmapTitle() {
+  return screen.getByRole("heading", { name: "준비 로드맵" });
 }
 
 const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1439px)";
@@ -181,7 +181,7 @@ describe("PreparationRoadmapFeature Analytics", () => {
   it("스크롤로 다음 카테고리를 선택하고 한 제스처에서는 한 번만 전송한다", () => {
     renderFeature();
     analyticsMocks.track.mockClear();
-    const roadmapTitle = getRoadmapTitle("웨딩홀 준비 로드맵");
+    const roadmapTitle = getRoadmapTitle();
 
     fireEvent.wheel(roadmapTitle, { deltaX: 0, deltaY: 100 });
     fireEvent.wheel(roadmapTitle, { deltaX: 0, deltaY: 100 });
@@ -202,7 +202,7 @@ describe("PreparationRoadmapFeature Analytics", () => {
     renderFeature();
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle("웨딩홀 준비 로드맵"), {
+    fireEvent.wheel(getRoadmapTitle(), {
       deltaX: 0,
       deltaY: -100,
     });
@@ -215,7 +215,7 @@ describe("PreparationRoadmapFeature Analytics", () => {
     fireEvent.click(screen.getByRole("button", { name: "기타" }));
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle("기타 준비 로드맵"), {
+    fireEvent.wheel(getRoadmapTitle(), {
       deltaX: 0,
       deltaY: 100,
     });
@@ -238,6 +238,19 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
   afterEach(() => {
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
     vi.unstubAllGlobals();
+  });
+
+  it("로드맵 상세 패널에서는 중복되는 카테고리 라벨을 표시하지 않는다", () => {
+    setViewportMatches(false);
+    renderFeature();
+
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
+    });
+
+    expect(
+      detail.querySelector(".preparation-step-detail__category"),
+    ).toBeNull();
   });
 
   it("모바일 최초 진입 시에는 단계를 자동 선택하지 않는다", () => {
@@ -447,13 +460,13 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle("웨딩홀 준비 로드맵"), {
+    fireEvent.wheel(getRoadmapTitle(), {
       deltaX: 0,
       deltaY: 100,
     });
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
-    expect(getRoadmapTitle("웨딩홀 준비 로드맵")).toBeTruthy();
+    expect(getRoadmapTitle()).toBeTruthy();
   });
 
   it("viewport 복귀 후 첫 wheel 제스처로 카테고리를 변경한다", () => {
@@ -461,11 +474,15 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle("웨딩홀 준비 로드맵"), {
+    fireEvent.wheel(getRoadmapTitle(), {
       deltaX: 0,
       deltaY: 100,
     });
-    expect(getRoadmapTitle("스드메 준비 로드맵")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "스드메" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
 
     act(() => {
       viewport.change(true);
@@ -475,12 +492,16 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     });
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle("스드메 준비 로드맵"), {
+    fireEvent.wheel(getRoadmapTitle(), {
       deltaX: 0,
       deltaY: 100,
     });
 
-    expect(getRoadmapTitle("초대 준비 로드맵")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "초대" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 });

@@ -4,11 +4,13 @@ import { PreparationStepDetailViewModel } from "../view-model/createPreparationR
 interface PreparationStepDetailProps {
   detail: PreparationStepDetailViewModel;
   focusOnMount?: boolean;
+  showCategoryLabel?: boolean;
 }
 
 export function PreparationStepDetail({
   detail,
   focusOnMount = false,
+  showCategoryLabel = true,
 }: PreparationStepDetailProps) {
   const detailRef = useRef<HTMLElement>(null);
 
@@ -38,10 +40,18 @@ export function PreparationStepDetail({
       tabIndex={focusOnMount ? -1 : undefined}
     >
       <div className="preparation-step-detail__panel">
-        <header className="preparation-step-detail__header">
-          <span className="preparation-step-detail__category">
-            {detail.categoryLabel}
-          </span>
+        <header
+          className={`preparation-step-detail__header${
+            showCategoryLabel
+              ? ""
+              : " preparation-step-detail__header--without-category"
+          }`}
+        >
+          {showCategoryLabel ? (
+            <span className="preparation-step-detail__category">
+              {detail.categoryLabel}
+            </span>
+          ) : null}
           <h2>{detail.title}</h2>
           <p>{detail.description}</p>
           <span

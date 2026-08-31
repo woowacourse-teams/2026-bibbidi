@@ -101,6 +101,7 @@ function PreparationRoadmapSteps({
               <PreparationStepDetail
                 detail={viewModel.selectedStepDetail}
                 focusOnMount
+                showCategoryLabel={false}
               />
             ) : (
               <button
@@ -305,7 +306,10 @@ export function PreparationRoadmap({
         </div>
 
         {!isMobileLayout ? (
-          <PreparationStepDetail detail={viewModel.selectedStepDetail} />
+          <PreparationStepDetail
+            detail={viewModel.selectedStepDetail}
+            showCategoryLabel={false}
+          />
         ) : null}
       </section>
     </div>

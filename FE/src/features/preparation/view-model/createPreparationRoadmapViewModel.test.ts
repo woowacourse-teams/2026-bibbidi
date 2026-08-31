@@ -224,6 +224,7 @@ describe("createPreparationRoadmapViewModel", () => {
       canNavigateNext: false,
       canNavigatePrevious: false,
     });
+    expect(viewModel.title).toBe("준비 로드맵");
   });
 
   it("사용자 진행 상태를 단계와 상세 패널에 반영한다", () => {
