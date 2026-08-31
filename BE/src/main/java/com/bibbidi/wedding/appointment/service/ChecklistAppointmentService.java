@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.appointment.service;
 
+import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,16 @@ public class ChecklistAppointmentService {
     @Transactional(readOnly = true)
     public boolean hasRemainingAppointment(Long checklistItemId) {
         return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+    }
+
+    @Transactional
+    public void completeAllByChecklistItemId(Long checklistItemId) {
+        List<Appointment> remaining = appointmentRepository.findAllRemainingByChecklistItemId(checklistItemId);
+        List<Appointment> completed = remaining.stream()
+                .map(Appointment::complete)
+                .toList();
+
+        appointmentRepository.saveAll(completed);
     }
 
     @Transactional
