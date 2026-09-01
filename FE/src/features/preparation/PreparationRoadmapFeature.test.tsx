@@ -187,10 +187,8 @@ describe("PreparationRoadmapFeature Analytics", () => {
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(
-      screen
-        .getByRole("button", { name: "웨딩홀" })
-        .getAttribute("aria-current"),
-    ).toBe("page");
+      screen.getByRole("button", { name: "웨딩홀", pressed: true }),
+    ).toBeTruthy();
   });
 });
 
