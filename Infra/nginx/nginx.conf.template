@@ -111,6 +111,11 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 
+        location ^~ /actuator {
+            access_log off;
+            return 404;
+        }
+
         location / {
             limit_req zone=per_ip_api burst=60 nodelay;
             limit_conn per_ip_conn 40;

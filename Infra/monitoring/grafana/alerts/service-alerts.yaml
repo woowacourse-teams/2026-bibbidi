@@ -17,8 +17,8 @@ groups:
         annotations:
           summary: "5xx response ratio is above 5%"
           description: "At least 5% of Backend HTTP responses have a 5xx status for 5 minutes. Check the Service Overview dashboard and Loki logs."
-          dashboard_uid: bibbidi-service-overview
-          panel_id: "2"
+          dashboard_uid: bibbidi-observability
+          panel_id: "3"
         labels: {severity: warning, service: bibbidi, symptom: api-errors}
         data:
           - refId: A
@@ -44,8 +44,8 @@ groups:
         annotations:
           summary: "5xx response ratio is above 15%"
           description: "At least 15% of Backend HTTP responses have a 5xx status for 2 minutes. Treat this as an active API outage."
-          dashboard_uid: bibbidi-service-overview
-          panel_id: "2"
+          dashboard_uid: bibbidi-observability
+          panel_id: "3"
         labels: {severity: critical, service: bibbidi, symptom: api-errors}
         data:
           - refId: A
@@ -71,8 +71,8 @@ groups:
         annotations:
           summary: "Checklist, appointment, auth, or user API availability is below 99%"
           description: "The major API group has a non-2xx response ratio above 1% for 5 minutes. Use the URI label only for investigation, not as an index label."
-          dashboard_uid: bibbidi-service-overview
-          panel_id: "3"
+          dashboard_uid: bibbidi-observability
+          panel_id: "4"
         labels: {severity: warning, service: bibbidi, symptom: availability}
         data:
           - refId: A
@@ -98,8 +98,8 @@ groups:
         annotations:
           summary: "API p95 latency is above 1 second"
           description: "The 5-minute p95 latency is above 1 second. Check Database Pool, JVM, and Trace views for the slow dependency."
-          dashboard_uid: bibbidi-service-overview
-          panel_id: "4"
+          dashboard_uid: bibbidi-observability
+          panel_id: "5"
         labels: {severity: warning, service: bibbidi, symptom: latency}
         data:
           - refId: A
@@ -130,8 +130,8 @@ groups:
         annotations:
           summary: "HikariCP has pending connection requests"
           description: "One or more callers have waited for a database connection for 5 minutes. Check database health and active connection usage."
-          dashboard_uid: bibbidi-database-pool
-          panel_id: "1"
+          dashboard_uid: bibbidi-observability
+          panel_id: "12"
         labels: {severity: warning, service: bibbidi, symptom: database-pool}
         data:
           - refId: A
@@ -151,8 +151,8 @@ groups:
         annotations:
           summary: "HikariCP has more than 5 pending connection requests"
           description: "Database pool saturation can cause API timeouts. Check DB availability before increasing the pool size."
-          dashboard_uid: bibbidi-database-pool
-          panel_id: "1"
+          dashboard_uid: bibbidi-observability
+          panel_id: "12"
         labels: {severity: critical, service: bibbidi, symptom: database-pool}
         data:
           - refId: A
@@ -172,8 +172,8 @@ groups:
         annotations:
           summary: "JVM heap usage is above 85%"
           description: "High heap usage persisted for 10 minutes. Check GC pause time, allocation rate, and recent deployment changes."
-          dashboard_uid: bibbidi-jvm
-          panel_id: "1"
+          dashboard_uid: bibbidi-observability
+          panel_id: "7"
         labels: {severity: warning, service: bibbidi, symptom: jvm-memory}
         data:
           - refId: A
@@ -195,7 +195,7 @@ groups:
         annotations:
           summary: "Prometheus cannot scrape the Bibbidi Backend"
           description: "The Backend target is down or unreachable. Check the backend and Alloy containers, Docker Network, and Actuator access policy."
-          dashboard_uid: bibbidi-service-overview
+          dashboard_uid: bibbidi-observability
         labels: {severity: critical, service: bibbidi, symptom: target-down}
         data:
           - refId: A

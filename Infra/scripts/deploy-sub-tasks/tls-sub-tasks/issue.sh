@@ -13,7 +13,7 @@ issue_certificate() {
 }
 
 reload_nginx() {
-  sudo docker compose -f "$EC2_DEPLOY_PATH/compose.yaml" exec -T nginx nginx -s reload
+  docker compose -f "$EC2_DEPLOY_PATH/compose.yaml" exec -T nginx nginx -s reload
 }
 
 issue_tls() {

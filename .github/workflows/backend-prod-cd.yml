@@ -63,6 +63,17 @@ jobs:
     needs: build-and-push
     runs-on: [self-hosted, linux, ARM64, prod]
 
+    env:
+      EC2_DEPLOY_PATH: /opt/bibbidi/app
+      NGINX_CONFIG_PATH: /opt/bibbidi/app/infra/nginx/nginx.conf
+      ALLOY_CONFIG_PATH: /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+      SPRING_ENV_FILE: /opt/bibbidi/app/.env.spring
+      ALLOY_ENV_FILE: /opt/bibbidi/app/infra/monitoring/.env.alloy
+      NGINX_ENV_FILE: /opt/bibbidi/app/.env.nginx
+      TLS_ENV_FILE: /opt/bibbidi/app/.env.nginx
+      CERTBOT_WEBROOT: /opt/bibbidi/app/infra/nginx/certbot
+      TLS_SCRIPT: Infra/scripts/deploy-sub-tasks/tls-sub-tasks/do-tls.sh
+
     steps:
       - name: Checkout deployment configuration
         uses: actions/checkout@v7
@@ -84,7 +95,8 @@ jobs:
           test -n "$ALLOY_ENV_CONTENT"
           install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
           install -d -m 0755 /opt/bibbidi/app/infra/nginx
-          install -m 0644 BE/compose.prod.yaml /opt/bibbidi/app/compose.yaml
+          install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
+          install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
           install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
           umask 077
@@ -95,28 +107,24 @@ jobs:
       - name: Prepare observability network
         run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
 
+      - name: Render nginx configuration
+        run: |
+          set -a
+          . /opt/bibbidi/app/.env.nginx
+          set +a
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
+            < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
+            > /opt/bibbidi/app/infra/nginx/nginx.conf
+
+      - name: Bootstrap TLS material
+        run: bash "$TLS_SCRIPT" bootstrap
+
       - name: Deploy and verify health
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd /opt/bibbidi/app
-
-          docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
-          export NGINX_CONFIG_PATH=/opt/bibbidi/app/infra/nginx/nginx.conf
-          export ALLOY_CONFIG_PATH=/opt/bibbidi/app/infra/monitoring/alloy/config.alloy
-          export SPRING_ENV_FILE=/opt/bibbidi/app/.env.spring
-          export ALLOY_ENV_FILE=/opt/bibbidi/app/infra/monitoring/.env.alloy
-          export NGINX_ENV_FILE=/opt/bibbidi/app/.env.nginx
-          export TLS_ENV_FILE=/opt/bibbidi/app/.env.nginx
-
-          set -a
-          . /opt/bibbidi/app/.env.spring
-          . /opt/bibbidi/app/.env.nginx
-          set +a
-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
-            < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
-            > /opt/bibbidi/app/infra/nginx/nginx.conf
 
           docker compose config >/dev/null
           docker compose pull backend nginx alloy
@@ -141,4 +149,12 @@ jobs:
             exit 1
           fi
 
-          docker image prune --all --force
+      - name: Issue or renew TLS certificate
+        continue-on-error: true
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: bash "$TLS_SCRIPT" issue
+
+      - name: Prune stale images
+        run: docker image prune --all --force --filter "until=72h"
