@@ -253,7 +253,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBe("웨딩홀 투어와 계약");
   });
 
-  it("모바일 최초 진입 시에는 단계를 자동 선택하지 않는다", () => {
+  it("모바일 최초 진입 시 초기 선택 상태를 표시하고 상세는 자동 확장하지 않는다", () => {
     setViewportMatches();
     renderFeature();
 
@@ -265,6 +265,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       screen.getByRole("button", {
         name: /01.*웨딩홀 투어와 계약/,
+        pressed: true,
       }),
     ).toBeTruthy();
   });

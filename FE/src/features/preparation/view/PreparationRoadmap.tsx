@@ -70,7 +70,7 @@ function PreparationRoadmapSteps({
             ) : (
               <button
                 aria-controls="preparation-step-detail"
-                aria-pressed={!isMobileLayout && step.isSelected}
+                aria-pressed={step.isSelected}
                 className="preparation-roadmap__step-button"
                 onClick={() => onStepSelect(step.id)}
                 type="button"
