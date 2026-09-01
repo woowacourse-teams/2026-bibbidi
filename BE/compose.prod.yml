@@ -6,6 +6,7 @@ services:
     env_file:
       - ${SPRING_ENV_FILE:-./.env.spring}
     environment:
+      SPRING_PROFILES_ACTIVE: prod
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bibbidi-backend}
       OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-0.0.1}
       OTEL_SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}

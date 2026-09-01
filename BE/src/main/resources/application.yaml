@@ -2,23 +2,7 @@ spring:
   application:
     name: ${OTEL_SERVICE_NAME:bibbidi-backend}
 
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bibbidi}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
-    hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:10}
-      minimum-idle: 1
-      idle-timeout: 600000
-      connection-timeout: 30000
-      max-lifetime: 110000
-      keepalive-time: 30000
-      connection-test-query: "SELECT 1"
-
   jpa:
-    hibernate:
-      ddl-auto: validate
     open-in-view: false
     show-sql: false
 
@@ -62,3 +46,43 @@ logging:
     format:
       console: ecs
   include-application-name: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bibbidi}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 1
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 110000
+      keepalive-time: 30000
+      connection-test-query: "SELECT 1"
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "!prod"
+
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
