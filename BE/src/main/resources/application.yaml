@@ -1,6 +1,6 @@
 spring:
   application:
-    name: wedding
+    name: ${OTEL_SERVICE_NAME:bibbidi-backend}
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -36,3 +36,29 @@ server:
         http-only: true
         secure: true
         same-site: lax
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+      deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}
+
+logging:
+  structured:
+    format:
+      console: ecs
+  include-application-name: false

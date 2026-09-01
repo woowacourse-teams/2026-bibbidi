@@ -1,0 +1,94 @@
+services:
+  backend:
+    image: "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/bibbidi-backend:${IMAGE_TAG:?IMAGE_TAG is required}"
+    restart: unless-stopped
+    env_file:
+      - ${SPRING_ENV_FILE:-./.env.spring}
+    environment:
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bibbidi-backend}
+      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-0.0.1}
+      OTEL_SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}
+      DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+      OTEL_RESOURCE_ATTRIBUTES: service.name=${OTEL_SERVICE_NAME:-bibbidi-backend},service.version=${OTEL_SERVICE_VERSION:-0.0.1},service.instance.id=${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod},deployment.environment.name=${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 1200m
+    networks:
+      - bibbidi-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.29-alpine
+    container_name: nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - ${NGINX_ENV_FILE:-./.env.nginx}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${NGINX_CONFIG_PATH:-../Infra/nginx/nginx.conf.template}:/etc/nginx/nginx.conf:ro
+      - ${CERTBOT_WEBROOT:-../Infra/nginx/certbot}:/var/www/certbot:ro
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+    networks:
+      - bibbidi-observability
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  alloy:
+    image: grafana/alloy:v1.11.0
+    container_name: alloy
+    restart: unless-stopped
+    env_file:
+      - ${ALLOY_ENV_FILE:-../Infra/monitoring/.env.alloy}
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental
+    volumes:
+      - ${ALLOY_CONFIG_PATH:-../Infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    networks:
+      - bibbidi-observability
+    mem_limit: 256m
+    cpus: 0.50
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:12345/-/ready >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  bibbidi-observability:
+    external: true
+    name: bibbidi-observability
+
+volumes:
+  alloy_data:
