@@ -6,6 +6,9 @@ on:
     branches: [release-be]
     paths:
       - "BE/**"
+      - "Infra/monitoring/**"
+      - "Infra/nginx/**"
+      - "Infra/scripts/**"
 
 permissions:
   contents: read
@@ -71,7 +74,26 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Install deployment configuration
-        run: install -m 0644 BE/compose.prod.yaml /opt/bibbidi/app/compose.yaml
+        env:
+          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+        run: |
+          test -n "$SPRING_ENV_CONTENT"
+          test -n "$NGINX_ENV_CONTENT"
+          test -n "$ALLOY_ENV_CONTENT"
+          install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
+          install -d -m 0755 /opt/bibbidi/app/infra/nginx
+          install -m 0644 BE/compose.prod.yaml /opt/bibbidi/app/compose.yaml
+          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
+          umask 077
+          printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
+          printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
+          printf '%s\n' "$ALLOY_ENV_CONTENT" > /opt/bibbidi/app/infra/monitoring/.env.alloy
+
+      - name: Prepare observability network
+        run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
 
       - name: Deploy and verify health
         env:
@@ -80,8 +102,25 @@ jobs:
         run: |
           cd /opt/bibbidi/app
 
-          docker compose pull backend
-          docker compose up -d backend
+          docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
+          export NGINX_CONFIG_PATH=/opt/bibbidi/app/infra/nginx/nginx.conf
+          export ALLOY_CONFIG_PATH=/opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          export SPRING_ENV_FILE=/opt/bibbidi/app/.env.spring
+          export ALLOY_ENV_FILE=/opt/bibbidi/app/infra/monitoring/.env.alloy
+          export NGINX_ENV_FILE=/opt/bibbidi/app/.env.nginx
+          export TLS_ENV_FILE=/opt/bibbidi/app/.env.nginx
+
+          set -a
+          . /opt/bibbidi/app/.env.spring
+          . /opt/bibbidi/app/.env.nginx
+          set +a
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
+            < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
+            > /opt/bibbidi/app/infra/nginx/nginx.conf
+
+          docker compose config >/dev/null
+          docker compose pull backend nginx alloy
+          docker compose up -d backend nginx alloy
 
           if ! curl \
             --fail \
@@ -93,7 +132,12 @@ jobs:
             --retry-all-errors \
             http://127.0.0.1:8080/actuator/health \
             | grep --quiet '"status":"UP"'; then
-            docker compose logs --tail=200 backend
+            docker compose logs --tail=200 backend nginx alloy
+            exit 1
+          fi
+
+          if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
+            docker compose logs --tail=200 nginx alloy
             exit 1
           fi
 
