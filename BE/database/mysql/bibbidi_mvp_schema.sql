@@ -109,6 +109,7 @@ CREATE TABLE appointments (
     place VARCHAR(255),
     memo TEXT,
     is_done BOOLEAN NOT NULL,
+    done_by_checklist_item BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),

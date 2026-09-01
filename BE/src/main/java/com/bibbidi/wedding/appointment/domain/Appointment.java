@@ -18,6 +18,7 @@ public final class Appointment {
     private final String place;
     private final String memo;
     private final boolean isDone;
+    private final boolean doneByChecklistItem;
 
     public Appointment(
             @Nullable Long id,
@@ -28,7 +29,8 @@ public final class Appointment {
             LocalDateTime endTime,
             String place,
             String memo,
-            boolean isDone
+            boolean isDone,
+            boolean doneByChecklistItem
     ) {
         validateTime(startTime, endTime);
 
@@ -41,14 +43,19 @@ public final class Appointment {
         this.place = normalizePlace(place);
         this.memo = memo;
         this.isDone = isDone;
+        this.doneByChecklistItem = doneByChecklistItem;
     }
 
     public Appointment complete() {
-        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true);
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true, false);
+    }
+
+    public Appointment completeByChecklistItem() {
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true, true);
     }
 
     public Appointment reopen() {
-        return copy(checklistItemId, title, date, startTime, endTime, place, memo, false);
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, false, false);
     }
 
     public Appointment update(
@@ -59,7 +66,7 @@ public final class Appointment {
             String place,
             String memo
     ) {
-        return copy(checklistItemId, title, date, startTime, endTime, place, memo, isDone);
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, isDone, doneByChecklistItem);
     }
 
     private Appointment copy(
@@ -70,7 +77,8 @@ public final class Appointment {
             LocalDateTime endTime,
             String place,
             String memo,
-            boolean isDone
+            boolean isDone,
+            boolean doneByChecklistItem
     ) {
         return new Appointment(
                 id,
@@ -81,7 +89,8 @@ public final class Appointment {
                 endTime,
                 place,
                 memo,
-                isDone
+                isDone,
+                doneByChecklistItem
         );
     }
 
@@ -111,6 +120,10 @@ public final class Appointment {
 
     public boolean isDone() {
         return isDone;
+    }
+
+    public boolean doneByChecklistItem() {
+        return doneByChecklistItem;
     }
 
     public LocalDateTime startTime() {

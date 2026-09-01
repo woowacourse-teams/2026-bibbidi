@@ -38,6 +38,7 @@ public class AppointmentService {
                 command.endTime(),
                 command.place(),
                 command.memo(),
+                false,
                 false
         );
 

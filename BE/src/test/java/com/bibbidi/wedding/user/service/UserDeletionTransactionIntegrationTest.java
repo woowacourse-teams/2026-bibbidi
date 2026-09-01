@@ -86,6 +86,7 @@ class UserDeletionTransactionIntegrationTest {
                         null,
                         null,
                         null,
+                        false,
                         false
                 )
         );

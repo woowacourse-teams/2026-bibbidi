@@ -24,7 +24,7 @@ public class ChecklistAppointmentService {
     public void completeAllByChecklistItemId(Long checklistItemId) {
         List<Appointment> remaining = appointmentRepository.findAllRemainingByChecklistItemId(checklistItemId);
         List<Appointment> completed = remaining.stream()
-                .map(Appointment::complete)
+                .map(Appointment::completeByChecklistItem)
                 .toList();
 
         appointmentRepository.saveAll(completed);

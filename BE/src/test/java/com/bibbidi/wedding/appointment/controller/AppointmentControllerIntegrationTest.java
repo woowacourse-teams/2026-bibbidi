@@ -553,7 +553,8 @@ class AppointmentControllerIntegrationTest {
                 LocalDateTime.of(2026, 9, 1, 11, 0),
                 "웨딩홀",
                 "상담 준비",
-                true
+                true,
+                false
         ));
     }
 

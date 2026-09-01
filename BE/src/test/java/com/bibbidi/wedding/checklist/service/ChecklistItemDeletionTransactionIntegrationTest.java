@@ -73,6 +73,7 @@ class ChecklistItemDeletionTransactionIntegrationTest {
                         null,
                         null,
                         null,
+                        false,
                         false
                 )
         );

@@ -50,6 +50,7 @@ class AppointmentRepositoryTest {
                 LocalDateTime.of(2026, 9, 1, 11, 0),
                 "웨딩홀",
                 "상담 준비",
+                false,
                 false
         );
 
@@ -149,6 +150,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         );
         Appointment saved = appointmentRepository.save(testAppointment);
@@ -246,6 +248,7 @@ class AppointmentRepositoryTest {
                 LocalDateTime.of(2026, 9, 1, endHour, endMinute),
                 "probe",
                 null,
+                false,
                 false
         );
     }
@@ -266,6 +269,7 @@ class AppointmentRepositoryTest {
                 endHour == null ? null : LocalDateTime.of(2026, 9, 1, endHour, endMinute),
                 title,
                 null,
+                false,
                 false
         ));
     }
@@ -280,6 +284,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         ));
     }
@@ -294,7 +299,8 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
-                true
+                true,
+                false
         ));
     }
 
@@ -308,6 +314,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         ));
     }

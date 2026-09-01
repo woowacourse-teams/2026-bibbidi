@@ -28,7 +28,8 @@ class AppointmentTest {
                 END,
                 "Wedding hall",
                 "Preparation",
-                isDone
+                isDone,
+                false
         );
     }
 
@@ -177,13 +178,13 @@ class AppointmentTest {
                 null, CHECKLIST_ITEM_ID, "crossing", DATE,
                 LocalDateTime.of(2026, 9, 1, 23, 0),
                 LocalDateTime.of(2026, 9, 2, 1, 0),
-                "Wedding hall", null, false
+                "Wedding hall", null, false, false
         );
         Appointment nextDay = new Appointment(
                 null, CHECKLIST_ITEM_ID, "next day", DATE.plusDays(1),
                 LocalDateTime.of(2026, 9, 2, 0, 30),
                 LocalDateTime.of(2026, 9, 2, 2, 0),
-                "Wedding hall", null, false
+                "Wedding hall", null, false, false
         );
 
         assertThat(crossingMidnight.conflictsWith(nextDay)).isTrue();
@@ -199,7 +200,8 @@ class AppointmentTest {
     private static Appointment withoutPlace(Appointment appointment) {
         return new Appointment(
                 appointment.id(), appointment.checklistItemId(), appointment.title(), appointment.date(),
-                appointment.startTime(), appointment.endTime(), null, appointment.memo(), appointment.isDone()
+                appointment.startTime(), appointment.endTime(), null, appointment.memo(), appointment.isDone(),
+                false
         );
     }
 
@@ -213,6 +215,7 @@ class AppointmentTest {
                 endTime,
                 "Wedding hall",
                 "Preparation",
+                false,
                 false
         );
     }

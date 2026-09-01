@@ -18,7 +18,8 @@ public class AppointmentMapper {
                 appointment.endTime(),
                 appointment.place(),
                 appointment.memo(),
-                appointment.isDone()
+                appointment.isDone(),
+                appointment.doneByChecklistItem()
         );
     }
 
@@ -32,7 +33,8 @@ public class AppointmentMapper {
                 entity.endTime(),
                 entity.place(),
                 entity.memo(),
-                entity.isDone()
+                entity.isDone(),
+                entity.doneByChecklistItem()
         );
     }
 }

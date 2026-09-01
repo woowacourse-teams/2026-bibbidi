@@ -135,6 +135,7 @@ class AppointmentServiceTest {
                 LocalDateTime.of(2026, 9, 1, 11, 0),
                 "place",
                 "memo",
+                false,
                 false
         );
         AppointmentConflict conflict = new AppointmentConflict(
@@ -152,6 +153,7 @@ class AppointmentServiceTest {
                         conflict.endTime(),
                         conflict.place(),
                         null,
+                        false,
                         false
                 )));
 
@@ -168,6 +170,7 @@ class AppointmentServiceTest {
                 LocalDateTime.of(2026, 9, 1, 11, 0),
                 "place",
                 "memo",
+                false,
                 false
         );
     }

@@ -43,6 +43,9 @@ public class JpaAppointmentEntity extends BaseTimeEntity {
     @Column(name = "is_done", nullable = false)
     private boolean isDone;
 
+    @Column(name = "done_by_checklist_item", nullable = false)
+    private boolean doneByChecklistItem;
+
     protected JpaAppointmentEntity() {
     }
 
@@ -55,7 +58,8 @@ public class JpaAppointmentEntity extends BaseTimeEntity {
             LocalDateTime endTime,
             String place,
             String memo,
-            boolean isDone
+            boolean isDone,
+            boolean doneByChecklistItem
     ) {
         this.id = id;
         this.checklistItemId = checklistItemId;
@@ -66,6 +70,7 @@ public class JpaAppointmentEntity extends BaseTimeEntity {
         this.place = place;
         this.memo = memo;
         this.isDone = isDone;
+        this.doneByChecklistItem = doneByChecklistItem;
     }
 
     public Long id() {
@@ -102,5 +107,9 @@ public class JpaAppointmentEntity extends BaseTimeEntity {
 
     public boolean isDone() {
         return isDone;
+    }
+
+    public boolean doneByChecklistItem() {
+        return doneByChecklistItem;
     }
 }
