@@ -218,9 +218,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       name: "이 단계에서 준비할 일",
     });
 
-    expect(
-      detail.querySelector(".preparation-step-detail__category"),
-    ).toBeNull();
+    expect(within(detail).queryByText("웨딩홀")).toBeNull();
   });
 
   it("데스크톱 최초 진입 시에는 초기 단계 상세 패널을 표시한다", () => {

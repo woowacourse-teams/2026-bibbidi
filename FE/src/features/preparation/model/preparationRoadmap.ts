@@ -1,5 +1,4 @@
 export type PreparationStepStatus = "complete" | "in-progress" | "upcoming";
-export type PreparationCategoryNavigationDirection = "next" | "previous";
 
 export interface PreparationCategoryModel {
   id: string;
@@ -7,7 +6,6 @@ export interface PreparationCategoryModel {
 }
 
 export interface PreparationStepModel {
-  description: string;
   id: string;
   order: number;
   title: string;

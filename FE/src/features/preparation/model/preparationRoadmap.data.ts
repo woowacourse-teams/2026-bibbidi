@@ -6,6 +6,7 @@ import {
 } from "./preparationRoadmap";
 
 interface PreparationStepData extends PreparationStepModel {
+  description: string;
   tasks: PreparationDetailTaskModel[];
 }
 
@@ -572,8 +573,7 @@ export const preparationRoadmapData = {
   categories: categoryRoadmaps.map(({ category }) => category),
   roadmaps: categoryRoadmaps.map(({ category, steps }) => ({
     categoryId: category.id,
-    steps: steps.map(({ description, id, order, title: stepTitle }) => ({
-      description,
+    steps: steps.map(({ id, order, title: stepTitle }) => ({
       id,
       order,
       title: stepTitle,

@@ -50,8 +50,6 @@ export function PreparationRoadmapFeature() {
     analytics.track(
       createPreparationCategorySelectEvent({
         categoryId: nextSelection.categoryId,
-        direction: "direct",
-        inputMethod: "button",
         previousCategoryId: selection.categoryId,
       }),
     );
