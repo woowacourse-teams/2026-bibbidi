@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 
 issue_certificate() {
+  local registration=(--register-unsafely-without-email)
+  if [[ -n "${CERT_EMAIL:-}" ]]; then
+    registration=(--email "$CERT_EMAIL" --no-eff-email)
+  fi
+
   sudo certbot certonly --webroot \
     -w "$WEBROOT" \
     --non-interactive \
     --agree-tos \
-    --register-unsafely-without-email \
+    "${registration[@]}" \
     --keep-until-expiring \
     --cert-name "$CERT_DOMAIN" \
     -d "$CERT_DOMAIN" \
@@ -13,7 +18,7 @@ issue_certificate() {
 }
 
 reload_nginx() {
-  docker compose -f "$EC2_DEPLOY_PATH/compose.yaml" exec -T nginx nginx -s reload
+  docker exec nginx nginx -s reload
 }
 
 issue_tls() {

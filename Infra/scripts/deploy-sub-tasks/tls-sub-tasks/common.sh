@@ -8,6 +8,13 @@ read_dotenv_value() {
     index($0, key "=") == 1 {
       value = substr($0, length(key) + 2)
       sub(/\r$/, "", value)
+      if (length(value) > 1) {
+        first = substr(value, 1, 1)
+        last = substr(value, length(value), 1)
+        if ((first == "\"" && last == "\"") || (first == "\047" && last == "\047")) {
+          value = substr(value, 2, length(value) - 2)
+        }
+      }
       print value
       exit
     }
@@ -35,6 +42,7 @@ initialize_tls_context() {
   : "${SERVER_NAME:?SERVER_NAME must be configured in $NGINX_ENV}"
 
   CERT_ALT_DOMAIN="$(read_dotenv_value CERT_ALT_DOMAIN "$NGINX_ENV")"
+  CERT_EMAIL="$(read_dotenv_value CERT_EMAIL "$NGINX_ENV")"
   : "${CERT_ALT_DOMAIN:=www.${CERT_DOMAIN}}"
   CERT_LIVE_DIR="/etc/letsencrypt/live/${CERT_DOMAIN}"
   CERT_RENEWAL_CONF="/etc/letsencrypt/renewal/${CERT_DOMAIN}.conf"

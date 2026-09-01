@@ -32,7 +32,7 @@ prometheus.remote_write "grafana_cloud" {
 }
 
 discovery.docker "containers" {
-  host = "unix:///var/run/docker.sock"
+  host = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
 }
 
 discovery.relabel "docker_logs" {
@@ -56,7 +56,7 @@ discovery.relabel "docker_logs" {
 }
 
 loki.source.docker "containers" {
-  host         = "unix:///var/run/docker.sock"
+  host         = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
   relabel_rules = discovery.relabel.docker_logs.rules
   targets      = discovery.docker.containers.targets
   labels       = {
@@ -96,6 +96,16 @@ loki.process "normalize" {
   stage.replace {
     expression = "(?i)(access[_ -]?token|refresh[_ -]?token|authorization|cookie|password|passwd)=[^ ]+"
     replace    = "$1=[REDACTED]"
+  }
+
+  stage.replace {
+    expression = "(?i)\"(access[_ -]?token|refresh[_ -]?token|authorization|cookie|password|passwd)\"[[:space:]]*:[[:space:]]*\"[^\"]*\""
+    replace    = "\"$1\":\"[REDACTED]\""
+  }
+
+  stage.replace {
+    expression = "(?i)(bearer|basic)[[:space:]]+[A-Za-z0-9._~+/=-]{8,}"
+    replace    = "$1 [REDACTED]"
   }
 
   forward_to = [loki.write.grafana_cloud.receiver]

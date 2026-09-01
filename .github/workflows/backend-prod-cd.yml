@@ -20,6 +20,7 @@ jobs:
   build-and-push:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
 
     defaults:
       run:
@@ -62,6 +63,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: [self-hosted, linux, ARM64, prod]
+    timeout-minutes: 20
 
     env:
       EC2_DEPLOY_PATH: /opt/bibbidi/app
@@ -73,10 +75,14 @@ jobs:
       TLS_ENV_FILE: /opt/bibbidi/app/.env.nginx
       CERTBOT_WEBROOT: /opt/bibbidi/app/infra/nginx/certbot
       TLS_SCRIPT: Infra/scripts/deploy-sub-tasks/tls-sub-tasks/do-tls.sh
+      HOST_PREREQS_SCRIPT: Infra/scripts/deploy-sub-tasks/host-prereqs.sh
 
     steps:
       - name: Checkout deployment configuration
         uses: actions/checkout@v7
+
+      - name: Verify host prerequisites
+        run: bash "$HOST_PREREQS_SCRIPT"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -103,6 +109,7 @@ jobs:
           printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
           printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
           printf '%s\n' "$ALLOY_ENV_CONTENT" > /opt/bibbidi/app/infra/monitoring/.env.alloy
+          chmod 600 /opt/bibbidi/app/.env.spring /opt/bibbidi/app/.env.nginx /opt/bibbidi/app/infra/monitoring/.env.alloy
 
       - name: Prepare observability network
         run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
@@ -126,35 +133,87 @@ jobs:
         run: |
           cd /opt/bibbidi/app
 
+          PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
+
+          rollback() {
+            if [ -z "$PREVIOUS_IMAGE" ]; then
+              echo "::error::deploy failed and no previous image is available to roll back to"
+              return
+            fi
+            echo "::error::deploy failed - rolling back backend to $PREVIOUS_IMAGE"
+            IMAGE_TAG="${PREVIOUS_IMAGE##*:}" docker compose up -d --force-recreate backend || true
+          }
+
           docker compose config >/dev/null
-          docker compose pull backend nginx alloy
-          docker compose up -d backend nginx alloy
+          docker compose pull backend nginx alloy dockerproxy
+          docker compose up -d backend nginx alloy dockerproxy
 
           if ! curl \
             --fail \
             --silent \
             --show-error \
-            --retry 30 \
+            --retry 60 \
             --retry-delay 2 \
             --retry-connrefused \
             --retry-all-errors \
             http://127.0.0.1:8080/actuator/health \
             | grep --quiet '"status":"UP"'; then
             docker compose logs --tail=200 backend nginx alloy
+            rollback
             exit 1
           fi
 
           if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
             docker compose logs --tail=200 nginx alloy
+            rollback
             exit 1
           fi
 
       - name: Issue or renew TLS certificate
+        id: tls_issue
         continue-on-error: true
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          IMAGE_TAG: ${{ github.sha }}
         run: bash "$TLS_SCRIPT" issue
+
+      - name: Notify TLS failure
+        if: steps.tls_issue.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+        run: |
+          echo "::warning::TLS issue/renew failed - nginx may still be serving the bootstrap self-signed certificate"
+          if [ -n "${DISCORD_WEBHOOK_BE:-}" ]; then
+            curl -fsS -H 'Content-Type: application/json' \
+              -d '{"content":"Bibbidi PROD: TLS certificate issue/renew FAILED. nginx may be serving a self-signed certificate - check the deploy workflow logs."}' \
+              "$DISCORD_WEBHOOK_BE" >/dev/null || true
+          fi
+
+      - name: Install certificate renewal timer
+        run: |
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.service >/dev/null <<'UNIT'
+          [Unit]
+          Description=Renew the Bibbidi TLS certificate
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+          ExecStart=/bin/sh -c 'certbot renew --quiet --webroot -w /opt/bibbidi/app/infra/nginx/certbot --deploy-hook "docker exec nginx nginx -s reload"'
+          UNIT
+
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.timer >/dev/null <<'UNIT'
+          [Unit]
+          Description=Run the Bibbidi TLS renewal twice a day
+
+          [Timer]
+          OnCalendar=*-*-* 03,15:00:00
+          RandomizedDelaySec=1h
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now bibbidi-certbot-renew.timer
 
       - name: Prune stale images
         run: docker image prune --all --force --filter "until=72h"
