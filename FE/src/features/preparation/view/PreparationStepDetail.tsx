@@ -38,14 +38,9 @@ export function PreparationStepDetail({
       tabIndex={focusOnMount ? -1 : undefined}
     >
       <div className="preparation-step-detail__panel">
-        <header className="preparation-step-detail__header">
+        <header className="preparation-step-detail__header preparation-step-detail__header--without-category">
           <h2>{detail.title}</h2>
           <p>{detail.description}</p>
-          <span
-            className={`preparation-step-detail__status preparation-step-detail__status--${detail.status}`}
-          >
-            {detail.statusLabel}
-          </span>
         </header>
 
         <div aria-hidden="true" className="preparation-step-detail__divider" />

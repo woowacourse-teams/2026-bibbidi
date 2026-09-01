@@ -148,11 +148,11 @@ describe("PreparationRoadmapFeature Analytics", () => {
     analyticsMocks.track.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "웨딩홀" }));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
-      }),
-    );
+    const firstStepButton = screen.getByRole("button", {
+      name: /01.*웨딩홀 투어와 계약/,
+    });
+
+    fireEvent.click(firstStepButton);
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
@@ -163,7 +163,7 @@ describe("PreparationRoadmapFeature Analytics", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+        name: /02.*예식 형태·식순·입장 방식 결정/,
       }),
     );
 
@@ -218,7 +218,43 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       name: "이 단계에서 준비할 일",
     });
 
-    expect(within(detail).queryByText("웨딩홀")).toBeNull();
+    expect(
+      detail.querySelector(".preparation-step-detail__category"),
+    ).toBeNull();
+  });
+
+  it("데스크톱 최초 진입 시에는 초기 단계 상세 패널을 표시한다", () => {
+    setViewportMatches(false);
+    renderFeature();
+
+    expect(
+      screen.getByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: /01.*웨딩홀 투어와 계약/,
+        pressed: true,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("단계 카드에는 중복되는 상세 설명을 표시하지 않는다", () => {
+    setViewportMatches(false);
+    renderFeature();
+
+    const firstStepButton = screen.getByRole("button", {
+      name: "01.웨딩홀 투어와 계약",
+    });
+
+    expect(
+      firstStepButton.querySelector(".preparation-roadmap__step-description"),
+    ).toBeNull();
+    expect(
+      firstStepButton.querySelector(".preparation-roadmap__step-title")
+        ?.textContent,
+    ).toBe("웨딩홀 투어와 계약");
   });
 
   it("모바일 최초 진입 시에는 단계를 자동 선택하지 않는다", () => {
@@ -232,7 +268,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeNull();
     expect(
       screen.getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
       }),
     ).toBeTruthy();
   });
@@ -242,10 +278,10 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
 
     const firstStepButton = screen.getByRole("button", {
-      name: /01.*예정.*웨딩홀 투어와 계약/,
+      name: /01.*웨딩홀 투어와 계약/,
     });
     const firstStep = screen
-      .getByRole("button", { name: /01.*예정.*웨딩홀 투어와 계약/ })
+      .getByRole("button", { name: /01.*웨딩홀 투어와 계약/ })
       .closest("li");
 
     expect(firstStep).not.toBeNull();
@@ -253,7 +289,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     expect(
       within(firstStep!).queryByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
       }),
     ).toBeNull();
     const firstDetail = within(firstStep!).getByRole("complementary", {
@@ -268,7 +304,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     });
 
     const secondStepButton = screen.getByRole("button", {
-      name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+      name: /02.*예식 형태·식순·입장 방식 결정/,
     });
     const secondStep = secondStepButton.closest("li");
 
@@ -277,7 +313,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     expect(
       within(firstStep!).getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
       }),
     ).toBeTruthy();
     expect(
@@ -306,7 +342,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
       }),
     );
 
@@ -326,7 +362,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
     fireEvent.click(
       screen.getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
       }),
     );
 
@@ -339,7 +375,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeNull();
     expect(
       screen.getByRole("button", {
-        name: /01.*예정.*스드메 상담·견적과 패키지 계약/,
+        name: /01.*스드메 상담·견적과 패키지 계약/,
       }),
     ).toBeTruthy();
   });
@@ -349,7 +385,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
     fireEvent.click(
       screen.getByRole("button", {
-        name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+        name: /02.*예식 형태·식순·입장 방식 결정/,
       }),
     );
     analyticsMocks.track.mockClear();
@@ -361,7 +397,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       screen
         .getByRole("button", {
-          name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+          name: /02.*예식 형태·식순·입장 방식 결정/,
         })
         .getAttribute("aria-pressed"),
     ).toBe("true");
@@ -378,7 +414,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     renderFeature();
     fireEvent.click(
       screen.getByRole("button", {
-        name: /02.*예정.*예식 형태·식순·입장 방식 결정/,
+        name: /02.*예식 형태·식순·입장 방식 결정/,
       }),
     );
 
@@ -387,7 +423,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: /03.*예정.*예식 진행자와 당일 도우미 섭외/,
+        name: /03.*예식 진행자와 당일 도우미 섭외/,
       }),
     );
     act(() => {
@@ -401,18 +437,18 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeNull();
     expect(
       screen.getByRole("button", {
-        name: /03.*예정.*예식 진행자와 당일 도우미 섭외/,
+        name: /03.*예식 진행자와 당일 도우미 섭외/,
       }),
     ).toBeTruthy();
   });
 
-  it("태블릿에서는 기존 하단 상세 패널과 선택 상태를 유지한다", () => {
+  it("태블릿에서도 초기 단계 상세 패널과 선택 상태를 표시한다", () => {
     setViewportMatches({ compact: true, mobile: false });
     renderFeature();
 
     expect(
       screen.getByRole("button", {
-        name: /01.*예정.*웨딩홀 투어와 계약/,
+        name: /01.*웨딩홀 투어와 계약/,
         pressed: true,
       }),
     ).toBeTruthy();

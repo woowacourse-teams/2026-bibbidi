@@ -88,19 +88,11 @@ function PreparationRoadmapSteps({
               >
                 <span className="preparation-roadmap__step-header">
                   <span className="preparation-roadmap__step-number">
-                    {step.numberLabel}
-                  </span>
-                  <span
-                    className={`preparation-roadmap__step-status preparation-roadmap__step-status--${step.status}`}
-                  >
-                    {step.statusLabel}
+                    {step.numberLabel}.
                   </span>
                 </span>
                 <span className="preparation-roadmap__step-title">
                   {step.title}
-                </span>
-                <span className="preparation-roadmap__step-description">
-                  {step.description}
                 </span>
               </button>
             )}
