@@ -1,16 +1,10 @@
 import {
-  PreparationCategoryNavigationDirection,
   PreparationCatalogModel,
   PreparationRoadmapModel,
   PreparationStepProgressModel,
   PreparationStepStatus,
 } from "../model/preparationRoadmap";
 
-const statusLabels: Record<PreparationStepStatus, string> = {
-  complete: "완료",
-  "in-progress": "진행 중",
-  upcoming: "예정",
-};
 const ROADMAP_TITLE = "준비 로드맵";
 
 export interface PreparationCategoryViewModel {
@@ -20,21 +14,14 @@ export interface PreparationCategoryViewModel {
 }
 
 export interface PreparationStepViewModel {
-  description: string;
   id: string;
   isSelected: boolean;
   numberLabel: string;
   order: number;
-  status: PreparationStepStatus;
-  statusLabel: string;
   title: string;
 }
 
 export interface PreparationRoadmapViewModel {
-  categoryNavigation: {
-    canNavigateNext: boolean;
-    canNavigatePrevious: boolean;
-  };
   categories: PreparationCategoryViewModel[];
   selectedStepDetail: PreparationStepDetailViewModel;
   steps: PreparationStepViewModel[];
@@ -43,8 +30,6 @@ export interface PreparationRoadmapViewModel {
 
 export interface PreparationStepDetailViewModel {
   description: string;
-  status: PreparationStepStatus;
-  statusLabel: string;
   tasks: {
     id: string;
     title: string;
@@ -149,39 +134,6 @@ export function selectPreparationCategory(
   };
 }
 
-export function selectAdjacentPreparationCategory(
-  model: PreparationCatalogModel,
-  currentSelection: PreparationRoadmapSelection,
-  direction: PreparationCategoryNavigationDirection,
-  stepProgress: PreparationStepProgressModel[] = [],
-): PreparationRoadmapSelection {
-  const availableCategoryIds = getAvailableCategories(model).map(
-    (category) => category.id,
-  );
-  const currentCategoryIndex = availableCategoryIds.indexOf(
-    currentSelection.categoryId,
-  );
-
-  if (currentCategoryIndex < 0) {
-    throw new Error("현재 선택된 준비 카테고리가 올바르지 않습니다.");
-  }
-
-  const indexOffset = direction === "next" ? 1 : -1;
-  const targetCategoryId =
-    availableCategoryIds[currentCategoryIndex + indexOffset];
-
-  if (!targetCategoryId) {
-    return currentSelection;
-  }
-
-  return selectPreparationCategory(
-    model,
-    currentSelection,
-    targetCategoryId,
-    stepProgress,
-  );
-}
-
 function createStatusByStepId(stepProgress: PreparationStepProgressModel[]) {
   return new Map(
     stepProgress.map((progress) => [progress.stepId, progress.status]),
@@ -199,7 +151,6 @@ function createSelectedStepDetailViewModel(
   model: PreparationCatalogModel,
   roadmap: PreparationRoadmapModel,
   selectedStepId: string,
-  statusByStepId: Map<string, PreparationStepStatus>,
 ): PreparationStepDetailViewModel {
   const selectedStep = roadmap.steps.find((step) => step.id === selectedStepId);
   const selectedDetail = model.stepDetails.find(
@@ -210,12 +161,8 @@ function createSelectedStepDetailViewModel(
     throw new Error("준비 로드맵의 선택 단계 상세 데이터가 올바르지 않습니다.");
   }
 
-  const status = getStepStatus(statusByStepId, selectedStep.id);
-
   return {
     description: selectedDetail.description,
-    status,
-    statusLabel: statusLabels[status],
     tasks: selectedDetail.tasks,
     title: selectedStep.title,
   } satisfies PreparationStepDetailViewModel;
@@ -225,22 +172,11 @@ export function createPreparationRoadmapViewModel(
   model: PreparationCatalogModel,
   selectedCategoryId: string,
   selectedStepId: string,
-  stepProgress: PreparationStepProgressModel[] = [],
 ): PreparationRoadmapViewModel {
   const roadmap = getRoadmap(model, selectedCategoryId);
-  const statusByStepId = createStatusByStepId(stepProgress);
   const availableCategories = getAvailableCategories(model);
-  const selectedCategoryIndex = availableCategories.findIndex(
-    (category) => category.id === selectedCategoryId,
-  );
 
   return {
-    categoryNavigation: {
-      canNavigateNext:
-        selectedCategoryIndex >= 0 &&
-        selectedCategoryIndex < availableCategories.length - 1,
-      canNavigatePrevious: selectedCategoryIndex > 0,
-    },
     categories: availableCategories.map((category) => ({
       id: category.id,
       isCurrent: category.id === selectedCategoryId,
@@ -250,22 +186,14 @@ export function createPreparationRoadmapViewModel(
       model,
       roadmap,
       selectedStepId,
-      statusByStepId,
     ),
-    steps: roadmap.steps.map((step) => {
-      const status = getStepStatus(statusByStepId, step.id);
-
-      return {
-        description: step.description,
-        id: step.id,
-        isSelected: step.id === selectedStepId,
-        numberLabel: String(step.order).padStart(2, "0"),
-        order: step.order,
-        status,
-        statusLabel: statusLabels[status],
-        title: step.title,
-      };
-    }),
+    steps: roadmap.steps.map((step) => ({
+      id: step.id,
+      isSelected: step.id === selectedStepId,
+      numberLabel: String(step.order).padStart(2, "0"),
+      order: step.order,
+      title: step.title,
+    })),
     title: ROADMAP_TITLE,
   };
 }

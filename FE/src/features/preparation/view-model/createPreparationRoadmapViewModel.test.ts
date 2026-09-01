@@ -9,7 +9,6 @@ import {
   createPreparationRoadmapViewModel,
   getInitialSelectedCategoryId,
   getInitialSelectedStepId,
-  selectAdjacentPreparationCategory,
   selectPreparationCategory,
 } from "./createPreparationRoadmapViewModel";
 
@@ -25,7 +24,6 @@ function createCatalog(steps: StepFixture[]): PreparationCatalogModel {
       {
         categoryId: "wedding-hall",
         steps: steps.map((step) => ({
-          description: `${step.id} 설명`,
           id: step.id,
           order: step.order,
           title: `${step.id} 제목`,
@@ -52,7 +50,6 @@ function addInvitationRoadmap(model: PreparationCatalogModel) {
     categoryId: "invitation",
     steps: [
       {
-        description: "초대 설명",
         id: "invitation-step-1",
         order: 1,
         title: "초대 제목",
@@ -164,46 +161,10 @@ describe("카테고리 선택", () => {
       selectPreparationCategory(model, currentSelection, "wedding-hall"),
     ).toBe(currentSelection);
   });
-
-  it("다음 방향으로 이동하면 다음 카테고리의 첫 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-    addInvitationRoadmap(model);
-
-    expect(
-      selectAdjacentPreparationCategory(
-        model,
-        { categoryId: "wedding-hall", stepId: "step-2" },
-        "next",
-      ),
-    ).toEqual({
-      categoryId: "invitation",
-      stepId: "invitation-step-1",
-    });
-  });
-
-  it("첫 번째와 마지막 카테고리의 바깥 방향에서는 선택을 유지한다", () => {
-    const model = createCatalog(unorderedSteps);
-    addInvitationRoadmap(model);
-    const firstSelection = {
-      categoryId: "wedding-hall",
-      stepId: "step-2",
-    };
-    const lastSelection = {
-      categoryId: "invitation",
-      stepId: "invitation-step-1",
-    };
-
-    expect(
-      selectAdjacentPreparationCategory(model, firstSelection, "previous"),
-    ).toBe(firstSelection);
-    expect(
-      selectAdjacentPreparationCategory(model, lastSelection, "next"),
-    ).toBe(lastSelection);
-  });
 });
 
 describe("createPreparationRoadmapViewModel", () => {
-  it("진행 정보가 없으면 모든 단계를 예정으로 표시한다", () => {
+  it("로드맵 카드와 선택 단계 상세에 필요한 데이터를 구성한다", () => {
     const model = createCatalog(unorderedSteps);
 
     const viewModel = createPreparationRoadmapViewModel(
@@ -212,76 +173,35 @@ describe("createPreparationRoadmapViewModel", () => {
       "step-1",
     );
 
-    expect(viewModel.steps.map((step) => step.status)).toEqual([
-      "upcoming",
-      "upcoming",
-      "upcoming",
-    ]);
-    expect(viewModel.selectedStepDetail.status).toBe("upcoming");
-    expect(viewModel.categoryNavigation).toEqual({
-      canNavigateNext: false,
-      canNavigatePrevious: false,
+    expect(viewModel.steps.find((step) => step.id === "step-1")).toEqual({
+      id: "step-1",
+      isSelected: true,
+      numberLabel: "01",
+      order: 1,
+      title: "step-1 제목",
+    });
+    expect(viewModel.selectedStepDetail).toEqual({
+      description: "step-1 상세 설명",
+      tasks: [{ id: "step-1-task", title: "step-1 할 일" }],
+      title: "step-1 제목",
     });
     expect(viewModel.title).toBe("준비 로드맵");
   });
 
-  it("사용자 진행 상태를 단계와 상세 패널에 반영한다", () => {
-    const model = createCatalog(unorderedSteps);
-    const progress = createProgress([["step-2", "in-progress"]]);
-
-    const viewModel = createPreparationRoadmapViewModel(
-      model,
-      "wedding-hall",
-      "step-2",
-      progress,
-    );
-
-    expect(viewModel.steps.find((step) => step.id === "step-2")).toMatchObject({
-      status: "in-progress",
-      statusLabel: "진행 중",
-    });
-    expect(viewModel.selectedStepDetail).toMatchObject({
-      status: "in-progress",
-      statusLabel: "진행 중",
-    });
-  });
-
-  it("로드맵이 없는 카테고리를 표시와 이동 경계에서 제외한다", () => {
+  it("로드맵이 없는 카테고리를 표시에서 제외한다", () => {
     const model = createCatalog(unorderedSteps);
     model.categories.push({ id: "without-roadmap", label: "준비 중" });
     addInvitationRoadmap(model);
 
-    const firstCategoryViewModel = createPreparationRoadmapViewModel(
+    const viewModel = createPreparationRoadmapViewModel(
       model,
       "wedding-hall",
       "step-1",
     );
-    const lastCategoryViewModel = createPreparationRoadmapViewModel(
-      model,
-      "invitation",
-      "invitation-step-1",
-    );
 
-    expect(
-      firstCategoryViewModel.categories.map((category) => category.id),
-    ).toEqual(["wedding-hall", "invitation"]);
-    expect(firstCategoryViewModel.categoryNavigation).toEqual({
-      canNavigateNext: true,
-      canNavigatePrevious: false,
-    });
-    expect(lastCategoryViewModel.categoryNavigation).toEqual({
-      canNavigateNext: false,
-      canNavigatePrevious: true,
-    });
-    expect(
-      selectAdjacentPreparationCategory(
-        model,
-        { categoryId: "wedding-hall", stepId: "step-1" },
-        "next",
-      ),
-    ).toEqual({
-      categoryId: "invitation",
-      stepId: "invitation-step-1",
-    });
+    expect(viewModel.categories.map((category) => category.id)).toEqual([
+      "wedding-hall",
+      "invitation",
+    ]);
   });
 });

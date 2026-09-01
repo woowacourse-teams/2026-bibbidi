@@ -6,11 +6,9 @@ import {
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
 import { preparationRoadmapData } from "./model/preparationRoadmap.data";
-import { PreparationCategoryNavigationDirection } from "./model/preparationRoadmap";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
-  selectAdjacentPreparationCategory,
   selectPreparationCategory,
 } from "./view-model/createPreparationRoadmapViewModel";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
@@ -19,9 +17,6 @@ export function PreparationRoadmapFeature() {
   const [selection, setSelection] = useState(() =>
     createInitialPreparationRoadmapSelection(preparationRoadmapData),
   );
-  const [mobileExpandedStepId, setMobileExpandedStepId] = useState<
-    string | null
-  >(null);
   const hasTrackedCatalogViewRef = useRef(false);
   const viewModel = createPreparationRoadmapViewModel(
     preparationRoadmapData,
@@ -52,23 +47,13 @@ export function PreparationRoadmapFeature() {
     analytics.track(
       createPreparationCategorySelectEvent({
         categoryId: nextSelection.categoryId,
-        direction: "direct",
-        inputMethod: "button",
         previousCategoryId: selection.categoryId,
       }),
     );
-    setMobileExpandedStepId(null);
     setSelection(nextSelection);
   };
 
-  const handleStepSelect = (
-    stepId: string,
-    options: { expandsMobileDetail: boolean },
-  ) => {
-    if (!options.expandsMobileDetail && selection.stepId === stepId) {
-      return;
-    }
-
+  const handleStepSelect = (stepId: string) => {
     const selectedStep = viewModel.steps.find((step) => step.id === stepId);
 
     if (!selectedStep) {
@@ -82,44 +67,16 @@ export function PreparationRoadmapFeature() {
         stepOrder: selectedStep.order,
       }),
     );
-    setMobileExpandedStepId(options.expandsMobileDetail ? stepId : null);
     setSelection({
       ...selection,
       stepId,
     });
   };
 
-  const handleCategoryNavigate = (
-    direction: PreparationCategoryNavigationDirection,
-  ) => {
-    const nextSelection = selectAdjacentPreparationCategory(
-      preparationRoadmapData,
-      selection,
-      direction,
-    );
-
-    if (nextSelection === selection) {
-      return;
-    }
-
-    analytics.track(
-      createPreparationCategorySelectEvent({
-        categoryId: nextSelection.categoryId,
-        direction,
-        inputMethod: "wheel",
-        previousCategoryId: selection.categoryId,
-      }),
-    );
-    setMobileExpandedStepId(null);
-    setSelection(nextSelection);
-  };
-
   return (
     <PreparationRoadmap
-      onCategoryNavigate={handleCategoryNavigate}
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
-      mobileExpandedStepId={mobileExpandedStepId}
       viewModel={viewModel}
     />
   );

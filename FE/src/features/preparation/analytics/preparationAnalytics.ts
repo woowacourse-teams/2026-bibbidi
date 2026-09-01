@@ -1,9 +1,4 @@
 import type { AnalyticsEvent } from "../../../infrastructure/analytics";
-import type { PreparationCategoryNavigationDirection } from "../model/preparationRoadmap";
-
-export type PreparationCategoryInputMethod = "button" | "wheel";
-export type PreparationCategorySelectionDirection =
-  PreparationCategoryNavigationDirection | "direct";
 
 export function createPreparationCatalogViewEvent(
   initialCategoryId: string,
@@ -18,23 +13,19 @@ export function createPreparationCatalogViewEvent(
 
 interface CreatePreparationCategorySelectEventParameters {
   categoryId: string;
-  direction: PreparationCategorySelectionDirection;
-  inputMethod: PreparationCategoryInputMethod;
   previousCategoryId: string;
 }
 
 export function createPreparationCategorySelectEvent({
   categoryId,
-  direction,
-  inputMethod,
   previousCategoryId,
 }: CreatePreparationCategorySelectEventParameters): AnalyticsEvent {
   return {
     name: "preparation_category_select",
     parameters: {
       category_id: categoryId,
-      direction,
-      input_method: inputMethod,
+      direction: "direct",
+      input_method: "button",
       previous_category_id: previousCategoryId,
     },
   };

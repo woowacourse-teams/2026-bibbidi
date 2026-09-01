@@ -15,20 +15,18 @@ describe("준비 목록 Analytics 이벤트", () => {
     });
   });
 
-  it("카테고리 선택 방식과 이동 방향을 포함한 이벤트를 생성한다", () => {
+  it("버튼으로 직접 선택한 카테고리 이벤트를 생성한다", () => {
     expect(
       createPreparationCategorySelectEvent({
         categoryId: "invitation",
-        direction: "next",
-        inputMethod: "wheel",
         previousCategoryId: "studio-dress-makeup",
       }),
     ).toEqual({
       name: "preparation_category_select",
       parameters: {
         category_id: "invitation",
-        direction: "next",
-        input_method: "wheel",
+        direction: "direct",
+        input_method: "button",
         previous_category_id: "studio-dress-makeup",
       },
     });

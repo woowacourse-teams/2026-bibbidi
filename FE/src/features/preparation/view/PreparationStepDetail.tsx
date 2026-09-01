@@ -41,11 +41,6 @@ export function PreparationStepDetail({
         <header className="preparation-step-detail__header">
           <h2>{detail.title}</h2>
           <p>{detail.description}</p>
-          <span
-            className={`preparation-step-detail__status preparation-step-detail__status--${detail.status}`}
-          >
-            {detail.statusLabel}
-          </span>
         </header>
 
         <div aria-hidden="true" className="preparation-step-detail__divider" />
