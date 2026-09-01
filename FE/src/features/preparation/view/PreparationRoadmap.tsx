@@ -33,22 +33,15 @@ function useMediaQuery(query: string): boolean {
 }
 
 interface PreparationRoadmapProps {
-  mobileExpandedStepId: string | null;
   onCategorySelect: (categoryId: string) => void;
-  onStepSelect: (
-    stepId: string,
-    options: { expandsMobileDetail: boolean },
-  ) => void;
+  onStepSelect: (stepId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
 interface PreparationRoadmapStepsProps {
   isMobileLayout: boolean;
   mobileExpandedStepId: string | null;
-  onStepSelect: (
-    stepId: string,
-    options: { expandsMobileDetail: boolean },
-  ) => void;
+  onStepSelect: (stepId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
@@ -79,11 +72,7 @@ function PreparationRoadmapSteps({
                 aria-controls="preparation-step-detail"
                 aria-pressed={!isMobileLayout && step.isSelected}
                 className="preparation-roadmap__step-button"
-                onClick={() =>
-                  onStepSelect(step.id, {
-                    expandsMobileDetail: isMobileLayout,
-                  })
-                }
+                onClick={() => onStepSelect(step.id)}
                 type="button"
               >
                 <span className="preparation-roadmap__step-header">
@@ -104,12 +93,37 @@ function PreparationRoadmapSteps({
 }
 
 export function PreparationRoadmap({
-  mobileExpandedStepId,
   onCategorySelect,
   onStepSelect,
   viewModel,
 }: PreparationRoadmapProps) {
   const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
+  const [mobileExpandedStepId, setMobileExpandedStepId] = useState<
+    string | null
+  >(null);
+
+  const handleCategorySelect = (categoryId: string) => {
+    const changesCategory = viewModel.categories.some(
+      (category) => category.id === categoryId && !category.isCurrent,
+    );
+
+    if (changesCategory) {
+      setMobileExpandedStepId(null);
+    }
+
+    onCategorySelect(categoryId);
+  };
+
+  const handleStepSelect = (stepId: string) => {
+    const selectedStep = viewModel.steps.find((step) => step.id === stepId);
+
+    if (!selectedStep || (!isMobileLayout && selectedStep.isSelected)) {
+      return;
+    }
+
+    setMobileExpandedStepId(isMobileLayout ? stepId : null);
+    onStepSelect(stepId);
+  };
 
   return (
     <div className="preparation-roadmap">
@@ -129,7 +143,7 @@ export function PreparationRoadmap({
                     ? " preparation-roadmap__category--current"
                     : ""
                 }`}
-                onClick={() => onCategorySelect(category.id)}
+                onClick={() => handleCategorySelect(category.id)}
                 type="button"
               >
                 {category.label}
@@ -153,7 +167,7 @@ export function PreparationRoadmap({
             <PreparationRoadmapSteps
               isMobileLayout={isMobileLayout}
               mobileExpandedStepId={mobileExpandedStepId}
-              onStepSelect={onStepSelect}
+              onStepSelect={handleStepSelect}
               viewModel={viewModel}
             />
           </div>

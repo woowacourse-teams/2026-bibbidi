@@ -17,9 +17,6 @@ export function PreparationRoadmapFeature() {
   const [selection, setSelection] = useState(() =>
     createInitialPreparationRoadmapSelection(preparationRoadmapData),
   );
-  const [mobileExpandedStepId, setMobileExpandedStepId] = useState<
-    string | null
-  >(null);
   const hasTrackedCatalogViewRef = useRef(false);
   const viewModel = createPreparationRoadmapViewModel(
     preparationRoadmapData,
@@ -53,18 +50,10 @@ export function PreparationRoadmapFeature() {
         previousCategoryId: selection.categoryId,
       }),
     );
-    setMobileExpandedStepId(null);
     setSelection(nextSelection);
   };
 
-  const handleStepSelect = (
-    stepId: string,
-    options: { expandsMobileDetail: boolean },
-  ) => {
-    if (!options.expandsMobileDetail && selection.stepId === stepId) {
-      return;
-    }
-
+  const handleStepSelect = (stepId: string) => {
     const selectedStep = viewModel.steps.find((step) => step.id === stepId);
 
     if (!selectedStep) {
@@ -78,7 +67,6 @@ export function PreparationRoadmapFeature() {
         stepOrder: selectedStep.order,
       }),
     );
-    setMobileExpandedStepId(options.expandsMobileDetail ? stepId : null);
     setSelection({
       ...selection,
       stepId,
@@ -89,7 +77,6 @@ export function PreparationRoadmapFeature() {
     <PreparationRoadmap
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
-      mobileExpandedStepId={mobileExpandedStepId}
       viewModel={viewModel}
     />
   );
