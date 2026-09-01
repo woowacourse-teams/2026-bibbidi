@@ -4,11 +4,13 @@ import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
+import com.bibbidi.wedding.checklist.controller.dto.RemainingAppointmentResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +24,16 @@ public class ChecklistItemController {
 
     public ChecklistItemController(ChecklistService checklistService) {
         this.checklistService = checklistService;
+    }
+
+    @GetMapping("/api/checklist-items/{itemId}/remaining-appointments")
+    public RemainingAppointmentResponse hasRemainingAppointments(
+            @Auth Long userId,
+            @PathVariable Long itemId
+    ) {
+        boolean hasRemainingAppointments = checklistService.hasRemainingAppointments(userId, itemId);
+
+        return new RemainingAppointmentResponse(hasRemainingAppointments);
     }
 
     @PutMapping("/api/checklist-items/{itemId}/category")

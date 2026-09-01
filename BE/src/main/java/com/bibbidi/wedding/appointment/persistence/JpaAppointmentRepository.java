@@ -35,6 +35,14 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
     void deleteAll(List<Long> targetAppointmentIds);
 
     @Query("""
+            SELECT COUNT(appointment) > 0
+            FROM JpaAppointmentEntity appointment
+            WHERE appointment.checklistItemId = :checklistItemId
+              AND appointment.isDone = false
+            """)
+    boolean existsRemainingByChecklistItemId(Long checklistItemId);
+
+    @Query("""
             SELECT appointment
             FROM JpaAppointmentEntity appointment
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId

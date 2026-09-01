@@ -6,12 +6,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ChecklistAppointmentDeleteService {
+public class ChecklistAppointmentService {
 
     private final AppointmentRepository appointmentRepository;
 
-    public ChecklistAppointmentDeleteService(AppointmentRepository appointmentRepository) {
+    public ChecklistAppointmentService(AppointmentRepository appointmentRepository) {
         this.appointmentRepository = appointmentRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasRemainingAppointment(Long checklistItemId) {
+        return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
     }
 
     @Transactional

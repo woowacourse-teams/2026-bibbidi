@@ -13,7 +13,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
-import com.bibbidi.wedding.appointment.service.ChecklistAppointmentDeleteService;
+import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -40,6 +40,7 @@ class ChecklistServiceTest {
 
     private static final Long OWNER_ID = 1L;
     private static final Long CHECKLIST_ID = 10L;
+    private static final Long OTHER_OWNER_ID = 2L;
     private static final Long CATEGORY_ID = 2L;
     private static final Long CONTRACT_ITEM_ID = 100L;
     private static final Long ESTIMATE_ITEM_ID = 101L;
@@ -51,7 +52,7 @@ class ChecklistServiceTest {
     private CatalogService catalogService;
 
     @Mock
-    private ChecklistAppointmentDeleteService checklistAppointmentDeleteService;
+    private ChecklistAppointmentService checklistAppointmentService;
 
     private ChecklistService checklistService;
 
@@ -60,7 +61,7 @@ class ChecklistServiceTest {
         checklistService = new ChecklistService(
                 checklistRepository,
                 catalogService,
-                checklistAppointmentDeleteService
+                checklistAppointmentService
         );
     }
 
@@ -257,8 +258,8 @@ class ChecklistServiceTest {
         checklistService.deleteItem(OWNER_ID, item.id());
 
         // then
-        InOrder deletionOrder = inOrder(checklistAppointmentDeleteService, checklistRepository);
-        deletionOrder.verify(checklistAppointmentDeleteService).deleteAllByChecklistItemId(item.id());
+        InOrder deletionOrder = inOrder(checklistAppointmentService, checklistRepository);
+        deletionOrder.verify(checklistAppointmentService).deleteAllByChecklistItemId(item.id());
         deletionOrder.verify(checklistRepository).deleteItem(item);
     }
 
@@ -272,7 +273,7 @@ class ChecklistServiceTest {
         checklistService.deleteItem(OWNER_ID, 200L);
 
         // then
-        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistAppointmentService).shouldHaveNoInteractions();
         then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
@@ -289,7 +290,7 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
-        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistAppointmentService).shouldHaveNoInteractions();
         then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
@@ -306,7 +307,7 @@ class ChecklistServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
-        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistAppointmentService).shouldHaveNoInteractions();
         then(checklistRepository).should(never()).deleteItem(any(ChecklistItem.class));
     }
 
@@ -318,7 +319,7 @@ class ChecklistServiceTest {
         given(checklistRepository.findByChecklistItemId(item.id()))
                 .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item))));
         willThrow(new IllegalStateException("appointment deletion failed"))
-                .given(checklistAppointmentDeleteService)
+                .given(checklistAppointmentService)
                 .deleteAllByChecklistItemId(item.id());
 
         // when, then
@@ -340,8 +341,8 @@ class ChecklistServiceTest {
 
         checklistService.deleteByOwnerId(OWNER_ID);
 
-        InOrder order = inOrder(checklistAppointmentDeleteService, checklistRepository);
-        order.verify(checklistAppointmentDeleteService).deleteAllByChecklistItemIds(checklistItemIds);
+        InOrder order = inOrder(checklistAppointmentService, checklistRepository);
+        order.verify(checklistAppointmentService).deleteAllByChecklistItemIds(checklistItemIds);
         order.verify(checklistRepository).delete(checklist);
     }
 
@@ -353,7 +354,39 @@ class ChecklistServiceTest {
         checklistService.deleteByOwnerId(OWNER_ID);
 
         then(checklistRepository).should(never()).delete(any(Checklist.class));
-        then(checklistAppointmentDeleteService).shouldHaveNoInteractions();
+        then(checklistAppointmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("남은 일정 조회는 소유권을 확인한 뒤 일정 쪽 판단을 그대로 돌려준다")
+    void shouldReturnRemainingAppointmentResultAfterOwnershipCheck() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        given(checklistAppointmentService.hasRemainingAppointment(item.id())).willReturn(true);
+
+        // when
+        boolean hasRemaining = checklistService.hasRemainingAppointments(OWNER_ID, item.id());
+
+        // then
+        assertThat(hasRemaining).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 남은 일정을 조회할 수 없다")
+    void shouldRejectRemainingAppointmentLookupForOtherUsersItem() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.hasRemainingAppointments(OTHER_OWNER_ID, item.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+        then(checklistAppointmentService).shouldHaveNoInteractions();
     }
 
     private static ChecklistItem item(Long id) {
