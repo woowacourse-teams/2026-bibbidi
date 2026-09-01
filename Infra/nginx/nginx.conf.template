@@ -1,0 +1,152 @@
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
+    limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
+    limit_req_status 429;
+    limit_conn_status 429;
+    limit_req_log_level warn;
+
+    log_format otel_json escape=json
+        '{"timestamp":"$time_iso8601",'
+        '"client.address":"$remote_addr",'
+        '"http.request.method":"$request_method",'
+        '"url.path":"$uri",'
+        '"url.query":"$args",'
+        '"http.response.status_code":$status,'
+        '"http.response.body.size":$body_bytes_sent,'
+        '"http.request.duration":$request_time,'
+        '"http.request.protocol":"$server_protocol",'
+        '"user_agent.original":"$http_user_agent",'
+        '"server.address":"$host"}';
+
+    access_log /dev/stdout otel_json;
+    error_log /dev/stderr warn;
+    sendfile on;
+    keepalive_timeout 65;
+    server_tokens off;
+    client_max_body_size 1m;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    server {
+        listen 80 default_server;
+        server_name _;
+        return 444;
+    }
+
+    server {
+        listen 443 ssl default_server;
+        server_name _;
+        ssl_reject_handshake on;
+    }
+
+    server {
+        listen 80;
+        server_name ${SERVER_NAME} www.${SERVER_NAME};
+
+        location ^~ /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 'ok\n';
+        }
+
+        location / {
+            return 301 https://${SERVER_NAME}$request_uri;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name www.${SERVER_NAME};
+
+        ssl_certificate /etc/letsencrypt/live/${CERT_DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${CERT_DOMAIN}/privkey.pem;
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+        return 301 https://${SERVER_NAME}$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name ${SERVER_NAME};
+
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+
+        ssl_certificate /etc/letsencrypt/live/${CERT_DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${CERT_DOMAIN}/privkey.pem;
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 'ok\n';
+        }
+
+        location ^~ /api/ {
+            limit_req zone=per_ip_api burst=60 nodelay;
+            limit_conn per_ip_conn 40;
+
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header X-Frame-Options DENY always;
+            add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+            add_header Access-Control-Allow-Origin ${NGINX_ALLOWED_ORIGIN} always;
+            add_header Vary Origin always;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header Access-Control-Allow-Headers 'Content-Type, Authorization, X-Requested-With' always;
+            add_header Access-Control-Allow-Credentials true always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_pass http://backend:8080;
+            proxy_hide_header Access-Control-Allow-Origin;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location ^~ /actuator {
+            access_log off;
+            return 404;
+        }
+
+        location / {
+            limit_req zone=per_ip_api burst=60 nodelay;
+            limit_conn per_ip_conn 40;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}

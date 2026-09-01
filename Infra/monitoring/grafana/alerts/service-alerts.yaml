@@ -1,0 +1,207 @@
+apiVersion: 1
+
+# Grafana Cloud Alerting provisioning file.
+# Import this file from Grafana Cloud; it is not a Notification Dashboard.
+groups:
+  - orgId: 1
+    name: bibbidi-service-symptoms
+    folder: Bibbidi / Alerts
+    interval: 1m
+    rules:
+      - uid: bibbidi-5xx-rate-warning
+        title: Bibbidi API 5xx rate is elevated
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "5xx response ratio is above 5%"
+          description: "At least 5% of Backend HTTP responses have a 5xx status for 5 minutes. Check the Service Overview dashboard and Loki logs."
+          dashboard_uid: bibbidi-observability
+          panel_id: "3"
+        labels: {severity: warning, service: bibbidi, symptom: api-errors}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model:
+              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0.05], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-5xx-rate-critical
+        title: Bibbidi API 5xx rate is critical
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "5xx response ratio is above 15%"
+          description: "At least 15% of Backend HTTP responses have a 5xx status for 2 minutes. Treat this as an active API outage."
+          dashboard_uid: bibbidi-observability
+          panel_id: "3"
+        labels: {severity: critical, service: bibbidi, symptom: api-errors}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model:
+              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0.15], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-major-api-availability
+        title: Bibbidi major API availability is low
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "Checklist, appointment, auth, or user API availability is below 99%"
+          description: "The major API group has a non-2xx response ratio above 1% for 5 minutes. Use the URI label only for investigation, not as an index label."
+          dashboard_uid: bibbidi-observability
+          panel_id: "4"
+        labels: {severity: warning, service: bibbidi, symptom: availability}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model:
+              expr: 'sum(rate(http_server_requests_seconds_count{uri=~"/api/(checklists|appointments|auth|users).*",status!~"2.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{uri=~"/api/(checklists|appointments|auth|users).*"}[5m])), 1)'
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0.01], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-api-latency-p95
+        title: Bibbidi API p95 latency is high
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "API p95 latency is above 1 second"
+          description: "The 5-minute p95 latency is above 1 second. Check Database Pool, JVM, and Trace views for the slow dependency."
+          dashboard_uid: bibbidi-observability
+          panel_id: "5"
+        labels: {severity: warning, service: bibbidi, symptom: latency}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model:
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))'
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [1], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+  - orgId: 1
+    name: bibbidi-runtime-symptoms
+    folder: Bibbidi / Alerts
+    interval: 1m
+    rules:
+      - uid: bibbidi-hikari-pending-warning
+        title: Bibbidi Hikari pending connections persist
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "HikariCP has pending connection requests"
+          description: "One or more callers have waited for a database connection for 5 minutes. Check database health and active connection usage."
+          dashboard_uid: bibbidi-observability
+          panel_id: "12"
+        labels: {severity: warning, service: bibbidi, symptom: database-pool}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model: {expr: 'max(hikaricp_connections_pending)', refId: A}
+          - refId: C
+            datasourceUid: __expr__
+            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}], refId: C}
+
+      - uid: bibbidi-hikari-pending-critical
+        title: Bibbidi Hikari pool is saturated
+        condition: C
+        for: 2m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "HikariCP has more than 5 pending connection requests"
+          description: "Database pool saturation can cause API timeouts. Check DB availability before increasing the pool size."
+          dashboard_uid: bibbidi-observability
+          panel_id: "12"
+        labels: {severity: critical, service: bibbidi, symptom: database-pool}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model: {expr: 'max(hikaricp_connections_pending)', refId: A}
+          - refId: C
+            datasourceUid: __expr__
+            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [5], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}], refId: C}
+
+      - uid: bibbidi-jvm-heap-warning
+        title: Bibbidi JVM heap usage is high
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "JVM heap usage is above 85%"
+          description: "High heap usage persisted for 10 minutes. Check GC pause time, allocation rate, and recent deployment changes."
+          dashboard_uid: bibbidi-observability
+          panel_id: "7"
+        labels: {severity: warning, service: bibbidi, symptom: jvm-memory}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model:
+              expr: 'sum(jvm_memory_used_bytes{area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{area="heap"}), 1)'
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0.85], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}], refId: C}
+
+      - uid: bibbidi-instance-down
+        title: Bibbidi Backend scrape target is down
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: "Prometheus cannot scrape the Bibbidi Backend"
+          description: "The Backend target is down or unreachable. Check the backend and Alloy containers, Docker Network, and Actuator access policy."
+          dashboard_uid: bibbidi-observability
+        labels: {severity: critical, service: bibbidi, symptom: target-down}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 120, to: 0}
+            datasourceUid: bibbidi-prometheus
+            model: {expr: 'min(up{job=~".*bibbidi.*"})', refId: A}
+          - refId: C
+            datasourceUid: __expr__
+            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0], type: lte}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}], refId: C}

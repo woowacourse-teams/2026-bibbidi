@@ -1,0 +1,219 @@
+name: Bibbidi Backend PROD CD
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [release-be]
+    paths:
+      - "BE/**"
+      - "Infra/monitoring/**"
+      - "Infra/nginx/**"
+      - "Infra/scripts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-prod-deploy
+
+jobs:
+  build-and-push:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: BE
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and test
+        run: ./gradlew clean build
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./BE
+          file: ./BE/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: [self-hosted, linux, ARM64, prod]
+    timeout-minutes: 20
+
+    env:
+      EC2_DEPLOY_PATH: /opt/bibbidi/app
+      NGINX_CONFIG_PATH: /opt/bibbidi/app/infra/nginx/nginx.conf
+      ALLOY_CONFIG_PATH: /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+      SPRING_ENV_FILE: /opt/bibbidi/app/.env.spring
+      ALLOY_ENV_FILE: /opt/bibbidi/app/infra/monitoring/.env.alloy
+      NGINX_ENV_FILE: /opt/bibbidi/app/.env.nginx
+      TLS_ENV_FILE: /opt/bibbidi/app/.env.nginx
+      CERTBOT_WEBROOT: /opt/bibbidi/app/infra/nginx/certbot
+      TLS_SCRIPT: Infra/scripts/deploy-sub-tasks/tls-sub-tasks/do-tls.sh
+      HOST_PREREQS_SCRIPT: Infra/scripts/deploy-sub-tasks/host-prereqs.sh
+
+    steps:
+      - name: Checkout deployment configuration
+        uses: actions/checkout@v7
+
+      - name: Verify host prerequisites
+        run: bash "$HOST_PREREQS_SCRIPT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Install deployment configuration
+        env:
+          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+        run: |
+          test -n "$SPRING_ENV_CONTENT"
+          test -n "$NGINX_ENV_CONTENT"
+          test -n "$ALLOY_ENV_CONTENT"
+          install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
+          install -d -m 0755 /opt/bibbidi/app/infra/nginx
+          install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
+          install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
+          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
+          umask 077
+          printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
+          printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
+          printf '%s\n' "$ALLOY_ENV_CONTENT" > /opt/bibbidi/app/infra/monitoring/.env.alloy
+          chmod 600 /opt/bibbidi/app/.env.spring /opt/bibbidi/app/.env.nginx /opt/bibbidi/app/infra/monitoring/.env.alloy
+
+      - name: Prepare observability network
+        run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
+
+      - name: Render nginx configuration
+        run: |
+          set -a
+          . /opt/bibbidi/app/.env.nginx
+          set +a
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
+            < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
+            > /opt/bibbidi/app/infra/nginx/nginx.conf
+
+      - name: Bootstrap TLS material
+        run: bash "$TLS_SCRIPT" bootstrap
+
+      - name: Deploy and verify health
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd /opt/bibbidi/app
+
+          PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
+
+          rollback() {
+            if [ -z "$PREVIOUS_IMAGE" ]; then
+              echo "::error::deploy failed and no previous image is available to roll back to"
+              return
+            fi
+            echo "::error::deploy failed - rolling back backend to $PREVIOUS_IMAGE"
+            IMAGE_TAG="${PREVIOUS_IMAGE##*:}" docker compose up -d --force-recreate backend || true
+          }
+
+          docker compose config >/dev/null
+          docker compose pull backend nginx alloy dockerproxy
+          docker compose up -d backend nginx alloy dockerproxy
+
+          if ! curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 60 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --retry-all-errors \
+            http://127.0.0.1:8080/actuator/health \
+            | grep --quiet '"status":"UP"'; then
+            docker compose logs --tail=200 backend nginx alloy
+            rollback
+            exit 1
+          fi
+
+          if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
+            docker compose logs --tail=200 nginx alloy
+            rollback
+            exit 1
+          fi
+
+      - name: Issue or renew TLS certificate
+        id: tls_issue
+        continue-on-error: true
+        run: bash "$TLS_SCRIPT" issue
+
+      - name: Notify TLS failure
+        if: steps.tls_issue.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+        run: |
+          echo "::warning::TLS issue/renew failed - nginx may still be serving the bootstrap self-signed certificate"
+          if [ -n "${DISCORD_WEBHOOK_BE:-}" ]; then
+            curl -fsS -H 'Content-Type: application/json' \
+              -d '{"content":"Bibbidi PROD: TLS certificate issue/renew FAILED. nginx may be serving a self-signed certificate - check the deploy workflow logs."}' \
+              "$DISCORD_WEBHOOK_BE" >/dev/null || true
+          fi
+
+      - name: Install certificate renewal timer
+        run: |
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.service >/dev/null <<'UNIT'
+          [Unit]
+          Description=Renew the Bibbidi TLS certificate
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+          ExecStart=/bin/sh -c 'certbot renew --quiet --webroot -w /opt/bibbidi/app/infra/nginx/certbot --deploy-hook "docker exec nginx nginx -s reload"'
+          UNIT
+
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.timer >/dev/null <<'UNIT'
+          [Unit]
+          Description=Run the Bibbidi TLS renewal twice a day
+
+          [Timer]
+          OnCalendar=*-*-* 03,15:00:00
+          RandomizedDelaySec=1h
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now bibbidi-certbot-renew.timer
+
+      - name: Prune stale images
+        run: docker image prune --all --force --filter "until=72h"
