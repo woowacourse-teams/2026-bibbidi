@@ -6,11 +6,9 @@ import {
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
 import { preparationRoadmapData } from "./model/preparationRoadmap.data";
-import { PreparationCategoryNavigationDirection } from "./model/preparationRoadmap";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
-  selectAdjacentPreparationCategory,
   selectPreparationCategory,
 } from "./view-model/createPreparationRoadmapViewModel";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
@@ -89,34 +87,8 @@ export function PreparationRoadmapFeature() {
     });
   };
 
-  const handleCategoryNavigate = (
-    direction: PreparationCategoryNavigationDirection,
-  ) => {
-    const nextSelection = selectAdjacentPreparationCategory(
-      preparationRoadmapData,
-      selection,
-      direction,
-    );
-
-    if (nextSelection === selection) {
-      return;
-    }
-
-    analytics.track(
-      createPreparationCategorySelectEvent({
-        categoryId: nextSelection.categoryId,
-        direction,
-        inputMethod: "wheel",
-        previousCategoryId: selection.categoryId,
-      }),
-    );
-    setMobileExpandedStepId(null);
-    setSelection(nextSelection);
-  };
-
   return (
     <PreparationRoadmap
-      onCategoryNavigate={handleCategoryNavigate}
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
       mobileExpandedStepId={mobileExpandedStepId}

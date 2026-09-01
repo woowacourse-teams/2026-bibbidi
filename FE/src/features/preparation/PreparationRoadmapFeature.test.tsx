@@ -178,49 +178,19 @@ describe("PreparationRoadmapFeature Analytics", () => {
     });
   });
 
-  it("스크롤로 다음 카테고리를 선택하고 한 제스처에서는 한 번만 전송한다", () => {
-    renderFeature();
-    analyticsMocks.track.mockClear();
-    const roadmapTitle = getRoadmapTitle();
-
-    fireEvent.wheel(roadmapTitle, { deltaX: 0, deltaY: 100 });
-    fireEvent.wheel(roadmapTitle, { deltaX: 0, deltaY: 100 });
-
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_category_select",
-      parameters: {
-        category_id: "studio-dress-makeup",
-        direction: "next",
-        input_method: "wheel",
-        previous_category_id: "wedding-hall",
-      },
-    });
-  });
-
-  it("첫 카테고리에서 이전 방향으로 스크롤하면 이벤트를 전송하지 않는다", () => {
+  it("데스크톱에서 세로 스크롤로 카테고리를 변경하지 않는다", () => {
+    setViewportMatches(false);
     renderFeature();
     analyticsMocks.track.mockClear();
 
-    fireEvent.wheel(getRoadmapTitle(), {
-      deltaX: 0,
-      deltaY: -100,
-    });
+    fireEvent.wheel(getRoadmapTitle(), { deltaX: 0, deltaY: 100 });
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
-  });
-
-  it("마지막 카테고리에서 다음 방향으로 스크롤하면 이벤트를 전송하지 않는다", () => {
-    renderFeature();
-    fireEvent.click(screen.getByRole("button", { name: "기타" }));
-    analyticsMocks.track.mockClear();
-
-    fireEvent.wheel(getRoadmapTitle(), {
-      deltaX: 0,
-      deltaY: 100,
-    });
-
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByRole("button", { name: "웨딩홀" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
 
@@ -465,39 +435,5 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(getRoadmapTitle()).toBeTruthy();
-  });
-
-  it("viewport 복귀 후 첫 wheel 제스처로 카테고리를 변경한다", () => {
-    const viewport = setViewportMatches(false);
-    renderFeature();
-    analyticsMocks.track.mockClear();
-
-    fireEvent.wheel(getRoadmapTitle(), {
-      deltaX: 0,
-      deltaY: 100,
-    });
-    expect(
-      screen
-        .getByRole("button", { name: "스드메" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-
-    act(() => {
-      viewport.change(true);
-    });
-    act(() => {
-      viewport.change(false);
-    });
-    analyticsMocks.track.mockClear();
-
-    fireEvent.wheel(getRoadmapTitle(), {
-      deltaX: 0,
-      deltaY: 100,
-    });
-
-    expect(
-      screen.getByRole("button", { name: "초대" }).getAttribute("aria-pressed"),
-    ).toBe("true");
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 });
