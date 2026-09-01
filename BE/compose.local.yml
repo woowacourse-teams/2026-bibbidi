@@ -1,0 +1,97 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bibbidi-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: bibbidi
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3307:3306"
+    volumes:
+      - bibbidi-mysql-data:/var/lib/mysql
+      - ./database/mysql/bibbidi_mvp_schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    networks:
+      - bibbidi-local
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    container_name: bibbidi-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - ./.env.spring.local
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "false"
+    ports:
+      - "127.0.0.1:18080:8080"
+    networks:
+      - bibbidi-local
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.29-alpine
+    container_name: bibbidi-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - ./.env.nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ../Infra/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - bibbidi-local
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  alloy:
+    image: grafana/alloy:v1.11.0
+    container_name: bibbidi-alloy-local
+    restart: unless-stopped
+    env_file:
+      - ../Infra/monitoring/.env.alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental
+    volumes:
+      - ../Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - bibbidi-alloy-data:/var/lib/alloy/data
+    networks:
+      - bibbidi-local
+    mem_limit: 256m
+    cpus: 0.50
+
+networks:
+  bibbidi-local:
+
+volumes:
+  bibbidi-mysql-data:
+  bibbidi-alloy-data:
