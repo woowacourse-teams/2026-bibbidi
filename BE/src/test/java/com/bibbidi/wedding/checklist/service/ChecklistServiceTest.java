@@ -389,6 +389,79 @@ class ChecklistServiceTest {
         then(checklistAppointmentService).shouldHaveNoInteractions();
     }
 
+    @Test
+    @DisplayName("할 일을 완료하면 남은 일정도 함께 완료한 뒤 할 일을 저장한다")
+    void shouldCompleteRemainingAppointmentsBeforeSavingCompletedItem() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(1));
+
+        // when
+        ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
+
+        // then
+        assertThat(result.isDone()).isTrue();
+
+        InOrder inOrder = inOrder(checklistAppointmentService, checklistRepository);
+        inOrder.verify(checklistAppointmentService).completeAllByChecklistItemId(item.id());
+        inOrder.verify(checklistRepository).saveItem(any(Checklist.class), any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("이미 완료한 할 일을 다시 완료해도 남은 일정은 함께 완료한다")
+    void shouldCompleteRemainingAppointmentsWhenItemIsAlreadyDone() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(1));
+
+        // when
+        ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
+
+        // then
+        assertThat(result.isDone()).isTrue();
+        then(checklistAppointmentService).should().completeAllByChecklistItemId(item.id());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 완료할 수 없다")
+    void shouldRejectCompletionForOtherUsersItem() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.completeItem(OTHER_OWNER_ID, item.id()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
+        then(checklistAppointmentService).shouldHaveNoInteractions();
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("일정 완료가 실패하면 할 일을 완료하지 않는다")
+    void shouldNotCompleteItemWhenAppointmentCompletionFails() {
+        // given
+        ChecklistItem item = item(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        willThrow(new IllegalStateException("일정 완료 실패"))
+                .given(checklistAppointmentService)
+                .completeAllByChecklistItemId(item.id());
+
+        // when, then
+        assertThatThrownBy(() -> checklistService.completeItem(OWNER_ID, item.id()))
+                .isInstanceOf(IllegalStateException.class);
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
+    }
+
     private static ChecklistItem item(Long id) {
         return item(id, ChecklistItemStatus.PREV, null);
     }

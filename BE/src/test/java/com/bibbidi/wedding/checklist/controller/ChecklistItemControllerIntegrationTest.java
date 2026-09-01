@@ -21,7 +21,9 @@ import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
+import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCompletionRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
@@ -55,6 +57,7 @@ class ChecklistItemControllerIntegrationTest {
     private static final String CHANGE_TITLE_URL = "/api/checklist-items/{itemId}/title";
     private static final String DELETE_ITEM_URL = "/api/checklist-items/{itemId}";
     private static final String REMAINING_APPOINTMENTS_URL = "/api/checklist-items/{itemId}/remaining-appointments";
+    private static final String COMPLETE_ITEM_URL = "/api/checklist-items/{itemId}/completion";
     private static final Long USER_ID = 7L;
     private static final Long CUSTOM_ITEM_ID = 500L;
     private static final Long CATALOG_SOURCED_ITEM_ID = 501L;
@@ -70,6 +73,8 @@ class ChecklistItemControllerIntegrationTest {
     private static final Long CATALOG_SOURCED_ITEM_APPOINTMENT_ID = 802L;
     private static final Long DONE_ITEM_APPOINTMENT_ID = 803L;
     private static final Long CONTINUE_ITEM_APPOINTMENT_ID = 805L;
+    private static final Long FIRST_DONE_APPOINTMENT_ID = 806L;
+    private static final Long SECOND_DONE_APPOINTMENT_ID = 807L;
     private static final String NEW_TITLE = "청첩장 문구 최종 확정";
 
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -83,6 +88,10 @@ class ChecklistItemControllerIntegrationTest {
     private static final String CHANGE_TITLE_DESCRIPTION =
             "직접 만든 할 일의 제목만 바꿉니다. 카테고리와 완료 상태, 연결된 일정은 그대로 유지합니다. "
                     + "준비 목록에서 추가한 할 일은 원본 제목을 따라야 하므로 변경할 수 없습니다.";
+    private static final String COMPLETE_ITEM_SUMMARY = "할 일 완료";
+    private static final String COMPLETE_ITEM_DESCRIPTION =
+            "할 일을 완료 상태로 바꾸고, 그 할 일에 남아 있던 미완료 일정도 함께 완료합니다. "
+                    + "이미 완료한 일정은 그대로 둡니다. isDone 은 true 만 보낼 수 있습니다.";
     private static final String REMAINING_APPOINTMENTS_SUMMARY = "할 일에 남은 일정 확인";
     private static final String REMAINING_APPOINTMENTS_DESCRIPTION =
             "할 일에 아직 완료하지 않은 일정이 남아 있는지 알려줍니다. "
@@ -128,6 +137,160 @@ class ChecklistItemControllerIntegrationTest {
 
     private String titleRequestBody(String title) {
         return objectMapper.writeValueAsString(new ChangeChecklistItemTitleRequest(title));
+    }
+
+    private String completionRequestBody(boolean isDone) {
+        return objectMapper.writeValueAsString(new ChangeChecklistItemCompletionRequest(isDone));
+    }
+
+    @Test
+    @DisplayName("할 일을 완료하면 남아 있던 일정도 함께 완료된다")
+    void shouldCompleteItemAndRemainingAppointments() throws Exception {
+        // when
+        mockMvc.perform(put(COMPLETE_ITEM_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CUSTOM_ITEM_ID))
+                .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
+                .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
+                .andExpect(jsonPath("$.isDone").value(true))
+                .andDo(document(
+                        "checklist-items-complete",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(COMPLETE_ITEM_SUMMARY)
+                                .description(COMPLETE_ITEM_DESCRIPTION)
+                                .requestSchema(schema("ChangeChecklistItemCompletionRequest"))
+                                .responseSchema(schema("ChecklistItemResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("완료할 할 일 ID")
+                                )
+                                .requestFields(
+                                        fieldWithPath("isDone").description("완료 여부. true 만 보낼 수 있다")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("할 일 ID"),
+                                        fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
+                                        fieldWithPath("categoryId").description("할 일 카테고리 ID"),
+                                        fieldWithPath("title").description("할 일 제목"),
+                                        fieldWithPath("isDone").description("완료 여부")
+                                )
+                                .build())
+                ));
+
+        // then
+        assertThat(jpaChecklistItemRepository.findById(CUSTOM_ITEM_ID).orElseThrow().status())
+                .isEqualTo(ChecklistItemStatus.DONE);
+        assertThat(jpaAppointmentRepository.findAllById(List.of(
+                FIRST_CUSTOM_ITEM_APPOINTMENT_ID,
+                SECOND_CUSTOM_ITEM_APPOINTMENT_ID
+        ))).allSatisfy(appointment -> {
+            assertThat(appointment.isDone()).isTrue();
+            assertThat(appointment.doneByChecklistItem()).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("이미 완료된 일정은 할 일을 완료해도 따로 완료한 기록이 남는다")
+    void shouldKeepIndividuallyCompletedAppointmentsUnmarked() throws Exception {
+        // when
+        mockMvc.perform(put(COMPLETE_ITEM_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isDone").value(true));
+
+        // then
+        assertThat(jpaAppointmentRepository.findAllById(List.of(
+                FIRST_DONE_APPOINTMENT_ID,
+                SECOND_DONE_APPOINTMENT_ID
+        ))).allSatisfy(appointment -> {
+            assertThat(appointment.isDone()).isTrue();
+            assertThat(appointment.doneByChecklistItem()).isFalse();
+        });
+    }
+
+    @Test
+    @DisplayName("이미 완료한 할 일을 다시 완료해도 남은 일정은 함께 완료된다")
+    void shouldCompleteRemainingAppointmentsWhenItemIsAlreadyDone() throws Exception {
+        // when
+        mockMvc.perform(put(COMPLETE_ITEM_URL, DONE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isDone").value(true));
+
+        // then
+        assertThat(jpaAppointmentRepository.findById(DONE_ITEM_APPOINTMENT_ID).orElseThrow())
+                .satisfies(appointment -> {
+                    assertThat(appointment.isDone()).isTrue();
+                    assertThat(appointment.doneByChecklistItem()).isTrue();
+                });
+    }
+
+    @Test
+    @DisplayName("isDone 을 false 로 보내면 할 일을 완료할 수 없다")
+    void shouldRejectCompletionWhenIsDoneIsFalse() throws Exception {
+        // when, then
+        mockMvc.perform(put(COMPLETE_ITEM_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+
+        // then
+        assertThat(jpaChecklistItemRepository.findById(CUSTOM_ITEM_ID).orElseThrow().status())
+                .isEqualTo(ChecklistItemStatus.PREV);
+        assertThat(jpaAppointmentRepository.findById(FIRST_CUSTOM_ITEM_APPOINTMENT_ID).orElseThrow().isDone())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 완료할 수 없다")
+    void shouldRejectCompletionForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(COMPLETE_ITEM_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 완료할 수 없다")
+    void shouldRejectCompletionWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(put(COMPLETE_ITEM_URL, 9999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 할 일을 완료할 수 없다")
+    void shouldRequireAuthenticationToCompleteItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(COMPLETE_ITEM_URL, CUSTOM_ITEM_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completionRequestBody(true)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 
     @Test

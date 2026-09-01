@@ -47,6 +47,69 @@ class AppointmentTest {
     }
 
     @Test
+    @DisplayName("할 일과 함께 완료하면 완료 상태가 되고 할 일 때문에 완료했다고 표시한다")
+    void shouldMarkDoneByChecklistItemWhenCompletedTogether() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+
+        // when
+        Appointment completed = appointment.completeByChecklistItem();
+
+        // then
+        assertThat(completed.isDone()).isTrue();
+        assertThat(completed.doneByChecklistItem()).isTrue();
+    }
+
+    @Test
+    @DisplayName("일정만 따로 완료하면 할 일 때문에 완료했다고 표시하지 않는다")
+    void shouldNotMarkDoneByChecklistItemWhenCompletedAlone() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+
+        // when
+        Appointment completed = appointment.complete();
+
+        // then
+        assertThat(completed.isDone()).isTrue();
+        assertThat(completed.doneByChecklistItem()).isFalse();
+    }
+
+    @Test
+    @DisplayName("완료를 취소하면 할 일 때문에 완료했다는 표시도 지운다")
+    void shouldClearDoneByChecklistItemWhenReopened() {
+        // given
+        Appointment completed = constructTestAppointment(false).completeByChecklistItem();
+
+        // when
+        Appointment reopened = completed.reopen();
+
+        // then
+        assertThat(reopened.isDone()).isFalse();
+        assertThat(reopened.doneByChecklistItem()).isFalse();
+    }
+
+    @Test
+    @DisplayName("일정 내용을 수정해도 할 일 때문에 완료했다는 표시는 유지된다")
+    void shouldPreserveDoneByChecklistItemWhenUpdated() {
+        // given
+        Appointment completed = constructTestAppointment(false).completeByChecklistItem();
+
+        // when
+        Appointment updated = completed.update(
+                "Updated consultation",
+                LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                "Studio",
+                "Updated memo"
+        );
+
+        // then
+        assertThat(updated.isDone()).isTrue();
+        assertThat(updated.doneByChecklistItem()).isTrue();
+    }
+
+    @Test
     @DisplayName("완료된 일정의 완료를 취소하면 미완료 상태가 된다")
     void shouldNotBeDoneWhenReopened() {
         // given
