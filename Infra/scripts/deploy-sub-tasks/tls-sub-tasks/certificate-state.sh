@@ -17,7 +17,13 @@ is_letsencrypt_cert() {
 }
 
 is_bootstrap_cert() {
-  cert_issuer | grep -q "CN=${CERT_DOMAIN}"
+  # openssl prints the issuer as `CN = example.com`, spaces included, so the
+  # whitespace has to go before the name can be compared. Keep the comparison
+  # out of a pipeline: under `set -o pipefail` a short-circuiting grep can kill
+  # its upstream with SIGPIPE and fail the test even on a match.
+  local issuer
+  issuer="$(cert_issuer | tr -d '[:space:]')"
+  [[ "$issuer" == *"CN=${CERT_DOMAIN}"* ]]
 }
 
 lineage_is_valid() {

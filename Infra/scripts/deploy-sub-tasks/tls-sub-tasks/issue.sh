@@ -6,6 +6,11 @@ issue_certificate() {
     registration=(--email "$CERT_EMAIL" --no-eff-email)
   fi
 
+  local domains=(-d "$CERT_DOMAIN")
+  if [[ -n "${CERT_ALT_DOMAIN:-}" ]]; then
+    domains+=(-d "$CERT_ALT_DOMAIN")
+  fi
+
   sudo certbot certonly --webroot \
     -w "$WEBROOT" \
     --non-interactive \
@@ -13,8 +18,7 @@ issue_certificate() {
     "${registration[@]}" \
     --keep-until-expiring \
     --cert-name "$CERT_DOMAIN" \
-    -d "$CERT_DOMAIN" \
-    -d "$CERT_ALT_DOMAIN"
+    "${domains[@]}"
 }
 
 reload_nginx() {
