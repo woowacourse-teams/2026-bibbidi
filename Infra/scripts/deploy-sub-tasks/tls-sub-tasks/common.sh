@@ -8,6 +8,7 @@ read_dotenv_value() {
     index($0, key "=") == 1 {
       value = substr($0, length(key) + 2)
       sub(/\r$/, "", value)
+      sub(/[ \t]+$/, "", value)
       if (length(value) > 1) {
         first = substr(value, 1, 1)
         last = substr(value, length(value), 1)

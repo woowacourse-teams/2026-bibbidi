@@ -79,7 +79,13 @@ services:
     mem_limit: 256m
     cpus: 0.50
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:12345/-/ready >/dev/null 2>&1"]
+      # The alloy image ships neither wget nor curl, and its /bin/sh is dash,
+      # so the probe has to be bash talking to /dev/tcp directly.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"
       interval: 10s
       timeout: 3s
       retries: 6
