@@ -36,8 +36,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ${NGINX_CONFIG_PATH:-../Infra/nginx/nginx.conf.template}:/etc/nginx/nginx.conf:ro
-      - ${CERTBOT_WEBROOT:-../Infra/nginx/certbot}:/var/www/certbot:ro
+      - ${NGINX_CONFIG_PATH:-./infra/nginx/nginx.conf.template}:/etc/nginx/nginx.conf:ro
+      - ${CERTBOT_WEBROOT:-./infra/nginx/certbot}:/var/www/certbot:ro
       - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
     networks:
       - bibbidi-observability
@@ -60,7 +60,7 @@ services:
     container_name: alloy
     restart: unless-stopped
     env_file:
-      - ${ALLOY_ENV_FILE:-../Infra/monitoring/.env.alloy}
+      - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
     command:
       - run
       - /etc/alloy/config.alloy
@@ -72,7 +72,7 @@ services:
     depends_on:
       - dockerproxy
     volumes:
-      - ${ALLOY_CONFIG_PATH:-../Infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - ${ALLOY_CONFIG_PATH:-./infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy/data
     networks:
       - bibbidi-observability
