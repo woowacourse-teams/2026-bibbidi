@@ -127,7 +127,7 @@ class ChecklistServiceTest {
     }
 
     private static Checklist checklistOwnedBy(Long ownerId) {
-        return new Checklist(CHECKLIST_ID, ownerId, List.of(item(200L)));
+        return new Checklist(CHECKLIST_ID, ownerId, List.of(constructTestItem(200L)));
     }
 
     @Test
@@ -250,7 +250,7 @@ class ChecklistServiceTest {
     @DisplayName("준비 목록에서 가져온 미완료 할 일과 연결된 일정을 함께 삭제한다")
     void shouldDeleteIncompleteCatalogSourcedItemAndAppointments() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, 100L);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.PREV, 100L);
         Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item));
         given(checklistRepository.findByChecklistItemId(item.id())).willReturn(Optional.of(checklist));
 
@@ -281,7 +281,7 @@ class ChecklistServiceTest {
     @DisplayName("다른 사용자의 할 일은 삭제할 수 없다")
     void shouldRejectDeletionWhenItemBelongsToAnotherUser() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, null);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.PREV, null);
         given(checklistRepository.findByChecklistItemId(item.id()))
                 .willReturn(Optional.of(new Checklist(CHECKLIST_ID, 2L, List.of(item))));
 
@@ -298,7 +298,7 @@ class ChecklistServiceTest {
     @DisplayName("완료된 할 일은 삭제할 수 없다")
     void shouldRejectDeletionWhenItemIsDone() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.DONE, null);
         given(checklistRepository.findByChecklistItemId(item.id()))
                 .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item))));
 
@@ -315,7 +315,7 @@ class ChecklistServiceTest {
     @DisplayName("일정 삭제가 실패하면 할 일을 삭제하지 않는다")
     void shouldNotDeleteItemWhenAppointmentDeletionFails() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.PREV, null);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.PREV, null);
         given(checklistRepository.findByChecklistItemId(item.id()))
                 .willReturn(Optional.of(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item))));
         willThrow(new IllegalStateException("appointment deletion failed"))
@@ -335,7 +335,7 @@ class ChecklistServiceTest {
         Checklist checklist = new Checklist(
                 CHECKLIST_ID,
                 OWNER_ID,
-                List.of(item(100L), item(101L))
+                List.of(constructTestItem(100L), constructTestItem(101L))
         );
         given(checklistRepository.findByOwnerId(OWNER_ID)).willReturn(Optional.of(checklist));
 
@@ -361,7 +361,7 @@ class ChecklistServiceTest {
     @DisplayName("남은 일정 조회는 소유권을 확인한 뒤 일정 쪽 판단을 그대로 돌려준다")
     void shouldReturnRemainingAppointmentResultAfterOwnershipCheck() {
         // given
-        ChecklistItem item = item(200L);
+        ChecklistItem item = constructTestItem(200L);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
         given(checklistAppointmentService.hasRemainingAppointment(item.id())).willReturn(true);
@@ -377,7 +377,7 @@ class ChecklistServiceTest {
     @DisplayName("다른 사용자의 할 일은 남은 일정을 조회할 수 없다")
     void shouldRejectRemainingAppointmentLookupForOtherUsersItem() {
         // given
-        ChecklistItem item = item(200L);
+        ChecklistItem item = constructTestItem(200L);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
 
@@ -393,7 +393,7 @@ class ChecklistServiceTest {
     @DisplayName("할 일을 완료하면 남은 일정도 함께 완료한 뒤 할 일을 저장한다")
     void shouldCompleteRemainingAppointmentsBeforeSavingCompletedItem() {
         // given
-        ChecklistItem item = item(200L);
+        ChecklistItem item = constructTestItem(200L);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
         given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
@@ -414,7 +414,7 @@ class ChecklistServiceTest {
     @DisplayName("이미 완료한 할 일을 다시 완료해도 남은 일정은 함께 완료한다")
     void shouldCompleteRemainingAppointmentsWhenItemIsAlreadyDone() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.DONE, null);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
         given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
@@ -432,7 +432,7 @@ class ChecklistServiceTest {
     @DisplayName("할 일을 미완료 상태로 바꾸면 일정 되돌리기를 맡긴 뒤 할 일을 저장한다")
     void shouldReopenAppointmentsBeforeSavingReopenedItem() {
         // given
-        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.DONE, null);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
         given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
@@ -454,7 +454,7 @@ class ChecklistServiceTest {
     @DisplayName("다른 사용자의 할 일은 완료할 수 없다")
     void shouldRejectCompletionForOtherUsersItem() {
         // given
-        ChecklistItem item = item(200L);
+        ChecklistItem item = constructTestItem(200L);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
 
@@ -471,7 +471,7 @@ class ChecklistServiceTest {
     @DisplayName("일정 완료가 실패하면 할 일을 완료하지 않는다")
     void shouldNotCompleteItemWhenAppointmentCompletionFails() {
         // given
-        ChecklistItem item = item(200L);
+        ChecklistItem item = constructTestItem(200L);
         given(checklistRepository.getByChecklistItemId(item.id()))
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
         willThrow(new IllegalStateException("일정 완료 실패"))
@@ -484,11 +484,11 @@ class ChecklistServiceTest {
         then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
-    private static ChecklistItem item(Long id) {
-        return item(id, ChecklistItemStatus.PREV, null);
+    private static ChecklistItem constructTestItem(Long id) {
+        return constructTestItem(id, ChecklistItemStatus.PREV, null);
     }
 
-    private static ChecklistItem item(
+    private static ChecklistItem constructTestItem(
             Long id,
             ChecklistItemStatus status,
             Long sourceCatalogItemId
