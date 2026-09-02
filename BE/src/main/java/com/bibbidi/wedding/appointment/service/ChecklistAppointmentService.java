@@ -22,12 +22,25 @@ public class ChecklistAppointmentService {
 
     @Transactional
     public void completeAllByChecklistItemId(Long checklistItemId) {
-        List<Appointment> remaining = appointmentRepository.findAllRemainingByChecklistItemId(checklistItemId);
-        List<Appointment> completed = remaining.stream()
+        List<Appointment> completed = appointmentRepository
+                .findAllRemainingByChecklistItemId(checklistItemId)
+                .stream()
                 .map(Appointment::completeByChecklistItem)
                 .toList();
 
         appointmentRepository.saveAll(completed);
+    }
+
+    @Transactional
+    public void reopenAllDoneByChecklistItemId(Long checklistItemId) {
+        List<Appointment> reopened = appointmentRepository
+                .findAllCompletedByChecklistItemId(checklistItemId)
+                .stream()
+                .filter(Appointment::doneByChecklistItem)
+                .map(Appointment::reopen)
+                .toList();
+
+        appointmentRepository.saveAll(reopened);
     }
 
     @Transactional

@@ -62,7 +62,48 @@ class ChecklistAppointmentServiceTest {
         then(appointmentRepository).should().saveAll(List.of());
     }
 
+    @Test
+    @DisplayName("할 일을 미완료로 되돌리면 할 일 때문에 완료했던 일정만 되돌린다")
+    void shouldReopenOnlyAppointmentsCompletedByChecklistItem() {
+        given(appointmentRepository.findAllCompletedByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(List.of(doneByChecklistItem(1L), doneAlone(2L)));
+
+        checklistAppointmentService.reopenAllDoneByChecklistItemId(CHECKLIST_ITEM_ID);
+
+        then(appointmentRepository).should().saveAll(savedAppointmentsCaptor.capture());
+        assertThat(savedAppointmentsCaptor.getValue())
+                .singleElement()
+                .satisfies(saved -> {
+                    assertThat(saved.id()).isEqualTo(1L);
+                    assertThat(saved.isDone()).isFalse();
+                    assertThat(saved.doneByChecklistItem()).isFalse();
+                });
+    }
+
+    @Test
+    @DisplayName("따로 완료한 일정만 있으면 할 일을 되돌려도 되돌릴 일정이 없다")
+    void shouldReopenNothingWhenEveryAppointmentWasCompletedAlone() {
+        given(appointmentRepository.findAllCompletedByChecklistItemId(CHECKLIST_ITEM_ID))
+                .willReturn(List.of(doneAlone(1L)));
+
+        checklistAppointmentService.reopenAllDoneByChecklistItemId(CHECKLIST_ITEM_ID);
+
+        then(appointmentRepository).should().saveAll(List.of());
+    }
+
     private static Appointment appointment(Long id) {
+        return appointment(id, false, false);
+    }
+
+    private static Appointment doneByChecklistItem(Long id) {
+        return appointment(id, true, true);
+    }
+
+    private static Appointment doneAlone(Long id) {
+        return appointment(id, true, false);
+    }
+
+    private static Appointment appointment(Long id, boolean isDone, boolean doneByChecklistItem) {
         return new Appointment(
                 id,
                 CHECKLIST_ITEM_ID,
@@ -72,8 +113,8 @@ class ChecklistAppointmentServiceTest {
                 null,
                 null,
                 null,
-                false,
-                false
+                isDone,
+                doneByChecklistItem
         );
     }
 

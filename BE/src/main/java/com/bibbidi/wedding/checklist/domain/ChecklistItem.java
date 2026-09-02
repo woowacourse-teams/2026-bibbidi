@@ -27,16 +27,14 @@ public final class ChecklistItem {
         this.status = status;
     }
 
-    public ChecklistItem onProgress() {
-        return withStatus(ChecklistItemStatus.CONTINUE);
-    }
-
-    public ChecklistItem complete() {
-        return withStatus(ChecklistItemStatus.DONE);
-    }
-
-    public ChecklistItem reset() {
-        return withStatus(ChecklistItemStatus.PREV);
+    public ChecklistItem changeStatus(ChecklistItemStatus status) {
+        return new ChecklistItem(
+                id,
+                categoryId,
+                title,
+                sourceCatalogItemId,
+                status
+        );
     }
 
     public ChecklistItem changeCategory(Long categoryId) {
@@ -80,16 +78,6 @@ public final class ChecklistItem {
                     "완료된 할 일입니다. checklistItemId=" + id
             );
         }
-    }
-
-    private ChecklistItem withStatus(ChecklistItemStatus status) {
-        return new ChecklistItem(
-                id,
-                categoryId,
-                title,
-                sourceCatalogItemId,
-                status
-        );
     }
 
     public boolean cameFrom(Long catalogItemId) {

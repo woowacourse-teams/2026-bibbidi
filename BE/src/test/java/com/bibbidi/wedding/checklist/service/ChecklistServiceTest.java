@@ -400,7 +400,7 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE");
 
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
@@ -421,11 +421,33 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE");
 
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
         then(checklistAppointmentService).should().completeAllByChecklistItemId(item.id());
+    }
+
+    @Test
+    @DisplayName("할 일을 미완료 상태로 바꾸면 일정 되돌리기를 맡긴 뒤 할 일을 저장한다")
+    void shouldReopenAppointmentsBeforeSavingReopenedItem() {
+        // given
+        ChecklistItem item = item(200L, ChecklistItemStatus.DONE, null);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(1));
+
+        // when
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "PREV");
+
+        // then
+        assertThat(result.status()).isEqualTo(ChecklistItemStatus.PREV);
+
+        InOrder inOrder = inOrder(checklistAppointmentService, checklistRepository);
+        inOrder.verify(checklistAppointmentService)
+                .reopenAllDoneByChecklistItemId(item.id());
+        inOrder.verify(checklistRepository).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
 
     @Test
@@ -437,7 +459,7 @@ class ChecklistServiceTest {
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.completeItem(OTHER_OWNER_ID, item.id()))
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OTHER_OWNER_ID, item.id(), "DONE"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
@@ -457,7 +479,7 @@ class ChecklistServiceTest {
                 .completeAllByChecklistItemId(item.id());
 
         // when, then
-        assertThatThrownBy(() -> checklistService.completeItem(OWNER_ID, item.id()))
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE"))
                 .isInstanceOf(IllegalStateException.class);
         then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }
