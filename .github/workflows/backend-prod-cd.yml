@@ -151,6 +151,11 @@ jobs:
           docker compose pull backend nginx alloy dockerproxy
           docker compose up -d backend nginx alloy dockerproxy
 
+          # nginx.conf is a bind mount, so compose does not recreate nginx when
+          # only the rendered config changed. Reload it explicitly.
+          docker exec nginx nginx -t
+          docker exec nginx nginx -s reload
+
           if ! curl \
             --fail \
             --silent \
