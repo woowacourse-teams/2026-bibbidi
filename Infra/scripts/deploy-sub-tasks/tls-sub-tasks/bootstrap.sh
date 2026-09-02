@@ -2,9 +2,8 @@
 
 generate_bootstrap_cert() {
   sudo mkdir -p -- "$CERT_LIVE_DIR"
-  local config
+  local config status=0
   config=$(mktemp)
-  trap 'rm -f -- "$config"' RETURN
 
   cat > "$config" <<EOF
 [req]
@@ -20,14 +19,20 @@ subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = ${CERT_DOMAIN}
-DNS.2 = ${CERT_ALT_DOMAIN}
 EOF
+
+  if [[ -n "${CERT_ALT_DOMAIN:-}" ]]; then
+    printf 'DNS.2 = %s\n' "$CERT_ALT_DOMAIN" >> "$config"
+  fi
 
   sudo openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
     -keyout "$CERT_LIVE_DIR/privkey.pem" \
     -out "$CERT_LIVE_DIR/fullchain.pem" \
     -config "$config" \
-    -extensions v3_req
+    -extensions v3_req || status=$?
+  rm -f -- "$config"
+  [[ $status -eq 0 ]] || return "$status"
+
   sudo chmod 600 "$CERT_LIVE_DIR/privkey.pem"
   sudo chmod 644 "$CERT_LIVE_DIR/fullchain.pem"
 }

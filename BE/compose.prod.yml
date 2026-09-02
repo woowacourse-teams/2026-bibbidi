@@ -36,8 +36,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ${NGINX_CONFIG_PATH:-../Infra/nginx/nginx.conf.template}:/etc/nginx/nginx.conf:ro
-      - ${CERTBOT_WEBROOT:-../Infra/nginx/certbot}:/var/www/certbot:ro
+      - ${NGINX_CONFIG_PATH:-./infra/nginx/nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ${CERTBOT_WEBROOT:-./infra/nginx/certbot}:/var/www/certbot:ro
       - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
     networks:
       - bibbidi-observability
@@ -60,7 +60,7 @@ services:
     container_name: alloy
     restart: unless-stopped
     env_file:
-      - ${ALLOY_ENV_FILE:-../Infra/monitoring/.env.alloy}
+      - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
     command:
       - run
       - /etc/alloy/config.alloy
@@ -72,14 +72,20 @@ services:
     depends_on:
       - dockerproxy
     volumes:
-      - ${ALLOY_CONFIG_PATH:-../Infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - ${ALLOY_CONFIG_PATH:-./infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy/data
     networks:
       - bibbidi-observability
     mem_limit: 256m
     cpus: 0.50
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:12345/-/ready >/dev/null 2>&1"]
+      # The alloy image ships neither wget nor curl, and its /bin/sh is dash,
+      # so the probe has to be bash talking to /dev/tcp directly.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"
       interval: 10s
       timeout: 3s
       retries: 6
@@ -96,6 +102,7 @@ services:
     restart: unless-stopped
     environment:
       CONTAINERS: "1"
+      NETWORKS: "1"
       EVENTS: "1"
       PING: "1"
       VERSION: "1"
