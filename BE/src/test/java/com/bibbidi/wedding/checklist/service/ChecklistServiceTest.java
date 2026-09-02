@@ -400,7 +400,7 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE");
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "done");
 
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
@@ -421,7 +421,7 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE");
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "done");
 
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
@@ -439,7 +439,7 @@ class ChecklistServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(1));
 
         // when
-        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "PREV");
+        ChecklistItemResult result = checklistService.changeItemStatus(OWNER_ID, item.id(), "prev");
 
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.PREV);
@@ -459,7 +459,7 @@ class ChecklistServiceTest {
                 .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.changeItemStatus(OTHER_OWNER_ID, item.id(), "DONE"))
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OTHER_OWNER_ID, item.id(), "done"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CHECKLIST_ITEM_ACCESS_DENIED);
@@ -479,7 +479,7 @@ class ChecklistServiceTest {
                 .completeAllByChecklistItemId(item.id());
 
         // when, then
-        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, item.id(), "DONE"))
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, item.id(), "done"))
                 .isInstanceOf(IllegalStateException.class);
         then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
     }

@@ -107,7 +107,7 @@ class ChecklistControllerTest {
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
                 .andExpect(jsonPath("$.items[0].categoryId").value(2))
                 .andExpect(jsonPath("$.items[0].title").value("계약서 확인"))
-                .andExpect(jsonPath("$.items[0].status").value("PREV"))
+                .andExpect(jsonPath("$.items[0].status").value("prev"))
                 .andExpect(jsonPath("$.items[1].catalogItemId").value(101));
     }
 

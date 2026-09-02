@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.controller.dto;
 
-import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 
 public record ChecklistItemResponse(
@@ -8,7 +7,7 @@ public record ChecklistItemResponse(
         Long catalogItemId,
         Long categoryId,
         String title,
-        ChecklistItemStatus status
+        String status
 ) {
 
     public static ChecklistItemResponse from(ChecklistItemResult result) {
@@ -17,7 +16,7 @@ public record ChecklistItemResponse(
                 result.catalogItemId(),
                 result.categoryId(),
                 result.title(),
-                result.status()
+                result.status().value()
         );
     }
 }

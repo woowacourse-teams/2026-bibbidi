@@ -15,14 +15,14 @@ class ChecklistItemStatusTest {
 
     @ParameterizedTest
     @CsvSource({
-            "PREV, PREV",
-            "CONTINUE, CONTINUE",
-            "DONE, DONE",
+            "prev, PREV",
+            "continue, CONTINUE",
             "done, DONE",
+            "DONE, DONE",
             "Done, DONE",
             "cOnTiNuE, CONTINUE"
     })
-    @DisplayName("대소문자를 구분하지 않고 상태 이름과 같은 값을 주면 그 상태를 만든다")
+    @DisplayName("대소문자를 구분하지 않고 상태 값과 같은 값을 주면 그 상태를 만든다")
     void shouldCreateStatusFromMatchingName(String value, ChecklistItemStatus expected) {
         ChecklistItemStatus status = ChecklistItemStatus.from(value);
 
@@ -30,9 +30,9 @@ class ChecklistItemStatusTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"FINISHED", "", " ", "DONE "})
+    @ValueSource(strings = {"finished", "", " ", "done "})
     @NullSource
-    @DisplayName("상태 이름과 다른 값을 주면 만들 수 없다")
+    @DisplayName("상태 값과 다른 값을 주면 만들 수 없다")
     void shouldRejectValueThatMatchesNoStatus(String value) {
         assertThatThrownBy(() -> ChecklistItemStatus.from(value))
                 .isInstanceOf(BusinessException.class)

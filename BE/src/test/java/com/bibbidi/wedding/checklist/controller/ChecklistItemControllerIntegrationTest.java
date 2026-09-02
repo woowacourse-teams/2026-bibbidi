@@ -94,10 +94,10 @@ class ChecklistItemControllerIntegrationTest {
                     + "준비 목록에서 추가한 할 일은 원본 제목을 따라야 하므로 변경할 수 없습니다.";
     private static final String CHANGE_STATUS_SUMMARY = "할 일 상태 변경";
     private static final String CHANGE_STATUS_DESCRIPTION =
-            "할 일의 상태를 PREV(시작 전), CONTINUE(진행 중), DONE(완료) 중 하나로 바꿉니다. "
-                    + "DONE 으로 바꾸면 그 할 일에 남아 있던 미완료 일정도 함께 완료하고, "
+            "할 일의 상태를 prev(시작 전), continue(진행 중), done(완료) 중 하나로 바꿉니다. "
+                    + "done 으로 바꾸면 그 할 일에 남아 있던 미완료 일정도 함께 완료하고, "
                     + "이미 따로 완료한 일정은 그대로 둡니다. "
-                    + "DONE 이 아닌 상태로 바꾸면 할 일 완료 때문에 함께 완료됐던 일정만 되돌립니다.";
+                    + "done 이 아닌 상태로 바꾸면 할 일 완료 때문에 함께 완료됐던 일정만 되돌립니다.";
     private static final String REMAINING_APPOINTMENTS_SUMMARY = "할 일에 남은 일정 확인";
     private static final String REMAINING_APPOINTMENTS_DESCRIPTION =
             "할 일에 아직 완료하지 않은 일정이 남아 있는지 알려줍니다. "
@@ -157,12 +157,12 @@ class ChecklistItemControllerIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(CUSTOM_ITEM_ID))
                 .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
                 .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
-                .andExpect(jsonPath("$.status").value("DONE"))
+                .andExpect(jsonPath("$.status").value("done"))
                 .andDo(document(
                         "checklist-items-change-status",
                         resource(ResourceSnippetParameters.builder()
@@ -179,14 +179,14 @@ class ChecklistItemControllerIntegrationTest {
                                         parameterWithName("itemId").description("상태를 바꿀 할 일 ID")
                                 )
                                 .requestFields(
-                                        fieldWithPath("status").description("바꿀 상태. PREV, CONTINUE, DONE 중 하나. 대소문자는 구분하지 않는다")
+                                        fieldWithPath("status").description("바꿀 상태. prev, continue, done 중 하나. 대소문자는 구분하지 않는다")
                                 )
                                 .responseFields(
                                         fieldWithPath("id").description("할 일 ID"),
                                         fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
                                         fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                         fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. PREV, CONTINUE, DONE")
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                 )
                                 .build())
                 ));
@@ -210,9 +210,9 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DONE"));
+                .andExpect(jsonPath("$.status").value("done"));
 
         // then
         assertThat(jpaAppointmentRepository.findAllById(List.of(
@@ -231,9 +231,9 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_CUSTOM_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DONE"));
+                .andExpect(jsonPath("$.status").value("done"));
 
         // then
         assertThat(jpaAppointmentRepository.findById(DONE_ITEM_APPOINTMENT_ID).orElseThrow())
@@ -250,9 +250,9 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("PREV")))
+                        .content(statusRequestBody("prev")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PREV"));
+                .andExpect(jsonPath("$.status").value("prev"));
 
         // then
         assertThat(jpaChecklistItemRepository.findById(DONE_BY_CHECKLIST_ITEM_ID).orElseThrow().status())
@@ -271,7 +271,7 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("PREV")))
+                        .content(statusRequestBody("prev")))
                 .andExpect(status().isOk());
 
         // then
@@ -291,9 +291,9 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("CONTINUE")))
+                        .content(statusRequestBody("continue")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CONTINUE"));
+                .andExpect(jsonPath("$.status").value("continue"));
 
         // then
         assertThat(jpaAppointmentRepository.findById(DONE_BY_ITEM_APPOINTMENT_ID).orElseThrow().isDone())
@@ -339,7 +339,7 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, OTHER_USERS_ITEM_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203))
                 .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
@@ -352,7 +352,7 @@ class ChecklistItemControllerIntegrationTest {
         mockMvc.perform(put(CHANGE_STATUS_URL, 9999L)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(304))
                 .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
@@ -364,7 +364,7 @@ class ChecklistItemControllerIntegrationTest {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("DONE")))
+                        .content(statusRequestBody("done")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
@@ -470,7 +470,7 @@ class ChecklistItemControllerIntegrationTest {
                 .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
                 .andExpect(jsonPath("$.categoryId").value(NEW_CATEGORY_ID))
                 .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
-                .andExpect(jsonPath("$.status").value("PREV"))
+                .andExpect(jsonPath("$.status").value("prev"))
                 .andDo(document(
                         "checklist-items-change-category",
                         resource(ResourceSnippetParameters.builder()
@@ -495,7 +495,7 @@ class ChecklistItemControllerIntegrationTest {
                                                 .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                         fieldWithPath("categoryId").description("변경된 카테고리 ID"),
                                         fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. PREV, CONTINUE, DONE")
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                 )
                                 .build())
                 ));
@@ -512,7 +512,7 @@ class ChecklistItemControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categoryId").value(NEW_CATEGORY_ID))
                 .andExpect(jsonPath("$.title").value("식순 정하기"))
-                .andExpect(jsonPath("$.status").value("DONE"));
+                .andExpect(jsonPath("$.status").value("done"));
     }
 
     @Test
@@ -642,7 +642,7 @@ class ChecklistItemControllerIntegrationTest {
                 .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
                 .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
                 .andExpect(jsonPath("$.title").value(NEW_TITLE))
-                .andExpect(jsonPath("$.status").value("PREV"))
+                .andExpect(jsonPath("$.status").value("prev"))
                 .andDo(document(
                         "checklist-items-change-title",
                         resource(ResourceSnippetParameters.builder()
@@ -667,7 +667,7 @@ class ChecklistItemControllerIntegrationTest {
                                                 .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                         fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                         fieldWithPath("title").description("변경된 할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. PREV, CONTINUE, DONE")
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                 )
                                 .build())
                 ));
@@ -684,7 +684,7 @@ class ChecklistItemControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value(NEW_TITLE))
                 .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
-                .andExpect(jsonPath("$.status").value("DONE"));
+                .andExpect(jsonPath("$.status").value("done"));
     }
 
     @Test

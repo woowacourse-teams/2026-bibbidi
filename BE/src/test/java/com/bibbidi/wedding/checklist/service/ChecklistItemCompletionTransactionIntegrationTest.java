@@ -83,7 +83,7 @@ class ChecklistItemCompletionTransactionIntegrationTest {
                 .saveAndFlush(any(JpaChecklistItemEntity.class));
 
         // when, then
-        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, checklistItem.id(), "DONE"))
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, checklistItem.id(), "done"))
                 .isInstanceOf(DataAccessException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("checklist item completion failed");
