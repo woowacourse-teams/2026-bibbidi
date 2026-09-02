@@ -15,6 +15,8 @@
   --color-bg-critical-weak: #fdf0f0;
   --color-bg-informative-weak: #eff6ff;
   --color-bg-neutral-weak: var(--color-palette-ivory);
+  --color-bg-positive-badge: #eef4d6;
+  --color-bg-positive-subtle: #fbfcf7;
   --color-bg-positive-weak: var(--color-palette-green);
   --color-fg-neutral: #36383d;
   --color-fg-neutral-muted: #555d6d;
@@ -27,6 +29,7 @@
   --color-stroke-neutral: #d5d7db;
   --color-stroke-neutral-weak: #dcdee3;
   --color-stroke-brand-solid: var(--color-palette-coral);
+  --color-stroke-brand-weak: #e7d9b7;
   --color-stroke-neutral-contrast: #1a1c20;
   --color-stroke-critical-solid: #fa342c;
   --color-stroke-focus-ring: #5e98fe;
