@@ -39,7 +39,15 @@ public class AppointmentRepository {
     }
 
     public List<Appointment> findAllRemainingByChecklistItemId(Long checklistItemId) {
-        return jpaAppointmentRepository.findAllRemainingByChecklistItemId(checklistItemId)
+        return findAllByChecklistItemIdAndIsDone(checklistItemId, false);
+    }
+
+    public List<Appointment> findAllCompletedByChecklistItemId(Long checklistItemId) {
+        return findAllByChecklistItemIdAndIsDone(checklistItemId, true);
+    }
+
+    private List<Appointment> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone) {
+        return jpaAppointmentRepository.findAllByChecklistItemIdAndIsDone(checklistItemId, isDone)
                 .stream()
                 .map(appointmentMapper::toDomain)
                 .toList();

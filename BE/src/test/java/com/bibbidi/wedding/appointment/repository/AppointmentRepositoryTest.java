@@ -154,6 +154,20 @@ class AppointmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("할 일의 완료된 일정만 조회한다")
+    void shouldFindOnlyDoneAppointmentsOfChecklistItem() {
+        saveAppointment(10L, "아직 안 끝낸 일정");
+        Appointment done = saveDoneAppointment(10L, "이미 끝낸 일정");
+        saveDoneAppointment(20L, "다른 할 일의 끝낸 일정");
+
+        List<Appointment> found = appointmentRepository.findAllCompletedByChecklistItemId(10L);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactly(done.id());
+    }
+
+    @Test
     @DisplayName("할 일에 남은 일정이 없으면 빈 목록을 조회한다")
     void shouldFindNoRemainingAppointmentWhenEveryAppointmentIsDone() {
         saveDoneAppointment(10L, "이미 끝낸 일정");
