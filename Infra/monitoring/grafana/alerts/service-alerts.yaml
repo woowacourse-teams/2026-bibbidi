@@ -1,11 +1,20 @@
 apiVersion: 1
 
-# Grafana Cloud Alerting provisioning file.
-# Import this file from Grafana Cloud; it is not a Notification Dashboard.
+# Reference copy of the Bibbidi alert rules. The rules that actually run are
+# the ones registered in the Grafana Cloud UI; this file documents them and is
+# not imported by any pipeline, so the two can drift apart.
+#
+# Datasource UIDs are the ones provisioned by Grafana Cloud on this stack:
+#   grafanacloud-prom    - grafanacloud-rubyplatypus371-prom   (metrics)
+#   grafanacloud-logs    - grafanacloud-rubyplatypus371-logs   (logs)
+#   grafanacloud-traces  - grafanacloud-rubyplatypus371-traces (traces, used by
+#                          dashboards and log-to-trace links, not by alert rules)
+# Do not point rules at grafanacloud-usage, -usage-insights, or
+# -alert-state-history: those describe Grafana Cloud itself, not this service.
 groups:
   - orgId: 1
     name: bibbidi-service-symptoms
-    folder: Bibbidi / Alerts
+    folder: Bibbidi/Alerts
     interval: 1m
     rules:
       - uid: bibbidi-5xx-rate-warning
@@ -23,9 +32,9 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
-            datasourceUid: bibbidi-prometheus
             model:
               expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              instant: true
               refId: A
           - refId: C
             datasourceUid: __expr__
@@ -50,9 +59,9 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
-            datasourceUid: bibbidi-prometheus
             model:
               expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              instant: true
               refId: A
           - refId: C
             datasourceUid: __expr__
@@ -60,33 +69,6 @@ groups:
               expression: A
               type: threshold
               conditions: [{evaluator: {params: [0.15], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
-              refId: C
-
-      - uid: bibbidi-major-api-availability
-        title: Bibbidi major API availability is low
-        condition: C
-        for: 5m
-        noDataState: NoData
-        execErrState: Error
-        annotations:
-          summary: "Checklist, appointment, auth, or user API availability is below 99%"
-          description: "The major API group has a non-2xx response ratio above 1% for 5 minutes. Use the URI label only for investigation, not as an index label."
-          dashboard_uid: bibbidi-observability
-          panel_id: "4"
-        labels: {severity: warning, service: bibbidi, symptom: availability}
-        data:
-          - refId: A
-            relativeTimeRange: {from: 300, to: 0}
-            datasourceUid: bibbidi-prometheus
-            model:
-              expr: 'sum(rate(http_server_requests_seconds_count{uri=~"/api/(checklists|appointments|auth|users).*",status!~"2.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{uri=~"/api/(checklists|appointments|auth|users).*"}[5m])), 1)'
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              expression: A
-              type: threshold
-              conditions: [{evaluator: {params: [0.01], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
               refId: C
 
       - uid: bibbidi-api-latency-p95
@@ -104,9 +86,9 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 600, to: 0}
-            datasourceUid: bibbidi-prometheus
             model:
               expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))'
+              instant: true
               refId: A
           - refId: C
             datasourceUid: __expr__
@@ -118,7 +100,7 @@ groups:
 
   - orgId: 1
     name: bibbidi-runtime-symptoms
-    folder: Bibbidi / Alerts
+    folder: Bibbidi/Alerts
     interval: 1m
     rules:
       - uid: bibbidi-hikari-pending-warning
@@ -136,11 +118,17 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
-            datasourceUid: bibbidi-prometheus
-            model: {expr: 'max(hikaricp_connections_pending)', refId: A}
+            model:
+              expr: 'max(hikaricp_connections_pending)'
+              instant: true
+              refId: A
           - refId: C
             datasourceUid: __expr__
-            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}], refId: C}
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}]
+              refId: C
 
       - uid: bibbidi-hikari-pending-critical
         title: Bibbidi Hikari pool is saturated
@@ -157,11 +145,17 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
-            datasourceUid: bibbidi-prometheus
-            model: {expr: 'max(hikaricp_connections_pending)', refId: A}
+            model:
+              expr: 'max(hikaricp_connections_pending)'
+              instant: true
+              refId: A
           - refId: C
             datasourceUid: __expr__
-            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [5], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}], refId: C}
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [5], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: max}, type: query}]
+              refId: C
 
       - uid: bibbidi-jvm-heap-warning
         title: Bibbidi JVM heap usage is high
@@ -178,13 +172,17 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 600, to: 0}
-            datasourceUid: bibbidi-prometheus
             model:
               expr: 'sum(jvm_memory_used_bytes{area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{area="heap"}), 1)'
+              instant: true
               refId: A
           - refId: C
             datasourceUid: __expr__
-            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0.85], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}], refId: C}
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0.85], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
 
       - uid: bibbidi-instance-down
         title: Bibbidi Backend scrape target is down
@@ -200,8 +198,91 @@ groups:
         data:
           - refId: A
             relativeTimeRange: {from: 120, to: 0}
-            datasourceUid: bibbidi-prometheus
-            model: {expr: 'min(up{job=~".*bibbidi.*"})', refId: A}
+            model:
+              expr: 'min(up{job=~".*bibbidi.*"})'
+              instant: true
+              refId: A
           - refId: C
             datasourceUid: __expr__
-            model: {expression: A, type: threshold, conditions: [{evaluator: {params: [0], type: lte}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}], refId: C}
+            model:
+              expression: A
+              type: threshold
+              conditions: [{evaluator: {params: [0], type: lte}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+  - orgId: 1
+    name: bibbidi-log-symptoms
+    folder: Bibbidi/Alerts
+    interval: 1m
+    rules:
+      # Metrics only say that requests failed. These rules watch the log stream
+      # itself, so an exception storm that never reaches a 5xx response - a
+      # failing scheduled job, a swallowed error - still raises an alert.
+      #
+      # Labels come from Alloy: job="bibbidi" is set by loki.source.docker, and
+      # severity_text by loki.process.normalize (stage.labels).
+      - uid: bibbidi-error-log-spike
+        title: Bibbidi error log volume is elevated
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "More than 10 ERROR or FATAL log lines in 5 minutes"
+          description: "The backend is logging errors at an unusual rate. Open Loki with {job=\"bibbidi\", severity_text=~\"(?i)error|fatal\"} and follow the traceId in the structured metadata into Tempo."
+          dashboard_uid: bibbidi-observability
+        labels: {severity: warning, service: bibbidi, symptom: error-logs}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            model:
+              expr: 'sum(count_over_time({job="bibbidi", severity_text=~"(?i)error|fatal"}[5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: reduce
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions: [{evaluator: {params: [10], type: gt}, operator: {type: and}, query: {params: [B]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-nginx-5xx-log-spike
+        title: Nginx is returning 5xx responses
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "More than 10 nginx 5xx access log lines in 5 minutes"
+          description: "Nginx itself is answering 5xx. A 502 or 504 here usually means the backend container is down, restarting, or slower than the 30s proxy_read_timeout - the application metrics may show nothing at all."
+          dashboard_uid: bibbidi-observability
+        labels: {severity: critical, service: bibbidi, symptom: gateway-errors}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            model:
+              expr: 'sum(count_over_time({job="bibbidi", compose_service="nginx"} | json | http_response_status_code >= 500 [5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: reduce
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions: [{evaluator: {params: [10], type: gt}, operator: {type: and}, query: {params: [B]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
