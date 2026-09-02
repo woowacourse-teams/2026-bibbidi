@@ -45,7 +45,8 @@ class CatalogRepositoryTest {
         JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
         JpaCategoryEntity studio = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
         JpaStepEntity contract = jpaStepRepository.save(new JpaStepEntity(
-                null, weddingHall.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1
+                null, weddingHall.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.",
+                "https://www.bibbidi.kr/icon/wedding/venue-hall-tour.png", 1
         ));
         JpaCatalogItemEntity item = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
                 null, contract.id(), "계약서 확인", 1, true

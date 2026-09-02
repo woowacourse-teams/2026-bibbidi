@@ -10,6 +10,7 @@ public final class Step {
     private final Long id;
     private final String name;
     private final String description;
+    private final String iconUrl;
     private final int displayOrder;
     private final List<Item> items;
 
@@ -17,12 +18,14 @@ public final class Step {
             @Nullable Long id,
             @NonNull String name,
             @Nullable String description,
+            @Nullable String iconUrl,
             int displayOrder,
             @NonNull List<Item> items
     ) {
         this.id = id;
         this.name = name;
         this.description = description;
+        this.iconUrl = iconUrl;
         this.displayOrder = displayOrder;
         this.items = sortByDisplayOrder(items);
     }
@@ -37,6 +40,10 @@ public final class Step {
 
     public String description() {
         return description;
+    }
+
+    public String iconUrl() {
+        return iconUrl;
     }
 
     public int displayOrder() {

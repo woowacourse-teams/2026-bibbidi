@@ -26,6 +26,9 @@ public class JpaStepEntity extends BaseTimeEntity {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "icon_url", length = 255)
+    private String iconUrl;
+
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
@@ -37,12 +40,14 @@ public class JpaStepEntity extends BaseTimeEntity {
             Long categoryId,
             String name,
             String description,
+            String iconUrl,
             int displayOrder
     ) {
         this.id = id;
         this.categoryId = categoryId;
         this.name = name;
         this.description = description;
+        this.iconUrl = iconUrl;
         this.displayOrder = displayOrder;
     }
 
@@ -60,6 +65,10 @@ public class JpaStepEntity extends BaseTimeEntity {
 
     public String description() {
         return description;
+    }
+
+    public String iconUrl() {
+        return iconUrl;
     }
 
     public int displayOrder() {

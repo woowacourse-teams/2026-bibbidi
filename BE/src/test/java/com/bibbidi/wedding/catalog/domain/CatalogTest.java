@@ -15,8 +15,8 @@ class CatalogTest {
     @DisplayName("준비 영역과 단계와 항목을 모두 노출 순서대로 정렬한다")
     void shouldSortEveryLevelByDisplayOrder() {
         // given
-        Step firstStep = new Step(1L, "첫 번째 단계", "단계 설명", 1, List.of(SECOND_ITEM, FIRST_ITEM));
-        Step secondStep = new Step(2L, "두 번째 단계", null, 2, List.of());
+        Step firstStep = new Step(1L, "첫 번째 단계", "단계 설명", null, 1, List.of(SECOND_ITEM, FIRST_ITEM));
+        Step secondStep = new Step(2L, "두 번째 단계", null, null, 2, List.of());
         Category firstCategory = new Category(1L, "첫 번째 영역", 1, List.of(secondStep, firstStep));
         Category secondCategory = new Category(2L, "두 번째 영역", 2, List.of());
 

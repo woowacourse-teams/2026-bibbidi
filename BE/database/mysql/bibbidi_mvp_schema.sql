@@ -36,6 +36,7 @@ CREATE TABLE steps (
     category_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     description VARCHAR(500),
+    icon_url VARCHAR(255),
     display_order INT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,

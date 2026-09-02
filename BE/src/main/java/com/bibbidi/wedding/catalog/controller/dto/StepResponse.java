@@ -8,6 +8,7 @@ public record StepResponse(
         Long id,
         String name,
         String description,
+        String iconUrl,
         int displayOrder,
         List<ItemResponse> items
 ) {
@@ -17,6 +18,7 @@ public record StepResponse(
                 step.id(),
                 step.name(),
                 step.description(),
+                step.iconUrl(),
                 step.displayOrder(),
                 step.items().stream()
                         .map(item -> ItemResponse.fromDomain(item, includedCatalogItemIds))
@@ -29,6 +31,7 @@ public record StepResponse(
                 step.id(),
                 step.name(),
                 step.description(),
+                step.iconUrl(),
                 step.displayOrder(),
                 step.items().stream()
                         .map(ItemResponse::forPublic)

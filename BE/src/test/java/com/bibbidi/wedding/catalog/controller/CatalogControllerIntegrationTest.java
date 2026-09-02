@@ -234,6 +234,9 @@ class CatalogControllerIntegrationTest {
                 fieldWithPath("categories[].steps[].description")
                         .description("준비 단계 설명. 설명이 없으면 null")
                         .optional(),
+                fieldWithPath("categories[].steps[].iconUrl")
+                        .description("준비 단계를 대표하는 아이콘 이미지 URL. 아이콘이 없으면 null")
+                        .optional(),
                 fieldWithPath("categories[].steps[].displayOrder")
                         .description("현재 준비 영역 안에서의 단계 노출 순서. 값이 작을수록 먼저 노출"),
                 fieldWithPath("categories[].steps[].items")
@@ -264,6 +267,9 @@ class CatalogControllerIntegrationTest {
                 fieldWithPath("categories[].steps[].name").description("준비 단계 이름"),
                 fieldWithPath("categories[].steps[].description")
                         .description("준비 단계 설명. 설명이 없으면 null")
+                        .optional(),
+                fieldWithPath("categories[].steps[].iconUrl")
+                        .description("준비 단계를 대표하는 아이콘 이미지 URL. 아이콘이 없으면 null")
                         .optional(),
                 fieldWithPath("categories[].steps[].displayOrder")
                         .description("현재 준비 영역 안에서의 단계 노출 순서. 값이 작을수록 먼저 노출"),

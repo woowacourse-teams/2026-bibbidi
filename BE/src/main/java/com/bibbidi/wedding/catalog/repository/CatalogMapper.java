@@ -64,6 +64,7 @@ public class CatalogMapper {
                 entity.id(),
                 entity.name(),
                 entity.description(),
+                entity.iconUrl(),
                 entity.displayOrder(),
                 items
         );
