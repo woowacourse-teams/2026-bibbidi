@@ -122,6 +122,9 @@ jobs:
           envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
             > /opt/bibbidi/app/infra/nginx/nginx.conf
+          test -s /opt/bibbidi/app/infra/nginx/nginx.conf
+          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN)\}' \
+            /opt/bibbidi/app/infra/nginx/nginx.conf
 
       - name: Bootstrap TLS material
         run: bash "$TLS_SCRIPT" bootstrap
