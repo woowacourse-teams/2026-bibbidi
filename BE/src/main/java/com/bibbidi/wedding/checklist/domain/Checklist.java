@@ -20,28 +20,28 @@ public final class Checklist {
 
     public ChecklistItem changeItemCategory(Long ownerId, Long checklistItemId, Long categoryId) {
         validateOwnedBy(ownerId);
-        ChecklistItem item = item(checklistItemId);
+        ChecklistItem item = findItem(checklistItemId);
 
         return item.changeCategory(categoryId);
     }
 
     public ChecklistItem changeItemTitle(Long ownerId, Long checklistItemId, String title) {
         validateOwnedBy(ownerId);
-        ChecklistItem item = item(checklistItemId);
+        ChecklistItem item = findItem(checklistItemId);
 
         return item.changeTitle(title);
     }
 
     public ChecklistItem completeItem(Long ownerId, Long checklistItemId) {
         validateOwnedBy(ownerId);
-        ChecklistItem item = item(checklistItemId);
+        ChecklistItem item = findItem(checklistItemId);
 
         return item.complete();
     }
 
     public ChecklistItem deletableItem(Long ownerId, Long checklistItemId) {
         validateOwnedBy(ownerId);
-        ChecklistItem item = item(checklistItemId);
+        ChecklistItem item = findItem(checklistItemId);
         item.validateDeletable();
 
         return item;
@@ -75,7 +75,7 @@ public final class Checklist {
         return items;
     }
 
-    private ChecklistItem item(Long checklistItemId) {
+    private ChecklistItem findItem(Long checklistItemId) {
         return items.stream()
                 .filter(item -> Objects.equals(item.id(), checklistItemId))
                 .findFirst()
