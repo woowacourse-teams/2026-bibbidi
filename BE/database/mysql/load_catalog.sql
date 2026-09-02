@@ -1,19 +1,8 @@
--- Loads the initial wedding preparation catalog: 5 categories, 43 steps, 169 items.
--- Run this right after bibbidi_mvp_schema.sql.
---
--- Safe to run more than once. Each statement upserts, so a second run brings existing
--- rows back in line with this file instead of failing on a duplicate id.
--- created_at is left alone; only updated_at moves.
--- Rows dropped from this file are not deleted from the database.
---
--- Ids are explicit so that catalog_items can point at their step without a lookup.
--- Source: FigJam backbone map, captured 2026-08-26.
+-- 준비 목록 초기 데이터
 
 USE bibbidi;
 
--- ============================================================
--- categories
--- ============================================================
+-- 카테고리
 INSERT INTO categories (id, name, display_order, created_at, updated_at) VALUES
 (1, '웨딩홀', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, '스드메', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -25,10 +14,7 @@ AS new ON DUPLICATE KEY UPDATE
     display_order = new.display_order,
     updated_at    = CURRENT_TIMESTAMP;
 
--- ============================================================
--- steps
--- icon_url points at the CloudFront path for that step's roadmap icon.
--- ============================================================
+-- 단계
 INSERT INTO steps (id, category_id, name, description, icon_url, display_order, created_at, updated_at) VALUES
 -- 웨딩홀
 (1, 1, '웨딩홀 투어와 계약',
@@ -176,21 +162,15 @@ AS new ON DUPLICATE KEY UPDATE
     display_order = new.display_order,
     updated_at    = CURRENT_TIMESTAMP;
 
--- ============================================================
--- catalog_items
--- essential = TRUE means the item is added to every new checklist.
--- ============================================================
+-- 준비 항목
 INSERT INTO catalog_items (id, step_id, title, display_order, essential, created_at, updated_at) VALUES
--- step 1. 웨딩홀 투어와 계약
 (1, 1, '웨딩홀 투어', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 1, '웨딩홀 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 2. 예식 형태·식순·입장 방식 결정
 (3, 2, '예식 형태 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (4, 2, '입장 방식 결정', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (5, 2, '식순 준비', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 3. 예식 진행자와 당일 도우미 섭외
 (6, 3, '주례·사회자 섭외', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (7, 3, '축가·축사·덕담 섭외', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (8, 3, '가방순이 섭외', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -198,7 +178,6 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (10, 3, '축의대 담당자 섭외·역할 안내', 5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (11, 3, '헬퍼비·사례비 봉투 준비', 6, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 4. 예식 대본과 음원·영상 준비
 (12, 4, '사회자 대본 준비', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (13, 4, '성혼선언문 준비', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (14, 4, '혼인서약문 준비', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -207,13 +186,11 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (17, 4, '식전영상 웨딩홀 전달', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (18, 4, '본식음원 웨딩홀 전달', 7, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 5. 본식 촬영·기록 업체 계약
 (19, 5, '본식스냅 계약', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (20, 5, '본식DVD 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (21, 5, '서브스냅 계약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (22, 5, '아이폰스냅 계약', 4, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 6. 예식 물품과 답례품 준비
 (23, 6, '포토부스 설치 여부 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (24, 6, '답례 대상·수량 정리', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (25, 6, '답례품 준비', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -221,21 +198,17 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (27, 6, '식권·식순지·접수대 봉투 준비', 5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (28, 6, '부케·부토니아·코사지 예약', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 7. 웨딩홀 시식·리허설과 본식 당일 준비
 (29, 7, '웨딩홀 시식', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (30, 7, '웨딩홀 리허설 방문', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (31, 7, '본식 전날 숙박 예약', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (32, 7, '예식장 이동 차량·트렁크 준비', 4, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (33, 7, '본식 당일 개인 준비물 준비', 5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 8. 본식 당일 진행
 (34, 8, '본식 진행', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 9. 예식 비용 정산과 사례비 전달
 (35, 9, '예식비용 정산', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (36, 9, '사례비 전달', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 10. 스드메 상담·견적과 패키지 계약
 (37, 10, '웨딩박람회 방문', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (38, 10, '플래너 배정과 상담', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (39, 10, '스드메 상담', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -244,7 +217,6 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (42, 10, '스드메 계약', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (43, 10, '계약금·중도금·잔금 일정 확정', 7, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 11. 스드메 업체 확정과 촬영일 예약
 (44, 11, '드레스샵 투어', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (45, 11, '스튜디오 선택', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (46, 11, '메이크업 상담', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -253,7 +225,6 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (49, 11, '촬영 날짜 확정', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (50, 11, '헤어메이크업 일정 확정', 7, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 12. 촬영 드레스·예복 가봉과 헤어변형·헬퍼 예약
 (51, 12, '가봉 전 드레스 시착', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (52, 12, '촬영 드레스 선택과 가봉', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (53, 12, '촬영용 대여복 선택', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -264,27 +235,22 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (58, 12, '촬영 플라워디렉팅 예약', 8, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (59, 12, '촬영 헬퍼 섭외', 9, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 13. 촬영 시안 제작과 업체 전달
 (60, 13, '촬영 시안 제작', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (61, 13, '참고 사진·레퍼런스 전달', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 14. 촬영 추가 착장과 소품 준비
 (62, 14, '자유복·캐주얼 착장 준비', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (63, 14, '한복 촬영 착장 준비', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (64, 14, '붙임머리·가발 준비', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (65, 14, '촬영 부케 준비', 4, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 15. 웨딩 촬영 당일 진행
 (66, 15, '야외·추가 스냅 여부 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (67, 15, '스튜디오 촬영 진행', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 16. 촬영 사진 셀렉·보정과 앨범·액자 주문
 (68, 16, '촬영 사진 셀렉', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (69, 16, '보정본 수령', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (70, 16, '앨범 구성 결정과 주문', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (71, 16, '액자 주문', 4, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 17. 본식 드레스·예복 계약과 헤어메이크업·소품 결정
 (72, 17, '예복 맞춤·기성·대여 결정', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (73, 17, '예복 상담과 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (74, 17, '본식 드레스샵 계약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -299,20 +265,16 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (83, 17, '2부 헤어변형 여부 결정', 12, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (84, 17, '본식 메이크업 진행', 13, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 18. 대여 물품 반납
 (85, 18, '대여 물품 반납', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 19. 하객 범위 결정과 명단 작성
 (86, 19, '하객 초대 범위 결정', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (87, 19, '예상 하객수 산정', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (88, 19, '하객 명단 작성', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 20. 청첩장 문구 작성과 화환 여부 결정
 (89, 20, '청첩장 문구 작성', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (90, 20, '청첩장 교통·주차 안내 반영', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (91, 20, '화환 수령 여부 결정', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 21. 모바일·종이 청첩장 제작과 주문
 (92, 21, '종이 청첩장 업체 선택', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (93, 21, '청첩장 수량 결정', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (94, 21, '청첩장 검수', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -320,31 +282,24 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (96, 21, '모바일 청첩장 업체 선택', 5, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (97, 21, '모바일 청첩장 제작', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 22. 청첩장 모임과 전달
 (98, 22, '청첩장 모임 진행', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (99, 22, '종이 청첩장 직접 전달', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (100, 22, '모바일 청첩장 발송', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 23. 참석 인원 확정과 식장 통보
 (101, 23, '식장 보증 인원 통보', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 24. 하객 셔틀버스와 교통비 준비
 (102, 24, '셔틀·대절버스 예약', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (103, 24, '장거리 하객 숙박 준비', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (104, 24, '하객 교통비 준비', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 25. 식권 준비
 (105, 25, '식권 준비', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 26. 식대 정산과 축의금 정리
 (106, 26, '축의금 정리', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (107, 26, '축의금 명단 정리', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (108, 26, '잔여 식권·식대 정산', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 27. 하객 감사 인사 전달
 (109, 27, '하객 감사 인사 전달', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 28. 상견례 일정·장소 예약과 진행
 (110, 28, '양가 부모님 첫인사', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (111, 28, '상견례 날짜 확정', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (112, 28, '상견례 장소 선택과 예약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -353,16 +308,13 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (115, 28, '상견례 진행', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (116, 28, '예식 일정·조건 조율', 7, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 29. 예단 여부 협의와 날짜 결정
 (117, 29, '예단 여부 양가 협의', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (118, 29, '예단 전달 날짜 확정', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 30. 폐백 여부 결정과 진행
 (119, 30, '폐백 여부 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (120, 30, '이바지 음식 예약', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (121, 30, '폐백 진행', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 31. 혼주 한복·예복 계약과 소품 준비
 (122, 31, '한복 대여·맞춤 결정', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (123, 31, '한복 업체 선택', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (124, 31, '혼주 한복 선택과 계약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -373,45 +325,37 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (129, 31, '혼주 구두·가방 선택', 8, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (130, 31, '혼주 코사지·꽃 준비', 9, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 32. 형제자매·조부모 의상 준비
 (131, 32, '형제자매 의상 준비', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (132, 32, '조부모 의상 준비', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (133, 32, '조부모 선물 준비', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 33. 혼주 헤어·메이크업 예약
 (134, 33, '출장 메이크업 여부 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (135, 33, '혼주 메이크업 인원 확정', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (136, 33, '혼주 메이크업 예약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (137, 33, '혼주 헤어 예약', 4, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 34. 가족 대여 물품 반납
 (138, 34, '가족 대여 물품 반납', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 35. 총예산 수립과 예식 기본 조건 결정
 (139, 35, '총예산 수립', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (140, 35, '예비비 편성', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (141, 35, '예식 희망 날짜 범위 결정', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (142, 35, '예식 지역 결정', 4, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (143, 35, '현금영수증·소득공제 방식 확인', 5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 36. 결혼반지 투어와 계약
 (144, 36, '웨딩밴드 투어', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (145, 36, '결혼반지 선택', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (146, 36, '웨딩밴드 계약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 37. 웨딩 전 피부·치아·헤어 관리 예약
 (147, 37, '결혼 전 건강검진 여부 결정', 1, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (148, 37, '치아 관리 일정 예약', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (149, 37, '피부 관리 일정 예약', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (150, 37, '헤어·염색 일정 예약', 4, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (151, 37, '네일 일정 예약', 5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 38. 신혼여행지 결정과 항공·숙소 예약
 (152, 38, '신혼여행지 결정', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (153, 38, '항공권 예약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (154, 38, '숙소 예약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 39. 출국 준비와 해외 결제 수단 마련
 (155, 39, '여권 유효기간 확인', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (156, 39, '비자·입국 등록 확인', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (157, 39, '여행자보험 가입', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -419,21 +363,17 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (159, 39, '환전·외화 준비', 5, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (160, 39, '로밍·eSIM 준비', 6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 40. 신혼집 계약과 인테리어 범위 결정
 (161, 40, '신혼집 후보 조사', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (162, 40, '신혼집 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (163, 40, '인테리어·공사 범위 결정', 3, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 41. 혼수 구입과 이사 준비
 (164, 41, '혼수 목록 결정', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (165, 41, '가전·가구 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (166, 41, '이사 업체 예약', 3, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 42. 신혼집 입주와 전입신고
 (167, 42, '신혼집 입주', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (168, 42, '전입신고·확정일자 처리', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- step 43. 혼인신고 접수
 (169, 43, '혼인신고 접수', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 AS new ON DUPLICATE KEY UPDATE
     step_id       = new.step_id,
@@ -442,21 +382,13 @@ AS new ON DUPLICATE KEY UPDATE
     essential     = new.essential,
     updated_at    = CURRENT_TIMESTAMP;
 
--- ============================================================
--- precedences: the board's red arrows could not be recovered from screenshots.
--- Step order and item order stand in for the preparation order for now.
--- ============================================================
 
--- ============================================================
--- Move AUTO_INCREMENT past the explicit ids.
--- ============================================================
+-- 명시한 ID 이후부터 자동 증가
 ALTER TABLE categories AUTO_INCREMENT = 6;
 ALTER TABLE steps AUTO_INCREMENT = 44;
 ALTER TABLE catalog_items AUTO_INCREMENT = 170;
 
--- ============================================================
--- Verify
--- ============================================================
+-- 데이터 검증
 SELECT (SELECT COUNT(*) FROM categories)    AS categories,   -- 5
        (SELECT COUNT(*) FROM steps)         AS steps,        -- 43
        (SELECT COUNT(*) FROM catalog_items) AS catalog_items;-- 169
