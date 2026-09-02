@@ -119,11 +119,11 @@ jobs:
           set -a
           . /opt/bibbidi/app/.env.nginx
           set +a
-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN}' \
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT}' \
             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
             > /opt/bibbidi/app/infra/nginx/nginx.conf
           test -s /opt/bibbidi/app/infra/nginx/nginx.conf
-          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN)\}' \
+          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT)\}' \
             /opt/bibbidi/app/infra/nginx/nginx.conf
 
       - name: Bootstrap TLS material
