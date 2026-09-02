@@ -181,7 +181,7 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
                 .andExpect(jsonPath("$.items[0].categoryId").value(2))
                 .andExpect(jsonPath("$.items[0].title").value("계약서 확인"))
-                .andExpect(jsonPath("$.items[0].isDone").value(false))
+                .andExpect(jsonPath("$.items[0].status").value("PREV"))
                 .andDo(document(
                         "checklists-add-catalog-items",
                         resource(ResourceSnippetParameters.builder()
@@ -202,7 +202,7 @@ class ChecklistControllerIntegrationTest {
                                         fieldWithPath("items[].catalogItemId").description("원본 준비 항목 ID"),
                                         fieldWithPath("items[].categoryId").description("복사된 카테고리 ID"),
                                         fieldWithPath("items[].title").description("복사된 할 일 제목"),
-                                        fieldWithPath("items[].isDone").description("완료 여부")
+                                        fieldWithPath("items[].status").description("할 일 상태. PREV, CONTINUE, DONE")
                                 )
                                 .build())
                 ));
@@ -314,7 +314,7 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
                 .andExpect(jsonPath("$.categoryId").value(2))
                 .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
-                .andExpect(jsonPath("$.isDone").value(false))
+                .andExpect(jsonPath("$.status").value("PREV"))
                 .andDo(document(
                         "checklists-write-item",
                         resource(ResourceSnippetParameters.builder()
@@ -336,7 +336,7 @@ class ChecklistControllerIntegrationTest {
                                         fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
                                         fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
                                         fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("isDone").description("완료 여부")
+                                        fieldWithPath("status").description("할 일 상태. PREV, CONTINUE, DONE")
                                 )
                                 .build())
                 ));

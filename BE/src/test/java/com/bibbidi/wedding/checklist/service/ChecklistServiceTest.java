@@ -149,11 +149,11 @@ class ChecklistServiceTest {
                 .extracting(
                         CatalogItemAdditionResult.AddedChecklistItem::catalogItemId,
                         CatalogItemAdditionResult.AddedChecklistItem::categoryId,
-                        CatalogItemAdditionResult.AddedChecklistItem::isDone
+                        CatalogItemAdditionResult.AddedChecklistItem::status
                 )
                 .containsExactly(
-                        tuple(CONTRACT_ITEM_ID, CATEGORY_ID, false),
-                        tuple(ESTIMATE_ITEM_ID, CATEGORY_ID, false)
+                        tuple(CONTRACT_ITEM_ID, CATEGORY_ID, ChecklistItemStatus.PREV),
+                        tuple(ESTIMATE_ITEM_ID, CATEGORY_ID, ChecklistItemStatus.PREV)
                 );
     }
 
@@ -207,9 +207,9 @@ class ChecklistServiceTest {
                         ChecklistItemResult::catalogItemId,
                         ChecklistItemResult::categoryId,
                         ChecklistItemResult::title,
-                        ChecklistItemResult::isDone
+                        ChecklistItemResult::status
                 )
-                .containsExactly(null, CATEGORY_ID, "청첩장 문구 정하기", false);
+                .containsExactly(null, CATEGORY_ID, "청첩장 문구 정하기", ChecklistItemStatus.PREV);
     }
 
     @Test
@@ -403,7 +403,7 @@ class ChecklistServiceTest {
         ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
 
         // then
-        assertThat(result.isDone()).isTrue();
+        assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
 
         InOrder inOrder = inOrder(checklistAppointmentService, checklistRepository);
         inOrder.verify(checklistAppointmentService).completeAllByChecklistItemId(item.id());
@@ -424,7 +424,7 @@ class ChecklistServiceTest {
         ChecklistItemResult result = checklistService.completeItem(OWNER_ID, item.id());
 
         // then
-        assertThat(result.isDone()).isTrue();
+        assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
         then(checklistAppointmentService).should().completeAllByChecklistItemId(item.id());
     }
 
