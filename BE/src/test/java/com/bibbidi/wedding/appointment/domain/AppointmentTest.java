@@ -28,7 +28,8 @@ class AppointmentTest {
                 END,
                 "Wedding hall",
                 "Preparation",
-                isDone
+                isDone,
+                false
         );
     }
 
@@ -43,6 +44,69 @@ class AppointmentTest {
 
         // then
         assertThat(completed.isDone()).isTrue();
+    }
+
+    @Test
+    @DisplayName("할 일과 함께 완료하면 완료 상태가 되고 할 일 때문에 완료했다고 표시한다")
+    void shouldMarkDoneByChecklistItemWhenCompletedTogether() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+
+        // when
+        Appointment completed = appointment.completeByChecklistItem();
+
+        // then
+        assertThat(completed.isDone()).isTrue();
+        assertThat(completed.doneByChecklistItem()).isTrue();
+    }
+
+    @Test
+    @DisplayName("일정만 따로 완료하면 할 일 때문에 완료했다고 표시하지 않는다")
+    void shouldNotMarkDoneByChecklistItemWhenCompletedAlone() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+
+        // when
+        Appointment completed = appointment.complete();
+
+        // then
+        assertThat(completed.isDone()).isTrue();
+        assertThat(completed.doneByChecklistItem()).isFalse();
+    }
+
+    @Test
+    @DisplayName("완료를 취소하면 할 일 때문에 완료했다는 표시도 지운다")
+    void shouldClearDoneByChecklistItemWhenReopened() {
+        // given
+        Appointment completed = constructTestAppointment(false).completeByChecklistItem();
+
+        // when
+        Appointment reopened = completed.reopen();
+
+        // then
+        assertThat(reopened.isDone()).isFalse();
+        assertThat(reopened.doneByChecklistItem()).isFalse();
+    }
+
+    @Test
+    @DisplayName("일정 내용을 수정해도 할 일 때문에 완료했다는 표시는 유지된다")
+    void shouldPreserveDoneByChecklistItemWhenUpdated() {
+        // given
+        Appointment completed = constructTestAppointment(false).completeByChecklistItem();
+
+        // when
+        Appointment updated = completed.update(
+                "Updated consultation",
+                LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                "Studio",
+                "Updated memo"
+        );
+
+        // then
+        assertThat(updated.isDone()).isTrue();
+        assertThat(updated.doneByChecklistItem()).isTrue();
     }
 
     @Test
@@ -177,13 +241,13 @@ class AppointmentTest {
                 null, CHECKLIST_ITEM_ID, "crossing", DATE,
                 LocalDateTime.of(2026, 9, 1, 23, 0),
                 LocalDateTime.of(2026, 9, 2, 1, 0),
-                "Wedding hall", null, false
+                "Wedding hall", null, false, false
         );
         Appointment nextDay = new Appointment(
                 null, CHECKLIST_ITEM_ID, "next day", DATE.plusDays(1),
                 LocalDateTime.of(2026, 9, 2, 0, 30),
                 LocalDateTime.of(2026, 9, 2, 2, 0),
-                "Wedding hall", null, false
+                "Wedding hall", null, false, false
         );
 
         assertThat(crossingMidnight.conflictsWith(nextDay)).isTrue();
@@ -199,7 +263,8 @@ class AppointmentTest {
     private static Appointment withoutPlace(Appointment appointment) {
         return new Appointment(
                 appointment.id(), appointment.checklistItemId(), appointment.title(), appointment.date(),
-                appointment.startTime(), appointment.endTime(), null, appointment.memo(), appointment.isDone()
+                appointment.startTime(), appointment.endTime(), null, appointment.memo(), appointment.isDone(),
+                false
         );
     }
 
@@ -213,6 +278,7 @@ class AppointmentTest {
                 endTime,
                 "Wedding hall",
                 "Preparation",
+                false,
                 false
         );
     }

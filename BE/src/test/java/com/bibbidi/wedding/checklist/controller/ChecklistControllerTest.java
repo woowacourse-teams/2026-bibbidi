@@ -11,6 +11,7 @@ import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
 import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -92,8 +93,8 @@ class ChecklistControllerTest {
         // given
         when(checklistService.addItemsFromCatalog(USER_ID, List.of(100L, 101L)))
                 .thenReturn(new CatalogItemAdditionResult(List.of(
-                        new CatalogItemAdditionResult.AddedChecklistItem(201L, 100L, 2L, "계약서 확인", false),
-                        new CatalogItemAdditionResult.AddedChecklistItem(202L, 101L, 2L, "견적 비교", false)
+                        new CatalogItemAdditionResult.AddedChecklistItem(201L, 100L, 2L, "계약서 확인", ChecklistItemStatus.PREV),
+                        new CatalogItemAdditionResult.AddedChecklistItem(202L, 101L, 2L, "견적 비교", ChecklistItemStatus.PREV)
                 )));
 
         // when, then
@@ -106,7 +107,7 @@ class ChecklistControllerTest {
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
                 .andExpect(jsonPath("$.items[0].categoryId").value(2))
                 .andExpect(jsonPath("$.items[0].title").value("계약서 확인"))
-                .andExpect(jsonPath("$.items[0].isDone").value(false))
+                .andExpect(jsonPath("$.items[0].status").value("prev"))
                 .andExpect(jsonPath("$.items[1].catalogItemId").value(101));
     }
 

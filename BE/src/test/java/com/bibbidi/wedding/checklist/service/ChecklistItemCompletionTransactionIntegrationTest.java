@@ -1,20 +1,17 @@
-package com.bibbidi.wedding.user.service;
+package com.bibbidi.wedding.checklist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willThrow;
 
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
-import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
-import com.bibbidi.wedding.user.persistence.JpaUserEntity;
-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,23 +24,17 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class UserDeletionTransactionIntegrationTest {
+class ChecklistItemCompletionTransactionIntegrationTest {
 
-    private static final String PASSWORD = "wish";
-
-    @Autowired
-    private AuthService authService;
+    private static final Long OWNER_ID = 1L;
 
     @Autowired
-    private PasswordHasher passwordHasher;
+    private ChecklistService checklistService;
 
     @Autowired
-    private JpaUserRepository jpaUserRepository;
-
-    @MockitoSpyBean
     private JpaChecklistRepository jpaChecklistRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private JpaChecklistItemRepository jpaChecklistItemRepository;
 
     @Autowired
@@ -54,25 +45,22 @@ class UserDeletionTransactionIntegrationTest {
         jpaAppointmentRepository.deleteAllInBatch();
         jpaChecklistItemRepository.deleteAllInBatch();
         jpaChecklistRepository.deleteAllInBatch();
-        jpaUserRepository.deleteAllInBatch();
     }
 
     @Test
-    @DisplayName("체크리스트 삭제 중 실패하면 먼저 삭제한 일정과 할 일도 모두 롤백한다")
-    void shouldRollbackAllDeletedDataWhenDeletionFails() {
-        JpaUserEntity user = jpaUserRepository.saveAndFlush(
-                new JpaUserEntity(null, "bibbidi", passwordHasher.hash(PASSWORD))
-        );
+    @DisplayName("할 일 완료 중 실패하면 먼저 완료한 일정도 롤백한다")
+    void shouldRollbackCompletedAppointmentsWhenChecklistItemCompletionFails() {
+        // given
         JpaChecklistEntity checklist = jpaChecklistRepository.saveAndFlush(
-                new JpaChecklistEntity(null, user.id())
+                new JpaChecklistEntity(null, OWNER_ID)
         );
         JpaChecklistItemEntity checklistItem = jpaChecklistItemRepository.saveAndFlush(
                 new JpaChecklistItemEntity(
                         null,
                         checklist,
                         1L,
-                        100L,
-                        "계약서 확인",
+                        null,
+                        "청첩장 문구 정하기",
                         ChecklistItemStatus.PREV
                 )
         );
@@ -80,7 +68,7 @@ class UserDeletionTransactionIntegrationTest {
                 new JpaAppointmentEntity(
                         null,
                         checklistItem.id(),
-                        "웨딩홀 상담",
+                        "청첩장 문구 검토",
                         LocalDate.of(2026, 9, 1),
                         null,
                         null,
@@ -90,18 +78,21 @@ class UserDeletionTransactionIntegrationTest {
                         false
                 )
         );
-        willThrow(new IllegalStateException("checklist deletion failed"))
-                .given(jpaChecklistRepository)
-                .deleteByChecklistId(checklist.id());
+        willThrow(new IllegalStateException("checklist item completion failed"))
+                .given(jpaChecklistItemRepository)
+                .saveAndFlush(any(JpaChecklistItemEntity.class));
 
-        assertThatThrownBy(() -> authService.deleteUser(user.id(), PASSWORD))
+        // when, then
+        assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, checklistItem.id(), "done"))
                 .isInstanceOf(DataAccessException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
-                .hasRootCauseMessage("checklist deletion failed");
-
-        assertThat(jpaUserRepository.findById(user.id())).isPresent();
-        assertThat(jpaChecklistRepository.findById(checklist.id())).isPresent();
-        assertThat(jpaChecklistItemRepository.findById(checklistItem.id())).isPresent();
-        assertThat(jpaAppointmentRepository.findById(appointment.id())).isPresent();
+                .hasRootCauseMessage("checklist item completion failed");
+        assertThat(jpaChecklistItemRepository.findById(checklistItem.id()).orElseThrow().status())
+                .isEqualTo(ChecklistItemStatus.PREV);
+        assertThat(jpaAppointmentRepository.findById(appointment.id()).orElseThrow())
+                .satisfies(rolledBack -> {
+                    assertThat(rolledBack.isDone()).isFalse();
+                    assertThat(rolledBack.doneByChecklistItem()).isFalse();
+                });
     }
 }

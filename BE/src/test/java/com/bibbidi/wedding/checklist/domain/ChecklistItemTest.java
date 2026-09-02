@@ -35,39 +35,39 @@ class ChecklistItemTest {
     }
 
     @Test
-    @DisplayName("진행을 시작하면 `진행 중` 상태가 된다")
+    @DisplayName("진행 중 상태로 바꾸면 `진행 중` 상태가 된다")
     void shouldHaveContinueStatusWhenOnProgress() {
         // given
         ChecklistItem item = constructTestItem();
 
         // when
-        ChecklistItem progressed = item.onProgress();
+        ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
 
         // then
         assertThat(progressed.status()).isEqualTo(ChecklistItemStatus.CONTINUE);
     }
 
     @Test
-    @DisplayName("완료하면 `완료 상태`가 된다")
+    @DisplayName("완료 상태로 바꾸면 `완료 상태`가 된다")
     void shouldHaveDoneStatusWhenCompleted() {
         // given
         ChecklistItem item = constructTestItem();
 
         // when
-        ChecklistItem completed = item.complete();
+        ChecklistItem completed = item.changeStatus(ChecklistItemStatus.DONE);
 
         // then
         assertThat(completed.status()).isEqualTo(ChecklistItemStatus.DONE);
     }
 
     @Test
-    @DisplayName("reset()하면 `시작 전` 상태로 돌아간다")
+    @DisplayName("시작 전 상태로 바꾸면 `시작 전` 상태로 돌아간다")
     void shouldReturnToBeforeStatusWhenReset() {
         // given
-        ChecklistItem item = constructTestItem().complete();
+        ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
 
         // when
-        item = item.reset();
+        item = item.changeStatus(ChecklistItemStatus.PREV);
 
         // then
         assertThat(item.status()).isEqualTo(ChecklistItemStatus.PREV);
@@ -80,7 +80,7 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem();
 
         // when
-        ChecklistItem progressed = item.onProgress();
+        ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
 
         // then
         assertThat(progressed)
@@ -247,7 +247,7 @@ class ChecklistItemTest {
     void shouldAllowDeletionWhenItemIsIncomplete() {
         // given
         ChecklistItem item = constructTestItem();
-        ChecklistItem progressed = item.onProgress();
+        ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
 
         // when, then
         assertThatCode(item::validateDeletable).doesNotThrowAnyException();
@@ -258,7 +258,7 @@ class ChecklistItemTest {
     @DisplayName("완료된 할 일은 삭제할 수 없다")
     void shouldRejectDeletionWhenItemIsDone() {
         // given
-        ChecklistItem item = constructTestItem().complete();
+        ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
 
         // when, then
         assertThatThrownBy(item::validateDeletable)

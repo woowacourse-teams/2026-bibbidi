@@ -50,6 +50,7 @@ class AppointmentRepositoryTest {
                 LocalDateTime.of(2026, 9, 1, 11, 0),
                 "웨딩홀",
                 "상담 준비",
+                false,
                 false
         );
 
@@ -139,6 +140,62 @@ class AppointmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("할 일에 남은 미완료 일정만 조회한다")
+    void shouldFindOnlyRemainingAppointmentsOfChecklistItem() {
+        Appointment remaining = saveAppointment(10L, "아직 안 끝낸 일정");
+        saveDoneAppointment(10L, "이미 끝낸 일정");
+        saveAppointment(20L, "다른 할 일의 일정");
+
+        List<Appointment> found = appointmentRepository.findAllRemainingByChecklistItemId(10L);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactly(remaining.id());
+    }
+
+    @Test
+    @DisplayName("할 일의 완료된 일정만 조회한다")
+    void shouldFindOnlyDoneAppointmentsOfChecklistItem() {
+        saveAppointment(10L, "아직 안 끝낸 일정");
+        Appointment done = saveDoneAppointment(10L, "이미 끝낸 일정");
+        saveDoneAppointment(20L, "다른 할 일의 끝낸 일정");
+
+        List<Appointment> found = appointmentRepository.findAllCompletedByChecklistItemId(10L);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactly(done.id());
+    }
+
+    @Test
+    @DisplayName("할 일에 남은 일정이 없으면 빈 목록을 조회한다")
+    void shouldFindNoRemainingAppointmentWhenEveryAppointmentIsDone() {
+        saveDoneAppointment(10L, "이미 끝낸 일정");
+
+        List<Appointment> found = appointmentRepository.findAllRemainingByChecklistItemId(10L);
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    @DisplayName("여러 일정의 완료 상태를 한 번에 저장한다")
+    void shouldSaveCompletedAppointmentsAtOnce() {
+        Appointment first = saveAppointment(10L, "첫 번째 일정");
+        Appointment second = saveAppointment(10L, "두 번째 일정");
+
+        appointmentRepository.saveAll(List.of(
+                first.completeByChecklistItem(),
+                second.completeByChecklistItem()
+        ));
+
+        assertThat(jpaAppointmentRepository.findAllById(List.of(first.id(), second.id())))
+                .allSatisfy(appointment -> {
+                    assertThat(appointment.isDone()).isTrue();
+                    assertThat(appointment.doneByChecklistItem()).isTrue();
+                });
+    }
+
+    @Test
     void shouldDeleteAppointment() {
         Appointment testAppointment = new Appointment(
                 null,
@@ -149,6 +206,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         );
         Appointment saved = appointmentRepository.save(testAppointment);
@@ -246,6 +304,7 @@ class AppointmentRepositoryTest {
                 LocalDateTime.of(2026, 9, 1, endHour, endMinute),
                 "probe",
                 null,
+                false,
                 false
         );
     }
@@ -266,6 +325,7 @@ class AppointmentRepositoryTest {
                 endHour == null ? null : LocalDateTime.of(2026, 9, 1, endHour, endMinute),
                 title,
                 null,
+                false,
                 false
         ));
     }
@@ -280,6 +340,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         ));
     }
@@ -294,7 +355,8 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
-                true
+                true,
+                false
         ));
     }
 
@@ -308,6 +370,7 @@ class AppointmentRepositoryTest {
                 null,
                 null,
                 null,
+                false,
                 false
         ));
     }

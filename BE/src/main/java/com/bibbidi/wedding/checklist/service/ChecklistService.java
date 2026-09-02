@@ -94,6 +94,26 @@ public class ChecklistService {
         checklist.validateOwnedBy(ownerId);
     }
 
+    @Transactional
+    public ChecklistItemResult changeItemStatus(Long ownerId, Long checklistItemId, String status) {
+        ChecklistItemStatus newStatus = ChecklistItemStatus.from(status);
+
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
+        ChecklistItem changed = checklist.changeItemStatus(ownerId, checklistItemId, newStatus);
+        changeAppointmentsStatus(changed);
+        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
+
+        return ChecklistItemResult.from(saved);
+    }
+
+    private void changeAppointmentsStatus(ChecklistItem item) {
+        if (item.isDone()) {
+            checklistAppointmentService.completeAllByChecklistItemId(item.id());
+        } else {
+            checklistAppointmentService.reopenAllDoneByChecklistItemId(item.id());
+        }
+    }
+
     @Transactional(readOnly = true)
     public boolean hasRemainingAppointments(Long ownerId, Long checklistItemId) {
         validateItemOwnership(checklistItemId, ownerId);

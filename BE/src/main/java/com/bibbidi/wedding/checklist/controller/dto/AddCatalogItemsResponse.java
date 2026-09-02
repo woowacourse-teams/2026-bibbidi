@@ -16,7 +16,7 @@ public record AddCatalogItemsResponse(List<AddedChecklistItemResponse> items) {
             Long catalogItemId,
             Long categoryId,
             String title,
-            boolean isDone
+            String status
     ) {
 
         public static AddedChecklistItemResponse from(CatalogItemAdditionResult.AddedChecklistItem item) {
@@ -25,7 +25,7 @@ public record AddCatalogItemsResponse(List<AddedChecklistItemResponse> items) {
                     item.catalogItemId(),
                     item.categoryId(),
                     item.title(),
-                    item.isDone()
+                    item.status().value()
             );
         }
     }

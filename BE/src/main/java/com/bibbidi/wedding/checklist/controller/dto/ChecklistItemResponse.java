@@ -7,7 +7,7 @@ public record ChecklistItemResponse(
         Long catalogItemId,
         Long categoryId,
         String title,
-        boolean isDone
+        String status
 ) {
 
     public static ChecklistItemResponse from(ChecklistItemResult result) {
@@ -16,7 +16,7 @@ public record ChecklistItemResponse(
                 result.catalogItemId(),
                 result.categoryId(),
                 result.title(),
-                result.isDone()
+                result.status().value()
         );
     }
 }

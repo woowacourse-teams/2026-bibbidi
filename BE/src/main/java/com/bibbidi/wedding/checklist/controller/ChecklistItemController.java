@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.controller;
 
 import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
+import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.RemainingAppointmentResponse;
@@ -62,6 +63,17 @@ public class ChecklistItemController {
                 itemId,
                 request.title()
         );
+
+        return ChecklistItemResponse.from(result);
+    }
+
+    @PutMapping("/api/checklist-items/{itemId}/status")
+    public ChecklistItemResponse changeStatus(
+            @Auth Long userId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody ChangeChecklistItemStatusRequest request
+    ) {
+        ChecklistItemResult result = checklistService.changeItemStatus(userId, itemId, request.status());
 
         return ChecklistItemResponse.from(result);
     }

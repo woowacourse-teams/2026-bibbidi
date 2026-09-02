@@ -38,6 +38,29 @@ public class AppointmentRepository {
         return jpaAppointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
     }
 
+    public List<Appointment> findAllRemainingByChecklistItemId(Long checklistItemId) {
+        return findAllByChecklistItemIdAndIsDone(checklistItemId, false);
+    }
+
+    public List<Appointment> findAllCompletedByChecklistItemId(Long checklistItemId) {
+        return findAllByChecklistItemIdAndIsDone(checklistItemId, true);
+    }
+
+    private List<Appointment> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone) {
+        return jpaAppointmentRepository.findAllByChecklistItemIdAndIsDone(checklistItemId, isDone)
+                .stream()
+                .map(appointmentMapper::toDomain)
+                .toList();
+    }
+
+    public void saveAll(List<Appointment> appointments) {
+        List<JpaAppointmentEntity> entities = appointments.stream()
+                .map(appointmentMapper::toEntity)
+                .toList();
+
+        jpaAppointmentRepository.saveAll(entities);
+    }
+
     public int deleteAllByChecklistItemIds(List<Long> checklistItemIds) {
         return jpaAppointmentRepository.deleteAllByChecklistItemIds(checklistItemIds);
     }

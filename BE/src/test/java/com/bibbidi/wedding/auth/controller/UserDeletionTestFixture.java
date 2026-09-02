@@ -87,6 +87,7 @@ class UserDeletionTestFixture {
                 null,
                 null,
                 null,
+                false,
                 false
         )).id();
     }

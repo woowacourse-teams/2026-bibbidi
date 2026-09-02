@@ -1,13 +1,14 @@
 package com.bibbidi.wedding.checklist.service.dto;
 
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 
 public record ChecklistItemResult(
         Long id,
         Long catalogItemId,
         Long categoryId,
         String title,
-        boolean isDone
+        ChecklistItemStatus status
 ) {
 
     public static ChecklistItemResult from(ChecklistItem item) {
@@ -16,7 +17,7 @@ public record ChecklistItemResult(
                 item.sourceCatalogItemId(),
                 item.categoryId(),
                 item.title(),
-                item.isDone()
+                item.status()
         );
     }
 }

@@ -45,6 +45,14 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
     @Query("""
             SELECT appointment
             FROM JpaAppointmentEntity appointment
+            WHERE appointment.checklistItemId = :checklistItemId
+              AND appointment.isDone = :isDone
+            """)
+    List<JpaAppointmentEntity> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone);
+
+    @Query("""
+            SELECT appointment
+            FROM JpaAppointmentEntity appointment
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
             WHERE item.checklist.ownerId = :userId
               AND appointment.startTime <= :endTime
