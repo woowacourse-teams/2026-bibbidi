@@ -11,7 +11,7 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # limit 제한은 차후 변경되어야 합니다.
+    # limit 제한은 차후 사용 패턴에 따라 변경되어야 합니다.
     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
     limit_req_status 429;
@@ -44,13 +44,6 @@ http {
     server {
         listen 80 default_server;
         server_name _;
-
-        location = /healthz {
-            access_log off;
-            add_header Content-Type text/plain;
-            return 200 'ok\n';
-        }
-
         return 444;
     }
 
