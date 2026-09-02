@@ -44,6 +44,13 @@ http {
     server {
         listen 80 default_server;
         server_name _;
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 'ok\n';
+        }
+
         return 444;
     }
 
