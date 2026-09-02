@@ -9,6 +9,7 @@ on:
       - "Infra/monitoring/**"
       - "Infra/nginx/**"
       - "Infra/scripts/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
