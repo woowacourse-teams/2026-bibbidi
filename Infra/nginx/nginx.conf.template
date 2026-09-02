@@ -11,6 +11,7 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
+    # limit 제한은 차후 변경되어야 합니다.
     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
     limit_req_status 429;
