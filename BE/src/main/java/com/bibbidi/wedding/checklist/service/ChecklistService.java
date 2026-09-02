@@ -100,15 +100,18 @@ public class ChecklistService {
 
         Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
         ChecklistItem changed = checklist.changeItemStatus(ownerId, checklistItemId, newStatus);
-
-        if (changed.isDone()) {
-            checklistAppointmentService.completeAllByChecklistItemId(checklistItemId);
-        } else {
-            checklistAppointmentService.reopenAllDoneByChecklistItemId(checklistItemId);
-        }
+        changeAppointmentsStatus(changed);
         ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
 
         return ChecklistItemResult.from(saved);
+    }
+
+    private void changeAppointmentsStatus(ChecklistItem item) {
+        if (item.isDone()) {
+            checklistAppointmentService.completeAllByChecklistItemId(item.id());
+        } else {
+            checklistAppointmentService.reopenAllDoneByChecklistItemId(item.id());
+        }
     }
 
     @Transactional(readOnly = true)
