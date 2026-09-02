@@ -43,7 +43,6 @@ initialize_tls_context() {
 
   CERT_ALT_DOMAIN="$(read_dotenv_value CERT_ALT_DOMAIN "$NGINX_ENV")"
   CERT_EMAIL="$(read_dotenv_value CERT_EMAIL "$NGINX_ENV")"
-  : "${CERT_ALT_DOMAIN:=www.${CERT_DOMAIN}}"
   CERT_LIVE_DIR="/etc/letsencrypt/live/${CERT_DOMAIN}"
   CERT_RENEWAL_CONF="/etc/letsencrypt/renewal/${CERT_DOMAIN}.conf"
   WEBROOT="${CERTBOT_WEBROOT:-${EC2_DEPLOY_PATH}/infra/nginx/certbot}"

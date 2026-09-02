@@ -11,6 +11,7 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
+    # limit 제한은 차후 사용 패턴에 따라 변경되어야 합니다.
     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
     limit_req_status 429;
@@ -40,10 +41,27 @@ http {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
 
+    # Only the front-end origins may read API responses. Anything else gets an
+    # empty value, and nginx omits an add_header whose value is empty.
+    map $http_origin $cors_origin {
+        default "";
+        "${NGINX_ALLOWED_ORIGIN}"     "${NGINX_ALLOWED_ORIGIN}";
+        "${NGINX_ALLOWED_ORIGIN_ALT}" "${NGINX_ALLOWED_ORIGIN_ALT}";
+    }
+
     server {
         listen 80 default_server;
         server_name _;
-        return 444;
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 'ok\n';
+        }
+
+        location / {
+            return 444;
+        }
     }
 
     server {
@@ -54,7 +72,7 @@ http {
 
     server {
         listen 80;
-        server_name ${SERVER_NAME} www.${SERVER_NAME};
+        server_name ${SERVER_NAME};
 
         location ^~ /.well-known/acme-challenge/ {
             root /var/www/certbot;
@@ -69,17 +87,6 @@ http {
         location / {
             return 301 https://${SERVER_NAME}$request_uri;
         }
-    }
-
-    server {
-        listen 443 ssl;
-        server_name www.${SERVER_NAME};
-
-        ssl_certificate /etc/letsencrypt/live/${CERT_DOMAIN}/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/${CERT_DOMAIN}/privkey.pem;
-        include /etc/letsencrypt/options-ssl-nginx.conf;
-        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-        return 301 https://${SERVER_NAME}$request_uri;
     }
 
     server {
@@ -115,7 +122,7 @@ http {
             add_header X-Frame-Options DENY always;
             add_header Referrer-Policy strict-origin-when-cross-origin always;
 
-            add_header Access-Control-Allow-Origin ${NGINX_ALLOWED_ORIGIN} always;
+            add_header Access-Control-Allow-Origin $cors_origin always;
             add_header Vary Origin always;
             add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
             add_header Access-Control-Allow-Headers 'Content-Type, Authorization, X-Requested-With' always;
