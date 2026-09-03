@@ -24,6 +24,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -121,6 +122,34 @@ class ChecklistServiceTest {
                 List.of(incompleteItem.id(), completedItem.id())
         );
         then(checklistAppointmentService).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    @DisplayName("할 일 상태를 기준으로 체크리스트 진행도를 계산한다")
+    void shouldCalculateChecklistProgressBasedOnChecklistItems() {
+        Checklist checklist = new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(
+                        constructTestItem(200L),
+                        constructTestItem(201L, ChecklistItemStatus.DONE, null),
+                        constructTestItem(202L, ChecklistItemStatus.DONE, CONTRACT_ITEM_ID)
+                )
+        );
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(checklist);
+
+        ChecklistProgressResult result = checklistService.findMyChecklistProgress(OWNER_ID);
+
+        assertThat(result)
+                .extracting(
+                        ChecklistProgressResult::totalCount,
+                        ChecklistProgressResult::doneCount,
+                        ChecklistProgressResult::remainingCount,
+                        ChecklistProgressResult::percentage,
+                        ChecklistProgressResult::allDone
+                )
+                .containsExactly(3, 2, 1, 67, false);
+        then(checklistAppointmentService).shouldHaveNoInteractions();
     }
 
     @Test

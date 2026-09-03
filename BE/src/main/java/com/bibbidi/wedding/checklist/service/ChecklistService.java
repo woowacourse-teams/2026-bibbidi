@@ -7,11 +7,13 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+import com.bibbidi.wedding.checklist.domain.ChecklistProgress;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -51,6 +53,14 @@ public class ChecklistService {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
         List<ChecklistItemWithAppointmentsResult> items = getChecklistItemWithAppointmentsResults(checklist);
         return new ChecklistWithAppointmentsResult(checklist.id(), items);
+    }
+
+    @Transactional(readOnly = true)
+    public ChecklistProgressResult findMyChecklistProgress(Long ownerId) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+        ChecklistProgress progress = checklist.calculateProgress();
+
+        return ChecklistProgressResult.from(progress);
     }
 
     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(

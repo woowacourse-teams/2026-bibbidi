@@ -6,12 +6,14 @@ import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsResponse;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistCreationResponse;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistWithAppointmentsResponse;
+import com.bibbidi.wedding.checklist.controller.dto.ChecklistProgressResponse;
 import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +42,12 @@ public class ChecklistController {
     public ChecklistWithAppointmentsResponse findMyChecklist(@Auth Long userId) {
         ChecklistWithAppointmentsResult result = checklistService.findMyChecklist(userId);
         return ChecklistWithAppointmentsResponse.from(result);
+    }
+
+    @GetMapping("/api/checklists/me/progress")
+    public ChecklistProgressResponse findMyChecklistProgress(@Auth Long userId) {
+        ChecklistProgressResult result = checklistService.findMyChecklistProgress(userId);
+        return ChecklistProgressResponse.from(result);
     }
 
     @ResponseStatus(HttpStatus.CREATED)

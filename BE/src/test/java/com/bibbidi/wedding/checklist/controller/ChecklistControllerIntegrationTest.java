@@ -182,7 +182,20 @@ class ChecklistControllerIntegrationTest {
     @DisplayName("인증되지 않은 사용자의 체크리스트 조회 요청을 거절한다")
     void shouldRequireAuthenticationToFindChecklist() throws Exception {
         mockMvc.perform(get("/api/checklists/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andDo(document(
+                        "checklists-find-me-unauthorized",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary("인증 없이 내 체크리스트 조회")
+                                .description("인증되지 않은 사용자의 체크리스트 조회 요청은 거절합니다.")
+                                .responseSchema(schema("ErrorResponse"))
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
     }
 
     @Test
@@ -190,7 +203,44 @@ class ChecklistControllerIntegrationTest {
     void shouldRejectWhenChecklistDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/checklists/me")
                         .session(authenticatedSession()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andDo(document(
+                        "checklists-find-me-not-found",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary("체크리스트가 없는 사용자의 조회")
+                                .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
+                                .responseSchema(schema("ErrorResponse"))
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("빈 체크리스트의 진행도는 0%이며 전체 완료 상태가 아니다")
+    void shouldReturnZeroProgressForEmptyChecklist() throws Exception {
+        mockMvc.perform(post("/api/checklists")
+                        .session(authenticatedSession()))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/checklists/me/progress")
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(0))
+                .andExpect(jsonPath("$.doneCount").value(0))
+                .andExpect(jsonPath("$.remainingCount").value(0))
+                .andExpect(jsonPath("$.percentage").value(0))
+                .andExpect(jsonPath("$.allDone").value(false));
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자의 진행도 조회 요청을 거절한다")
+    void shouldRequireAuthenticationToFindChecklistProgress() throws Exception {
+        mockMvc.perform(get("/api/checklists/me/progress"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
