@@ -325,7 +325,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     await renderFeature();
 
     const firstStepButton = screen.getByRole("button", {
-      name: "01.웨딩홀 투어와 계약",
+      name: "01 웨딩홀 투어와 계약",
     });
 
     expect(
@@ -335,6 +335,24 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       firstStepButton.querySelector(".preparation-roadmap__step-title")
         ?.textContent,
     ).toBe("웨딩홀 투어와 계약");
+    const icon = firstStepButton.querySelector<HTMLImageElement>(
+      ".preparation-roadmap__step-icon",
+    );
+
+    expect(icon?.getAttribute("src")).toBe(
+      "https://example.com/wedding-hall.png",
+    );
+    expect(
+      screen
+        .getByRole("button", {
+          name: /02.*예식 형태·식순·입장 방식 결정/,
+        })
+        .querySelector(".preparation-roadmap__step-icon"),
+    ).toBeNull();
+
+    fireEvent.error(icon!);
+
+    expect(icon?.hidden).toBe(true);
   });
 
   it("모바일 최초 진입 시 초기 선택 상태를 표시하고 상세는 자동 확장하지 않는다", async () => {

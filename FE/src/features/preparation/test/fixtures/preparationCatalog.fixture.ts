@@ -11,6 +11,7 @@ export const preparationCatalogFixture = {
       steps: [
         {
           id: "step-1",
+          iconUrl: "https://example.com/wedding-hall.png",
           order: 1,
           title: "웨딩홀 투어와 계약",
         },

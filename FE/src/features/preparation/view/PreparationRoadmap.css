@@ -147,6 +147,7 @@
 }
 
 .preparation-roadmap__step-button {
+  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
@@ -272,10 +273,21 @@
 .preparation-roadmap__step-title {
   display: block;
   flex: none;
+  padding-right: 64px;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
+
+.preparation-roadmap__step-icon {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
 }
 
 .preparation-step-detail {

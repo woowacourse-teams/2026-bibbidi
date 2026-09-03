@@ -70,6 +70,7 @@ function PreparationRoadmapSteps({
             ) : (
               <button
                 aria-controls="preparation-step-detail"
+                aria-label={`${step.numberLabel} ${step.title}`}
                 aria-pressed={step.isSelected}
                 className="preparation-roadmap__step-button"
                 onClick={() => onStepSelect(step.id)}
@@ -77,12 +78,22 @@ function PreparationRoadmapSteps({
               >
                 <span className="preparation-roadmap__step-header">
                   <span className="preparation-roadmap__step-number">
-                    {step.numberLabel}.
+                    {step.numberLabel}
                   </span>
                 </span>
                 <span className="preparation-roadmap__step-title">
                   {step.title}
                 </span>
+                {step.iconUrl ? (
+                  <img
+                    alt=""
+                    className="preparation-roadmap__step-icon"
+                    onError={(event) => {
+                      event.currentTarget.hidden = true;
+                    }}
+                    src={step.iconUrl}
+                  />
+                ) : null}
               </button>
             )}
           </li>

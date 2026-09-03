@@ -25,6 +25,8 @@ function createCatalog(steps: StepFixture[]): PreparationCatalogModel {
         categoryId: "wedding-hall",
         steps: steps.map((step) => ({
           id: step.id,
+          iconUrl:
+            step.id === "step-1" ? "https://example.com/step-1.png" : undefined,
           order: step.order,
           title: `${step.id} 제목`,
         })),
@@ -175,6 +177,7 @@ describe("createPreparationRoadmapViewModel", () => {
 
     expect(viewModel.steps.find((step) => step.id === "step-1")).toEqual({
       id: "step-1",
+      iconUrl: "https://example.com/step-1.png",
       isSelected: true,
       numberLabel: "01",
       order: 1,
