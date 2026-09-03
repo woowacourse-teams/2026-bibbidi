@@ -14,8 +14,6 @@ import com.bibbidi.wedding.feedback.controller.dto.CreateFeedbackRequest;
 import com.bibbidi.wedding.feedback.client.DiscordApiClient;
 import com.bibbidi.wedding.feedback.client.DiscordMessageDto;
 import java.net.URI;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,25 +118,18 @@ class FeedbackControllerIntegrationTest {
     @Test
     @DisplayName("Discord 알림 전송이 요청 스레드를 점유하지 않는다")
     void shouldNotBlockRequestThreadWithDiscordNotification() throws Exception {
-        CountDownLatch release = new CountDownLatch(1);
         doAnswer(invocation -> {
-            release.await(2, TimeUnit.SECONDS);
+            assertThat(Thread.currentThread().getName()).startsWith("discord-");
             return null;
         }).when(discordApiClient).sendMessage(any(URI.class), any(DiscordMessageDto.class));
-
-        long startedAt = System.nanoTime();
 
         mockMvc.perform(post("/api/feedbacks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateFeedbackRequest("good", null))))
                 .andExpect(status().isCreated());
 
-        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-        assertThat(elapsedMillis).isLessThan(1_000L);
-
         verify(discordApiClient, org.mockito.Mockito.timeout(1_000))
                 .sendMessage(any(URI.class), any(DiscordMessageDto.class));
-        release.countDown();
     }
 
 }
