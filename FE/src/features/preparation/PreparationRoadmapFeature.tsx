@@ -35,9 +35,10 @@ export function PreparationRoadmapFeature() {
   const hasTrackedCatalogViewRef = useRef(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     let ignoresResult = false;
 
-    void getPublicPreparationCatalog()
+    void getPublicPreparationCatalog(controller.signal)
       .then((nextCatalog) => {
         if (ignoresResult) {
           return;
@@ -62,6 +63,7 @@ export function PreparationRoadmapFeature() {
 
     return () => {
       ignoresResult = true;
+      controller.abort();
     };
   }, [requestRevision]);
 

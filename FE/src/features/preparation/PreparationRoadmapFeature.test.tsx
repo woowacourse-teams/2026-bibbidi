@@ -223,6 +223,23 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     );
   });
 
+  it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
+    let requestSignal: AbortSignal | undefined;
+    apiMocks.getPublicPreparationCatalog.mockImplementation(
+      (signal?: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise(() => {});
+      },
+    );
+
+    const { unmount } = render(<PreparationRoadmapFeature />);
+    expect(requestSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
   it("준비 단계가 없으면 빈 상태를 표시한다", async () => {
     apiMocks.getPublicPreparationCatalog.mockResolvedValue({
       categories: [{ id: "empty", label: "비어 있음" }],

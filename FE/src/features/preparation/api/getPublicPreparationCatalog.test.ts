@@ -164,6 +164,32 @@ describe("getPublicPreparationCatalog", () => {
     await expectation;
   });
 
+  it("응답 본문이 10초 동안 완료되지 않아도 타임아웃 오류로 변환한다", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) =>
+        Promise.resolve({
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("aborted", "AbortError"));
+              });
+            }),
+          ok: true,
+        } satisfies Pick<Response, "json" | "ok">),
+      ),
+    );
+
+    const request = getPublicPreparationCatalog();
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      PublicPreparationCatalogTimeoutError,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expectation;
+  });
+
   it("계약과 다른 성공 응답은 거부한다", async () => {
     vi.stubGlobal(
       "fetch",

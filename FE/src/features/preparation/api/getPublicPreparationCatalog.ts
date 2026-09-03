@@ -30,40 +30,72 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export async function getPublicPreparationCatalog(): Promise<PreparationCatalogModel> {
-  let response: Response;
+function toRequestError(error: unknown, didTimeout: boolean): Error {
+  if (didTimeout) {
+    return new PublicPreparationCatalogTimeoutError();
+  }
+
+  if (isRecord(error) && error.name === "AbortError") {
+    return new PublicPreparationCatalogNetworkError();
+  }
+
+  return new PublicPreparationCatalogNetworkError();
+}
+
+export async function getPublicPreparationCatalog(
+  signal?: AbortSignal,
+): Promise<PreparationCatalogModel> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(
-    () => controller.abort(),
-    PUBLIC_CATALOG_TIMEOUT_MS,
-  );
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, PUBLIC_CATALOG_TIMEOUT_MS);
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
 
   try {
-    response = await fetch(PUBLIC_CATALOG_ENDPOINT, {
-      method: "GET",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (isRecord(error) && error.name === "AbortError") {
-      throw new PublicPreparationCatalogTimeoutError();
+    let response: Response;
+
+    try {
+      response = await fetch(PUBLIC_CATALOG_ENDPOINT, {
+        method: "GET",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      throw toRequestError(error, didTimeout);
     }
 
-    throw new PublicPreparationCatalogNetworkError();
+    if (!response.ok) {
+      throw new PublicPreparationCatalogApiError(response.status);
+    }
+
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (
+        didTimeout ||
+        (isRecord(error) && error.name === "AbortError") ||
+        error instanceof TypeError
+      ) {
+        throw toRequestError(error, didTimeout);
+      }
+
+      throw new Error("준비 목록 성공 응답을 해석하지 못했습니다.", {
+        cause: error,
+      });
+    }
+
+    return parsePreparationCatalogResponse(body);
   } finally {
     window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
   }
-
-  if (!response.ok) {
-    throw new PublicPreparationCatalogApiError(response.status);
-  }
-
-  let body: unknown;
-
-  try {
-    body = await response.json();
-  } catch {
-    throw new Error("준비 목록 성공 응답을 해석하지 못했습니다.");
-  }
-
-  return parsePreparationCatalogResponse(body);
 }
