@@ -20,7 +20,7 @@ public enum Sentiment {
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         ClientError.INVALID_REQUEST,
-                        "Unsupported feedback sentiment: " + value
+                        "지원하지 않는 피드백 평가값입니다. sentiment=" + value
                 ));
     }
 }
