@@ -43,6 +43,32 @@ class ChecklistTest {
     }
 
     @Test
+    @DisplayName("체크리스트의 할 일 상태로 진행도를 계산한다")
+    void shouldCalculateProgressFromChecklistItems() {
+        Checklist checklist = new Checklist(
+                1L,
+                OWNER_ID,
+                List.of(
+                        item(1L, null, ChecklistItemStatus.DONE),
+                        item(2L, null, ChecklistItemStatus.PREV),
+                        item(3L, null, ChecklistItemStatus.CONTINUE)
+                )
+        );
+
+        ChecklistProgress progress = checklist.calculateProgress();
+
+        assertThat(progress)
+                .extracting(
+                        ChecklistProgress::totalCount,
+                        ChecklistProgress::doneCount,
+                        ChecklistProgress::remainingCount,
+                        ChecklistProgress::percentage,
+                        ChecklistProgress::allDone
+                )
+                .containsExactly(3, 1, 2, 33, false);
+    }
+
+    @Test
     @DisplayName("체크리스트의 소유자는 접근할 수 있다")
     void shouldAllowAccessByOwner() {
         // given

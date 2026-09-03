@@ -80,6 +80,14 @@ public final class Checklist {
         return items;
     }
 
+    public ChecklistProgress calculateProgress() {
+        int totalCount = items.size();
+        int doneCount = (int) items.stream()
+                .filter(ChecklistItem::isDone)
+                .count();
+        return new ChecklistProgress(totalCount, doneCount);
+    }
+
     private ChecklistItem findItem(Long checklistItemId) {
         return items.stream()
                 .filter(item -> Objects.equals(item.id(), checklistItemId))
