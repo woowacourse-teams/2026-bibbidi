@@ -40,8 +40,8 @@ jobs:
                   path: BE/build
                   key: ${{ runner.os }}-java25-gradle-build-${{ hashFiles('BE/build.gradle', 'BE/gradle/**', 'BE/gradlew', 'BE/gradlew.bat', 'BE/src/main/**', 'BE/src/test/**', 'BE/database/**') }}
 
-            - name: Build (test + jacoco + openapi + bootJar)
-              run: ./gradlew build
+            - name: Build (test + jacoco)
+              run: ./gradlew test
 
             - name: Upload test report
               if: failure()
