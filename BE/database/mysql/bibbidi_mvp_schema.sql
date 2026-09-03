@@ -122,3 +122,14 @@ CREATE TABLE appointments (
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE feedbacks (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    sentiment VARCHAR(20) NOT NULL,
+    content VARCHAR(255),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
