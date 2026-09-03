@@ -107,7 +107,10 @@ class UserDeletionTestFixture {
                 new JpaCategoryEntity(null, "웨딩홀", 1)
         );
         JpaStepEntity step = stepRepository.saveAndFlush(
-                new JpaStepEntity(null, category.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.", 1)
+                new JpaStepEntity(
+                        null, category.id(), "웨딩홀 계약", "웨딩홀을 결정하고 계약한다.",
+                        "https://www.bibbidi.kr/icon/wedding/venue-hall-tour.png", 1
+                )
         );
         JpaCatalogItemEntity catalogItem = catalogItemRepository.saveAndFlush(
                 new JpaCatalogItemEntity(null, step.id(), "계약서 확인", 1, true)

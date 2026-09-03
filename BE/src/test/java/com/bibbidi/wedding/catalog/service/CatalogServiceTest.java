@@ -34,7 +34,7 @@ class CatalogServiceTest {
     private static Catalog constructTestCatalog() {
         Item includedItem = new Item(INCLUDED_ITEM_ID, "포함된 할 일", 1, true);
         Item excludedItem = new Item(EXCLUDED_ITEM_ID, "포함되지 않은 할 일", 2, false);
-        Step step = new Step(1L, "계약", null, 1, List.of(includedItem, excludedItem));
+        Step step = new Step(1L, "계약", null, null, 1, List.of(includedItem, excludedItem));
         return new Catalog(List.of(new Category(1L, "웨딩홀", 1, List.of(step))));
     }
 

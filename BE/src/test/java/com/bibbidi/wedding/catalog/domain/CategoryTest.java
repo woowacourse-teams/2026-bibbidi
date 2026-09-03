@@ -16,8 +16,8 @@ class CategoryTest {
     @DisplayName("여러 단계에 걸쳐 있어도 선택한 준비 항목만 찾는다")
     void shouldFindSelectedItemsAcrossSteps() {
         // given
-        Step firstStep = new Step(1L, "첫 번째 단계", null, 1, List.of(FIRST_ITEM, SECOND_ITEM));
-        Step secondStep = new Step(2L, "두 번째 단계", null, 2, List.of(THIRD_ITEM));
+        Step firstStep = new Step(1L, "첫 번째 단계", null, null, 1, List.of(FIRST_ITEM, SECOND_ITEM));
+        Step secondStep = new Step(2L, "두 번째 단계", null, null, 2, List.of(THIRD_ITEM));
         Category category = new Category(10L, "웨딩홀", 1, List.of(firstStep, secondStep));
 
         // when
@@ -33,7 +33,7 @@ class CategoryTest {
     @DisplayName("영역에 없는 ID는 조회 결과에 포함하지 않는다")
     void shouldNotFindUnknownItem() {
         // given
-        Step step = new Step(1L, "첫 번째 단계", null, 1, List.of(FIRST_ITEM));
+        Step step = new Step(1L, "첫 번째 단계", null, null, 1, List.of(FIRST_ITEM));
         Category category = new Category(10L, "웨딩홀", 1, List.of(step));
 
         // when, then

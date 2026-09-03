@@ -36,11 +36,14 @@ CREATE TABLE steps (
     category_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     description VARCHAR(500),
+    icon_url VARCHAR(255),
     display_order INT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE (category_id, display_order)
+    UNIQUE (category_id, display_order),
+    CONSTRAINT fk_steps_category
+        FOREIGN KEY (category_id) REFERENCES categories (id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
@@ -54,7 +57,9 @@ CREATE TABLE catalog_items (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE (step_id, display_order)
+    UNIQUE (step_id, display_order),
+    CONSTRAINT fk_catalog_items_step
+        FOREIGN KEY (step_id) REFERENCES steps (id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
