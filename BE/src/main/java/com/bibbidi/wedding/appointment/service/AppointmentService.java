@@ -4,6 +4,8 @@ import static java.util.Comparator.comparing;
 
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
@@ -69,6 +71,23 @@ public class AppointmentService {
 
         return AppointmentUpdateResult.fromDomain(saved)
                 .withConflicts(conflicts);
+    }
+
+    @Transactional
+    public AppointmentCompletionResult changeStatus(AppointmentCompletionCommand command) {
+        Appointment appointment = appointmentRepository.findById(command.appointmentId());
+        checklistService.validateItemOwnership(appointment.checklistItemId(), command.userId());
+
+        Appointment changed = appointment.changeCompletion(command.isDone());
+        Appointment saved = appointmentRepository.save(changed);
+
+        boolean checklistItemDone = checklistService.changeItemStatusByAppointment(
+                command.userId(),
+                saved.checklistItemId(),
+                saved.isDone()
+        );
+
+        return AppointmentCompletionResult.from(saved, checklistItemDone);
     }
 
     @Transactional

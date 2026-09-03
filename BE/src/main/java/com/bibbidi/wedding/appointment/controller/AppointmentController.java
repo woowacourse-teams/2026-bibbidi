@@ -1,9 +1,13 @@
 package com.bibbidi.wedding.appointment.controller;
 
+import com.bibbidi.wedding.appointment.controller.dto.AppointmentCompletionResponse;
 import com.bibbidi.wedding.appointment.controller.dto.AppointmentResponse;
+import com.bibbidi.wedding.appointment.controller.dto.ChangeAppointmentCompletionRequest;
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.controller.dto.UpdateAppointmentRequest;
 import com.bibbidi.wedding.appointment.service.AppointmentService;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
@@ -49,6 +53,21 @@ public class AppointmentController {
         AppointmentUpdateCommand command = AppointmentUpdateCommand.fromRequest(appointmentId, userId, request);
         AppointmentUpdateResult result = appointmentService.update(command);
         return AppointmentResponse.from(result);
+    }
+
+    @PutMapping("/api/appointments/{appointmentId}/complete")
+    public AppointmentCompletionResponse changeCompletion(
+            @Auth Long userId,
+            @PathVariable Long appointmentId,
+            @Valid @RequestBody ChangeAppointmentCompletionRequest request
+    ) {
+        AppointmentCompletionCommand command = AppointmentCompletionCommand.fromRequest(
+                appointmentId,
+                userId,
+                request.isDone()
+        );
+        AppointmentCompletionResult result = appointmentService.changeStatus(command);
+        return AppointmentCompletionResponse.from(result);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)

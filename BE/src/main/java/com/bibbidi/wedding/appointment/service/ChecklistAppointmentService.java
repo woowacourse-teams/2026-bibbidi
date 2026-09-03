@@ -37,7 +37,7 @@ public class ChecklistAppointmentService {
                 .findAllCompletedByChecklistItemId(checklistItemId)
                 .stream()
                 .filter(Appointment::doneByChecklistItem)
-                .map(Appointment::reopen)
+                .map(appointment -> appointment.changeCompletion(false))
                 .toList();
 
         appointmentRepository.saveAll(reopened);

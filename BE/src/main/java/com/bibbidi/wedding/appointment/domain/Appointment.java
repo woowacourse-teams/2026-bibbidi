@@ -46,15 +46,22 @@ public final class Appointment {
         this.doneByChecklistItem = doneByChecklistItem;
     }
 
-    public Appointment complete() {
-        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true, false);
-    }
-
     public Appointment completeByChecklistItem() {
         return copy(checklistItemId, title, date, startTime, endTime, place, memo, true, true);
     }
 
-    public Appointment reopen() {
+    public Appointment changeCompletion(boolean isDone) {
+        if (isDone) {
+            return complete();
+        }
+        return reopen();
+    }
+
+    private Appointment complete() {
+        return copy(checklistItemId, title, date, startTime, endTime, place, memo, true, false);
+    }
+
+    private Appointment reopen() {
         return copy(checklistItemId, title, date, startTime, endTime, place, memo, false, false);
     }
 

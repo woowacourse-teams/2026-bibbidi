@@ -95,6 +95,26 @@ public class ChecklistService {
     }
 
     @Transactional
+    public boolean changeItemStatusByAppointment(Long ownerId, Long checklistItemId, boolean appointmentDone) {
+        Checklist checklist = checklistRepository.getByChecklistItemId(checklistItemId);
+        if (appointmentDone) {
+            return checklist.isItemDone(ownerId, checklistItemId);
+        }
+
+        reopenItemIfDone(ownerId, checklistItemId, checklist);
+        return false;
+    }
+
+    private void reopenItemIfDone(Long ownerId, Long checklistItemId, Checklist checklist) {
+        if (!checklist.isItemDone(ownerId, checklistItemId)) {
+            return;
+        }
+
+        ChecklistItem changed = checklist.changeItemStatus(ownerId, checklistItemId, ChecklistItemStatus.CONTINUE);
+        checklistRepository.saveItem(checklist, changed);
+    }
+
+    @Transactional
     public ChecklistItemResult changeItemStatus(Long ownerId, Long checklistItemId, String status) {
         ChecklistItemStatus newStatus = ChecklistItemStatus.from(status);
 

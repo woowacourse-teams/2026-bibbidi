@@ -40,7 +40,7 @@ class AppointmentTest {
         Appointment appointment = constructTestAppointment(false);
 
         // when
-        Appointment completed = appointment.complete();
+        Appointment completed = appointment.changeCompletion(true);
 
         // then
         assertThat(completed.isDone()).isTrue();
@@ -67,7 +67,7 @@ class AppointmentTest {
         Appointment appointment = constructTestAppointment(false);
 
         // when
-        Appointment completed = appointment.complete();
+        Appointment completed = appointment.changeCompletion(true);
 
         // then
         assertThat(completed.isDone()).isTrue();
@@ -81,7 +81,7 @@ class AppointmentTest {
         Appointment completed = constructTestAppointment(false).completeByChecklistItem();
 
         // when
-        Appointment reopened = completed.reopen();
+        Appointment reopened = completed.changeCompletion(false);
 
         // then
         assertThat(reopened.isDone()).isFalse();
@@ -116,7 +116,7 @@ class AppointmentTest {
         Appointment appointment = constructTestAppointment(true);
 
         // when
-        Appointment reopened = appointment.reopen();
+        Appointment reopened = appointment.changeCompletion(false);
 
         // then
         assertThat(reopened.isDone()).isFalse();
