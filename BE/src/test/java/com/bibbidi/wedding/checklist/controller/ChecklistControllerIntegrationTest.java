@@ -137,7 +137,8 @@ class ChecklistControllerIntegrationTest {
         ));
 
         mockMvc.perform(get("/api/checklists/me")
-                        .session(sessionOf(1L)))
+                        .session(sessionOf(1L))
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(1))
@@ -157,6 +158,10 @@ class ChecklistControllerIntegrationTest {
                                 .summary("내 체크리스트 조회")
                                 .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
                                 .responseSchema(schema("ChecklistWithAppointmentsResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
                                 .responseFields(
                                         fieldWithPath("id").description("체크리스트 ID"),
                                         fieldWithPath("items[].id").description("할 일 ID"),
