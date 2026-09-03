@@ -15,6 +15,7 @@ export interface PreparationCategoryViewModel {
 
 export interface PreparationStepViewModel {
   id: string;
+  iconUrl?: string;
   isSelected: boolean;
   numberLabel: string;
   order: number;
@@ -199,6 +200,7 @@ export function createPreparationRoadmapViewModel(
     ),
     steps: roadmap.steps.map((step) => ({
       id: step.id,
+      iconUrl: step.iconUrl,
       isSelected: step.id === selectedStepId,
       numberLabel: String(step.order).padStart(2, "0"),
       order: step.order,
