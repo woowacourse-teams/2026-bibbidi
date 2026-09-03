@@ -8,6 +8,38 @@
   grid-template-columns: 180px minmax(0, 1fr);
 }
 
+.preparation-roadmap-state {
+  display: flex;
+  min-height: calc(100vh - 80px);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  color: var(--color-fg-neutral);
+  text-align: center;
+}
+
+.preparation-roadmap-state p {
+  margin: 0;
+}
+
+.preparation-roadmap-state button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.preparation-roadmap-state button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
 .preparation-roadmap__categories {
   padding: 32px 12px;
   background: var(--color-bg-layer-default);
