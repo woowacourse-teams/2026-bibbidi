@@ -59,8 +59,10 @@ export function FeedbackFeature() {
     closeButtonRef,
     containerRef,
     content,
+    errorMessage,
     isOpen,
     isSnackbarVisible,
+    isSubmitting,
     open,
     sentiment,
     setContent,
@@ -77,6 +79,8 @@ export function FeedbackFeature() {
             canSubmit={canSubmit}
             closeButtonRef={closeButtonRef}
             content={content}
+            errorMessage={errorMessage}
+            isSubmitting={isSubmitting}
             onClose={close}
             onContentChange={setContent}
             onSentimentChange={setSentiment}
@@ -88,6 +92,8 @@ export function FeedbackFeature() {
             canSubmit={canSubmit}
             closeButtonRef={closeButtonRef}
             content={content}
+            errorMessage={errorMessage}
+            isSubmitting={isSubmitting}
             onClose={close}
             onContentChange={setContent}
             onSentimentChange={setSentiment}
