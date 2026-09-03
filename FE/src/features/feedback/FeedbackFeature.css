@@ -209,6 +209,14 @@
   cursor: not-allowed;
 }
 
+.feedback-form__error {
+  margin: 0;
+  color: var(--color-fg-critical);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .feedback-bottom-sheet {
   display: none;
 }

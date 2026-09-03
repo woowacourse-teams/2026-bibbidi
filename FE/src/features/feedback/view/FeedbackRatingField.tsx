@@ -1,4 +1,4 @@
-import type { FeedbackSentiment } from "../useFeedbackForm";
+import type { FeedbackSentiment } from "../model/feedback";
 
 interface FeedbackRatingFieldProps {
   onChange: (sentiment: FeedbackSentiment) => void;

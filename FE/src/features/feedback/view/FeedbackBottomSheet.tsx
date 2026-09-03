@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { MAX_FEEDBACK_LENGTH } from "../useFeedbackForm";
+import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
 import type { FeedbackFormViewProps } from "./feedbackFormView";
 import { FeedbackRatingField } from "./FeedbackRatingField";
 
@@ -27,6 +27,8 @@ export function FeedbackBottomSheet({
   canSubmit,
   closeButtonRef,
   content,
+  errorMessage,
+  isSubmitting,
   onClose,
   onContentChange,
   onSentimentChange,
@@ -47,6 +49,7 @@ export function FeedbackBottomSheet({
       <button
         aria-label="피드백 창 닫기"
         className="feedback-bottom-sheet__scrim"
+        disabled={isSubmitting}
         onClick={onClose}
         tabIndex={-1}
         type="button"
@@ -66,6 +69,7 @@ export function FeedbackBottomSheet({
           <button
             aria-label="피드백 창 닫기"
             className="feedback-bottom-sheet__close"
+            disabled={isSubmitting}
             onClick={onClose}
             ref={closeButtonRef}
             type="button"
@@ -74,7 +78,7 @@ export function FeedbackBottomSheet({
           </button>
         </header>
 
-        <form onSubmit={onSubmit}>
+        <form aria-busy={isSubmitting} onSubmit={onSubmit}>
           <FeedbackRatingField onChange={onSentimentChange} value={sentiment} />
 
           <label className="feedback-bottom-sheet__field">
@@ -95,8 +99,13 @@ export function FeedbackBottomSheet({
             disabled={!canSubmit}
             type="submit"
           >
-            의견 보내기
+            {isSubmitting ? "보내는 중..." : "의견 보내기"}
           </button>
+          {errorMessage ? (
+            <p className="feedback-form__error" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
         </form>
       </section>
     </div>

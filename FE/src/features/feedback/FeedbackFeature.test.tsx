@@ -1,7 +1,26 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createFeedback } from "./api/createFeedback";
 import { FeedbackFeature } from "./FeedbackFeature";
+
+vi.mock("./api/createFeedback", () => ({
+  createFeedback: vi.fn(),
+}));
+
+const createFeedbackMock = vi.mocked(createFeedback);
+
+beforeEach(() => {
+  createFeedbackMock.mockReset();
+  createFeedbackMock.mockResolvedValue();
+  setMobileViewport(false);
+});
 
 function setMobileViewport(matches: boolean) {
   Object.defineProperty(window, "matchMedia", {
@@ -50,15 +69,91 @@ describe("FeedbackFeature", () => {
     expect(getSubmitButton().disabled).toBe(false);
   });
 
-  it("제출하면 폼을 닫고 성공 Snackbar를 표시한다", () => {
+  it("제출에 성공하면 API에 입력값을 보내고 성공 Snackbar를 표시한다", async () => {
     render(<FeedbackFeature />);
     openFeedback();
 
     fireEvent.click(screen.getByRole("button", { name: "아쉬워요" }));
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+      target: { value: "조금 아쉬웠어요" },
+    });
     fireEvent.click(getSubmitButton());
 
-    expect(screen.getByText("소중한 의견을 보내주셔서 감사해요.")).toBeTruthy();
+    expect(createFeedbackMock).toHaveBeenCalledWith({
+      content: "조금 아쉬웠어요",
+      sentiment: "bad",
+    });
+    expect(
+      await screen.findByText("소중한 의견을 보내주셔서 감사해요."),
+    ).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("내용이 공백이면 null로 전송한다", async () => {
+    render(<FeedbackFeature />);
+    openFeedback();
+
+    fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(getSubmitButton());
+
+    await waitFor(() =>
+      expect(createFeedbackMock).toHaveBeenCalledWith({
+        content: null,
+        sentiment: "good",
+      }),
+    );
+  });
+
+  it("전송 중에는 중복 제출할 수 없다", async () => {
+    let resolveRequest: (() => void) | undefined;
+    createFeedbackMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    render(<FeedbackFeature />);
+    openFeedback();
+
+    fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+    const submitButton = getSubmitButton();
+    fireEvent.click(submitButton);
+
+    expect(
+      await within(screen.getByRole("dialog")).findByRole("button", {
+        name: "보내는 중...",
+      }),
+    ).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.click(submitButton);
+    expect(createFeedbackMock).toHaveBeenCalledOnce();
+
+    resolveRequest?.();
+    await screen.findByText("소중한 의견을 보내주셔서 감사해요.");
+  });
+
+  it("전송에 실패하면 입력값을 유지하고 재시도 오류를 표시한다", async () => {
+    createFeedbackMock.mockRejectedValueOnce(new Error("request failed"));
+    render(<FeedbackFeature />);
+    openFeedback();
+
+    fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+      target: { value: "좋았어요" },
+    });
+    fireEvent.click(getSubmitButton());
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "의견을 보내지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(
+      (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement).value,
+    ).toBe("좋았어요");
+    expect(getSubmitButton().disabled).toBe(false);
   });
 
   it("Escape 키로 닫고 플로팅 버튼에 포커스를 돌려준다", () => {

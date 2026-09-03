@@ -1,4 +1,4 @@
-import { MAX_FEEDBACK_LENGTH } from "../useFeedbackForm";
+import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
 import type { FeedbackFormViewProps } from "./feedbackFormView";
 import { FeedbackRatingField } from "./FeedbackRatingField";
 
@@ -6,6 +6,8 @@ export function FeedbackPopover({
   canSubmit,
   closeButtonRef,
   content,
+  errorMessage,
+  isSubmitting,
   onClose,
   onContentChange,
   onSentimentChange,
@@ -24,6 +26,7 @@ export function FeedbackPopover({
         <button
           aria-label="피드백 창 닫기"
           className="feedback-popover__close"
+          disabled={isSubmitting}
           onClick={onClose}
           ref={closeButtonRef}
           type="button"
@@ -32,7 +35,7 @@ export function FeedbackPopover({
         </button>
       </header>
 
-      <form onSubmit={onSubmit}>
+      <form aria-busy={isSubmitting} onSubmit={onSubmit}>
         <FeedbackRatingField onChange={onSentimentChange} value={sentiment} />
 
         <div className="feedback-popover__field">
@@ -59,8 +62,13 @@ export function FeedbackPopover({
           disabled={!canSubmit}
           type="submit"
         >
-          의견 보내기
+          {isSubmitting ? "보내는 중..." : "의견 보내기"}
         </button>
+        {errorMessage ? (
+          <p className="feedback-form__error" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
       </form>
     </section>
   );
