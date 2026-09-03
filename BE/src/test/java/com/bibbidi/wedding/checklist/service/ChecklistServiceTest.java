@@ -32,6 +32,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -426,6 +427,44 @@ class ChecklistServiceTest {
         // then
         assertThat(result.status()).isEqualTo(ChecklistItemStatus.DONE);
         then(checklistAppointmentService).should().completeAllByChecklistItemId(item.id());
+    }
+
+    @Test
+    @DisplayName("?쇱젙???꾨즺?섏뼱?룄 泥댄겕由ъ뒪????ぉ???꾨즺?섏? ?딆뒗??")
+    void shouldNotCompleteChecklistItemWhenAppointmentIsCompleted() {
+        ChecklistItem item = constructTestItem(200L);
+        given(checklistRepository.getByChecklistItemId(item.id()))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item)));
+
+        boolean checklistItemDone = checklistService.changeItemStatusByAppointment(
+                OWNER_ID,
+                item.id(),
+                true
+        );
+
+        assertThat(checklistItemDone).isFalse();
+        then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("?쇱젙???誘몄셿猷??섎㈃ ?꾨즺???곹깭??泥댄겕由ъ뒪????ぉ???誘몄셿猷뚮줈 蹂寃쏀븳??")
+    void shouldReopenChecklistItemWhenAppointmentIsReopened() {
+        ChecklistItem item = constructTestItem(200L, ChecklistItemStatus.DONE, null);
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(item));
+        given(checklistRepository.getByChecklistItemId(item.id())).willReturn(checklist);
+        given(checklistRepository.saveItem(any(Checklist.class), any(ChecklistItem.class)))
+                .willAnswer(invocation -> invocation.getArgument(1));
+
+        boolean checklistItemDone = checklistService.changeItemStatusByAppointment(
+                OWNER_ID,
+                item.id(),
+                false
+        );
+
+        assertThat(checklistItemDone).isFalse();
+        ArgumentCaptor<ChecklistItem> captor = ArgumentCaptor.forClass(ChecklistItem.class);
+        then(checklistRepository).should().saveItem(any(Checklist.class), captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo(ChecklistItemStatus.CONTINUE);
     }
 
     @Test

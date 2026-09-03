@@ -15,11 +15,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
+import com.bibbidi.wedding.appointment.controller.dto.ChangeAppointmentCompletionRequest;
 import com.bibbidi.wedding.appointment.controller.dto.UpdateAppointmentRequest;
 import com.bibbidi.wedding.appointment.domain.Appointment;
+import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
 import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.Arrays;
 import java.time.LocalDate;
@@ -61,6 +65,9 @@ class AppointmentControllerIntegrationTest {
 
     @Autowired
     private JpaAppointmentRepository jpaAppointmentRepository;
+
+    @Autowired
+    private JpaChecklistItemRepository checklistItemRepository;
 
     private MockMvc mockMvc;
 
@@ -541,6 +548,99 @@ class AppointmentControllerIntegrationTest {
 
         assertThat(jpaAppointmentRepository.findById(deletedAppointmentId)).isEmpty();
         assertThat(jpaAppointmentRepository.findById(remainingAppointmentId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("미래 일정을 완료 상태로 변경한다")
+    void shouldCompleteFutureAppointment() throws Exception {
+        Long appointmentId = saveAppointment(LocalDate.of(2099, 1, 1), false);
+
+        mockMvc.perform(put("/api/appointments/{appointmentId}/completion", appointmentId)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ChangeAppointmentCompletionRequest(true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointmentId))
+                .andExpect(jsonPath("$.isDone").value(true))
+                .andExpect(jsonPath("$.checklistItemId").value(1L))
+                .andExpect(jsonPath("$.checklistItemDone").value(false));
+    }
+
+    @Test
+    @DisplayName("완료된 일정을 미완료로 변경하고 완료된 할 일도 재개한다")
+    void shouldReopenAppointmentAndChecklistItem() throws Exception {
+        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+        changeChecklistItemStatusToDone();
+
+        mockMvc.perform(put("/api/appointments/{appointmentId}/completion", appointmentId)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ChangeAppointmentCompletionRequest(false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isDone").value(false))
+                .andExpect(jsonPath("$.checklistItemDone").value(false));
+
+        assertThat(checklistItemRepository.findById(1L).orElseThrow().status().name())
+                .isEqualTo("CONTINUE");
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 일정 완료 변경 요청을 거절한다")
+    void shouldRequireAuthenticationToChangeCompletion() throws Exception {
+        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+
+        mockMvc.perform(put("/api/appointments/{appointmentId}/completion", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChangeAppointmentCompletionRequest(true))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 일정의 완료 변경 요청을 거절한다")
+    void shouldRejectWhenAppointmentDoesNotExist() throws Exception {
+        mockMvc.perform(put("/api/appointments/{appointmentId}/completion", 99999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChangeAppointmentCompletionRequest(true))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("완료 여부가 없으면 일정 완료 변경 요청을 거절한다")
+    void shouldRejectWhenCompletionIsMissing() throws Exception {
+        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+
+        mockMvc.perform(put("/api/appointments/{appointmentId}/completion", appointmentId)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    private void changeChecklistItemStatusToDone() throws Exception {
+        mockMvc.perform(put("/api/checklist-items/{itemId}/status", 1L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ChangeChecklistItemStatusRequest("done"))))
+                .andExpect(status().isOk());
+    }
+
+    private Long saveAppointment(LocalDate date, boolean isDone) {
+        return jpaAppointmentRepository.save(new JpaAppointmentEntity(
+                null,
+                1L,
+                "appointment",
+                date,
+                LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 10, 0),
+                LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 11, 0),
+                "place",
+                "memo",
+                isDone,
+                false
+        )).id();
     }
 
     private Appointment saveAppointment() {

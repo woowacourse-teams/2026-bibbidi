@@ -39,6 +39,11 @@ public final class Checklist {
         return item.changeStatus(status);
     }
 
+    public boolean isItemDone(Long ownerId, Long checklistItemId) {
+        validateOwnedBy(ownerId);
+        return findItem(checklistItemId).isDone();
+    }
+
     public ChecklistItem deletableItem(Long ownerId, Long checklistItemId) {
         validateOwnedBy(ownerId);
         ChecklistItem item = findItem(checklistItemId);

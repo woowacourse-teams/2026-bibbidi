@@ -12,6 +12,9 @@ import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -64,7 +67,7 @@ class AppointmentServiceTest {
     @Test
     @DisplayName("소유하지 않은 체크리스트 항목의 일정은 수정할 수 없다")
     void shouldDenyUpdateWhenUserDoesNotOwnAppointmentChecklistItem() {
-        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment());
+        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(createAppointment());
         willThrow(new BusinessException(ClientError.CHECKLIST_ITEM_ACCESS_DENIED, "access denied"))
                 .given(checklistService)
                 .validateItemOwnership(CHECKLIST_ITEM_ID, USER_ID);
@@ -80,7 +83,7 @@ class AppointmentServiceTest {
     @Test
     @DisplayName("자신이 소유한 일정은 삭제할 수 있다")
     void shouldDeleteAppointmentWhenUserOwnsChecklistItem() {
-        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment());
+        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(createAppointment());
 
         appointmentService.delete(USER_ID, APPOINTMENT_ID);
 
@@ -125,6 +128,7 @@ class AppointmentServiceTest {
     }
 
     @Test
+    @DisplayName("새 일정을 생성하고 일정 시간이 겹치는 충돌 목록을 반환한다")
     void shouldReturnConflictsAfterCreatingAppointment() {
         Appointment saved = new Appointment(
                 200L,
@@ -142,25 +146,56 @@ class AppointmentServiceTest {
                 300L, 20L, "conflict", saved.date(),
                 LocalDateTime.of(2026, 9, 1, 10, 30),
                 LocalDateTime.of(2026, 9, 1, 11, 30), "other place");
+        Appointment conflictingAppointment = new Appointment(
+                conflict.appointmentId(),
+                conflict.checklistItemId(),
+                conflict.title(),
+                conflict.date(),
+                conflict.startTime(),
+                conflict.endTime(),
+                conflict.place(),
+                null,
+                false,
+                false
+        );
         given(appointmentRepository.save(any(Appointment.class))).willReturn(saved);
         given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
-                .willReturn(List.of(new Appointment(
-                        conflict.appointmentId(),
-                        conflict.checklistItemId(),
-                        conflict.title(),
-                        conflict.date(),
-                        conflict.startTime(),
-                        conflict.endTime(),
-                        conflict.place(),
-                        null,
-                        false,
-                        false
-                )));
+                .willReturn(List.of(conflictingAppointment));
 
-        assertThat(appointmentService.create(createCommand()).conflicts()).containsExactly(conflict);
+        AppointmentCreationResult result = appointmentService.create(createCommand());
+
+        assertThat(result.conflicts()).containsExactly(conflict);
     }
 
-    private static Appointment appointment() {
+    @Test
+    @DisplayName("일정 완료 상태를 변경하고 체크리스트 결과를 함께 반환한다")
+    void shouldChangeAppointmentCompletionAndReturnChecklistItemStatus() {
+        Appointment appointment = createAppointment();
+        AppointmentCompletionCommand command = new AppointmentCompletionCommand(
+                APPOINTMENT_ID,
+                USER_ID,
+                true
+        );
+        given(appointmentRepository.findById(APPOINTMENT_ID)).willReturn(appointment);
+        given(appointmentRepository.save(any(Appointment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(checklistService.changeItemStatusByAppointment(USER_ID, CHECKLIST_ITEM_ID, true))
+                .willReturn(false);
+
+        AppointmentCompletionResult result = appointmentService.changeCompletion(command);
+
+        assertThat(result)
+                .extracting(
+                        AppointmentCompletionResult::id,
+                        AppointmentCompletionResult::isDone,
+                        AppointmentCompletionResult::checklistItemId,
+                        AppointmentCompletionResult::checklistItemDone
+                )
+                .containsExactly(APPOINTMENT_ID, true, CHECKLIST_ITEM_ID, false);
+        then(checklistService).should().changeItemStatusByAppointment(USER_ID, CHECKLIST_ITEM_ID, true);
+    }
+
+    private static Appointment createAppointment() {
         return new Appointment(
                 APPOINTMENT_ID,
                 CHECKLIST_ITEM_ID,
