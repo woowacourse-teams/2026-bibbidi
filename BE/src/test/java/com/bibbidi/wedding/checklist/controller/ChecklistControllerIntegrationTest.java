@@ -122,7 +122,7 @@ class ChecklistControllerIntegrationTest {
     @Test
     @Sql("/appointment-fixture.sql")
     @DisplayName("로그인한 사용자의 미완료 할 일과 일정을 함께 조회한다")
-    void shouldReturnIncompleteChecklistItemsWithAppointments() throws Exception {
+    void shouldReturnChecklistItemsWithAppointments() throws Exception {
         appointmentRepository.save(new JpaAppointmentEntity(
                 null,
                 1L,
@@ -155,7 +155,7 @@ class ChecklistControllerIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Checklist")
                                 .summary("내 체크리스트 조회")
-                                .description("현재 사용자의 미완료 할 일과 각 할 일에 연결된 일정을 조회합니다.")
+                                .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
                                 .responseSchema(schema("ChecklistWithAppointmentsResponse"))
                                 .responseFields(
                                         fieldWithPath("id").description("체크리스트 ID"),

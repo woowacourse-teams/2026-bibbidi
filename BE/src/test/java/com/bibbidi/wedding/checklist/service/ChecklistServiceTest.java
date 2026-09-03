@@ -13,8 +13,8 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
-import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.appointment.domain.Appointment;
+import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -33,8 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -90,8 +90,8 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("미완료 할 일과 해당 일정을 조회하고 완료된 할 일은 제외한다")
-    void shouldFindIncompleteChecklistWithAppointments() {
+    @DisplayName("모든 할 일과 해당 일정을 조회한다")
+    void shouldFindChecklistWithAppointments() {
         ChecklistItem incompleteItem = constructTestItem(200L);
         ChecklistItem completedItem = constructTestItem(201L, ChecklistItemStatus.DONE, null);
         Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(incompleteItem, completedItem));
@@ -108,15 +108,18 @@ class ChecklistServiceTest {
                 false
         );
         given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(checklist);
-        given(checklistAppointmentService.findAllByChecklistItemIds(List.of(incompleteItem.id())))
+        given(checklistAppointmentService.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(
+                List.of(incompleteItem.id(), completedItem.id())))
                 .willReturn(List.of(appointment));
 
         ChecklistWithAppointmentsResult result = checklistService.findMyChecklist(OWNER_ID);
 
-        assertThat(result.items()).hasSize(1);
+        assertThat(result.items()).hasSize(2);
         assertThat(result.items().getFirst().appointments()).hasSize(1);
         assertThat(result.items().getFirst().appointments().getFirst().title()).isEqualTo("appointment");
-        then(checklistAppointmentService).should().findAllByChecklistItemIds(List.of(incompleteItem.id()));
+        then(checklistAppointmentService).should().findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(
+                List.of(incompleteItem.id(), completedItem.id())
+        );
         then(checklistAppointmentService).shouldHaveNoMoreInteractions();
     }
 

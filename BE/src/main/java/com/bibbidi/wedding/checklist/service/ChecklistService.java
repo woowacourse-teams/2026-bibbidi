@@ -55,16 +55,16 @@ public class ChecklistService {
 
     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(
             Checklist checklist) {
-        List<ChecklistItem> incompleteItems = findIncompleteItems(checklist);
-        List<Long> checklistItemIds = incompleteItems.stream()
+        List<ChecklistItem> checklistItems = getChecklistItems(checklist);
+        List<Long> checklistItemIds = checklistItems.stream()
                 .map(ChecklistItem::id)
                 .toList();
 
         Map<Long, List<Appointment>> appointmentsByChecklistItemId = checklistAppointmentService
-                .findAllByChecklistItemIds(checklistItemIds).stream()
+                .findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds).stream()
                 .collect(Collectors.groupingBy(Appointment::checklistItemId));
 
-        return incompleteItems.stream()
+        return checklistItems.stream()
                 .map(item -> ChecklistItemWithAppointmentsResult.from(
                         item,
                         appointmentsByChecklistItemId.getOrDefault(item.id(), List.of())
@@ -72,10 +72,10 @@ public class ChecklistService {
                 .toList();
     }
 
-    private List<ChecklistItem> findIncompleteItems(Checklist checklist) {
+    private List<ChecklistItem> getChecklistItems(Checklist checklist) {
         return checklist.items().stream()
-                .filter(item -> !item.isDone())
-                .sorted(Comparator.comparing(ChecklistItem::id))
+                .sorted(Comparator.comparing(ChecklistItem::title)
+                        .thenComparing(ChecklistItem::id))
                 .toList();
     }
 

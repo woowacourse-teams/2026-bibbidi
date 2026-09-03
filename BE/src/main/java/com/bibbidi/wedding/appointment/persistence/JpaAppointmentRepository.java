@@ -50,7 +50,9 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             """)
     List<JpaAppointmentEntity> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone);
 
-    List<JpaAppointmentEntity> findAllByChecklistItemIdIn(List<Long> checklistItemIds);
+    List<JpaAppointmentEntity> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(
+            List<Long> checklistItemIds
+    );
 
     @Query("""
             SELECT appointment
