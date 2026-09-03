@@ -1,7 +1,5 @@
 package com.bibbidi.wedding.appointment.service.dto;
 
-import com.bibbidi.wedding.appointment.controller.dto.ChangeAppointmentCompletionRequest;
-
 public record AppointmentCompletionCommand(
         Long appointmentId,
         Long userId,
@@ -11,12 +9,12 @@ public record AppointmentCompletionCommand(
     public static AppointmentCompletionCommand fromRequest(
             Long appointmentId,
             Long userId,
-            ChangeAppointmentCompletionRequest request
+            boolean isDone
     ) {
         return new AppointmentCompletionCommand(
                 appointmentId,
                 userId,
-                request.isDone()
+                isDone
         );
     }
 }

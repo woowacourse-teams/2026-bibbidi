@@ -1,15 +1,15 @@
 package com.bibbidi.wedding.appointment.controller;
 
-import com.bibbidi.wedding.appointment.controller.dto.AppointmentResponse;
 import com.bibbidi.wedding.appointment.controller.dto.AppointmentCompletionResponse;
+import com.bibbidi.wedding.appointment.controller.dto.AppointmentResponse;
 import com.bibbidi.wedding.appointment.controller.dto.ChangeAppointmentCompletionRequest;
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.controller.dto.UpdateAppointmentRequest;
 import com.bibbidi.wedding.appointment.service.AppointmentService;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
-import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
-import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateResult;
 import com.bibbidi.wedding.auth.session.Auth;
@@ -55,7 +55,7 @@ public class AppointmentController {
         return AppointmentResponse.from(result);
     }
 
-    @PutMapping("/api/appointments/{appointmentId}/completion")
+    @PutMapping("/api/appointments/{appointmentId}/complete")
     public AppointmentCompletionResponse changeCompletion(
             @Auth Long userId,
             @PathVariable Long appointmentId,
@@ -64,9 +64,9 @@ public class AppointmentController {
         AppointmentCompletionCommand command = AppointmentCompletionCommand.fromRequest(
                 appointmentId,
                 userId,
-                request
+                request.isDone()
         );
-        AppointmentCompletionResult result = appointmentService.changeCompletion(command);
+        AppointmentCompletionResult result = appointmentService.changeStatus(command);
         return AppointmentCompletionResponse.from(result);
     }
 

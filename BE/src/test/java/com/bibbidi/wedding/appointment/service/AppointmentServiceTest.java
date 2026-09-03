@@ -10,10 +10,10 @@ import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
-import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
-import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCompletionResult;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentConflict;
+import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentCreationResult;
 import com.bibbidi.wedding.appointment.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
@@ -182,7 +182,7 @@ class AppointmentServiceTest {
         given(checklistService.changeItemStatusByAppointment(USER_ID, CHECKLIST_ITEM_ID, true))
                 .willReturn(false);
 
-        AppointmentCompletionResult result = appointmentService.changeCompletion(command);
+        AppointmentCompletionResult result = appointmentService.changeStatus(command);
 
         assertThat(result)
                 .extracting(
