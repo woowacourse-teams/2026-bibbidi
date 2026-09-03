@@ -1,8 +1,7 @@
--- 준비 목록 초기 데이터
+-- bibbidi_mvp_schema.sql 실행 후 이 파일을 실행한다.
 
 USE bibbidi;
 
--- 카테고리
 INSERT INTO categories (id, name, display_order, created_at, updated_at) VALUES
 (1, '웨딩홀', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, '스드메', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -14,9 +13,7 @@ AS new ON DUPLICATE KEY UPDATE
     display_order = new.display_order,
     updated_at    = CURRENT_TIMESTAMP;
 
--- 단계
 INSERT INTO steps (id, category_id, name, description, icon_url, display_order, created_at, updated_at) VALUES
--- 웨딩홀
 (1, 1, '웨딩홀 투어와 계약',
  '후보 웨딩홀을 직접 돌아보고 조건을 비교한 뒤 한 곳과 계약한다.',
  'https://www.bibbidi.kr/icon/wedding/venue-hall-tour.png', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -45,7 +42,6 @@ INSERT INTO steps (id, category_id, name, description, icon_url, display_order, 
  '예식 비용을 정산하고 도와준 사람들에게 사례비를 전한다.',
  'https://www.bibbidi.kr/icon/wedding/venue-final-payment.png', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- 스드메
 (10, 2, '스드메 상담·견적과 패키지 계약',
  '플래너 상담과 박람회로 시세를 알아보고 패키지 구성을 정해 계약까지 마친다.',
  'https://www.bibbidi.kr/icon/styling/sdm-package-contract.png', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -74,7 +70,6 @@ INSERT INTO steps (id, category_id, name, description, icon_url, display_order, 
  '빌려 쓴 물품을 돌려준다.',
  'https://www.bibbidi.kr/icon/styling/sdm-rental-return.png', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- 초대
 (19, 3, '하객 범위 결정과 명단 작성',
  '누구를 부를지 범위를 정하고 예상 인원과 명단까지 만든다.',
  'https://www.bibbidi.kr/icon/invitation/guests-list.png', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -103,7 +98,6 @@ INSERT INTO steps (id, category_id, name, description, icon_url, display_order, 
  '와준 하객에게 감사 인사를 전한다.',
  'https://www.bibbidi.kr/icon/invitation/guests-thank-you.png', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- 가족
 (28, 4, '상견례 일정·장소 예약과 진행',
  '양가가 만날 날짜와 장소를 잡아 상견례를 치르고 그 자리에서 예식 일정까지 조율한다.',
  'https://www.bibbidi.kr/icon/family/family-meeting.png', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -126,7 +120,6 @@ INSERT INTO steps (id, category_id, name, description, icon_url, display_order, 
  '빌려 쓴 가족 물품을 돌려준다.',
  'https://www.bibbidi.kr/icon/family/family-rental-return.png', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- 기타
 (35, 5, '총예산 수립과 예식 기본 조건 결정',
  '전체 예산과 예비비를 잡고 예식 시기와 지역 같은 기본 조건을 정한다.',
  'https://www.bibbidi.kr/icon/etc/etc-budget.png', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -162,7 +155,6 @@ AS new ON DUPLICATE KEY UPDATE
     display_order = new.display_order,
     updated_at    = CURRENT_TIMESTAMP;
 
--- 준비 항목
 INSERT INTO catalog_items (id, step_id, title, display_order, essential, created_at, updated_at) VALUES
 (1, 1, '웨딩홀 투어', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 1, '웨딩홀 계약', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -383,13 +375,11 @@ AS new ON DUPLICATE KEY UPDATE
     updated_at    = CURRENT_TIMESTAMP;
 
 
--- 명시한 ID 이후부터 자동 증가
 ALTER TABLE categories AUTO_INCREMENT = 6;
 ALTER TABLE steps AUTO_INCREMENT = 44;
 ALTER TABLE catalog_items AUTO_INCREMENT = 170;
 
--- 데이터 검증
-SELECT (SELECT COUNT(*) FROM categories)    AS categories,   -- 5
-       (SELECT COUNT(*) FROM steps)         AS steps,        -- 43
-       (SELECT COUNT(*) FROM catalog_items) AS catalog_items;-- 169
-SELECT COUNT(*) AS steps_without_icon FROM steps WHERE icon_url IS NULL; -- 0
+SELECT (SELECT COUNT(*) FROM categories)    AS categories,
+       (SELECT COUNT(*) FROM steps)         AS steps,
+       (SELECT COUNT(*) FROM catalog_items) AS catalog_items;
+SELECT COUNT(*) AS steps_without_icon FROM steps WHERE icon_url IS NULL;
