@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
+import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
@@ -10,11 +11,16 @@ import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +31,8 @@ public class ChecklistService {
     private final CatalogService catalogService;
     private final ChecklistAppointmentService checklistAppointmentService;
 
-    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService, ChecklistAppointmentService checklistAppointmentService) {
+    public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService,
+                            ChecklistAppointmentService checklistAppointmentService) {
         this.checklistRepository = checklistRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentService = checklistAppointmentService;
@@ -37,6 +44,39 @@ public class ChecklistService {
         Checklist saved = checklistRepository.save(checklist);
 
         return ChecklistCreationResult.from(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public ChecklistWithAppointmentsResult findMyChecklist(Long ownerId) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+        List<ChecklistItemWithAppointmentsResult> items = getChecklistItemWithAppointmentsResults(checklist);
+        return new ChecklistWithAppointmentsResult(checklist.id(), items);
+    }
+
+    private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(
+            Checklist checklist) {
+        List<ChecklistItem> incompleteItems = findIncompleteItems(checklist);
+        List<Long> checklistItemIds = incompleteItems.stream()
+                .map(ChecklistItem::id)
+                .toList();
+
+        Map<Long, List<Appointment>> appointmentsByChecklistItemId = checklistAppointmentService
+                .findAllByChecklistItemIds(checklistItemIds).stream()
+                .collect(Collectors.groupingBy(Appointment::checklistItemId));
+
+        return incompleteItems.stream()
+                .map(item -> ChecklistItemWithAppointmentsResult.from(
+                        item,
+                        appointmentsByChecklistItemId.getOrDefault(item.id(), List.of())
+                ))
+                .toList();
+    }
+
+    private List<ChecklistItem> findIncompleteItems(Checklist checklist) {
+        return checklist.items().stream()
+                .filter(item -> !item.isDone())
+                .sorted(Comparator.comparing(ChecklistItem::id))
+                .toList();
     }
 
     @Transactional
