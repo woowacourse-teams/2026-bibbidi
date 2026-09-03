@@ -98,6 +98,7 @@ module.exports = (_environment, arguments_) => {
         ? {
             proxy: [
               {
+                changeOrigin: true,
                 context: "/api",
                 target: apiProxyTarget,
               },

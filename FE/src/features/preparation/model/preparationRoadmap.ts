@@ -7,6 +7,7 @@ export interface PreparationCategoryModel {
 
 export interface PreparationStepModel {
   id: string;
+  iconUrl?: string;
   order: number;
   title: string;
 }
@@ -17,7 +18,9 @@ export interface PreparationStepProgressModel {
 }
 
 export interface PreparationDetailTaskModel {
+  essential?: boolean;
   id: string;
+  included?: boolean;
   title: string;
 }
 

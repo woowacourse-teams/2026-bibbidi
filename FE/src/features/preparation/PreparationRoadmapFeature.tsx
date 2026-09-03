@@ -5,37 +5,100 @@ import {
   createPreparationCategorySelectEvent,
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
-import { preparationRoadmapData } from "./model/preparationRoadmap.data";
+import { getPublicPreparationCatalog } from "./api/getPublicPreparationCatalog";
+import { PreparationCatalogModel } from "./model/preparationRoadmap";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
+  hasSelectablePreparationSteps,
+  PreparationRoadmapSelection,
   selectPreparationCategory,
 } from "./view-model/createPreparationRoadmapViewModel";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
+import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+
+type CatalogRequestState =
+  | { status: "loading" }
+  | { status: "empty" }
+  | { status: "error" }
+  | {
+      catalog: PreparationCatalogModel;
+      selection: PreparationRoadmapSelection;
+      status: "success";
+    };
 
 export function PreparationRoadmapFeature() {
-  const [selection, setSelection] = useState(() =>
-    createInitialPreparationRoadmapSelection(preparationRoadmapData),
-  );
+  const [requestState, setRequestState] = useState<CatalogRequestState>({
+    status: "loading",
+  });
+  const [requestRevision, setRequestRevision] = useState(0);
   const hasTrackedCatalogViewRef = useRef(false);
-  const viewModel = createPreparationRoadmapViewModel(
-    preparationRoadmapData,
-    selection.categoryId,
-    selection.stepId,
-  );
 
   useEffect(() => {
-    if (hasTrackedCatalogViewRef.current) {
+    let ignoresResult = false;
+
+    void getPublicPreparationCatalog()
+      .then((nextCatalog) => {
+        if (ignoresResult) {
+          return;
+        }
+
+        if (!hasSelectablePreparationSteps(nextCatalog)) {
+          setRequestState({ status: "empty" });
+          return;
+        }
+
+        setRequestState({
+          catalog: nextCatalog,
+          selection: createInitialPreparationRoadmapSelection(nextCatalog),
+          status: "success",
+        });
+      })
+      .catch(() => {
+        if (!ignoresResult) {
+          setRequestState({ status: "error" });
+        }
+      });
+
+    return () => {
+      ignoresResult = true;
+    };
+  }, [requestRevision]);
+
+  useEffect(() => {
+    if (requestState.status !== "success" || hasTrackedCatalogViewRef.current) {
       return;
     }
 
     hasTrackedCatalogViewRef.current = true;
-    analytics.track(createPreparationCatalogViewEvent(selection.categoryId));
-  }, [selection.categoryId]);
+    analytics.track(
+      createPreparationCatalogViewEvent(requestState.selection.categoryId),
+    );
+  }, [requestState]);
+
+  if (requestState.status === "error") {
+    const handleRetry = () => {
+      setRequestState({ status: "loading" });
+      setRequestRevision((value) => value + 1);
+    };
+
+    return <PreparationRoadmapState onRetry={handleRetry} status="error" />;
+  }
+
+  if (requestState.status === "loading" || requestState.status === "empty") {
+    return <PreparationRoadmapState status={requestState.status} />;
+  }
+
+  const { catalog, selection } = requestState;
+  const viewModel = createPreparationRoadmapViewModel(
+    catalog,
+    selection.categoryId,
+    selection.stepId,
+  );
 
   const handleCategorySelect = (categoryId: string) => {
     const nextSelection = selectPreparationCategory(
-      preparationRoadmapData,
+      catalog,
       selection,
       categoryId,
     );
@@ -50,7 +113,10 @@ export function PreparationRoadmapFeature() {
         previousCategoryId: selection.categoryId,
       }),
     );
-    setSelection(nextSelection);
+    setRequestState({
+      ...requestState,
+      selection: nextSelection,
+    });
   };
 
   const handleStepSelect = (stepId: string) => {
@@ -67,9 +133,12 @@ export function PreparationRoadmapFeature() {
         stepOrder: selectedStep.order,
       }),
     );
-    setSelection({
-      ...selection,
-      stepId,
+    setRequestState({
+      ...requestState,
+      selection: {
+        ...selection,
+        stepId,
+      },
     });
   };
 

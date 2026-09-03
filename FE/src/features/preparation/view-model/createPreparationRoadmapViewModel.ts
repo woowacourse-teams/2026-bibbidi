@@ -58,9 +58,19 @@ function getRoadmap(
 }
 
 function getAvailableCategories(model: PreparationCatalogModel) {
-  return model.categories.filter((category) =>
-    model.roadmaps.some((roadmap) => roadmap.categoryId === category.id),
-  );
+  return model.categories.filter((category) => {
+    const roadmap = model.roadmaps.find(
+      (candidate) => candidate.categoryId === category.id,
+    );
+
+    return Boolean(roadmap?.steps.length);
+  });
+}
+
+export function hasSelectablePreparationSteps(
+  model: PreparationCatalogModel,
+): boolean {
+  return getAvailableCategories(model).length > 0;
 }
 
 export function getInitialSelectedCategoryId(
