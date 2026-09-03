@@ -15,3 +15,7 @@ spring:
   sql:
     init:
       mode: never
+
+discord:
+  url:
+    feedback: https://discord.test/webhook

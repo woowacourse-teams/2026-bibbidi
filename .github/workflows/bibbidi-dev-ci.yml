@@ -34,8 +34,14 @@ jobs:
             - name: Setup Gradle
               uses: gradle/actions/setup-gradle@v6
 
-            - name: Build (test + jacoco + openapi + bootJar)
-              run: ./gradlew build
+            - name: Cache Gradle build outputs
+              uses: actions/cache@v4
+              with:
+                  path: BE/build
+                  key: ${{ runner.os }}-java25-gradle-build-${{ hashFiles('BE/build.gradle', 'BE/gradle/**', 'BE/gradlew', 'BE/gradlew.bat', 'BE/src/main/**', 'BE/src/test/**', 'BE/database/**') }}
+
+            - name: Build (test + jacoco)
+              run: ./gradlew test
 
             - name: Upload test report
               if: failure()

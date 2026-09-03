@@ -21,7 +21,7 @@ tasks.named('test') {
 }
 
 openapi3 {
-    server = 'http://localhost:8080'
+    server = 'https://api.bibbidi.kr'
     title = 'Bibbidi API 문서'
     description = 'Bibbidi 서비스 API 문서입니다.'
     version = project.version

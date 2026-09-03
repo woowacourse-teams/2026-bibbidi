@@ -10,6 +10,10 @@ spring:
     init:
       mode: never
 
+discord:
+  url:
+    feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
+
 server:
   servlet:
     session:
