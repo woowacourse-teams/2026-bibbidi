@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
+
 import { useFeedbackForm } from "./useFeedbackForm";
+import { FeedbackBottomSheet } from "./view/FeedbackBottomSheet";
 import { FeedbackPopover } from "./view/FeedbackPopover";
 import { FeedbackSnackbar } from "./view/FeedbackSnackbar";
 import "./FeedbackFeature.css";
@@ -22,7 +25,34 @@ function FeedbackIcon() {
   );
 }
 
+const MOBILE_MEDIA_QUERY = "(max-width: 760px)";
+
+function useIsMobileViewport() {
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false,
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY);
+
+    if (!mediaQuery) {
+      return;
+    }
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return isMobile;
+}
+
 export function FeedbackFeature() {
+  const isMobile = useIsMobileViewport();
   const {
     canSubmit,
     close,
@@ -42,7 +72,18 @@ export function FeedbackFeature() {
   return (
     <>
       <div className="feedback-feature" ref={containerRef}>
-        {isOpen ? (
+        {isOpen && isMobile ? (
+          <FeedbackBottomSheet
+            canSubmit={canSubmit}
+            closeButtonRef={closeButtonRef}
+            content={content}
+            onClose={close}
+            onContentChange={setContent}
+            onSentimentChange={setSentiment}
+            onSubmit={submit}
+            sentiment={sentiment}
+          />
+        ) : isOpen ? (
           <FeedbackPopover
             canSubmit={canSubmit}
             closeButtonRef={closeButtonRef}
