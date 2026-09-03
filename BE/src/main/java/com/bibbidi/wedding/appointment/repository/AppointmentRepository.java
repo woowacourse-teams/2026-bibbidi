@@ -46,6 +46,12 @@ public class AppointmentRepository {
         return findAllByChecklistItemIdAndIsDone(checklistItemId, true);
     }
 
+    public List<Appointment> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(List<Long> checklistItemIds) {
+        return jpaAppointmentRepository.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds).stream()
+                .map(appointmentMapper::toDomain)
+                .toList();
+    }
+
     private List<Appointment> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone) {
         return jpaAppointmentRepository.findAllByChecklistItemIdAndIsDone(checklistItemId, isDone)
                 .stream()

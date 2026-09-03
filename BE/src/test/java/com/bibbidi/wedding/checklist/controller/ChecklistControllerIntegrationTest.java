@@ -9,15 +9,20 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
+import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
 import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,6 +70,9 @@ class ChecklistControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JpaAppointmentRepository appointmentRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -75,8 +83,12 @@ class ChecklistControllerIntegrationTest {
     }
 
     private static MockHttpSession authenticatedSession() {
+        return sessionOf(USER_ID);
+    }
+
+    private static MockHttpSession sessionOf(Long userId) {
         MockHttpSession session = new MockHttpSession();
-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, USER_ID);
+        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
         return session;
     }
 
@@ -105,6 +117,80 @@ class ChecklistControllerIntegrationTest {
                                 )
                                 .build())
                 ));
+    }
+
+    @Test
+    @Sql("/appointment-fixture.sql")
+    @DisplayName("로그인한 사용자의 미완료 할 일과 일정을 함께 조회한다")
+    void shouldReturnChecklistItemsWithAppointments() throws Exception {
+        appointmentRepository.save(new JpaAppointmentEntity(
+                null,
+                1L,
+                "상담 일정",
+                LocalDate.of(2026, 9, 10),
+                LocalDateTime.of(2026, 9, 10, 10, 0),
+                LocalDateTime.of(2026, 9, 10, 11, 0),
+                "상담 장소",
+                "상담 메모",
+                false,
+                false
+        ));
+
+        mockMvc.perform(get("/api/checklists/me")
+                        .session(sessionOf(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(1))
+                .andExpect(jsonPath("$.items[0].categoryId").value(1))
+                .andExpect(jsonPath("$.items[0].sourceCatalogItemId").isEmpty())
+                .andExpect(jsonPath("$.items[0].isDone").value(false))
+                .andExpect(jsonPath("$.items[0].appointments[0].title").value("상담 일정"))
+                .andExpect(jsonPath("$.items[0].appointments[0].date").value("2026-09-10"))
+                .andExpect(jsonPath("$.items[0].appointments[0].startTime").value("2026-09-10T10:00:00"))
+                .andExpect(jsonPath("$.items[0].appointments[0].place").value("상담 장소"))
+                .andExpect(jsonPath("$.items[0].appointments[0].memo").value("상담 메모"))
+                .andExpect(jsonPath("$.items[0].appointments[0].isDone").value(false))
+                .andDo(document(
+                        "checklists-find-me",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary("내 체크리스트 조회")
+                                .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
+                                .responseSchema(schema("ChecklistWithAppointmentsResponse"))
+                                .responseFields(
+                                        fieldWithPath("id").description("체크리스트 ID"),
+                                        fieldWithPath("items[].id").description("할 일 ID"),
+                                        fieldWithPath("items[].categoryId").description("카테고리 ID"),
+                                        fieldWithPath("items[].sourceCatalogItemId").description("원본 준비 항목 ID").optional(),
+                                        fieldWithPath("items[].title").description("할 일 제목"),
+                                        fieldWithPath("items[].isDone").description("할 일 완료 여부"),
+                                        fieldWithPath("items[].appointments").description("할 일에 연결된 일정 목록"),
+                                        fieldWithPath("items[].appointments[].id").description("일정 ID"),
+                                        fieldWithPath("items[].appointments[].title").description("일정 제목"),
+                                        fieldWithPath("items[].appointments[].date").description("일정 날짜"),
+                                        fieldWithPath("items[].appointments[].startTime").description("일정 시작 시간").optional(),
+                                        fieldWithPath("items[].appointments[].endTime").description("일정 종료 시간").optional(),
+                                        fieldWithPath("items[].appointments[].place").description("일정 장소").optional(),
+                                        fieldWithPath("items[].appointments[].memo").description("일정 메모").optional(),
+                                        fieldWithPath("items[].appointments[].isDone").description("일정 완료 여부")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자의 체크리스트 조회 요청을 거절한다")
+    void shouldRequireAuthenticationToFindChecklist() throws Exception {
+        mockMvc.perform(get("/api/checklists/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없는 사용자의 조회 요청을 거절한다")
+    void shouldRejectWhenChecklistDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/checklists/me")
+                        .session(authenticatedSession()))
+                .andExpect(status().isNotFound());
     }
 
     @Test

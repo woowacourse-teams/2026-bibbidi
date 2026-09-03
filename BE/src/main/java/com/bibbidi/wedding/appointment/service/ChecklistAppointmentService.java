@@ -20,6 +20,15 @@ public class ChecklistAppointmentService {
         return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
     }
 
+    @Transactional(readOnly = true)
+    public List<Appointment> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(List<Long> checklistItemIds) {
+        if (checklistItemIds.isEmpty()) {
+            return List.of();
+        }
+
+        return appointmentRepository.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds);
+    }
+
     @Transactional
     public void completeAllByChecklistItemId(Long checklistItemId) {
         List<Appointment> completed = appointmentRepository

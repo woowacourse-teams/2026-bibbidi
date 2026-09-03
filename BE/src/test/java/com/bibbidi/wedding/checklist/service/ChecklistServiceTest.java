@@ -13,6 +13,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
+import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
@@ -23,6 +24,7 @@ import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
@@ -31,8 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -85,6 +87,40 @@ class ChecklistServiceTest {
 
         // then
         assertThat(result).isEqualTo(new ChecklistCreationResult(10L));
+    }
+
+    @Test
+    @DisplayName("모든 할 일과 해당 일정을 조회한다")
+    void shouldFindChecklistWithAppointments() {
+        ChecklistItem incompleteItem = constructTestItem(200L);
+        ChecklistItem completedItem = constructTestItem(201L, ChecklistItemStatus.DONE, null);
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(incompleteItem, completedItem));
+        Appointment appointment = new Appointment(
+                300L,
+                incompleteItem.id(),
+                "appointment",
+                java.time.LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                "memo",
+                false,
+                false
+        );
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(checklist);
+        given(checklistAppointmentService.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(
+                List.of(incompleteItem.id(), completedItem.id())))
+                .willReturn(List.of(appointment));
+
+        ChecklistWithAppointmentsResult result = checklistService.findMyChecklist(OWNER_ID);
+
+        assertThat(result.items()).hasSize(2);
+        assertThat(result.items().getFirst().appointments()).hasSize(1);
+        assertThat(result.items().getFirst().appointments().getFirst().title()).isEqualTo("appointment");
+        then(checklistAppointmentService).should().findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(
+                List.of(incompleteItem.id(), completedItem.id())
+        );
+        then(checklistAppointmentService).shouldHaveNoMoreInteractions();
     }
 
     @Test
