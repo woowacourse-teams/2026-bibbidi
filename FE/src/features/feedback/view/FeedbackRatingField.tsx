@@ -1,6 +1,7 @@
 import type { FeedbackSentiment } from "../model/feedback";
 
 interface FeedbackRatingFieldProps {
+  disabled: boolean;
   onChange: (sentiment: FeedbackSentiment) => void;
   value: FeedbackSentiment | null;
 }
@@ -27,6 +28,7 @@ function ThumbIcon({ direction }: { direction: "down" | "up" }) {
 }
 
 export function FeedbackRatingField({
+  disabled,
   onChange,
   value,
 }: FeedbackRatingFieldProps) {
@@ -36,6 +38,7 @@ export function FeedbackRatingField({
       <button
         aria-pressed={value === "good"}
         className="feedback-rating__button"
+        disabled={disabled}
         onClick={() => onChange("good")}
         type="button"
       >
@@ -45,6 +48,7 @@ export function FeedbackRatingField({
       <button
         aria-pressed={value === "bad"}
         className="feedback-rating__button"
+        disabled={disabled}
         onClick={() => onChange("bad")}
         type="button"
       >

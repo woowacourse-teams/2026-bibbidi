@@ -79,7 +79,11 @@ export function FeedbackBottomSheet({
         </header>
 
         <form aria-busy={isSubmitting} onSubmit={onSubmit}>
-          <FeedbackRatingField onChange={onSentimentChange} value={sentiment} />
+          <FeedbackRatingField
+            disabled={isSubmitting}
+            onChange={onSentimentChange}
+            value={sentiment}
+          />
 
           <label className="feedback-bottom-sheet__field">
             <span className="feedback-feature__sr-only">
@@ -87,6 +91,7 @@ export function FeedbackBottomSheet({
             </span>
             <MessageIcon />
             <textarea
+              disabled={isSubmitting}
               maxLength={MAX_FEEDBACK_LENGTH}
               onChange={(event) => onContentChange(event.target.value)}
               placeholder="조금 더 자세히 알려주실래요? (선택)"

@@ -36,7 +36,11 @@ export function FeedbackPopover({
       </header>
 
       <form aria-busy={isSubmitting} onSubmit={onSubmit}>
-        <FeedbackRatingField onChange={onSentimentChange} value={sentiment} />
+        <FeedbackRatingField
+          disabled={isSubmitting}
+          onChange={onSentimentChange}
+          value={sentiment}
+        />
 
         <div className="feedback-popover__field">
           <div className="feedback-popover__label-row">
@@ -45,6 +49,7 @@ export function FeedbackPopover({
           </div>
           <textarea
             id="feedback-content"
+            disabled={isSubmitting}
             maxLength={MAX_FEEDBACK_LENGTH}
             onChange={(event) => onContentChange(event.target.value)}
             placeholder={

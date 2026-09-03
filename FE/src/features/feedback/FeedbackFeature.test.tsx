@@ -127,6 +127,18 @@ describe("FeedbackFeature", () => {
         name: "보내는 중...",
       }),
     ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "좋았어요" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "아쉬워요" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement)
+        .disabled,
+    ).toBe(true);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.click(submitButton);
