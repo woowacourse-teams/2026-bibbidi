@@ -65,7 +65,6 @@ function toApiError(response: Response, body: unknown): LoginApiError {
 }
 
 export async function login(values: LoginValues): Promise<LoginResult> {
-  let response: Response;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
     () => controller.abort(),
@@ -73,47 +72,57 @@ export async function login(values: LoginValues): Promise<LoginResult> {
   );
 
   try {
-    response = await fetch(LOGIN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(values),
-      credentials: "include",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (isRecord(error) && error.name === "AbortError") {
-      throw new LoginTimeoutError();
+    let response: Response;
+
+    try {
+      response = await fetch(LOGIN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+        credentials: "include",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (isRecord(error) && error.name === "AbortError") {
+        throw new LoginTimeoutError();
+      }
+
+      throw new LoginNetworkError();
     }
 
-    throw new LoginNetworkError();
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (isRecord(error) && error.name === "AbortError") {
+        throw new LoginTimeoutError();
+      }
+
+      if (!response.ok) {
+        throw toApiError(response, undefined);
+      }
+
+      throw new Error("로그인 성공 응답을 해석하지 못했습니다.", {
+        cause: error,
+      });
+    }
+
+    if (!response.ok) {
+      throw toApiError(response, body);
+    }
+
+    if (!isLoginResponse(body)) {
+      throw new Error("로그인 성공 응답 형식이 올바르지 않습니다.");
+    }
+
+    return {
+      userId: body.userId,
+      nickname: body.nickname,
+    };
   } finally {
     window.clearTimeout(timeoutId);
   }
-
-  let body: unknown;
-
-  try {
-    body = await response.json();
-  } catch {
-    if (!response.ok) {
-      throw toApiError(response, undefined);
-    }
-
-    throw new Error("로그인 성공 응답을 해석하지 못했습니다.");
-  }
-
-  if (!response.ok) {
-    throw toApiError(response, body);
-  }
-
-  if (!isLoginResponse(body)) {
-    throw new Error("로그인 성공 응답 형식이 올바르지 않습니다.");
-  }
-
-  return {
-    userId: body.userId,
-    nickname: body.nickname,
-  };
 }
