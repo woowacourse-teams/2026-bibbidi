@@ -3,6 +3,7 @@ package com.bibbidi.wedding.user.controller;
 import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameResponse;
+import com.bibbidi.wedding.user.controller.dto.CurrentUserResponse;
 import com.bibbidi.wedding.user.controller.dto.NicknameAvailabilityResponse;
 import com.bibbidi.wedding.user.service.NicknameAvailabilityResult;
 import com.bibbidi.wedding.user.service.UserResult;
@@ -23,6 +24,12 @@ public class UserController {
 
     public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+    @GetMapping("/me")
+    public CurrentUserResponse findCurrentUser(@Auth Long currentUserId) {
+        UserResult result = userService.findCurrentUser(currentUserId);
+        return CurrentUserResponse.from(result);
     }
 
     @GetMapping("/nickname/availability")
