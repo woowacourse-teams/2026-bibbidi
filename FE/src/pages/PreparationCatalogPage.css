@@ -1,6 +1,16 @@
 .preparation-catalog-page {
+  display: flex;
   min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
+}
+
+.preparation-catalog-page > main {
+  display: flex;
+  flex: 1;
+}
+
+.preparation-catalog-page > main > * {
+  flex: 1;
 }

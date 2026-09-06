@@ -1,0 +1,81 @@
+.app-header-summary,
+.app-header-summary__d-day,
+.app-header-summary__progress {
+  display: flex;
+  align-items: center;
+}
+
+.app-header-summary {
+  width: 360px;
+  max-width: 100%;
+  height: 48px;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.app-header-summary__d-day,
+.app-header-summary__progress {
+  gap: 8px;
+}
+
+.app-header-summary strong {
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-header-summary time,
+.app-header-summary__progress > span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.app-header-summary__separator {
+  width: 1px;
+  height: 24px;
+  flex: none;
+  background: var(--color-stroke-neutral-weak);
+}
+
+.app-header-summary__progress-ring {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.app-header-summary__progress-ring circle {
+  fill: none;
+  stroke: var(--color-stroke-neutral-weak);
+  stroke-width: 4;
+}
+
+.app-header-summary__progress-ring .app-header-summary__progress-range {
+  stroke: var(--color-bg-brand-solid);
+}
+
+@media (max-width: 760px) {
+  .app-header-summary {
+    width: auto;
+    height: 36px;
+    gap: 8px;
+  }
+
+  .app-header-summary__d-day time,
+  .app-header-summary__progress > span,
+  .app-header-summary__separator {
+    display: none;
+  }
+
+  .app-header-summary__d-day,
+  .app-header-summary__progress {
+    gap: 4px;
+  }
+
+  .app-header-summary__progress-ring {
+    width: 20px;
+    height: 20px;
+  }
+}

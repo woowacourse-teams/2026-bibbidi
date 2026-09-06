@@ -1,10 +1,10 @@
 import {
+  AppHeaderSummaryModel,
   calculateDaysUntilWedding,
   calculatePreparationProgress,
-  HomeHeaderSummaryModel,
-} from "../model/homeHeaderSummary";
+} from "../model/appHeaderSummary";
 
-export interface HomeHeaderSummaryViewModel {
+export interface AppHeaderSummaryViewModel {
   dDayLabel: string;
   progressLabel: string;
   progressPercentage: number;
@@ -17,9 +17,9 @@ function formatCompactDate(date: string) {
   return date.replaceAll("-", ".");
 }
 
-export function createHomeHeaderSummaryViewModel(
-  model: HomeHeaderSummaryModel,
-): HomeHeaderSummaryViewModel {
+export function createAppHeaderSummaryViewModel(
+  model: AppHeaderSummaryModel,
+): AppHeaderSummaryViewModel {
   const daysUntilWedding = calculateDaysUntilWedding(
     model.referenceDate,
     model.weddingDate,

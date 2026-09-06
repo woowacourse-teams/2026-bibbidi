@@ -1,0 +1,51 @@
+.service-layout {
+  --mobile-dock-size: 72px;
+  --mobile-dock-offset: max(12px, env(safe-area-inset-bottom));
+
+  display: flex;
+  height: 100dvh;
+  min-width: 320px;
+  overflow: hidden;
+  flex-direction: column;
+  background: var(--color-bg-layer-basement);
+}
+
+.service-layout__content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.service-layout .service-layout__content > * {
+  min-height: 100%;
+}
+
+.service-layout__mobile-dock {
+  display: contents;
+}
+
+@media (max-width: 760px) {
+  .service-layout__content {
+    padding-bottom: calc(
+      var(--mobile-dock-size) + var(--mobile-dock-offset) + 16px
+    );
+    scroll-padding-bottom: calc(
+      var(--mobile-dock-size) + var(--mobile-dock-offset) + 16px
+    );
+  }
+
+  .service-layout__mobile-dock {
+    position: fixed;
+    z-index: 20;
+    right: 16px;
+    bottom: var(--mobile-dock-offset);
+    left: 16px;
+    display: flex;
+    width: auto;
+    max-width: 438px;
+    height: var(--mobile-dock-size);
+    margin: 0 auto;
+    gap: clamp(8px, 2vw, 12px);
+  }
+}

@@ -1,8 +1,8 @@
-import { homeDashboardReferenceDateMock } from "./homeDashboardReferenceDate.mock";
+import { weddingReferenceDateMock } from "../../../domain/wedding/weddingReferenceDate.mock";
 import { UpcomingScheduleListModel } from "./upcomingSchedule";
 
 export const upcomingScheduleListMock: UpcomingScheduleListModel = {
-  referenceDate: homeDashboardReferenceDateMock,
+  referenceDate: weddingReferenceDateMock,
   schedules: [
     {
       date: "2026-08-25",

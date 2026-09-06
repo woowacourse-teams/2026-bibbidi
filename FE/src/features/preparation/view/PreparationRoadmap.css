@@ -4,13 +4,11 @@
 
   isolation: isolate;
   display: grid;
-  min-height: calc(100vh - 80px);
   grid-template-columns: 180px minmax(0, 1fr);
 }
 
 .preparation-roadmap-state {
   display: flex;
-  min-height: calc(100vh - 80px);
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -550,11 +548,5 @@
     height: auto;
     min-height: 52px;
     padding: 8px 20px;
-  }
-}
-
-@media (max-width: 520px) {
-  .preparation-roadmap {
-    min-height: calc(100vh - 72px);
   }
 }
