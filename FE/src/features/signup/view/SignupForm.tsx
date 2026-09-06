@@ -17,6 +17,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
     isFormValid,
     isSubmitting,
     isSuccess,
+    nicknameMessage,
     setFieldValue,
     submit,
     validateFieldOnBlur,
@@ -40,29 +41,30 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
             닉네임
           </label>
           <input
-            aria-describedby={errors.nickname ? "nickname-error" : undefined}
+            aria-describedby="nickname-message"
             aria-invalid={Boolean(errors.nickname)}
             autoComplete="username"
             className="signup-form__input"
             disabled={isFormDisabled}
             id="nickname"
             name="nickname"
-            onBlur={() => validateFieldOnBlur("nickname")}
+            onBlur={() => void validateFieldOnBlur("nickname")}
             onChange={(event) => setFieldValue("nickname", event.target.value)}
             placeholder="닉네임을 입력하세요"
             type="text"
             value={values.nickname}
           />
           <p
+            aria-live="polite"
             className={
               errors.nickname
                 ? "signup-form__message signup-form__message--error"
                 : "signup-form__message"
             }
-            id={errors.nickname ? "nickname-error" : undefined}
+            id="nickname-message"
             role={errors.nickname ? "alert" : undefined}
           >
-            {errors.nickname ?? SIGNUP_FORM_GUIDANCE.nickname}
+            {nicknameMessage}
           </p>
         </div>
 
@@ -78,7 +80,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
             disabled={isFormDisabled}
             id="password"
             name="password"
-            onBlur={() => validateFieldOnBlur("password")}
+            onBlur={() => void validateFieldOnBlur("password")}
             onChange={(event) => setFieldValue("password", event.target.value)}
             placeholder="비밀번호를 입력하세요"
             type="password"
@@ -111,7 +113,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
             disabled={isFormDisabled}
             id="passwordConfirm"
             name="passwordConfirm"
-            onBlur={() => validateFieldOnBlur("passwordConfirm")}
+            onBlur={() => void validateFieldOnBlur("passwordConfirm")}
             onChange={(event) =>
               setFieldValue("passwordConfirm", event.target.value)
             }

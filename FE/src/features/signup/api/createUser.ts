@@ -16,7 +16,7 @@ interface ApiFieldError {
 
 export class CreateUserApiError extends Error {
   constructor(
-    readonly id: number,
+    readonly errorCode: number,
     readonly status: number,
     message: string,
     readonly fieldErrors: ApiFieldError[] = [],
@@ -75,8 +75,8 @@ function toApiError(response: Response, body: unknown): CreateUserApiError {
   }
 
   return new CreateUserApiError(
-    typeof body.id === "number" ? body.id : 0,
-    typeof body.status === "number" ? body.status : response.status,
+    typeof body.errorCode === "number" ? body.errorCode : 0,
+    response.status,
     typeof body.message === "string"
       ? body.message
       : "회원가입 요청을 처리하지 못했습니다.",
