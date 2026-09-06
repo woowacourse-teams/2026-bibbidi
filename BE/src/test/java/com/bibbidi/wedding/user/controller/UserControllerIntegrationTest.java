@@ -71,7 +71,7 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("현재 인증 Session의 사용자 정보를 조회한다")
+    @DisplayName("Session Cookie를 전달받아 현재 사용자의 정보를 조회하여 반환한다")
     void shouldFindCurrentUserFromAuthenticatedSession() throws Exception {
         mockMvc.perform(get("/api/users/me")
                         .session(authenticatedSession(currentUserId))
@@ -103,7 +103,7 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("요청 사용자 ID 대신 인증 Session의 사용자 정보를 조회한다")
+    @DisplayName("다른 사용자 ID를 요청 파라미터로 전달해도 Session 사용자의 정보를 반환한다")
     void shouldIgnoreRequestedUserIdAndFindSessionUser() throws Exception {
         mockMvc.perform(get("/api/users/me")
                         .session(authenticatedSession(currentUserId))
@@ -114,7 +114,7 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("인증 Session이 없으면 현재 사용자 정보를 조회할 수 없다")
+    @DisplayName("Session Cookie 없이 현재 사용자 정보를 요청하면 인증 필요 오류를 반환한다")
     void shouldRequireAuthenticationToFindCurrentUser() throws Exception {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isUnauthorized())
@@ -138,7 +138,7 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Session 사용자가 존재하지 않으면 인증 필요 오류를 반환한다")
+    @DisplayName("Session에 존재하지 않는 사용자 ID가 저장되어 있으면 인증 필요 오류를 반환한다")
     void shouldRequireAuthenticationWhenSessionUserDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/users/me")
                         .session(authenticatedSession(Long.MAX_VALUE)))
