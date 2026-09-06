@@ -1,7 +1,14 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { SignupForm } from "../features/signup";
 
 export function SignupPage() {
-  return <SignupForm loginLink={<Link to="/login">로그인</Link>} />;
+  const navigate = useNavigate();
+
+  return (
+    <SignupForm
+      loginLink={<Link to="/login">로그인</Link>}
+      onSuccess={() => navigate("/login", { replace: true })}
+    />
+  );
 }

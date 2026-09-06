@@ -97,7 +97,10 @@ export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
         )}
       </div>
 
-      <p className="login-form__signup-prompt">계정이 없나요? {signupLink}</p>
+      <p className="login-form__signup-prompt">
+        <span>계정이 없나요?</span>
+        {signupLink}
+      </p>
     </form>
   );
 }

@@ -8,13 +8,13 @@
   display: grid;
   min-height: calc(100vh - 80px);
   place-items: center;
-  padding: 48px 24px;
+  padding: 56px 24px 96px;
 }
 
 @media (max-width: 520px) {
   .auth-page {
-    min-height: calc(100vh - 72px);
+    min-height: calc(100vh - 96px);
     align-items: start;
-    padding: 40px 20px;
+    padding: 42px 16px 48px;
   }
 }

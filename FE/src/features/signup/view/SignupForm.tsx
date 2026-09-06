@@ -1,6 +1,7 @@
 import { ReactNode, SubmitEvent } from "react";
 
 import { SignupResult } from "../model/signup";
+import { SIGNUP_FORM_GUIDANCE } from "../view-model/signupFormView";
 import { useSignupForm } from "../view-model/useSignupForm";
 import "./SignupForm.css";
 
@@ -13,6 +14,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
   const {
     errors,
     formError,
+    isFormValid,
     isSubmitting,
     isSuccess,
     setFieldValue,
@@ -51,11 +53,17 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
             type="text"
             value={values.nickname}
           />
-          {errors.nickname && (
-            <p className="signup-form__error" id="nickname-error" role="alert">
-              {errors.nickname}
-            </p>
-          )}
+          <p
+            className={
+              errors.nickname
+                ? "signup-form__message signup-form__message--error"
+                : "signup-form__message"
+            }
+            id={errors.nickname ? "nickname-error" : undefined}
+            role={errors.nickname ? "alert" : undefined}
+          >
+            {errors.nickname ?? SIGNUP_FORM_GUIDANCE.nickname}
+          </p>
         </div>
 
         <div className="signup-form__field">
@@ -76,11 +84,17 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
             type="password"
             value={values.password}
           />
-          {errors.password && (
-            <p className="signup-form__error" id="password-error" role="alert">
-              {errors.password}
-            </p>
-          )}
+          <p
+            className={
+              errors.password
+                ? "signup-form__message signup-form__message--error"
+                : "signup-form__message"
+            }
+            id={errors.password ? "password-error" : undefined}
+            role={errors.password ? "alert" : undefined}
+          >
+            {errors.password ?? SIGNUP_FORM_GUIDANCE.password}
+          </p>
         </div>
 
         <div className="signup-form__field">
@@ -107,7 +121,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
           />
           {errors.passwordConfirm && (
             <p
-              className="signup-form__error"
+              className="signup-form__message signup-form__message--error"
               id="password-confirm-error"
               role="alert"
             >
@@ -121,7 +135,7 @@ export function SignupForm({ loginLink, onSuccess }: SignupFormProps) {
         <button
           aria-busy={isSubmitting}
           className="signup-form__submit"
-          disabled={isFormDisabled}
+          disabled={isFormDisabled || !isFormValid}
           type="submit"
         >
           {isSubmitting ? "가입 중..." : isSuccess ? "가입 완료" : "회원가입"}

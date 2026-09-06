@@ -4,11 +4,11 @@ import {
   createUser,
   CreateUserApiError,
   CreateUserNetworkError,
-  CreateUserResponse,
   CreateUserTimeoutError,
 } from "../api/createUser";
 import {
   initialSignupFormValues,
+  isSignupFormValid,
   SignupFormErrors,
   SignupFormField,
   SignupResult,
@@ -102,7 +102,7 @@ export function useSignupForm({ onSuccess }: UseSignupFormOptions) {
     setFormError(undefined);
     setSubmissionStatus("submitting");
 
-    let user: CreateUserResponse;
+    let user: SignupResult;
 
     try {
       user = await createUser(toSignupValues(values));
@@ -144,10 +144,12 @@ export function useSignupForm({ onSuccess }: UseSignupFormOptions) {
 
   const isSubmitting = submissionStatus === "submitting";
   const isSuccess = submissionStatus === "success";
+  const isFormValid = isSignupFormValid(values);
 
   return {
     errors,
     formError,
+    isFormValid,
     isSubmitting,
     isSuccess,
     setFieldValue,

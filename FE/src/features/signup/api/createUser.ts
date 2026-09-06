@@ -1,10 +1,10 @@
-import { SignupValues } from "../model/signup";
+import { SignupResult, SignupValues } from "../model/signup";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CREATE_USER_ENDPOINT = `${apiBaseUrl}/api/users`;
 const CREATE_USER_TIMEOUT_MS = 10_000;
 
-export interface CreateUserResponse {
+interface CreateUserResponse {
   id: number;
   nickname: string;
 }
@@ -84,9 +84,7 @@ function toApiError(response: Response, body: unknown): CreateUserApiError {
   );
 }
 
-export async function createUser(
-  values: SignupValues,
-): Promise<CreateUserResponse> {
+export async function createUser(values: SignupValues): Promise<SignupResult> {
   let response: Response;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -133,5 +131,8 @@ export async function createUser(
     throw new Error("회원가입 성공 응답 형식이 올바르지 않습니다.");
   }
 
-  return body;
+  return {
+    id: body.id,
+    nickname: body.nickname,
+  };
 }
