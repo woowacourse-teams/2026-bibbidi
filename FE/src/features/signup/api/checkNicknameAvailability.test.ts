@@ -119,4 +119,30 @@ describe("checkNicknameAvailability", () => {
 
     await requestExpectation;
   });
+
+  it("응답 본문을 읽는 동안 10초가 지나면 Timeout 오류를 반환한다", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) =>
+        Promise.resolve({
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("aborted", "AbortError"));
+              });
+            }),
+          ok: true,
+          status: 200,
+        } as Response),
+      ),
+    );
+
+    const requestExpectation = expect(
+      checkNicknameAvailability("bibbidi"),
+    ).rejects.toBeInstanceOf(NicknameAvailabilityTimeoutError);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await requestExpectation;
+  });
 });

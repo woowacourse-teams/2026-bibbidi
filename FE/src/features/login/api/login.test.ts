@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { login, LoginApiError } from "./login";
+import { login, LoginApiError, LoginTimeoutError } from "./login";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -48,5 +49,31 @@ describe("login", () => {
     ).rejects.toEqual(
       new LoginApiError(202, 401, "인증 정보가 올바르지 않습니다."),
     );
+  });
+
+  it("응답 본문을 읽는 동안 10초가 지나면 Timeout 오류를 반환한다", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) =>
+        Promise.resolve({
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("aborted", "AbortError"));
+              });
+            }),
+          ok: true,
+          status: 200,
+        } as Response),
+      ),
+    );
+
+    const requestExpectation = expect(
+      login({ nickname: "bibbidi", password: "wish" }),
+    ).rejects.toBeInstanceOf(LoginTimeoutError);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await requestExpectation;
   });
 });

@@ -94,46 +94,55 @@ export async function checkNicknameAvailability(
     NICKNAME_AVAILABILITY_TIMEOUT_MS,
   );
   const query = new URLSearchParams({ nickname });
-  let response: Response;
 
   try {
-    response = await fetch(`${NICKNAME_AVAILABILITY_ENDPOINT}?${query}`, {
-      method: "GET",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (isRecord(error) && error.name === "AbortError") {
-      throw new NicknameAvailabilityTimeoutError();
+    let response: Response;
+
+    try {
+      response = await fetch(`${NICKNAME_AVAILABILITY_ENDPOINT}?${query}`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (isRecord(error) && error.name === "AbortError") {
+        throw new NicknameAvailabilityTimeoutError();
+      }
+
+      throw new NicknameAvailabilityNetworkError();
     }
 
-    throw new NicknameAvailabilityNetworkError();
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (isRecord(error) && error.name === "AbortError") {
+        throw new NicknameAvailabilityTimeoutError();
+      }
+
+      if (!response.ok) {
+        throw toApiError(response, undefined);
+      }
+
+      throw new Error("닉네임 중복 확인 응답을 해석하지 못했습니다.", {
+        cause: error,
+      });
+    }
+
+    if (!response.ok) {
+      throw toApiError(response, body);
+    }
+
+    if (!isNicknameAvailability(body)) {
+      throw new Error("닉네임 중복 확인 응답 형식이 올바르지 않습니다.");
+    }
+
+    if (body.nickname !== nickname) {
+      throw new Error("닉네임 중복 확인 응답의 닉네임이 일치하지 않습니다.");
+    }
+
+    return body;
   } finally {
     window.clearTimeout(timeoutId);
   }
-
-  let body: unknown;
-
-  try {
-    body = await response.json();
-  } catch {
-    if (!response.ok) {
-      throw toApiError(response, undefined);
-    }
-
-    throw new Error("닉네임 중복 확인 응답을 해석하지 못했습니다.");
-  }
-
-  if (!response.ok) {
-    throw toApiError(response, body);
-  }
-
-  if (!isNicknameAvailability(body)) {
-    throw new Error("닉네임 중복 확인 응답 형식이 올바르지 않습니다.");
-  }
-
-  if (body.nickname !== nickname) {
-    throw new Error("닉네임 중복 확인 응답의 닉네임이 일치하지 않습니다.");
-  }
-
-  return body;
 }
