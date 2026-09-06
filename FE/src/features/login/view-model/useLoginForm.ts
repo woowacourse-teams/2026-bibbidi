@@ -4,7 +4,6 @@ import {
   login,
   LoginApiError,
   LoginNetworkError,
-  LoginResponse,
   LoginTimeoutError,
 } from "../api/login";
 import {
@@ -57,7 +56,7 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
     setFormError(undefined);
     setSubmissionStatus("submitting");
 
-    let result: LoginResponse;
+    let result: LoginResult;
 
     try {
       result = await login(toLoginValues(values));
@@ -66,7 +65,9 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
 
       if (
         error instanceof LoginApiError &&
-        (error.status === 400 || error.status === 401)
+        (error.errorCode === 101 ||
+          error.errorCode === 102 ||
+          error.errorCode === 202)
       ) {
         showFormError(LOGIN_FORM_ERROR_MESSAGE);
       } else if (error instanceof LoginNetworkError) {

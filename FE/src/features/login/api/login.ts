@@ -1,17 +1,21 @@
-import { LoginValues } from "../model/login";
+import { LoginResult, LoginValues } from "../model/login";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const LOGIN_ENDPOINT = `${apiBaseUrl}/api/login`;
 const LOGIN_TIMEOUT_MS = 10_000;
 
-export interface LoginResponse {
+interface LoginResponse {
   userId: number;
   nickname: string;
 }
 
 export class LoginApiError extends Error {
-  constructor(readonly status: number) {
-    super("로그인 요청을 처리하지 못했습니다.");
+  constructor(
+    readonly errorCode: number,
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
     this.name = "LoginApiError";
   }
 }
@@ -42,7 +46,25 @@ function isLoginResponse(value: unknown): value is LoginResponse {
   );
 }
 
-export async function login(values: LoginValues): Promise<LoginResponse> {
+function toApiError(response: Response, body: unknown): LoginApiError {
+  if (!isRecord(body)) {
+    return new LoginApiError(
+      0,
+      response.status,
+      "로그인 요청을 처리하지 못했습니다.",
+    );
+  }
+
+  return new LoginApiError(
+    typeof body.errorCode === "number" ? body.errorCode : 0,
+    response.status,
+    typeof body.message === "string"
+      ? body.message
+      : "로그인 요청을 처리하지 못했습니다.",
+  );
+}
+
+export async function login(values: LoginValues): Promise<LoginResult> {
   let response: Response;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -70,21 +92,28 @@ export async function login(values: LoginValues): Promise<LoginResponse> {
     window.clearTimeout(timeoutId);
   }
 
-  if (!response.ok) {
-    throw new LoginApiError(response.status);
-  }
-
   let body: unknown;
 
   try {
     body = await response.json();
   } catch {
+    if (!response.ok) {
+      throw toApiError(response, undefined);
+    }
+
     throw new Error("로그인 성공 응답을 해석하지 못했습니다.");
+  }
+
+  if (!response.ok) {
+    throw toApiError(response, body);
   }
 
   if (!isLoginResponse(body)) {
     throw new Error("로그인 성공 응답 형식이 올바르지 않습니다.");
   }
 
-  return body;
+  return {
+    userId: body.userId,
+    nickname: body.nickname,
+  };
 }
