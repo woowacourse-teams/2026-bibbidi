@@ -1,35 +1,66 @@
 import { ReactNode } from "react";
+import { NavLink } from "react-router";
 
 import "./AppHeader.css";
+import { HeaderBrandLink } from "./HeaderBrandLink";
+import { appNavigationItems } from "./AppNavigation";
 
-interface AppHeaderProps {
-  homeLink: ReactNode;
+interface AuthenticatedUser {
+  kind: "authenticated";
   summary: ReactNode;
+  userInitial: string;
 }
 
-export function AppHeader({ homeLink, summary }: AppHeaderProps) {
+interface GuestUser {
+  kind: "guest";
+}
+
+interface AppHeaderProps {
+  user: AuthenticatedUser | GuestUser;
+}
+
+export function AppHeader({ user }: AppHeaderProps) {
   return (
     <header className="app-header">
       <div className="app-header__inner">
         <div className="app-header__left">
-          {homeLink}
+          <HeaderBrandLink to="/" />
 
           <nav aria-label="주요 메뉴" className="app-header__navigation">
-            <span aria-disabled="true" className="app-header__navigation-item">
-              체크리스트
-            </span>
-            <span aria-disabled="true" className="app-header__navigation-item">
-              준비 목록
-            </span>
+            {appNavigationItems
+              .filter((item) => item.showInDesktopHeader)
+              .map((item) => (
+                <NavLink
+                  className="app-header__navigation-item"
+                  key={item.to}
+                  to={item.to}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
           </nav>
         </div>
 
-        <div className="app-header__right">
-          <div className="app-header__summary">{summary}</div>
-          <span aria-label="현재 사용자 나" className="app-header__user">
-            나
-          </span>
-        </div>
+        {user.kind === "authenticated" ? (
+          <div className="app-header__right">
+            <div className="app-header__summary">{user.summary}</div>
+            <span
+              aria-label={`현재 사용자 ${user.userInitial}`}
+              className="app-header__user"
+            >
+              {user.userInitial}
+            </span>
+          </div>
+        ) : (
+          <nav aria-label="계정 메뉴" className="app-header__guest-actions">
+            <NavLink className="app-header__login" to="/login">
+              로그인
+            </NavLink>
+            <NavLink className="app-header__signup" to="/signup">
+              회원가입
+            </NavLink>
+          </nav>
+        )}
       </div>
     </header>
   );

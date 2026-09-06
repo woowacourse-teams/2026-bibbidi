@@ -1,18 +1,28 @@
 import { createBrowserRouter, Navigate } from "react-router";
 
 import { AuthLayout } from "../layouts/AuthLayout";
-import { FeedbackLayout } from "../layouts/FeedbackLayout";
+import { ServiceLayout } from "../layouts/ServiceLayout";
+import { ChecklistPage } from "../pages/ChecklistPage";
+import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SignupPage } from "../pages/SignupPage";
 
 export const router = createBrowserRouter([
   {
-    Component: FeedbackLayout,
+    Component: ServiceLayout,
     children: [
       {
         path: "/",
+        Component: HomePage,
+      },
+      {
+        path: "/preparation",
         Component: PreparationCatalogPage,
+      },
+      {
+        path: "/checklist",
+        Component: ChecklistPage,
       },
     ],
   },

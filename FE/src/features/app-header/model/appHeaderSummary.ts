@@ -1,4 +1,4 @@
-export interface HomeHeaderSummaryModel {
+export interface AppHeaderSummaryModel {
   completedTaskCount: number;
   referenceDate: string;
   totalTaskCount: number;

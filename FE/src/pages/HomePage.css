@@ -1,7 +1,6 @@
 .home-page {
   display: flex;
   min-width: 320px;
-  min-height: 100vh;
   flex-direction: column;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
