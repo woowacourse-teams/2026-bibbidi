@@ -28,7 +28,7 @@ public class UserController {
 
     @GetMapping("/me")
     public CurrentUserResponse findCurrentUser(@Auth Long currentUserId) {
-        UserResult result = userService.findCurrentUser(currentUserId);
+        UserResult result = userService.findCurrentUserInfo(currentUserId);
         return CurrentUserResponse.from(result);
     }
 

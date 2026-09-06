@@ -52,18 +52,18 @@ public class UserService {
     }
 
     public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
-        User user = getCurrentUser(currentUserId);
+        User user = findCurrentUser(currentUserId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
-    public UserResult findCurrentUser(Long currentUserId) {
-        User user = getCurrentUser(currentUserId);
+    public UserResult findCurrentUserInfo(Long currentUserId) {
+        User user = findCurrentUser(currentUserId);
         return UserResult.from(user);
     }
 
     @Transactional
     public void changePasswordHash(Long currentUserId, String passwordHash) {
-        User user = getCurrentUser(currentUserId);
+        User user = findCurrentUser(currentUserId);
         User changedUser = user.changePasswordHash(passwordHash);
         userRepository.save(changedUser);
     }
@@ -76,7 +76,7 @@ public class UserService {
 
     @Transactional
     public UserResult changeNickname(Long currentUserId, String nickname) {
-        User user = getCurrentUser(currentUserId);
+        User user = findCurrentUser(currentUserId);
 
         if (user.nickname().equals(nickname)) {
             return UserResult.from(user);
@@ -94,7 +94,7 @@ public class UserService {
         }
     }
 
-    private User getCurrentUser(Long currentUserId) {
+    private User findCurrentUser(Long currentUserId) {
         try {
             return userRepository.findById(currentUserId);
         } catch (BusinessException exception) {

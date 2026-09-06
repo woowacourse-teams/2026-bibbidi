@@ -46,7 +46,7 @@ class UserServiceTest {
         User user = new User(1L, "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
 
-        UserResult result = userService.findCurrentUser(1L);
+        UserResult result = userService.findCurrentUserInfo(1L);
 
         assertThat(result).isEqualTo(new UserResult(1L, "current"));
         then(userRepository).should().findById(1L);
@@ -59,7 +59,7 @@ class UserServiceTest {
                 new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
         );
 
-        assertThatThrownBy(() -> userService.findCurrentUser(1L))
+        assertThatThrownBy(() -> userService.findCurrentUserInfo(1L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
