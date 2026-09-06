@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +45,9 @@ class UserControllerIntegrationTest {
 
     private static final String PASSWORD = "wish";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
+    private static final String CURRENT_USER_DESCRIPTION =
+            "현재 인증 Session의 사용자 ID로 계정 정보를 조회합니다. "
+                    + "Session이 없거나 Session 사용자가 존재하지 않으면 인증 필요 오류를 반환합니다.";
     private static final String CHANGE_NICKNAME_DESCRIPTION = "현재 인증 Session의 사용자 ID를 유지하면서 로그인에 사용할 닉네임을 변경합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
     private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 닉네임을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
 
@@ -64,6 +68,84 @@ class UserControllerIntegrationTest {
                 .build();
         currentUserId = createUser("current");
         otherUserId = createUser("other");
+    }
+
+    @Test
+    @DisplayName("현재 인증 Session의 사용자 정보를 조회한다")
+    void shouldFindCurrentUserFromAuthenticatedSession() throws Exception {
+        mockMvc.perform(get("/api/users/me")
+                        .session(authenticatedSession(currentUserId))
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(currentUserId))
+                .andExpect(jsonPath("$.nickname").value("current"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.sessionId").doesNotExist())
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andDo(document(
+                        "users-find-me",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 정보 조회")
+                                .description(CURRENT_USER_DESCRIPTION)
+                                .responseSchema(schema("CurrentUserResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("현재 사용자 ID"),
+                                        fieldWithPath("nickname").description("현재 사용자 닉네임")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("요청 사용자 ID 대신 인증 Session의 사용자 정보를 조회한다")
+    void shouldIgnoreRequestedUserIdAndFindSessionUser() throws Exception {
+        mockMvc.perform(get("/api/users/me")
+                        .session(authenticatedSession(currentUserId))
+                        .queryParam("userId", otherUserId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(currentUserId))
+                .andExpect(jsonPath("$.nickname").value("current"));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 현재 사용자 정보를 조회할 수 없다")
+    void shouldRequireAuthenticationToFindCurrentUser() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
+                .andDo(document(
+                        "users-find-me-authentication-required",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 정보 조회")
+                                .description(CURRENT_USER_DESCRIPTION)
+                                .responseSchema(schema("ErrorResponse"))
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("Session 사용자가 존재하지 않으면 인증 필요 오류를 반환한다")
+    void shouldRequireAuthenticationWhenSessionUserDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/users/me")
+                        .session(authenticatedSession(Long.MAX_VALUE)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+                .andExpect(jsonPath("$.status").doesNotExist());
     }
 
     @Test

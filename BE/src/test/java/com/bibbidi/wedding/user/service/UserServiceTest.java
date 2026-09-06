@@ -41,6 +41,31 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("사용자 ID로 비밀번호 해시가 없는 현재 사용자 정보를 조회한다")
+    void shouldFindCurrentUserWithoutPasswordHash() {
+        User user = new User(1L, "current", "password-hash");
+        given(userRepository.findById(1L)).willReturn(user);
+
+        UserResult result = userService.findCurrentUser(1L);
+
+        assertThat(result).isEqualTo(new UserResult(1L, "current"));
+        then(userRepository).should().findById(1L);
+    }
+
+    @Test
+    @DisplayName("현재 사용자 정보 조회에서 Session 사용자가 없으면 인증 필요 오류를 반환한다")
+    void shouldRequireAuthenticationWhenFindingMissingCurrentUser() {
+        given(userRepository.findById(1L)).willThrow(
+                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+        );
+
+        assertThatThrownBy(() -> userService.findCurrentUser(1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+    }
+
+    @Test
     @DisplayName("대소문자만 다른 닉네임도 요청한 표기로 변경한다")
     void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
         User user = new User(1L, "Bibbidi", "password-hash");
