@@ -15,6 +15,10 @@ export interface SignupFormValues extends SignupValues {
 export type SignupFormField = keyof SignupFormValues;
 export type SignupFormErrors = Partial<Record<SignupFormField, string>>;
 
+export const SIGNUP_NICKNAME_MAX_LENGTH = 10;
+export const SIGNUP_PASSWORD_MIN_LENGTH = 4;
+export const SIGNUP_PASSWORD_MAX_LENGTH = 20;
+
 export const initialSignupFormValues: SignupFormValues = {
   nickname: "",
   password: "",
@@ -39,8 +43,8 @@ export function validateSignupField(
       return "닉네임을 입력해 주세요.";
     }
 
-    if (nickname.length > 10) {
-      return "닉네임은 10자 이하로 입력해 주세요.";
+    if (nickname.length > SIGNUP_NICKNAME_MAX_LENGTH) {
+      return `닉네임은 ${SIGNUP_NICKNAME_MAX_LENGTH}자 이하로 입력해 주세요.`;
     }
   }
 
@@ -49,12 +53,12 @@ export function validateSignupField(
       return "비밀번호를 입력해 주세요.";
     }
 
-    if (values.password.length < 4) {
-      return "비밀번호는 4자 이상 입력해 주세요.";
+    if (values.password.length < SIGNUP_PASSWORD_MIN_LENGTH) {
+      return `비밀번호는 ${SIGNUP_PASSWORD_MIN_LENGTH}자 이상 입력해 주세요.`;
     }
 
-    if (values.password.length > 20) {
-      return "비밀번호는 20자 이하로 입력해 주세요.";
+    if (values.password.length > SIGNUP_PASSWORD_MAX_LENGTH) {
+      return `비밀번호는 ${SIGNUP_PASSWORD_MAX_LENGTH}자 이하로 입력해 주세요.`;
     }
   }
 
@@ -84,4 +88,8 @@ export function validateSignupForm(values: SignupFormValues): SignupFormErrors {
     },
     {},
   );
+}
+
+export function isSignupFormValid(values: SignupFormValues): boolean {
+  return Object.keys(validateSignupForm(values)).length === 0;
 }

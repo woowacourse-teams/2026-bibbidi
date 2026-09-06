@@ -30,7 +30,7 @@
 @media (max-width: 520px) {
   .brand-header,
   .brand-header__inner {
-    min-height: 72px;
+    min-height: 96px;
   }
 
   .brand-header__inner {
