@@ -184,11 +184,67 @@ describe("createPreparationRoadmapViewModel", () => {
       title: "step-1 제목",
     });
     expect(viewModel.selectedStepDetail).toEqual({
+      allTasks: [
+        {
+          id: "step-1-task",
+          isEssential: false,
+          title: "step-1 할 일",
+        },
+      ],
+      checklistTasks: [],
       description: "step-1 상세 설명",
-      tasks: [{ id: "step-1-task", title: "step-1 할 일" }],
+      detailTasks: [
+        {
+          id: "step-1-task",
+          isEssential: false,
+          title: "step-1 할 일",
+        },
+      ],
       title: "step-1 제목",
     });
     expect(viewModel.title).toBe("준비 로드맵");
+  });
+
+  it("체크리스트 포함 여부와 필수 여부를 단계 상세 표시 데이터로 변환한다", () => {
+    const model = createCatalog([{ id: "step-1", order: 1 }]);
+    model.stepDetails[0].tasks = [
+      {
+        essential: true,
+        id: "included-essential-task",
+        included: true,
+        title: "체크리스트 필수 할 일",
+      },
+      {
+        essential: false,
+        id: "detail-task",
+        included: false,
+        title: "세부 할 일",
+      },
+    ];
+
+    const viewModel = createPreparationRoadmapViewModel(
+      model,
+      "wedding-hall",
+      "step-1",
+    );
+
+    expect(viewModel.selectedStepDetail.checklistTasks).toEqual([
+      {
+        id: "included-essential-task",
+        isEssential: true,
+        title: "체크리스트 필수 할 일",
+      },
+    ]);
+    expect(
+      viewModel.selectedStepDetail.allTasks.map((task) => task.id),
+    ).toEqual(["included-essential-task", "detail-task"]);
+    expect(viewModel.selectedStepDetail.detailTasks).toEqual([
+      {
+        id: "detail-task",
+        isEssential: false,
+        title: "세부 할 일",
+      },
+    ]);
   });
 
   it("로드맵이 없는 카테고리를 표시에서 제외한다", () => {

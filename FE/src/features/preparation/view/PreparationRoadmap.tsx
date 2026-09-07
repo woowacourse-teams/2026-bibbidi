@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepDetail } from "./PreparationStepDetail";
+import { PreparationStepChecklist } from "./PreparationStepChecklist";
 import "./PreparationRoadmap.css";
 
 const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
@@ -184,7 +185,15 @@ export function PreparationRoadmap({
         </div>
 
         {!isMobileLayout ? (
-          <PreparationStepDetail detail={viewModel.selectedStepDetail} />
+          <div className="preparation-roadmap__sidebar">
+            <PreparationStepChecklist
+              tasks={viewModel.selectedStepDetail.checklistTasks}
+            />
+            <PreparationStepDetail
+              detail={viewModel.selectedStepDetail}
+              showsTaskActions
+            />
+          </div>
         ) : null}
       </section>
     </div>
