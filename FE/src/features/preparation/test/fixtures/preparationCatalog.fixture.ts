@@ -42,7 +42,20 @@ export const preparationCatalogFixture = {
     {
       description: "웨딩홀을 둘러보고 계약해요.",
       stepId: "step-1",
-      tasks: [{ id: "catalog-item-1", title: "웨딩홀 투어" }],
+      tasks: [
+        {
+          essential: true,
+          id: "catalog-item-1",
+          included: true,
+          title: "웨딩홀 투어",
+        },
+        {
+          essential: false,
+          id: "catalog-item-1-2",
+          included: false,
+          title: "웨딩홀 견적 비교",
+        },
+      ],
     },
     {
       description: "예식 형태와 식순을 정해요.",

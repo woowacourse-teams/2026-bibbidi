@@ -318,6 +318,40 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         pressed: true,
       }),
     ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "이 단계의 체크리스트" }),
+    ).toBeTruthy();
+    expect(screen.getByText("웨딩홀 투어")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", {
+          name: "웨딩홀 견적 비교 추가 (준비 중)",
+        })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(screen.getByText("필수")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "모든 할 일 추가 (준비 중)" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(screen.getByText("1개")).toBeTruthy();
+  });
+
+  it("데스크톱에서 선택한 단계의 체크리스트가 비어 있으면 안내한다", async () => {
+    setViewportMatches(false);
+    await renderFeature();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /02.*예식 형태·식순·입장 방식 결정/,
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "이 단계의 체크리스트" }),
+    ).toBeTruthy();
+    expect(screen.getByText("이 단계에 추가한 할 일이 없어요.")).toBeTruthy();
   });
 
   it("단계 카드에는 중복되는 상세 설명을 표시하지 않는다", async () => {
@@ -370,6 +404,23 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         pressed: true,
       }),
     ).toBeTruthy();
+  });
+
+  it("모바일 단계 상세에는 Web 체크리스트와 추가 버튼을 표시하지 않는다", async () => {
+    setViewportMatches();
+    await renderFeature();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /01.*웨딩홀 투어와 계약/,
+      }),
+    );
+
+    expect(
+      screen.queryByRole("heading", { name: "이 단계의 체크리스트" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /추가/ })).toBeNull();
+    expect(screen.getByText("웨딩홀 투어")).toBeTruthy();
   });
 
   it("모바일에서는 선택한 단계 카드를 상세 패널로 교체한다", async () => {

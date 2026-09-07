@@ -30,11 +30,16 @@ export interface PreparationRoadmapViewModel {
 }
 
 export interface PreparationStepDetailViewModel {
+  allTasks: PreparationStepTaskViewModel[];
+  checklistTasks: PreparationStepTaskViewModel[];
   description: string;
-  tasks: {
-    id: string;
-    title: string;
-  }[];
+  detailTasks: PreparationStepTaskViewModel[];
+  title: string;
+}
+
+export interface PreparationStepTaskViewModel {
+  id: string;
+  isEssential: boolean;
   title: string;
 }
 
@@ -172,9 +177,33 @@ function createSelectedStepDetailViewModel(
     throw new Error("준비 로드맵의 선택 단계 상세 데이터가 올바르지 않습니다.");
   }
 
+  const tasks = selectedDetail.tasks.reduce<{
+    allTasks: PreparationStepTaskViewModel[];
+    checklistTasks: PreparationStepTaskViewModel[];
+    detailTasks: PreparationStepTaskViewModel[];
+  }>(
+    (result, task) => {
+      const taskViewModel = {
+        id: task.id,
+        isEssential: task.essential ?? false,
+        title: task.title,
+      };
+
+      result.allTasks.push(taskViewModel);
+      (task.included ? result.checklistTasks : result.detailTasks).push(
+        taskViewModel,
+      );
+
+      return result;
+    },
+    { allTasks: [], checklistTasks: [], detailTasks: [] },
+  );
+
   return {
+    allTasks: tasks.allTasks,
+    checklistTasks: tasks.checklistTasks,
     description: selectedDetail.description,
-    tasks: selectedDetail.tasks,
+    detailTasks: tasks.detailTasks,
     title: selectedStep.title,
   } satisfies PreparationStepDetailViewModel;
 }
