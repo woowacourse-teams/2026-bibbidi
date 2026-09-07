@@ -47,7 +47,7 @@ class UserControllerIntegrationTest {
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
     private static final String CURRENT_USER_DESCRIPTION =
             "현재 인증 Session의 사용자 ID로 계정 정보를 조회합니다. "
-                    + "Session이 없거나 Session 사용자가 존재하지 않으면 인증 필요 오류를 반환합니다.";
+                    + "Session이 없으면 인증 필요 오류를, DB에 사용자가 없으면 사용자 없음 오류를 반환합니다.";
     private static final String CHANGE_NICKNAME_DESCRIPTION = "현재 인증 Session의 사용자 ID를 유지하면서 로그인에 사용할 닉네임을 변경합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
     private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 닉네임을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
 
@@ -138,14 +138,27 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Session에 존재하지 않는 사용자 ID가 저장되어 있으면 인증 필요 오류를 반환한다")
-    void shouldRequireAuthenticationWhenSessionUserDoesNotExist() throws Exception {
+    @DisplayName("Session에 저장된 사용자 ID가 DB에 없으면 사용자 없음 오류를 반환한다")
+    void shouldReturnUserNotFoundWhenSessionUserDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/users/me")
                         .session(authenticatedSession(Long.MAX_VALUE)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value(201))
-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
-                .andExpect(jsonPath("$.status").doesNotExist());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(301))
+                .andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andDo(document(
+                        "users-find-me-user-not-found",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 정보 조회")
+                                .description(CURRENT_USER_DESCRIPTION)
+                                .responseSchema(schema("ErrorResponse"))
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
     }
 
     @Test

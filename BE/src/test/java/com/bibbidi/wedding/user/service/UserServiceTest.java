@@ -53,8 +53,8 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("현재 사용자 정보 조회에서 Session 사용자가 없으면 인증 필요 오류를 반환한다")
-    void shouldRequireAuthenticationWhenFindingMissingCurrentUser() {
+    @DisplayName("현재 사용자 정보 조회 시 DB에 사용자가 없으면 사용자 없음 오류를 유지한다")
+    void shouldKeepUserNotFoundWhenFindingMissingCurrentUser() {
         given(userRepository.findById(1L)).willThrow(
                 new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
         );
@@ -62,7 +62,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.findCurrentUserInfo(1L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+                .isEqualTo(ClientError.USER_NOT_FOUND);
     }
 
     @Test
@@ -110,8 +110,8 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Session의 사용자 ID로 사용자를 찾을 수 없으면 인증 필요 오류를 반환한다")
-    void shouldRequireAuthenticationWhenSessionUserDoesNotExist() {
+    @DisplayName("Session의 사용자 ID로 DB에서 사용자를 찾을 수 없으면 사용자 없음 오류를 유지한다")
+    void shouldKeepUserNotFoundWhenSessionUserDoesNotExist() {
         given(userRepository.findById(1L)).willThrow(
                 new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
         );
@@ -119,7 +119,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.changeNickname(1L, "new-name"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+                .isEqualTo(ClientError.USER_NOT_FOUND);
     }
 
     @Test

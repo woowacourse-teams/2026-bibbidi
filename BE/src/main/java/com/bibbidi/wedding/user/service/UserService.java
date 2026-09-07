@@ -52,18 +52,18 @@ public class UserService {
     }
 
     public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
-        User user = findCurrentUser(currentUserId);
+        User user = userRepository.findById(currentUserId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
     public UserResult findCurrentUserInfo(Long currentUserId) {
-        User user = findCurrentUser(currentUserId);
+        User user = userRepository.findById(currentUserId);
         return UserResult.from(user);
     }
 
     @Transactional
     public void changePasswordHash(Long currentUserId, String passwordHash) {
-        User user = findCurrentUser(currentUserId);
+        User user = userRepository.findById(currentUserId);
         User changedUser = user.changePasswordHash(passwordHash);
         userRepository.save(changedUser);
     }
@@ -76,7 +76,7 @@ public class UserService {
 
     @Transactional
     public UserResult changeNickname(Long currentUserId, String nickname) {
-        User user = findCurrentUser(currentUserId);
+        User user = userRepository.findById(currentUserId);
 
         if (user.nickname().equals(nickname)) {
             return UserResult.from(user);
@@ -92,23 +92,5 @@ public class UserService {
                     "이미 사용 중인 닉네임입니다. nickname=" + nickname
             );
         }
-    }
-
-    private User findCurrentUser(Long currentUserId) {
-        try {
-            return userRepository.findById(currentUserId);
-        } catch (BusinessException exception) {
-            if (exception.clientError() != ClientError.USER_NOT_FOUND) {
-                throw exception;
-            }
-            throw authenticationRequired(currentUserId);
-        }
-    }
-
-    private BusinessException authenticationRequired(Long currentUserId) {
-        return new BusinessException(
-                ClientError.AUTHENTICATION_REQUIRED,
-                "Session 사용자 조회에 실패했습니다. userId=" + currentUserId
-        );
     }
 }
