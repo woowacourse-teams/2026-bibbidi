@@ -9,6 +9,7 @@ import { AppHeader } from "./AppHeader";
 function renderHeader(
   user:
     | { kind: "guest" }
+    | { kind: "pending" }
     | { kind: "authenticated"; summary: ReactNode; userInitial: string },
   path = "/",
 ) {
@@ -31,6 +32,15 @@ describe("AppHeader", () => {
       screen.getByRole("link", { name: "회원가입" }).getAttribute("href"),
     ).toBe("/signup");
     expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
+  });
+
+  it("인증 확인 중에는 계정 메뉴 대신 자리를 유지한다", () => {
+    renderHeader({ kind: "pending" });
+
+    expect(
+      screen.getByRole("status", { name: "로그인 상태 확인 중" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "계정 메뉴" })).toBeNull();
   });
 
   it("로그인 사용자에게 요약과 사용자 정보를 표시한다", () => {

@@ -87,7 +87,6 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
 
     setSubmissionStatus("success");
     onSuccess?.({
-      userId: result.userId,
       nickname: result.nickname,
     });
   };

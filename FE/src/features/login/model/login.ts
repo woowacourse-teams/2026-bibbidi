@@ -9,7 +9,6 @@ export interface LoginValues {
 }
 
 export interface LoginResult {
-  userId: number;
   nickname: string;
 }
 
