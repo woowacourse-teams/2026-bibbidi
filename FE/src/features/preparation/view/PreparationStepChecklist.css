@@ -36,43 +36,6 @@
   font-weight: 700;
 }
 
-.preparation-step-checklist__list {
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  padding: 8px 0 0;
-  margin: 0;
-  list-style: none;
-  scrollbar-gutter: stable;
-}
-
-.preparation-step-checklist__item {
-  display: flex;
-  min-width: 0;
-  min-height: 48px;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  color: var(--color-fg-neutral);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.preparation-step-checklist__marker {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--color-fg-neutral-muted);
-}
-
-.preparation-step-checklist__item .preparation-task-essential-badge {
-  margin-left: auto;
-}
-
 .preparation-step-checklist--empty {
   display: flex;
   flex-direction: column;
@@ -80,51 +43,4 @@
 
 .preparation-step-checklist--empty .preparation-step-checklist__header {
   border-bottom: 0;
-}
-
-.preparation-step-checklist__empty {
-  display: flex;
-  min-height: 0;
-  overflow-y: auto;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 16px;
-  text-align: center;
-}
-
-.preparation-step-checklist__empty p {
-  margin: 8px 0 0;
-  color: var(--color-fg-neutral-muted);
-  font-size: 14px;
-  line-height: 1.6;
-  word-break: keep-all;
-}
-
-.preparation-step-checklist__empty-icon {
-  display: flex;
-  width: 44px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-  border-radius: 50%;
-  background: var(--color-bg-neutral-weak);
-  color: var(--color-fg-neutral-muted);
-}
-
-.preparation-step-checklist__empty-icon svg {
-  width: 24px;
-  height: 24px;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.preparation-step-checklist__empty h3 {
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.5;
 }

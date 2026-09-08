@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepDetail } from "./PreparationStepDetail";
+import { PreparationStepInlineAccordions } from "./PreparationStepInlineAccordions";
 import { PreparationStepChecklist } from "./PreparationStepChecklist";
 import "./PreparationRoadmap.css";
 
@@ -57,16 +58,17 @@ function PreparationRoadmapSteps({
       {viewModel.steps.map((step) => {
         const showsMobileDetail =
           isMobileLayout && mobileExpandedStepId === step.id;
+        const stepClassName = [
+          "preparation-roadmap__step",
+          `preparation-roadmap__step--${step.numberLabel}`,
+          ...(showsMobileDetail ? ["preparation-roadmap__step--expanded"] : []),
+        ].join(" ");
 
         return (
-          <li
-            className={`preparation-roadmap__step preparation-roadmap__step--${step.numberLabel}`}
-            key={step.id}
-          >
+          <li className={stepClassName} key={step.id}>
             {showsMobileDetail ? (
-              <PreparationStepDetail
+              <PreparationStepInlineAccordions
                 detail={viewModel.selectedStepDetail}
-                focusOnMount
               />
             ) : (
               <button
@@ -189,10 +191,7 @@ export function PreparationRoadmap({
             <PreparationStepChecklist
               tasks={viewModel.selectedStepDetail.checklistTasks}
             />
-            <PreparationStepDetail
-              detail={viewModel.selectedStepDetail}
-              showsTaskActions
-            />
+            <PreparationStepDetail detail={viewModel.selectedStepDetail} />
           </div>
         ) : null}
       </section>
