@@ -80,8 +80,8 @@ interface PreparationStepInlineAccordionsProps {
 export function PreparationStepInlineAccordions({
   detail,
 }: PreparationStepInlineAccordionsProps) {
-  const [expandedValue, setExpandedValue] = useState<AccordionValue | null>(
-    null,
+  const [expandedValues, setExpandedValues] = useState<Set<AccordionValue>>(
+    () => new Set(),
   );
   const detailRef = useRef<HTMLElement>(null);
 
@@ -98,7 +98,17 @@ export function PreparationStepInlineAccordions({
   }, []);
 
   const handleToggle = (value: AccordionValue) => {
-    setExpandedValue((currentValue) => (currentValue === value ? null : value));
+    setExpandedValues((currentValues) => {
+      const nextValues = new Set(currentValues);
+
+      if (nextValues.has(value)) {
+        nextValues.delete(value);
+      } else {
+        nextValues.add(value);
+      }
+
+      return nextValues;
+    });
   };
 
   return (
@@ -116,7 +126,7 @@ export function PreparationStepInlineAccordions({
       </header>
       <PreparationTaskAccordion
         count={detail.checklistTasks.length}
-        isExpanded={expandedValue === "checklist"}
+        isExpanded={expandedValues.has("checklist")}
         onToggle={() => handleToggle("checklist")}
         title="내 체크리스트"
       >
@@ -127,7 +137,7 @@ export function PreparationStepInlineAccordions({
         />
       </PreparationTaskAccordion>
       <PreparationTaskAccordion
-        isExpanded={expandedValue === "available-tasks"}
+        isExpanded={expandedValues.has("available-tasks")}
         onToggle={() => handleToggle("available-tasks")}
         title="추가할 수 있는 할 일"
       >

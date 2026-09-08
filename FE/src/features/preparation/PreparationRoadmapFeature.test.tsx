@@ -447,7 +447,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeNull();
   });
 
-  it("모바일에서는 한 번에 하나의 아코디언만 펼친다", async () => {
+  it("모바일에서는 두 아코디언을 동시에 펼칠 수 있다", async () => {
     setViewportMatches();
     await renderFeature();
     fireEvent.click(
@@ -475,14 +475,14 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     fireEvent.click(availableTasksTrigger);
 
-    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("true");
     expect(availableTasksTrigger.getAttribute("aria-expanded")).toBe("true");
     expect(
       screen
         .getByText("웨딩홀 투어")
         .closest("[role='region']")
         ?.hasAttribute("hidden"),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       screen
         .getByRole("button", {
@@ -497,6 +497,11 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         })
         .hasAttribute("disabled"),
     ).toBe(true);
+
+    fireEvent.click(checklistTrigger);
+
+    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(availableTasksTrigger.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("모바일 아코디언에서도 빈 목록을 안내한다", async () => {
