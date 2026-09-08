@@ -1,0 +1,187 @@
+.preparation-step-bottom-sheet {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .preparation-step-bottom-sheet {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    display: block;
+  }
+
+  .preparation-step-bottom-sheet__scrim {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: rgb(23 23 23 / 40%);
+  }
+
+  .preparation-step-bottom-sheet__dialog {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: 100%;
+    max-width: 480px;
+    height: min(732px, 90dvh);
+    max-height: 90dvh;
+    min-height: 0;
+    overflow: hidden;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 16px max(20px, env(safe-area-inset-bottom));
+    margin: 0 auto;
+    border-radius: 24px 24px 0 0;
+    outline: none;
+    background: var(--color-bg-layer-default);
+    box-shadow: 0 -8px 32px -8px rgb(0 0 0 / 18%);
+  }
+
+  .preparation-step-bottom-sheet__handle-area {
+    display: flex;
+    height: 16px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preparation-step-bottom-sheet__handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-stroke-neutral-weak);
+  }
+
+  .preparation-step-bottom-sheet__header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .preparation-step-bottom-sheet__title-group {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .preparation-step-bottom-sheet__header h2 {
+    margin: 0;
+    color: var(--color-fg-neutral);
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .preparation-step-bottom-sheet__header p {
+    margin: 0;
+    color: var(--color-fg-neutral-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .preparation-step-bottom-sheet__close {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    place-items: center;
+    background: var(--color-bg-neutral-weak);
+    color: var(--color-fg-neutral-muted);
+    cursor: pointer;
+  }
+
+  .preparation-step-bottom-sheet__close svg {
+    width: 19px;
+    height: 19px;
+    stroke: currentcolor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+  }
+
+  .preparation-step-bottom-sheet__close:focus-visible,
+  .preparation-step-bottom-sheet__scrim:focus-visible {
+    outline: 3px solid var(--color-stroke-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .preparation-step-bottom-sheet__content {
+    display: grid;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 2px;
+    flex: 1;
+    grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 12px;
+  }
+
+  .preparation-step-bottom-sheet__section {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    flex-direction: column;
+    border: 1px solid var(--color-stroke-neutral-weak);
+    border-radius: 14px;
+    background: var(--color-bg-layer-default);
+  }
+
+  .preparation-step-bottom-sheet__section-header {
+    display: flex;
+    min-height: 48px;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  }
+
+  .preparation-step-bottom-sheet__section-header h3 {
+    margin: 0;
+    color: var(--color-fg-neutral);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .preparation-step-bottom-sheet__count {
+    display: inline-flex;
+    height: 24px;
+    flex: none;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--color-bg-neutral-weak);
+    color: var(--color-fg-neutral-muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .preparation-step-bottom-sheet .preparation-task-list--scrollable {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .preparation-step-bottom-sheet .preparation-task-list__item {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .preparation-step-bottom-sheet__footer {
+    flex: none;
+    padding: 10px 14px 12px;
+    border-top: 1px solid var(--color-stroke-neutral-weak);
+  }
+}

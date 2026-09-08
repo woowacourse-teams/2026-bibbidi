@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
+import { PreparationStepBottomSheet } from "./PreparationStepBottomSheet";
 import { PreparationStepDetail } from "./PreparationStepDetail";
-import { PreparationStepInlineAccordions } from "./PreparationStepInlineAccordions";
 import { PreparationStepChecklist } from "./PreparationStepChecklist";
 import "./PreparationRoadmap.css";
 
@@ -41,64 +41,51 @@ interface PreparationRoadmapProps {
 }
 
 interface PreparationRoadmapStepsProps {
-  isMobileLayout: boolean;
-  mobileExpandedStepId: string | null;
   onStepSelect: (stepId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
 function PreparationRoadmapSteps({
-  isMobileLayout,
-  mobileExpandedStepId,
   onStepSelect,
   viewModel,
 }: PreparationRoadmapStepsProps) {
   return (
     <ol className="preparation-roadmap__steps">
       {viewModel.steps.map((step) => {
-        const showsMobileDetail =
-          isMobileLayout && mobileExpandedStepId === step.id;
         const stepClassName = [
           "preparation-roadmap__step",
           `preparation-roadmap__step--${step.numberLabel}`,
-          ...(showsMobileDetail ? ["preparation-roadmap__step--expanded"] : []),
         ].join(" ");
 
         return (
           <li className={stepClassName} key={step.id}>
-            {showsMobileDetail ? (
-              <PreparationStepInlineAccordions
-                detail={viewModel.selectedStepDetail}
-              />
-            ) : (
-              <button
-                aria-controls="preparation-step-detail"
-                aria-label={`${step.numberLabel} ${step.title}`}
-                aria-pressed={step.isSelected}
-                className="preparation-roadmap__step-button"
-                onClick={() => onStepSelect(step.id)}
-                type="button"
-              >
-                <span className="preparation-roadmap__step-header">
-                  <span className="preparation-roadmap__step-number">
-                    {step.numberLabel}
-                  </span>
+            <button
+              aria-controls="preparation-step-detail"
+              aria-label={`${step.numberLabel} ${step.title}`}
+              aria-pressed={step.isSelected}
+              className="preparation-roadmap__step-button"
+              onClick={() => onStepSelect(step.id)}
+              type="button"
+            >
+              <span className="preparation-roadmap__step-header">
+                <span className="preparation-roadmap__step-number">
+                  {step.numberLabel}
                 </span>
-                <span className="preparation-roadmap__step-title">
-                  {step.title}
-                </span>
-                {step.iconUrl ? (
-                  <img
-                    alt=""
-                    className="preparation-roadmap__step-icon"
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                    }}
-                    src={step.iconUrl}
-                  />
-                ) : null}
-              </button>
-            )}
+              </span>
+              <span className="preparation-roadmap__step-title">
+                {step.title}
+              </span>
+              {step.iconUrl ? (
+                <img
+                  alt=""
+                  className="preparation-roadmap__step-icon"
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                  src={step.iconUrl}
+                />
+              ) : null}
+            </button>
           </li>
         );
       })}
@@ -112,9 +99,7 @@ export function PreparationRoadmap({
   viewModel,
 }: PreparationRoadmapProps) {
   const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
-  const [mobileExpandedStepId, setMobileExpandedStepId] = useState<
-    string | null
-  >(null);
+  const [mobileOpenStepId, setMobileOpenStepId] = useState<string | null>(null);
 
   const handleCategorySelect = (categoryId: string) => {
     const changesCategory = viewModel.categories.some(
@@ -122,7 +107,7 @@ export function PreparationRoadmap({
     );
 
     if (changesCategory) {
-      setMobileExpandedStepId(null);
+      setMobileOpenStepId(null);
     }
 
     onCategorySelect(categoryId);
@@ -135,7 +120,7 @@ export function PreparationRoadmap({
       return;
     }
 
-    setMobileExpandedStepId(isMobileLayout ? stepId : null);
+    setMobileOpenStepId(isMobileLayout ? stepId : null);
     onStepSelect(stepId);
   };
 
@@ -178,8 +163,6 @@ export function PreparationRoadmap({
 
           <div className="preparation-roadmap__grid-wrap">
             <PreparationRoadmapSteps
-              isMobileLayout={isMobileLayout}
-              mobileExpandedStepId={mobileExpandedStepId}
               onStepSelect={handleStepSelect}
               viewModel={viewModel}
             />
@@ -195,6 +178,13 @@ export function PreparationRoadmap({
           </div>
         ) : null}
       </section>
+      {isMobileLayout && mobileOpenStepId ? (
+        <PreparationStepBottomSheet
+          detail={viewModel.selectedStepDetail}
+          key={mobileOpenStepId}
+          onClose={() => setMobileOpenStepId(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -27,7 +27,11 @@ export function ServiceLayout() {
         }}
       />
 
-      <div className="service-layout__content" ref={contentRef}>
+      <div
+        className="service-layout__content"
+        data-page-scroll-container
+        ref={contentRef}
+      >
         <Outlet />
       </div>
 
