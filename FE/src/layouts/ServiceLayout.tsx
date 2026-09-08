@@ -29,7 +29,9 @@ export function ServiceLayout() {
                 summary: <AppHeaderSummaryFeature />,
                 userInitial: authState.user.nickname.charAt(0),
               }
-            : { kind: "guest" }
+            : authState.status === "guest"
+              ? { kind: "guest" }
+              : { kind: "pending" }
         }
       />
 

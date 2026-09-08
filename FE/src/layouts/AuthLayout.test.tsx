@@ -33,6 +33,9 @@ describe("AuthLayout", () => {
       </AuthProvider>,
     );
 
+    expect(screen.getByRole("status").textContent).toBe(
+      "로그인 상태를 확인하고 있습니다.",
+    );
     expect(
       await screen.findByRole("heading", { name: "홈 페이지" }),
     ).toBeTruthy();

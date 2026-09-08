@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,45 @@ afterEach(() => {
 });
 
 describe("ServiceLayout", () => {
+  it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
+    let resolveCurrentUser: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveCurrentUser = resolve;
+          }),
+      ),
+    );
+
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <Routes>
+            <Route element={<ServiceLayout />}>
+              <Route path="/" element={<div>홈 화면</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "로그인 상태 확인 중" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "계정 메뉴" })).toBeNull();
+
+    await act(async () => {
+      resolveCurrentUser(
+        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+      );
+    });
+
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+  });
+
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
     vi.stubGlobal(
       "fetch",

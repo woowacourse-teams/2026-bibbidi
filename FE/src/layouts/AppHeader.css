@@ -81,27 +81,59 @@
 
 .app-header__guest-actions {
   flex: none;
-  gap: 8px;
+  gap: 0;
+}
+
+.app-header__auth-pending {
+  width: 128px;
+  height: 36px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--color-bg-neutral-weak);
+}
+
+.app-header__auth-pending-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .app-header__login,
 .app-header__signup {
+  position: relative;
   display: inline-flex;
-  min-width: 64px;
-  height: 40px;
+  min-width: auto;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  color: var(--color-fg-neutral);
+  padding: 0 12px;
+  border-radius: 6px;
+  color: var(--color-fg-neutral-muted);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
 }
 
-.app-header__signup {
-  padding: 0 14px;
-  background: var(--color-bg-brand-solid);
-  color: var(--color-fg-on-brand);
+.app-header__login:hover,
+.app-header__signup:hover {
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral);
+}
+
+.app-header__signup::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 14px;
+  background: var(--color-stroke-neutral-weak);
+  content: "";
+  transform: translateY(-50%);
 }
 
 .app-header a:focus-visible {
@@ -141,9 +173,8 @@
     height: 36px;
   }
 
-  .app-header__login,
-  .app-header__signup {
-    height: 36px;
+  .app-header__auth-pending {
+    width: 108px;
   }
 }
 
@@ -152,14 +183,9 @@
     width: calc(100% - 24px);
   }
 
-  .app-header__guest-actions {
-    gap: 2px;
-  }
-
   .app-header__login,
   .app-header__signup {
-    min-width: auto;
-    padding: 0 10px;
+    padding: 0 9px;
     font-size: 13px;
   }
 }

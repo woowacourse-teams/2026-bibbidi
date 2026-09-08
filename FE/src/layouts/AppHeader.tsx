@@ -15,8 +15,12 @@ interface GuestUser {
   kind: "guest";
 }
 
+interface PendingUser {
+  kind: "pending";
+}
+
 interface AppHeaderProps {
-  user: AuthenticatedUser | GuestUser;
+  user: AuthenticatedUser | GuestUser | PendingUser;
 }
 
 export function AppHeader({ user }: AppHeaderProps) {
@@ -51,7 +55,7 @@ export function AppHeader({ user }: AppHeaderProps) {
               {user.userInitial}
             </span>
           </div>
-        ) : (
+        ) : user.kind === "guest" ? (
           <nav aria-label="계정 메뉴" className="app-header__guest-actions">
             <NavLink className="app-header__login" to="/login">
               로그인
@@ -60,6 +64,16 @@ export function AppHeader({ user }: AppHeaderProps) {
               회원가입
             </NavLink>
           </nav>
+        ) : (
+          <div
+            aria-label="로그인 상태 확인 중"
+            className="app-header__auth-pending"
+            role="status"
+          >
+            <span className="app-header__auth-pending-text">
+              로그인 상태 확인 중
+            </span>
+          </div>
         )}
       </div>
     </header>

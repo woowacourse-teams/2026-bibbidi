@@ -16,7 +16,11 @@ export function AuthLayout() {
       <BrandHeader />
 
       <main className="auth-page">
-        <Outlet />
+        {authState.status === "loading" ? (
+          <p role="status">로그인 상태를 확인하고 있습니다.</p>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );

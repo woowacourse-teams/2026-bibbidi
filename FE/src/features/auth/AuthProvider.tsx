@@ -80,13 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   let content = children;
 
-  if (authState.status === "loading") {
-    content = (
-      <main aria-busy="true">
-        <p role="status">로그인 상태를 확인하고 있습니다.</p>
-      </main>
-    );
-  } else if (authState.status === "error") {
+  if (authState.status === "error") {
     content = (
       <main>
         <p role="alert">로그인 상태를 확인하지 못했습니다.</p>

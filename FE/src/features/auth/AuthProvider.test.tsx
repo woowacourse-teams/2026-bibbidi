@@ -34,9 +34,7 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(screen.getByRole("status").textContent).toBe(
-      "로그인 상태를 확인하고 있습니다.",
-    );
+    expect(screen.getByText("loading")).toBeTruthy();
     expect(await screen.findByText("로그인 사용자 bibbidi")).toBeTruthy();
   });
 
