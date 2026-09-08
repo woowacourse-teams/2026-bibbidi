@@ -10,7 +10,7 @@ afterEach(() => {
 describe("login", () => {
   it("세션 쿠키를 포함하도록 로그인 요청을 전송한다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ userId: 3, nickname: "bibbidi" }), {
+      new Response(JSON.stringify({ nickname: "bibbidi" }), {
         status: 200,
       }),
     );
@@ -18,7 +18,7 @@ describe("login", () => {
 
     await expect(
       login({ nickname: "bibbidi", password: "wish" }),
-    ).resolves.toEqual({ userId: 3, nickname: "bibbidi" });
+    ).resolves.toEqual({ nickname: "bibbidi" });
     expect(fetchMock).toHaveBeenCalledWith("/api/login", {
       body: JSON.stringify({ nickname: "bibbidi", password: "wish" }),
       credentials: "include",

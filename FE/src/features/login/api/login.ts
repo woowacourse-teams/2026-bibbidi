@@ -5,7 +5,6 @@ const LOGIN_ENDPOINT = `${apiBaseUrl}/api/login`;
 const LOGIN_TIMEOUT_MS = 10_000;
 
 interface LoginResponse {
-  userId: number;
   nickname: string;
 }
 
@@ -39,11 +38,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isLoginResponse(value: unknown): value is LoginResponse {
-  return (
-    isRecord(value) &&
-    typeof value.userId === "number" &&
-    typeof value.nickname === "string"
-  );
+  return isRecord(value) && typeof value.nickname === "string";
 }
 
 function toApiError(response: Response, body: unknown): LoginApiError {
@@ -119,7 +114,6 @@ export async function login(values: LoginValues): Promise<LoginResult> {
     }
 
     return {
-      userId: body.userId,
       nickname: body.nickname,
     };
   } finally {

@@ -2,12 +2,14 @@ import { useLayoutEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
+import { useAuth } from "../features/auth";
 import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
 
 export function ServiceLayout() {
+  const { authState } = useAuth();
   const { pathname } = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -20,11 +22,15 @@ export function ServiceLayout() {
   return (
     <div className="service-layout">
       <AppHeader
-        user={{
-          kind: "authenticated",
-          summary: <AppHeaderSummaryFeature />,
-          userInitial: "나",
-        }}
+        user={
+          authState.status === "authenticated"
+            ? {
+                kind: "authenticated",
+                summary: <AppHeaderSummaryFeature />,
+                userInitial: authState.user.nickname.charAt(0),
+              }
+            : { kind: "guest" }
+        }
       />
 
       <div
