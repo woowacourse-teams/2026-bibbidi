@@ -1,0 +1,206 @@
+.preparation-task-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.preparation-task-list--checklist {
+  padding-top: 8px;
+}
+
+.preparation-task-list--scrollable {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.preparation-task-list__item {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--color-fg-neutral);
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.preparation-task-list--checklist .preparation-task-list__item {
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.preparation-task-list--regular .preparation-task-list__item {
+  font-size: 14px;
+}
+
+.preparation-task-list--compact .preparation-task-list__item {
+  gap: 10px;
+  font-size: 13px;
+}
+
+.preparation-task-list--compact.preparation-task-list--checklist
+  .preparation-task-list__item {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.preparation-task-list__marker {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.preparation-task-list__marker--checklist {
+  background: var(--color-fg-neutral-muted);
+}
+
+.preparation-task-list__marker--available {
+  background: var(--color-bg-brand-solid);
+}
+
+.preparation-task-list__title {
+  min-width: 0;
+  flex: 1;
+}
+
+.preparation-task-list__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.preparation-task-essential-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.preparation-task-list--compact .preparation-task-essential-badge {
+  font-size: 11px;
+}
+
+.preparation-task-list__add {
+  min-width: 52px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-stroke-brand-solid);
+  border-radius: 8px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.preparation-task-list--compact .preparation-task-list__add {
+  min-width: auto;
+  min-height: 30px;
+  padding: 0 10px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.preparation-task-list__empty {
+  margin: 0;
+  padding: 12px 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.preparation-task-list__empty--compact {
+  padding-bottom: 4px;
+  font-size: 13px;
+}
+
+.preparation-task-list__empty-checklist {
+  display: flex;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.preparation-task-list__empty-checklist--compact {
+  overflow: visible;
+  padding: 12px 0 4px;
+}
+
+.preparation-task-list__empty-checklist p {
+  margin: 8px 0 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.preparation-task-list__empty-checklist--compact p {
+  font-size: 13px;
+}
+
+.preparation-task-list__empty-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+}
+
+.preparation-task-list__empty-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.preparation-task-list__empty-checklist h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.preparation-task-list__add-all {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.preparation-task-list__add-all--large {
+  min-height: 48px;
+  border-radius: 12px;
+}
+
+.preparation-task-list__add:disabled,
+.preparation-task-list__add-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

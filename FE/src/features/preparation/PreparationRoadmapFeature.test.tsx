@@ -406,7 +406,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeTruthy();
   });
 
-  it("모바일 단계 상세에는 Web 체크리스트와 추가 버튼을 표시하지 않는다", async () => {
+  it("모바일 단계 상세의 두 아코디언은 모두 접힌 상태로 시작한다", async () => {
     setViewportMatches();
     await renderFeature();
 
@@ -416,11 +416,105 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       }),
     );
 
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
+    });
+    const checklistTrigger = screen.getByRole("button", {
+      name: /내 체크리스트.*1개/,
+    });
+    const availableTasksTrigger = screen.getByRole("button", {
+      name: "추가할 수 있는 할 일",
+    });
+
     expect(
-      screen.queryByRole("heading", { name: "이 단계의 체크리스트" }),
+      within(detail).getByRole("heading", { name: "웨딩홀 투어와 계약" }),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByText("웨딩홀을 둘러보고 계약해요."),
+    ).toBeTruthy();
+    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(availableTasksTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      screen
+        .getByText("웨딩홀 투어")
+        .closest("[role='region']")
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(
+      screen.queryByRole("button", {
+        name: "남은 할 일 모두 추가 (준비 중)",
+      }),
     ).toBeNull();
-    expect(screen.queryByRole("button", { name: /추가/ })).toBeNull();
-    expect(screen.getByText("웨딩홀 투어")).toBeTruthy();
+  });
+
+  it("모바일에서는 한 번에 하나의 아코디언만 펼친다", async () => {
+    setViewportMatches();
+    await renderFeature();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /01.*웨딩홀 투어와 계약/,
+      }),
+    );
+
+    const checklistTrigger = screen.getByRole("button", {
+      name: /내 체크리스트.*1개/,
+    });
+    const availableTasksTrigger = screen.getByRole("button", {
+      name: "추가할 수 있는 할 일",
+    });
+
+    fireEvent.click(checklistTrigger);
+
+    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      screen
+        .getByText("웨딩홀 투어")
+        .closest("[role='region']")
+        ?.hasAttribute("hidden"),
+    ).toBe(false);
+
+    fireEvent.click(availableTasksTrigger);
+
+    expect(checklistTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(availableTasksTrigger.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      screen
+        .getByText("웨딩홀 투어")
+        .closest("[role='region']")
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("button", {
+          name: "웨딩홀 견적 비교 추가 (준비 중)",
+        })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("button", {
+          name: "남은 할 일 모두 추가 (준비 중)",
+        })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("모바일 아코디언에서도 빈 목록을 안내한다", async () => {
+    setViewportMatches();
+    await renderFeature();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /02.*예식 형태·식순·입장 방식 결정/,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /내 체크리스트.*0개/,
+      }),
+    );
+
+    expect(screen.getByText("이 단계에 추가한 할 일이 없어요.")).toBeTruthy();
   });
 
   it("모바일에서는 선택한 단계 카드를 상세 패널로 교체한다", async () => {
