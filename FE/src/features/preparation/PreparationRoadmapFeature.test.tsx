@@ -318,12 +318,15 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         name: "이 단계에서 준비할 일",
       }),
     ).toBeTruthy();
-    expect(
-      screen.getByRole("button", {
-        name: /01.*웨딩홀 투어와 계약/,
-        pressed: true,
-      }),
-    ).toBeTruthy();
+    const selectedStep = screen.getByRole("button", {
+      name: /01.*웨딩홀 투어와 계약/,
+      pressed: true,
+    });
+
+    expect(selectedStep.getAttribute("aria-controls")).toBe(
+      "preparation-step-detail",
+    );
+    expect(selectedStep.hasAttribute("aria-haspopup")).toBe(false);
     expect(
       screen.getByRole("heading", { name: "이 단계의 체크리스트" }),
     ).toBeTruthy();
@@ -404,12 +407,13 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         name: "이 단계에서 준비할 일",
       }),
     ).toBeNull();
-    expect(
-      screen.getByRole("button", {
-        name: /01.*웨딩홀 투어와 계약/,
-        pressed: true,
-      }),
-    ).toBeTruthy();
+    const selectedStep = screen.getByRole("button", {
+      name: /01.*웨딩홀 투어와 계약/,
+      pressed: true,
+    });
+
+    expect(selectedStep.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(selectedStep.hasAttribute("aria-controls")).toBe(false);
   });
 
   it("모바일 바텀시트에서 웹과 같은 상세 목록을 바로 표시한다", async () => {

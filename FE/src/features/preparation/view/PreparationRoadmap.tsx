@@ -41,11 +41,13 @@ interface PreparationRoadmapProps {
 }
 
 interface PreparationRoadmapStepsProps {
+  isMobileLayout: boolean;
   onStepSelect: (stepId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
 function PreparationRoadmapSteps({
+  isMobileLayout,
   onStepSelect,
   viewModel,
 }: PreparationRoadmapStepsProps) {
@@ -60,7 +62,10 @@ function PreparationRoadmapSteps({
         return (
           <li className={stepClassName} key={step.id}>
             <button
-              aria-controls="preparation-step-detail"
+              aria-controls={
+                isMobileLayout ? undefined : "preparation-step-detail"
+              }
+              aria-haspopup={isMobileLayout ? "dialog" : undefined}
               aria-label={`${step.numberLabel} ${step.title}`}
               aria-pressed={step.isSelected}
               className="preparation-roadmap__step-button"
@@ -163,6 +168,7 @@ export function PreparationRoadmap({
 
           <div className="preparation-roadmap__grid-wrap">
             <PreparationRoadmapSteps
+              isMobileLayout={isMobileLayout}
               onStepSelect={handleStepSelect}
               viewModel={viewModel}
             />
