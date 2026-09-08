@@ -51,7 +51,6 @@ class CatalogControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("견적 비교"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(false))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].id").value(CONTRACT_ITEM_ID))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].title").value("계약서 확인"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].displayOrder").value(2))

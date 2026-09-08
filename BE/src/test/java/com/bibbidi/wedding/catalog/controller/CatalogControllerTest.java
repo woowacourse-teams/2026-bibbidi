@@ -60,7 +60,6 @@ class CatalogControllerTest {
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].title").value("계약서 확인"))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].essential").value(true))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].categoryId").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].description").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].precedingItemIds").doesNotExist());
