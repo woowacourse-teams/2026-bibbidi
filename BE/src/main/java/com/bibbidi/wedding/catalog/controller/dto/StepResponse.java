@@ -12,7 +12,7 @@ public record StepResponse(
         List<ItemResponse> items
 ) {
 
-    public static StepResponse forPublic(Step step) {
+    public static StepResponse from(Step step) {
         return new StepResponse(
                 step.id(),
                 step.name(),
@@ -20,7 +20,7 @@ public record StepResponse(
                 step.iconUrl(),
                 step.displayOrder(),
                 step.items().stream()
-                        .map(ItemResponse::forPublic)
+                        .map(ItemResponse::from)
                         .toList()
         );
     }

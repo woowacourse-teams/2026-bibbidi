@@ -29,8 +29,6 @@ class CatalogControllerIntegrationTest extends BibbidiIntegrationTest {
     private static final String CATALOG_FIND_DESCRIPTION =
             "로그인 없이 조회할 수 있습니다. "
                     + "준비 영역, 단계, 항목을 각각 displayOrder 오름차순으로 반환합니다.";
-    private static final String CATALOG_PUBLIC_SUMMARY = "준비 목록 공개 조회";
-    private static final String CATALOG_PUBLIC_DESCRIPTION = CATALOG_FIND_DESCRIPTION;
 
     @Test
     @DisplayName("준비 목록 조회에 성공한다")
@@ -81,32 +79,6 @@ class CatalogControllerIntegrationTest extends BibbidiIntegrationTest {
                 );
     }
 
-    @Test
-    @DisplayName("로그인하지 않은 사용자가 준비 목록 공개 조회에 성공한다")
-    void shouldFindPublicCatalogWithoutAuthentication() throws Exception {
-        // when & then
-        mockMvc.perform(get("/api/catalog/public"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.categories.length()").value(2))
-                .andExpect(jsonPath("$.categories[0].id").value(WEDDING_HALL_CATEGORY_ID))
-                .andExpect(jsonPath("$.categories[0].steps[0].items.length()").value(2))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(ESTIMATE_ITEM_ID))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
-                .andExpect(jsonPath("$.categories[0].steps[0].items[1].id").value(CONTRACT_ITEM_ID))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[1].included").doesNotExist())
-                .andDo(document(
-                                "catalog-public",
-                                resource(ResourceSnippetParameters.builder()
-                                        .tag("Catalog")
-                                        .summary(CATALOG_PUBLIC_SUMMARY)
-                                        .description(CATALOG_PUBLIC_DESCRIPTION)
-                                        .responseSchema(schema("CatalogResponse"))
-                                        .responseFields(catalogResponseFields())
-                                        .build()
-                                )
-                        )
-                );
-    }
 
     private static FieldDescriptor[] catalogResponseFields() {
         return new FieldDescriptor[]{

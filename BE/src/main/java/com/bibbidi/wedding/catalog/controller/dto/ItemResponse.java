@@ -9,7 +9,7 @@ public record ItemResponse(
         boolean essential
 ) {
 
-    public static ItemResponse forPublic(Item item) {
+    public static ItemResponse from(Item item) {
         return new ItemResponse(
                 item.id(),
                 item.title(),

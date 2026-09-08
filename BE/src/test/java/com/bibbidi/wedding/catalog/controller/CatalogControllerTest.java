@@ -43,7 +43,7 @@ class CatalogControllerTest {
     @DisplayName("준비 목록을 계층 구조로 응답한다")
     void shouldRespondCatalogWithHierarchy() throws Exception {
         // given
-        when(catalogService.findPublicCatalog()).thenReturn(constructTestCatalog());
+        when(catalogService.find()).thenReturn(constructTestCatalog());
 
         // when, then
         mockMvc.perform(get("/api/catalog"))
@@ -66,16 +66,4 @@ class CatalogControllerTest {
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].precedingItemIds").doesNotExist());
     }
 
-    @Test
-    @DisplayName("로그인하지 않아도 준비 목록을 응답한다")
-    void shouldRespondCatalogWithoutAuthentication() throws Exception {
-        // given
-        when(catalogService.findPublicCatalog()).thenReturn(constructTestCatalog());
-
-        // when, then
-        mockMvc.perform(get("/api/catalog/public"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].id").value(100))
-                .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist());
-    }
 }

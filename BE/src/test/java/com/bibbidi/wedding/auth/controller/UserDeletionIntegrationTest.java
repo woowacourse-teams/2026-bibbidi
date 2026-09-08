@@ -86,11 +86,11 @@ class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
                         )
                 );
 
-        mockMvc.perform(get("/api/catalog/public"))
+        mockMvc.perform(get("/api/catalog"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories[0].id").value(CATEGORY_ID));
 
-        mockMvc.perform(get("/api/catalog").session(currentSession))
+        mockMvc.perform(get("/api/checklists/me").session(currentSession))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201));
 

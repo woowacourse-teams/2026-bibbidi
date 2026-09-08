@@ -17,13 +17,7 @@ public class CatalogController {
 
     @GetMapping("/api/catalog")
     public CatalogResponse find() {
-        Catalog catalog = catalogService.findPublicCatalog();
-        return CatalogResponse.forPublic(catalog);
-    }
-
-    @GetMapping("/api/catalog/public")
-    public CatalogResponse findPublicCatalog() {
-        Catalog catalog = catalogService.findPublicCatalog();
-        return CatalogResponse.forPublic(catalog);
+        Catalog catalog = catalogService.find();
+        return CatalogResponse.from(catalog);
     }
 }

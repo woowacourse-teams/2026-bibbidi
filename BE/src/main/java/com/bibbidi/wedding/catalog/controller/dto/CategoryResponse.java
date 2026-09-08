@@ -10,13 +10,13 @@ public record CategoryResponse(
         List<StepResponse> steps
 ) {
 
-    public static CategoryResponse forPublic(Category category) {
+    public static CategoryResponse from(Category category) {
         return new CategoryResponse(
                 category.id(),
                 category.name(),
                 category.displayOrder(),
                 category.steps().stream()
-                        .map(StepResponse::forPublic)
+                        .map(StepResponse::from)
                         .toList()
         );
     }

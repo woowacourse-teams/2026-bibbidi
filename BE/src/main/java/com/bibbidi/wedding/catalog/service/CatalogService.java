@@ -33,7 +33,7 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
-    public Catalog findPublicCatalog() {
+    public Catalog find() {
         return catalogRepository.findCatalog();
     }
 }

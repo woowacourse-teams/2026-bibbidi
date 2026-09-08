@@ -38,10 +38,10 @@ class CatalogServiceTest {
         when(catalogRepository.findCatalog()).thenReturn(catalog);
 
         // when
-        Catalog publicCatalog = catalogService.findPublicCatalog();
+        Catalog found = catalogService.find();
 
         // then
-        assertThat(publicCatalog).isSameAs(catalog);
+        assertThat(found).isSameAs(catalog);
     }
 
     @Test
