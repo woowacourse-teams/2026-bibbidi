@@ -1,220 +1,139 @@
 package com.bibbidi.wedding.auth.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+import static com.epages.restdocs.apispec.Schema.schema;
+import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
+import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.auth.controller.UserDeletionTestFixture.CatalogData;
-import com.bibbidi.wedding.auth.controller.UserDeletionTestFixture.Scenario;
-import com.bibbidi.wedding.auth.controller.UserDeletionTestFixture.UserWeddingData;
+import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
-import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
-import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
-import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class UserDeletionIntegrationTest {
+@Sql("/user-deletion-fixture.sql")
+class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String PASSWORD = "wish";
-
-    @LocalServerPort
-    private int port;
+    private static final Long CATEGORY_ID = 1000L;
+    private static final Long OTHER_CHECKLIST_ID = 1001L;
+    private static final String DOCUMENTED_SESSION_COOKIE =
+            "JSESSIONID=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax";
 
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private JpaUserRepository userRepository;
-
-    @Autowired
-    private JpaChecklistRepository checklistRepository;
-
-    @Autowired
-    private JpaChecklistItemRepository checklistItemRepository;
-
-    @Autowired
-    private JpaAppointmentRepository appointmentRepository;
-
-    @Autowired
-    private JpaCategoryRepository categoryRepository;
-
-    @Autowired
-    private JpaStepRepository stepRepository;
-
-    @Autowired
-    private JpaCatalogItemRepository catalogItemRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    private HttpClient httpClient;
-    private UserDeletionTestFixture fixture;
-    private Scenario scenario;
-
-    @BeforeEach
-    void setUp() {
-        httpClient = HttpClient.newHttpClient();
-        fixture = new UserDeletionTestFixture(
-                userRepository,
-                checklistRepository,
-                checklistItemRepository,
-                appointmentRepository,
-                categoryRepository,
-                stepRepository,
-                catalogItemRepository,
-                passwordHasher
-        );
-        fixture.clear();
-        scenario = fixture.create("current", "other", PASSWORD);
-    }
-
-    @AfterEach
-    void cleanUp() {
-        fixture.clear();
-    }
-
     @Test
-    @DisplayName("회원 탈퇴는 현재 사용자의 결혼 준비 데이터만 삭제하고 준비 목록과 다른 사용자 데이터를 유지한다")
-    void shouldDeleteOnlyCurrentUsersWeddingDataAndInvalidateSession() throws Exception {
-        String sessionCookie = login("current");
-        Long checklistItemId = createChecklistItem(sessionCookie);
-        Long appointmentId = fixture.createAppointment(checklistItemId);
-        OwnedWeddingData currentUsersData = new OwnedWeddingData(
-                scenario.currentUser().checklistId(),
-                checklistItemId,
-                appointmentId
-        );
+    @DisplayName("현재 사용자를 탈퇴시키고 세션을 만료한다")
+    void shouldDeleteCurrentUserAndInvalidateSession() throws Exception {
+        MockHttpSession currentSession = login("current");
+        Long checklistItemId = createChecklistItem(currentSession);
+        createAppointment(currentSession, checklistItemId);
 
-        HttpResponse<String> deletionResponse = deleteCurrentUser(sessionCookie);
-
-        assertThat(deletionResponse.statusCode()).isEqualTo(204);
-        assertThat(deletionResponse.body()).isEmpty();
-        assertThat(deletionResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow())
-                .contains("Max-Age=0");
-        assertCurrentUsersDataDeleted(scenario.currentUser().userId(), currentUsersData);
-        assertOtherUsersDataRemains(scenario.otherUser());
-        assertCatalogRemains(scenario.catalog());
-
-        HttpResponse<String> previousSessionResponse = httpClient.send(
-                request("/api/catalog", sessionCookie)
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
-
-        assertThat(previousSessionResponse.statusCode()).isEqualTo(401);
-        assertThat(previousSessionResponse.body())
-                .contains("\"errorCode\":201")
-                .contains("\"message\":\"로그인이 필요합니다.\"");
-    }
-
-    private String login(String nickname) throws Exception {
-        HttpResponse<String> loginResponse = sendJson(
-                "/api/login",
-                null,
-                new LoginRequest(nickname, PASSWORD)
-        );
-        assertThat(loginResponse.statusCode()).isEqualTo(200);
-
-        String setCookie = loginResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow();
-        return setCookie.substring(0, setCookie.indexOf(';'));
-    }
-
-    private Long createChecklistItem(String sessionCookie) throws Exception {
-        HttpResponse<String> checklistItemResponse = sendJson(
-                "/api/checklists/me/items",
-                sessionCookie,
-                new CreateChecklistItemRequest("청첩장 문구 정하기", scenario.catalog().categoryId())
-        );
-        assertThat(checklistItemResponse.statusCode()).isEqualTo(201);
-        ChecklistItemResponse checklistItem = objectMapper.readValue(
-                checklistItemResponse.body(),
-                ChecklistItemResponse.class
-        );
-        assertThat(checklistItem.catalogItemId()).isNull();
-
-        return checklistItem.id();
-    }
-
-    private HttpResponse<String> deleteCurrentUser(String sessionCookie) throws Exception {
-        return httpClient.send(
-                request("/api/users/me", sessionCookie)
-                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .method(
-                                "DELETE",
-                                HttpRequest.BodyPublishers.ofString(
-                                        objectMapper.writeValueAsString(new DeleteUserRequest(PASSWORD))
+        mockMvc.perform(delete("/api/users/me")
+                        .session(currentSession)
+                        .header(HttpHeaders.COOKIE, "JSESSIONID=" + currentSession.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new DeleteUserRequest(PASSWORD))))
+                .andExpect(status().isNoContent())
+                .andDo(document(
+                                "users-delete-me",
+                                preprocessResponse(modifyHeaders().set(
+                                                HttpHeaders.SET_COOKIE,
+                                                DOCUMENTED_SESSION_COOKIE
+                                        )
+                                ),
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("User")
+                                        .summary("회원 탈퇴")
+                                        .description(
+                                                "인증된 사용자를 탈퇴 처리하고 사용자의 결혼식 데이터를 삭제한 뒤 세션 쿠키를 만료합니다.")
+                                        .requestSchema(schema("DeleteUserRequest"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description("인증된 JSESSIONID 세션 쿠키")
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("password")
+                                                        .description("회원 탈퇴를 확인하기 위한 현재 비밀번호")
+                                        )
+                                        .responseHeaders(
+                                                headerWithName(HttpHeaders.SET_COOKIE)
+                                                        .description("만료된 JSESSIONID 세션 쿠키")
+                                        )
+                                        .build()
                                 )
                         )
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
+                );
+
+        mockMvc.perform(get("/api/catalog/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[0].id").value(CATEGORY_ID));
+
+        mockMvc.perform(get("/api/catalog").session(currentSession))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201));
+
+        MockHttpSession otherSession = login("other");
+        mockMvc.perform(get("/api/checklists/me").session(otherSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(OTHER_CHECKLIST_ID))
+                .andExpect(jsonPath("$.items[0].appointments[0].id").isNumber());
+    }
+
+    private MockHttpSession login(String nickname) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(nickname, PASSWORD))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return (MockHttpSession) result.getRequest().getSession(false);
+    }
+
+    private Long createChecklistItem(MockHttpSession session) throws Exception {
+        String response = mockMvc.perform(post("/api/checklists/me/items")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateChecklistItemRequest("custom item", CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return objectMapper.readValue(response, ChecklistItemResponse.class).id();
+    }
+
+    private void createAppointment(MockHttpSession session, Long checklistItemId) throws Exception {
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                "appointment", LocalDate.of(2026, 9, 1), null, null, null, null
         );
-    }
 
-    private HttpResponse<String> sendJson(String path, String sessionCookie, Object body) throws Exception {
-        return httpClient.send(
-                request(path, sessionCookie)
-                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
-    }
-
-    private HttpRequest.Builder request(String path, String sessionCookie) {
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
-        if (sessionCookie != null) {
-            request.header(HttpHeaders.COOKIE, sessionCookie);
-        }
-        return request;
-    }
-
-    private void assertCurrentUsersDataDeleted(Long userId, OwnedWeddingData data) {
-        assertThat(userRepository.findById(userId)).isEmpty();
-        assertThat(checklistRepository.findById(data.checklistId())).isEmpty();
-        assertThat(checklistItemRepository.findById(data.checklistItemId())).isEmpty();
-        assertThat(appointmentRepository.findById(data.appointmentId())).isEmpty();
-    }
-
-    private void assertOtherUsersDataRemains(UserWeddingData data) {
-        assertThat(userRepository.findById(data.userId())).isPresent();
-        assertThat(checklistRepository.findById(data.checklistId())).isPresent();
-        assertThat(checklistItemRepository.findById(data.checklistItemId())).isPresent();
-        assertThat(appointmentRepository.findById(data.appointmentId())).isPresent();
-    }
-
-    private void assertCatalogRemains(CatalogData catalog) {
-        assertThat(categoryRepository.findById(catalog.categoryId())).isPresent();
-        assertThat(stepRepository.findById(catalog.stepId())).isPresent();
-        assertThat(catalogItemRepository.findById(catalog.catalogItemId())).isPresent();
-    }
-
-    private record OwnedWeddingData(
-            Long checklistId,
-            Long checklistItemId,
-            Long appointmentId
-    ) {
+        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", checklistItemId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
     }
 }

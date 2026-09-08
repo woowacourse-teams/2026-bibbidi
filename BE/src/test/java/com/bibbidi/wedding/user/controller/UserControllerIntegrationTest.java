@@ -6,15 +6,14 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithNam
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.session.AuthSession;
@@ -23,25 +22,13 @@ import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-@ExtendWith(RestDocumentationExtension.class)
-class UserControllerIntegrationTest {
+class UserControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String PASSWORD = "wish";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -52,20 +39,12 @@ class UserControllerIntegrationTest {
     private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 닉네임을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
 
     @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
     private ObjectMapper objectMapper;
-
-    private MockMvc mockMvc;
     private Long currentUserId;
     private Long otherUserId;
 
     @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) throws Exception {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
+    void setUp() throws Exception {
         currentUserId = createUser("current");
         otherUserId = createUser("other");
     }

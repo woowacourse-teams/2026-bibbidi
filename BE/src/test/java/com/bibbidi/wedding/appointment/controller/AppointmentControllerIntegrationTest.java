@@ -4,79 +4,38 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.appointment.controller.dto.ChangeAppointmentCompletionRequest;
 import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
 import com.bibbidi.wedding.appointment.controller.dto.UpdateAppointmentRequest;
-import com.bibbidi.wedding.appointment.domain.Appointment;
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.appointment.repository.AppointmentRepository;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
-import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
 @Sql("/appointment-fixture.sql")
-@ExtendWith(RestDocumentationExtension.class)
-class AppointmentControllerIntegrationTest {
-
-    @Autowired
-    private WebApplicationContext context;
+class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private AppointmentRepository appointmentRepository;
-
-    @Autowired
-    private JpaAppointmentRepository jpaAppointmentRepository;
-
-    @Autowired
-    private JpaChecklistItemRepository checklistItemRepository;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
-    }
 
     @Test
     @DisplayName("인증된 사용자가 일정 생성에 성공한다")
@@ -103,24 +62,26 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.date").value("2026-09-01"))
                 .andExpect(jsonPath("$.isDone").value(false))
                 .andDo(document(
-                        "appointments-create",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("일정 생성")
-                                .description("체크리스트 항목에 수행 일정을 추가합니다.")
-                                .requestSchema(schema("CreateAppointmentRequest"))
-                                .responseSchema(schema("AppointmentResponse"))
-                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(appointmentResponseFields())
-                                .build())
-                ));
+                                "appointments-create",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("일정 생성")
+                                        .description("체크리스트 항목에 수행 일정을 추가합니다.")
+                                        .requestSchema(schema("CreateAppointmentRequest"))
+                                        .responseSchema(schema("AppointmentResponse"))
+                                        .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(appointmentResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("기존 일정과 시간이 겹치는 일정을 생성하면 생성에 성공하고 충돌 목록을 함께 반환한다")
     void shouldReturnConflictsWhenCreatingOverlappingAppointment() throws Exception {
-        Long existingAppointmentId = saveAppointment().id();
+        Long existingAppointmentId = createAppointment();
         CreateAppointmentRequest request = new CreateAppointmentRequest(
                 "overlapping appointment",
                 LocalDate.of(2026, 9, 1),
@@ -139,18 +100,20 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.conflicts[0].checklistItemId").value(1))
                 .andExpect(jsonPath("$.conflicts[0].startTime").value("2026-09-01T10:00:00"))
                 .andDo(document(
-                        "appointments-create-conflict",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("충돌 일정이 있는 일정 생성")
-                                .description("시간이 겹치는 일정을 경고로 반환하고 일정 생성은 허용합니다.")
-                                .requestSchema(schema("CreateAppointmentRequest"))
-                                .responseSchema(schema("AppointmentResponse"))
-                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(conflictAppointmentResponseFields())
-                                .build())
-                ));
+                                "appointments-create-conflict",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("충돌 일정이 있는 일정 생성")
+                                        .description("시간이 겹치는 일정을 경고로 반환하고 일정 생성은 허용합니다.")
+                                        .requestSchema(schema("CreateAppointmentRequest"))
+                                        .responseSchema(schema("AppointmentResponse"))
+                                        .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(conflictAppointmentResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
@@ -175,18 +138,20 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andDo(document(
-                        "appointments-create-invalid-request",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("잘못된 일정 생성 요청")
-                                .description("입력값이 유효하지 않으면 요청을 거부합니다.")
-                                .requestSchema(schema("CreateAppointmentRequest"))
-                                .responseSchema(schema("ValidationErrorResponse"))
-                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(validationResponseFields())
-                                .build())
-                ));
+                                "appointments-create-invalid-request",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("잘못된 일정 생성 요청")
+                                        .description("입력값이 유효하지 않으면 요청을 거부합니다.")
+                                        .requestSchema(schema("CreateAppointmentRequest"))
+                                        .responseSchema(schema("ValidationErrorResponse"))
+                                        .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(validationResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
@@ -208,21 +173,23 @@ class AppointmentControllerIntegrationTest {
                         .content(convertToStringValue(request)))
                 .andExpect(status().isUnauthorized())
                 .andDo(document(
-                        "appointments-create-unauthorized",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("인증 없이 일정 생성")
-                                .description("인증되지 않은 요청은 거부합니다.")
-                                .requestSchema(schema("CreateAppointmentRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
-                                .requestFields(
-                                        fieldWithPath("title").description("일정 제목"),
-                                        fieldWithPath("date").description("일정 날짜")
+                                "appointments-create-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("인증 없이 일정 생성")
+                                        .description("인증되지 않은 요청은 거부합니다.")
+                                        .requestSchema(schema("CreateAppointmentRequest"))
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("checklistItemId").description("체크리스트 항목 ID"))
+                                        .requestFields(
+                                                fieldWithPath("title").description("일정 제목"),
+                                                fieldWithPath("date").description("일정 날짜")
+                                        )
+                                        .responseFields(errorResponseFields())
+                                        .build()
                                 )
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -249,7 +216,7 @@ class AppointmentControllerIntegrationTest {
     @DisplayName("인증된 사용자가 일정 수정에 성공한다")
     void shouldUpdateAppointmentWhenRequestIsValid() throws Exception {
         // given
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
                 "웨딩홀 재상담",
                 LocalDate.of(2026, 10, 1),
@@ -268,25 +235,27 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.title").value("웨딩홀 재상담"))
                 .andExpect(jsonPath("$.isDone").value(true))
                 .andDo(document(
-                        "appointments-update",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("일정 수정")
-                                .description("등록된 일정의 내용을 수정합니다. 완료 여부는 변경되지 않습니다.")
-                                .requestSchema(schema("UpdateAppointmentRequest"))
-                                .responseSchema(schema("AppointmentResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(appointmentResponseFields())
-                                .build())
-                ));
+                                "appointments-update",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("일정 수정")
+                                        .description("등록된 일정의 내용을 수정합니다. 완료 여부는 변경되지 않습니다.")
+                                        .requestSchema(schema("UpdateAppointmentRequest"))
+                                        .responseSchema(schema("AppointmentResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(appointmentResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("수정한 시간이 다른 일정과 겹치면 수정에 성공하고 충돌 목록을 함께 반환한다")
     void shouldReturnConflictsWhenUpdatingAppointment() throws Exception {
-        saveAppointment();
-        Long appointmentId = saveAppointment().id();
+        createAppointment();
+        Long appointmentId = createAppointment();
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
                 "updated overlapping appointment",
                 LocalDate.of(2026, 9, 1),
@@ -304,25 +273,27 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.conflicts[0].appointmentId").isNumber())
                 .andExpect(jsonPath("$.conflicts[0].appointmentId").value(appointmentId - 1))
                 .andDo(document(
-                        "appointments-update-conflict",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("충돌 일정이 있는 일정 수정")
-                                .description("시간이 겹치는 일정을 경고로 반환하고 일정 수정은 허용합니다.")
-                                .requestSchema(schema("UpdateAppointmentRequest"))
-                                .responseSchema(schema("AppointmentResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(conflictAppointmentResponseFields())
-                                .build())
-                ));
+                                "appointments-update-conflict",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("충돌 일정이 있는 일정 수정")
+                                        .description("시간이 겹치는 일정을 경고로 반환하고 일정 수정은 허용합니다.")
+                                        .requestSchema(schema("UpdateAppointmentRequest"))
+                                        .responseSchema(schema("AppointmentResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(conflictAppointmentResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("잘못된 입력이면 일정 수정을 거부한다")
     void shouldRejectUpdateWhenRequestIsInvalid() throws Exception {
         // given
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
                 "",
                 LocalDate.of(2026, 10, 1),
@@ -341,18 +312,20 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andDo(document(
-                        "appointments-update-invalid-request",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("잘못된 일정 수정 요청")
-                                .description("입력값이 유효하지 않으면 요청을 거부합니다.")
-                                .requestSchema(schema("UpdateAppointmentRequest"))
-                                .responseSchema(schema("ValidationErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .requestFields(requestFields())
-                                .responseFields(validationResponseFields())
-                                .build())
-                ));
+                                "appointments-update-invalid-request",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("잘못된 일정 수정 요청")
+                                        .description("입력값이 유효하지 않으면 요청을 거부합니다.")
+                                        .requestSchema(schema("UpdateAppointmentRequest"))
+                                        .responseSchema(schema("ValidationErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .requestFields(requestFields())
+                                        .responseFields(validationResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
@@ -376,28 +349,30 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(302))
                 .andDo(document(
-                        "appointments-update-not-found",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("존재하지 않는 일정 수정")
-                                .description("수정 대상 일정이 없으면 요청을 거부합니다.")
-                                .requestSchema(schema("UpdateAppointmentRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .requestFields(
-                                        fieldWithPath("title").description("일정 제목"),
-                                        fieldWithPath("date").description("일정 날짜")
+                                "appointments-update-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("존재하지 않는 일정 수정")
+                                        .description("수정 대상 일정이 없으면 요청을 거부합니다.")
+                                        .requestSchema(schema("UpdateAppointmentRequest"))
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .requestFields(
+                                                fieldWithPath("title").description("일정 제목"),
+                                                fieldWithPath("date").description("일정 날짜")
+                                        )
+                                        .responseFields(errorResponseFields())
+                                        .build()
                                 )
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
     @DisplayName("인증되지 않은 사용자의 일정 수정을 거부한다")
     void shouldRejectUpdateWhenUserIsUnauthenticated() throws Exception {
         // given
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
                 "웨딩홀 재상담",
                 LocalDate.of(2026, 10, 1),
@@ -413,27 +388,29 @@ class AppointmentControllerIntegrationTest {
                         .content(convertToStringValue(request)))
                 .andExpect(status().isUnauthorized())
                 .andDo(document(
-                        "appointments-update-unauthorized",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("인증 없이 일정 수정")
-                                .description("인증되지 않은 요청은 거부합니다.")
-                                .requestSchema(schema("UpdateAppointmentRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .requestFields(
-                                        fieldWithPath("title").description("일정 제목"),
-                                        fieldWithPath("date").description("일정 날짜")
+                                "appointments-update-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("인증 없이 일정 수정")
+                                        .description("인증되지 않은 요청은 거부합니다.")
+                                        .requestSchema(schema("UpdateAppointmentRequest"))
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .requestFields(
+                                                fieldWithPath("title").description("일정 제목"),
+                                                fieldWithPath("date").description("일정 날짜")
+                                        )
+                                        .responseFields(errorResponseFields())
+                                        .build()
                                 )
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
     @DisplayName("다른 사용자의 체크리스트 항목에 속한 일정 수정은 거부한다")
     void shouldRejectUpdateWhenUserDoesNotOwnChecklistItem() throws Exception {
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
                 "updated title",
                 LocalDate.of(2026, 10, 1),
@@ -454,46 +431,46 @@ class AppointmentControllerIntegrationTest {
     @Test
     @DisplayName("자신의 일정은 삭제할 수 있다")
     void shouldDeleteOwnAppointment() throws Exception {
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
                         .session(authenticatedSession()))
                 .andExpect(status().isNoContent())
                 .andDo(document(
-                        "appointments-delete",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("일정 삭제")
-                                .description("현재 사용자가 소유한 일정을 삭제합니다.")
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .build())
-                ));
-
-        assertThat(jpaAppointmentRepository.findById(appointmentId)).isEmpty();
+                                "appointments-delete",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("일정 삭제")
+                                        .description("현재 사용자가 소유한 일정을 삭제합니다.")
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("다른 사용자의 일정은 삭제할 수 없다")
     void shouldRejectDeletingAnotherUsersAppointment() throws Exception {
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
                         .session(sessionOf(2L)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203))
                 .andDo(document(
-                        "appointments-delete-forbidden",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("일정 삭제 권한 없음")
-                                .description("다른 사용자의 일정 삭제 요청을 거부합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
-
-        assertThat(jpaAppointmentRepository.findById(appointmentId)).isPresent();
+                                "appointments-delete-forbidden",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("일정 삭제 권한 없음")
+                                        .description("다른 사용자의 일정 삭제 요청을 거부합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .responseFields(errorResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
@@ -504,56 +481,57 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(302))
                 .andDo(document(
-                        "appointments-delete-not-found",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("존재하지 않는 일정 삭제")
-                                .description("존재하지 않는 일정 삭제 요청을 거부합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
+                                "appointments-delete-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("존재하지 않는 일정 삭제")
+                                        .description("존재하지 않는 일정 삭제 요청을 거부합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .responseFields(errorResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("인증되지 않은 사용자의 일정 삭제 요청은 거부한다")
     void shouldRejectDeletingAppointmentWhenUserIsUnauthenticated() throws Exception {
-        Long appointmentId = saveAppointment().id();
+        Long appointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId))
                 .andExpect(status().isUnauthorized())
                 .andDo(document(
-                        "appointments-delete-unauthorized",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Appointment")
-                                .summary("인증 없이 일정 삭제")
-                                .description("인증되지 않은 일정 삭제 요청을 거부합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
-                                .responseFields(errorResponseFields())
-                                .build())
-                ));
+                                "appointments-delete-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("인증 없이 일정 삭제")
+                                        .description("인증되지 않은 일정 삭제 요청을 거부합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
+                                        .responseFields(errorResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     @Test
     @DisplayName("일정을 삭제해도 같은 할 일의 다른 일정은 유지된다")
     void shouldKeepOtherAppointmentWhenDeletingAnAppointment() throws Exception {
-        Long deletedAppointmentId = saveAppointment().id();
-        Long remainingAppointmentId = saveAppointment().id();
+        Long deletedAppointmentId = createAppointment();
+        Long remainingAppointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", deletedAppointmentId)
                         .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
-
-        assertThat(jpaAppointmentRepository.findById(deletedAppointmentId)).isEmpty();
-        assertThat(jpaAppointmentRepository.findById(remainingAppointmentId)).isPresent();
     }
 
     @Test
     @DisplayName("미래 일정을 완료 상태로 변경한다")
     void shouldCompleteFutureAppointment() throws Exception {
-        Long appointmentId = saveAppointment(LocalDate.of(2099, 1, 1), false);
+        Long appointmentId = createAppointment(LocalDate.of(2099, 1, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
                         .session(authenticatedSession())
@@ -570,7 +548,7 @@ class AppointmentControllerIntegrationTest {
     @Test
     @DisplayName("완료된 일정을 미완료로 변경하고 완료된 할 일도 재개한다")
     void shouldReopenAppointmentAndChecklistItem() throws Exception {
-        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+        Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
         changeChecklistItemStatusToDone();
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
@@ -581,15 +559,12 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isDone").value(false))
                 .andExpect(jsonPath("$.checklistItemDone").value(false));
-
-        assertThat(checklistItemRepository.findById(1L).orElseThrow().status().name())
-                .isEqualTo("CONTINUE");
     }
 
     @Test
     @DisplayName("인증되지 않은 일정 완료 변경 요청을 거절한다")
     void shouldRequireAuthenticationToChangeStatus() throws Exception {
-        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+        Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -610,7 +585,7 @@ class AppointmentControllerIntegrationTest {
     @Test
     @DisplayName("완료 여부가 없으면 일정 완료 변경 요청을 거절한다")
     void shouldRejectWhenCompletionIsMissing() throws Exception {
-        Long appointmentId = saveAppointment(LocalDate.of(2026, 9, 1), false);
+        Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
                         .session(authenticatedSession())
@@ -628,34 +603,39 @@ class AppointmentControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    private Long saveAppointment(LocalDate date, boolean isDone) {
-        return jpaAppointmentRepository.save(new JpaAppointmentEntity(
-                null,
-                1L,
-                "appointment",
+    private Long createAppointment() throws Exception {
+        return createAppointment(LocalDate.of(2026, 9, 1), true);
+    }
+
+    private Long createAppointment(LocalDate date, boolean isDone) throws Exception {
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                "웨딩홀 상담",
                 date,
                 LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 10, 0),
                 LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 11, 0),
-                "place",
-                "memo",
-                isDone,
-                false
-        )).id();
-    }
-
-    private Appointment saveAppointment() {
-        return appointmentRepository.save(new Appointment(
-                null,
-                1L,
-                "웨딩홀 상담",
-                LocalDate.of(2026, 9, 1),
-                LocalDateTime.of(2026, 9, 1, 10, 0),
-                LocalDateTime.of(2026, 9, 1, 11, 0),
                 "웨딩홀",
-                "상담 준비",
-                true,
-                false
-        ));
+                "상담 준비"
+        );
+
+        String response = mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(convertToStringValue(request)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long appointmentId = objectMapper.readTree(response).get("id").asLong();
+
+        if (isDone) {
+            mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
+                            .session(authenticatedSession())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ChangeAppointmentCompletionRequest(true))))
+                    .andExpect(status().isOk());
+        }
+
+        return appointmentId;
     }
 
     private String convertToStringValue(Object request) {

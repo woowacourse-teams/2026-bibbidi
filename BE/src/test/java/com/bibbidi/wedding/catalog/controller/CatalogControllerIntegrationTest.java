@@ -5,40 +5,25 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessRequest;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.FieldDescriptor;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
 @Sql("/catalog-fixture.sql")
-@ExtendWith(RestDocumentationExtension.class)
-class CatalogControllerIntegrationTest {
+class CatalogControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final Long USER_ID = 7L;
     private static final long WEDDING_HALL_CATEGORY_ID = 2L;
@@ -60,18 +45,6 @@ class CatalogControllerIntegrationTest {
     private static final String SESSION_COOKIE_DESCRIPTION =
             "로그인 API가 발급한 인증 Session Cookie. 형식: JSESSIONID=<session-id>";
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
-
-    @Autowired
-    private WebApplicationContext context;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
-    }
 
     @Test
     @DisplayName("인증된 사용자가 준비 목록 조회에 성공한다")
@@ -115,23 +88,25 @@ class CatalogControllerIntegrationTest {
                 .andExpect(jsonPath("$.categories[1].displayOrder").value(2))
                 .andExpect(jsonPath("$.categories[1].steps").isEmpty())
                 .andDo(document(
-                        "catalog-find",
-                        preprocessRequest(modifyHeaders().set(
-                                HttpHeaders.COOKIE,
-                                DOCUMENTED_SESSION_COOKIE
-                        )),
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Catalog")
-                                .summary(CATALOG_FIND_SUMMARY)
-                                .description(CATALOG_FIND_DESCRIPTION)
-                                .responseSchema(schema("CatalogResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "catalog-find",
+                                preprocessRequest(modifyHeaders().set(
+                                        HttpHeaders.COOKIE,
+                                        DOCUMENTED_SESSION_COOKIE
+                                )),
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Catalog")
+                                        .summary(CATALOG_FIND_SUMMARY)
+                                        .description(CATALOG_FIND_DESCRIPTION)
+                                        .responseSchema(schema("CatalogResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(catalogResponseFields())
+                                        .build()
                                 )
-                                .responseFields(catalogResponseFields())
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -144,28 +119,30 @@ class CatalogControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
                 .andDo(document(
-                        "catalog-find-unauthorized",
-                        preprocessRequest(modifyHeaders().set(
-                                HttpHeaders.COOKIE,
-                                DOCUMENTED_SESSION_COOKIE
-                        )),
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Catalog")
-                                .summary(CATALOG_FIND_SUMMARY)
-                                .description(CATALOG_FIND_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "catalog-find-unauthorized",
+                                preprocessRequest(modifyHeaders().set(
+                                        HttpHeaders.COOKIE,
+                                        DOCUMENTED_SESSION_COOKIE
+                                )),
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Catalog")
+                                        .summary(CATALOG_FIND_SUMMARY)
+                                        .description(CATALOG_FIND_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode")
+                                                        .description("클라이언트가 오류를 구분하는 코드. 인증 필요 오류는 201"),
+                                                fieldWithPath("message")
+                                                        .description("사용자에게 안내할 인증 오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .responseFields(
-                                        fieldWithPath("errorCode")
-                                                .description("클라이언트가 오류를 구분하는 코드. 인증 필요 오류는 201"),
-                                        fieldWithPath("message")
-                                                .description("사용자에게 안내할 인증 오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -202,15 +179,17 @@ class CatalogControllerIntegrationTest {
                 .andExpect(jsonPath("$.categories[0].steps[0].items[0].included").doesNotExist())
                 .andExpect(jsonPath("$.categories[0].steps[0].items[1].included").doesNotExist())
                 .andDo(document(
-                        "catalog-public",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Catalog")
-                                .summary(CATALOG_PUBLIC_SUMMARY)
-                                .description(CATALOG_PUBLIC_DESCRIPTION)
-                                .responseSchema(schema("PublicCatalogResponse"))
-                                .responseFields(publicCatalogResponseFields())
-                                .build())
-                ));
+                                "catalog-public",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Catalog")
+                                        .summary(CATALOG_PUBLIC_SUMMARY)
+                                        .description(CATALOG_PUBLIC_DESCRIPTION)
+                                        .responseSchema(schema("PublicCatalogResponse"))
+                                        .responseFields(publicCatalogResponseFields())
+                                        .build()
+                                )
+                        )
+                );
     }
 
     private static MockHttpSession authenticatedSession() {

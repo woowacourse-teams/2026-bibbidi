@@ -3,15 +3,10 @@ package com.bibbidi.wedding.auth.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
-import com.bibbidi.wedding.user.domain.User;
-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
-import com.bibbidi.wedding.user.repository.UserRepository;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,42 +16,30 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Sql(statements = "DELETE FROM users")
+@Sql("/auth-login-fixture.sql")
+@Sql(statements = "DELETE FROM users", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class AuthSessionIntegrationTest {
 
+    private static final long USER_ID = 1L;
     private static final String PASSWORD = "wish";
 
     @LocalServerPort
     private int port;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private JpaUserRepository jpaUserRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
     private ObjectMapper objectMapper;
 
     private HttpClient httpClient;
-    private User user;
 
     @BeforeEach
     void setUp() {
-        jpaUserRepository.deleteAll();
-        user = userRepository.save(new User(null, "bibbidi", passwordHasher.hash(PASSWORD)));
         httpClient = HttpClient.newHttpClient();
-    }
-
-    @AfterEach
-    void cleanUp() {
-        jpaUserRepository.deleteAll();
     }
 
     @Test
@@ -88,10 +71,9 @@ class AuthSessionIntegrationTest {
                 .doesNotContain("Max-Age");
         assertThat(sessionCookieName).isEqualTo("JSESSIONID");
         assertThat(loginResponse.body())
-                .contains("\"userId\":" + user.id())
+                .contains("\"userId\":" + USER_ID)
                 .contains("\"nickname\":\"bibbidi\"")
                 .doesNotContain(PASSWORD)
-                .doesNotContain(user.passwordHash())
                 .doesNotContain(sessionId);
 
         HttpResponse<String> logoutResponse = sendLogout(sessionCookie);

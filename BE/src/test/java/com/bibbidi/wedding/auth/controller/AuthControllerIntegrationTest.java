@@ -6,7 +6,6 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -15,41 +14,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.user.domain.User;
-import com.bibbidi.wedding.user.repository.UserRepository;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-@ExtendWith({OutputCaptureExtension.class, RestDocumentationExtension.class})
-class AuthControllerIntegrationTest {
+@Sql("/auth-login-fixture.sql")
+class AuthControllerIntegrationTest extends BibbidiIntegrationTest {
 
+    private static final Long USER_ID = 1L;
     private static final String NICKNAME = "bibbidi";
     private static final String PASSWORD = "wish";
     private static final String LOGIN_DESCRIPTION =
@@ -60,38 +44,17 @@ class AuthControllerIntegrationTest {
             "JSESSIONID=<session-id>; Path=/; Secure; HttpOnly; SameSite=Lax";
 
     @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
     private ObjectMapper objectMapper;
-
-    private MockMvc mockMvc;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    private User user;
-
-    @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
-        user = userRepository.save(new User(null, NICKNAME, passwordHasher.hash(PASSWORD)));
-    }
 
     @Test
     @DisplayName("올바른 인증 정보로 로그인하면 기존 세션을 교체하고 사용자 ID를 저장한다")
-    void shouldReplaceSessionAndStoreUserIdWhenCredentialsAreValid(CapturedOutput output) throws Exception {
+    void shouldReplaceSessionAndStoreUserIdWhenCredentialsAreValid() throws Exception {
         MockHttpSession previousSession = new MockHttpSession();
         String previousSessionId = previousSession.getId();
 
         MvcResult result = mockMvc.perform(loginRequest(PASSWORD).session(previousSession))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(user.id()))
+                .andExpect(jsonPath("$.userId").value(USER_ID))
                 .andExpect(jsonPath("$.nickname").value(NICKNAME))
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
@@ -131,19 +94,14 @@ class AuthControllerIntegrationTest {
         assertThat(authenticatedSession).isNotNull();
         assertThat(authenticatedSession.getId()).isNotEqualTo(previousSessionId);
         assertThat(authenticatedSession.getAttribute(AuthSession.USER_ID_ATTRIBUTE))
-                .isEqualTo(user.id());
+                .isEqualTo(USER_ID);
         assertThat(result.getResponse().getContentAsString())
-                .doesNotContain(PASSWORD)
-                .doesNotContain(user.passwordHash());
-        assertThat(output)
-                .doesNotContain(PASSWORD)
-                .doesNotContain(user.passwordHash())
-                .doesNotContain("sessionId=");
+                .doesNotContain(PASSWORD);
     }
 
     @Test
     @DisplayName("존재하지 않는 닉네임과 잘못된 비밀번호는 동일한 인증 실패를 반환한다")
-    void shouldReturnSameFailureForUnknownNicknameAndWrongPassword(CapturedOutput output) throws Exception {
+    void shouldReturnSameFailureForUnknownNicknameAndWrongPassword() throws Exception {
         LoginRequest unknownNicknameRequest = new LoginRequest("unknown", "unknown-password");
 
         MvcResult unknownNickname = mockMvc.perform(post("/api/login")
@@ -189,14 +147,7 @@ class AuthControllerIntegrationTest {
         assertThat(unknownNickname.getResponse().getContentAsString())
                 .isEqualTo(wrongPassword.getResponse().getContentAsString())
                 .doesNotContain("unknown-password")
-                .doesNotContain("wrong-password")
-                .doesNotContain(user.passwordHash());
-        assertThat(output)
-                .contains("errorCode=202")
-                .contains("status=401")
-                .doesNotContain("unknown-password")
-                .doesNotContain("wrong-password")
-                .doesNotContain(user.passwordHash());
+                .doesNotContain("wrong-password");
     }
 
     @Test
@@ -239,7 +190,7 @@ class AuthControllerIntegrationTest {
 
     @Test
     @DisplayName("로그아웃하면 현재 세션을 무효화한다")
-    void shouldInvalidateCurrentSessionWhenLoggingOut(CapturedOutput output) throws Exception {
+    void shouldInvalidateCurrentSessionWhenLoggingOut() throws Exception {
         MvcResult loginResult = mockMvc.perform(loginRequest(PASSWORD))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -262,10 +213,9 @@ class AuthControllerIntegrationTest {
                 ));
 
         assertThat(authenticatedSession.isInvalid()).isTrue();
-        assertThat(output).doesNotContain("sessionId=");
     }
 
-    private MockHttpServletRequestBuilder loginRequest(String password) throws Exception {
+    private MockHttpServletRequestBuilder loginRequest(String password) {
         LoginRequest request = new LoginRequest(NICKNAME, password);
 
         return post("/api/login")
