@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.auth.session;
+package com.bibbidi.wedding.common.auth;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

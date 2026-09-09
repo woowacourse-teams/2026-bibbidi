@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.controller;
 
-import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
 import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
@@ -8,6 +7,7 @@ import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.RemainingAppointmentResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;

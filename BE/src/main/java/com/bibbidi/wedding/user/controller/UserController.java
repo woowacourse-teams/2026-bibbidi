@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.user.controller;
 
-import com.bibbidi.wedding.auth.session.Auth;
+import com.bibbidi.wedding.common.auth.Auth;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameResponse;
 import com.bibbidi.wedding.user.controller.dto.CurrentUserResponse;
