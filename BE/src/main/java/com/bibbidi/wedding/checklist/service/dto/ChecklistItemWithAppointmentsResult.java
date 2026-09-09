@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.service.dto;
 
-import com.bibbidi.wedding.appointment.domain.Appointment;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import java.util.List;
 
@@ -13,7 +12,7 @@ public record ChecklistItemWithAppointmentsResult(
         List<ChecklistAppointmentResult> appointments
 ) {
 
-    public static ChecklistItemWithAppointmentsResult from(ChecklistItem item, List<Appointment> appointments) {
+    public static ChecklistItemWithAppointmentsResult from(ChecklistItem item, List<AppointmentSummaryResult> appointments) {
         return new ChecklistItemWithAppointmentsResult(
                 item.id(),
                 item.categoryId(),

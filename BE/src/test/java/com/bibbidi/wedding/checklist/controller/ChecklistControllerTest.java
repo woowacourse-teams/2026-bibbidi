@@ -9,7 +9,6 @@ import com.bibbidi.wedding.auth.config.AuthWebConfig;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
-import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -58,7 +57,7 @@ class ChecklistControllerTest {
         // when, then
         mockMvc.perform(post("/api/checklists").session(authenticatedSession()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(10));
+                .andExpect(jsonPath("$").value(10));
     }
 
     @Test
@@ -101,7 +100,7 @@ class ChecklistControllerTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 101L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.items[0].id").value(201))
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
@@ -118,7 +117,7 @@ class ChecklistControllerTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of()))))
+                        .content(objectMapper.writeValueAsString(List.of())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101));
     }
@@ -134,7 +133,7 @@ class ChecklistControllerTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(303))
                 .andExpect(jsonPath("$.message").value("체크리스트를 찾을 수 없습니다."));
@@ -151,7 +150,7 @@ class ChecklistControllerTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(403))
                 .andExpect(jsonPath("$.message").value("이미 추가된 준비 항목입니다."));
@@ -168,7 +167,7 @@ class ChecklistControllerTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(999L)))))
+                        .content(objectMapper.writeValueAsString(List.of(999L))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
@@ -180,7 +179,7 @@ class ChecklistControllerTest {
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201));
     }

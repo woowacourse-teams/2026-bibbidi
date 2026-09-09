@@ -1,14 +1,13 @@
 package com.bibbidi.wedding.checklist.controller;
 
-import com.bibbidi.wedding.auth.session.Auth;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
-import com.bibbidi.wedding.checklist.controller.dto.RemainingAppointmentResponse;
+import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,26 +27,20 @@ public class ChecklistItemController {
     }
 
     @GetMapping("/api/checklist-items/{itemId}/remaining-appointments")
-    public RemainingAppointmentResponse hasRemainingAppointments(
+    public boolean hasRemainingAppointments(
             @Auth Long userId,
             @PathVariable Long itemId
     ) {
-        boolean hasRemainingAppointments = checklistService.hasRemainingAppointments(userId, itemId);
-
-        return new RemainingAppointmentResponse(hasRemainingAppointments);
+        return checklistService.hasRemainingAppointments(userId, itemId);
     }
 
     @PutMapping("/api/checklist-items/{itemId}/category")
     public ChecklistItemResponse changeCategory(
             @Auth Long userId,
             @PathVariable Long itemId,
-            @Valid @RequestBody ChangeChecklistItemCategoryRequest request
+            @Valid @RequestBody @NotNull(message = "카테고리를 선택해야 합니다.") Long categoryId
     ) {
-        ChecklistItemResult result = checklistService.changeItemCategory(
-                userId,
-                itemId,
-                request.categoryId()
-        );
+        ChecklistItemResult result = checklistService.changeItemCategory(userId, itemId, categoryId);
 
         return ChecklistItemResponse.from(result);
     }
@@ -56,12 +49,17 @@ public class ChecklistItemController {
     public ChecklistItemResponse changeTitle(
             @Auth Long userId,
             @PathVariable Long itemId,
-            @Valid @RequestBody ChangeChecklistItemTitleRequest request
+            @Valid
+            @RequestBody
+            @NotBlank(message = "할 일 제목을 입력해야 합니다.")
+            @Size(max = 50, message = "할 일 제목은 50자를 넘을 수 없습니다.")
+            String title
     ) {
+        String stripedTitle = title.strip();
         ChecklistItemResult result = checklistService.changeItemTitle(
                 userId,
                 itemId,
-                request.title()
+                stripedTitle
         );
 
         return ChecklistItemResponse.from(result);
@@ -71,9 +69,9 @@ public class ChecklistItemController {
     public ChecklistItemResponse changeStatus(
             @Auth Long userId,
             @PathVariable Long itemId,
-            @Valid @RequestBody ChangeChecklistItemStatusRequest request
+            @Valid @RequestBody @NotNull(message = "할 일 상태를 선택해야 합니다.") String status
     ) {
-        ChecklistItemResult result = checklistService.changeItemStatus(userId, itemId, request.status());
+        ChecklistItemResult result = checklistService.changeItemStatus(userId, itemId, status);
 
         return ChecklistItemResponse.from(result);
     }

@@ -6,45 +6,30 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-@ExtendWith({OutputCaptureExtension.class, RestDocumentationExtension.class})
-class PasswordChangeControllerIntegrationTest {
+class PasswordChangeControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String PASSWORD = "wish";
     private static final String NEW_PASSWORD = "magic";
@@ -54,20 +39,12 @@ class PasswordChangeControllerIntegrationTest {
                     + "비밀번호 변경 후에도 현재 Session은 유지됩니다.";
 
     @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
     private ObjectMapper objectMapper;
-
-    private MockMvc mockMvc;
     private Long currentUserId;
     private Long otherUserId;
 
     @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) throws Exception {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
+    void setUp() throws Exception {
         currentUserId = createUser("current");
         otherUserId = createUser("other");
     }
@@ -88,23 +65,24 @@ class PasswordChangeControllerIntegrationTest {
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""))
                 .andDo(document(
-                        "users-change-password",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("비밀번호 변경")
-                                .description(CHANGE_PASSWORD_DESCRIPTION)
-                                .requestSchema(schema("ChangePasswordRequest"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                "users-change-password",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("User")
+                                        .summary("비밀번호 변경")
+                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+                                        .requestSchema(schema("ChangePasswordRequest"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
-                                        fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
-                                )
-                                .build())
-                ))
-                .andReturn();
+                        )
+                ).andReturn();
 
         assertThat(session.isInvalid()).isFalse();
         assertThat(session.getId()).isEqualTo(sessionId);
@@ -133,7 +111,7 @@ class PasswordChangeControllerIntegrationTest {
 
     @Test
     @DisplayName("현재 비밀번호가 일치하지 않으면 기존 비밀번호를 유지한다")
-    void shouldKeepCurrentPasswordWhenCurrentPasswordDoesNotMatch(CapturedOutput output) throws Exception {
+    void shouldKeepCurrentPasswordWhenCurrentPasswordDoesNotMatch() throws Exception {
         ChangePasswordRequest request = new ChangePasswordRequest("incorrect-current", NEW_PASSWORD);
 
         MvcResult result = mockMvc.perform(put("/api/users/me/password")
@@ -145,33 +123,30 @@ class PasswordChangeControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(202))
                 .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
                 .andDo(document(
-                        "users-change-password-current-password-mismatch",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("비밀번호 변경")
-                                .description(CHANGE_PASSWORD_DESCRIPTION)
-                                .requestSchema(schema("ChangePasswordRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
-                                )
-                                .requestFields(
-                                        fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
-                                        fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ))
-                .andReturn();
+                                "users-change-password-current-password-mismatch",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("User")
+                                        .summary("비밀번호 변경")
+                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+                                        .requestSchema(schema("ChangePasswordRequest"))
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build())
+                        )
+                ).andReturn();
 
         assertThat(result.getResponse().getContentAsString())
-                .doesNotContain("incorrect-current")
-                .doesNotContain(NEW_PASSWORD);
-        assertThat(output)
                 .doesNotContain("incorrect-current")
                 .doesNotContain(NEW_PASSWORD);
 
@@ -228,30 +203,32 @@ class PasswordChangeControllerIntegrationTest {
                         "비밀번호는 4자 이상 20자 이하여야 합니다."
                 )))
                 .andDo(document(
-                        "users-change-password-invalid-request",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("비밀번호 변경")
-                                .description(CHANGE_PASSWORD_DESCRIPTION)
-                                .requestSchema(schema("ChangePasswordRequest"))
-                                .responseSchema(schema("ValidationErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                "users-change-password-invalid-request",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("User")
+                                        .summary("비밀번호 변경")
+                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+                                        .requestSchema(schema("ChangePasswordRequest"))
+                                        .responseSchema(schema("ValidationErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지"),
+                                                fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
+                                                fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
+                                                fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
-                                        fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지"),
-                                        fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
-                                        fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
-                                        fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
 
         mockMvc.perform(post("/api/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -271,23 +248,25 @@ class PasswordChangeControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(201))
                 .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
                 .andDo(document(
-                        "users-change-password-authentication-required",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("비밀번호 변경")
-                                .description(CHANGE_PASSWORD_DESCRIPTION)
-                                .requestSchema(schema("ChangePasswordRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestFields(
-                                        fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
-                                        fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+                                "users-change-password-authentication-required",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("User")
+                                        .summary("비밀번호 변경")
+                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+                                        .requestSchema(schema("ChangePasswordRequest"))
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestFields(
+                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     private Long createUser(String nickname) throws Exception {

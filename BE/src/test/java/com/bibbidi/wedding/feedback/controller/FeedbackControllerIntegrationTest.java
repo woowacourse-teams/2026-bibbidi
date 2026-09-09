@@ -1,61 +1,41 @@
 package com.bibbidi.wedding.feedback.controller;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.assertj.core.api.Assertions.assertThat;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 
-import com.bibbidi.wedding.feedback.controller.dto.CreateFeedbackRequest;
 import com.bibbidi.wedding.feedback.client.DiscordApiClient;
 import com.bibbidi.wedding.feedback.client.DiscordMessageDto;
+import com.bibbidi.wedding.feedback.controller.dto.CreateFeedbackRequest;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.net.URI;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
-import com.epages.restdocs.apispec.ResourceSnippetParameters;
-import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@ExtendWith(RestDocumentationExtension.class)
-class FeedbackControllerIntegrationTest {
-
-    @Autowired
-    private WebApplicationContext context;
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class FeedbackControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @MockitoBean
     private DiscordApiClient discordApiClient;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
-    }
 
     @Test
     @DisplayName("인증 없이 피드백을 생성한다")
@@ -128,7 +108,7 @@ class FeedbackControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(new CreateFeedbackRequest("good", null))))
                 .andExpect(status().isCreated());
 
-        verify(discordApiClient, org.mockito.Mockito.timeout(1_000))
+        verify(discordApiClient, timeout(1_000))
                 .sendMessage(any(URI.class), any(DiscordMessageDto.class));
     }
 

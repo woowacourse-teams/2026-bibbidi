@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.auth.session;
 
+import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;

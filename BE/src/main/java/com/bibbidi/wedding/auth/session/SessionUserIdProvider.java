@@ -12,18 +12,15 @@ public class SessionUserIdProvider {
     public Long getCurrentUserId(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session == null) {
-            throw authenticationRequired();
+            throw new BusinessException(ClientError.AUTHENTICATION_REQUIRED, "현재 사용자 ID 조회 실패: 요청에 세션이 없습니다.");
         }
 
         Object userId = session.getAttribute(AuthSession.USER_ID_ATTRIBUTE);
         if (!(userId instanceof Long currentUserId) || currentUserId <= 0) {
-            throw authenticationRequired();
+            throw new BusinessException(ClientError.AUTHENTICATION_REQUIRED,
+                    "현재 사용자 ID 조회 실패: 세션의 사용자 ID가 없거나 양수인 Long 타입이 아닙니다.");
         }
 
         return currentUserId;
-    }
-
-    private BusinessException authenticationRequired() {
-        return new BusinessException(ClientError.AUTHENTICATION_REQUIRED, "Session에 유효한 사용자 ID가 없습니다.");
     }
 }

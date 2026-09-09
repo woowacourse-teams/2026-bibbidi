@@ -2,7 +2,6 @@ package com.bibbidi.wedding.catalog.controller.dto;
 
 import com.bibbidi.wedding.catalog.domain.Step;
 import java.util.List;
-import java.util.Set;
 
 public record StepResponse(
         Long id,
@@ -13,7 +12,7 @@ public record StepResponse(
         List<ItemResponse> items
 ) {
 
-    public static StepResponse fromDomain(Step step, Set<Long> includedCatalogItemIds) {
+    public static StepResponse from(Step step) {
         return new StepResponse(
                 step.id(),
                 step.name(),
@@ -21,20 +20,7 @@ public record StepResponse(
                 step.iconUrl(),
                 step.displayOrder(),
                 step.items().stream()
-                        .map(item -> ItemResponse.fromDomain(item, includedCatalogItemIds))
-                        .toList()
-        );
-    }
-
-    public static StepResponse forPublic(Step step) {
-        return new StepResponse(
-                step.id(),
-                step.name(),
-                step.description(),
-                step.iconUrl(),
-                step.displayOrder(),
-                step.items().stream()
-                        .map(ItemResponse::forPublic)
+                        .map(ItemResponse::from)
                         .toList()
         );
     }

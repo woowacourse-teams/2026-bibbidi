@@ -1,10 +1,8 @@
 package com.bibbidi.wedding.catalog.controller;
 
-import com.bibbidi.wedding.auth.session.Auth;
 import com.bibbidi.wedding.catalog.controller.dto.CatalogResponse;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.catalog.service.dto.CatalogQueryResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,14 +16,8 @@ public class CatalogController {
     }
 
     @GetMapping("/api/catalog")
-    public CatalogResponse find(@Auth Long userId) {
-        CatalogQueryResult result = catalogService.find(userId);
-        return CatalogResponse.from(result);
-    }
-
-    @GetMapping("/api/catalog/public")
-    public CatalogResponse findPublicCatalog() {
-        Catalog catalog = catalogService.findPublicCatalog();
-        return CatalogResponse.forPublic(catalog);
+    public CatalogResponse find() {
+        Catalog catalog = catalogService.find();
+        return CatalogResponse.from(catalog);
     }
 }

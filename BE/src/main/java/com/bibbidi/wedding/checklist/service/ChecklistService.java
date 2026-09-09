@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
-import com.bibbidi.wedding.appointment.domain.Appointment;
-import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
+import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
@@ -70,9 +69,9 @@ public class ChecklistService {
                 .map(ChecklistItem::id)
                 .toList();
 
-        Map<Long, List<Appointment>> appointmentsByChecklistItemId = checklistAppointmentService
+        Map<Long, List<AppointmentSummaryResult>> appointmentsByChecklistItemId = checklistAppointmentService
                 .findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds).stream()
-                .collect(Collectors.groupingBy(Appointment::checklistItemId));
+                .collect(Collectors.groupingBy(AppointmentSummaryResult::checklistItemId));
 
         return checklistItems.stream()
                 .map(item -> ChecklistItemWithAppointmentsResult.from(

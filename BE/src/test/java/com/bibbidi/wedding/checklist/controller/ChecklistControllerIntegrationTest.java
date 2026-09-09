@@ -5,48 +5,28 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.hamcrest.Matchers.nullValue;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
-import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
-import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
+import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.restdocs.RestDocumentationContextProvider;
-import org.springframework.restdocs.RestDocumentationExtension;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
 @Sql("/checklist-fixture.sql")
-@ExtendWith(RestDocumentationExtension.class)
-class ChecklistControllerIntegrationTest {
+class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final Long USER_ID = 7L;
     private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
@@ -65,22 +45,7 @@ class ChecklistControllerIntegrationTest {
                     + "이미 담긴 준비 항목이 포함되면 요청 전체가 실패합니다.";
 
     @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private JpaAppointmentRepository appointmentRepository;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp(RestDocumentationContextProvider restDocumentation) {
-        mockMvc = webAppContextSetup(context)
-                .apply(documentationConfiguration(restDocumentation))
-                .build();
-    }
 
     private static MockHttpSession authenticatedSession() {
         return sessionOf(USER_ID);
@@ -100,41 +65,28 @@ class ChecklistControllerIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$").isNumber())
                 .andDo(document(
-                        "checklists-create",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(CREATE_SUMMARY)
-                                .description(CREATE_DESCRIPTION)
-                                .responseSchema(schema("ChecklistCreationResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-create",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CREATE_SUMMARY)
+                                        .description(CREATE_DESCRIPTION + " 생성된 체크리스트 ID를 그대로 응답 본문으로 반환합니다.")
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .build()
                                 )
-                                .responseFields(
-                                        fieldWithPath("id").description("생성된 체크리스트 ID")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
     @Sql("/appointment-fixture.sql")
+    @Sql(statements = "INSERT INTO appointments (id, checklist_item_id, title, appointment_date, start_time, end_time, place, memo, is_done, done_by_checklist_item, created_at, updated_at) VALUES (100, 1, 'appointment', '2026-09-10', '2026-09-10 10:00:00', '2026-09-10 11:00:00', 'place', 'memo', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     @DisplayName("로그인한 사용자의 미완료 할 일과 일정을 함께 조회한다")
     void shouldReturnChecklistItemsWithAppointments() throws Exception {
-        appointmentRepository.save(new JpaAppointmentEntity(
-                null,
-                1L,
-                "상담 일정",
-                LocalDate.of(2026, 9, 10),
-                LocalDateTime.of(2026, 9, 10, 10, 0),
-                LocalDateTime.of(2026, 9, 10, 11, 0),
-                "상담 장소",
-                "상담 메모",
-                false,
-                false
-        ));
 
         mockMvc.perform(get("/api/checklists/me")
                         .session(sessionOf(1L))
@@ -145,42 +97,47 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.items[0].categoryId").value(1))
                 .andExpect(jsonPath("$.items[0].sourceCatalogItemId").isEmpty())
                 .andExpect(jsonPath("$.items[0].isDone").value(false))
-                .andExpect(jsonPath("$.items[0].appointments[0].title").value("상담 일정"))
+                .andExpect(jsonPath("$.items[0].appointments[0].title").value("appointment"))
                 .andExpect(jsonPath("$.items[0].appointments[0].date").value("2026-09-10"))
                 .andExpect(jsonPath("$.items[0].appointments[0].startTime").value("2026-09-10T10:00:00"))
-                .andExpect(jsonPath("$.items[0].appointments[0].place").value("상담 장소"))
-                .andExpect(jsonPath("$.items[0].appointments[0].memo").value("상담 메모"))
+                .andExpect(jsonPath("$.items[0].appointments[0].place").value("place"))
+                .andExpect(jsonPath("$.items[0].appointments[0].memo").value("memo"))
                 .andExpect(jsonPath("$.items[0].appointments[0].isDone").value(false))
                 .andDo(document(
-                        "checklists-find-me",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary("내 체크리스트 조회")
-                                .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
-                                .responseSchema(schema("ChecklistWithAppointmentsResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-find-me",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary("내 체크리스트 조회")
+                                        .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
+                                        .responseSchema(schema("ChecklistWithAppointmentsResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("id").description("체크리스트 ID"),
+                                                fieldWithPath("items[].id").description("할 일 ID"),
+                                                fieldWithPath("items[].categoryId").description("카테고리 ID"),
+                                                fieldWithPath("items[].sourceCatalogItemId").description("원본 준비 항목 ID")
+                                                        .optional(),
+                                                fieldWithPath("items[].title").description("할 일 제목"),
+                                                fieldWithPath("items[].isDone").description("할 일 완료 여부"),
+                                                fieldWithPath("items[].appointments").description("할 일에 연결된 일정 목록"),
+                                                fieldWithPath("items[].appointments[].id").description("일정 ID"),
+                                                fieldWithPath("items[].appointments[].title").description("일정 제목"),
+                                                fieldWithPath("items[].appointments[].date").description("일정 날짜"),
+                                                fieldWithPath("items[].appointments[].startTime").description("일정 시작 시간")
+                                                        .optional(),
+                                                fieldWithPath("items[].appointments[].endTime").description("일정 종료 시간")
+                                                        .optional(),
+                                                fieldWithPath("items[].appointments[].place").description("일정 장소").optional(),
+                                                fieldWithPath("items[].appointments[].memo").description("일정 메모").optional(),
+                                                fieldWithPath("items[].appointments[].isDone").description("일정 완료 여부")
+                                        )
+                                        .build()
                                 )
-                                .responseFields(
-                                        fieldWithPath("id").description("체크리스트 ID"),
-                                        fieldWithPath("items[].id").description("할 일 ID"),
-                                        fieldWithPath("items[].categoryId").description("카테고리 ID"),
-                                        fieldWithPath("items[].sourceCatalogItemId").description("원본 준비 항목 ID").optional(),
-                                        fieldWithPath("items[].title").description("할 일 제목"),
-                                        fieldWithPath("items[].isDone").description("할 일 완료 여부"),
-                                        fieldWithPath("items[].appointments").description("할 일에 연결된 일정 목록"),
-                                        fieldWithPath("items[].appointments[].id").description("일정 ID"),
-                                        fieldWithPath("items[].appointments[].title").description("일정 제목"),
-                                        fieldWithPath("items[].appointments[].date").description("일정 날짜"),
-                                        fieldWithPath("items[].appointments[].startTime").description("일정 시작 시간").optional(),
-                                        fieldWithPath("items[].appointments[].endTime").description("일정 종료 시간").optional(),
-                                        fieldWithPath("items[].appointments[].place").description("일정 장소").optional(),
-                                        fieldWithPath("items[].appointments[].memo").description("일정 메모").optional(),
-                                        fieldWithPath("items[].appointments[].isDone").description("일정 완료 여부")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -189,18 +146,20 @@ class ChecklistControllerIntegrationTest {
         mockMvc.perform(get("/api/checklists/me"))
                 .andExpect(status().isUnauthorized())
                 .andDo(document(
-                        "checklists-find-me-unauthorized",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary("인증 없이 내 체크리스트 조회")
-                                .description("인증되지 않은 사용자의 체크리스트 조회 요청은 거절합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
+                                "checklists-find-me-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary("인증 없이 내 체크리스트 조회")
+                                        .description("인증되지 않은 사용자의 체크리스트 조회 요청은 거절합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -210,18 +169,20 @@ class ChecklistControllerIntegrationTest {
                         .session(authenticatedSession()))
                 .andExpect(status().isNotFound())
                 .andDo(document(
-                        "checklists-find-me-not-found",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary("체크리스트가 없는 사용자의 조회")
-                                .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
-                                .responseSchema(schema("ErrorResponse"))
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
+                                "checklists-find-me-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary("체크리스트가 없는 사용자의 조회")
+                                        .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -266,22 +227,24 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(402))
                 .andExpect(jsonPath("$.message").value("이미 체크리스트가 존재합니다."))
                 .andDo(document(
-                        "checklists-create-conflict",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(CREATE_SUMMARY)
-                                .description(CREATE_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-create-conflict",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CREATE_SUMMARY)
+                                        .description(CREATE_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -317,36 +280,37 @@ class ChecklistControllerIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 101L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
                 .andExpect(jsonPath("$.items[0].categoryId").value(2))
                 .andExpect(jsonPath("$.items[0].title").value("계약서 확인"))
                 .andExpect(jsonPath("$.items[0].status").value("prev"))
                 .andDo(document(
-                        "checklists-add-catalog-items",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(ADD_SUMMARY)
-                                .description(ADD_DESCRIPTION)
-                                .requestSchema(schema("AddCatalogItemsRequest"))
-                                .responseSchema(schema("AddCatalogItemsResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-add-catalog-items",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(ADD_SUMMARY)
+                                        .description(ADD_DESCRIPTION)
+                                        .responseSchema(schema("AddCatalogItemsResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("items[].id").description("생성된 할 일 ID"),
+                                                fieldWithPath("items[].catalogItemId").description("원본 준비 항목 ID"),
+                                                fieldWithPath("items[].categoryId").description("복사된 카테고리 ID"),
+                                                fieldWithPath("items[].title").description("복사된 할 일 제목"),
+                                                fieldWithPath("items[].status").description("할 일 상태. prev, continue, done")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
-                                )
-                                .responseFields(
-                                        fieldWithPath("items[].id").description("생성된 할 일 ID"),
-                                        fieldWithPath("items[].catalogItemId").description("원본 준비 항목 ID"),
-                                        fieldWithPath("items[].categoryId").description("복사된 카테고리 ID"),
-                                        fieldWithPath("items[].title").description("복사된 할 일 제목"),
-                                        fieldWithPath("items[].status").description("할 일 상태. prev, continue, done")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -357,7 +321,7 @@ class ChecklistControllerIntegrationTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isCreated());
 
         // when, then
@@ -365,30 +329,32 @@ class ChecklistControllerIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 101L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(403))
                 .andExpect(jsonPath("$.message").value("이미 추가된 준비 항목입니다."))
                 .andDo(document(
-                        "checklists-add-catalog-items-conflict",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(ADD_SUMMARY)
-                                .description(ADD_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-add-catalog-items-conflict",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(ADD_SUMMARY)
+                                        .description(ADD_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -399,7 +365,7 @@ class ChecklistControllerIntegrationTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 999L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 999L))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
@@ -413,30 +379,32 @@ class ChecklistControllerIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(303))
                 .andExpect(jsonPath("$.message").value("체크리스트를 찾을 수 없습니다."))
                 .andDo(document(
-                        "checklists-add-catalog-items-checklist-not-found",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(ADD_SUMMARY)
-                                .description(ADD_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-add-catalog-items-checklist-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(ADD_SUMMARY)
+                                        .description(ADD_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -457,30 +425,32 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
                 .andExpect(jsonPath("$.status").value("prev"))
                 .andDo(document(
-                        "checklists-write-item",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(WRITE_SUMMARY)
-                                .description(WRITE_DESCRIPTION)
-                                .requestSchema(schema("CreateChecklistItemRequest"))
-                                .responseSchema(schema("ChecklistItemResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-write-item",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(WRITE_SUMMARY)
+                                        .description(WRITE_DESCRIPTION)
+                                        .requestSchema(schema("CreateChecklistItemRequest"))
+                                        .responseSchema(schema("ChecklistItemResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("title").description("할 일 제목. 앞뒤 공백을 제거한 뒤 1자 이상 50자 이하"),
+                                                fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("id").description("생성된 할 일 ID"),
+                                                fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
+                                                fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
+                                                fieldWithPath("title").description("할 일 제목"),
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("title").description("할 일 제목. 앞뒤 공백을 제거한 뒤 1자 이상 50자 이하"),
-                                        fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
-                                )
-                                .responseFields(
-                                        fieldWithPath("id").description("생성된 할 일 ID"),
-                                        fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
-                                        fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
-                                        fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
@@ -520,26 +490,28 @@ class ChecklistControllerIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value(305))
                 .andExpect(jsonPath("$.message").value("카테고리를 찾을 수 없습니다."))
                 .andDo(document(
-                        "checklists-write-item-category-not-found",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("Checklist")
-                                .summary(WRITE_SUMMARY)
-                                .description(WRITE_DESCRIPTION)
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                "checklists-write-item-category-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(WRITE_SUMMARY)
+                                        .description(WRITE_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .requestFields(
+                                                fieldWithPath("title").description("할 일 제목"),
+                                                fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
                                 )
-                                .requestFields(
-                                        fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("categoryId").description("할 일이 속할 카테고리 ID")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                        )
+                );
     }
 
     @Test
