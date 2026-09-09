@@ -14,9 +14,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemCategoryRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemStatusRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChangeChecklistItemTitleRequest;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.DisplayName;
@@ -86,15 +83,15 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private String requestBody(Long categoryId) {
-        return objectMapper.writeValueAsString(new ChangeChecklistItemCategoryRequest(categoryId));
+        return objectMapper.writeValueAsString(categoryId);
     }
 
     private String statusRequestBody(String status) {
-        return objectMapper.writeValueAsString(new ChangeChecklistItemStatusRequest(status));
+        return status == null ? "" : status;
     }
 
     private String titleRequestBody(String title) {
-        return objectMapper.writeValueAsString(new ChangeChecklistItemTitleRequest(title));
+        return title == null ? "" : title;
     }
 
     @Test
@@ -116,8 +113,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 resource(ResourceSnippetParameters.builder()
                                         .tag("Checklist")
                                         .summary(CHANGE_STATUS_SUMMARY)
-                                        .description(CHANGE_STATUS_DESCRIPTION)
-                                        .requestSchema(schema("ChangeChecklistItemStatusRequest"))
+                                        .description(CHANGE_STATUS_DESCRIPTION
+                                                + " 요청 본문은 바꿀 상태(prev, continue, done 중 하나, 대소문자 구분 없음)를 나타내는 문자열 하나입니다.")
                                         .responseSchema(schema("ChecklistItemResponse"))
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
@@ -125,10 +122,6 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         )
                                         .pathParameters(
                                                 parameterWithName("itemId").description("상태를 바꿀 할 일 ID")
-                                        )
-                                        .requestFields(
-                                                fieldWithPath("status").description(
-                                                        "바꿀 상태. prev, continue, done 중 하나. 대소문자는 구분하지 않는다")
                                         )
                                         .responseFields(
                                                 fieldWithPath("id").description("할 일 ID"),
@@ -236,24 +229,20 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasRemainingAppointments").value(true))
+                .andExpect(jsonPath("$").value(true))
                 .andDo(document(
                         "checklist-items-remaining-appointments",
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Checklist")
                                 .summary(REMAINING_APPOINTMENTS_SUMMARY)
-                                .description(REMAINING_APPOINTMENTS_DESCRIPTION)
-                                .responseSchema(schema("RemainingAppointmentResponse"))
+                                .description(REMAINING_APPOINTMENTS_DESCRIPTION
+                                        + " 응답 본문은 완료하지 않은 일정이 남아 있는지 여부를 나타내는 boolean 값 하나입니다.")
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)
                                 )
                                 .pathParameters(
                                         parameterWithName("itemId").description("남은 일정을 확인할 할 일 ID")
-                                )
-                                .responseFields(
-                                        fieldWithPath("hasRemainingAppointments")
-                                                .description("완료하지 않은 일정이 남아 있는지 여부")
                                 )
                                 .build())
                 ));
@@ -266,7 +255,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
                         .session(authenticatedSession()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasRemainingAppointments").value(false));
+                .andExpect(jsonPath("$").value(false));
     }
 
     @Test
@@ -278,7 +267,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
                         .session(authenticatedSession()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasRemainingAppointments").value(false));
+                .andExpect(jsonPath("$").value(false));
     }
 
     @Test
@@ -333,8 +322,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Checklist")
                                 .summary(CHANGE_CATEGORY_SUMMARY)
-                                .description(CHANGE_CATEGORY_DESCRIPTION)
-                                .requestSchema(schema("ChangeChecklistItemCategoryRequest"))
+                                .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
                                 .responseSchema(schema("ChecklistItemResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
@@ -342,9 +330,6 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                                 .pathParameters(
                                         parameterWithName("itemId").description("카테고리를 바꿀 할 일 ID")
-                                )
-                                .requestFields(
-                                        fieldWithPath("categoryId").description("새로 지정할 카테고리 ID")
                                 )
                                 .responseFields(
                                         fieldWithPath("id").description("할 일 ID"),
@@ -401,8 +386,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Checklist")
                                 .summary(CHANGE_CATEGORY_SUMMARY)
-                                .description(CHANGE_CATEGORY_DESCRIPTION)
-                                .requestSchema(schema("ChangeChecklistItemCategoryRequest"))
+                                .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestHeaders(
                                         headerWithName(HttpHeaders.COOKIE)
@@ -410,9 +394,6 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                                 .pathParameters(
                                         parameterWithName("itemId").description("카테고리를 바꿀 할 일 ID")
-                                )
-                                .requestFields(
-                                        fieldWithPath("categoryId").description("새로 지정할 카테고리 ID")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -505,8 +486,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 resource(ResourceSnippetParameters.builder()
                                         .tag("Checklist")
                                         .summary(CHANGE_TITLE_SUMMARY)
-                                        .description(CHANGE_TITLE_DESCRIPTION)
-                                        .requestSchema(schema("ChangeChecklistItemTitleRequest"))
+                                        .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다. 공백만 보낼 수 없고 50자를 넘을 수 없습니다.")
                                         .responseSchema(schema("ChecklistItemResponse"))
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
@@ -514,9 +494,6 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         )
                                         .pathParameters(
                                                 parameterWithName("itemId").description("제목을 바꿀 할 일 ID")
-                                        )
-                                        .requestFields(
-                                                fieldWithPath("title").description("새로 지정할 제목. 공백만 보낼 수 없고 50자를 넘을 수 없다")
                                         )
                                         .responseFields(
                                                 fieldWithPath("id").description("할 일 ID"),
@@ -574,8 +551,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 resource(ResourceSnippetParameters.builder()
                                         .tag("Checklist")
                                         .summary(CHANGE_TITLE_SUMMARY)
-                                        .description(CHANGE_TITLE_DESCRIPTION)
-                                        .requestSchema(schema("ChangeChecklistItemTitleRequest"))
+                                        .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다.")
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
@@ -583,9 +559,6 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         )
                                         .pathParameters(
                                                 parameterWithName("itemId").description("제목을 바꿀 할 일 ID")
-                                        )
-                                        .requestFields(
-                                                fieldWithPath("title").description("새로 지정할 제목")
                                         )
                                         .responseFields(
                                                 fieldWithPath("errorCode").description("오류 코드"),

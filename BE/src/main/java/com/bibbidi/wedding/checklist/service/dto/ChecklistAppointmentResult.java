@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.service.dto;
 
-import com.bibbidi.wedding.appointment.service.dto.AppointmentSummaryResult;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 

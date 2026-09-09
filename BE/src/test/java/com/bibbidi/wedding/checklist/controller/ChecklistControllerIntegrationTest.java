@@ -12,8 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.checklist.controller.dto.AddCatalogItemsRequest;
-import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
+import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.util.List;
@@ -66,20 +65,16 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$").isNumber())
                 .andDo(document(
                                 "checklists-create",
                                 resource(ResourceSnippetParameters.builder()
                                         .tag("Checklist")
                                         .summary(CREATE_SUMMARY)
-                                        .description(CREATE_DESCRIPTION)
-                                        .responseSchema(schema("ChecklistCreationResponse"))
+                                        .description(CREATE_DESCRIPTION + " 생성된 체크리스트 ID를 그대로 응답 본문으로 반환합니다.")
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
-                                        )
-                                        .responseFields(
-                                                fieldWithPath("id").description("생성된 체크리스트 ID")
                                         )
                                         .build()
                                 )
@@ -285,7 +280,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 101L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.items[0].catalogItemId").value(100))
                 .andExpect(jsonPath("$.items[0].categoryId").value(2))
@@ -297,14 +292,13 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .tag("Checklist")
                                         .summary(ADD_SUMMARY)
                                         .description(ADD_DESCRIPTION)
-                                        .requestSchema(schema("AddCatalogItemsRequest"))
                                         .responseSchema(schema("AddCatalogItemsResponse"))
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
-                                                fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
                                         )
                                         .responseFields(
                                                 fieldWithPath("items[].id").description("생성된 할 일 ID"),
@@ -327,7 +321,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isCreated());
 
         // when, then
@@ -335,7 +329,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 101L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(403))
                 .andExpect(jsonPath("$.message").value("이미 추가된 준비 항목입니다."))
@@ -351,7 +345,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
-                                                fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
                                         )
                                         .responseFields(
                                                 fieldWithPath("errorCode").description("오류 코드"),
@@ -371,7 +365,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(post("/api/checklists/me/catalog-items")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L, 999L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L, 999L))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
@@ -385,7 +379,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                         .session(authenticatedSession())
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AddCatalogItemsRequest(List.of(100L)))))
+                        .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(303))
                 .andExpect(jsonPath("$.message").value("체크리스트를 찾을 수 없습니다."))
@@ -401,7 +395,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
-                                                fieldWithPath("catalogItemIds").description("추가할 준비 항목 ID 목록")
+                                                fieldWithPath("[]").description("추가할 준비 항목 ID 목록")
                                         )
                                         .responseFields(
                                                 fieldWithPath("errorCode").description("오류 코드"),

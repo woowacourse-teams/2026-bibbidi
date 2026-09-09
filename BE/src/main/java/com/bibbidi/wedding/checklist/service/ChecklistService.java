@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.checklist.service;
 
-import com.bibbidi.wedding.appointment.service.ChecklistAppointmentService;
-import com.bibbidi.wedding.appointment.service.dto.AppointmentSummaryResult;
+import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;

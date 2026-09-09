@@ -13,10 +13,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.appointment.controller.dto.CreateAppointmentRequest;
+import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
-import com.bibbidi.wedding.checklist.controller.dto.ChecklistItemResponse;
-import com.bibbidi.wedding.checklist.controller.dto.CreateChecklistItemRequest;
+import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
+import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;

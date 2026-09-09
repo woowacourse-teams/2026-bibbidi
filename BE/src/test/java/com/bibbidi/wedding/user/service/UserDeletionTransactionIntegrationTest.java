@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.willThrow;
 
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentEntity;
-import com.bibbidi.wedding.appointment.persistence.JpaAppointmentRepository;
+import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
+import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.auth.password.PasswordHasher;
 import com.bibbidi.wedding.auth.service.AuthService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;

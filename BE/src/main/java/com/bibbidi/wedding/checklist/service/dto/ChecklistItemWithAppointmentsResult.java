@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.checklist.service.dto;
 
-import com.bibbidi.wedding.appointment.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import java.util.List;
 

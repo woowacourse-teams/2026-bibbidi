@@ -37,7 +37,6 @@ class ArchitectureConventionTest {
 
     private static final String BASE_PACKAGE = "com.bibbidi.wedding";
     private static final List<String> FEATURES = List.of(
-            "appointment",
             "auth",
             "catalog",
             "checklist",
