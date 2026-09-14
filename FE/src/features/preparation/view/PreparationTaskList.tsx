@@ -18,19 +18,20 @@ function PreparationTaskEmptyState({
   density,
   variant,
 }: Pick<PreparationTaskListProps, "density" | "variant">) {
-  if (variant === "available") {
-    return (
-      <p
-        className={`preparation-task-list__empty preparation-task-list__empty--${density}`}
-      >
-        추가할 세부 할 일이 없어요.
-      </p>
-    );
-  }
+  const message =
+    variant === "available"
+      ? {
+          description: "이 단계의 모든 할 일을 체크리스트에 추가했어요.",
+          title: "추가할 수 있는 할 일이 없어요.",
+        }
+      : {
+          description: "아래 준비할 일에서 필요한 항목을 확인해 보세요.",
+          title: "이 단계에 추가한 할 일이 없어요.",
+        };
 
   return (
     <div
-      className={`preparation-task-list__empty-checklist preparation-task-list__empty-checklist--${density}`}
+      className={`preparation-task-list__empty-state preparation-task-list__empty-state--${density}`}
     >
       <span aria-hidden="true" className="preparation-task-list__empty-icon">
         <svg viewBox="0 0 24 24" fill="none">
@@ -38,8 +39,8 @@ function PreparationTaskEmptyState({
           <path d="M9 4V2h6v2M8 10l1 1 2-2M13 10h3M8 16l1 1 2-2M13 16h3" />
         </svg>
       </span>
-      <h3>이 단계에 추가한 할 일이 없어요.</h3>
-      <p>아래 준비할 일에서 필요한 항목을 확인해 보세요.</p>
+      <h3>{message.title}</h3>
+      <p>{message.description}</p>
     </div>
   );
 }

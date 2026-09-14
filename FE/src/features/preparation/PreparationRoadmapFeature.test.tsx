@@ -531,7 +531,15 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       ["102"],
       expect.any(AbortSignal),
     );
-    expect(await screen.findByText("추가할 세부 할 일이 없어요.")).toBeTruthy();
+    expect(
+      await screen.findByText("추가할 수 있는 할 일이 없어요."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /모든 할 일 추가/ }),
+    ).toBeNull();
   });
 
   it("추가 요청 중 버튼을 잠가 중복 요청을 막는다", async () => {
@@ -684,12 +692,15 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
       ["102"],
       expect.any(AbortSignal),
     );
-    expect(await screen.findByText("추가할 세부 할 일이 없어요.")).toBeTruthy();
     expect(
-      screen
-        .getByRole("button", { name: "모든 할 일 추가 (준비 중)" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+      await screen.findByText("추가할 수 있는 할 일이 없어요."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /모든 할 일 추가/ }),
+    ).toBeNull();
   });
 
   it("로컬 저장 실패 시 화면을 유지하고 같은 동작을 다시 시도할 수 있다", async () => {
@@ -749,6 +760,37 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
         }),
       ).toBeNull(),
     );
+  });
+
+  it("모바일에서 남은 할 일을 모두 추가하면 빈 상태를 안내하고 전체 추가 버튼을 숨긴다", async () => {
+    setViewportMatches(true);
+    await renderFeature();
+    fireEvent.click(
+      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "웨딩홀 투어와 계약",
+    });
+
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "남은 할 일 모두 추가",
+      }),
+    );
+
+    expect(
+      await within(dialog).findByText("추가할 수 있는 할 일이 없어요."),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByText(
+        "이 단계의 모든 할 일을 체크리스트에 추가했어요.",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(dialog).queryByRole("button", {
+        name: /남은 할 일 모두 추가/,
+      }),
+    ).toBeNull();
   });
 });
 

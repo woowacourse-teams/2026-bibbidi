@@ -107,23 +107,21 @@ export function PreparationStepBottomSheet({
               tasks={detail.detailTasks}
               variant="available"
             />
-            <footer className="preparation-step-bottom-sheet__footer">
-              {additionErrorMessage ? (
-                <p className="preparation-task-list__error" role="alert">
-                  {additionErrorMessage}
-                </p>
-              ) : null}
-              <PreparationAddAllTasksButton
-                isDisabled={
-                  !canAddTasks ||
-                  addingCatalogItemIds.length > 0 ||
-                  detail.detailTasks.length === 0
-                }
-                isLoading={addingCatalogItemIds.length > 0}
-                label="남은 할 일 모두 추가"
-                onClick={onAddAllTasks}
-              />
-            </footer>
+            {detail.detailTasks.length > 0 ? (
+              <footer className="preparation-step-bottom-sheet__footer">
+                {additionErrorMessage ? (
+                  <p className="preparation-task-list__error" role="alert">
+                    {additionErrorMessage}
+                  </p>
+                ) : null}
+                <PreparationAddAllTasksButton
+                  isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
+                  isLoading={addingCatalogItemIds.length > 0}
+                  label="남은 할 일 모두 추가"
+                  onClick={onAddAllTasks}
+                />
+              </footer>
+            ) : null}
           </section>
         </div>
       </section>
