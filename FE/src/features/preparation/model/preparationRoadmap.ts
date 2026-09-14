@@ -59,3 +59,22 @@ export function applyChecklistCatalogItemIds(
     })),
   };
 }
+
+export function includeChecklistCatalogItemIds(
+  catalog: PreparationCatalogModel,
+  catalogItemIds: readonly string[],
+): PreparationCatalogModel {
+  const addedCatalogItemIds = new Set(catalogItemIds);
+
+  return {
+    ...catalog,
+    stepDetails: catalog.stepDetails.map((stepDetail) => ({
+      ...stepDetail,
+      tasks: stepDetail.tasks.map((task) =>
+        task.included || !addedCatalogItemIds.has(task.id)
+          ? task
+          : { ...task, included: true },
+      ),
+    })),
+  };
+}

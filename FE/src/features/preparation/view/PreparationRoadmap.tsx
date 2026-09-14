@@ -36,6 +36,7 @@ function useMediaQuery(query: string): boolean {
 
 interface PreparationRoadmapProps {
   additionErrorMessage: string | null;
+  addingCatalogItemIds: readonly string[];
   canAddTasks: boolean;
   onAddAllTasks: () => void;
   onCategorySelect: (categoryId: string) => void;
@@ -104,6 +105,7 @@ function PreparationRoadmapSteps({
 
 export function PreparationRoadmap({
   additionErrorMessage,
+  addingCatalogItemIds,
   canAddTasks,
   onAddAllTasks,
   onCategorySelect,
@@ -190,6 +192,7 @@ export function PreparationRoadmap({
             />
             <PreparationStepDetail
               additionErrorMessage={additionErrorMessage}
+              addingCatalogItemIds={addingCatalogItemIds}
               canAddTasks={canAddTasks}
               detail={viewModel.selectedStepDetail}
               onAddAllTasks={onAddAllTasks}
@@ -201,6 +204,7 @@ export function PreparationRoadmap({
       {isMobileLayout && mobileOpenStepId ? (
         <PreparationStepBottomSheet
           additionErrorMessage={additionErrorMessage}
+          addingCatalogItemIds={addingCatalogItemIds}
           canAddTasks={canAddTasks}
           detail={viewModel.selectedStepDetail}
           key={mobileOpenStepId}

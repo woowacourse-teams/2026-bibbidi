@@ -7,7 +7,12 @@ import {
   RemoteChecklistDataSource,
 } from "../data-source/remoteChecklistDataSource";
 import { PreparationAudience } from "../model/preparationRoadmap";
-import { PreparationAuthenticationRequiredError } from "./preparationErrors";
+import {
+  PreparationAuthenticationRequiredError,
+  PreparationChecklistAdditionError,
+  PreparationChecklistNotFoundError,
+  PreparationDuplicateChecklistItemError,
+} from "./preparationErrors";
 
 export class ChecklistPersistenceError extends Error {
   constructor(options?: ErrorOptions) {
@@ -24,7 +29,11 @@ export class InvalidChecklistCatalogItemIdError extends Error {
 }
 
 export interface ChecklistRepository {
-  addLocalCatalogItemIds(catalogItemIds: string[]): string[];
+  addCatalogItemIds(
+    audience: PreparationAudience,
+    catalogItemIds: string[],
+    signal?: AbortSignal,
+  ): Promise<string[]>;
   getCatalogItemIds(
     audience: PreparationAudience,
     signal?: AbortSignal,
@@ -58,21 +67,64 @@ export function createChecklistRepository(
   remoteDataSource: RemoteChecklistDataSource,
 ): ChecklistRepository {
   return {
-    addLocalCatalogItemIds(catalogItemIds) {
+    async addCatalogItemIds(audience, catalogItemIds, signal) {
       const catalogItemIdNumbers = catalogItemIds.map(toCatalogItemIdNumber);
 
-      return runWithPersistenceError(() => {
-        const currentCatalogItemIds = localDataSource.getCatalogItemIds();
-        const nextCatalogItemIds = [
-          ...new Set([...currentCatalogItemIds, ...catalogItemIdNumbers]),
-        ];
+      if (audience === "guest") {
+        return runWithPersistenceError(() => {
+          const currentCatalogItemIds = localDataSource.getCatalogItemIds();
+          const currentCatalogItemIdSet = new Set(currentCatalogItemIds);
+          const addedCatalogItemIds = [
+            ...new Set(
+              catalogItemIdNumbers.filter(
+                (catalogItemId) => !currentCatalogItemIdSet.has(catalogItemId),
+              ),
+            ),
+          ];
+          const nextCatalogItemIds = [
+            ...currentCatalogItemIds,
+            ...addedCatalogItemIds,
+          ];
 
-        if (catalogItemIdNumbers.length > 0) {
-          localDataSource.setCatalogItemIds(nextCatalogItemIds);
+          if (addedCatalogItemIds.length > 0) {
+            localDataSource.setCatalogItemIds(nextCatalogItemIds);
+          }
+
+          return addedCatalogItemIds.map(String);
+        });
+      }
+
+      try {
+        return (
+          await remoteDataSource.addCatalogItemIds(catalogItemIdNumbers, signal)
+        ).map(String);
+      } catch (error) {
+        if (error instanceof RemoteChecklistApiError) {
+          if (error.status === 401 || error.errorCode === 201) {
+            throw new PreparationAuthenticationRequiredError();
+          }
+
+          if (error.status === 404 && error.errorCode === 303) {
+            throw new PreparationChecklistNotFoundError(error.message, {
+              cause: error,
+            });
+          }
+
+          if (error.status === 409 && error.errorCode === 403) {
+            throw new PreparationDuplicateChecklistItemError(error.message, {
+              cause: error,
+            });
+          }
+
+          throw new PreparationChecklistAdditionError(error.message, {
+            cause: error,
+          });
         }
 
-        return nextCatalogItemIds.map(String);
-      });
+        throw new PreparationChecklistAdditionError(undefined, {
+          cause: error,
+        });
+      }
     },
     async getCatalogItemIds(audience, signal) {
       if (audience === "guest") {

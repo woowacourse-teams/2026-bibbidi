@@ -8,6 +8,7 @@ import {
 } from "./analytics/preparationAnalytics";
 import {
   applyChecklistCatalogItemIds,
+  includeChecklistCatalogItemIds,
   PreparationAudience,
   PreparationCatalogModel,
 } from "./model/preparationRoadmap";
@@ -15,7 +16,10 @@ import {
   checklistRepository,
   preparationCatalogRepository,
 } from "./preparationDependencies";
-import { PreparationAuthenticationRequiredError } from "./repository/preparationErrors";
+import {
+  PreparationAuthenticationRequiredError,
+  PreparationChecklistAdditionError,
+} from "./repository/preparationErrors";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
@@ -46,10 +50,14 @@ export function PreparationRoadmapFeature() {
   const [additionErrorMessage, setAdditionErrorMessage] = useState<
     string | null
   >(null);
+  const [addingCatalogItemIds, setAddingCatalogItemIds] = useState<string[]>(
+    [],
+  );
   const [requestState, setRequestState] = useState<CatalogRequestState>({
     status: "loading",
   });
   const [requestRevision, setRequestRevision] = useState(0);
+  const additionControllerRef = useRef<AbortController | null>(null);
   const hasTrackedCatalogViewRef = useRef(false);
   const audience: PreparationAudience | undefined =
     authState.status === "authenticated"
@@ -117,6 +125,13 @@ export function PreparationRoadmapFeature() {
       controller.abort();
     };
   }, [audience, refreshAuth, requestRevision]);
+
+  useEffect(
+    () => () => {
+      additionControllerRef.current?.abort();
+    },
+    [audience],
+  );
 
   useEffect(() => {
     if (requestState.status !== "success" || hasTrackedCatalogViewRef.current) {
@@ -231,31 +246,75 @@ export function PreparationRoadmapFeature() {
     });
   };
 
-  const addTasksToLocalChecklist = (catalogItemIds: string[]) => {
-    if (audience !== "guest") {
+  const addTasksToChecklist = async (catalogItemIds: string[]) => {
+    if (catalogItemIds.length === 0 || additionControllerRef.current) {
       return;
     }
 
-    try {
-      const nextCatalogItemIds =
-        checklistRepository.addLocalCatalogItemIds(catalogItemIds);
+    const controller = new AbortController();
+    additionControllerRef.current = controller;
+    setAddingCatalogItemIds(catalogItemIds);
+    setAdditionErrorMessage(null);
 
-      setAdditionErrorMessage(null);
-      setRequestState({
-        ...requestState,
-        catalog: applyChecklistCatalogItemIds(catalog, nextCatalogItemIds),
+    try {
+      const addedCatalogItemIds = await checklistRepository.addCatalogItemIds(
+        audience,
+        catalogItemIds,
+        controller.signal,
+      );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setRequestState((currentState) => {
+        if (
+          currentState.status !== "success" ||
+          currentState.audience !== audience
+        ) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          catalog: includeChecklistCatalogItemIds(
+            currentState.catalog,
+            addedCatalogItemIds,
+          ),
+        };
       });
-    } catch {
-      setAdditionErrorMessage("할 일을 저장하지 못했어요. 다시 시도해 주세요.");
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      if (error instanceof PreparationAuthenticationRequiredError) {
+        setAdditionErrorMessage(
+          "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+        );
+        refreshAuth();
+        return;
+      }
+
+      setAdditionErrorMessage(
+        error instanceof PreparationChecklistAdditionError
+          ? error.message
+          : "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
+      );
+    } finally {
+      if (additionControllerRef.current === controller) {
+        additionControllerRef.current = null;
+        setAddingCatalogItemIds([]);
+      }
     }
   };
 
   const handleTaskAdd = (catalogItemId: string) => {
-    addTasksToLocalChecklist([catalogItemId]);
+    void addTasksToChecklist([catalogItemId]);
   };
 
   const handleAddAllTasks = () => {
-    addTasksToLocalChecklist(
+    void addTasksToChecklist(
       viewModel.selectedStepDetail.detailTasks.map((task) => task.id),
     );
   };
@@ -263,7 +322,8 @@ export function PreparationRoadmapFeature() {
   return (
     <PreparationRoadmap
       additionErrorMessage={additionErrorMessage}
-      canAddTasks={audience === "guest"}
+      addingCatalogItemIds={addingCatalogItemIds}
+      canAddTasks
       onAddAllTasks={handleAddAllTasks}
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
