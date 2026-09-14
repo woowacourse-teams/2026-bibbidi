@@ -5,12 +5,14 @@ import com.bibbidi.wedding.checklist.controller.dto.resp.AddCatalogItemsResponse
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistProgressResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistWithAppointmentsResponse;
+import com.bibbidi.wedding.checklist.controller.dto.resp.UnscheduledChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -49,6 +51,14 @@ public class ChecklistController {
     public ChecklistProgressResponse findMyChecklistProgress(@Auth Long userId) {
         ChecklistProgressResult result = checklistService.findMyChecklistProgress(userId);
         return ChecklistProgressResponse.from(result);
+    }
+
+    @GetMapping("/api/checklists/me/unscheduled-items")
+    public List<UnscheduledChecklistItemResponse> findMyUnscheduledItems(@Auth Long userId) {
+        List<UnscheduledChecklistItemResult> results = checklistService.findMyUnscheduledItems(userId);
+        return results.stream()
+                .map(UnscheduledChecklistItemResponse::from)
+                .toList();
     }
 
     @ResponseStatus(HttpStatus.CREATED)

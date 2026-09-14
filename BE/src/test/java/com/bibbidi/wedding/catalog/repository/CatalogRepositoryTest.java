@@ -14,6 +14,8 @@ import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,5 +85,24 @@ class CatalogRepositoryTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.CATEGORY_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("요청한 카테고리 중 존재하는 카테고리의 이름만 조회한다")
+    void shouldFindNamesOfExistingCategories() {
+        // given
+        JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        JpaCategoryEntity studio = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
+        jpaCategoryRepository.save(new JpaCategoryEntity(null, "예물", 3));
+
+        // when
+        Map<Long, String> categoryNames = catalogRepository.findCategoryNames(
+                List.of(weddingHall.id(), studio.id(), 999L));
+
+        // then
+        assertThat(categoryNames).containsExactlyInAnyOrderEntriesOf(Map.of(
+                weddingHall.id(), "웨딩홀",
+                studio.id(), "스드메"
+        ));
     }
 }

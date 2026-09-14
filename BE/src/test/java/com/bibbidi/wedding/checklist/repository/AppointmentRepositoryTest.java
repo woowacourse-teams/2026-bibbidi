@@ -13,6 +13,7 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -193,6 +194,19 @@ class AppointmentRepositoryTest {
                     assertThat(appointment.isDone()).isTrue();
                     assertThat(appointment.doneByChecklistItem()).isTrue();
                 });
+    }
+
+    @Test
+    @DisplayName("완료 여부와 관계없이 일정이 하나라도 있는 할 일 ID만 중복 없이 조회한다")
+    void shouldFindChecklistItemIdsHavingAnyAppointment() {
+        saveAppointment(10L, "아직 안 끝낸 일정");
+        saveAppointment(10L, "같은 할 일의 두 번째 일정");
+        saveDoneAppointment(11L, "이미 끝낸 일정");
+        saveAppointment(20L, "조회 대상이 아닌 할 일의 일정");
+
+        Set<Long> found = appointmentRepository.findChecklistItemIdsHavingAppointment(List.of(10L, 11L, 12L));
+
+        assertThat(found).containsExactlyInAnyOrder(10L, 11L);
     }
 
     @Test

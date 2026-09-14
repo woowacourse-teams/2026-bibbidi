@@ -14,12 +14,16 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -27,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChecklistService {
+
+    private static final int UNSCHEDULED_ITEM_LIMIT = 4;
 
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
@@ -60,6 +66,41 @@ public class ChecklistService {
         ChecklistProgress progress = checklist.calculateProgress();
 
         return ChecklistProgressResult.from(progress);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UnscheduledChecklistItemResult> findMyUnscheduledItems(Long ownerId) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+        List<ChecklistItem> unscheduledItems = pickUnscheduledItems(checklist.unfinishedItems());
+        Map<Long, String> categoryNames = catalogService.findCategoryNames(categoryIdsOf(unscheduledItems));
+
+        return unscheduledItems.stream()
+                .map(item -> UnscheduledChecklistItemResult.from(item, categoryNames))
+                .toList();
+    }
+
+    private List<ChecklistItem> pickUnscheduledItems(List<ChecklistItem> unfinishedItems) {
+        List<Long> unfinishedItemIds = unfinishedItems.stream()
+                .map(ChecklistItem::id)
+                .toList();
+        Set<Long> scheduledItemIds = checklistAppointmentService.findChecklistItemIdsHavingAppointment(
+                unfinishedItemIds);
+
+        List<ChecklistItem> unscheduledItems = new ArrayList<>(unfinishedItems.stream()
+                .filter(item -> !scheduledItemIds.contains(item.id()))
+                .toList());
+        Collections.shuffle(unscheduledItems);
+
+        return unscheduledItems.stream()
+                .limit(UNSCHEDULED_ITEM_LIMIT)
+                .toList();
+    }
+
+    private Set<Long> categoryIdsOf(List<ChecklistItem> items) {
+        return items.stream()
+                .map(ChecklistItem::categoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(

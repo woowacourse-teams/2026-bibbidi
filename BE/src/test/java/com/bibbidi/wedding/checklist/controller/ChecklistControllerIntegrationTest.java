@@ -4,6 +4,8 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,6 +45,10 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     private static final String ADD_DESCRIPTION =
             "선택한 준비 항목의 제목과 카테고리를 복사해 현재 사용자의 체크리스트에 할 일로 추가합니다. "
                     + "이미 담긴 준비 항목이 포함되면 요청 전체가 실패합니다.";
+    private static final String UNSCHEDULED_SUMMARY = "일정이 필요한 할 일 조회";
+    private static final String UNSCHEDULED_DESCRIPTION =
+            "현재 사용자의 할 일 중 완료되지 않았고 연결된 일정이 하나도 없는 할 일을 랜덤으로 최대 4개 조회합니다. "
+                    + "대상이 없으면 빈 배열을 응답합니다.";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -175,6 +181,112 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .summary("체크리스트가 없는 사용자의 조회")
                                         .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
                                         .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @Sql("/checklist-item-fixture.sql")
+    @Sql(statements = {
+            "INSERT INTO catalog_items (id, step_id, title, display_order, essential, created_at, updated_at) "
+                    + "VALUES (101, 11, '견적 비교', 2, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO checklist_items "
+                    + "(id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES "
+                    + "(510, 1000, 3, NULL, '스튜디오 투어', 'PREV', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                    + "(511, 1000, 2, 101, '견적 비교', 'CONTINUE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                    + "(512, 1000, 2, NULL, '하객 명단 정리', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                    + "(513, 1001, 2, NULL, '다른 사용자의 할 일', 'PREV', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+    })
+    @DisplayName("완료되지 않았고 일정이 없는 내 할 일을 조회한다")
+    void shouldFindMyUnscheduledItems() throws Exception {
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].checklistItemId", containsInAnyOrder(510, 511)))
+                .andExpect(jsonPath("$[*].title", containsInAnyOrder("스튜디오 투어", "견적 비교")))
+                .andExpect(jsonPath("$[*].categoryName", containsInAnyOrder("스튜디오", "웨딩홀")))
+                .andExpect(jsonPath("$[*].status", containsInAnyOrder("prev", "continue")))
+                .andDo(document(
+                                "checklists-find-unscheduled-items",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(UNSCHEDULED_SUMMARY)
+                                        .description(UNSCHEDULED_DESCRIPTION)
+                                        .responseSchema(schema("UnscheduledChecklistItemResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("[].checklistItemId").description(
+                                                        "할 일 ID. 일정 추가(POST /api/checklist-items/{checklistItemId}/appointments)에 그대로 사용"),
+                                                fieldWithPath("[].title").description("할 일 제목"),
+                                                fieldWithPath("[].categoryName")
+                                                        .description("할 일이 속한 카테고리 이름. 카테고리를 찾을 수 없으면 null")
+                                                        .optional(),
+                                                fieldWithPath("[].status").description("할 일 상태. prev 또는 continue")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
+    void shouldRequireAuthenticationToFindUnscheduledItems() throws Exception {
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+                .andDo(document(
+                                "checklists-find-unscheduled-items-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(UNSCHEDULED_SUMMARY)
+                                        .description(UNSCHEDULED_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없는 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
+    void shouldRejectFindUnscheduledItemsWhenChecklistDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(303))
+                .andExpect(jsonPath("$.message").value("체크리스트를 찾을 수 없습니다."))
+                .andDo(document(
+                                "checklists-find-unscheduled-items-checklist-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(UNSCHEDULED_SUMMARY)
+                                        .description(UNSCHEDULED_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
                                         .responseFields(
                                                 fieldWithPath("errorCode").description("오류 코드"),
                                                 fieldWithPath("message").description("오류 메시지")

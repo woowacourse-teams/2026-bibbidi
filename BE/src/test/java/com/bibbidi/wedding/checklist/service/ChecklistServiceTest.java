@@ -25,10 +25,13 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -584,6 +587,102 @@ class ChecklistServiceTest {
         assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, item.id(), "done"))
                 .isInstanceOf(IllegalStateException.class);
         then(checklistRepository).should(never()).saveItem(any(Checklist.class), any(ChecklistItem.class));
+    }
+
+    @Test
+    @DisplayName("완료되지 않았고 일정이 없는 할 일만 카테고리 이름과 함께 조회한다")
+    void shouldFindUnfinishedItemsWithoutAppointment() {
+        // given
+        ChecklistItem customItem = constructTestItem(200L, ChecklistItemStatus.PREV, null);
+        ChecklistItem catalogItem = constructTestItem(201L, ChecklistItemStatus.CONTINUE, CONTRACT_ITEM_ID);
+        ChecklistItem doneItem = constructTestItem(202L, ChecklistItemStatus.DONE, null);
+        ChecklistItem scheduledItem = constructTestItem(203L, ChecklistItemStatus.PREV, null);
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID,
+                List.of(customItem, catalogItem, doneItem, scheduledItem));
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(checklist);
+        given(checklistAppointmentService.findChecklistItemIdsHavingAppointment(List.of(200L, 201L, 203L)))
+                .willReturn(Set.of(203L));
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID))).willReturn(Map.of(CATEGORY_ID, "웨딩홀"));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findMyUnscheduledItems(OWNER_ID);
+
+        // then
+        assertThat(results)
+                .extracting(
+                        UnscheduledChecklistItemResult::checklistItemId,
+                        UnscheduledChecklistItemResult::categoryName,
+                        UnscheduledChecklistItemResult::status
+                )
+                .containsExactlyInAnyOrder(
+                        tuple(200L, "웨딩홀", ChecklistItemStatus.PREV),
+                        tuple(201L, "웨딩홀", ChecklistItemStatus.CONTINUE)
+                );
+        then(checklistAppointmentService).should()
+                .findChecklistItemIdsHavingAppointment(List.of(200L, 201L, 203L));
+    }
+
+    @Test
+    @DisplayName("일정이 필요한 할 일이 4개보다 많으면 그중 4개만 조회한다")
+    void shouldFindAtMostFourUnscheduledItems() {
+        // given
+        List<ChecklistItem> items = List.of(
+                constructTestItem(200L), constructTestItem(201L), constructTestItem(202L),
+                constructTestItem(203L), constructTestItem(204L), constructTestItem(205L)
+        );
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, items));
+        given(checklistAppointmentService.findChecklistItemIdsHavingAppointment(
+                List.of(200L, 201L, 202L, 203L, 204L, 205L)))
+                .willReturn(Set.of());
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID))).willReturn(Map.of(CATEGORY_ID, "웨딩홀"));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findMyUnscheduledItems(OWNER_ID);
+
+        // then
+        assertThat(results)
+                .extracting(UnscheduledChecklistItemResult::checklistItemId)
+                .hasSize(4)
+                .doesNotHaveDuplicates()
+                .isSubsetOf(200L, 201L, 202L, 203L, 204L, 205L);
+    }
+
+    @Test
+    @DisplayName("모든 할 일이 완료되었으면 빈 목록을 조회한다")
+    void shouldFindNoUnscheduledItemWhenEveryItemIsDone() {
+        // given
+        Checklist checklist = new Checklist(CHECKLIST_ID, OWNER_ID, List.of(
+                constructTestItem(200L, ChecklistItemStatus.DONE, null)
+        ));
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(checklist);
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findMyUnscheduledItems(OWNER_ID);
+
+        // then
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("카테고리가 없거나 준비 목록에서 찾을 수 없는 할 일은 카테고리 이름 없이 조회한다")
+    void shouldFindUnscheduledItemsWithoutCategoryName() {
+        // given
+        ChecklistItem withoutCategory = new ChecklistItem(200L, null, "하객 명단 정리", null, ChecklistItemStatus.PREV);
+        ChecklistItem unknownCategory = new ChecklistItem(201L, 999L, "식권 준비", null, ChecklistItemStatus.PREV);
+        given(checklistRepository.getByOwnerId(OWNER_ID))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of(withoutCategory, unknownCategory)));
+        given(checklistAppointmentService.findChecklistItemIdsHavingAppointment(List.of(200L, 201L)))
+                .willReturn(Set.of());
+        given(catalogService.findCategoryNames(Set.of(999L))).willReturn(Map.of());
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findMyUnscheduledItems(OWNER_ID);
+
+        // then
+        assertThat(results)
+                .extracting(UnscheduledChecklistItemResult::categoryName)
+                .hasSize(2)
+                .containsOnlyNulls();
     }
 
     private static ChecklistItem constructTestItem(Long id) {

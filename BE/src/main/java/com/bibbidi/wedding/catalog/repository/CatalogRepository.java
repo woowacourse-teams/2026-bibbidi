@@ -2,10 +2,14 @@ package com.bibbidi.wedding.catalog.repository;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
+import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -35,6 +39,11 @@ public class CatalogRepository {
                     "준비 목록에 없는 카테고리입니다. categoryId=" + categoryId
             );
         }
+    }
+
+    public Map<Long, String> findCategoryNames(Collection<Long> categoryIds) {
+        return jpaCategoryRepository.findAllById(categoryIds).stream()
+                .collect(Collectors.toMap(JpaCategoryEntity::id, JpaCategoryEntity::name));
     }
 
     public Catalog findCatalog() {

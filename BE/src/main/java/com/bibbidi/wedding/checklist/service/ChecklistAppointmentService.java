@@ -4,6 +4,7 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,15 @@ public class ChecklistAppointmentService {
         return appointmentRepository.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds).stream()
                 .map(AppointmentSummaryResult::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Set<Long> findChecklistItemIdsHavingAppointment(List<Long> checklistItemIds) {
+        if (checklistItemIds.isEmpty()) {
+            return Set.of();
+        }
+
+        return appointmentRepository.findChecklistItemIdsHavingAppointment(checklistItemIds);
     }
 
     @Transactional

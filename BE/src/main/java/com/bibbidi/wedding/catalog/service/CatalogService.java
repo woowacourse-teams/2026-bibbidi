@@ -5,6 +5,7 @@ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,11 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public void validateCategoryExists(Long categoryId) {
         catalogRepository.validateCategoryExists(categoryId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, String> findCategoryNames(Collection<Long> categoryIds) {
+        return catalogRepository.findCategoryNames(categoryIds);
     }
 
     @Transactional(readOnly = true)

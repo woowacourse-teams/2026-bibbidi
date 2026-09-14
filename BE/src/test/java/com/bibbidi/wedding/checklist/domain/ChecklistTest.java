@@ -69,6 +69,22 @@ class ChecklistTest {
     }
 
     @Test
+    @DisplayName("완료되지 않은 할 일만 골라낸다")
+    void shouldFindOnlyUnfinishedItems() {
+        // given
+        ChecklistItem prevItem = item(1L, null, ChecklistItemStatus.PREV);
+        ChecklistItem doneItem = item(2L, null, ChecklistItemStatus.DONE);
+        ChecklistItem continueItem = item(3L, null, ChecklistItemStatus.CONTINUE);
+        Checklist checklist = new Checklist(1L, OWNER_ID, List.of(prevItem, doneItem, continueItem));
+
+        // when
+        List<ChecklistItem> unfinishedItems = checklist.unfinishedItems();
+
+        // then
+        assertThat(unfinishedItems).containsExactly(prevItem, continueItem);
+    }
+
+    @Test
     @DisplayName("체크리스트의 소유자는 접근할 수 있다")
     void shouldAllowAccessByOwner() {
         // given

@@ -6,6 +6,7 @@ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -50,6 +51,10 @@ public class AppointmentRepository {
         return jpaAppointmentRepository.findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(checklistItemIds).stream()
                 .map(appointmentMapper::toDomain)
                 .toList();
+    }
+
+    public Set<Long> findChecklistItemIdsHavingAppointment(List<Long> checklistItemIds) {
+        return Set.copyOf(jpaAppointmentRepository.findChecklistItemIdsHavingAppointment(checklistItemIds));
     }
 
     private List<Appointment> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone) {

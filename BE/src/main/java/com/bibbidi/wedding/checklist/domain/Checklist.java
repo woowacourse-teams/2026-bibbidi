@@ -68,6 +68,12 @@ public final class Checklist {
                 .toList();
     }
 
+    public List<ChecklistItem> unfinishedItems() {
+        return items.stream()
+                .filter(item -> !item.isDone())
+                .toList();
+    }
+
     public Long id() {
         return id;
     }

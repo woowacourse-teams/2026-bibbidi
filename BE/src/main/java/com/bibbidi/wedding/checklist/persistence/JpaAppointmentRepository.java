@@ -55,6 +55,13 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
     );
 
     @Query("""
+            SELECT DISTINCT appointment.checklistItemId
+            FROM JpaAppointmentEntity appointment
+            WHERE appointment.checklistItemId IN :checklistItemIds
+            """)
+    List<Long> findChecklistItemIdsHavingAppointment(List<Long> checklistItemIds);
+
+    @Query("""
             SELECT appointment
             FROM JpaAppointmentEntity appointment
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
