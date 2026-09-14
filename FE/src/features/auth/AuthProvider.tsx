@@ -13,6 +13,7 @@ import { AuthState, CurrentUser } from "./model/auth";
 
 interface AuthContextValue {
   authState: AuthState;
+  refreshAuth: () => void;
   setAuthenticatedUser: (user: CurrentUser) => void;
 }
 
@@ -68,14 +69,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthState({ status: "authenticated", user });
   }, []);
 
-  const retry = useCallback(() => {
+  const refreshAuth = useCallback(() => {
     setAuthState({ status: "loading" });
     setRequestRevision((currentRevision) => currentRevision + 1);
   }, []);
 
   const contextValue = useMemo(
-    () => ({ authState, setAuthenticatedUser }),
-    [authState, setAuthenticatedUser],
+    () => ({ authState, refreshAuth, setAuthenticatedUser }),
+    [authState, refreshAuth, setAuthenticatedUser],
   );
 
   let content = children;
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     content = (
       <main>
         <p role="alert">로그인 상태를 확인하지 못했습니다.</p>
-        <button onClick={retry} type="button">
+        <button onClick={refreshAuth} type="button">
           다시 시도
         </button>
       </main>

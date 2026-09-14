@@ -12,21 +12,45 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const analyticsMocks = vi.hoisted(() => ({
   track: vi.fn(),
 }));
-const apiMocks = vi.hoisted(() => ({
-  getPublicPreparationCatalog: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  authState: { status: "guest" } as
+    | { status: "authenticated"; user: { nickname: string } }
+    | { status: "guest" }
+    | { status: "loading" },
+  refreshAuth: vi.fn(),
+}));
+const repositoryMocks = vi.hoisted(() => ({
+  getCatalog: vi.fn(),
 }));
 
+vi.mock("../auth", () => ({
+  useAuth: () => ({
+    authState: authMocks.authState,
+    refreshAuth: authMocks.refreshAuth,
+  }),
+}));
 vi.mock("../../infrastructure/analytics", () => ({
   analytics: {
     initialize: vi.fn(),
     track: analyticsMocks.track,
   },
 }));
-vi.mock("./api/getPublicPreparationCatalog", () => ({
-  getPublicPreparationCatalog: apiMocks.getPublicPreparationCatalog,
-}));
+vi.mock("./repository/preparationCatalogRepository", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("./repository/preparationCatalogRepository")
+    >();
+
+  return {
+    ...actual,
+    preparationCatalogRepository: {
+      getCatalog: repositoryMocks.getCatalog,
+    },
+  };
+});
 
 import { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
+import { PreparationAuthenticationRequiredError } from "./repository/preparationCatalogRepository";
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
 async function renderFeature({ strictMode = false } = {}) {
@@ -35,6 +59,11 @@ async function renderFeature({ strictMode = false } = {}) {
 
   const result = render(strictMode ? <StrictMode>{page}</StrictMode> : page);
   await screen.findByRole("heading", { name: "준비 로드맵" });
+  await waitFor(() =>
+    expect(analyticsMocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "preparation_catalog_view" }),
+    ),
+  );
 
   return result;
 }
@@ -128,10 +157,10 @@ function setViewportMatches(initialMatches: boolean | ViewportMatches = true) {
 
 describe("PreparationRoadmapFeature Analytics", () => {
   beforeEach(() => {
+    authMocks.authState = { status: "guest" };
+    authMocks.refreshAuth.mockReset();
     analyticsMocks.track.mockReset();
-    apiMocks.getPublicPreparationCatalog.mockResolvedValue(
-      preparationCatalogFixture,
-    );
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
   });
 
   it("StrictMode에서도 준비 목록 최초 진입 이벤트를 한 번 전송한다", async () => {
@@ -215,12 +244,14 @@ describe("PreparationRoadmapFeature Analytics", () => {
 
 describe("PreparationRoadmapFeature 서버 상태", () => {
   beforeEach(() => {
+    authMocks.authState = { status: "guest" };
+    authMocks.refreshAuth.mockReset();
     analyticsMocks.track.mockReset();
-    apiMocks.getPublicPreparationCatalog.mockReset();
+    repositoryMocks.getCatalog.mockReset();
   });
 
   it("응답을 기다리는 동안 로딩 상태를 표시한다", () => {
-    apiMocks.getPublicPreparationCatalog.mockReturnValue(new Promise(() => {}));
+    repositoryMocks.getCatalog.mockReturnValue(new Promise(() => {}));
 
     render(<PreparationRoadmapFeature />);
 
@@ -229,10 +260,96 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     );
   });
 
+  it("인증 상태가 확정되기 전에는 준비 목록을 요청하지 않는다", () => {
+    authMocks.authState = { status: "loading" };
+
+    render(<PreparationRoadmapFeature />);
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "준비 목록을 불러오고 있어요.",
+    );
+    expect(repositoryMocks.getCatalog).not.toHaveBeenCalled();
+  });
+
+  it("비로그인 사용자는 공개 준비 목록을 요청한다", async () => {
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+
+    await renderFeature();
+
+    expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
+      "guest",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("로그인 사용자는 인증 준비 목록을 요청한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+
+    await renderFeature();
+
+    expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
+      "authenticated",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("비로그인 빈 상태에서 로그인하면 인증 조회 동안 로딩 상태를 표시한다", async () => {
+    repositoryMocks.getCatalog
+      .mockResolvedValueOnce({
+        categories: [{ id: "empty", label: "비어 있음" }],
+        roadmaps: [{ categoryId: "empty", steps: [] }],
+        stepDetails: [],
+      })
+      .mockReturnValueOnce(new Promise(() => {}));
+    const { rerender } = render(<PreparationRoadmapFeature />);
+    expect(await screen.findByText("표시할 준비 목록이 없어요.")).toBeTruthy();
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    rerender(<PreparationRoadmapFeature />);
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "준비 목록을 불러오고 있어요.",
+    );
+    await waitFor(() =>
+      expect(repositoryMocks.getCatalog).toHaveBeenLastCalledWith(
+        "authenticated",
+        expect.any(AbortSignal),
+      ),
+    );
+  });
+
+  it("비로그인 조회 오류 상태에서 로그인하면 이전 오류를 표시하지 않는다", async () => {
+    repositoryMocks.getCatalog
+      .mockRejectedValueOnce(new Error("failed"))
+      .mockReturnValueOnce(new Promise(() => {}));
+    const { rerender } = render(<PreparationRoadmapFeature />);
+    expect(
+      await screen.findByText("준비 목록을 불러오지 못했어요."),
+    ).toBeTruthy();
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    rerender(<PreparationRoadmapFeature />);
+
+    expect(screen.queryByText("준비 목록을 불러오지 못했어요.")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe(
+      "준비 목록을 불러오고 있어요.",
+    );
+  });
+
   it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
     let requestSignal: AbortSignal | undefined;
-    apiMocks.getPublicPreparationCatalog.mockImplementation(
-      (signal?: AbortSignal) => {
+    repositoryMocks.getCatalog.mockImplementation(
+      (_audience: string, signal?: AbortSignal) => {
         requestSignal = signal;
         return new Promise(() => {});
       },
@@ -247,7 +364,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
   });
 
   it("준비 단계가 없으면 빈 상태를 표시한다", async () => {
-    apiMocks.getPublicPreparationCatalog.mockResolvedValue({
+    repositoryMocks.getCatalog.mockResolvedValue({
       categories: [{ id: "empty", label: "비어 있음" }],
       roadmaps: [{ categoryId: "empty", steps: [] }],
       stepDetails: [],
@@ -260,7 +377,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
   });
 
   it("조회 실패를 안내하고 다시 시도할 수 있다", async () => {
-    apiMocks.getPublicPreparationCatalog
+    repositoryMocks.getCatalog
       .mockRejectedValueOnce(new Error("failed"))
       .mockResolvedValueOnce(preparationCatalogFixture);
 
@@ -269,12 +386,52 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     expect(
       await screen.findByText("준비 목록을 불러오지 못했어요."),
     ).toBeTruthy();
+    expect(authMocks.refreshAuth).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     expect(
       await screen.findByRole("heading", { name: "준비 로드맵" }),
     ).toBeTruthy();
-    expect(apiMocks.getPublicPreparationCatalog).toHaveBeenCalledTimes(2);
+    expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("인증 준비 목록의 401 응답을 로그인 만료로 안내한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getCatalog.mockRejectedValue(
+      new PreparationAuthenticationRequiredError(),
+    );
+
+    render(<PreparationRoadmapFeature />);
+
+    expect(
+      await screen.findByText(
+        "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+      ),
+    ).toBeTruthy();
+    expect(authMocks.refreshAuth).toHaveBeenCalledOnce();
+  });
+
+  it("인증 상태 재조회 중에도 로그인 만료 안내에서 다시 시도할 수 있다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getCatalog.mockRejectedValue(
+      new PreparationAuthenticationRequiredError(),
+    );
+    const { rerender } = render(<PreparationRoadmapFeature />);
+    await screen.findByText(
+      "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+    );
+
+    authMocks.authState = { status: "loading" };
+    rerender(<PreparationRoadmapFeature />);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(authMocks.refreshAuth).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -282,10 +439,9 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
   const scrollIntoViewMock = vi.fn();
 
   beforeEach(() => {
+    authMocks.authState = { status: "guest" };
     analyticsMocks.track.mockReset();
-    apiMocks.getPublicPreparationCatalog.mockResolvedValue(
-      preparationCatalogFixture,
-    );
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
     scrollIntoViewMock.mockReset();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
