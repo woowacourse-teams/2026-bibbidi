@@ -1,17 +1,9 @@
+import { RemotePreparationCatalogApiError } from "../data-source/remotePreparationCatalogDataSource";
 import {
-  remotePreparationCatalogDataSource,
-  RemotePreparationCatalogApiError,
-} from "../data-source/remotePreparationCatalogDataSource";
-import { PreparationCatalogModel } from "../model/preparationRoadmap";
-
-export type PreparationCatalogAudience = "authenticated" | "guest";
-
-export class PreparationAuthenticationRequiredError extends Error {
-  constructor() {
-    super("로그인이 필요합니다.");
-    this.name = "PreparationAuthenticationRequiredError";
-  }
-}
+  PreparationAudience,
+  PreparationCatalogModel,
+} from "../model/preparationRoadmap";
+import { PreparationAuthenticationRequiredError } from "./preparationErrors";
 
 export interface PreparationCatalogDataSource {
   getAuthenticatedCatalog(
@@ -22,7 +14,7 @@ export interface PreparationCatalogDataSource {
 
 export interface PreparationCatalogRepository {
   getCatalog(
-    audience: PreparationCatalogAudience,
+    audience: PreparationAudience,
     signal?: AbortSignal,
   ): Promise<PreparationCatalogModel>;
 }
@@ -51,7 +43,3 @@ export function createPreparationCatalogRepository(
     },
   };
 }
-
-export const preparationCatalogRepository = createPreparationCatalogRepository(
-  remotePreparationCatalogDataSource,
-);

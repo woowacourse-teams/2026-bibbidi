@@ -133,9 +133,7 @@ describe("remotePreparationCatalogDataSource.getAuthenticatedCatalog", () => {
     await expect(
       remotePreparationCatalogDataSource.getAuthenticatedCatalog(),
     ).resolves.toEqual(
-      parsePreparationCatalogResponse(authenticatedResponseBody, {
-        requiresIncluded: true,
-      }),
+      parsePreparationCatalogResponse(authenticatedResponseBody),
     );
     expect(fetchMock).toHaveBeenCalledWith("/api/catalog", {
       credentials: "include",
@@ -144,7 +142,7 @@ describe("remotePreparationCatalogDataSource.getAuthenticatedCatalog", () => {
     });
   });
 
-  it("included가 없는 인증 성공 응답을 거부한다", async () => {
+  it("included가 없는 인증 성공 응답도 그대로 변환한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi
@@ -156,7 +154,7 @@ describe("remotePreparationCatalogDataSource.getAuthenticatedCatalog", () => {
 
     await expect(
       remotePreparationCatalogDataSource.getAuthenticatedCatalog(),
-    ).rejects.toThrow("준비 목록 성공 응답 형식이 올바르지 않습니다.");
+    ).resolves.toEqual(parsePreparationCatalogResponse(responseBody));
   });
 
   it("오류 응답의 코드와 상태를 API 오류로 변환한다", async () => {

@@ -10,10 +10,20 @@ type PreparationStepDetailContentViewModel = Pick<
 >;
 
 interface PreparationStepDetailProps {
+  additionErrorMessage: string | null;
+  canAddTasks: boolean;
   detail: PreparationStepDetailContentViewModel;
+  onAddAllTasks: () => void;
+  onTaskAdd: (catalogItemId: string) => void;
 }
 
-export function PreparationStepDetail({ detail }: PreparationStepDetailProps) {
+export function PreparationStepDetail({
+  additionErrorMessage,
+  canAddTasks,
+  detail,
+  onAddAllTasks,
+  onTaskAdd,
+}: PreparationStepDetailProps) {
   return (
     <aside
       aria-live="polite"
@@ -33,13 +43,23 @@ export function PreparationStepDetail({ detail }: PreparationStepDetailProps) {
             className="preparation-step-detail__section"
           >
             <PreparationTaskList
+              canAddTasks={canAddTasks}
+              onTaskAdd={onTaskAdd}
               tasks={detail.detailTasks}
               variant="available"
             />
           </section>
         </div>
         <footer className="preparation-step-detail__footer">
-          <PreparationAddAllTasksButton />
+          {additionErrorMessage ? (
+            <p className="preparation-task-list__error" role="alert">
+              {additionErrorMessage}
+            </p>
+          ) : null}
+          <PreparationAddAllTasksButton
+            isDisabled={!canAddTasks || detail.detailTasks.length === 0}
+            onClick={onAddAllTasks}
+          />
         </footer>
       </div>
     </aside>

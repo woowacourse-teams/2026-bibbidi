@@ -45,13 +45,13 @@ export const preparationCatalogFixture = {
       tasks: [
         {
           essential: true,
-          id: "catalog-item-1",
+          id: "101",
           included: true,
           title: "웨딩홀 투어",
         },
         {
           essential: false,
-          id: "catalog-item-1-2",
+          id: "102",
           included: false,
           title: "웨딩홀 견적 비교",
         },
@@ -60,17 +60,17 @@ export const preparationCatalogFixture = {
     {
       description: "예식 형태와 식순을 정해요.",
       stepId: "step-2",
-      tasks: [{ id: "catalog-item-2", title: "예식 형태 결정" }],
+      tasks: [{ id: "201", included: false, title: "예식 형태 결정" }],
     },
     {
       description: "예식 진행자를 섭외해요.",
       stepId: "step-3",
-      tasks: [{ id: "catalog-item-3", title: "사회자 섭외" }],
+      tasks: [{ id: "301", included: false, title: "사회자 섭외" }],
     },
     {
       description: "스드메 상품을 비교하고 계약해요.",
       stepId: "step-10",
-      tasks: [{ id: "catalog-item-10", title: "스드메 계약" }],
+      tasks: [{ id: "1001", included: false, title: "스드메 계약" }],
     },
   ],
 } satisfies PreparationCatalogModel;

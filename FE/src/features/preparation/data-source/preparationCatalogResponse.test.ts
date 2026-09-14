@@ -28,13 +28,13 @@ describe("parsePreparationCatalogResponse", () => {
         {
           essential: true,
           id: "1001",
-          included: undefined,
+          included: false,
           title: "첫 번째 할 일",
         },
         {
           essential: false,
           id: "1002",
-          included: undefined,
+          included: false,
           title: "두 번째 할 일",
         },
       ],
@@ -59,18 +59,15 @@ describe("parsePreparationCatalogResponse", () => {
     ).not.toThrow();
   });
 
-  it("인증 응답에서는 included가 모든 항목에 있어야 한다", () => {
-    expect(() =>
-      parsePreparationCatalogResponse(publicPreparationCatalogResponseFixture, {
-        requiresIncluded: true,
-      }),
-    ).toThrow("준비 목록 성공 응답 형식이 올바르지 않습니다.");
+  it("응답에 포함된 included 값은 그대로 유지한다", () => {
+    const model = parsePreparationCatalogResponse(
+      authenticatedPreparationCatalogResponseFixture,
+    );
 
-    expect(() =>
-      parsePreparationCatalogResponse(
-        authenticatedPreparationCatalogResponseFixture,
-        { requiresIncluded: true },
+    expect(
+      model.stepDetails.flatMap((step) =>
+        step.tasks.map((task) => task.included),
       ),
-    ).not.toThrow();
+    ).toEqual([true, false]);
   });
 });

@@ -35,8 +35,12 @@ function useMediaQuery(query: string): boolean {
 }
 
 interface PreparationRoadmapProps {
+  additionErrorMessage: string | null;
+  canAddTasks: boolean;
+  onAddAllTasks: () => void;
   onCategorySelect: (categoryId: string) => void;
   onStepSelect: (stepId: string) => void;
+  onTaskAdd: (catalogItemId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
@@ -99,8 +103,12 @@ function PreparationRoadmapSteps({
 }
 
 export function PreparationRoadmap({
+  additionErrorMessage,
+  canAddTasks,
+  onAddAllTasks,
   onCategorySelect,
   onStepSelect,
+  onTaskAdd,
   viewModel,
 }: PreparationRoadmapProps) {
   const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
@@ -180,15 +188,25 @@ export function PreparationRoadmap({
             <PreparationStepChecklist
               tasks={viewModel.selectedStepDetail.checklistTasks}
             />
-            <PreparationStepDetail detail={viewModel.selectedStepDetail} />
+            <PreparationStepDetail
+              additionErrorMessage={additionErrorMessage}
+              canAddTasks={canAddTasks}
+              detail={viewModel.selectedStepDetail}
+              onAddAllTasks={onAddAllTasks}
+              onTaskAdd={onTaskAdd}
+            />
           </div>
         ) : null}
       </section>
       {isMobileLayout && mobileOpenStepId ? (
         <PreparationStepBottomSheet
+          additionErrorMessage={additionErrorMessage}
+          canAddTasks={canAddTasks}
           detail={viewModel.selectedStepDetail}
           key={mobileOpenStepId}
+          onAddAllTasks={onAddAllTasks}
           onClose={() => setMobileOpenStepId(null)}
+          onTaskAdd={onTaskAdd}
         />
       ) : null}
     </div>
