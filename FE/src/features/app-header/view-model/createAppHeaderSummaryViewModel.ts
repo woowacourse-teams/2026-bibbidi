@@ -1,40 +1,63 @@
 import {
   AppHeaderSummaryModel,
-  calculateDaysUntilWedding,
+  AppHeaderWeddingDateModel,
   calculatePreparationProgress,
 } from "../model/appHeaderSummary";
 
+export interface AppHeaderProgressViewModel {
+  label: string;
+  percentage: number;
+  taskCountLabel: string;
+}
+
 export interface AppHeaderSummaryViewModel {
   dDayLabel: string;
-  progressLabel: string;
-  progressPercentage: number;
-  taskCountLabel: string;
-  weddingDate: string;
+  mobileDDayLabel: string;
+  progress: AppHeaderProgressViewModel | null;
   weddingDateLabel: string;
 }
 
-function formatCompactDate(date: string) {
-  return date.replaceAll("-", ".");
+function createWeddingDateViewModel(
+  weddingDate: AppHeaderWeddingDateModel,
+): Pick<
+  AppHeaderSummaryViewModel,
+  "dDayLabel" | "mobileDDayLabel" | "weddingDateLabel"
+> {
+  switch (weddingDate.status) {
+    case "unset":
+      return {
+        dDayLabel: "D-Day",
+        mobileDDayLabel: "D-Day 미설정",
+        weddingDateLabel: "결혼 일자 미설정",
+      };
+  }
 }
 
 export function createAppHeaderSummaryViewModel(
-  model: AppHeaderSummaryModel,
+  model: AppHeaderSummaryModel | null,
 ): AppHeaderSummaryViewModel {
-  const daysUntilWedding = calculateDaysUntilWedding(
-    model.referenceDate,
-    model.weddingDate,
+  const weddingDateViewModel = createWeddingDateViewModel(
+    model?.weddingDate ?? { status: "unset" },
   );
+
+  if (!model) {
+    return {
+      progress: null,
+      ...weddingDateViewModel,
+    };
+  }
+
   const progressPercentage = calculatePreparationProgress(
     model.completedTaskCount,
     model.totalTaskCount,
   );
 
   return {
-    dDayLabel: `D-${daysUntilWedding}`,
-    progressLabel: `${progressPercentage}%`,
-    progressPercentage,
-    taskCountLabel: `${model.completedTaskCount}/${model.totalTaskCount}`,
-    weddingDate: model.weddingDate,
-    weddingDateLabel: formatCompactDate(model.weddingDate),
+    progress: {
+      label: `${progressPercentage}%`,
+      percentage: progressPercentage,
+      taskCountLabel: `${model.completedTaskCount}/${model.totalTaskCount}`,
+    },
+    ...weddingDateViewModel,
   };
 }

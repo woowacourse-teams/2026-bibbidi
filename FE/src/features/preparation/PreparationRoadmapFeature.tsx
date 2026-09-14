@@ -13,8 +13,8 @@ import {
   PreparationCatalogModel,
 } from "./model/preparationRoadmap";
 import {
-  checklistRepository,
   preparationCatalogRepository,
+  usePreparationChecklistRepository,
 } from "./preparationDependencies";
 import {
   PreparationAuthenticationRequiredError,
@@ -47,6 +47,7 @@ type CatalogRequestState =
 
 export function PreparationRoadmapFeature() {
   const { authState, refreshAuth } = useAuth();
+  const checklistRepository = usePreparationChecklistRepository();
   const [additionErrorMessage, setAdditionErrorMessage] = useState<
     string | null
   >(null);
@@ -124,7 +125,7 @@ export function PreparationRoadmapFeature() {
       ignoresResult = true;
       controller.abort();
     };
-  }, [audience, refreshAuth, requestRevision]);
+  }, [audience, checklistRepository, refreshAuth, requestRevision]);
 
   useEffect(
     () => () => {

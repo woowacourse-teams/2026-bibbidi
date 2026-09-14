@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistQueryRepository,
+} from "../../checklist";
 import { LocalChecklistStorageError } from "../data-source/localChecklistDataSource";
 import { RemoteChecklistApiError } from "../data-source/remoteChecklistDataSource";
 import {
   ChecklistPersistenceError,
-  createChecklistRepository,
+  createChecklistRepository as createChecklistRepositoryWithDependencies,
   InvalidChecklistCatalogItemIdError,
 } from "./checklistRepository";
 import {
@@ -23,8 +27,33 @@ function createLocalDataSource(catalogItemIds: number[] = []) {
 function createRemoteDataSource(catalogItemIds: number[] = []) {
   return {
     addCatalogItemIds: vi.fn().mockResolvedValue(catalogItemIds),
-    getCatalogItemIds: vi.fn().mockResolvedValue(catalogItemIds),
   };
+}
+
+function createQueryRepository(
+  catalogItemIds: number[] = [],
+): MyChecklistQueryRepository {
+  return {
+    getChecklist: vi.fn().mockResolvedValue({
+      items: catalogItemIds.map((sourceCatalogItemId) => ({
+        isDone: false,
+        sourceCatalogItemId,
+      })),
+    }),
+    invalidate: vi.fn(),
+  };
+}
+
+function createChecklistRepository(
+  localDataSource: ReturnType<typeof createLocalDataSource>,
+  remoteDataSource: ReturnType<typeof createRemoteDataSource>,
+  queryRepository = createQueryRepository(),
+) {
+  return createChecklistRepositoryWithDependencies(
+    localDataSource,
+    remoteDataSource,
+    queryRepository,
+  );
 }
 
 describe("ChecklistRepository", () => {
@@ -38,7 +67,6 @@ describe("ChecklistRepository", () => {
       "201",
     ]);
     expect(dataSource.getCatalogItemIds).toHaveBeenCalledOnce();
-    expect(remoteDataSource.getCatalogItemIds).not.toHaveBeenCalled();
   });
 
   it("비로그인 추가는 신규 ID만 반환하고 기존 ID와 합쳐 저장한다", async () => {
@@ -114,9 +142,11 @@ describe("ChecklistRepository", () => {
 
   it("로그인 추가는 숫자 ID를 서버에 보내고 응답 ID를 문자열로 변환한다", async () => {
     const remoteDataSource = createRemoteDataSource([102, 201]);
+    const queryRepository = createQueryRepository();
     const repository = createChecklistRepository(
       createLocalDataSource(),
       remoteDataSource,
+      queryRepository,
     );
     const controller = new AbortController();
 
@@ -131,6 +161,7 @@ describe("ChecklistRepository", () => {
       [102, 201],
       controller.signal,
     );
+    expect(queryRepository.invalidate).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -198,26 +229,25 @@ describe("ChecklistRepository", () => {
   });
 
   it("서버 체크리스트의 숫자 ID를 카탈로그 모델의 문자열 ID로 변환한다", async () => {
-    const remoteDataSource = createRemoteDataSource([101, 201]);
+    const queryRepository = createQueryRepository([101, 201]);
     const repository = createChecklistRepository(
       createLocalDataSource(),
-      remoteDataSource,
+      createRemoteDataSource(),
+      queryRepository,
     );
 
     await expect(
       repository.getCatalogItemIds("authenticated"),
     ).resolves.toEqual(["101", "201"]);
-    expect(remoteDataSource.getCatalogItemIds).toHaveBeenCalledOnce();
+    expect(queryRepository.getChecklist).toHaveBeenCalledOnce();
   });
 
   it("내 체크리스트가 없으면 포함된 준비 항목이 없는 것으로 처리한다", async () => {
-    const remoteDataSource = createRemoteDataSource();
-    remoteDataSource.getCatalogItemIds.mockRejectedValue(
-      new RemoteChecklistApiError(303, 404, "체크리스트를 찾을 수 없습니다."),
-    );
+    const queryRepository = createQueryRepository();
     const repository = createChecklistRepository(
       createLocalDataSource(),
-      remoteDataSource,
+      createRemoteDataSource(),
+      queryRepository,
     );
 
     await expect(
@@ -226,13 +256,14 @@ describe("ChecklistRepository", () => {
   });
 
   it("내 체크리스트의 인증 오류를 로그인 만료 오류로 변환한다", async () => {
-    const remoteDataSource = createRemoteDataSource();
-    remoteDataSource.getCatalogItemIds.mockRejectedValue(
-      new RemoteChecklistApiError(201, 401, "로그인이 필요합니다."),
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.getChecklist).mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
     );
     const repository = createChecklistRepository(
       createLocalDataSource(),
-      remoteDataSource,
+      createRemoteDataSource(),
+      queryRepository,
     );
 
     await expect(
