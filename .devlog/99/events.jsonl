@@ -14,3 +14,4 @@
 {"type":"ADR_CREATED","issue":99,"timestamp":"2026-09-14T17:35:27.213Z"}
 {"type":"TURN_FINISHED","turnId":"t2","assistantMessage":"검증용 결정 3개를 기록하고 Issue #99에 임시 ADR을 추가한 뒤 ChecklistItemDoneStatusTest를 추가했습니다. BE test·build와 Logger test가 macOS에서 통과했습니다.","redacted":false,"diff":"turn-002.diff","diffStat":" .../domain/ChecklistItemDoneStatusTest.java        | 52 ++++++++++++++++++++++\n 1 file changed, 52 insertions(+)","testResult":"PASSED","timestamp":"2026-09-14T17:36:10.147Z"}
 {"type":"USER_PROMPTED","issue":99,"turnId":"t3","prompt":"Commit하고 Draft PR을 만들어줘.","redacted":false,"timestamp":"2026-09-14T17:36:44.974Z"}
+{"type":"PR_REQUESTED","issue":99,"timestamp":"2026-09-14T17:36:49.353Z"}
