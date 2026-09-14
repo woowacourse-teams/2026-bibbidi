@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../auth";
 import { analytics } from "../../infrastructure/analytics";
 import {
   createPreparationCatalogViewEvent,
   createPreparationCategorySelectEvent,
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
-import { getPublicPreparationCatalog } from "./api/getPublicPreparationCatalog";
 import { PreparationCatalogModel } from "./model/preparationRoadmap";
+import {
+  PreparationCatalogAudience,
+  PreparationAuthenticationRequiredError,
+  preparationCatalogRepository,
+} from "./repository/preparationCatalogRepository";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
@@ -18,46 +23,76 @@ import { PreparationRoadmap } from "./view/PreparationRoadmap";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
 
 type CatalogRequestState =
-  | { status: "loading" }
-  | { status: "empty" }
-  | { status: "error" }
+  | { audience?: PreparationCatalogAudience; status: "loading" }
+  | { audience: PreparationCatalogAudience; status: "empty" }
   | {
+      audience: PreparationCatalogAudience;
+      status: "authentication-required";
+    }
+  | { audience: PreparationCatalogAudience; status: "error" }
+  | {
+      audience: PreparationCatalogAudience;
       catalog: PreparationCatalogModel;
       selection: PreparationRoadmapSelection;
       status: "success";
     };
 
 export function PreparationRoadmapFeature() {
+  const { authState, refreshAuth } = useAuth();
   const [requestState, setRequestState] = useState<CatalogRequestState>({
     status: "loading",
   });
   const [requestRevision, setRequestRevision] = useState(0);
   const hasTrackedCatalogViewRef = useRef(false);
+  const audience: PreparationCatalogAudience | undefined =
+    authState.status === "authenticated"
+      ? "authenticated"
+      : authState.status === "guest"
+        ? "guest"
+        : undefined;
 
   useEffect(() => {
+    if (!audience) {
+      return;
+    }
+
     const controller = new AbortController();
     let ignoresResult = false;
 
-    void getPublicPreparationCatalog(controller.signal)
+    void preparationCatalogRepository
+      .getCatalog(audience, controller.signal)
       .then((nextCatalog) => {
         if (ignoresResult) {
           return;
         }
 
         if (!hasSelectablePreparationSteps(nextCatalog)) {
-          setRequestState({ status: "empty" });
+          setRequestState({ audience, status: "empty" });
           return;
         }
 
         setRequestState({
+          audience,
           catalog: nextCatalog,
           selection: createInitialPreparationRoadmapSelection(nextCatalog),
           status: "success",
         });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!ignoresResult) {
-          setRequestState({ status: "error" });
+          const requiresAuthentication =
+            error instanceof PreparationAuthenticationRequiredError;
+
+          if (requiresAuthentication) {
+            refreshAuth();
+          }
+
+          setRequestState({
+            audience,
+            status: requiresAuthentication
+              ? "authentication-required"
+              : "error",
+          });
         }
       });
 
@@ -65,7 +100,7 @@ export function PreparationRoadmapFeature() {
       ignoresResult = true;
       controller.abort();
     };
-  }, [requestRevision]);
+  }, [audience, refreshAuth, requestRevision]);
 
   useEffect(() => {
     if (requestState.status !== "success" || hasTrackedCatalogViewRef.current) {
@@ -78,16 +113,50 @@ export function PreparationRoadmapFeature() {
     );
   }, [requestState]);
 
-  if (requestState.status === "error") {
-    const handleRetry = () => {
-      setRequestState({ status: "loading" });
-      setRequestRevision((value) => value + 1);
-    };
+  const handleRetry = () => {
+    if (!audience) {
+      refreshAuth();
+      return;
+    }
 
-    return <PreparationRoadmapState onRetry={handleRetry} status="error" />;
+    setRequestState({ audience, status: "loading" });
+    setRequestRevision((value) => value + 1);
+  };
+
+  if (!audience) {
+    return (
+      <PreparationRoadmapState
+        onRetry={
+          requestState.status === "authentication-required"
+            ? handleRetry
+            : undefined
+        }
+        status={
+          requestState.status === "authentication-required"
+            ? "authentication-required"
+            : "loading"
+        }
+      />
+    );
   }
 
-  if (requestState.status === "loading" || requestState.status === "empty") {
+  if (requestState.audience !== audience) {
+    return <PreparationRoadmapState status="loading" />;
+  }
+
+  if (
+    requestState.status === "authentication-required" ||
+    requestState.status === "error"
+  ) {
+    return (
+      <PreparationRoadmapState
+        onRetry={handleRetry}
+        status={requestState.status}
+      />
+    );
+  }
+
+  if (requestState.status !== "success") {
     return <PreparationRoadmapState status={requestState.status} />;
   }
 

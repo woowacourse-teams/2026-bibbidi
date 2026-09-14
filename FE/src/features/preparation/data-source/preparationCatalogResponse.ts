@@ -24,7 +24,7 @@ interface PreparationCatalogCategoryResponse {
   steps: PreparationCatalogStepResponse[];
 }
 
-interface PreparationCatalogResponse {
+interface RemotePreparationCatalogResponse {
   categories: PreparationCatalogCategoryResponse[];
 }
 
@@ -44,19 +44,23 @@ function isOptionalNullableString(
 
 function isPreparationCatalogItem(
   value: unknown,
+  requiresIncluded: boolean,
 ): value is PreparationCatalogItemResponse {
   return (
     isRecord(value) &&
     typeof value.displayOrder === "number" &&
     typeof value.essential === "boolean" &&
     typeof value.id === "number" &&
-    isOptionalBoolean(value.included) &&
+    (requiresIncluded
+      ? typeof value.included === "boolean"
+      : isOptionalBoolean(value.included)) &&
     typeof value.title === "string"
   );
 }
 
 function isPreparationCatalogStep(
   value: unknown,
+  requiresIncluded: boolean,
 ): value is PreparationCatalogStepResponse {
   return (
     isRecord(value) &&
@@ -65,13 +69,16 @@ function isPreparationCatalogStep(
     isOptionalNullableString(value.iconUrl) &&
     typeof value.id === "number" &&
     Array.isArray(value.items) &&
-    value.items.every(isPreparationCatalogItem) &&
+    value.items.every((item) =>
+      isPreparationCatalogItem(item, requiresIncluded),
+    ) &&
     typeof value.name === "string"
   );
 }
 
 function isPreparationCatalogCategory(
   value: unknown,
+  requiresIncluded: boolean,
 ): value is PreparationCatalogCategoryResponse {
   return (
     isRecord(value) &&
@@ -79,17 +86,22 @@ function isPreparationCatalogCategory(
     typeof value.id === "number" &&
     typeof value.name === "string" &&
     Array.isArray(value.steps) &&
-    value.steps.every(isPreparationCatalogStep)
+    value.steps.every((step) =>
+      isPreparationCatalogStep(step, requiresIncluded),
+    )
   );
 }
 
 function isPreparationCatalogResponse(
   value: unknown,
-): value is PreparationCatalogResponse {
+  requiresIncluded: boolean,
+): value is RemotePreparationCatalogResponse {
   return (
     isRecord(value) &&
     Array.isArray(value.categories) &&
-    value.categories.every(isPreparationCatalogCategory)
+    value.categories.every((category) =>
+      isPreparationCatalogCategory(category, requiresIncluded),
+    )
   );
 }
 
@@ -102,8 +114,9 @@ function byDisplayOrder(
 
 export function parsePreparationCatalogResponse(
   value: unknown,
+  { requiresIncluded = false }: { requiresIncluded?: boolean } = {},
 ): PreparationCatalogModel {
-  if (!isPreparationCatalogResponse(value)) {
+  if (!isPreparationCatalogResponse(value, requiresIncluded)) {
     throw new Error("준비 목록 성공 응답 형식이 올바르지 않습니다.");
   }
 
