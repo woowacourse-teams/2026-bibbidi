@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  authenticatedPreparationCatalogResponseFixture,
-  publicPreparationCatalogResponseFixture,
-} from "../test/fixtures/preparationCatalogResponse.fixture";
+import { preparationCatalogResponseFixture } from "../test/fixtures/preparationCatalogResponse.fixture";
 import { parsePreparationCatalogResponse } from "./preparationCatalogResponse";
 
 describe("parsePreparationCatalogResponse", () => {
-  it("공개 응답을 표시 순서에 맞는 화면 모델로 변환한다", () => {
+  it("응답을 표시 순서에 맞는 화면 모델로 변환한다", () => {
     const model = parsePreparationCatalogResponse(
-      publicPreparationCatalogResponseFixture,
+      preparationCatalogResponseFixture,
     );
 
     expect(model.categories.map((category) => category.id)).toEqual([
@@ -43,7 +40,7 @@ describe("parsePreparationCatalogResponse", () => {
 
   it("nullable 선택 필드가 생략된 응답도 처리한다", () => {
     const responseWithoutOptionalFields = structuredClone(
-      publicPreparationCatalogResponseFixture,
+      preparationCatalogResponseFixture,
     );
     Reflect.deleteProperty(
       responseWithoutOptionalFields.categories[1].steps[0],
@@ -57,17 +54,5 @@ describe("parsePreparationCatalogResponse", () => {
     expect(() =>
       parsePreparationCatalogResponse(responseWithoutOptionalFields),
     ).not.toThrow();
-  });
-
-  it("응답에 포함된 included 값은 그대로 유지한다", () => {
-    const model = parsePreparationCatalogResponse(
-      authenticatedPreparationCatalogResponseFixture,
-    );
-
-    expect(
-      model.stepDetails.flatMap((step) =>
-        step.tasks.map((task) => task.included),
-      ),
-    ).toEqual([true, false]);
   });
 });

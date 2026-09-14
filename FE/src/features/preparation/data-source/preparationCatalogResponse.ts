@@ -4,7 +4,6 @@ interface PreparationCatalogItemResponse {
   displayOrder: number;
   essential: boolean;
   id: number;
-  included?: boolean;
   title: string;
 }
 
@@ -32,10 +31,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isOptionalBoolean(value: unknown): value is boolean | undefined {
-  return value === undefined || typeof value === "boolean";
-}
-
 function isOptionalNullableString(
   value: unknown,
 ): value is string | null | undefined {
@@ -50,7 +45,6 @@ function isPreparationCatalogItem(
     typeof value.displayOrder === "number" &&
     typeof value.essential === "boolean" &&
     typeof value.id === "number" &&
-    isOptionalBoolean(value.included) &&
     typeof value.title === "string"
   );
 }
@@ -130,7 +124,7 @@ export function parsePreparationCatalogResponse(
         tasks: [...step.items].sort(byDisplayOrder).map((item) => ({
           essential: item.essential,
           id: String(item.id),
-          included: item.included ?? false,
+          included: false,
           title: item.title,
         })),
       })),

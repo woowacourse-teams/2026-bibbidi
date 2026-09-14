@@ -281,13 +281,12 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     expect(repositoryMocks.getCatalog).not.toHaveBeenCalled();
   });
 
-  it("비로그인 사용자는 공개 준비 목록을 요청한다", async () => {
+  it("비로그인 사용자도 단일 준비 목록을 요청한다", async () => {
     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
 
     await renderFeature();
 
     expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
-      "guest",
       expect.any(AbortSignal),
     );
     expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
@@ -296,7 +295,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     );
   });
 
-  it("로그인 사용자는 인증 준비 목록을 요청한다", async () => {
+  it("로그인 사용자는 단일 준비 목록과 서버 체크리스트를 요청한다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { nickname: "bibbidi" },
@@ -306,7 +305,6 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     await renderFeature();
 
     expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
-      "authenticated",
       expect.any(AbortSignal),
     );
     expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
@@ -367,7 +365,6 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     );
     await waitFor(() =>
       expect(repositoryMocks.getCatalog).toHaveBeenLastCalledWith(
-        "authenticated",
         expect.any(AbortSignal),
       ),
     );
@@ -396,12 +393,10 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
 
   it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
     let requestSignal: AbortSignal | undefined;
-    repositoryMocks.getCatalog.mockImplementation(
-      (_audience: string, signal?: AbortSignal) => {
-        requestSignal = signal;
-        return new Promise(() => {});
-      },
-    );
+    repositoryMocks.getCatalog.mockImplementation((signal?: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise(() => {});
+    });
 
     const { unmount } = render(<PreparationRoadmapFeature />);
     expect(requestSignal?.aborted).toBe(false);
@@ -443,12 +438,12 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
   });
 
-  it("인증 준비 목록의 401 응답을 로그인 만료로 안내한다", async () => {
+  it("내 체크리스트의 401 응답을 로그인 만료로 안내한다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { nickname: "bibbidi" },
     };
-    repositoryMocks.getCatalog.mockRejectedValue(
+    checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
       new PreparationAuthenticationRequiredError(),
     );
 
@@ -467,7 +462,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
       status: "authenticated",
       user: { nickname: "bibbidi" },
     };
-    repositoryMocks.getCatalog.mockRejectedValue(
+    checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
       new PreparationAuthenticationRequiredError(),
     );
     const { rerender } = render(<PreparationRoadmapFeature />);

@@ -67,7 +67,7 @@ export function PreparationRoadmapFeature() {
     let ignoresResult = false;
 
     void Promise.all([
-      preparationCatalogRepository.getCatalog(audience, controller.signal),
+      preparationCatalogRepository.getCatalog(controller.signal),
       checklistRepository.getCatalogItemIds(audience, controller.signal),
     ])
       .then(([catalog, catalogItemIds]) => {

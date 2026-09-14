@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  authenticatedPreparationCatalogResponseFixture as authenticatedResponseBody,
-  publicPreparationCatalogResponseFixture as responseBody,
-} from "../test/fixtures/preparationCatalogResponse.fixture";
+import { preparationCatalogResponseFixture as responseBody } from "../test/fixtures/preparationCatalogResponse.fixture";
 import {
   remotePreparationCatalogDataSource,
   RemotePreparationCatalogApiError,
@@ -16,8 +13,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
-  it("공개 준비 목록 endpoint를 인증 정보 없이 호출한다", async () => {
+describe("remotePreparationCatalogDataSource.getCatalog", () => {
+  it("단일 준비 목록 endpoint를 인증 정보 없이 호출한다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(responseBody), {
         headers: { "Content-Type": "application/json" },
@@ -27,10 +24,10 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      remotePreparationCatalogDataSource.getPublicCatalog(),
+      remotePreparationCatalogDataSource.getCatalog(),
     ).resolves.toEqual(parsePreparationCatalogResponse(responseBody));
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/public", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog", {
       credentials: "omit",
       method: "GET",
       signal: expect.any(AbortSignal),
@@ -44,7 +41,7 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
     );
 
     await expect(
-      remotePreparationCatalogDataSource.getPublicCatalog(),
+      remotePreparationCatalogDataSource.getCatalog(),
     ).rejects.toEqual(new RemotePreparationCatalogApiError(0, 500));
   });
 
@@ -52,7 +49,7 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("failed")));
 
     await expect(
-      remotePreparationCatalogDataSource.getPublicCatalog(),
+      remotePreparationCatalogDataSource.getCatalog(),
     ).rejects.toBeInstanceOf(RemotePreparationCatalogNetworkError);
   });
 
@@ -70,7 +67,7 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
       ),
     );
 
-    const request = remotePreparationCatalogDataSource.getPublicCatalog();
+    const request = remotePreparationCatalogDataSource.getCatalog();
     const expectation = expect(request).rejects.toBeInstanceOf(
       RemotePreparationCatalogTimeoutError,
     );
@@ -96,7 +93,7 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
       ),
     );
 
-    const request = remotePreparationCatalogDataSource.getPublicCatalog();
+    const request = remotePreparationCatalogDataSource.getCatalog();
     const expectation = expect(request).rejects.toBeInstanceOf(
       RemotePreparationCatalogTimeoutError,
     );
@@ -116,47 +113,9 @@ describe("remotePreparationCatalogDataSource.getPublicCatalog", () => {
     );
 
     await expect(
-      remotePreparationCatalogDataSource.getPublicCatalog(),
+      remotePreparationCatalogDataSource.getCatalog(),
     ).rejects.toThrow("준비 목록 성공 응답 형식이 올바르지 않습니다.");
   });
-});
-
-describe("remotePreparationCatalogDataSource.getAuthenticatedCatalog", () => {
-  it("세션 쿠키를 포함해 인증 준비 목록 endpoint를 호출한다", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(authenticatedResponseBody), {
-        status: 200,
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      remotePreparationCatalogDataSource.getAuthenticatedCatalog(),
-    ).resolves.toEqual(
-      parsePreparationCatalogResponse(authenticatedResponseBody),
-    );
-    expect(fetchMock).toHaveBeenCalledWith("/api/catalog", {
-      credentials: "include",
-      method: "GET",
-      signal: expect.any(AbortSignal),
-    });
-  });
-
-  it("included가 없는 인증 성공 응답도 그대로 변환한다", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify(responseBody), { status: 200 }),
-        ),
-    );
-
-    await expect(
-      remotePreparationCatalogDataSource.getAuthenticatedCatalog(),
-    ).resolves.toEqual(parsePreparationCatalogResponse(responseBody));
-  });
-
   it("오류 응답의 코드와 상태를 API 오류로 변환한다", async () => {
     vi.stubGlobal(
       "fetch",
@@ -172,7 +131,7 @@ describe("remotePreparationCatalogDataSource.getAuthenticatedCatalog", () => {
     );
 
     await expect(
-      remotePreparationCatalogDataSource.getAuthenticatedCatalog(),
+      remotePreparationCatalogDataSource.getCatalog(),
     ).rejects.toEqual(
       new RemotePreparationCatalogApiError(201, 401, "로그인이 필요합니다."),
     );
