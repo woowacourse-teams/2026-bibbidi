@@ -22,6 +22,10 @@ const authMocks = vi.hoisted(() => ({
 const repositoryMocks = vi.hoisted(() => ({
   getCatalog: vi.fn(),
 }));
+const checklistRepositoryMocks = vi.hoisted(() => ({
+  addLocalCatalogItemIds: vi.fn(),
+  getCatalogItemIds: vi.fn(),
+}));
 
 vi.mock("../auth", () => ({
   useAuth: () => ({
@@ -35,22 +39,18 @@ vi.mock("../../infrastructure/analytics", () => ({
     track: analyticsMocks.track,
   },
 }));
-vi.mock("./repository/preparationCatalogRepository", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("./repository/preparationCatalogRepository")
-    >();
-
-  return {
-    ...actual,
-    preparationCatalogRepository: {
-      getCatalog: repositoryMocks.getCatalog,
-    },
-  };
-});
+vi.mock("./preparationDependencies", () => ({
+  checklistRepository: {
+    addLocalCatalogItemIds: checklistRepositoryMocks.addLocalCatalogItemIds,
+    getCatalogItemIds: checklistRepositoryMocks.getCatalogItemIds,
+  },
+  preparationCatalogRepository: {
+    getCatalog: repositoryMocks.getCatalog,
+  },
+}));
 
 import { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
-import { PreparationAuthenticationRequiredError } from "./repository/preparationCatalogRepository";
+import { PreparationAuthenticationRequiredError } from "./repository/preparationErrors";
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
 async function renderFeature({ strictMode = false } = {}) {
@@ -74,6 +74,15 @@ function getRoadmapTitle() {
 
 const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1439px)";
 const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
+
+beforeEach(() => {
+  checklistRepositoryMocks.addLocalCatalogItemIds.mockReset();
+  checklistRepositoryMocks.addLocalCatalogItemIds.mockImplementation(
+    (catalogItemIds: string[]) => [...new Set(["101", ...catalogItemIds])],
+  );
+  checklistRepositoryMocks.getCatalogItemIds.mockReset();
+  checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["101"]);
+});
 
 interface ViewportMatches {
   compact: boolean;
@@ -160,6 +169,7 @@ describe("PreparationRoadmapFeature Analytics", () => {
     authMocks.authState = { status: "guest" };
     authMocks.refreshAuth.mockReset();
     analyticsMocks.track.mockReset();
+    repositoryMocks.getCatalog.mockReset();
     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
   });
 
@@ -280,6 +290,10 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
       "guest",
       expect.any(AbortSignal),
     );
+    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
+      "guest",
+      expect.any(AbortSignal),
+    );
   });
 
   it("로그인 사용자는 인증 준비 목록을 요청한다", async () => {
@@ -295,6 +309,40 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
       "authenticated",
       expect.any(AbortSignal),
     );
+    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
+      "authenticated",
+      expect.any(AbortSignal),
+    );
+    expect(
+      screen
+        .getByRole("button", {
+          name: "웨딩홀 견적 비교 추가 (준비 중)",
+        })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("로그인 사용자는 내 체크리스트의 원본 준비 항목 ID로 included를 계산한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+    checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
+
+    await renderFeature();
+
+    expect(screen.getByText("웨딩홀 견적 비교")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", {
+        name: "웨딩홀 견적 비교 추가 (준비 중)",
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", {
+        name: "웨딩홀 투어 추가 (준비 중)",
+      }),
+    ).toBeTruthy();
   });
 
   it("비로그인 빈 상태에서 로그인하면 인증 조회 동안 로딩 상태를 표시한다", async () => {
@@ -435,6 +483,143 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
   });
 });
 
+describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
+  beforeEach(() => {
+    authMocks.authState = { status: "guest" };
+    authMocks.refreshAuth.mockReset();
+    analyticsMocks.track.mockReset();
+    repositoryMocks.getCatalog.mockReset();
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+    setViewportMatches(false);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("로컬에 저장된 항목을 공개 준비 목록의 체크리스트로 복원한다", async () => {
+    checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
+
+    await renderFeature();
+
+    expect(screen.getByText("웨딩홀 견적 비교")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "웨딩홀 투어 추가" }),
+    ).toBeTruthy();
+  });
+
+  it("로컬 저장소 읽기 실패를 안내하고 다시 조회할 수 있다", async () => {
+    checklistRepositoryMocks.getCatalogItemIds
+      .mockRejectedValueOnce(new Error("storage unavailable"))
+      .mockResolvedValueOnce(["101"]);
+
+    render(<PreparationRoadmapFeature />);
+
+    expect(
+      await screen.findByText("준비 목록을 불러오지 못했어요."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "준비 로드맵" }),
+    ).toBeTruthy();
+    expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
+    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
+  });
+
+  it("개별 할 일을 로컬 체크리스트에 추가하고 즉시 화면에 반영한다", async () => {
+    await renderFeature();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+
+    expect(
+      checklistRepositoryMocks.addLocalCatalogItemIds,
+    ).toHaveBeenCalledWith(["102"]);
+    expect(
+      screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeNull();
+    expect(screen.getByText("2개")).toBeTruthy();
+  });
+
+  it("현재 단계의 남은 할 일을 모두 로컬 체크리스트에 추가한다", async () => {
+    await renderFeature();
+
+    fireEvent.click(screen.getByRole("button", { name: "모든 할 일 추가" }));
+
+    expect(
+      checklistRepositoryMocks.addLocalCatalogItemIds,
+    ).toHaveBeenCalledWith(["102"]);
+    expect(screen.getByText("추가할 세부 할 일이 없어요.")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "모든 할 일 추가 (준비 중)" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("로컬 저장 실패 시 화면을 유지하고 같은 동작을 다시 시도할 수 있다", async () => {
+    checklistRepositoryMocks.addLocalCatalogItemIds
+      .mockImplementationOnce(() => {
+        throw new Error("storage unavailable");
+      })
+      .mockReturnValueOnce(["101", "102"]);
+    await renderFeature();
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+
+    expect(
+      checklistRepositoryMocks.addLocalCatalogItemIds,
+    ).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeNull();
+  });
+
+  it("모바일 바텀시트에서도 개별 할 일을 추가한다", async () => {
+    setViewportMatches(true);
+    await renderFeature();
+    fireEvent.click(
+      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "웨딩홀 투어와 계약",
+    });
+
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "웨딩홀 견적 비교 추가",
+      }),
+    );
+
+    expect(
+      checklistRepositoryMocks.addLocalCatalogItemIds,
+    ).toHaveBeenCalledWith(["102"]);
+    expect(
+      within(dialog).queryByRole("button", {
+        name: "웨딩홀 견적 비교 추가",
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
   const scrollIntoViewMock = vi.fn();
 
@@ -490,16 +675,16 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       screen
         .getByRole("button", {
-          name: "웨딩홀 견적 비교 추가 (준비 중)",
+          name: "웨딩홀 견적 비교 추가",
         })
         .hasAttribute("disabled"),
-    ).toBe(true);
+    ).toBe(false);
     expect(screen.getByText("필수")).toBeTruthy();
     expect(
       screen
-        .getByRole("button", { name: "모든 할 일 추가 (준비 중)" })
+        .getByRole("button", { name: "모든 할 일 추가" })
         .hasAttribute("disabled"),
-    ).toBe(true);
+    ).toBe(false);
     expect(screen.getByText("1개")).toBeTruthy();
   });
 
@@ -606,17 +791,17 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       within(detail)
         .getByRole("button", {
-          name: "웨딩홀 견적 비교 추가 (준비 중)",
+          name: "웨딩홀 견적 비교 추가",
         })
         .hasAttribute("disabled"),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       within(detail)
         .getByRole("button", {
-          name: "남은 할 일 모두 추가 (준비 중)",
+          name: "남은 할 일 모두 추가",
         })
         .hasAttribute("disabled"),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       within(detail).queryByRole("button", { name: /내 체크리스트/ }),
     ).toBeNull();

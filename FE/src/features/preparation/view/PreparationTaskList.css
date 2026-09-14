@@ -199,6 +199,13 @@
   border-radius: 12px;
 }
 
+.preparation-task-list__error {
+  margin: 0 0 8px;
+  color: var(--color-fg-critical);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .preparation-task-list__add:disabled,
 .preparation-task-list__add-all:disabled {
   cursor: not-allowed;

@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { RemotePreparationCatalogApiError } from "../data-source/remotePreparationCatalogDataSource";
 import { preparationCatalogFixture } from "../test/fixtures/preparationCatalog.fixture";
-import {
-  createPreparationCatalogRepository,
-  PreparationAuthenticationRequiredError,
-} from "./preparationCatalogRepository";
+import { createPreparationCatalogRepository } from "./preparationCatalogRepository";
+import { PreparationAuthenticationRequiredError } from "./preparationErrors";
 
 describe("PreparationCatalogRepository", () => {
   it("비로그인 사용자는 공개 준비 목록 DataSource를 사용한다", async () => {

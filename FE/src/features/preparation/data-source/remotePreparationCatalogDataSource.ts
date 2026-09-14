@@ -124,9 +124,7 @@ async function getPreparationCatalog(
       );
     }
 
-    return parsePreparationCatalogResponse(body, {
-      requiresIncluded: requiresAuthentication,
-    });
+    return parsePreparationCatalogResponse(body);
   } finally {
     window.clearTimeout(timeoutId);
     signal?.removeEventListener("abort", handleCallerAbort);

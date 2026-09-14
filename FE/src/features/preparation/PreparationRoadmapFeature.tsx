@@ -6,12 +6,16 @@ import {
   createPreparationCategorySelectEvent,
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
-import { PreparationCatalogModel } from "./model/preparationRoadmap";
 import {
-  PreparationCatalogAudience,
-  PreparationAuthenticationRequiredError,
+  applyChecklistCatalogItemIds,
+  PreparationAudience,
+  PreparationCatalogModel,
+} from "./model/preparationRoadmap";
+import {
+  checklistRepository,
   preparationCatalogRepository,
-} from "./repository/preparationCatalogRepository";
+} from "./preparationDependencies";
+import { PreparationAuthenticationRequiredError } from "./repository/preparationErrors";
 import {
   createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
@@ -23,15 +27,15 @@ import { PreparationRoadmap } from "./view/PreparationRoadmap";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
 
 type CatalogRequestState =
-  | { audience?: PreparationCatalogAudience; status: "loading" }
-  | { audience: PreparationCatalogAudience; status: "empty" }
+  | { audience?: PreparationAudience; status: "loading" }
+  | { audience: PreparationAudience; status: "empty" }
   | {
-      audience: PreparationCatalogAudience;
+      audience: PreparationAudience;
       status: "authentication-required";
     }
-  | { audience: PreparationCatalogAudience; status: "error" }
+  | { audience: PreparationAudience; status: "error" }
   | {
-      audience: PreparationCatalogAudience;
+      audience: PreparationAudience;
       catalog: PreparationCatalogModel;
       selection: PreparationRoadmapSelection;
       status: "success";
@@ -39,12 +43,15 @@ type CatalogRequestState =
 
 export function PreparationRoadmapFeature() {
   const { authState, refreshAuth } = useAuth();
+  const [additionErrorMessage, setAdditionErrorMessage] = useState<
+    string | null
+  >(null);
   const [requestState, setRequestState] = useState<CatalogRequestState>({
     status: "loading",
   });
   const [requestRevision, setRequestRevision] = useState(0);
   const hasTrackedCatalogViewRef = useRef(false);
-  const audience: PreparationCatalogAudience | undefined =
+  const audience: PreparationAudience | undefined =
     authState.status === "authenticated"
       ? "authenticated"
       : authState.status === "guest"
@@ -59,12 +66,21 @@ export function PreparationRoadmapFeature() {
     const controller = new AbortController();
     let ignoresResult = false;
 
-    void preparationCatalogRepository
-      .getCatalog(audience, controller.signal)
-      .then((nextCatalog) => {
+    void Promise.all([
+      preparationCatalogRepository.getCatalog(audience, controller.signal),
+      checklistRepository.getCatalogItemIds(audience, controller.signal),
+    ])
+      .then(([catalog, catalogItemIds]) => {
         if (ignoresResult) {
           return;
         }
+
+        const nextCatalog = applyChecklistCatalogItemIds(
+          catalog,
+          catalogItemIds,
+        );
+
+        setAdditionErrorMessage(null);
 
         if (!hasSelectablePreparationSteps(nextCatalog)) {
           setRequestState({ audience, status: "empty" });
@@ -184,6 +200,7 @@ export function PreparationRoadmapFeature() {
         previousCategoryId: selection.categoryId,
       }),
     );
+    setAdditionErrorMessage(null);
     setRequestState({
       ...requestState,
       selection: nextSelection,
@@ -204,6 +221,7 @@ export function PreparationRoadmapFeature() {
         stepOrder: selectedStep.order,
       }),
     );
+    setAdditionErrorMessage(null);
     setRequestState({
       ...requestState,
       selection: {
@@ -213,10 +231,43 @@ export function PreparationRoadmapFeature() {
     });
   };
 
+  const addTasksToLocalChecklist = (catalogItemIds: string[]) => {
+    if (audience !== "guest") {
+      return;
+    }
+
+    try {
+      const nextCatalogItemIds =
+        checklistRepository.addLocalCatalogItemIds(catalogItemIds);
+
+      setAdditionErrorMessage(null);
+      setRequestState({
+        ...requestState,
+        catalog: applyChecklistCatalogItemIds(catalog, nextCatalogItemIds),
+      });
+    } catch {
+      setAdditionErrorMessage("할 일을 저장하지 못했어요. 다시 시도해 주세요.");
+    }
+  };
+
+  const handleTaskAdd = (catalogItemId: string) => {
+    addTasksToLocalChecklist([catalogItemId]);
+  };
+
+  const handleAddAllTasks = () => {
+    addTasksToLocalChecklist(
+      viewModel.selectedStepDetail.detailTasks.map((task) => task.id),
+    );
+  };
+
   return (
     <PreparationRoadmap
+      additionErrorMessage={additionErrorMessage}
+      canAddTasks={audience === "guest"}
+      onAddAllTasks={handleAddAllTasks}
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
+      onTaskAdd={handleTaskAdd}
       viewModel={viewModel}
     />
   );

@@ -35,7 +35,13 @@ function createCatalog(steps: StepFixture[]): PreparationCatalogModel {
     stepDetails: steps.map((step) => ({
       description: `${step.id} 상세 설명`,
       stepId: step.id,
-      tasks: [{ id: `${step.id}-task`, title: `${step.id} 할 일` }],
+      tasks: [
+        {
+          id: `${step.id}-task`,
+          included: false,
+          title: `${step.id} 할 일`,
+        },
+      ],
     })),
   };
 }
@@ -61,7 +67,7 @@ function addInvitationRoadmap(model: PreparationCatalogModel) {
   model.stepDetails.push({
     description: "초대 상세 설명",
     stepId: "invitation-step-1",
-    tasks: [{ id: "invitation-task-1", title: "초대 할 일" }],
+    tasks: [{ id: "invitation-task-1", included: false, title: "초대 할 일" }],
   });
 }
 

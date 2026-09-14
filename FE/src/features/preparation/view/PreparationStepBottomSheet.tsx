@@ -9,13 +9,21 @@ import { usePreparationBottomSheetModal } from "./usePreparationBottomSheetModal
 import "./PreparationStepBottomSheet.css";
 
 interface PreparationStepBottomSheetProps {
+  additionErrorMessage: string | null;
+  canAddTasks: boolean;
   detail: PreparationStepDetailViewModel;
+  onAddAllTasks: () => void;
   onClose: () => void;
+  onTaskAdd: (catalogItemId: string) => void;
 }
 
 export function PreparationStepBottomSheet({
+  additionErrorMessage,
+  canAddTasks,
   detail,
+  onAddAllTasks,
   onClose,
+  onTaskAdd,
 }: PreparationStepBottomSheetProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -90,12 +98,23 @@ export function PreparationStepBottomSheet({
               </span>
             </header>
             <PreparationTaskList
+              canAddTasks={canAddTasks}
               isScrollable
+              onTaskAdd={onTaskAdd}
               tasks={detail.detailTasks}
               variant="available"
             />
             <footer className="preparation-step-bottom-sheet__footer">
-              <PreparationAddAllTasksButton label="남은 할 일 모두 추가" />
+              {additionErrorMessage ? (
+                <p className="preparation-task-list__error" role="alert">
+                  {additionErrorMessage}
+                </p>
+              ) : null}
+              <PreparationAddAllTasksButton
+                isDisabled={!canAddTasks || detail.detailTasks.length === 0}
+                label="남은 할 일 모두 추가"
+                onClick={onAddAllTasks}
+              />
             </footer>
           </section>
         </div>
