@@ -1,0 +1,1951 @@
+diff --git a/.agents/skills/bibbidi-conventions/SKILL.md b/.agents/skills/bibbidi-conventions/SKILL.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..01ef7cec10460c0c0f02f0852b144f699497258c
+--- /dev/null
++++ b/.agents/skills/bibbidi-conventions/SKILL.md
+@@ -0,0 +1,28 @@
++---
++name: bibbidi-conventions
++description: Bibbidi 저장소에서 코드·테스트·Git·PR 또는 로그 처리 방식을 변경할 때 docs/convention의 팀 규칙을 작업 범위에 맞게 적용한다. 단순 설명이나 저장소 밖의 작업에는 사용하지 않는다.
++---
++
++# Bibbidi Conventions
++
++- 구현 전에 작업 범위에 해당하는 `docs/convention` 문서를 끝까지 읽는다.
++  - 문서 내용을 Skill에 복제하지 않고 저장소 문서를 Source of Truth로 사용한다.
++  - 사용자 요구사항이나 Issue와 충돌하면 추측하지 말고 구현 전에 질문한다.
++  - 문서에 없는 규칙은 새로 만들지 않고 인접 코드를 따른다.
++
++## 문서 선택
++
++- 모든 코드·Git·PR 작업에서는 [`docs/convention/git-convention.md`](../../../docs/convention/git-convention.md)를 읽는다.
++- `BE` 코드를 변경할 때는 [`docs/convention/code-convention.md`](../../../docs/convention/code-convention.md)를 읽는다.
++- 오류 응답, 예외, 보안 로그 또는 민감정보 처리를 변경할 때는 [`docs/convention/error-handling.md`](../../../docs/convention/error-handling.md)를 읽는다.
++- `BE` 테스트를 추가·변경하거나 검증 범위를 결정할 때는 [`docs/convention/test-strategy.md`](../../../docs/convention/test-strategy.md)를 읽는다.
++- `FE`와 `APP`에는 별도의 코드·테스트 Convention이 없으므로 `git-convention.md`와 각 패키지의 기존 코드·스크립트를 기준으로 삼는다.
++- 저장소 공통 도구가 로그를 기록한다면 `error-handling.md`의 로그 보안 규칙을 적용한다.
++
++## 적용
++
++- 작업과 관계없는 파일을 일괄 수정하지 않는다.
++- Convention을 적용하기 어려운 경우 이유, 대안, 영향을 먼저 제시하고 사용자 결정을 기다린다.
++- 저장소에 정의된 검증 명령을 우선하며 변경된 책임과 가장 가까운 테스트부터 실행한다.
++- 완료 시 적용한 문서, 확인한 완료 조건, 의도적인 예외를 두괄식·개조식으로 정리한다.
++
+diff --git a/.agents/skills/grill-me/SKILL.md b/.agents/skills/grill-me/SKILL.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b38784cb5495d0bbb57095d12e79e2af9fcd6c08
+--- /dev/null
++++ b/.agents/skills/grill-me/SKILL.md
+@@ -0,0 +1,83 @@
++---
++name: grill-me
++description: GitHub Issue 기반 구현 전에 요구사항과 설계를 결정 트리로 검증하고 합의된 결정·대안·근거·검증 방법을 정리한다. 새 개발 작업을 시작하거나 핵심 ADR을 다시 열 때 사용하며, 단순 질의나 이미 합의된 구현을 반복할 때는 사용하지 않는다.
++---
++
++# Grill Me
++
++- 구현 전에 사용자와 설계의 모든 필수 분기를 합의한다.
++  - 모호한 요구사항, 숨은 전제, 책임 위치, 대안, trade-off, 검증 방법을 드러낸다.
++  - 구현 결과를 사후 정당화하기 위한 질문은 하지 않는다.
++
++## 준비
++
++- 질문 전에 직접 확인할 수 있는 사실을 조사한다.
++  - GitHub Issue와 댓글을 읽는다.
++  - 관련 코드, 프로젝트 규칙, 기존 검증 명령을 확인한다.
++  - 기술적으로 검증 가능한 사실은 공식 문서나 공신력 있는 자료에서 확인한다.
++- 사용자에게는 선택과 정책만 질문한다.
++  - 코드나 문서에서 확인할 수 있는 사실을 사용자에게 묻지 않는다.
++  - 조사 중인 사실에 의존하는 질문은 해당 사실이 확인될 때까지 보류한다.
++
++## 진행
++
++- 설계를 결정 트리로 관리한다.
++  - 각 결정 아래에 그 결정이 확정되어야 답할 수 있는 후속 결정을 둔다.
++  - 선행 결정이 끝난 질문들의 집합을 현재 라운드로 정의한다.
++- 한 라운드에서는 현재 답할 수 있는 질문을 함께 제시한다.
++  - 질문마다 번호, 선택이 필요한 이유, 현실적인 대안, 추천안과 추천 이유를 제공한다.
++  - 개수를 채우기 위한 질문이나 이미 명확한 내용을 반복하는 질문은 제외한다.
++  - 서로 의존하는 질문은 같은 라운드에 넣지 않는다.
++- 사용자의 답변을 받은 뒤 결정 트리를 다시 계산한다.
++  - 답변이 새로운 분기나 충돌을 만들면 다음 라운드에서 다룬다.
++  - 사용자가 모른다고 답하면 추측하지 않고 조사, 작은 실험, prototype 중 적절한 방법을 제안한다.
++
++라운드는 다음 형식을 따른다.
++
++```markdown
++- Q1. **질문 제목**
++  - 질문: 결정해야 하는 내용
++  - 대안: 선택 가능한 안과 핵심 trade-off
++  - 추천: 추천하는 안과 이유
++
++- Q2. **질문 제목**
++  - 질문: 결정해야 하는 내용
++  - 대안: 선택 가능한 안과 핵심 trade-off
++  - 추천: 추천하는 안과 이유
++```
++
++## 기록 의미
++
++- Development Logger가 활성화된 경우 Hook이 다음 의미로 대화를 기록하도록 한다.
++  - 시작: `GRILL_ME_STARTED`
++  - 질문: 질문마다 `GRILL_ME_QUESTION`
++  - 답변: 답변마다 `GRILL_ME_ANSWER`
++  - 결정: 합의된 결정마다 `GRILL_ME_DECISION`
++  - 종료: `GRILL_ME_FINISHED`
++- Skill 자체가 Hook을 우회해 `.devlog`를 직접 조작하지 않는다.
++- Development Logger가 설치된 저장소에서는 공통 CLI로 의미 Event를 기록한다.
++  - Hook Context가 제공한 session ID를 각 명령의 `<session-id>`에 사용한다.
++  - 라운드 시작 전: `node packages/development-logger/src/cli.mjs grill start --session <session-id>`
++  - 질문 제시 전 각 질문마다: `node packages/development-logger/src/cli.mjs grill question --session <session-id> --text "<question>"`
++  - 사용자 답변으로 합의한 각 결정마다: `node packages/development-logger/src/cli.mjs grill decision --session <session-id> --text "<decision>"`
++  - 종료 합의 전: `node packages/development-logger/src/cli.mjs grill finish --session <session-id>`
++  - CLI가 실패하면 구현으로 넘어가지 않고 실패 원인과 복구 방법을 알린다.
++
++## 종료 조건
++
++- 다음 조건을 모두 충족할 때만 인터뷰 종료를 제안한다.
++  - 구현 범위와 비범위가 명확하다.
++  - 핵심 책임과 데이터 흐름이 명확하다.
++  - 주요 대안과 trade-off가 비교됐다.
++  - 실패·복구 정책과 호환성 조건이 명확하다.
++  - 프로젝트에 맞는 검증 명령과 통과 기준이 정해졌다.
++  - 외부 근거가 필요한 기술 결정과 Issue 합의로 충분한 제품 결정이 구분됐다.
++- 결론을 두괄식·개조식으로 정리한다.
++  - 결정
++  - 이유
++  - 대안과 trade-off
++  - 근거
++  - 검증
++  - 미해결 사항
++- 사용자에게 공유된 이해가 맞는지 확인한다.
++  - 사용자가 명시적으로 확인하기 전에는 ADR 작성이나 구현으로 넘어가지 않는다.
+diff --git a/.claude/settings.json b/.claude/settings.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b936c10bb8425a232506b214bdd9c361708c876
+--- /dev/null
++++ b/.claude/settings.json
+@@ -0,0 +1,10 @@
++{
++  "hooks": {
++    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/packages/development-logger/src/cli.mjs\" hook claude", "timeout": 15, "statusMessage": "개발 Session 기준 상태를 기록하는 중" }] }],
++    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "Issue와 사용자 요구사항을 연결하는 중" }] }],
++    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "개발 Lifecycle Gate를 확인하는 중" }] }],
++    "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "검증 결과를 기록하는 중" }] }],
++    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "Turn 결과와 Diff를 기록하는 중" }] }]
++  }
++}
++
+diff --git a/.claude/skills/bibbidi-conventions/SKILL.md b/.claude/skills/bibbidi-conventions/SKILL.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..01ef7cec10460c0c0f02f0852b144f699497258c
+--- /dev/null
++++ b/.claude/skills/bibbidi-conventions/SKILL.md
+@@ -0,0 +1,28 @@
++---
++name: bibbidi-conventions
++description: Bibbidi 저장소에서 코드·테스트·Git·PR 또는 로그 처리 방식을 변경할 때 docs/convention의 팀 규칙을 작업 범위에 맞게 적용한다. 단순 설명이나 저장소 밖의 작업에는 사용하지 않는다.
++---
++
++# Bibbidi Conventions
++
++- 구현 전에 작업 범위에 해당하는 `docs/convention` 문서를 끝까지 읽는다.
++  - 문서 내용을 Skill에 복제하지 않고 저장소 문서를 Source of Truth로 사용한다.
++  - 사용자 요구사항이나 Issue와 충돌하면 추측하지 말고 구현 전에 질문한다.
++  - 문서에 없는 규칙은 새로 만들지 않고 인접 코드를 따른다.
++
++## 문서 선택
++
++- 모든 코드·Git·PR 작업에서는 [`docs/convention/git-convention.md`](../../../docs/convention/git-convention.md)를 읽는다.
++- `BE` 코드를 변경할 때는 [`docs/convention/code-convention.md`](../../../docs/convention/code-convention.md)를 읽는다.
++- 오류 응답, 예외, 보안 로그 또는 민감정보 처리를 변경할 때는 [`docs/convention/error-handling.md`](../../../docs/convention/error-handling.md)를 읽는다.
++- `BE` 테스트를 추가·변경하거나 검증 범위를 결정할 때는 [`docs/convention/test-strategy.md`](../../../docs/convention/test-strategy.md)를 읽는다.
++- `FE`와 `APP`에는 별도의 코드·테스트 Convention이 없으므로 `git-convention.md`와 각 패키지의 기존 코드·스크립트를 기준으로 삼는다.
++- 저장소 공통 도구가 로그를 기록한다면 `error-handling.md`의 로그 보안 규칙을 적용한다.
++
++## 적용
++
++- 작업과 관계없는 파일을 일괄 수정하지 않는다.
++- Convention을 적용하기 어려운 경우 이유, 대안, 영향을 먼저 제시하고 사용자 결정을 기다린다.
++- 저장소에 정의된 검증 명령을 우선하며 변경된 책임과 가장 가까운 테스트부터 실행한다.
++- 완료 시 적용한 문서, 확인한 완료 조건, 의도적인 예외를 두괄식·개조식으로 정리한다.
++
+diff --git a/.claude/skills/grill-me/SKILL.md b/.claude/skills/grill-me/SKILL.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b38784cb5495d0bbb57095d12e79e2af9fcd6c08
+--- /dev/null
++++ b/.claude/skills/grill-me/SKILL.md
+@@ -0,0 +1,83 @@
++---
++name: grill-me
++description: GitHub Issue 기반 구현 전에 요구사항과 설계를 결정 트리로 검증하고 합의된 결정·대안·근거·검증 방법을 정리한다. 새 개발 작업을 시작하거나 핵심 ADR을 다시 열 때 사용하며, 단순 질의나 이미 합의된 구현을 반복할 때는 사용하지 않는다.
++---
++
++# Grill Me
++
++- 구현 전에 사용자와 설계의 모든 필수 분기를 합의한다.
++  - 모호한 요구사항, 숨은 전제, 책임 위치, 대안, trade-off, 검증 방법을 드러낸다.
++  - 구현 결과를 사후 정당화하기 위한 질문은 하지 않는다.
++
++## 준비
++
++- 질문 전에 직접 확인할 수 있는 사실을 조사한다.
++  - GitHub Issue와 댓글을 읽는다.
++  - 관련 코드, 프로젝트 규칙, 기존 검증 명령을 확인한다.
++  - 기술적으로 검증 가능한 사실은 공식 문서나 공신력 있는 자료에서 확인한다.
++- 사용자에게는 선택과 정책만 질문한다.
++  - 코드나 문서에서 확인할 수 있는 사실을 사용자에게 묻지 않는다.
++  - 조사 중인 사실에 의존하는 질문은 해당 사실이 확인될 때까지 보류한다.
++
++## 진행
++
++- 설계를 결정 트리로 관리한다.
++  - 각 결정 아래에 그 결정이 확정되어야 답할 수 있는 후속 결정을 둔다.
++  - 선행 결정이 끝난 질문들의 집합을 현재 라운드로 정의한다.
++- 한 라운드에서는 현재 답할 수 있는 질문을 함께 제시한다.
++  - 질문마다 번호, 선택이 필요한 이유, 현실적인 대안, 추천안과 추천 이유를 제공한다.
++  - 개수를 채우기 위한 질문이나 이미 명확한 내용을 반복하는 질문은 제외한다.
++  - 서로 의존하는 질문은 같은 라운드에 넣지 않는다.
++- 사용자의 답변을 받은 뒤 결정 트리를 다시 계산한다.
++  - 답변이 새로운 분기나 충돌을 만들면 다음 라운드에서 다룬다.
++  - 사용자가 모른다고 답하면 추측하지 않고 조사, 작은 실험, prototype 중 적절한 방법을 제안한다.
++
++라운드는 다음 형식을 따른다.
++
++```markdown
++- Q1. **질문 제목**
++  - 질문: 결정해야 하는 내용
++  - 대안: 선택 가능한 안과 핵심 trade-off
++  - 추천: 추천하는 안과 이유
++
++- Q2. **질문 제목**
++  - 질문: 결정해야 하는 내용
++  - 대안: 선택 가능한 안과 핵심 trade-off
++  - 추천: 추천하는 안과 이유
++```
++
++## 기록 의미
++
++- Development Logger가 활성화된 경우 Hook이 다음 의미로 대화를 기록하도록 한다.
++  - 시작: `GRILL_ME_STARTED`
++  - 질문: 질문마다 `GRILL_ME_QUESTION`
++  - 답변: 답변마다 `GRILL_ME_ANSWER`
++  - 결정: 합의된 결정마다 `GRILL_ME_DECISION`
++  - 종료: `GRILL_ME_FINISHED`
++- Skill 자체가 Hook을 우회해 `.devlog`를 직접 조작하지 않는다.
++- Development Logger가 설치된 저장소에서는 공통 CLI로 의미 Event를 기록한다.
++  - Hook Context가 제공한 session ID를 각 명령의 `<session-id>`에 사용한다.
++  - 라운드 시작 전: `node packages/development-logger/src/cli.mjs grill start --session <session-id>`
++  - 질문 제시 전 각 질문마다: `node packages/development-logger/src/cli.mjs grill question --session <session-id> --text "<question>"`
++  - 사용자 답변으로 합의한 각 결정마다: `node packages/development-logger/src/cli.mjs grill decision --session <session-id> --text "<decision>"`
++  - 종료 합의 전: `node packages/development-logger/src/cli.mjs grill finish --session <session-id>`
++  - CLI가 실패하면 구현으로 넘어가지 않고 실패 원인과 복구 방법을 알린다.
++
++## 종료 조건
++
++- 다음 조건을 모두 충족할 때만 인터뷰 종료를 제안한다.
++  - 구현 범위와 비범위가 명확하다.
++  - 핵심 책임과 데이터 흐름이 명확하다.
++  - 주요 대안과 trade-off가 비교됐다.
++  - 실패·복구 정책과 호환성 조건이 명확하다.
++  - 프로젝트에 맞는 검증 명령과 통과 기준이 정해졌다.
++  - 외부 근거가 필요한 기술 결정과 Issue 합의로 충분한 제품 결정이 구분됐다.
++- 결론을 두괄식·개조식으로 정리한다.
++  - 결정
++  - 이유
++  - 대안과 trade-off
++  - 근거
++  - 검증
++  - 미해결 사항
++- 사용자에게 공유된 이해가 맞는지 확인한다.
++  - 사용자가 명시적으로 확인하기 전에는 ADR 작성이나 구현으로 넘어가지 않는다.
+diff --git a/.codex/config.toml b/.codex/config.toml
+new file mode 100644
+index 0000000000000000000000000000000000000000..15b9082970be872796f3cfb78ee1e40d760d868f
+--- /dev/null
++++ b/.codex/config.toml
+@@ -0,0 +1,3 @@
++[features]
++hooks = true
++
+diff --git a/.codex/hooks.json b/.codex/hooks.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f9da032ebe3ca79ea2f566b60edee25b9d8e29c3
+--- /dev/null
++++ b/.codex/hooks.json
+@@ -0,0 +1,11 @@
++{
++  "description": "GitHub Issue 기반 AI Development Logger",
++  "hooks": {
++    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 15, "statusMessage": "개발 Session 기준 상태를 기록하는 중" }] }],
++    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "Issue와 사용자 요구사항을 연결하는 중" }] }],
++    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "개발 Lifecycle Gate를 확인하는 중" }] }],
++    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "검증 결과를 기록하는 중" }] }],
++    "Stop": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "Turn 결과와 Diff를 기록하는 중" }] }]
++  }
++}
++
+diff --git a/.devlogger.json b/.devlogger.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..c69034974eef469c486a91c45463040d74d971e5
+--- /dev/null
++++ b/.devlogger.json
+@@ -0,0 +1,57 @@
++{
++  "version": 1,
++  "repository": "woowacourse-teams/2026-bibbidi",
++  "defaultBaseBranch": "release-be",
++  "issueTemplate": ".github/ISSUE_TEMPLATE/development.md",
++  "pullRequestTemplate": ".github/pull_request_template.md",
++  "validation": [
++    {
++      "key": "logger-test",
++      "paths": [
++        ".agents/",
++        ".claude/",
++        ".codex/",
++        ".devlogger.json",
++        ".github/ISSUE_TEMPLATE/",
++        ".github/pull_request_template.md",
++        "packages/development-logger/"
++      ],
++      "commands": ["node --test \"packages/development-logger/test/*.test.mjs\""]
++    },
++    {
++      "key": "be-test",
++      "paths": ["BE/"],
++      "commands": ["BE/gradlew test", "BE/gradlew.bat test"]
++    },
++    {
++      "key": "be-build",
++      "paths": ["BE/"],
++      "commands": ["BE/gradlew build", "BE/gradlew.bat build"]
++    },
++    {
++      "key": "fe-typecheck",
++      "paths": ["FE/"],
++      "commands": ["pnpm --filter bibbidi-fe typecheck"]
++    },
++    {
++      "key": "fe-build",
++      "paths": ["FE/"],
++      "commands": ["pnpm --filter bibbidi-fe build", "pnpm web:build"]
++    },
++    {
++      "key": "app-lint",
++      "paths": ["APP/"],
++      "commands": ["pnpm --filter @bibbidi/app lint"]
++    },
++    {
++      "key": "app-typecheck",
++      "paths": ["APP/"],
++      "commands": ["pnpm --filter @bibbidi/app typecheck", "pnpm app:typecheck"]
++    },
++    {
++      "key": "app-build-web",
++      "paths": ["APP/"],
++      "commands": ["pnpm --filter @bibbidi/app build:web"]
++    }
++  ]
++}
+diff --git a/.github/ISSUE_TEMPLATE/development.md b/.github/ISSUE_TEMPLATE/development.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..80491343960b50d74fdf6ea6bd852d419bccb527
+--- /dev/null
++++ b/.github/ISSUE_TEMPLATE/development.md
+@@ -0,0 +1,51 @@
++---
++name: 개발 작업
++about: 문제와 설계 판단이 필요한 개발 작업을 제안합니다.
++title: ""
++labels: ""
++assignees: ""
++---
++
++## 해결하려는 문제
++
++- 결론부터 작성한다.
++  - 현재 어떤 문제가 있는지 구체적으로 설명한다.
++
++## 왜 지금 해결해야 하는가
++
++- 구현 가능성보다 지금 해결해야 하는 이유를 작성한다.
++  - 사용자·운영·개발 Workflow에 미치는 영향을 설명한다.
++
++## 요구사항과 범위
++
++- 포함할 요구사항
++  -
++- 포함하지 않을 범위
++  -
++
++## 완료 조건
++
++- [ ] 사용자가 확인할 수 있는 완료 상태를 작성한다.
++
++## 기존 기능에 미치는 영향
++
++- 영향받는 기능, 데이터, API 또는 개발 Workflow를 작성한다.
++
++## Edge Case와 실패 시나리오
++
++- 실패할 수 있는 조건과 기대하는 처리 방식을 작성한다.
++
++## 검토할 대안
++
++- 대안과 선택 시 발생하는 Trade-off를 작성한다.
++
++## 검증 방법
++
++- 자동 테스트와 수동 확인 방법을 작성한다.
++
++## 관련 자료
++
++- 공식 문서, 공신력 있는 기술 자료 또는 제품 합의 자료를 연결한다.
++
++<!-- grill-me 완료 후 Agent가 이 아래에 최초 ADR을 추가한다. -->
++
+diff --git a/.github/pull_request_template.md b/.github/pull_request_template.md
+index c9da132d089233c79f627bfed089fb2f8a255869..8c17508d78d01aadd6128348307bded0e6a187db 100644
+--- a/.github/pull_request_template.md
++++ b/.github/pull_request_template.md
+@@ -1,6 +1,6 @@
+-## TASK
++## 관련 Issue
+ 
+-- Notion Task URL :
++- #
+ 
+ ## 변경 유형
+ 
+@@ -12,24 +12,80 @@
+ - [ ] Chore
+ - [ ] Docs
+ 
+-## 변경 사항
++## 해결한 문제와 변경 이유
+ 
+-> 이번 PR에서 추가하거나 수정한 핵심 내용을 작성한다.
++> 무엇을 바꿨는지보다 어떤 문제를 왜 지금 해결했는지 먼저 작성한다.
++
++-
++
++## 변경 사항과 핵심 설계 결정
++
++> 해결 방법, 핵심 책임과 데이터 흐름, grill-me에서 합의한 결정을 작성한다.
++
++-
++
++## 한계와 Trade-off
++
++> 현재 선택으로 얻는 것과 감수하는 비용을 작성한다. 비어 있다면 판단할 Trade-off가 없음을 명시한다.
++
++-
++
++## 기존 기능에 미치는 영향
++
++> 영향받는 기능, 데이터, API 또는 개발 Workflow를 작성한다.
++
++-
++
++## Edge Case와 실패 시나리오
++
++> 예상 가능한 실패 조건, 복구 방식, 의도적으로 다루지 않은 범위를 작성한다.
++
++-
++
++## 검토한 대안과 선택 이유
++
++> 선택하지 않은 대안과 현재 방식을 선택한 근거를 작성한다.
++
++-
++
++## 개발 과정
++
++### Grill Me 주요 결정
++
++-
++
++### 주요 사용자-Agent 대화
++
++-
++
++### ADR 변경
++
++- 최초 ADR 이후 변경된 결정이 없습니다.
++
++## 검증 결과
++
++> 실행한 명령과 결과를 작성한다.
+ 
+ -
+ 
+ ## 리뷰 요청
+ 
++> 파일이나 영역별 위험도를 🔴·🟡·🟢로 표시한다.
+ > 사람이 판단해야 하는 부분을 작성한다.
+ > 요구사항 해석, 설계 선택, 영향 범위 등 리뷰어와 논의가 필요한 내용을 작성한다.
+ > 단순 컨벤션 위반이나 기계적으로 확인 가능한 내용은 CodeRabbit 리뷰를 먼저 확인한다.
+ 
+ -
+ 
+-## 고민 사항 (Optional)
++## 고민 사항
+ 
+ > 구현 과정에서 판단이 필요했던 선택지와 트레이드오프를 작성한다.
+ > 선택하지 않은 대안이 있다면 현재 방식을 선택한 이유를 함께 작성한다.
+ > 코드만 보고 알 수 있는 내용은 작성하지 않는다.
+ 
+ -
++
++## Development Log
++
++- `.devlog/{issue}/events.jsonl`
++- `.devlog/{issue}/turn-*.diff`
+diff --git a/docs/convention/git-convention.md b/docs/convention/git-convention.md
+index 6fb75d3a245534cec417ecd26d4d1aadf883c723..28338f6a452e3249142989cb79284c84b5b0f1c9 100644
+--- a/docs/convention/git-convention.md
++++ b/docs/convention/git-convention.md
+@@ -46,34 +46,34 @@ release-app ──┘
+ - `docs`: 문서 변경
+ - `chore`: 인프라 및 유지보수 작업
+ 
+-브랜치 식별자는 Notion 액션 아이템에서 발급한 Task ID를 사용한다.
++브랜치 식별자는 GitHub Issue ID를 사용한다.
+ 
+ ```text
+-{prefix}/{task-id}
++{prefix}/{issue-id}
+ 
+-예시: feature/TSK-001
++예시: feature/201
+ ```
+ 
+-## 작은 TSK와 짧은 브랜치
++## 작은 Issue와 짧은 브랜치
+ 
+-- TSK 하나당 PR 하나를 만든다.
++- Issue 하나당 PR 하나를 만든다.
+ - 예상 리뷰 시간은 30분 이하로 유지한다.
+-- TSK 구현 시간은 1일 이내를 목표로 한다.
++- Issue 구현 시간은 1일 이내를 목표로 한다.
+ - 핵심 변경 코드는 200줄 이하를 권장한다.
+ - 핵심 변경 파일은 5개 이하를 권장한다.
+ - 핵심 변경 코드 350줄 초과, 변경 파일 10개 초과, 리뷰 60분 초과, 구현 2일 이상은 작업 분할을 검토한다.
+ - 테스트 코드와 단순 변수명 변경은 변경량 판단에서 제외한다.
+ 
+-TSK는 기술 계층이 아니라 사용자 스토리를 기준으로 분리한다. 하나의 사용자 스토리가 BE·FE·APP 모두에 영향을 주면 분야별 TSK로 나눈다.
++Issue는 기술 계층이 아니라 사용자 스토리를 기준으로 분리한다. 하나의 사용자 스토리가 BE·FE·APP 모두에 영향을 주면 분야별 Issue로 나눈다.
+ 
+ ```text
+ User Story
+-├── TSK-201 · BE
+-├── TSK-202 · FE
+-└── TSK-203 · APP
++├── #201 · BE
++├── #202 · FE
++└── #203 · APP
+ ```
+ 
+-Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기준으로 TSK를 나누지 않는다.
++Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기준으로 Issue를 나누지 않는다.
+ 
+ ## PR 및 병합
+ 
+@@ -82,11 +82,11 @@ Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기
+ ```text
+ release-be
+     │
+-    ├── feature/TSK-201
++    ├── feature/201
+     │        │
+     │        └── PR → Squash Merge
+     │
+-    └── feature/TSK-202
++    └── feature/202
+              │
+              └── PR → Squash Merge
+                          │
+@@ -99,10 +99,10 @@ release-be
+ 
+ ### PR 제목
+ 
+-- 작업 브랜치에서 `release-*`로 제출하는 PR 제목에는 Task ID를 포함한다.
++- 작업 브랜치에서 `release-*`로 제출하는 PR 제목에는 GitHub Issue ID를 포함한다.
+ 
+ ```text
+-[TSK-201] 할 일 완료 API 구현
++[#201] 할 일 완료 API 구현
+ ```
+ 
+ - `release-*`에서 `main`으로 병합할 때는 BE·APP·FE 버전을 제목에 명시한다.
+@@ -118,14 +118,14 @@ BE v1.3.0 / APP v1.2.0 / FE v1.4.0
+ - Squash Merge가 완료된 작업 브랜치는 삭제한다.
+ 
+ ```text
+-feature/TSK-201
++feature/201
+   ├── commit A
+   ├── commit B
+   └── commit C
+          │ Squash Merge
+          ▼
+ release-be
+-  └── [TSK-201] 하나의 커밋
++  └── [#201] 하나의 커밋
+          │ Merge Commit
+          ▼
+ main
+@@ -149,7 +149,7 @@ main
+ - APP은 Store 배포를 수동으로 진행한다.
+ 
+ ```text
+-feature/TSK-201
++feature/201
+     │
+     └── PR → release-be
+                    │
+@@ -164,12 +164,12 @@ feature/TSK-201
+ - 운영 장애 대응도 PR과 Squash Merge를 거친다.
+ 
+ ```text
+-release-be → hotfix/TSK-301 → PR → Squash Merge → release-be
++release-be → hotfix/301 → PR → Squash Merge → release-be
+ ```
+ 
+ ### 롤백
+ 
+ - 이전 정상 Artifact 또는 배포 버전으로 되돌릴 수 있으면 해당 버전으로 Rollback한다.
+ - 코드 자체를 되돌려야 하면 문제가 된 Squash Commit을 Revert한다.
+-- 추가 수정이 필요하면 새 Task ID를 발급받아 별도 작업으로 진행한다.
++- 추가 수정이 필요하면 새 GitHub Issue를 발급받아 별도 작업으로 진행한다.
+ - Rollback과 Fix를 하나의 변경으로 섞지 않는다.
+diff --git a/packages/development-logger/package.json b/packages/development-logger/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..14d72b9806d1ea2222a02121714f347cd3c31d31
+--- /dev/null
++++ b/packages/development-logger/package.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@bibbidi/development-logger",
++  "version": "0.1.0",
++  "private": true,
++  "type": "module",
++  "engines": {
++    "node": ">=20"
++  },
++  "scripts": {
++    "test": "node --test \"test/*.test.mjs\""
++  }
++}
+diff --git a/packages/development-logger/src/cli.mjs b/packages/development-logger/src/cli.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..68b3002ba7e2184fe5606a378385132687574ef8
+--- /dev/null
++++ b/packages/development-logger/src/cli.mjs
+@@ -0,0 +1,38 @@
++#!/usr/bin/env node
++import { handleHook } from './hook.mjs';
++import { runLifecycle } from './lifecycle.mjs';
++import { readStdin } from './process.mjs';
++
++async function main() {
++  const [mode, ...args] = process.argv.slice(2);
++  if (mode === 'hook') {
++    const agent = args[0];
++    if (!['codex', 'claude'].includes(agent)) throw new Error('hook Agent는 codex 또는 claude여야 합니다.');
++    const payload = await readStdin();
++    try {
++      const output = handleHook({ agent, payload });
++      if (output && Object.keys(output).length) process.stdout.write(JSON.stringify(output));
++    } catch (error) {
++      if (payload.hook_event_name === 'PreToolUse') {
++        process.stdout.write(JSON.stringify({
++          hookSpecificOutput: {
++            hookEventName: 'PreToolUse',
++            permissionDecision: 'deny',
++            permissionDecisionReason: `Development Logger Gate 오류: ${error.message}`,
++          },
++        }));
++      } else {
++        process.stderr.write(`Development Logger 경고: ${error.message}\n`);
++      }
++    }
++    return;
++  }
++
++  const result = runLifecycle([mode, ...args]);
++  if (result) process.stdout.write(`${result}\n`);
++}
++
++main().catch((error) => {
++  process.stderr.write(`Development Logger: ${error.message}\n`);
++  process.exitCode = 2;
++});
+diff --git a/packages/development-logger/src/events.mjs b/packages/development-logger/src/events.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc8e3608004b59cd1e883c474d5268742aedc328
+--- /dev/null
++++ b/packages/development-logger/src/events.mjs
+@@ -0,0 +1,57 @@
++import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
++import { dirname, join } from 'node:path';
++import { redact } from './redaction.mjs';
++
++const EVENT_TYPES = new Set([
++  'SESSION_STARTED',
++  'ISSUE_BOUND',
++  'GRILL_ME_STARTED',
++  'GRILL_ME_QUESTION',
++  'GRILL_ME_ANSWER',
++  'GRILL_ME_DECISION',
++  'GRILL_ME_FINISHED',
++  'ADR_CREATED',
++  'ADR_REOPENED',
++  'ADR_CHANGED',
++  'USER_PROMPTED',
++  'TURN_FINISHED',
++  'PR_REQUESTED',
++]);
++
++export function eventPath(root, issue) {
++  return join(root, '.devlog', String(issue), 'events.jsonl');
++}
++
++export function appendEvent(root, issue, event) {
++  if (!EVENT_TYPES.has(event.type)) throw new Error(`지원하지 않는 Event Type입니다: ${event.type}`);
++  const path = eventPath(root, issue);
++  mkdirSync(dirname(path), { recursive: true });
++  const normalized = { ...event, timestamp: event.timestamp ?? new Date().toISOString() };
++  appendFileSync(path, `${JSON.stringify(normalized)}\n`, 'utf8');
++  return normalized;
++}
++
++export function readEvents(root, issue) {
++  try {
++    return readFileSync(eventPath(root, issue), 'utf8')
++      .split(/\r?\n/)
++      .filter(Boolean)
++      .map((line) => JSON.parse(line));
++  } catch (error) {
++    if (error.code === 'ENOENT') return [];
++    throw error;
++  }
++}
++
++export function redactField(value) {
++  const result = redact(value);
++  return { text: result.value, redacted: result.redacted };
++}
++
++export function hasEvent(events, type) {
++  return events.some((event) => event.type === type);
++}
++
++export function nextTurnNumber(events) {
++  return events.filter((event) => event.type === 'TURN_FINISHED').length + 1;
++}
+diff --git a/packages/development-logger/src/git.mjs b/packages/development-logger/src/git.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2c1fd7c8b856d3cb09ca444ed322a8a4b0ac338
+--- /dev/null
++++ b/packages/development-logger/src/git.mjs
+@@ -0,0 +1,61 @@
++import { mkdtempSync, rmSync } from 'node:fs';
++import { join } from 'node:path';
++import { tmpdir } from 'node:os';
++import { gitDirectory, removeFile, run, tryRun } from './process.mjs';
++
++export function gitMetadata(root) {
++  return {
++    branch: run('git', ['branch', '--show-current'], { cwd: root }),
++    head: run('git', ['rev-parse', 'HEAD'], { cwd: root }),
++    status: run('git', ['status', '--short'], { cwd: root }),
++  };
++}
++
++export function snapshotTree(root) {
++  const gitDir = gitDirectory(root);
++  const indexPath = join(gitDir, `devlogger-index-${process.pid}-${Date.now()}`);
++  const env = { ...process.env, GIT_INDEX_FILE: indexPath };
++  try {
++    const head = tryRun('git', ['rev-parse', '--verify', 'HEAD'], { cwd: root });
++    run('git', head.ok ? ['read-tree', 'HEAD'] : ['read-tree', '--empty'], { cwd: root, env });
++    run('git', ['add', '-A', '--', '.'], { cwd: root, env });
++    tryRun('git', ['rm', '-r', '--cached', '--ignore-unmatch', '--', '.devlog'], { cwd: root, env });
++    return run('git', ['write-tree'], { cwd: root, env });
++  } finally {
++    removeFile(indexPath);
++  }
++}
++
++export function diffTrees(root, before, after) {
++  if (!before || !after || before === after) return '';
++  return run('git', ['diff', '--binary', '--full-index', before, after, '--', '.', ':(exclude).devlog', ':(exclude).devlog/**'], { cwd: root });
++}
++
++export function diffStat(root, before, after) {
++  if (!before || !after || before === after) return '';
++  return run('git', ['diff', '--stat', before, after, '--', '.', ':(exclude).devlog', ':(exclude).devlog/**'], { cwd: root });
++}
++
++export function changedFiles(root, baseBranch) {
++  const mergeBase = run('git', ['merge-base', 'HEAD', baseBranch], { cwd: root });
++  const committed = run('git', ['diff', '--name-only', `${mergeBase}..HEAD`], { cwd: root })
++    .split(/\r?\n/)
++    .filter(Boolean);
++  const worktree = run('git', ['status', '--porcelain=v1'], { cwd: root })
++    .split(/\r?\n/)
++    .filter(Boolean)
++    .map((line) => line.slice(3).replace(/^"|"$/g, ''));
++  return [...new Set([...committed, ...worktree])].filter((path) => !path.startsWith('.devlog/'));
++}
++
++export function tracked(root, path) {
++  return tryRun('git', ['ls-files', '--error-unmatch', '--', path], { cwd: root }).ok;
++}
++
++export function temporaryDirectory(prefix = 'devlogger-') {
++  return mkdtempSync(join(tmpdir(), prefix));
++}
++
++export function removeDirectory(path) {
++  rmSync(path, { recursive: true, force: true });
++}
+diff --git a/packages/development-logger/src/github.mjs b/packages/development-logger/src/github.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..70ae2735be24083d8942a3239cd628b1485c7f5b
+--- /dev/null
++++ b/packages/development-logger/src/github.mjs
+@@ -0,0 +1,16 @@
++import { tryRun } from './process.mjs';
++
++export function getIssue(root, repository, issue) {
++  const result = tryRun('gh', [
++    'issue',
++    'view',
++    String(issue),
++    '--repo',
++    repository,
++    '--json',
++    'number,title,body,state,comments,url',
++  ], { cwd: root });
++  if (!result.ok) throw new Error(`GitHub Issue #${issue}를 조회하지 못했습니다: ${result.error || result.output}`);
++  return JSON.parse(result.output);
++}
++
+diff --git a/packages/development-logger/src/hook.mjs b/packages/development-logger/src/hook.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b04200ace1ee0ab4534da691ffedcd0579554b8b
+--- /dev/null
++++ b/packages/development-logger/src/hook.mjs
+@@ -0,0 +1,193 @@
++import { join } from 'node:path';
++import { appendEvent, hasEvent, nextTurnNumber, readEvents, redactField } from './events.mjs';
++import { diffStat, diffTrees, gitMetadata, snapshotTree } from './git.mjs';
++import { getIssue } from './github.mjs';
++import { extractIssueNumber, hasInitialAdr } from './issue.mjs';
++import { findRepositoryRoot, loadConfig, writeTextAtomic } from './process.mjs';
++import { preparePullRequest, updatePullRequestInput } from './pr.mjs';
++import { loadState, saveState } from './state.mjs';
++import { allow, deny, isMutation, isPullRequestCreate } from './tool-policy.mjs';
++import { recordValidation } from './validation.mjs';
++
++function sessionState(root, payload, agent) {
++  return loadState(root, payload.session_id) ?? {
++    sessionId: payload.session_id,
++    agent: agent.toUpperCase(),
++    cwd: payload.cwd ?? root,
++    phase: 'WAITING_FOR_ISSUE',
++    validations: {},
++  };
++}
++
++function eventContext(state) {
++  if (!state.issue) return 'GitHub Issue ID가 연결되기 전에는 조회와 조사만 수행할 수 있습니다.';
++  return `Development Logger session=${state.sessionId}, issue=#${state.issue}, phase=${state.phase}. 설계 인터뷰에서는 Logger CLI에 --session ${state.sessionId}를 전달하세요.`;
++}
++
++function validationResultForTurn(state, tree) {
++  const values = Object.values(state.validations ?? {}).filter((item) => item.tree === tree);
++  if (!values.length) return 'NOT_RUN';
++  return values.every((item) => item.passed) ? 'PASSED' : 'FAILED';
++}
++
++function ensureAdrEvent(root, config, state, services) {
++  if (!state.issue) return false;
++  const events = readEvents(root, state.issue);
++  if (!hasEvent(events, 'GRILL_ME_FINISHED')) return false;
++  const issue = services.getIssue(root, config.repository, state.issue);
++  if (!hasInitialAdr(issue.body)) return false;
++  if (!hasEvent(events, 'ADR_CREATED')) appendEvent(root, state.issue, { type: 'ADR_CREATED', issue: state.issue, ...(state.bootstrap ? { bootstrap: true } : {}) });
++  state.phase = 'READY_TO_IMPLEMENT';
++  return true;
++}
++
++function onSessionStart(root, payload, agent) {
++  const state = sessionState(root, payload, agent);
++  const metadata = gitMetadata(root);
++  Object.assign(state, {
++    source: payload.source ?? 'startup',
++    branch: metadata.branch,
++    head: metadata.head,
++    initialStatus: metadata.status,
++    previousTree: snapshotTree(root),
++    startedAt: state.startedAt ?? new Date().toISOString(),
++  });
++  saveState(root, state);
++  return {};
++}
++
++function onUserPrompt(root, config, payload, agent, services) {
++  const state = sessionState(root, payload, agent);
++  if (!state.head) {
++    const metadata = gitMetadata(root);
++    state.branch = metadata.branch;
++    state.head = metadata.head;
++    state.initialStatus = metadata.status;
++    state.startedAt = new Date().toISOString();
++  }
++  state.previousTree ??= snapshotTree(root);
++  state.promptCounter = (state.promptCounter ?? 0) + 1;
++  state.activeTurnKey = payload.turn_id ?? String(state.promptCounter);
++  state.turnStartTree = state.previousTree;
++
++  if (!state.issue) {
++    const issue = extractIssueNumber(payload.prompt);
++    if (issue) {
++      const issueData = services.getIssue(root, config.repository, issue);
++      if (issueData.state !== 'OPEN') throw new Error(`Issue #${issue}가 열려 있지 않습니다.`);
++      state.issue = issue;
++      state.issueRead = true;
++      state.phase = 'RESEARCHING';
++      appendEvent(root, issue, {
++        type: 'SESSION_STARTED',
++        sessionId: state.sessionId,
++        agent: state.agent,
++        cwd: state.cwd,
++        branch: state.branch,
++        head: state.head,
++        gitStatus: state.initialStatus,
++      });
++      appendEvent(root, issue, { type: 'ISSUE_BOUND', issue });
++    }
++  }
++
++  if (state.issue) {
++    const prompt = redactField(payload.prompt);
++    appendEvent(root, state.issue, state.phase === 'GRILLING'
++      ? { type: 'GRILL_ME_ANSWER', issue: state.issue, turnId: state.activeTurnKey, answer: prompt.text, redacted: prompt.redacted }
++      : { type: 'USER_PROMPTED', issue: state.issue, turnId: state.activeTurnKey, prompt: prompt.text, redacted: prompt.redacted });
++  }
++
++  saveState(root, state);
++  return {
++    hookSpecificOutput: {
++      hookEventName: 'UserPromptSubmit',
++      additionalContext: eventContext(state),
++    },
++  };
++}
++
++function onPostToolUse(root, config, payload, agent) {
++  const state = sessionState(root, payload, agent);
++  if (recordValidation(state, config, payload.tool_input, payload.tool_response, root)) saveState(root, state);
++  return {};
++}
++
++function onStop(root, payload, agent) {
++  const state = sessionState(root, payload, agent);
++  if (!state.issue) return {};
++  const turnKey = payload.turn_id ?? state.activeTurnKey ?? String(state.promptCounter ?? 0);
++  if (state.lastStoppedTurnKey === turnKey) return {};
++
++  const events = readEvents(root, state.issue);
++  const number = nextTurnNumber(events);
++  const currentTree = snapshotTree(root);
++  const before = state.turnStartTree ?? state.previousTree ?? currentTree;
++  const diff = diffTrees(root, before, currentTree);
++  const filename = `turn-${String(number).padStart(3, '0')}.diff`;
++  writeTextAtomic(join(root, '.devlog', String(state.issue), filename), diff ? `${diff}\n` : '');
++  const assistant = redactField(payload.last_assistant_message ?? '');
++  appendEvent(root, state.issue, {
++    type: 'TURN_FINISHED',
++    turnId: turnKey,
++    assistantMessage: assistant.text,
++    redacted: assistant.redacted,
++    diff: filename,
++    diffStat: diffStat(root, before, currentTree),
++    testResult: validationResultForTurn(state, currentTree),
++    ...(state.bootstrap ? { bootstrap: true } : {}),
++  });
++  state.previousTree = currentTree;
++  state.turnStartTree = currentTree;
++  state.lastStoppedTurnKey = turnKey;
++  saveState(root, state);
++  return {};
++}
++
++function onPreToolUse(root, config, payload, agent, services) {
++  const state = sessionState(root, payload, agent);
++  const prRequested = isPullRequestCreate(payload.tool_name, payload.tool_input);
++
++  if (prRequested) {
++    if (!state.issue) return deny('GitHub Issue가 연결되지 않아 PR을 생성할 수 없습니다.');
++    const events = readEvents(root, state.issue);
++    if (!hasEvent(events, 'PR_REQUESTED')) {
++      appendEvent(root, state.issue, { type: 'PR_REQUESTED', issue: state.issue });
++      return deny(`PR_REQUESTED를 기록했습니다. .devlog/${state.issue}/events.jsonl을 Commit한 뒤 다시 PR을 생성하세요.`);
++    }
++    try {
++      const prepared = preparePullRequest({ root, config, state });
++      const dirty = gitMetadata(root).status;
++      if (dirty) return deny(`Commit되지 않은 변경이 있어 PR을 생성할 수 없습니다:\n${dirty}`);
++      return allow(updatePullRequestInput(payload.tool_input, prepared.bodyPath));
++    } catch (error) {
++      return deny(error.message);
++    }
++  }
++
++  if (!isMutation(payload.tool_name, payload.tool_input, config, state.issue)) return allow();
++  if (!state.issue) return deny('GitHub Issue ID를 먼저 제공하고 Issue를 조사해야 합니다.');
++
++  try {
++    ensureAdrEvent(root, config, state, services);
++  } catch (error) {
++    return deny(error.message);
++  }
++  saveState(root, state);
++  if (state.phase !== 'READY_TO_IMPLEMENT' && state.phase !== 'ADR_REOPENED') {
++    return deny('구현 Gate가 닫혀 있습니다. grill-me를 완료하고 Issue 본문에 최초 ADR과 검증 계획을 기록하세요.');
++  }
++  return allow();
++}
++
++export function handleHook({ agent, payload, cwd = payload.cwd ?? process.cwd(), services = { getIssue } }) {
++  const root = findRepositoryRoot(cwd);
++  const config = loadConfig(root);
++  const event = payload.hook_event_name;
++  if (event === 'SessionStart') return onSessionStart(root, payload, agent);
++  if (event === 'UserPromptSubmit') return onUserPrompt(root, config, payload, agent, services);
++  if (event === 'PostToolUse') return onPostToolUse(root, config, payload, agent);
++  if (event === 'Stop') return onStop(root, payload, agent);
++  if (event === 'PreToolUse') return onPreToolUse(root, config, payload, agent, services);
++  return {};
++}
+diff --git a/packages/development-logger/src/issue.mjs b/packages/development-logger/src/issue.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f712866842f6fbaae4809f4cce6cfaebeb2c5e1
+--- /dev/null
++++ b/packages/development-logger/src/issue.mjs
+@@ -0,0 +1,23 @@
++export function extractIssueNumber(prompt) {
++  const text = String(prompt ?? '');
++  const patterns = [
++    /github\.com\/[^\s/]+\/[^\s/]+\/issues\/(\d+)/i,
++    /(?:issue|이슈)\s*#?\s*(\d+)/i,
++    /(?:^|\s)#(\d+)\b/,
++  ];
++  for (const pattern of patterns) {
++    const match = text.match(pattern);
++    if (match) return Number(match[1]);
++  }
++  return null;
++}
++
++export function hasInitialAdr(body) {
++  const text = String(body ?? '');
++  return /^## ADR\s*$/m.test(text)
++    && /^### 결정\s*$/m.test(text)
++    && /^### 이유\s*$/m.test(text)
++    && /^### 근거\s*$/m.test(text)
++    && /^### 검증\s*$/m.test(text);
++}
++
+diff --git a/packages/development-logger/src/lifecycle.mjs b/packages/development-logger/src/lifecycle.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..302cb11e1b55fdb9c2809325bee8c15e3a53e8f0
+--- /dev/null
++++ b/packages/development-logger/src/lifecycle.mjs
+@@ -0,0 +1,107 @@
++import { appendEvent, hasEvent, readEvents } from './events.mjs';
++import { gitMetadata } from './git.mjs';
++import { getIssue } from './github.mjs';
++import { preparePullRequest } from './pr.mjs';
++import { findRepositoryRoot, loadConfig, run } from './process.mjs';
++import { resolveState, saveState } from './state.mjs';
++
++function valueOf(args, name) {
++  const index = args.indexOf(name);
++  return index >= 0 ? args[index + 1] : null;
++}
++
++export function runLifecycle(args, cwd = process.cwd()) {
++  const [group, action] = args;
++  const root = findRepositoryRoot(cwd);
++  const config = loadConfig(root);
++
++  if (group === 'bootstrap' && action === 'start') {
++    const issue = Number(valueOf(args, '--issue'));
++    const sessionId = valueOf(args, '--session') ?? `bootstrap-${issue}`;
++    if (!Number.isInteger(issue) || issue <= 0) throw new Error('bootstrap start에는 유효한 --issue가 필요합니다.');
++    const issueData = getIssue(root, config.repository, issue);
++    if (issueData.state !== 'OPEN') throw new Error(`Issue #${issue}가 열려 있지 않습니다.`);
++    const metadata = gitMetadata(root);
++    const baseline = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
++    const state = {
++      sessionId,
++      agent: 'CODEX',
++      cwd: root,
++      issue,
++      issueRead: true,
++      phase: 'RESEARCHING',
++      branch: metadata.branch,
++      head: metadata.head,
++      initialStatus: metadata.status,
++      previousTree: baseline,
++      turnStartTree: baseline,
++      bootstrap: true,
++      validations: {},
++      startedAt: new Date().toISOString(),
++    };
++    appendEvent(root, issue, { type: 'SESSION_STARTED', sessionId, agent: state.agent, cwd: root, branch: state.branch, head: state.head, gitStatus: state.initialStatus, bootstrap: true });
++    appendEvent(root, issue, { type: 'ISSUE_BOUND', issue, bootstrap: true });
++    saveState(root, state);
++    return sessionId;
++  }
++
++  const state = resolveState(root, valueOf(args, '--session'));
++  if (!state.issue) throw new Error('Issue가 연결되지 않았습니다.');
++  const text = valueOf(args, '--text');
++  const bootstrap = state.bootstrap ? { bootstrap: true } : {};
++
++  if (group === 'bootstrap') {
++    if (!text) throw new Error(`bootstrap ${action}에는 --text가 필요합니다.`);
++    if (action === 'prompt') {
++      appendEvent(root, state.issue, { type: 'USER_PROMPTED', issue: state.issue, prompt: text, redacted: false, ...bootstrap });
++    } else if (action === 'answer') {
++      appendEvent(root, state.issue, { type: 'GRILL_ME_ANSWER', issue: state.issue, answer: text, redacted: false, ...bootstrap });
++    } else {
++      throw new Error(`지원하지 않는 bootstrap action입니다: ${action}`);
++    }
++  } else if (group === 'grill') {
++    if (action === 'start') {
++      const events = readEvents(root, state.issue);
++      if (!hasEvent(events, 'GRILL_ME_STARTED')) appendEvent(root, state.issue, { type: 'GRILL_ME_STARTED', issue: state.issue, ...bootstrap });
++      state.phase = 'GRILLING';
++    } else if (action === 'question') {
++      if (!text) throw new Error('question에는 --text가 필요합니다.');
++      appendEvent(root, state.issue, { type: 'GRILL_ME_QUESTION', issue: state.issue, question: text, ...bootstrap });
++    } else if (action === 'decision') {
++      if (!text) throw new Error('decision에는 --text가 필요합니다.');
++      appendEvent(root, state.issue, { type: 'GRILL_ME_DECISION', issue: state.issue, decision: text, ...bootstrap });
++    } else if (action === 'finish') {
++      const events = readEvents(root, state.issue);
++      for (const type of ['GRILL_ME_STARTED', 'GRILL_ME_QUESTION', 'GRILL_ME_ANSWER', 'GRILL_ME_DECISION']) {
++        if (!hasEvent(events, type)) throw new Error(`${type} Event가 없어 grill-me를 종료할 수 없습니다.`);
++      }
++      appendEvent(root, state.issue, { type: 'GRILL_ME_FINISHED', issue: state.issue, ...bootstrap });
++      state.phase = 'GRILL_COMPLETE';
++    } else {
++      throw new Error(`지원하지 않는 grill action입니다: ${action}`);
++    }
++  } else if (group === 'adr') {
++    if (action === 'reopen') {
++      if (!text) throw new Error('reopen에는 --text가 필요합니다.');
++      appendEvent(root, state.issue, { type: 'ADR_REOPENED', issue: state.issue, reason: text, ...bootstrap });
++      state.phase = 'ADR_REOPENED';
++    } else if (action === 'changed') {
++      if (!text) throw new Error('changed에는 --text가 필요합니다.');
++      appendEvent(root, state.issue, { type: 'ADR_CHANGED', issue: state.issue, decision: text, ...bootstrap });
++      state.phase = 'READY_TO_IMPLEMENT';
++    } else {
++      throw new Error(`지원하지 않는 adr action입니다: ${action}`);
++    }
++  } else if (group === 'pr' && action === 'prepare') {
++    const events = readEvents(root, state.issue);
++    if (!hasEvent(events, 'PR_REQUESTED')) appendEvent(root, state.issue, { type: 'PR_REQUESTED', issue: state.issue, ...bootstrap });
++    const prepared = preparePullRequest({ root, config, state, requireTracked: false });
++    saveState(root, state);
++    return prepared.bodyPath;
++  } else {
++    throw new Error(`지원하지 않는 lifecycle 명령입니다: ${group} ${action}`);
++  }
++
++  saveState(root, state);
++  return 'OK';
++}
+diff --git a/packages/development-logger/src/pr.mjs b/packages/development-logger/src/pr.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..cf8f4991209725c5918ae3a5294fec83a203279c
+--- /dev/null
++++ b/packages/development-logger/src/pr.mjs
+@@ -0,0 +1,196 @@
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { readEvents } from './events.mjs';
++import { changedFiles, snapshotTree, tracked } from './git.mjs';
++import { getIssue } from './github.mjs';
++import { hasInitialAdr } from './issue.mjs';
++import { gitDirectory, run, writeTextAtomic } from './process.mjs';
++import { requiredValidations, validationStatus } from './validation.mjs';
++
++function truncate(value, length = 240) {
++  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
++  return text.length <= length ? text : `${text.slice(0, length - 1)}…`;
++}
++
++function bulletList(values, fallback) {
++  return values.length ? values.map((value) => `- ${value}`).join('\n') : `- ${fallback}`;
++}
++
++function typeChecklist(files) {
++  const docsOnly = files.every((file) => /(?:^docs\/|\.md$)/.test(file));
++  return [
++    ['Feature', false],
++    ['Fix', false],
++    ['Hotfix', false],
++    ['Chore', !docsOnly],
++    ['Docs', docsOnly],
++  ].map(([label, checked]) => `- [${checked ? 'x' : ' '}] ${label}`).join('\n');
++}
++
++function riskFor(file) {
++  if (/hooks|tool-policy|gate|cli\.mjs/.test(file)) return `🔴 \`${file}\` — Lifecycle 차단과 허용 경계를 확인해 주세요.`;
++  if (/test|template|skill|convention/.test(file)) return `🟡 \`${file}\` — 요구사항과 검증 범위를 확인해 주세요.`;
++  return `🟢 \`${file}\` — 구조와 명명 일관성을 확인해 주세요.`;
++}
++
++export function buildPullRequestBody({ root, config, state, files, validations, issueData }) {
++  const events = readEvents(root, state.issue);
++  const decisions = events
++    .filter((event) => event.type === 'GRILL_ME_DECISION')
++    .map((event) => truncate(event.decision));
++  const prompts = events
++    .filter((event) => event.type === 'USER_PROMPTED')
++    .slice(-5)
++    .map((event) => `사용자: “${truncate(event.prompt, 180)}”`);
++  const adrChanges = issueData.comments
++    .filter((comment) => /## ADR 변경/.test(comment.body))
++    .map((comment, index) => `ADR 변경 #${index + 1}: ${truncate(comment.body, 220)}`);
++  const passed = validations.filter((item) => item.passed).map((item) => `\`${item.command}\` — PASSED`);
++  const diffStat = run('git', ['diff', '--stat', config.defaultBaseBranch, 'HEAD'], { cwd: root });
++
++  return `## 관련 Issue
++
++- #${state.issue}
++
++## 변경 유형
++
++${typeChecklist(files)}
++
++## 해결한 문제와 변경 이유
++
++- ${issueData.title} 문제를 해결합니다.
++  - Coding Agent가 만든 코드와 함께 문제, 설계 결정, 사용자 피드백, 검증 과정을 복원할 수 있게 합니다.
++
++## 변경 사항과 핵심 설계 결정
++
++${bulletList(decisions, 'Issue의 최초 ADR을 기준으로 구현했습니다.')}
++
++<details>
++<summary>Diff Stat</summary>
++
++\`\`\`text
++${diffStat || '변경 통계가 없습니다.'}
++\`\`\`
++
++</details>
++
++## 한계와 Trade-off
++
++- Development Logger 실행을 위해 Node.js 20+가 필요합니다.
++- Agent별 Hook payload 차이는 adapter가 흡수하지만 Agent의 Hook 계약 변경 시 fixture와 adapter 갱신이 필요합니다.
++- 설치 전 Issue #${state.issue} 기록은 \`bootstrap: true\`로 복원한 기록입니다.
++
++## 기존 기능에 미치는 영향
++
++- 일반 애플리케이션 runtime에는 개입하지 않습니다.
++- Coding Agent의 변경 작업과 PR 생성 과정에는 Fail Closed Gate가 적용됩니다.
++
++## Edge Case와 실패 시나리오
++
++- Issue, grill-me, 최초 ADR이 없으면 구현 변경을 차단합니다.
++- 필수 검증이 실패했거나 마지막 코드 변경 이후 실행되지 않았으면 PR 생성을 차단합니다.
++- 일반 Development Log 실패는 경고하고 PR Gate에서 재검증합니다.
++
++## 검토한 대안과 선택 이유
++
++- Agent transcript 분석 대신 명시적인 lifecycle command를 선택했습니다.
++  - 비공개 transcript 형식과 Agent 버전에 대한 결합을 줄입니다.
++- Bash·PowerShell 이중 구현 대신 Node.js 공통 core를 선택했습니다.
++  - OS별 핵심 로직 중복을 방지합니다.
++
++## 개발 과정
++
++### Grill Me 주요 결정
++
++${bulletList(decisions, '기록된 결정이 없습니다.')}
++
++### 주요 사용자-Agent 대화
++
++${bulletList(prompts, '추가로 요약할 일반 대화가 없습니다.')}
++
++### ADR 변경
++
++${bulletList(adrChanges, '최초 ADR 이후 변경된 결정이 없습니다.')}
++
++## 검증 결과
++
++${bulletList(passed, '통과한 필수 검증이 없습니다.')}
++
++## 리뷰 요청
++
++${bulletList(files.slice(0, 12).map(riskFor), '별도 위험 파일이 없습니다.')}
++
++## 고민 사항
++
++- Hook이 허용하는 조회·검증 명령과 차단하는 변경 명령의 경계가 팀 Workflow에 적절한지 확인해 주세요.
++- APP까지 포함한 경로별 검증 선택이 실제 CI 책임과 일치하는지 확인해 주세요.
++
++## Development Log
++
++- \`.devlog/${state.issue}/events.jsonl\`
++- \`.devlog/${state.issue}/turn-*.diff\`
++`;
++}
++
++export function updatePullRequestInput(toolInput, bodyPath) {
++  const key = Object.hasOwn(toolInput, 'command') ? 'command' : Object.hasOwn(toolInput, 'cmd') ? 'cmd' : null;
++  if (!key || typeof toolInput[key] !== 'string') {
++    throw new Error('gh pr create 명령의 문자열 입력을 찾지 못했습니다.');
++  }
++  let command = toolInput[key]
++    .replace(/\s+--body-file(?:=|\s+)(?:"[^"]*"|'[^']*'|\S+)/gi, '')
++    .replace(/\s+--body(?:=|\s+)(?:"[^"]*"|'[^']*'|\S+)/gi, '')
++    .replace(/\s+--fill(?:-first|-verbose)?\b/gi, '');
++  const quoted = `"${bodyPath.replace(/"/g, '\\"')}"`;
++  command = `${command} --body-file ${quoted}`;
++  return { ...toolInput, [key]: command };
++}
++
++export function assertTemplateStructure(template, body) {
++  const headings = String(template).match(/^#{2,3}\s+.+$/gm) ?? [];
++  const missing = headings.filter((heading) => !body.includes(heading));
++  if (missing.length) throw new Error(`PR Template Section이 누락됐습니다: ${missing.join(', ')}`);
++}
++
++export function preparePullRequest({ root, config, state, requireTracked = true }) {
++  const events = readEvents(root, state.issue);
++  const requiredEvents = ['SESSION_STARTED', 'ISSUE_BOUND', 'GRILL_ME_STARTED', 'GRILL_ME_QUESTION', 'GRILL_ME_ANSWER', 'GRILL_ME_DECISION', 'GRILL_ME_FINISHED', 'ADR_CREATED', 'TURN_FINISHED'];
++  const missingEvents = requiredEvents.filter((type) => !events.some((event) => event.type === type));
++  if (missingEvents.length) throw new Error(`필수 Event가 없습니다: ${missingEvents.join(', ')}`);
++  const lastReopened = events.findLastIndex((event) => event.type === 'ADR_REOPENED');
++  const lastChanged = events.findLastIndex((event) => event.type === 'ADR_CHANGED');
++  if (lastReopened > lastChanged) throw new Error('다시 열린 ADR이 결정되지 않았습니다.');
++
++  const issueData = getIssue(root, config.repository, state.issue);
++  if (!hasInitialAdr(issueData.body)) throw new Error('Issue 본문에 결정·이유·근거·검증을 포함한 최초 ADR이 없습니다.');
++  const adrChanged = events.some((event) => event.type === 'ADR_CHANGED');
++  if (adrChanged && !issueData.comments.some((comment) => /## ADR 변경[\s\S]*### 선택[\s\S]*### 이유/.test(comment.body))) {
++    throw new Error('ADR_CHANGED Event가 있지만 선택과 이유를 포함한 Issue 댓글이 없습니다.');
++  }
++
++  const files = changedFiles(root, config.defaultBaseBranch);
++  const currentTree = snapshotTree(root);
++  const required = requiredValidations(config, files);
++  const validations = validationStatus(state, required, currentTree);
++  const failed = validations.filter((item) => !item.passed);
++  if (failed.length) {
++    throw new Error(`필수 검증이 준비되지 않았습니다: ${failed.map((item) => `${item.key}(${item.reason})`).join(', ')}`);
++  }
++
++  if (requireTracked) {
++    const eventFile = `.devlog/${state.issue}/events.jsonl`;
++    if (!tracked(root, eventFile)) throw new Error(`${eventFile}이 Git Commit 대상에 포함되지 않았습니다.`);
++    const turnEvents = events.filter((event) => event.type === 'TURN_FINISHED');
++    for (const event of turnEvents) {
++      const diff = `.devlog/${state.issue}/${event.diff}`;
++      if (!tracked(root, diff)) throw new Error(`${diff}가 Git Commit 대상에 포함되지 않았습니다.`);
++    }
++  }
++
++  const body = buildPullRequestBody({ root, config, state, files, validations, issueData });
++  const template = readFileSync(join(root, config.pullRequestTemplate), 'utf8');
++  assertTemplateStructure(template, body);
++  const bodyPath = join(gitDirectory(root), 'development-logger', `pr-body-${state.issue}.md`);
++  writeTextAtomic(bodyPath, body);
++  return { bodyPath, files, validations };
++}
+diff --git a/packages/development-logger/src/process.mjs b/packages/development-logger/src/process.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..111326b9fc38452646410ab00c73dc6aeed2ee25
+--- /dev/null
++++ b/packages/development-logger/src/process.mjs
+@@ -0,0 +1,81 @@
++import { execFileSync } from 'node:child_process';
++import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
++import { dirname, isAbsolute, join, resolve } from 'node:path';
++
++export function run(command, args, options = {}) {
++  return execFileSync(command, args, {
++    cwd: options.cwd,
++    encoding: 'utf8',
++    env: options.env ?? process.env,
++    input: options.input,
++    maxBuffer: 20 * 1024 * 1024,
++    stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
++  }).trimEnd();
++}
++
++export function tryRun(command, args, options = {}) {
++  try {
++    return { ok: true, output: run(command, args, options) };
++  } catch (error) {
++    return {
++      ok: false,
++      output: String(error.stdout ?? '').trimEnd(),
++      error: String(error.stderr ?? error.message ?? '').trimEnd(),
++      status: Number.isInteger(error.status) ? error.status : 1,
++    };
++  }
++}
++
++export function findRepositoryRoot(cwd = process.cwd()) {
++  const result = tryRun('git', ['rev-parse', '--show-toplevel'], { cwd });
++  if (!result.ok) {
++    throw new Error('Git 저장소 안에서 Development Logger를 실행해야 합니다.');
++  }
++  return resolve(result.output);
++}
++
++export function gitDirectory(root) {
++  const value = run('git', ['rev-parse', '--git-dir'], { cwd: root });
++  return isAbsolute(value) ? value : resolve(root, value);
++}
++
++export function readJson(path, fallback = null) {
++  if (!existsSync(path)) return fallback;
++  return JSON.parse(readFileSync(path, 'utf8'));
++}
++
++export function writeJsonAtomic(path, value) {
++  mkdirSync(dirname(path), { recursive: true });
++  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
++  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
++  renameSync(temporary, path);
++}
++
++export function writeTextAtomic(path, value) {
++  mkdirSync(dirname(path), { recursive: true });
++  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
++  writeFileSync(temporary, value, 'utf8');
++  renameSync(temporary, path);
++}
++
++export function removeFile(path) {
++  rmSync(path, { force: true });
++  rmSync(`${path}.lock`, { force: true });
++}
++
++export function loadConfig(root) {
++  const path = join(root, '.devlogger.json');
++  const config = readJson(path);
++  if (!config || config.version !== 1) {
++    throw new Error(`지원하는 Development Logger 설정을 찾지 못했습니다: ${path}`);
++  }
++  return config;
++}
++
++export async function readStdin() {
++  let input = '';
++  process.stdin.setEncoding('utf8');
++  for await (const chunk of process.stdin) input += chunk;
++  return input.trim() ? JSON.parse(input) : {};
++}
++
+diff --git a/packages/development-logger/src/redaction.mjs b/packages/development-logger/src/redaction.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..271b6e50783a09b3c6b20d144b92c6b68d13fffb
+--- /dev/null
++++ b/packages/development-logger/src/redaction.mjs
+@@ -0,0 +1,22 @@
++const SECRET_PATTERNS = [
++  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
++  /\bgh[opusr]_[A-Za-z0-9_]{20,}\b/g,
++  /\b(?:sk|pk)-[A-Za-z0-9_-]{20,}\b/g,
++  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
++  /(authorization\s*:\s*bearer\s+)[^\s"']+/gi,
++  /((?:password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[=:]\s*)[^\s,;]+/gi,
++];
++
++export function redact(value) {
++  let text = String(value ?? '');
++  let redacted = false;
++  for (const pattern of SECRET_PATTERNS) {
++    text = text.replace(pattern, (...match) => {
++      redacted = true;
++      const prefix = typeof match[1] === 'string' ? match[1] : '';
++      return `${prefix}[REDACTED]`;
++    });
++  }
++  return { value: text, redacted };
++}
++
+diff --git a/packages/development-logger/src/state.mjs b/packages/development-logger/src/state.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5e092362d787578614fc3abaf1917c498ad4666
+--- /dev/null
++++ b/packages/development-logger/src/state.mjs
+@@ -0,0 +1,43 @@
++import { existsSync, readdirSync } from 'node:fs';
++import { join } from 'node:path';
++import { gitDirectory, readJson, writeJsonAtomic } from './process.mjs';
++
++function safeId(value) {
++  return String(value ?? 'unknown').replace(/[^A-Za-z0-9_.-]/g, '_');
++}
++
++export function stateDirectory(root) {
++  return join(gitDirectory(root), 'development-logger');
++}
++
++export function statePath(root, sessionId) {
++  return join(stateDirectory(root), 'sessions', `${safeId(sessionId)}.json`);
++}
++
++export function loadState(root, sessionId) {
++  return readJson(statePath(root, sessionId), null);
++}
++
++export function saveState(root, state) {
++  state.updatedAt = new Date().toISOString();
++  writeJsonAtomic(statePath(root, state.sessionId), state);
++  return state;
++}
++
++export function resolveState(root, sessionId = null) {
++  if (sessionId) {
++    const state = loadState(root, sessionId);
++    if (!state) throw new Error(`Session 상태를 찾지 못했습니다: ${sessionId}`);
++    return state;
++  }
++
++  const directory = join(stateDirectory(root), 'sessions');
++  if (!existsSync(directory)) throw new Error('활성 Development Logger Session이 없습니다.');
++  const states = readdirSync(directory)
++    .filter((name) => name.endsWith('.json'))
++    .map((name) => readJson(join(directory, name)))
++    .filter(Boolean)
++    .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
++  if (!states.length) throw new Error('활성 Development Logger Session이 없습니다.');
++  return states[0];
++}
+diff --git a/packages/development-logger/src/tool-policy.mjs b/packages/development-logger/src/tool-policy.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff35c5ea745d503a21edb2da4ccfa0c6f12d9a34
+--- /dev/null
++++ b/packages/development-logger/src/tool-policy.mjs
+@@ -0,0 +1,63 @@
++import { commandFromToolInput, validationForCommand } from './validation.mjs';
++
++const MUTATING_TOOL_NAMES = /(apply.?patch|write|edit|delete|remove|move|create|notebook)/i;
++const SHELL_TOOL_NAMES = /(bash|shell|exec|command|terminal|powershell)/i;
++
++function isLifecycleCommand(command) {
++  return /development-logger[/\\]src[/\\]cli\.mjs\s+(?:grill|adr)/i.test(command);
++}
++
++function isIssueAdrCommand(command, issue) {
++  const escaped = String(issue).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++  return new RegExp(`\\bgh\\s+issue\\s+(?:edit|comment)\\s+(?:#?${escaped}\\b|[^;&|]*\\s#?${escaped}\\b)`, 'i').test(command);
++}
++
++function isReadOnlyCommand(command) {
++  const value = command.trim();
++  const patterns = [
++    /^(?:git\s+)?(?:status|diff|log|show|rev-parse|ls-files)\b/i,
++    /^git\s+(?:status|diff|log|show|rev-parse|ls-files|merge-base|branch\s+--show-current)\b/i,
++    /^(?:rg|grep|ls|dir|find|cat|type|get-content|get-childitem)\b/i,
++    /^gh\s+issue\s+view\b/i,
++    /^gh\s+api\s+(?!.*(?:--method|-X)\s+(?:POST|PUT|PATCH|DELETE))/i,
++    /^(?:node\s+--test|npm\s+(?:test|run\s+(?:test|lint|build|typecheck))|pnpm\s+|yarn\s+|\.?[\\/]?gradlew(?:\.bat)?\s+(?:test|build|check))/i,
++  ];
++  return patterns.some((pattern) => pattern.test(value));
++}
++
++export function isPullRequestCreate(toolName, toolInput) {
++  if (!SHELL_TOOL_NAMES.test(String(toolName))) return false;
++  return /\bgh\s+pr\s+create\b/i.test(commandFromToolInput(toolInput));
++}
++
++export function isMutation(toolName, toolInput, config, issue) {
++  const name = String(toolName ?? '');
++  if (MUTATING_TOOL_NAMES.test(name)) return true;
++  if (!SHELL_TOOL_NAMES.test(name)) return false;
++  const command = commandFromToolInput(toolInput);
++  if (!command) return false;
++  if (validationForCommand(config, command)) return false;
++  if (isLifecycleCommand(command) || isIssueAdrCommand(command, issue)) return false;
++  return !isReadOnlyCommand(command);
++}
++
++export function deny(reason) {
++  return {
++    hookSpecificOutput: {
++      hookEventName: 'PreToolUse',
++      permissionDecision: 'deny',
++      permissionDecisionReason: reason,
++    },
++  };
++}
++
++export function allow(updatedInput = null, additionalContext = null) {
++  return {
++    hookSpecificOutput: {
++      hookEventName: 'PreToolUse',
++      permissionDecision: 'allow',
++      ...(updatedInput ? { updatedInput } : {}),
++      ...(additionalContext ? { additionalContext } : {}),
++    },
++  };
++}
+diff --git a/packages/development-logger/src/validation.mjs b/packages/development-logger/src/validation.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e9f2ea59d00a4e69151e8eaf34e6bc225d4348f4
+--- /dev/null
++++ b/packages/development-logger/src/validation.mjs
+@@ -0,0 +1,70 @@
++import { snapshotTree } from './git.mjs';
++
++function normalizeCommand(value) {
++  return String(value ?? '')
++    .replace(/\\/g, '/')
++    .replace(/\.\//g, '')
++    .replace(/\s+/g, ' ')
++    .trim()
++    .toLowerCase();
++}
++
++export function commandFromToolInput(input) {
++  if (!input || typeof input !== 'object') return '';
++  const value = input.command ?? input.cmd ?? input.script ?? input.code ?? '';
++  return Array.isArray(value) ? value.join(' ') : String(value);
++}
++
++export function validationForCommand(config, command) {
++  const normalized = normalizeCommand(command);
++  return config.validation.find((entry) => entry.commands.some((candidate) => normalized.includes(normalizeCommand(candidate)))) ?? null;
++}
++
++export function responseSucceeded(response) {
++  if (response == null) return true;
++  if (typeof response === 'string') {
++    return !/(?:exit(?:ed)?\s+(?:with\s+)?(?:code\s*)?|exit_code["']?\s*[:=]\s*)[1-9]\d*/i.test(response);
++  }
++  if (typeof response !== 'object') return true;
++  const code = response.exit_code ?? response.exitCode ?? response.code ?? response.status;
++  if (Number.isInteger(code)) return code === 0;
++  if (response.is_error === true || response.isError === true || response.success === false) return false;
++  return true;
++}
++
++export function recordValidation(state, config, toolInput, toolResponse, root) {
++  const command = commandFromToolInput(toolInput);
++  const definition = validationForCommand(config, command);
++  if (!definition) return false;
++  state.validations ??= {};
++  state.validations[definition.key] = {
++    command,
++    passed: responseSucceeded(toolResponse),
++    tree: snapshotTree(root),
++    timestamp: new Date().toISOString(),
++  };
++  return true;
++}
++
++export function requiredValidations(config, changedFiles) {
++  return config.validation.filter((entry) => changedFiles.some((file) => entry.paths.some((prefix) => file === prefix || file.startsWith(prefix))));
++}
++
++export function validationStatus(state, required, currentTree) {
++  return required.map((definition) => {
++    const result = state.validations?.[definition.key];
++    return {
++      key: definition.key,
++      command: result?.command ?? definition.commands[0],
++      passed: result?.passed === true && result.tree === currentTree,
++      reason: !result
++        ? 'NOT_RUN'
++        : result.passed !== true
++          ? 'FAILED'
++          : result.tree !== currentTree
++            ? 'STALE'
++            : 'PASSED',
++    };
++  });
++}
++
+diff --git a/packages/development-logger/test/git-snapshot.test.mjs b/packages/development-logger/test/git-snapshot.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..114fabbd9016b94482a341b081c296aa362e7a9b
+--- /dev/null
++++ b/packages/development-logger/test/git-snapshot.test.mjs
+@@ -0,0 +1,34 @@
++import assert from 'node:assert/strict';
++import { mkdirSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import test from 'node:test';
++import { diffTrees, removeDirectory, snapshotTree, temporaryDirectory } from '../src/git.mjs';
++import { run } from '../src/process.mjs';
++
++test('실제 index를 변경하지 않고 untracked 파일을 포함하며 .devlog는 제외한다', () => {
++  const root = temporaryDirectory();
++  try {
++    run('git', ['init'], { cwd: root });
++    run('git', ['config', 'user.name', 'Dev Logger Test'], { cwd: root });
++    run('git', ['config', 'user.email', 'devlogger@example.com'], { cwd: root });
++    writeFileSync(join(root, 'tracked.txt'), 'before\n');
++    run('git', ['add', 'tracked.txt'], { cwd: root });
++    run('git', ['commit', '-m', 'initial'], { cwd: root });
++
++    const before = snapshotTree(root);
++    writeFileSync(join(root, 'tracked.txt'), 'after\n');
++    writeFileSync(join(root, 'untracked.txt'), 'new\n');
++    mkdirSync(join(root, '.devlog', '1'), { recursive: true });
++    writeFileSync(join(root, '.devlog', '1', 'events.jsonl'), '{}\n');
++    const after = snapshotTree(root);
++    const diff = diffTrees(root, before, after);
++
++    assert.match(diff, /tracked\.txt/);
++    assert.match(diff, /untracked\.txt/);
++    assert.doesNotMatch(diff, /\.devlog/);
++    assert.equal(run('git', ['diff', '--cached', '--name-only'], { cwd: root }), '');
++  } finally {
++    removeDirectory(root);
++  }
++});
++
+diff --git a/packages/development-logger/test/hook-config.test.mjs b/packages/development-logger/test/hook-config.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..71b65b3e5a042b0f9a10a81d4e4379cadab3a863
+--- /dev/null
++++ b/packages/development-logger/test/hook-config.test.mjs
+@@ -0,0 +1,19 @@
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++import test from 'node:test';
++
++const root = resolve(import.meta.dirname, '..', '..', '..');
++const requiredEvents = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'];
++
++test('Codex와 Claude가 같은 Lifecycle Hook을 연결한다', () => {
++  const codex = JSON.parse(readFileSync(resolve(root, '.codex', 'hooks.json'), 'utf8'));
++  const claude = JSON.parse(readFileSync(resolve(root, '.claude', 'settings.json'), 'utf8'));
++  assert.deepEqual(Object.keys(codex.hooks), requiredEvents);
++  assert.deepEqual(Object.keys(claude.hooks), requiredEvents);
++  for (const event of requiredEvents) {
++    assert.match(codex.hooks[event][0].hooks[0].command, /development-logger/);
++    assert.match(claude.hooks[event][0].hooks[0].command, /development-logger/);
++  }
++});
++
+diff --git a/packages/development-logger/test/hook-lifecycle.test.mjs b/packages/development-logger/test/hook-lifecycle.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a380ad949c969bdb5198b3c883039bbadb0e3ebb
+--- /dev/null
++++ b/packages/development-logger/test/hook-lifecycle.test.mjs
+@@ -0,0 +1,80 @@
++import assert from 'node:assert/strict';
++import { readFileSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import test from 'node:test';
++import { readEvents } from '../src/events.mjs';
++import { handleHook } from '../src/hook.mjs';
++import { runLifecycle } from '../src/lifecycle.mjs';
++import { removeDirectory, temporaryDirectory } from '../src/git.mjs';
++import { run } from '../src/process.mjs';
++
++function setupRepository() {
++  const root = temporaryDirectory();
++  run('git', ['init', '-b', 'release-be'], { cwd: root });
++  run('git', ['config', 'user.name', 'Dev Logger Test'], { cwd: root });
++  run('git', ['config', 'user.email', 'devlogger@example.com'], { cwd: root });
++  writeFileSync(join(root, '.devlogger.json'), JSON.stringify({
++    version: 1,
++    repository: 'example/repo',
++    defaultBaseBranch: 'release-be',
++    validation: [],
++  }));
++  writeFileSync(join(root, 'tracked.txt'), 'before\n');
++  run('git', ['add', '.'], { cwd: root });
++  run('git', ['commit', '-m', 'initial'], { cwd: root });
++  return root;
++}
++
++test('Issue binding부터 grill-me, ADR Gate, Turn Diff까지 연결한다', () => {
++  const root = setupRepository();
++  const session = 'integration-session';
++  const issue = {
++    number: 106,
++    title: 'AX 설정',
++    body: '## ADR\n### 결정\n- Node core\n### 이유\n- 공통 처리\n### 근거\n- 공식 schema\n### 검증\n- node test',
++    state: 'OPEN',
++    comments: [],
++    url: 'https://example.test/issues/106',
++  };
++  const options = { agent: 'codex', cwd: root, services: { getIssue: () => issue } };
++  try {
++    handleHook({
++      ...options,
++      payload: { hook_event_name: 'SessionStart', session_id: session, cwd: root, source: 'startup' },
++    });
++    handleHook({
++      ...options,
++      payload: { hook_event_name: 'UserPromptSubmit', session_id: session, cwd: root, turn_id: '1', prompt: 'Issue 106 시작해줘' },
++    });
++    runLifecycle(['grill', 'start', '--session', session], root);
++    runLifecycle(['grill', 'question', '--session', session, '--text', '공통 core를 사용할 것인가?'], root);
++    handleHook({
++      ...options,
++      payload: { hook_event_name: 'UserPromptSubmit', session_id: session, cwd: root, turn_id: '2', prompt: '공통 core로 해줘' },
++    });
++    runLifecycle(['grill', 'decision', '--session', session, '--text', '공통 core를 사용한다.'], root);
++    runLifecycle(['grill', 'finish', '--session', session], root);
++
++    const gate = handleHook({
++      ...options,
++      payload: { hook_event_name: 'PreToolUse', session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: {} },
++    });
++    assert.equal(gate.hookSpecificOutput.permissionDecision, 'allow');
++
++    writeFileSync(join(root, 'tracked.txt'), 'after\n');
++    handleHook({
++      ...options,
++      payload: { hook_event_name: 'Stop', session_id: session, cwd: root, turn_id: '2', last_assistant_message: '구현 완료' },
++    });
++
++    const events = readEvents(root, 106);
++    for (const type of ['SESSION_STARTED', 'ISSUE_BOUND', 'GRILL_ME_STARTED', 'GRILL_ME_QUESTION', 'GRILL_ME_ANSWER', 'GRILL_ME_DECISION', 'GRILL_ME_FINISHED', 'ADR_CREATED', 'TURN_FINISHED']) {
++      assert.equal(events.some((event) => event.type === type), true, type);
++    }
++    const diff = readFileSync(join(root, '.devlog', '106', 'turn-001.diff'), 'utf8');
++    assert.match(diff, /tracked\.txt/);
++    assert.doesNotMatch(diff, /\.devlog/);
++  } finally {
++    removeDirectory(root);
++  }
++});
+diff --git a/packages/development-logger/test/issue-redaction.test.mjs b/packages/development-logger/test/issue-redaction.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4e384efc16ba5cd672208f67e6497510503ff9c
+--- /dev/null
++++ b/packages/development-logger/test/issue-redaction.test.mjs
+@@ -0,0 +1,28 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { extractIssueNumber, hasInitialAdr } from '../src/issue.mjs';
++import { redact } from '../src/redaction.mjs';
++
++test('GitHub URL과 일반 표기에서 Issue ID를 추출한다', () => {
++  assert.equal(extractIssueNumber('https://github.com/org/repo/issues/106'), 106);
++  assert.equal(extractIssueNumber('Issue 42 구현해줘'), 42);
++  assert.equal(extractIssueNumber('#7 작업 시작'), 7);
++  assert.equal(extractIssueNumber('번호가 없다'), null);
++});
++
++test('최초 ADR의 필수 절을 확인한다', () => {
++  assert.equal(hasInitialAdr('## ADR\n### 결정\n- A\n### 이유\n- B\n### 근거\n- C\n### 검증\n- D'), true);
++  assert.equal(hasInitialAdr('## ADR\n### 결정\n- A'), false);
++});
++
++test('명백한 비밀값을 마스킹하고 일반 문장은 보존한다', () => {
++  const secret = redact('token=abc123456 Authorization: Bearer very-secret-token');
++  assert.equal(secret.redacted, true);
++  assert.equal(secret.value.includes('abc123456'), false);
++  assert.equal(secret.value.includes('very-secret-token'), false);
++  assert.match(secret.value, /\[REDACTED\]/);
++
++  const plain = redact('0분 일정 테스트도 추가해줘.');
++  assert.deepEqual(plain, { value: '0분 일정 테스트도 추가해줘.', redacted: false });
++});
++
+diff --git a/packages/development-logger/test/pr.test.mjs b/packages/development-logger/test/pr.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ef3e538a025bd14df4ae87aeb6749fa1e165263
+--- /dev/null
++++ b/packages/development-logger/test/pr.test.mjs
+@@ -0,0 +1,18 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { assertTemplateStructure, updatePullRequestInput } from '../src/pr.mjs';
++
++test('기존 PR body 옵션을 Template 기반 body file로 교체한다', () => {
++  const input = { command: 'gh pr create --fill --body "old" --base release-be' };
++  const updated = updatePullRequestInput(input, 'C:\\repo\\.git\\development-logger\\pr.md');
++  assert.doesNotMatch(updated.command, /--fill\b/);
++  assert.doesNotMatch(updated.command, /\bold\b/);
++  assert.match(updated.command, /--body-file/);
++  assert.match(updated.command, /pr\.md/);
++});
++
++test('Repository PR Template의 Section 누락을 차단한다', () => {
++  const template = '## 관련 Issue\n\n## 검증 결과\n';
++  assert.doesNotThrow(() => assertTemplateStructure(template, `${template}\n- 완료`));
++  assert.throws(() => assertTemplateStructure(template, '## 관련 Issue\n- #106'), /검증 결과/);
++});
+diff --git a/packages/development-logger/test/validation-policy.test.mjs b/packages/development-logger/test/validation-policy.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..88a29e8235bd5a33f755ea59375a151d6ed24093
+--- /dev/null
++++ b/packages/development-logger/test/validation-policy.test.mjs
+@@ -0,0 +1,34 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { isMutation, isPullRequestCreate } from '../src/tool-policy.mjs';
++import { requiredValidations, responseSucceeded, validationForCommand } from '../src/validation.mjs';
++
++const config = {
++  validation: [
++    { key: 'logger-test', paths: ['packages/development-logger/'], commands: ['node --test "packages/development-logger/test/*.test.mjs"'] },
++    { key: 'be-test', paths: ['BE/'], commands: ['BE/gradlew test', 'BE/gradlew.bat test'] },
++  ],
++};
++
++test('검증 명령과 변경 경로를 정규화한다', () => {
++  assert.equal(validationForCommand(config, 'node --test "packages\\development-logger\\test\\*.test.mjs"').key, 'logger-test');
++  assert.equal(validationForCommand(config, '.\\BE\\gradlew.bat test').key, 'be-test');
++  assert.deepEqual(requiredValidations(config, ['BE/src/App.java']).map((item) => item.key), ['be-test']);
++});
++
++test('Tool 응답의 성공과 실패를 판정한다', () => {
++  assert.equal(responseSucceeded({ exit_code: 0 }), true);
++  assert.equal(responseSucceeded({ exitCode: 1 }), false);
++  assert.equal(responseSucceeded('Process exited with code 2'), false);
++  assert.equal(responseSucceeded({ success: false }), false);
++});
++
++test('준비 전 조회와 검증은 허용하고 변경은 식별한다', () => {
++  assert.equal(isMutation('Read', { file_path: 'README.md' }, config, 106), false);
++  assert.equal(isMutation('Bash', { command: 'git status --short' }, config, 106), false);
++  assert.equal(isMutation('Bash', { command: 'node --test "packages/development-logger/test/*.test.mjs"' }, config, 106), false);
++  assert.equal(isMutation('Bash', { command: 'gh issue edit 106 --body-file body.md' }, config, 106), false);
++  assert.equal(isMutation('apply_patch', {}, config, 106), true);
++  assert.equal(isMutation('Bash', { command: 'git commit -m "chore: 변경"' }, config, 106), true);
++  assert.equal(isPullRequestCreate('Bash', { command: 'gh pr create --base release-be' }), true);
++});
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index a7415b7e91ed28310f474c0b77ddc78d55afb238..f9d7d9a35842c7c9059586ae47a4e078a021af8e 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -139,6 +139,8 @@ importers:
+         specifier: ^6.0.0
+         version: 6.0.0(supports-color@8.1.1)(webpack-cli@7.2.2)(webpack@5.109.2)
+ 
++  packages/development-logger: {}
++
+ packages:
+ 
+   '@adobe/css-tools@4.5.0':

@@ -139,6 +139,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)(webpack-cli@7.2.2)(webpack@5.109.2)
 
+  packages/development-logger: {}
+
 packages:
 
   '@adobe/css-tools@4.5.0':

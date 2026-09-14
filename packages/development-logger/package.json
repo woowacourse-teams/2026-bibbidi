@@ -1,0 +1,12 @@
+{
+  "name": "@bibbidi/development-logger",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/index.test.mjs"
+  }
+}
