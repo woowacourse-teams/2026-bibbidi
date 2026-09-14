@@ -30,7 +30,7 @@ export function MyChecklistQueryProvider({
   );
 
   return (
-    <MyChecklistQueryContext.Provider value={scope}>
+    <MyChecklistQueryContext.Provider key={sessionKey} value={scope}>
       {children}
     </MyChecklistQueryContext.Provider>
   );

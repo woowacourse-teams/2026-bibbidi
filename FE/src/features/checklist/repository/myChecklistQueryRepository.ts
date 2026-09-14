@@ -52,7 +52,10 @@ async function loadChecklist(
       return { items: [] };
     }
 
-    if (error instanceof RemoteMyChecklistApiError && error.status === 401) {
+    if (
+      error instanceof RemoteMyChecklistApiError &&
+      (error.status === 401 || error.errorCode === 201)
+    ) {
       throw new MyChecklistAuthenticationRequiredError({ cause: error });
     }
 

@@ -147,17 +147,21 @@ describe("MyChecklistQueryRepository", () => {
     expect(dataSource.getChecklist).toHaveBeenCalledOnce();
   });
 
-  it("401을 공통 인증 만료 오류로 변환한다", async () => {
-    const dataSource = createDataSource();
-    vi.mocked(dataSource.getChecklist).mockRejectedValue(
-      new RemoteMyChecklistApiError(0, 401),
-    );
-    const repository = createMyChecklistQueryRepository(dataSource);
+  it.each([
+    new RemoteMyChecklistApiError(0, 401),
+    new RemoteMyChecklistApiError(201, 500),
+  ])(
+    "401 또는 errorCode 201을 공통 인증 만료 오류로 변환한다",
+    async (apiError) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.getChecklist).mockRejectedValue(apiError);
+      const repository = createMyChecklistQueryRepository(dataSource);
 
-    await expect(repository.getChecklist()).rejects.toBeInstanceOf(
-      MyChecklistAuthenticationRequiredError,
-    );
-  });
+      await expect(repository.getChecklist()).rejects.toBeInstanceOf(
+        MyChecklistAuthenticationRequiredError,
+      );
+    },
+  );
 
   it("그 외 오류를 공통 조회 실패로 변환한다", async () => {
     const dataSource = createDataSource();
