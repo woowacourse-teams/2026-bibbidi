@@ -17,10 +17,3 @@ test('Codex와 Claude가 같은 Lifecycle Hook을 연결한다', () => {
     assert.match(claude.hooks[event][0].hooks[0].command, /development-logger/);
   }
 });
-
-test('Development Logger를 Linux, macOS, Windows의 Node.js 20에서 검증한다', () => {
-  const workflow = readFileSync(resolve(root, '.github', 'workflows', 'development-logger-test.yml'), 'utf8');
-  for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) assert.match(workflow, new RegExp(os));
-  assert.match(workflow, /node-version:\s*20/);
-  assert.match(workflow, /node --test packages\/development-logger\/test\/index\.test\.mjs/);
-});

@@ -21,7 +21,6 @@
         ".devlogger.json",
         ".github/ISSUE_TEMPLATE/",
         ".github/pull_request_template.md",
-        ".github/workflows/development-logger-test.yml",
         "packages/development-logger/"
       ],
       "commands": ["node --test packages/development-logger/test/index.test.mjs"]
