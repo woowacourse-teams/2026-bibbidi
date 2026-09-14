@@ -113,20 +113,7 @@
   font-size: 12px;
 }
 
-.preparation-task-list__empty {
-  margin: 0;
-  padding: 12px 0;
-  color: var(--color-fg-neutral-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.preparation-task-list__empty--compact {
-  padding-bottom: 4px;
-  font-size: 13px;
-}
-
-.preparation-task-list__empty-checklist {
+.preparation-task-list__empty-state {
   display: flex;
   min-height: 0;
   overflow-y: auto;
@@ -138,12 +125,12 @@
   text-align: center;
 }
 
-.preparation-task-list__empty-checklist--compact {
+.preparation-task-list__empty-state--compact {
   overflow: visible;
   padding: 12px 0 4px;
 }
 
-.preparation-task-list__empty-checklist p {
+.preparation-task-list__empty-state p {
   margin: 8px 0 0;
   color: var(--color-fg-neutral-muted);
   font-size: 14px;
@@ -151,7 +138,7 @@
   word-break: keep-all;
 }
 
-.preparation-task-list__empty-checklist--compact p {
+.preparation-task-list__empty-state--compact p {
   font-size: 13px;
 }
 
@@ -176,7 +163,7 @@
   stroke-linejoin: round;
 }
 
-.preparation-task-list__empty-checklist h3 {
+.preparation-task-list__empty-state h3 {
   margin: 0;
   font-size: 16px;
   line-height: 1.5;

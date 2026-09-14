@@ -350,6 +350,11 @@
   border-top: 1px solid var(--color-stroke-neutral-weak);
 }
 
+.preparation-step-detail__section--empty {
+  display: flex;
+  min-height: 100%;
+}
+
 .preparation-roadmap__sidebar {
   display: grid;
   height: var(--preparation-roadmap-grid-height);

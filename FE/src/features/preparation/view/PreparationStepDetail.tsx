@@ -42,7 +42,7 @@ export function PreparationStepDetail({
         <div className="preparation-step-detail__content">
           <section
             aria-label="세부 할 일"
-            className="preparation-step-detail__section"
+            className={`preparation-step-detail__section${detail.detailTasks.length === 0 ? " preparation-step-detail__section--empty" : ""}`}
           >
             <PreparationTaskList
               addingCatalogItemIds={addingCatalogItemIds}
@@ -53,22 +53,20 @@ export function PreparationStepDetail({
             />
           </section>
         </div>
-        <footer className="preparation-step-detail__footer">
-          {additionErrorMessage ? (
-            <p className="preparation-task-list__error" role="alert">
-              {additionErrorMessage}
-            </p>
-          ) : null}
-          <PreparationAddAllTasksButton
-            isDisabled={
-              !canAddTasks ||
-              addingCatalogItemIds.length > 0 ||
-              detail.detailTasks.length === 0
-            }
-            isLoading={addingCatalogItemIds.length > 0}
-            onClick={onAddAllTasks}
-          />
-        </footer>
+        {detail.detailTasks.length > 0 ? (
+          <footer className="preparation-step-detail__footer">
+            {additionErrorMessage ? (
+              <p className="preparation-task-list__error" role="alert">
+                {additionErrorMessage}
+              </p>
+            ) : null}
+            <PreparationAddAllTasksButton
+              isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
+              isLoading={addingCatalogItemIds.length > 0}
+              onClick={onAddAllTasks}
+            />
+          </footer>
+        ) : null}
       </div>
     </aside>
   );

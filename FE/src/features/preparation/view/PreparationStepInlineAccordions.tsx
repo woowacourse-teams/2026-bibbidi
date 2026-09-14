@@ -147,10 +147,12 @@ export function PreparationStepInlineAccordions({
             tasks={detail.detailTasks}
             variant="available"
           />
-          <PreparationAddAllTasksButton
-            label="남은 할 일 모두 추가"
-            size="large"
-          />
+          {detail.detailTasks.length > 0 ? (
+            <PreparationAddAllTasksButton
+              label="남은 할 일 모두 추가"
+              size="large"
+            />
+          ) : null}
         </div>
       </PreparationTaskAccordion>
     </aside>
