@@ -1,4 +1,4 @@
-export const publicPreparationCatalogResponseFixture = {
+export const preparationCatalogResponseFixture = {
   categories: [
     {
       displayOrder: 2,
@@ -36,15 +36,3 @@ export const publicPreparationCatalogResponseFixture = {
     },
   ],
 };
-
-export const authenticatedPreparationCatalogResponseFixture = structuredClone(
-  publicPreparationCatalogResponseFixture,
-);
-
-authenticatedPreparationCatalogResponseFixture.categories[1].steps[0].items =
-  authenticatedPreparationCatalogResponseFixture.categories[1].steps[0].items.map(
-    (item) => ({
-      ...item,
-      included: item.id === 1001,
-    }),
-  );

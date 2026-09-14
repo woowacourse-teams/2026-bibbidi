@@ -2,8 +2,7 @@ import { PreparationCatalogModel } from "../model/preparationRoadmap";
 import { parsePreparationCatalogResponse } from "./preparationCatalogResponse";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
-const AUTHENTICATED_CATALOG_ENDPOINT = `${apiBaseUrl}/api/catalog`;
-const PUBLIC_CATALOG_ENDPOINT = `${apiBaseUrl}/api/catalog/public`;
+const CATALOG_ENDPOINT = `${apiBaseUrl}/api/catalog`;
 const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
 
 interface ApiErrorResponse {
@@ -60,11 +59,7 @@ function toRequestError(error: unknown, didTimeout: boolean): Error {
   return new RemotePreparationCatalogNetworkError();
 }
 
-async function getPreparationCatalog(
-  endpoint: string,
-  requiresAuthentication: boolean,
-  signal?: AbortSignal,
-) {
+async function getPreparationCatalog(signal?: AbortSignal) {
   const controller = new AbortController();
   let didTimeout = false;
   const handleCallerAbort = () => controller.abort();
@@ -83,8 +78,8 @@ async function getPreparationCatalog(
     let response: Response;
 
     try {
-      response = await fetch(endpoint, {
-        credentials: requiresAuthentication ? "include" : "omit",
+      response = await fetch(CATALOG_ENDPOINT, {
+        credentials: "omit",
         method: "GET",
         signal: controller.signal,
       });
@@ -132,12 +127,7 @@ async function getPreparationCatalog(
 }
 
 export const remotePreparationCatalogDataSource = {
-  getAuthenticatedCatalog(
-    signal?: AbortSignal,
-  ): Promise<PreparationCatalogModel> {
-    return getPreparationCatalog(AUTHENTICATED_CATALOG_ENDPOINT, true, signal);
-  },
-  getPublicCatalog(signal?: AbortSignal): Promise<PreparationCatalogModel> {
-    return getPreparationCatalog(PUBLIC_CATALOG_ENDPOINT, false, signal);
+  getCatalog(signal?: AbortSignal): Promise<PreparationCatalogModel> {
+    return getPreparationCatalog(signal);
   },
 };
