@@ -1,26 +1,25 @@
+export interface AppHeaderWeddingDateModel {
+  status: "unset";
+}
+
 export interface AppHeaderSummaryModel {
   completedTaskCount: number;
-  referenceDate: string;
   totalTaskCount: number;
-  weddingDate: string;
+  weddingDate: AppHeaderWeddingDateModel;
 }
 
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
-
-function parseDateAsUtc(date: string) {
-  const [year, month, day] = date.split("-").map(Number);
-
-  return Date.UTC(year, month - 1, day);
+export interface AppHeaderChecklistItem {
+  isDone: boolean;
 }
 
-export function calculateDaysUntilWedding(
-  referenceDate: string,
-  weddingDate: string,
-) {
-  return Math.round(
-    (parseDateAsUtc(weddingDate) - parseDateAsUtc(referenceDate)) /
-      MILLISECONDS_PER_DAY,
-  );
+export function createAppHeaderSummaryModel(
+  items: readonly AppHeaderChecklistItem[],
+): AppHeaderSummaryModel {
+  return {
+    completedTaskCount: items.filter((item) => item.isDone).length,
+    totalTaskCount: items.length,
+    weddingDate: { status: "unset" },
+  };
 }
 
 export function calculatePreparationProgress(

@@ -1,5 +1,6 @@
 .app-header-summary,
 .app-header-summary__d-day,
+.app-header-summary__d-day-desktop,
 .app-header-summary__progress {
   display: flex;
   align-items: center;
@@ -14,8 +15,13 @@
 }
 
 .app-header-summary__d-day,
+.app-header-summary__d-day-desktop,
 .app-header-summary__progress {
   gap: 8px;
+}
+
+.app-header-summary__d-day-mobile {
+  display: none;
 }
 
 .app-header-summary strong {
@@ -24,7 +30,7 @@
   font-weight: 700;
 }
 
-.app-header-summary time,
+.app-header-summary__d-day-desktop > span,
 .app-header-summary__progress > span {
   color: var(--color-fg-neutral-muted);
   font-size: 14px;
@@ -63,10 +69,14 @@
     gap: 8px;
   }
 
-  .app-header-summary__d-day time,
+  .app-header-summary__d-day-desktop,
   .app-header-summary__progress > span,
   .app-header-summary__separator {
     display: none;
+  }
+
+  .app-header-summary__d-day-mobile {
+    display: inline;
   }
 
   .app-header-summary__d-day,

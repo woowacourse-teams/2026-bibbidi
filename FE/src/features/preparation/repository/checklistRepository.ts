@@ -6,6 +6,10 @@ import {
   RemoteChecklistApiError,
   RemoteChecklistDataSource,
 } from "../data-source/remoteChecklistDataSource";
+import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistQueryRepository,
+} from "../../checklist";
 import { PreparationAudience } from "../model/preparationRoadmap";
 import {
   PreparationAuthenticationRequiredError,
@@ -65,6 +69,7 @@ function runWithPersistenceError<T>(operation: () => T): T {
 export function createChecklistRepository(
   localDataSource: LocalChecklistDataSource,
   remoteDataSource: RemoteChecklistDataSource,
+  checklistQueryRepository: MyChecklistQueryRepository,
 ): ChecklistRepository {
   return {
     async addCatalogItemIds(audience, catalogItemIds, signal) {
@@ -95,9 +100,14 @@ export function createChecklistRepository(
       }
 
       try {
-        return (
-          await remoteDataSource.addCatalogItemIds(catalogItemIdNumbers, signal)
-        ).map(String);
+        const addedCatalogItemIds = await remoteDataSource.addCatalogItemIds(
+          catalogItemIdNumbers,
+          signal,
+        );
+
+        checklistQueryRepository.invalidate();
+
+        return addedCatalogItemIds.map(String);
       } catch (error) {
         if (error instanceof RemoteChecklistApiError) {
           if (error.status === 401 || error.errorCode === 201) {
@@ -134,22 +144,20 @@ export function createChecklistRepository(
       }
 
       try {
-        return (await remoteDataSource.getCatalogItemIds(signal)).map(String);
-      } catch (error) {
-        if (
-          error instanceof RemoteChecklistApiError &&
-          error.status === 401 &&
-          error.errorCode === 201
-        ) {
-          throw new PreparationAuthenticationRequiredError();
-        }
+        const checklist = await checklistQueryRepository.getChecklist(signal);
 
-        if (
-          error instanceof RemoteChecklistApiError &&
-          error.status === 404 &&
-          error.errorCode === 303
-        ) {
-          return [];
+        return [
+          ...new Set(
+            checklist.items.flatMap((item) =>
+              item.sourceCatalogItemId === null
+                ? []
+                : [String(item.sourceCatalogItemId)],
+            ),
+          ),
+        ];
+      } catch (error) {
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
+          throw new PreparationAuthenticationRequiredError();
         }
 
         throw error;

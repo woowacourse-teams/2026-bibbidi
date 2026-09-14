@@ -39,15 +39,19 @@ vi.mock("../../infrastructure/analytics", () => ({
     track: analyticsMocks.track,
   },
 }));
-vi.mock("./preparationDependencies", () => ({
-  checklistRepository: {
+vi.mock("./preparationDependencies", () => {
+  const checklistRepository = {
     addCatalogItemIds: checklistRepositoryMocks.addCatalogItemIds,
     getCatalogItemIds: checklistRepositoryMocks.getCatalogItemIds,
-  },
-  preparationCatalogRepository: {
-    getCatalog: repositoryMocks.getCatalog,
-  },
-}));
+  };
+
+  return {
+    usePreparationChecklistRepository: () => checklistRepository,
+    preparationCatalogRepository: {
+      getCatalog: repositoryMocks.getCatalog,
+    },
+  };
+});
 
 import { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
 import {
