@@ -10,6 +10,7 @@ import "./PreparationStepBottomSheet.css";
 
 interface PreparationStepBottomSheetProps {
   additionErrorMessage: string | null;
+  addingCatalogItemIds: readonly string[];
   canAddTasks: boolean;
   detail: PreparationStepDetailViewModel;
   onAddAllTasks: () => void;
@@ -19,6 +20,7 @@ interface PreparationStepBottomSheetProps {
 
 export function PreparationStepBottomSheet({
   additionErrorMessage,
+  addingCatalogItemIds,
   canAddTasks,
   detail,
   onAddAllTasks,
@@ -85,6 +87,7 @@ export function PreparationStepBottomSheet({
               </span>
             </header>
             <PreparationTaskList
+              addingCatalogItemIds={addingCatalogItemIds}
               isScrollable
               tasks={detail.checklistTasks}
               variant="checklist"
@@ -111,7 +114,12 @@ export function PreparationStepBottomSheet({
                 </p>
               ) : null}
               <PreparationAddAllTasksButton
-                isDisabled={!canAddTasks || detail.detailTasks.length === 0}
+                isDisabled={
+                  !canAddTasks ||
+                  addingCatalogItemIds.length > 0 ||
+                  detail.detailTasks.length === 0
+                }
+                isLoading={addingCatalogItemIds.length > 0}
                 label="남은 할 일 모두 추가"
                 onClick={onAddAllTasks}
               />

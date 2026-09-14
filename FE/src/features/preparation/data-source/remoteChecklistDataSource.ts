@@ -1,5 +1,6 @@
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
+const ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT = `${MY_CHECKLIST_ENDPOINT}/catalog-items`;
 const CHECKLIST_REQUEST_TIMEOUT_MS = 10_000;
 
 interface ApiErrorResponse {
@@ -8,6 +9,10 @@ interface ApiErrorResponse {
 }
 
 export interface RemoteChecklistDataSource {
+  addCatalogItemIds(
+    catalogItemIds: number[],
+    signal?: AbortSignal,
+  ): Promise<number[]>;
   getCatalogItemIds(signal?: AbortSignal): Promise<number[]>;
 }
 
@@ -88,6 +93,22 @@ export function parseChecklistCatalogItemIds(value: unknown): number[] {
   return [...new Set(catalogItemIds)];
 }
 
+export function parseAddedChecklistCatalogItemIds(value: unknown): number[] {
+  if (!isRecord(value) || !Array.isArray(value.items)) {
+    throw new Error("체크리스트 추가 성공 응답 형식이 올바르지 않습니다.");
+  }
+
+  const catalogItemIds = value.items.map((item) => {
+    if (!isRecord(item) || !isValidCatalogItemId(item.catalogItemId)) {
+      throw new Error("체크리스트 추가 성공 응답 형식이 올바르지 않습니다.");
+    }
+
+    return item.catalogItemId;
+  });
+
+  return [...new Set(catalogItemIds)];
+}
+
 function toRequestError(didTimeout: boolean): Error {
   if (didTimeout) {
     return new RemoteChecklistTimeoutError();
@@ -159,6 +180,77 @@ async function getCatalogItemIds(signal?: AbortSignal): Promise<number[]> {
   }
 }
 
+async function addCatalogItemIds(
+  catalogItemIds: number[],
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const controller = new AbortController();
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, CHECKLIST_REQUEST_TIMEOUT_MS);
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
+
+  try {
+    let response: Response;
+
+    try {
+      response = await fetch(ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT, {
+        body: JSON.stringify(catalogItemIds),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        signal: controller.signal,
+      });
+    } catch {
+      throw toRequestError(didTimeout);
+    }
+
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (didTimeout || error instanceof TypeError) {
+        throw toRequestError(didTimeout);
+      }
+
+      if (!response.ok) {
+        throw new RemoteChecklistApiError(0, response.status);
+      }
+
+      throw new Error("체크리스트 추가 성공 응답을 해석하지 못했습니다.", {
+        cause: error,
+      });
+    }
+
+    if (!response.ok) {
+      throw new RemoteChecklistApiError(
+        isApiErrorResponse(body) ? body.errorCode : 0,
+        response.status,
+        isApiErrorResponse(body)
+          ? body.message
+          : "체크리스트에 할 일을 추가하지 못했습니다.",
+      );
+    }
+
+    return parseAddedChecklistCatalogItemIds(body);
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
+  }
+}
+
 export const remoteChecklistDataSource: RemoteChecklistDataSource = {
+  addCatalogItemIds,
   getCatalogItemIds,
 };
