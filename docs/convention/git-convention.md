@@ -54,11 +54,25 @@ release-app ──┘
 예시: feature/201
 ```
 
+## Issue와 PR Type Label
+
+- 모든 Issue와 PR은 다음 `type:*` Label 중 정확히 하나를 사용한다.
+  - `feature` Branch → `type: feature`
+  - `fix` Branch → `type: fix`
+  - `hotfix` Branch → `type: hotfix`
+  - `chore` Branch → `type: chore`
+  - `docs` Branch → `type: docs`
+- Coding Agent가 Issue를 생성할 때 Type Label이 없거나 둘 이상이면 생성을 차단한다.
+- Coding Agent가 PR을 생성할 때 Head Branch Prefix와 Issue의 Type Label이 다르면 생성을 차단한다.
+- Coding Agent가 만드는 PR에는 Head Branch Prefix에 해당하는 Type Label을 자동으로 추가한다.
+- GitHub UI에서 사람이 Issue나 PR을 만들 때는 Template 안내에 따라 Type Label을 직접 선택한다.
+- Label 강제 Gate는 Coding Agent에만 적용하며 사람의 GitHub UI 작업을 GitHub Action으로 차단하지 않는다.
+
 ## 작은 Issue와 짧은 브랜치
 
 - Issue 하나당 PR 하나를 만든다.
-- 예상 리뷰 시간은 30분 이하로 유지한다.
-- Issue 구현 시간은 1일 이내를 목표로 한다.
+- 예상 리뷰 시간은 20분 이하로 유지한다.
+- Issue 구현은 당일 구현을 목표로 한다.
 - 핵심 변경 코드는 200줄 이하를 권장한다.
 - 핵심 변경 파일은 5개 이하를 권장한다.
 - 핵심 변경 코드 350줄 초과, 변경 파일 10개 초과, 리뷰 60분 초과, 구현 2일 이상은 작업 분할을 검토한다.

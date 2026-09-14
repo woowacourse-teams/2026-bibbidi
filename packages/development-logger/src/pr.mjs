@@ -4,7 +4,8 @@ import { readEvents } from './events.mjs';
 import { changedFiles, snapshotTree, tracked } from './git.mjs';
 import { getIssue } from './github.mjs';
 import { hasInitialAdr } from './issue.mjs';
-import { gitDirectory, run, writeTextAtomic } from './process.mjs';
+import { gitDirectory, writeTextAtomic } from './process.mjs';
+import { appendTypeLabel, labelsFromToolInput, validateTypeLabels } from './type-label.mjs';
 import { requiredValidations, validationStatus } from './validation.mjs';
 
 function truncate(value, length = 240) {
@@ -16,101 +17,50 @@ function bulletList(values, fallback) {
   return values.length ? values.map((value) => `- ${value}`).join('\n') : `- ${fallback}`;
 }
 
-function typeChecklist(files) {
-  const docsOnly = files.every((file) => /(?:^docs\/|\.md$)/.test(file));
-  return [
-    ['Feature', false],
-    ['Fix', false],
-    ['Hotfix', false],
-    ['Chore', !docsOnly],
-    ['Docs', docsOnly],
-  ].map(([label, checked]) => `- [${checked ? 'x' : ' '}] ${label}`).join('\n');
+function reviewLevel(file) {
+  if (/hooks|tool-policy|gate|cli\.mjs|type-label/.test(file)) return 'REQUIRED';
+  if (/test|template|skill|convention|config/.test(file)) return 'CAUTION';
+  return 'ADVICE';
 }
 
-function riskFor(file) {
-  if (/hooks|tool-policy|gate|cli\.mjs/.test(file)) return `🔴 \`${file}\` — Lifecycle 차단과 허용 경계를 확인해 주세요.`;
-  if (/test|template|skill|convention/.test(file)) return `🟡 \`${file}\` — 요구사항과 검증 범위를 확인해 주세요.`;
-  return `🟢 \`${file}\` — 구조와 명명 일관성을 확인해 주세요.`;
+function reviewRequests(files) {
+  const descriptions = {
+    REQUIRED: '병합 전에 Lifecycle 차단·허용 경계와 정책 불변식을 확인해 주세요.',
+    CAUTION: '요구사항·검증 범위와 잠재적인 Trade-off를 확인해 주세요.',
+    ADVICE: '구조와 명명 등 낮은 위험의 개선 의견을 확인해 주세요.',
+  };
+  return ['REQUIRED', 'CAUTION', 'ADVICE'].map((level) => {
+    const matched = files.filter((file) => reviewLevel(file) === level);
+    if (!matched.length) return null;
+    const visible = matched.slice(0, 6).map((file) => `\`${file}\``);
+    const omitted = matched.length - visible.length;
+    return `- [${level}] ${descriptions[level]}\n  - ${visible.join(', ')}${omitted ? ` 외 ${omitted}개` : ''}`;
+  }).filter(Boolean).join('\n');
 }
 
 export function buildPullRequestBody({ root, config, state, files, validations, issueData }) {
   const events = readEvents(root, state.issue);
-  const decisions = events
-    .filter((event) => event.type === 'GRILL_ME_DECISION')
-    .map((event) => truncate(event.decision));
-  const prompts = events
-    .filter((event) => event.type === 'USER_PROMPTED')
+  const changes = events
+    .filter((event) => event.type === 'TURN_FINISHED' && event.assistantMessage)
+    .slice(-3)
+    .map((event) => truncate(event.assistantMessage));
+  const adrChanges = events
+    .filter((event) => event.type === 'ADR_CHANGED' && event.decision)
     .slice(-5)
-    .map((event) => `사용자: “${truncate(event.prompt, 180)}”`);
-  const adrChanges = issueData.comments
-    .filter((comment) => /## ADR 변경/.test(comment.body))
-    .map((comment, index) => `ADR 변경 #${index + 1}: ${truncate(comment.body, 220)}`);
+    .map((event) => truncate(event.decision));
   const passed = validations.filter((item) => item.passed).map((item) => `\`${item.command}\` — PASSED`);
-  const diffStat = run('git', ['diff', '--stat', config.defaultBaseBranch, 'HEAD'], { cwd: root });
 
   return `## 관련 Issue
 
-- #${state.issue}
+- Closes #${state.issue}
 
-## 변경 유형
+## 최종 변경 사항
 
-${typeChecklist(files)}
+${bulletList(changes, `${issueData.title} 구현을 완료했습니다.`)}
 
-## 해결한 문제와 변경 이유
+## Issue·ADR 대비 변경
 
-- ${issueData.title} 문제를 해결합니다.
-  - Coding Agent가 만든 코드와 함께 문제, 설계 결정, 사용자 피드백, 검증 과정을 복원할 수 있게 합니다.
-
-## 변경 사항과 핵심 설계 결정
-
-${bulletList(decisions, 'Issue의 최초 ADR을 기준으로 구현했습니다.')}
-
-<details>
-<summary>Diff Stat</summary>
-
-\`\`\`text
-${diffStat || '변경 통계가 없습니다.'}
-\`\`\`
-
-</details>
-
-## 한계와 Trade-off
-
-- Development Logger 실행을 위해 Node.js 20+가 필요합니다.
-- Agent별 Hook payload 차이는 adapter가 흡수하지만 Agent의 Hook 계약 변경 시 fixture와 adapter 갱신이 필요합니다.
-- 설치 전 Issue #${state.issue} 기록은 \`bootstrap: true\`로 복원한 기록입니다.
-
-## 기존 기능에 미치는 영향
-
-- 일반 애플리케이션 runtime에는 개입하지 않습니다.
-- Coding Agent의 변경 작업과 PR 생성 과정에는 Fail Closed Gate가 적용됩니다.
-
-## Edge Case와 실패 시나리오
-
-- Issue, grill-me, 최초 ADR이 없으면 구현 변경을 차단합니다.
-- 필수 검증이 실패했거나 마지막 코드 변경 이후 실행되지 않았으면 PR 생성을 차단합니다.
-- 일반 Development Log 실패는 경고하고 PR Gate에서 재검증합니다.
-
-## 검토한 대안과 선택 이유
-
-- Agent transcript 분석 대신 명시적인 lifecycle command를 선택했습니다.
-  - 비공개 transcript 형식과 Agent 버전에 대한 결합을 줄입니다.
-- Bash·PowerShell 이중 구현 대신 Node.js 공통 core를 선택했습니다.
-  - OS별 핵심 로직 중복을 방지합니다.
-
-## 개발 과정
-
-### Grill Me 주요 결정
-
-${bulletList(decisions, '기록된 결정이 없습니다.')}
-
-### 주요 사용자-Agent 대화
-
-${bulletList(prompts, '추가로 요약할 일반 대화가 없습니다.')}
-
-### ADR 변경
-
-${bulletList(adrChanges, '최초 ADR 이후 변경된 결정이 없습니다.')}
+${bulletList(adrChanges, '변경 없음')}
 
 ## 검증 결과
 
@@ -118,12 +68,7 @@ ${bulletList(passed, '통과한 필수 검증이 없습니다.')}
 
 ## 리뷰 요청
 
-${bulletList(files.slice(0, 12).map(riskFor), '별도 위험 파일이 없습니다.')}
-
-## 고민 사항
-
-- Hook이 허용하는 조회·검증 명령과 차단하는 변경 명령의 경계가 팀 Workflow에 적절한지 확인해 주세요.
-- APP까지 포함한 경로별 검증 선택이 실제 CI 책임과 일치하는지 확인해 주세요.
+${reviewRequests(files) || '- [ADVICE] 별도로 요청할 리뷰 항목이 없습니다.'}
 
 ## Development Log
 
@@ -132,7 +77,7 @@ ${bulletList(files.slice(0, 12).map(riskFor), '별도 위험 파일이 없습니
 `;
 }
 
-export function updatePullRequestInput(toolInput, bodyPath) {
+export function updatePullRequestInput(toolInput, bodyPath, typeLabel = null, config = {}) {
   const key = Object.hasOwn(toolInput, 'command') ? 'command' : Object.hasOwn(toolInput, 'cmd') ? 'cmd' : null;
   if (!key || typeof toolInput[key] !== 'string') {
     throw new Error('gh pr create 명령의 문자열 입력을 찾지 못했습니다.');
@@ -143,7 +88,15 @@ export function updatePullRequestInput(toolInput, bodyPath) {
     .replace(/\s+--fill(?:-first|-verbose)?\b/gi, '');
   const quoted = `"${bodyPath.replace(/"/g, '\\"')}"`;
   command = `${command} --body-file ${quoted}`;
-  return { ...toolInput, [key]: command };
+  const updated = { ...toolInput, [key]: command };
+  if (!typeLabel) return updated;
+  const labels = labelsFromToolInput(updated);
+  const existingTypes = labels.filter((label) => /^type\s*:/i.test(label));
+  if (existingTypes.length) {
+    validateTypeLabels(labels, config, typeLabel);
+    return updated;
+  }
+  return appendTypeLabel(updated, typeLabel);
 }
 
 export function assertTemplateStructure(template, body) {

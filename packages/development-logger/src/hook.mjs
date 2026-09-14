@@ -6,7 +6,8 @@ import { extractIssueNumber, hasInitialAdr } from './issue.mjs';
 import { findRepositoryRoot, loadConfig, writeTextAtomic } from './process.mjs';
 import { preparePullRequest, updatePullRequestInput } from './pr.mjs';
 import { loadState, saveState } from './state.mjs';
-import { allow, deny, isMutation, isPullRequestCreate } from './tool-policy.mjs';
+import { allow, deny, isIssueCreate, isMutation, isPullRequestCreate } from './tool-policy.mjs';
+import { expectedTypeLabel, issueTypeLabel, validateIssueCreateInput } from './type-label.mjs';
 import { recordValidation } from './validation.mjs';
 
 function sessionState(root, payload, agent) {
@@ -146,7 +147,17 @@ function onStop(root, payload, agent) {
 
 function onPreToolUse(root, config, payload, agent, services) {
   const state = sessionState(root, payload, agent);
+  const issueRequested = isIssueCreate(payload.tool_name, payload.tool_input);
   const prRequested = isPullRequestCreate(payload.tool_name, payload.tool_input);
+
+  if (issueRequested) {
+    try {
+      validateIssueCreateInput(payload.tool_input, config);
+      return allow();
+    } catch (error) {
+      return deny(error.message);
+    }
+  }
 
   if (prRequested) {
     if (!state.issue) return deny('GitHub Issue가 연결되지 않아 PR을 생성할 수 없습니다.');
@@ -156,10 +167,13 @@ function onPreToolUse(root, config, payload, agent, services) {
       return deny(`PR_REQUESTED를 기록했습니다. .devlog/${state.issue}/events.jsonl을 Commit한 뒤 다시 PR을 생성하세요.`);
     }
     try {
+      const typeLabel = expectedTypeLabel(gitMetadata(root).branch, config);
+      const issueData = services.getIssue(root, config.repository, state.issue);
+      issueTypeLabel(issueData, config, typeLabel);
       const prepared = preparePullRequest({ root, config, state });
       const dirty = gitMetadata(root).status;
       if (dirty) return deny(`Commit되지 않은 변경이 있어 PR을 생성할 수 없습니다:\n${dirty}`);
-      return allow(updatePullRequestInput(payload.tool_input, prepared.bodyPath));
+      return allow(updatePullRequestInput(payload.tool_input, prepared.bodyPath, typeLabel, config));
     } catch (error) {
       return deny(error.message);
     }

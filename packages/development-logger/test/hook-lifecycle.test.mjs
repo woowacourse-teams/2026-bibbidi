@@ -120,3 +120,36 @@ test('ADR 재개 후 grill-me는 새로운 설계 인터뷰 경계를 기록한�
     removeDirectory(root);
   }
 });
+
+test('Agent의 Issue 생성은 Type Label을 정확히 하나 요구한다', () => {
+  const root = setupRepository();
+  try {
+    const denied = handleHook({
+      agent: 'codex',
+      cwd: root,
+      payload: {
+        hook_event_name: 'PreToolUse',
+        session_id: 'issue-create-session',
+        cwd: root,
+        tool_name: 'Bash',
+        tool_input: { command: 'gh issue create --title "새 기능"' },
+      },
+    });
+    assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny');
+
+    const allowed = handleHook({
+      agent: 'codex',
+      cwd: root,
+      payload: {
+        hook_event_name: 'PreToolUse',
+        session_id: 'issue-create-session',
+        cwd: root,
+        tool_name: 'Bash',
+        tool_input: { command: 'gh issue create --title "새 기능" --label "type: feature"' },
+      },
+    });
+    assert.equal(allowed.hookSpecificOutput.permissionDecision, 'allow');
+  } finally {
+    removeDirectory(root);
+  }
+});

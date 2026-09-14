@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isMutation, isPullRequestCreate } from '../src/tool-policy.mjs';
+import { isIssueCreate, isMutation, isPullRequestCreate } from '../src/tool-policy.mjs';
 import { requiredValidations, responseSucceeded, validationForCommand } from '../src/validation.mjs';
 
 const config = {
@@ -31,4 +31,5 @@ test('준비 전 조회와 검증은 허용하고 변경은 식별한다', () =>
   assert.equal(isMutation('apply_patch', {}, config, 106), true);
   assert.equal(isMutation('Bash', { command: 'git commit -m "chore: 변경"' }, config, 106), true);
   assert.equal(isPullRequestCreate('Bash', { command: 'gh pr create --base release-be' }), true);
+  assert.equal(isIssueCreate('Bash', { command: 'gh issue create --label "type: feature"' }), true);
 });

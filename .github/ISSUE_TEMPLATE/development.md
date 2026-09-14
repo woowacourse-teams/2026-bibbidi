@@ -6,6 +6,16 @@ labels: ""
 assignees: ""
 ---
 
+## 변경 유형
+
+<!-- Agent는 Issue 생성 명령에 아래 유형과 같은 type:* Label을 정확히 하나 지정한다. 사람은 GitHub UI에서 Label을 직접 선택한다. -->
+
+- [ ] Feature (`type: feature`)
+- [ ] Fix (`type: fix`)
+- [ ] Hotfix (`type: hotfix`)
+- [ ] Chore (`type: chore`)
+- [ ] Docs (`type: docs`)
+
 ## 해결하려는 문제
 
 - 결론부터 작성한다.
@@ -48,4 +58,3 @@ assignees: ""
 - 공식 문서, 공신력 있는 기술 자료 또는 제품 합의 자료를 연결한다.
 
 <!-- grill-me 완료 후 Agent가 이 아래에 최초 ADR을 추가한다. -->
-

@@ -30,6 +30,11 @@ export function isPullRequestCreate(toolName, toolInput) {
   return /\bgh\s+pr\s+create\b/i.test(commandFromToolInput(toolInput));
 }
 
+export function isIssueCreate(toolName, toolInput) {
+  if (!SHELL_TOOL_NAMES.test(String(toolName))) return false;
+  return /\bgh\s+issue\s+create\b/i.test(commandFromToolInput(toolInput));
+}
+
 export function isMutation(toolName, toolInput, config, issue) {
   const name = String(toolName ?? '');
   if (MUTATING_TOOL_NAMES.test(name)) return true;
