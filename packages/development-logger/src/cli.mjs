@@ -18,7 +18,7 @@ async function main() {
           hookSpecificOutput: {
             hookEventName: 'PreToolUse',
             permissionDecision: 'deny',
-            permissionDecisionReason: `Development Logger Gate 오류: ${error.message}`,
+            permissionDecisionReason: `Development Logger 확인 중 오류: ${error.message}`,
           },
         }));
       } else {
