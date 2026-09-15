@@ -191,31 +191,6 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("카테고리를 찾을 수 없는 할 일은 랜덤으로 고르기 전에 뺀다")
-    void shouldExcludeUncategorizedItemBeforePicking() {
-        // given
-        ChecklistItem categorizedItem = constructTestItem(200L);
-        ChecklistItem uncategorizedItem = new ChecklistItem(201L, 99L, "청첩장 문구", null, ChecklistItemStatus.PREV);
-        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
-                CHECKLIST_ID,
-                OWNER_ID,
-                List.of(categorizedItem, uncategorizedItem)
-        ));
-        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID, 99L)))
-                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
-        given(shuffler.shuffle(List.of(categorizedItem)))
-                .willReturn(List.of(categorizedItem));
-
-        // when
-        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID);
-
-        // then
-        assertThat(results)
-                .extracting(UnscheduledChecklistItemResult::checklistItemId)
-                .containsExactly(200L);
-    }
-
-    @Test
     @DisplayName("일정이 필요한 할 일이 4개보다 많으면 섞은 순서에서 앞의 4개만 돌려준다")
     void shouldReturnFirstFourItemsInShuffledOrder() {
         // given

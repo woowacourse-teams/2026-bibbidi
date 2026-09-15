@@ -26,11 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 public class ChecklistService {
 
@@ -78,8 +76,7 @@ public class ChecklistService {
 
         List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
         CategoryNames categoryNames = findCategoryNames(unscheduledItems);
-        List<ChecklistItem> candidates = excludeUncategorizedItems(unscheduledItems, categoryNames);
-        List<ChecklistItem> pickedItems = pickRandomly(candidates);
+        List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems);
 
         return toResults(pickedItems, categoryNames);
     }
@@ -95,21 +92,6 @@ public class ChecklistService {
                 .map(ChecklistItem::categoryId)
                 .collect(Collectors.toSet());
         return catalogService.findCategoryNames(categoryIds);
-    }
-
-    private List<ChecklistItem> excludeUncategorizedItems(List<ChecklistItem> items, CategoryNames categoryNames) {
-        return items.stream()
-                .filter(item -> hasCategoryName(item, categoryNames))
-                .toList();
-    }
-
-    private boolean hasCategoryName(ChecklistItem item, CategoryNames categoryNames) {
-        if (categoryNames.contains(item.categoryId())) {
-            return true;
-        }
-
-        log.warn("카테고리를 찾을 수 없는 할 일입니다. checklistItemId={}, categoryId={}", item.id(), item.categoryId());
-        return false;
     }
 
     private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates) {
