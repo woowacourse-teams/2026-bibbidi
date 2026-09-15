@@ -75,13 +75,13 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
             WHERE item.checklist.ownerId = :userId
               AND appointment.isDone = false
-              AND (appointment.date > :today
-                   OR (appointment.date = :today
-                       AND (appointment.startTime IS NULL OR appointment.startTime >= :now)))
+              AND (appointment.date > :date
+                   OR (appointment.date = :date
+                       AND (appointment.startTime IS NULL OR appointment.startTime >= :time)))
             """)
     List<JpaAppointmentEntity> findNearby(
             @Param("userId") Long userId,
-            @Param("today") LocalDate today,
-            @Param("now") LocalDateTime now
+            @Param("date") LocalDate date,
+            @Param("time") LocalDateTime time
     );
 }

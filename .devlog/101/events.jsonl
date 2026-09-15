@@ -40,3 +40,11 @@
 {"type":"TURN_FINISHED","turnId":"6","diff":"turn-005.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-15T08:18:29.604Z"}
 {"type":"USER_PROMPTED","issue":101,"turnId":"7","prompt":"ㅇㅇ 커밋해","redacted":false,"timestamp":"2026-09-15T08:18:43.732Z"}
 {"type":"COMMIT_CONFIRMED","issue":101,"tree":"34e952ef310aaf69348ddf996c216576f2184620","timestamp":"2026-09-15T08:18:47.893Z"}
+{"type":"TURN_FINISHED","turnId":"7","diff":"turn-006.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-15T08:19:15.544Z"}
+{"type":"USER_PROMPTED","issue":101,"turnId":"8","prompt":"C:\\woowahan-techcourse\\3.LEVEL_3\\bibbdi_source_code\\BE\\src\\main\\java\\com\\bibbidi\\wedding\\checklist\\persistence\\JpaAppointmentRepository.java 도 date, time 변경에 맞춰 변경.","redacted":false,"timestamp":"2026-09-15T08:22:37.871Z"}
+{"type":"TURN_FINISHED","turnId":"8","diff":"turn-007.diff","diffStat":" BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)","testResult":"NOT_RUN","timestamp":"2026-09-15T08:23:49.711Z"}
+{"type":"USER_PROMPTED","issue":101,"turnId":"9","prompt":"commit & push","redacted":false,"timestamp":"2026-09-15T08:23:57.897Z"}
+{"type":"COMMIT_EXPLAINED","issue":101,"explanation":"JpaAppointmentRepository.findNearby: 쿼리 파라미터 플레이스홀더를 :now에서 :time으로 수정해 @Param(\"time\")과 이름을 맞춤. date/time 파라미터화에 맞춰 남아있던 불일치 수정.","diffStat":" .../checklist/persistence/JpaAppointmentRepository.java        | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)","tree":"dca5d0e7fd1b114f0a3e8a9e932418a95e9c519d","timestamp":"2026-09-15T08:24:08.313Z"}
+{"type":"TURN_FINISHED","turnId":"9","diff":"turn-008.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-15T08:24:12.433Z"}
+{"type":"USER_PROMPTED","issue":101,"turnId":"10","prompt":"ㅇㅇ 커밋해","redacted":false,"timestamp":"2026-09-15T08:24:16.011Z"}
+{"type":"COMMIT_CONFIRMED","issue":101,"tree":"dca5d0e7fd1b114f0a3e8a9e932418a95e9c519d","timestamp":"2026-09-15T08:24:24.224Z"}
