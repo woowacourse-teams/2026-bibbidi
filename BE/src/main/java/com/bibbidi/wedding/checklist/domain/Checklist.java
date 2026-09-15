@@ -4,6 +4,7 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 public final class Checklist {
@@ -65,6 +66,19 @@ public final class Checklist {
     public List<Long> itemIds() {
         return items.stream()
                 .map(ChecklistItem::id)
+                .toList();
+    }
+
+    public List<Long> undoneItemIds() {
+        return items.stream()
+                .filter(item -> !item.isDone())
+                .map(ChecklistItem::id)
+                .toList();
+    }
+
+    public List<ChecklistItem> unscheduledItems(Set<Long> scheduledItemIds) {
+        return items.stream()
+                .filter(item -> item.needsSchedule(scheduledItemIds))
                 .toList();
     }
 

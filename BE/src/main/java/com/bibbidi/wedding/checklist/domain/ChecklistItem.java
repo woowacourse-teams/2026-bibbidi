@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.domain;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -110,5 +111,9 @@ public final class ChecklistItem {
 
     public boolean isDone() {
         return status == ChecklistItemStatus.DONE;
+    }
+
+    public boolean needsSchedule(Set<Long> scheduledItemIds) {
+        return !isDone() && !scheduledItemIds.contains(id);
     }
 }

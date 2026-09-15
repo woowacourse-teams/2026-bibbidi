@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -265,6 +266,44 @@ class ChecklistItemTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
+    }
+
+    @Test
+    @DisplayName("완료되지 않았고 일정이 없는 할 일은 일정이 필요하다")
+    void shouldNeedScheduleWhenItemIsIncompleteAndUnscheduled() {
+        // given
+        ChecklistItem item = constructTestItem();
+        ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
+
+        // when, then
+        assertThat(item.needsSchedule(Set.of())).isTrue();
+        assertThat(progressed.needsSchedule(Set.of())).isTrue();
+    }
+
+    @Test
+    @DisplayName("일정이 있는 할 일은 일정이 필요하지 않다")
+    void shouldNotNeedScheduleWhenItemIsScheduled() {
+        // given
+        ChecklistItem item = constructTestItem();
+
+        // when
+        boolean needsSchedule = item.needsSchedule(Set.of(item.id()));
+
+        // then
+        assertThat(needsSchedule).isFalse();
+    }
+
+    @Test
+    @DisplayName("완료된 할 일은 일정이 없어도 일정이 필요하지 않다")
+    void shouldNotNeedScheduleWhenItemIsDone() {
+        // given
+        ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
+
+        // when
+        boolean needsSchedule = item.needsSchedule(Set.of());
+
+        // then
+        assertThat(needsSchedule).isFalse();
     }
 
     private static ChecklistItem constructCustomItem() {
