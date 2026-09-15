@@ -3,12 +3,15 @@ package com.bibbidi.wedding.user.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.user.domain.User;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
@@ -18,6 +21,12 @@ class UserRepositoryIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("닉네임 중복 검사에서 현재 사용자는 제외하고 다른 사용자는 대소문자 없이 찾는다")
@@ -81,6 +90,30 @@ class UserRepositoryIntegrationTest {
         assertThat(updated)
                 .extracting(User::id, User::nickname, User::passwordHash, User::weddingDate)
                 .containsExactly(user.id(), "Bibbidi", "password-hash", LocalDate.of(2027, 5, 15));
+    }
+
+    @Test
+    @DisplayName("동일한 결혼 예정일을 다시 저장해도 수정 시각을 갱신한다")
+    void shouldUpdateTimestampWhenSameWeddingDateIsSaved() {
+        LocalDate weddingDate = LocalDate.of(2027, 5, 15);
+        User user = userRepository.save(new User(null, "Bibbidi", "password-hash", weddingDate));
+        LocalDateTime previousUpdatedAt = LocalDateTime.of(2000, 1, 1, 0, 0);
+        jdbcTemplate.update(
+                "UPDATE users SET updated_at = ? WHERE id = ?",
+                previousUpdatedAt,
+                user.id()
+        );
+        entityManager.clear();
+
+        User sameWeddingDateUser = userRepository.findById(user.id());
+        userRepository.save(sameWeddingDateUser.changeWeddingDate(weddingDate));
+        LocalDateTime updatedAt = jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM users WHERE id = ?",
+                LocalDateTime.class,
+                user.id()
+        );
+
+        assertThat(updatedAt).isAfter(previousUpdatedAt);
     }
 
     @Test
