@@ -29,8 +29,20 @@ public class UserRepository {
         return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
     }
 
-    public User save(User user) {
+    public User create(User user) {
         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
+        return userMapper.toDomain(saved);
+    }
+
+    public User update(User user) {
+        JpaUserEntity currentEntity = getJpaUserEntity(user.id());
+        JpaUserEntity updatedEntity = new JpaUserEntity(
+                user.id(),
+                user.nickname(),
+                user.passwordHash(),
+                currentEntity.weddingDate()
+        );
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
         return userMapper.toDomain(saved);
     }
 

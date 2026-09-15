@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.user.domain;
 
-import java.time.LocalDate;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -9,30 +8,23 @@ public final class User {
     private final Long id;
     private final String nickname;
     private final String passwordHash;
-    private final LocalDate weddingDate;
 
     public User(
             @Nullable Long id,
             @NonNull String nickname,
-            @NonNull String passwordHash,
-            @Nullable LocalDate weddingDate
+            @NonNull String passwordHash
     ) {
         this.id = id;
         this.nickname = nickname;
         this.passwordHash = passwordHash;
-        this.weddingDate = weddingDate;
     }
 
     public User changeNickname(String nickname) {
-        return new User(id, nickname, passwordHash, weddingDate);
+        return new User(id, nickname, passwordHash);
     }
 
     public User changePasswordHash(String passwordHash) {
-        return new User(id, nickname, passwordHash, weddingDate);
-    }
-
-    public User changeWeddingDate(LocalDate weddingDate) {
-        return new User(id, nickname, passwordHash, weddingDate);
+        return new User(id, nickname, passwordHash);
     }
 
     public Long id() {
@@ -47,7 +39,4 @@ public final class User {
         return passwordHash;
     }
 
-    public LocalDate weddingDate() {
-        return weddingDate;
-    }
 }
