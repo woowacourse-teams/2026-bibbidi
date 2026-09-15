@@ -3,6 +3,7 @@ package com.bibbidi.wedding.catalog.service;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import java.util.Collection;
@@ -29,6 +30,11 @@ public class CatalogService {
                 .flatMap(category -> category.findItems(itemIds).stream()
                         .map(item -> new CatalogItemSnapshot(item.id(), category.id(), item.title())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogItemDetailSnapshot> findAllItemDetails() {
+        return catalogRepository.findAllItemDetails();
     }
 
     @Transactional(readOnly = true)
