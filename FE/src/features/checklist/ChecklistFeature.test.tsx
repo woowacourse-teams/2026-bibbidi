@@ -1,115 +1,365 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const authMocks = vi.hoisted(() => ({
+  authState: { status: "guest" } as
+    | { status: "authenticated"; user: { nickname: string } }
+    | { status: "error" }
+    | { status: "guest" }
+    | { status: "loading" }
+    | { status: "synchronizing"; user: { nickname: string } },
+  refreshAuth: vi.fn(),
+}));
+const repositoryMocks = vi.hoisted(() => {
+  const getChecklist = vi.fn();
+
+  return {
+    current: { getChecklist },
+    getChecklist,
+  };
+});
+
+vi.mock("../auth", () => ({
+  useAuth: () => ({
+    authState: authMocks.authState,
+    refreshAuth: authMocks.refreshAuth,
+  }),
+}));
+vi.mock("./checklistQueryDependencies", () => ({
+  useChecklistQueryRepository: () => repositoryMocks.current,
+}));
 
 import { ChecklistFeature } from "./ChecklistFeature";
+import { ChecklistQueryModel } from "./model/checklistQuery";
+import {
+  ChecklistQueryAuthenticationRequiredError,
+  ChecklistQueryLoadError,
+  ChecklistQueryRequestAbortedError,
+} from "./repository/checklistQueryRepository";
 
-const categoryNames = [
-  "계획·예산",
-  "양가·가족",
-  "예식장",
-  "스드메·촬영",
-  "의상·예물",
-  "청첩장·하객",
-  "본식 구성·진행",
-  "신혼여행",
-  "신혼집·혼수",
-  "웨딩 전 관리",
-  "정산·감사",
-];
+function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
+  return {
+    categories: [
+      { id: "20", items: [], title: "두 번째 카테고리" },
+      {
+        id: "10",
+        items: [
+          {
+            appointments: [],
+            categoryId: "10",
+            checklistItemId: null,
+            id: "catalog-item-101",
+            isDone: false,
+            sourceCatalogItemId: 101,
+            title,
+          },
+        ],
+        title: "첫 번째 카테고리",
+      },
+    ],
+  };
+}
 
-describe("ChecklistFeature", () => {
-  it("카테고리를 정의된 순서대로 heading으로 표시한다", () => {
+beforeEach(() => {
+  authMocks.authState = { status: "guest" };
+  authMocks.refreshAuth.mockReset();
+  repositoryMocks.getChecklist.mockReset();
+  repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
+  repositoryMocks.current = { getChecklist: repositoryMocks.getChecklist };
+});
+
+describe("ChecklistFeature 인증 상태별 조회", () => {
+  it("인증 확인 중에는 접근 가능한 로딩 상태를 표시하고 조회하지 않는다", () => {
+    authMocks.authState = { status: "loading" };
+
     render(<ChecklistFeature />);
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "체크리스트를 불러오고 있어요.",
+    );
+    expect(repositoryMocks.getChecklist).not.toHaveBeenCalled();
+  });
+
+  it("synchronizing 중에는 이전 guest 결과를 숨기고 새로 조회하지 않는다", async () => {
+    const view = render(<ChecklistFeature />);
+    expect(await screen.findByText("로컬 체크리스트 항목")).toBeTruthy();
+
+    authMocks.authState = {
+      status: "synchronizing",
+      user: { nickname: "bibbidi" },
+    };
+    view.rerender(<ChecklistFeature />);
+
+    expect(screen.queryByText("로컬 체크리스트 항목")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe(
+      "체크리스트를 불러오고 있어요.",
+    );
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("비로그인 audience의 Local Storage 조합 결과를 표시한다", async () => {
+    render(<ChecklistFeature />);
+
+    expect(await screen.findByText("로컬 체크리스트 항목")).toBeTruthy();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledWith(
+      "guest",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue({
+      categories: [
+        {
+          id: "10",
+          items: [
+            {
+              appointments: [],
+              categoryId: "10",
+              checklistItemId: 10,
+              id: "checklist-item-10",
+              isDone: false,
+              sourceCatalogItemId: 101,
+              title: "서버 Catalog 항목",
+            },
+            {
+              appointments: [],
+              categoryId: "10",
+              checklistItemId: 11,
+              id: "checklist-item-11",
+              isDone: false,
+              sourceCatalogItemId: null,
+              title: "직접 작성 항목",
+            },
+          ],
+          title: "첫 번째 카테고리",
+        },
+      ],
+    });
+
+    render(<ChecklistFeature />);
+
+    await screen.findByText("직접 작성 항목");
+    expect(
+      screen
+        .getAllByRole("listitem")
+        .map((item) => within(item).getByText(/항목$/).textContent),
+    ).toEqual(["서버 Catalog 항목", "직접 작성 항목"]);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledWith(
+      "authenticated",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("단순 리렌더링으로 조회를 반복하지 않는다", async () => {
+    const view = render(<ChecklistFeature />);
+    await screen.findByText("로컬 체크리스트 항목");
+
+    view.rerender(<ChecklistFeature />);
+
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ChecklistFeature 조회 상태와 요청 수명", () => {
+  it("Catalog 카테고리가 없으면 전체 빈 상태를 표시한다", async () => {
+    repositoryMocks.getChecklist.mockResolvedValue({ categories: [] });
+
+    render(<ChecklistFeature />);
+
+    expect(await screen.findByText("표시할 체크리스트가 없어요.")).toBeTruthy();
+  });
+
+  it("항목이 없는 카테고리는 전체 빈 화면 대신 0개와 0%로 표시한다", async () => {
+    repositoryMocks.getChecklist.mockResolvedValue({
+      categories: [{ id: "10", items: [], title: "빈 카테고리" }],
+    });
+
+    render(<ChecklistFeature />);
+
+    const category = (
+      await screen.findByRole("heading", { name: "빈 카테고리" })
+    ).closest("section");
+    expect(category).not.toBeNull();
+    expect(within(category!).getByText("0개")).toBeTruthy();
+    expect(within(category!).getByText("0%")).toBeTruthy();
+    expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
+  });
+
+  it("일반 오류를 화면 안에서 안내하고 다시 조회한다", async () => {
+    repositoryMocks.getChecklist
+      .mockRejectedValueOnce(new ChecklistQueryLoadError())
+      .mockResolvedValueOnce(createChecklist("재시도 결과"));
+
+    render(<ChecklistFeature />);
+
+    expect(
+      await screen.findByText("체크리스트를 불러오지 못했어요."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("재시도 결과")).toBeTruthy();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
+  });
+
+  it("인증 오류를 refreshAuth 흐름에 연결한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockRejectedValue(
+      new ChecklistQueryAuthenticationRequiredError(),
+    );
+
+    render(<ChecklistFeature />);
+
+    expect(
+      await screen.findByText(
+        "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+      ),
+    ).toBeTruthy();
+    expect(authMocks.refreshAuth).toHaveBeenCalledOnce();
+  });
+
+  it("취소 오류를 사용자 오류로 표시하지 않는다", async () => {
+    repositoryMocks.getChecklist.mockRejectedValue(
+      new ChecklistQueryRequestAbortedError(),
+    );
+
+    render(<ChecklistFeature />);
+
+    await waitFor(() =>
+      expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe(
+      "체크리스트를 불러오고 있어요.",
+    );
+  });
+
+  it("audience가 바뀌면 이전 요청을 취소하고 오래된 결과를 무시한다", async () => {
+    let firstSignal: AbortSignal | undefined;
+    let resolveGuest: (value: ChecklistQueryModel) => void = () => undefined;
+    let resolveAuthenticated: (value: ChecklistQueryModel) => void = () =>
+      undefined;
+    repositoryMocks.getChecklist
+      .mockImplementationOnce((_audience, signal?: AbortSignal) => {
+        firstSignal = signal;
+        return new Promise<ChecklistQueryModel>((resolve) => {
+          resolveGuest = resolve;
+        });
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<ChecklistQueryModel>((resolve) => {
+            resolveAuthenticated = resolve;
+          }),
+      );
+    const view = render(<ChecklistFeature />);
+    await waitFor(() => expect(firstSignal).toBeDefined());
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    view.rerender(<ChecklistFeature />);
+
+    expect(firstSignal?.aborted).toBe(true);
+    await act(async () => {
+      resolveGuest(createChecklist("오래된 guest 결과"));
+    });
+    expect(screen.queryByText("오래된 guest 결과")).toBeNull();
+
+    await act(async () => {
+      resolveAuthenticated(createChecklist("최신 서버 결과"));
+    });
+    expect(await screen.findByText("최신 서버 결과")).toBeTruthy();
+  });
+
+  it("인증 대상의 Repository가 바뀌면 이전 요청을 취소한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "first" },
+    };
+    let firstSignal: AbortSignal | undefined;
+    const firstGetChecklist = vi.fn(
+      (_audience: string, signal?: AbortSignal) => {
+        firstSignal = signal;
+        return new Promise<ChecklistQueryModel>(() => undefined);
+      },
+    );
+    repositoryMocks.current = { getChecklist: firstGetChecklist };
+    const view = render(<ChecklistFeature />);
+    await waitFor(() => expect(firstSignal).toBeDefined());
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "second" },
+    };
+    const secondGetChecklist = vi
+      .fn()
+      .mockResolvedValue(createChecklist("두 번째 사용자 결과"));
+    repositoryMocks.current = { getChecklist: secondGetChecklist };
+    view.rerender(<ChecklistFeature />);
+
+    expect(firstSignal?.aborted).toBe(true);
+    expect(await screen.findByText("두 번째 사용자 결과")).toBeTruthy();
+  });
+
+  it("화면에서 제거되면 진행 중 요청을 취소한다", async () => {
+    let requestSignal: AbortSignal | undefined;
+    repositoryMocks.getChecklist.mockImplementation(
+      (_audience, signal?: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise<ChecklistQueryModel>(() => undefined);
+      },
+    );
+    const view = render(<ChecklistFeature />);
+    await waitFor(() => expect(requestSignal).toBeDefined());
+
+    view.unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+});
+
+describe("ChecklistFeature 기존 UI", () => {
+  it("카테고리를 기존 순서대로 표시하고 accordion을 열고 닫는다", async () => {
+    render(<ChecklistFeature />);
+    await screen.findByText("로컬 체크리스트 항목");
 
     expect(
       screen
         .getAllByRole("heading", { level: 2 })
-        .map(
-          (heading, index) =>
-            within(heading).getByText(categoryNames[index]).textContent,
-        ),
-    ).toEqual(categoryNames);
-  });
+        .map((heading) => within(heading).getByText(/카테고리$/).textContent),
+    ).toEqual(["두 번째 카테고리", "첫 번째 카테고리"]);
+    const categoryButton = screen.getByRole("button", {
+      name: "첫 번째 카테고리",
+    });
+    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
+    expect(categoryButton.getAttribute("aria-controls")).toBeTruthy();
 
-  it("카테고리별 항목 수와 진행률을 제공한다", () => {
-    render(<ChecklistFeature />);
-
-    const planningCategory = screen
-      .getByRole("heading", { name: "계획·예산" })
-      .closest("section");
-
-    expect(planningCategory).not.toBeNull();
-    expect(within(planningCategory!).getByText("3개")).toBeTruthy();
+    fireEvent.click(categoryButton);
+    expect(categoryButton.getAttribute("aria-expanded")).toBe("false");
     expect(
-      within(planningCategory!)
-        .getByRole("progressbar", { name: "계획·예산 진행률" })
-        .getAttribute("aria-valuenow"),
-    ).toBe("33");
-    expect(within(planningCategory!).getByText("33%")).toBeTruthy();
-  });
+      screen.queryByRole("list", { name: "첫 번째 카테고리 할 일" }),
+    ).toBeNull();
 
-  it("할 일을 정의된 순서대로 표시한다", () => {
-    render(<ChecklistFeature />);
-
+    fireEvent.click(categoryButton);
+    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
     expect(
-      screen
-        .getAllByRole("listitem")
-        .map(
-          (item) =>
-            within(item).getByText(
-              /결혼예산표 계획|웨딩플래너 상담|웨딩플래너 계약|양가 부모님께 첫인사|상견례$|상견례 선물 준비|웨딩홀 투어|웨딩홀 계약|최소 보증 인원·식대 조건 확인|웨딩홀 시식|스드메 상담|스드메 계약|스튜디오 촬영 일정 예약/,
-            ).textContent,
-        ),
-    ).toEqual([
-      "결혼예산표 계획",
-      "웨딩플래너 상담",
-      "웨딩플래너 계약",
-      "양가 부모님께 첫인사",
-      "상견례",
-      "상견례 선물 준비",
-      "웨딩홀 투어",
-      "웨딩홀 계약",
-      "최소 보증 인원·식대 조건 확인",
-      "웨딩홀 시식",
-      "스드메 상담",
-      "스드메 계약",
-      "스튜디오 촬영 일정 예약",
-    ]);
-  });
-
-  it("할 일의 일정과 상태를 텍스트로 제공한다", () => {
-    render(<ChecklistFeature />);
-
-    const completedTask = screen.getByText("결혼예산표 계획").closest("li");
-    const inProgressTask = screen.getByText("웨딩플래너 상담").closest("li");
-    const incompleteTask = screen.getByText("웨딩플래너 계약").closest("li");
-
-    expect(completedTask).not.toBeNull();
-    expect(within(completedTask!).getByText("8월 5일")).toBeTruthy();
-    expect(within(completedTask!).getByText("완료")).toBeTruthy();
-    expect(within(inProgressTask!).getByText("진행 중")).toBeTruthy();
-    expect(within(incompleteTask!).getByText("일정 없음")).toBeTruthy();
-    expect(within(incompleteTask!).getByText("미완료")).toBeTruthy();
-  });
-
-  it("카테고리를 열고 닫는다", () => {
-    render(<ChecklistFeature />);
-
-    const planningButton = screen.getByRole("button", { name: "계획·예산" });
-    const outfitButton = screen.getByRole("button", { name: "의상·예물" });
-
-    expect(planningButton.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("결혼예산표 계획")).toBeTruthy();
-    expect(outfitButton.getAttribute("aria-expanded")).toBe("false");
-
-    fireEvent.click(planningButton);
-
-    expect(planningButton.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("list", { name: "계획·예산 할 일" })).toBeNull();
-
-    fireEvent.click(planningButton);
-
-    expect(planningButton.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("list", { name: "계획·예산 할 일" })).toBeTruthy();
+      screen.getByRole("list", { name: "첫 번째 카테고리 할 일" }),
+    ).toBeTruthy();
   });
 });

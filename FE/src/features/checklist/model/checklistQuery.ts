@@ -6,6 +6,7 @@ export interface ChecklistQueryItemModel {
   appointments: MyChecklistAppointmentModel[];
   categoryId: string;
   checklistItemId: number | null;
+  id: string;
   isDone: boolean;
   sourceCatalogItemId: number | null;
   title: string;
