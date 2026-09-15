@@ -141,8 +141,8 @@ public final class Appointment {
         return endTime;
     }
 
-    public boolean belongsTo(ChecklistItem checklistItem) {
-        return checklistItemId.equals(checklistItem.id());
+    public boolean belongsTo(Long checklistItemId) {
+        return this.checklistItemId.equals(checklistItemId);
     }
 
     public boolean conflictsWith(Appointment other) {

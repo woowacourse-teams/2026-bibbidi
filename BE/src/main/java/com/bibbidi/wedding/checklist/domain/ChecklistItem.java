@@ -114,6 +114,6 @@ public final class ChecklistItem {
     }
 
     public boolean needsSchedule(List<Appointment> appointments) {
-        return !isDone() && appointments.stream().noneMatch(appointment -> appointment.belongsTo(this));
+        return !isDone() && appointments.stream().noneMatch(appointment -> appointment.belongsTo(id));
     }
 }
