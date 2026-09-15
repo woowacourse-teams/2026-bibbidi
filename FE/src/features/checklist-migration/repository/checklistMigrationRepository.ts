@@ -196,8 +196,7 @@ export function createChecklistMigrationRepository(
         );
 
         queryRepository.invalidate();
-        await reconcileWithServer(localCatalogItemIds, signal);
-        return;
+        serverState = await reconcileWithServer(localCatalogItemIds, signal);
       } catch (error) {
         if (signal.aborted) {
           throw new ChecklistMigrationRequestAbortedError({ cause: error });
@@ -227,6 +226,10 @@ export function createChecklistMigrationRepository(
 
         serverState = await reconcileWithServer(localCatalogItemIds, signal);
       }
+    }
+
+    if (serverState.missingCatalogItemIds.length > 0) {
+      throw new ChecklistMigrationError();
     }
   };
 

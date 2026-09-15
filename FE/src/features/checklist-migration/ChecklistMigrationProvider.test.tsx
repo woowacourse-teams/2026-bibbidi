@@ -229,6 +229,7 @@ describe("ChecklistMigrationProvider", () => {
 
   it("StrictMode에서도 동일 인증 전환의 추가 요청을 한 번만 수행한다", async () => {
     vi.stubGlobal("localStorage", createStorage([101]));
+    let hasAddedCatalogItem = false;
     const fetchMock = vi
       .fn()
       .mockImplementation((url: string, init?: RequestInit) => {
@@ -242,13 +243,20 @@ describe("ChecklistMigrationProvider", () => {
 
         if (url === "/api/checklists/me" && init?.method === "GET") {
           return Promise.resolve(
-            new Response(JSON.stringify({ id: 1, items: [] }), {
-              status: 200,
-            }),
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items: hasAddedCatalogItem
+                  ? [{ id: 10, isDone: false, sourceCatalogItemId: 101 }]
+                  : [],
+              }),
+              { status: 200 },
+            ),
           );
         }
 
         if (url === "/api/checklists/me/catalog-items") {
+          hasAddedCatalogItem = true;
           return Promise.resolve(
             new Response(
               JSON.stringify({ items: [{ id: 10, catalogItemId: 101 }] }),

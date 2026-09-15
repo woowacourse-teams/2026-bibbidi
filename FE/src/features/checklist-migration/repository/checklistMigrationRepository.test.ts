@@ -183,14 +183,17 @@ describe("ChecklistMigrationRepository", () => {
     expect(local.getCatalogItemIds()).toEqual([]);
   });
 
-  it("추가 성공 응답에서 확인된 ID만 제거하고 나머지는 보존한다", async () => {
+  it("부분 성공 후 서버 차집합을 다시 계산해 누락 ID만 재시도한다", async () => {
     const local = createLocalDataSource([101, 102]);
     const remoteDataSource = createRemoteDataSource();
-    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue([101]);
+    vi.mocked(remoteDataSource.addCatalogItemIds)
+      .mockResolvedValueOnce([101])
+      .mockResolvedValueOnce([102]);
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))
-      .mockResolvedValueOnce(createChecklist([101]));
+      .mockResolvedValueOnce(createChecklist([101]))
+      .mockResolvedValueOnce(createChecklist([101, 102]));
     const dependencies = createRepository(
       local.dataSource,
       remoteDataSource,
@@ -200,6 +203,40 @@ describe("ChecklistMigrationRepository", () => {
 
     await dependencies.repository.migrate();
 
+    expect(remoteDataSource.addCatalogItemIds).toHaveBeenNthCalledWith(
+      1,
+      [101, 102],
+      expect.any(AbortSignal),
+    );
+    expect(remoteDataSource.addCatalogItemIds).toHaveBeenNthCalledWith(
+      2,
+      [102],
+      expect.any(AbortSignal),
+    );
+    expect(local.getCatalogItemIds()).toEqual([]);
+  });
+
+  it("최대 시도 후에도 누락 ID가 남으면 오류로 처리하고 보존한다", async () => {
+    const local = createLocalDataSource([101, 102]);
+    const remoteDataSource = createRemoteDataSource();
+    vi.mocked(remoteDataSource.addCatalogItemIds)
+      .mockResolvedValueOnce([101])
+      .mockResolvedValueOnce([]);
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.getChecklist)
+      .mockResolvedValueOnce(createChecklist([]))
+      .mockResolvedValue(createChecklist([101]));
+    const dependencies = createRepository(
+      local.dataSource,
+      remoteDataSource,
+      createCommandRepository(),
+      queryRepository,
+    );
+
+    await expect(dependencies.repository.migrate()).rejects.toThrow(
+      "로컬 체크리스트를 서버에 병합하지 못했습니다.",
+    );
+    expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledTimes(2);
     expect(local.getCatalogItemIds()).toEqual([102]);
   });
 
