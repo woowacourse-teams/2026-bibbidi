@@ -204,7 +204,7 @@ describe("Checklist 웹 상세 패널", () => {
 
     expect(removedTaskButton.isConnected).toBe(false);
     expect(document.activeElement).toBe(
-      screen.getByLabelText("결혼 준비 체크리스트"),
+      screen.getByRole("button", { name: "예식장" }),
     );
   });
 

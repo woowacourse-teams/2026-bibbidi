@@ -48,7 +48,7 @@ export function Checklist({
   );
   const [isDesktopDetailPanelSupported, setIsDesktopDetailPanelSupported] =
     useState(supportsDesktopDetailPanel);
-  const checklistRef = useRef<HTMLDivElement>(null);
+  const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
   const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -88,7 +88,7 @@ export function Checklist({
       if (canRestoreFocus(previousTaskButton)) {
         previousTaskButton.focus();
       } else {
-        checklistRef.current?.focus();
+        fallbackFocusRef.current?.focus();
       }
     }
 
@@ -142,13 +142,8 @@ export function Checklist({
       }`}
     >
       <div className="checklist-workspace__main">
-        <div
-          aria-label="결혼 준비 체크리스트"
-          className="checklist"
-          ref={checklistRef}
-          tabIndex={-1}
-        >
-          {categories.map((category) => {
+        <div aria-label="결혼 준비 체크리스트" className="checklist">
+          {categories.map((category, categoryIndex) => {
             const isExpanded = expandedCategoryIds.has(category.id);
             const taskListId = `${category.id}-tasks`;
 
@@ -165,6 +160,7 @@ export function Checklist({
                     aria-labelledby={`${category.id}-title`}
                     className="checklist__category-header"
                     onClick={() => toggleCategory(category.id)}
+                    ref={categoryIndex === 0 ? fallbackFocusRef : undefined}
                     type="button"
                   >
                     <span className="checklist__category-title-area">

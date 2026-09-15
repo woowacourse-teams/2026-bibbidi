@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { useAuth } from "../auth";
@@ -9,7 +9,6 @@ import {
 import { ChecklistAudience, ChecklistQueryModel } from "./model/checklistQuery";
 import {
   ChecklistQueryAuthenticationRequiredError,
-  ChecklistQueryRepository,
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
@@ -21,7 +20,7 @@ type ChecklistRequestState =
   | {
       audience: ChecklistAudience;
       checklistRevision: number;
-      repository: ChecklistQueryRepository;
+      requestId: number;
       requestRevision: number;
       status: "empty";
     }
@@ -31,7 +30,7 @@ type ChecklistRequestState =
       audience: ChecklistAudience;
       checklist: ChecklistQueryModel;
       checklistRevision: number;
-      repository: ChecklistQueryRepository;
+      requestId: number;
       requestRevision: number;
       status: "success";
     };
@@ -48,6 +47,7 @@ export function ChecklistFeature() {
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
+  const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
@@ -61,6 +61,8 @@ export function ChecklistFeature() {
       return;
     }
 
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
     const controller = new AbortController();
     let ignoresResult = false;
 
@@ -75,7 +77,7 @@ export function ChecklistFeature() {
           setRequestState({
             audience,
             checklistRevision,
-            repository: checklistRepository,
+            requestId,
             requestRevision,
             status: "empty",
           });
@@ -86,7 +88,7 @@ export function ChecklistFeature() {
           audience,
           checklist,
           checklistRevision,
-          repository: checklistRepository,
+          requestId,
           requestRevision,
           status: "success",
         });
@@ -165,7 +167,7 @@ export function ChecklistFeature() {
       requestState.audience !== audience ||
       (requestState.status !== "empty" && requestState.status !== "success") ||
       requestState.checklistRevision !== checklistRevision ||
-      requestState.repository !== checklistRepository ||
+      requestState.requestId !== latestRequestIdRef.current ||
       requestState.requestRevision !== requestRevision
     ) {
       return;
@@ -183,7 +185,6 @@ export function ChecklistFeature() {
   }, [
     audience,
     checklistRevision,
-    checklistRepository,
     requestRevision,
     requestState,
     selectedTaskId,
