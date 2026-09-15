@@ -144,6 +144,127 @@ describe("MyChecklistQueryRepository", () => {
     expect(dataSource.getChecklist).toHaveBeenCalledTimes(2);
   });
 
+  it("서버가 추가한 항목만 기존 캐시 뒤에 반영하고 별도 조회 없이 구독자에게 알린다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+
+    repository.applyAddedItems([
+      {
+        appointments: [],
+        categoryId: 2,
+        id: 11,
+        isDone: false,
+        sourceCatalogItemId: 102,
+        title: "드레스 계약",
+      },
+      {
+        appointments: [],
+        categoryId: 3,
+        id: 12,
+        isDone: false,
+        sourceCatalogItemId: 103,
+        title: "스냅 계약",
+      },
+    ]);
+
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [
+        checklist.items[0],
+        {
+          appointments: [],
+          categoryId: 2,
+          id: 11,
+          isDone: false,
+          sourceCatalogItemId: 102,
+          title: "드레스 계약",
+        },
+        {
+          appointments: [],
+          categoryId: 3,
+          id: 12,
+          isDone: false,
+          sourceCatalogItemId: 103,
+          title: "스냅 계약",
+        },
+      ],
+    });
+    expect(checklist.items[0].isDone).toBe(true);
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("기존 항목과 성공 응답 안의 중복 ID를 캐시에 한 번만 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const duplicateExistingItem = { ...checklist.items[0], title: "중복 기존" };
+    const newItem = {
+      appointments: [],
+      categoryId: 2,
+      id: 11,
+      isDone: false,
+      sourceCatalogItemId: 102,
+      title: "드레스 계약",
+    };
+
+    repository.applyAddedItems([
+      duplicateExistingItem,
+      newItem,
+      { ...newItem, title: "중복 신규" },
+    ]);
+
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [checklist.items[0], newItem],
+    });
+  });
+
+  it("체크리스트 없음 캐시에 빈 성공 결과를 적용해 존재 상태를 갱신한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockRejectedValue(
+      new RemoteMyChecklistApiError(303, 404),
+    );
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+
+    repository.applyAddedItems([]);
+
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [],
+    });
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("구독 해제 뒤에는 캐시 변경을 전달하지 않는다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    const unsubscribe = repository.subscribe(listener);
+    unsubscribe();
+
+    repository.applyAddedItems([
+      {
+        appointments: [],
+        categoryId: 2,
+        id: 11,
+        isDone: false,
+        sourceCatalogItemId: 102,
+        title: "드레스 계약",
+      },
+    ]);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("체크리스트 없음 응답의 존재 여부를 보존해 캐시한다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.getChecklist).mockRejectedValue(

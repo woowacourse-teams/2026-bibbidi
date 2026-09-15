@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 
-import { useMyChecklistQueryRepository } from "../checklist";
+import {
+  useMyChecklistQueryRepository,
+  useMyChecklistRevision,
+} from "../checklist";
 import { createAppHeaderSummaryRepository } from "./repository/appHeaderSummaryRepository";
 
 export function useAppHeaderSummaryRepository() {
@@ -10,4 +13,8 @@ export function useAppHeaderSummaryRepository() {
     () => createAppHeaderSummaryRepository(checklistRepository),
     [checklistRepository],
   );
+}
+
+export function useAppHeaderChecklistRevision() {
+  return useMyChecklistRevision();
 }

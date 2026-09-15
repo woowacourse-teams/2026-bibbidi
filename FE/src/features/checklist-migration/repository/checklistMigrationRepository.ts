@@ -4,6 +4,7 @@ import {
   MyChecklistModel,
   MyChecklistQueryRepository,
   MyChecklistRequestAbortedError,
+  toMyChecklistItemModel,
 } from "../../checklist";
 import {
   LocalChecklistDataSource,
@@ -183,10 +184,20 @@ export function createChecklistMigrationRepository(
         const requestedCatalogItemIds = new Set(
           serverState.missingCatalogItemIds,
         );
-        const addedCatalogItemIds = await remoteDataSource.addCatalogItemIds(
+        const addedItems = await remoteDataSource.addCatalogItemIds(
           serverState.missingCatalogItemIds,
           signal,
         );
+
+        if (signal.aborted) {
+          throw new ChecklistMigrationRequestAbortedError();
+        }
+
+        const addedCatalogItemIds = addedItems.map(
+          (item) => item.catalogItemId,
+        );
+
+        queryRepository.applyAddedItems(addedItems.map(toMyChecklistItemModel));
 
         removeConfirmedCatalogItemIds(
           localDataSource,
@@ -194,8 +205,6 @@ export function createChecklistMigrationRepository(
             requestedCatalogItemIds.has(catalogItemId),
           ),
         );
-
-        queryRepository.invalidate();
         serverState = await reconcileWithServer(localCatalogItemIds, signal);
       } catch (error) {
         if (signal.aborted) {

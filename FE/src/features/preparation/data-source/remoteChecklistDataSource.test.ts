@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  parseAddedChecklistCatalogItemIds,
+  parseAddedChecklistCatalogItems,
   remoteChecklistDataSource,
   RemoteChecklistApiError,
+  RemoteChecklistContractError,
   RemoteChecklistTimeoutError,
 } from "./remoteChecklistDataSource";
 
@@ -12,25 +13,79 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("parseAddedChecklistCatalogItemIds", () => {
-  it("추가 응답에서 원본 준비 항목 ID를 중복 없이 추출한다", () => {
+describe("parseAddedChecklistCatalogItems", () => {
+  it("추가 응답의 전체 항목과 서버 순서를 보존한다", () => {
     expect(
-      parseAddedChecklistCatalogItemIds({
+      parseAddedChecklistCatalogItems({
         items: [
-          { catalogItemId: 100, id: 1 },
-          { catalogItemId: 101, id: 2 },
-          { catalogItemId: 100, id: 3 },
+          {
+            catalogItemId: 100,
+            categoryId: 2,
+            id: 1,
+            status: "prev",
+            title: "계약서 확인",
+          },
+          {
+            catalogItemId: 101,
+            categoryId: 3,
+            id: 2,
+            status: "prev",
+            title: "예식장 예약",
+          },
         ],
       }),
-    ).toEqual([100, 101]);
+    ).toEqual([
+      {
+        catalogItemId: 100,
+        categoryId: 2,
+        id: 1,
+        status: "prev",
+        title: "계약서 확인",
+      },
+      {
+        catalogItemId: 101,
+        categoryId: 3,
+        id: 2,
+        status: "prev",
+        title: "예식장 예약",
+      },
+    ]);
   });
 
-  it("계약과 다른 추가 성공 응답을 거부한다", () => {
-    expect(() =>
-      parseAddedChecklistCatalogItemIds({
-        items: [{ catalogItemId: "100", id: 1 }],
-      }),
-    ).toThrow("체크리스트 추가 성공 응답 형식이 올바르지 않습니다.");
+  it.each([
+    {
+      catalogItemId: "100",
+      categoryId: 2,
+      id: 1,
+      status: "prev",
+      title: "할 일",
+    },
+    {
+      catalogItemId: 100,
+      categoryId: 0,
+      id: 1,
+      status: "prev",
+      title: "할 일",
+    },
+    {
+      catalogItemId: 100,
+      categoryId: 2,
+      id: -1,
+      status: "prev",
+      title: "할 일",
+    },
+    {
+      catalogItemId: 100,
+      categoryId: 2,
+      id: 1,
+      status: "done",
+      title: "할 일",
+    },
+    { catalogItemId: 100, categoryId: 2, id: 1, status: "prev", title: null },
+  ])("계약과 다른 추가 성공 항목을 거부한다: %o", (item) => {
+    expect(() => parseAddedChecklistCatalogItems({ items: [item] })).toThrow(
+      RemoteChecklistContractError,
+    );
   });
 });
 
@@ -56,7 +111,15 @@ describe("remoteChecklistDataSource.addCatalogItemIds", () => {
 
     await expect(
       remoteChecklistDataSource.addCatalogItemIds([100, 101]),
-    ).resolves.toEqual([100]);
+    ).resolves.toEqual([
+      {
+        catalogItemId: 100,
+        categoryId: 2,
+        id: 1,
+        status: "prev",
+        title: "계약서 확인",
+      },
+    ]);
     expect(fetchMock).toHaveBeenCalledWith("/api/checklists/me/catalog-items", {
       body: JSON.stringify([100, 101]),
       credentials: "include",

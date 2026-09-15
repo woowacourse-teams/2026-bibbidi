@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repositoryMocks = vi.hoisted(() => ({
+  checklistRevision: 0,
   getSummary: vi.fn(),
 }));
 
@@ -12,6 +13,7 @@ vi.mock("./appHeaderDependencies", () => {
   };
 
   return {
+    useAppHeaderChecklistRevision: () => repositoryMocks.checklistRevision,
     useAppHeaderSummaryRepository: () => repository,
   };
 });
@@ -30,6 +32,7 @@ const summary: AppHeaderSummaryModel = {
 };
 
 beforeEach(() => {
+  repositoryMocks.checklistRevision = 0;
   repositoryMocks.getSummary.mockReset();
 });
 

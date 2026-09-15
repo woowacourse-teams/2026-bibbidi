@@ -5,11 +5,13 @@ import {
 import {
   RemoteChecklistApiError,
   RemoteChecklistDataSource,
+  RemoteChecklistRequestAbortedError,
 } from "../data-source/remoteChecklistDataSource";
 import {
   MyChecklistCommandRepository,
   MyChecklistAuthenticationRequiredError,
   MyChecklistQueryRepository,
+  toMyChecklistItemModel,
 } from "../../checklist";
 import { PreparationAudience } from "../model/preparationRoadmap";
 import {
@@ -126,13 +128,20 @@ export function createChecklistRepository(
     );
 
     try {
-      const addedCatalogItemIds = await remoteDataSource.addCatalogItemIds(
+      const addedItems = await remoteDataSource.addCatalogItemIds(
         catalogItemIds,
         signal,
       );
-      checklistQueryRepository.invalidate();
 
-      return addedCatalogItemIds;
+      if (signal?.aborted) {
+        throw new RemoteChecklistRequestAbortedError();
+      }
+
+      checklistQueryRepository.applyAddedItems(
+        addedItems.map(toMyChecklistItemModel),
+      );
+
+      return addedItems.map((item) => item.catalogItemId);
     } catch (error) {
       const isChecklistMissing =
         error instanceof RemoteChecklistApiError &&
@@ -148,13 +157,20 @@ export function createChecklistRepository(
       );
 
       try {
-        const addedCatalogItemIds = await remoteDataSource.addCatalogItemIds(
+        const addedItems = await remoteDataSource.addCatalogItemIds(
           catalogItemIds,
           signal,
         );
-        checklistQueryRepository.invalidate();
 
-        return addedCatalogItemIds;
+        if (signal?.aborted) {
+          throw new RemoteChecklistRequestAbortedError();
+        }
+
+        checklistQueryRepository.applyAddedItems(
+          addedItems.map(toMyChecklistItemModel),
+        );
+
+        return addedItems.map((item) => item.catalogItemId);
       } catch (retryError) {
         return throwCatalogItemAdditionError(retryError);
       }

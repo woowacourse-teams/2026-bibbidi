@@ -1,4 +1,10 @@
-import { createContext, ReactNode, useContext, useMemo } from "react";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 
 import { createMyChecklistRepositoriesDependency } from "./checklistDependencies";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
@@ -47,6 +53,16 @@ export function useMyChecklistQueryRepository() {
   }
 
   return scope.queryRepository;
+}
+
+export function useMyChecklistRevision() {
+  const repository = useMyChecklistQueryRepository();
+
+  return useSyncExternalStore(
+    repository.subscribe,
+    repository.getRevision,
+    repository.getRevision,
+  );
 }
 
 export function useMyChecklistCommandRepository() {

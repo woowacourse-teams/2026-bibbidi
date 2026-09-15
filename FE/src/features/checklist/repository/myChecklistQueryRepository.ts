@@ -3,11 +3,14 @@ import {
   RemoteMyChecklistDataSource,
   RemoteMyChecklistRequestAbortedError,
 } from "../data-source/remoteMyChecklistDataSource";
-import { MyChecklistModel } from "../model/myChecklist";
+import { MyChecklistItemModel, MyChecklistModel } from "../model/myChecklist";
 
 export interface MyChecklistQueryRepository {
+  applyAddedItems(items: readonly MyChecklistItemModel[]): void;
   getChecklist(signal?: AbortSignal): Promise<MyChecklistModel>;
+  getRevision(): number;
   invalidate(): void;
+  subscribe(listener: () => void): () => void;
 }
 
 export class MyChecklistAuthenticationRequiredError extends Error {
@@ -72,6 +75,21 @@ export function createMyChecklistQueryRepository(
 ): MyChecklistQueryRepository {
   let cachedResult: MyChecklistModel | undefined;
   let inFlightRequest: InFlightRequest | undefined;
+  let revision = 0;
+  const listeners = new Set<() => void>();
+
+  const notify = () => {
+    revision += 1;
+
+    for (const listener of [...listeners]) {
+      listener();
+    }
+  };
+
+  const setCachedResult = (checklist: MyChecklistModel) => {
+    cachedResult = checklist;
+    notify();
+  };
 
   const invalidate = () => {
     cachedResult = undefined;
@@ -90,8 +108,8 @@ export function createMyChecklistQueryRepository(
     request.promise.then(
       (checklist) => {
         if (inFlightRequest === request) {
-          cachedResult = checklist;
           inFlightRequest = undefined;
+          setCachedResult(checklist);
         }
       },
       () => {
@@ -165,6 +183,30 @@ export function createMyChecklistQueryRepository(
     });
 
   return {
+    applyAddedItems(items) {
+      inFlightRequest?.controller.abort();
+      inFlightRequest = undefined;
+
+      const currentItems = cachedResult?.items ?? [];
+      const knownItemIds = new Set(currentItems.map((item) => item.id));
+      const addedItems = items.filter((item) => {
+        if (knownItemIds.has(item.id)) {
+          return false;
+        }
+
+        knownItemIds.add(item.id);
+        return true;
+      });
+
+      if (cachedResult?.exists === true && addedItems.length === 0) {
+        return;
+      }
+
+      setCachedResult({
+        exists: true,
+        items: [...currentItems, ...addedItems],
+      });
+    },
     getChecklist(signal) {
       if (signal?.aborted) {
         return Promise.reject(new MyChecklistRequestAbortedError());
@@ -178,6 +220,16 @@ export function createMyChecklistQueryRepository(
 
       return subscribe(request, signal);
     },
+    getRevision() {
+      return revision;
+    },
     invalidate,
+    subscribe(listener) {
+      listeners.add(listener);
+
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
 }

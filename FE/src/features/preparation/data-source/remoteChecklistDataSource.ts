@@ -1,3 +1,5 @@
+import type { AddedChecklistCatalogItemModel } from "../../checklist";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
 const ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT = `${MY_CHECKLIST_ENDPOINT}/catalog-items`;
@@ -12,7 +14,7 @@ export interface RemoteChecklistDataSource {
   addCatalogItemIds(
     catalogItemIds: number[],
     signal?: AbortSignal,
-  ): Promise<number[]>;
+  ): Promise<AddedChecklistCatalogItemModel[]>;
 }
 
 export class RemoteChecklistApiError extends Error {
@@ -40,14 +42,14 @@ export class RemoteChecklistTimeoutError extends Error {
   }
 }
 
-class RemoteChecklistRequestAbortedError extends Error {
+export class RemoteChecklistRequestAbortedError extends Error {
   constructor(options?: ErrorOptions) {
     super("체크리스트 요청이 취소됐습니다.", options);
     this.name = "RemoteChecklistRequestAbortedError";
   }
 }
 
-class RemoteChecklistContractError extends Error {
+export class RemoteChecklistContractError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "RemoteChecklistContractError";
@@ -70,20 +72,37 @@ function isValidCatalogItemId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-export function parseAddedChecklistCatalogItemIds(value: unknown): number[] {
+export function parseAddedChecklistCatalogItems(
+  value: unknown,
+): AddedChecklistCatalogItemModel[] {
   if (!isRecord(value) || !Array.isArray(value.items)) {
-    throw new Error("체크리스트 추가 성공 응답 형식이 올바르지 않습니다.");
+    throw new RemoteChecklistContractError(
+      "체크리스트 추가 성공 응답 형식이 올바르지 않습니다.",
+    );
   }
 
-  const catalogItemIds = value.items.map((item) => {
-    if (!isRecord(item) || !isValidCatalogItemId(item.catalogItemId)) {
-      throw new Error("체크리스트 추가 성공 응답 형식이 올바르지 않습니다.");
+  return value.items.map((item) => {
+    if (
+      !isRecord(item) ||
+      !isValidCatalogItemId(item.id) ||
+      !isValidCatalogItemId(item.catalogItemId) ||
+      !isValidCatalogItemId(item.categoryId) ||
+      typeof item.title !== "string" ||
+      item.status !== "prev"
+    ) {
+      throw new RemoteChecklistContractError(
+        "체크리스트 추가 성공 응답 형식이 올바르지 않습니다.",
+      );
     }
 
-    return item.catalogItemId;
+    return {
+      catalogItemId: item.catalogItemId,
+      categoryId: item.categoryId,
+      id: item.id,
+      status: item.status,
+      title: item.title,
+    };
   });
-
-  return [...new Set(catalogItemIds)];
 }
 
 function toRequestError(
@@ -130,7 +149,7 @@ function createRequestController(signal?: AbortSignal) {
 async function addCatalogItemIds(
   catalogItemIds: number[],
   signal?: AbortSignal,
-): Promise<number[]> {
+): Promise<AddedChecklistCatalogItemModel[]> {
   const request = createRequestController(signal);
 
   try {
@@ -179,7 +198,13 @@ async function addCatalogItemIds(
       );
     }
 
-    return parseAddedChecklistCatalogItemIds(body);
+    const addedItems = parseAddedChecklistCatalogItems(body);
+
+    if (signal?.aborted) {
+      throw new RemoteChecklistRequestAbortedError();
+    }
+
+    return addedItems;
   } finally {
     request.dispose();
   }

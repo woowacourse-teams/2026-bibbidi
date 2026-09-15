@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 
 import { catalogRepository } from "../catalog";
-import { useMyChecklistQueryRepository } from "./MyChecklistProvider";
+import {
+  useMyChecklistQueryRepository,
+  useMyChecklistRevision,
+} from "./MyChecklistProvider";
 import { localChecklistDataSource } from "./data-source/localChecklistDataSource";
 import { createChecklistQueryRepository } from "./repository/checklistQueryRepository";
 
@@ -17,4 +20,8 @@ export function useChecklistQueryRepository() {
       ),
     [myChecklistQueryRepository],
   );
+}
+
+export function useChecklistRevision() {
+  return useMyChecklistRevision();
 }

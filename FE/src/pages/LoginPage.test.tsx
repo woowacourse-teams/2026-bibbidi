@@ -115,7 +115,17 @@ describe("LoginPage", () => {
       )
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ items: [{ id: 10, catalogItemId: 101 }] }),
+          JSON.stringify({
+            items: [
+              {
+                catalogItemId: 101,
+                categoryId: 10,
+                id: 10,
+                status: "prev",
+                title: "추가된 할 일",
+              },
+            ],
+          }),
           { status: 201 },
         ),
       )

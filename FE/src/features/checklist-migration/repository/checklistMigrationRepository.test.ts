@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  AddedChecklistCatalogItemModel,
   MyChecklistAuthenticationRequiredError,
   MyChecklistCommandRepository,
   MyChecklistModel,
@@ -64,6 +65,18 @@ function createRemoteDataSource(): RemoteChecklistDataSource {
   };
 }
 
+function createAddedItems(
+  catalogItemIds: number[],
+): AddedChecklistCatalogItemModel[] {
+  return catalogItemIds.map((catalogItemId) => ({
+    catalogItemId,
+    categoryId: 1,
+    id: catalogItemId,
+    status: "prev",
+    title: `추가 항목 ${catalogItemId}`,
+  }));
+}
+
 function createCommandRepository(): MyChecklistCommandRepository {
   return {
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
@@ -73,8 +86,11 @@ function createCommandRepository(): MyChecklistCommandRepository {
 
 function createQueryRepository(): MyChecklistQueryRepository {
   return {
+    applyAddedItems: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue(createChecklist([])),
+    getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
 
@@ -116,7 +132,9 @@ describe("ChecklistMigrationRepository", () => {
   it("직접 생성 항목을 제외하고 서버에 없는 ID만 기존 순서로 추가한다", async () => {
     const local = createLocalDataSource([101, 102, 103]);
     const remoteDataSource = createRemoteDataSource();
-    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue([102]);
+    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue(
+      createAddedItems([102]),
+    );
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([101, null, 103]))
@@ -135,7 +153,7 @@ describe("ChecklistMigrationRepository", () => {
       expect.any(AbortSignal),
     );
     expect(local.getCatalogItemIds()).toEqual([]);
-    expect(queryRepository.invalidate).toHaveBeenCalledOnce();
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledOnce();
     expect(queryRepository.getChecklist).toHaveBeenCalledTimes(2);
   });
 
@@ -163,7 +181,9 @@ describe("ChecklistMigrationRepository", () => {
   it("체크리스트가 없으면 생성한 뒤 전체 로컬 ID를 추가한다", async () => {
     const local = createLocalDataSource([101, 102]);
     const remoteDataSource = createRemoteDataSource();
-    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue([101, 102]);
+    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue(
+      createAddedItems([101, 102]),
+    );
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([], false))
@@ -191,8 +211,8 @@ describe("ChecklistMigrationRepository", () => {
     const local = createLocalDataSource([101, 102]);
     const remoteDataSource = createRemoteDataSource();
     vi.mocked(remoteDataSource.addCatalogItemIds)
-      .mockResolvedValueOnce([101])
-      .mockResolvedValueOnce([102]);
+      .mockResolvedValueOnce(createAddedItems([101]))
+      .mockResolvedValueOnce(createAddedItems([102]));
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))
@@ -224,7 +244,7 @@ describe("ChecklistMigrationRepository", () => {
     const local = createLocalDataSource([101, 102]);
     const remoteDataSource = createRemoteDataSource();
     vi.mocked(remoteDataSource.addCatalogItemIds)
-      .mockResolvedValueOnce([101])
+      .mockResolvedValueOnce(createAddedItems([101]))
       .mockResolvedValueOnce([]);
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
@@ -293,7 +313,7 @@ describe("ChecklistMigrationRepository", () => {
     const remoteDataSource = createRemoteDataSource();
     vi.mocked(remoteDataSource.addCatalogItemIds)
       .mockRejectedValueOnce(new RemoteChecklistApiError(403, 409))
-      .mockResolvedValueOnce([102]);
+      .mockResolvedValueOnce(createAddedItems([102]));
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))
@@ -326,7 +346,7 @@ describe("ChecklistMigrationRepository", () => {
     const remoteDataSource = createRemoteDataSource();
     vi.mocked(remoteDataSource.addCatalogItemIds)
       .mockRejectedValueOnce(new RemoteChecklistApiError(303, 404))
-      .mockResolvedValueOnce([101]);
+      .mockResolvedValueOnce(createAddedItems([101]));
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))
@@ -383,7 +403,9 @@ describe("ChecklistMigrationRepository", () => {
   it("추가 후 최신 조회의 인증 오류도 인증 재확인용 오류로 유지한다", async () => {
     const local = createLocalDataSource([101]);
     const remoteDataSource = createRemoteDataSource();
-    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue([101]);
+    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue(
+      createAddedItems([101]),
+    );
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))

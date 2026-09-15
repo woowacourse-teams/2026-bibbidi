@@ -14,8 +14,11 @@ import {
 
 function createChecklistRepository(): MyChecklistQueryRepository {
   return {
+    applyAddedItems: vi.fn(),
     getChecklist: vi.fn(),
+    getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
 

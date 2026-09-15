@@ -22,8 +22,11 @@ function createDataSource(): RemoteMyChecklistCommandDataSource {
 
 function createQueryRepository(exists = true): MyChecklistQueryRepository {
   return {
+    applyAddedItems: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue({ exists, items: [] }),
+    getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
 
