@@ -4,6 +4,7 @@ import static com.bibbidi.wedding.common.exception.ClientError.USER_NOT_FOUND;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.user.domain.User;
+import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import java.util.NoSuchElementException;
@@ -29,8 +30,20 @@ public class UserRepository {
         return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
     }
 
-    public User save(User user) {
+    public User create(User user) {
         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
+        return userMapper.toDomain(saved);
+    }
+
+    public User update(User user) {
+        JpaUserEntity currentEntity = getJpaUserEntity(user.id());
+        JpaUserEntity updatedEntity = new JpaUserEntity(
+                user.id(),
+                user.nickname(),
+                user.passwordHash(),
+                currentEntity.weddingDate()
+        );
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
         return userMapper.toDomain(saved);
     }
 
@@ -44,6 +57,23 @@ public class UserRepository {
         return userMapper.toDomain(
                 getJpaUserEntity(userId)
         );
+    }
+
+    public WeddingDate findWeddingDateByUserId(Long userId) {
+        JpaUserEntity entity = getJpaUserEntity(userId);
+        return new WeddingDate(entity.id(), entity.weddingDate());
+    }
+
+    public WeddingDate saveWeddingDate(WeddingDate weddingDate) {
+        JpaUserEntity currentEntity = getJpaUserEntity(weddingDate.userId());
+        JpaUserEntity updatedEntity = new JpaUserEntity(
+                weddingDate.userId(),
+                currentEntity.nickname(),
+                currentEntity.passwordHash(),
+                weddingDate.date()
+        );
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
+        return new WeddingDate(saved.id(), saved.weddingDate());
     }
 
     public int deleteById(Long userId) {

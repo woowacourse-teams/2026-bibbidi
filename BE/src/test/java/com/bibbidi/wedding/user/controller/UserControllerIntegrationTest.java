@@ -13,12 +13,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
 import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
+import com.bibbidi.wedding.user.controller.dto.WeddingDateRequest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,8 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                     + "Session이 없으면 인증 필요 오류를, DB에 사용자가 없으면 사용자 없음 오류를 반환합니다.";
     private static final String CHANGE_NICKNAME_DESCRIPTION = "현재 인증 Session의 사용자 ID를 유지하면서 로그인에 사용할 닉네임을 변경합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
     private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 닉네임을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
+    private static final String WEDDING_DATE_DESCRIPTION =
+            "현재 인증 Session 사용자의 결혼 예정일을 저장하거나 변경합니다. 과거 날짜와 동일한 날짜도 허용합니다.";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -138,6 +143,211 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                                 .build())
                 ));
+    }
+
+    @Test
+    @DisplayName("현재 사용자의 결혼 예정일을 저장하고 조회한다")
+    void shouldSaveAndFindCurrentUserWeddingDate() throws Exception {
+        WeddingDateRequest request = new WeddingDateRequest(LocalDate.of(2027, 5, 15));
+        MockHttpSession session = authenticatedSession(currentUserId);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2027-05-15"))
+                .andExpect(jsonPath("$.daysUntilWedding").doesNotExist())
+                .andDo(document(
+                        "users-update-wedding-date",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("결혼 예정일 저장 및 변경")
+                                .description(WEDDING_DATE_DESCRIPTION)
+                                .requestSchema(schema("WeddingDateRequest"))
+                                .responseSchema(schema("WeddingDateResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                )
+                                .requestFields(
+                                        fieldWithPath("weddingDate").description("결혼 예정일(yyyy-MM-dd)")
+                                )
+                                .responseFields(
+                                        fieldWithPath("weddingDate").description("저장된 결혼 예정일(yyyy-MM-dd)")
+                                )
+                                .build())
+                ));
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session)
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2027-05-15"))
+                .andExpect(jsonPath("$.daysUntilWedding").doesNotExist())
+                .andDo(document(
+                        "users-find-wedding-date",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("결혼 예정일 조회")
+                                .description("현재 인증 Session 사용자의 결혼 예정일을 조회합니다. 미설정 상태는 null입니다.")
+                                .responseSchema(schema("WeddingDateResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
+                                )
+                                .responseFields(
+                                        fieldWithPath("weddingDate").description("설정된 결혼 예정일(yyyy-MM-dd), 미설정 시 null")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("결혼 예정일을 설정하지 않은 사용자는 null을 조회한다")
+    void shouldFindNullWhenWeddingDateIsNotSet() throws Exception {
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(authenticatedSession(currentUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value((Object) null))
+                .andExpect(jsonPath("$.daysUntilWedding").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("과거인 동일한 결혼 예정일도 반복해서 저장한다")
+    void shouldSaveSamePastWeddingDate() throws Exception {
+        WeddingDateRequest request = new WeddingDateRequest(LocalDate.of(2020, 1, 1));
+        MockHttpSession session = authenticatedSession(currentUserId);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2020-01-01"));
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2020-01-01"));
+    }
+
+    @Test
+    @DisplayName("저장한 결혼 예정일을 다른 날짜로 변경한다")
+    void shouldChangeWeddingDate() throws Exception {
+        MockHttpSession session = authenticatedSession(currentUserId);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WeddingDateRequest(LocalDate.of(2027, 5, 15))
+                        )))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WeddingDateRequest(LocalDate.of(2028, 6, 16))
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2028-06-16"));
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2028-06-16"));
+    }
+
+    @Test
+    @DisplayName("닉네임과 비밀번호를 변경해도 결혼 예정일을 유지한다")
+    void shouldKeepWeddingDateWhenNicknameAndPasswordChange() throws Exception {
+        MockHttpSession session = authenticatedSession(currentUserId);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WeddingDateRequest(LocalDate.of(2027, 5, 15))
+                        )))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/users/me/nickname")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChangeNicknameRequest("new-name"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChangePasswordRequest(PASSWORD, "magic"))))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2027-05-15"));
+    }
+
+    @Test
+    @DisplayName("결혼 예정일이 누락되면 요청을 거절한다")
+    void shouldRejectMissingWeddingDate() throws Exception {
+        WeddingDateRequest request = new WeddingDateRequest(null);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(authenticatedSession(currentUserId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.errors[0].field").value("weddingDate"))
+                .andExpect(jsonPath("$.errors[0].message").value("결혼 예정일은 비어 있을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 날짜는 요청을 거절하고 결혼 예정일을 저장하지 않는다")
+    void shouldRejectInvalidWeddingDate() throws Exception {
+        MockHttpSession session = authenticatedSession(currentUserId);
+        String invalidRequestBody = objectMapper.writeValueAsString(
+                new WeddingDateRequest(LocalDate.of(2027, 5, 15))
+        ).replace("2027-05-15", "2027-02-30");
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value((Object) null));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 결혼 예정일을 저장하거나 조회할 수 없다")
+    void shouldRequireAuthenticationForWeddingDate() throws Exception {
+        WeddingDateRequest request = new WeddingDateRequest(LocalDate.of(2027, 5, 15));
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+
+        mockMvc.perform(get("/api/users/me/wedding-date"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 
     @Test

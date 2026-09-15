@@ -70,8 +70,8 @@ class UserServiceConcurrencyIntegrationTest {
     @Test
     @DisplayName("서로 다른 사용자가 같은 닉네임으로 동시에 변경해도 한 명만 변경시킨다")
     void shouldChangeNicknameForOnlyOneUserOnConcurrentRequests() throws Exception {
-        User first = userRepository.save(new User(null, "first", PASSWORD_HASH));
-        User second = userRepository.save(new User(null, "second", PASSWORD_HASH));
+        User first = userRepository.create(new User(null, "first", PASSWORD_HASH));
+        User second = userRepository.create(new User(null, "second", PASSWORD_HASH));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
 

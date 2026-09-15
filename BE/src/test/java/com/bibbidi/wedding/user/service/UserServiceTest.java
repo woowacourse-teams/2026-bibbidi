@@ -14,7 +14,9 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
+import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,13 +72,13 @@ class UserServiceTest {
     void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
         User user = new User(1L, "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
-        given(userRepository.save(any(User.class)))
+        given(userRepository.update(any(User.class)))
                 .willReturn(new User(1L, "bibbidi", "password-hash"));
 
         UserResult result = userService.changeNickname(1L, "bibbidi");
 
         assertThat(result).isEqualTo(new UserResult(1L, "bibbidi"));
-        then(userRepository).should().save(argThat(changedUser ->
+        then(userRepository).should().update(argThat(changedUser ->
                 changedUser.id().equals(1L)
                         && changedUser.nickname().equals("bibbidi")
                         && changedUser.passwordHash().equals("password-hash")
@@ -92,7 +94,7 @@ class UserServiceTest {
         UserResult result = userService.changeNickname(1L, "Bibbidi");
 
         assertThat(result).isEqualTo(new UserResult(1L, "Bibbidi"));
-        then(userRepository).should(never()).save(any(User.class));
+        then(userRepository).should(never()).update(any(User.class));
     }
 
     @Test
@@ -101,7 +103,7 @@ class UserServiceTest {
         User user = new User(1L, "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
         willThrow(new DataIntegrityViolationException("uk_users_nickname"))
-                .given(userRepository).save(any(User.class));
+                .given(userRepository).update(any(User.class));
 
         assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
                 .isInstanceOf(BusinessException.class)
@@ -158,7 +160,7 @@ class UserServiceTest {
     @Test
     @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
     void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
-        given(userRepository.save(any(User.class)))
+        given(userRepository.create(any(User.class)))
                 .willThrow(new DataIntegrityViolationException("uk_users_nickname"));
 
         assertThatThrownBy(() -> userService.createUser("bibbidi", "password-hash"))
@@ -172,16 +174,47 @@ class UserServiceTest {
     void shouldChangeAndSaveCurrentUserPasswordHash() {
         User user = new User(1L, "current", "current-hash");
         given(userRepository.findById(1L)).willReturn(user);
-        given(userRepository.save(any(User.class)))
+        given(userRepository.update(any(User.class)))
                 .willReturn(new User(1L, "current", "new-password-hash"));
 
         userService.changePasswordHash(1L, "new-password-hash");
 
-        then(userRepository).should().save(argThat(changedUser ->
+        then(userRepository).should().update(argThat(changedUser ->
                 changedUser.id().equals(1L)
                         && changedUser.nickname().equals("current")
                         && changedUser.passwordHash().equals("new-password-hash")
         ));
+    }
+
+    @Test
+    @DisplayName("현재 사용자의 결혼 예정일을 조회한다")
+    void shouldFindCurrentUserWeddingDate() {
+        LocalDate weddingDate = LocalDate.of(2027, 5, 15);
+        WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
+        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
+
+        WeddingDateResult result = userService.findWeddingDate(1L);
+
+        assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
+        then(userRepository).should().findWeddingDateByUserId(1L);
+    }
+
+    @Test
+    @DisplayName("동일한 결혼 예정일도 성공적으로 저장한다")
+    void shouldSaveSameWeddingDate() {
+        LocalDate weddingDate = LocalDate.of(2027, 5, 15);
+        WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
+        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
+        given(userRepository.saveWeddingDate(any(WeddingDate.class))).willReturn(currentWeddingDate);
+
+        WeddingDateResult result = userService.updateWeddingDate(1L, weddingDate);
+
+        assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
+        then(userRepository).should().saveWeddingDate(argThat(changedWeddingDate ->
+                changedWeddingDate.userId().equals(1L)
+                        && changedWeddingDate.date().equals(weddingDate)
+        ));
+        then(checklistService).shouldHaveNoInteractions();
     }
 
     @Test

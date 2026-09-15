@@ -9,7 +9,11 @@ public final class User {
     private final String nickname;
     private final String passwordHash;
 
-    public User(@Nullable Long id, @NonNull String nickname, @NonNull String passwordHash) {
+    public User(
+            @Nullable Long id,
+            @NonNull String nickname,
+            @NonNull String passwordHash
+    ) {
         this.id = id;
         this.nickname = nickname;
         this.passwordHash = passwordHash;
@@ -34,4 +38,5 @@ public final class User {
     public String passwordHash() {
         return passwordHash;
     }
+
 }
