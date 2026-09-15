@@ -21,6 +21,7 @@ const repositoryMocks = vi.hoisted(() => {
   const getChecklist = vi.fn();
 
   return {
+    checklistRevision: 0,
     current: { getChecklist },
     getChecklist,
   };
@@ -34,6 +35,7 @@ vi.mock("../auth", () => ({
 }));
 vi.mock("./checklistQueryDependencies", () => ({
   useChecklistQueryRepository: () => repositoryMocks.current,
+  useChecklistRevision: () => repositoryMocks.checklistRevision,
 }));
 
 import { ChecklistFeature } from "./ChecklistFeature";
@@ -70,6 +72,7 @@ function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQuer
 beforeEach(() => {
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
+  repositoryMocks.checklistRevision = 0;
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
   repositoryMocks.current = { getChecklist: repositoryMocks.getChecklist };

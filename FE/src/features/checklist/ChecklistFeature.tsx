@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth";
-import { useChecklistQueryRepository } from "./checklistQueryDependencies";
+import {
+  useChecklistQueryRepository,
+  useChecklistRevision,
+} from "./checklistQueryDependencies";
 import { ChecklistAudience, ChecklistQueryModel } from "./model/checklistQuery";
 import {
   ChecklistQueryAuthenticationRequiredError,
@@ -29,6 +32,7 @@ function isRequestAborted(error: unknown): boolean {
 export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
   const checklistRepository = useChecklistQueryRepository();
+  const checklistRevision = useChecklistRevision();
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
@@ -88,7 +92,13 @@ export function ChecklistFeature() {
       ignoresResult = true;
       controller.abort();
     };
-  }, [audience, checklistRepository, refreshAuth, requestRevision]);
+  }, [
+    audience,
+    checklistRepository,
+    checklistRevision,
+    refreshAuth,
+    requestRevision,
+  ]);
 
   const handleRetry = () => {
     if (!audience) {

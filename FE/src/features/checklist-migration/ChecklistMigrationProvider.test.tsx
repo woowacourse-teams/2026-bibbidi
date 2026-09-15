@@ -132,7 +132,17 @@ describe("ChecklistMigrationProvider", () => {
         if (url === "/api/checklists/me/catalog-items") {
           return Promise.resolve(
             new Response(
-              JSON.stringify({ items: [{ id: 11, catalogItemId: 102 }] }),
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 102,
+                    categoryId: 10,
+                    id: 11,
+                    status: "prev",
+                    title: "추가된 할 일",
+                  },
+                ],
+              }),
               { status: 201 },
             ),
           );
@@ -260,7 +270,17 @@ describe("ChecklistMigrationProvider", () => {
           hasAddedCatalogItem = true;
           return Promise.resolve(
             new Response(
-              JSON.stringify({ items: [{ id: 10, catalogItemId: 101 }] }),
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 101,
+                    categoryId: 10,
+                    id: 10,
+                    status: "prev",
+                    title: "추가된 할 일",
+                  },
+                ],
+              }),
               { status: 201 },
             ),
           );
@@ -366,7 +386,17 @@ describe("ChecklistMigrationProvider", () => {
 
           return Promise.resolve(
             new Response(
-              JSON.stringify({ items: [{ id: 10, catalogItemId: 101 }] }),
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 101,
+                    categoryId: 10,
+                    id: 10,
+                    status: "prev",
+                    title: "추가된 할 일",
+                  },
+                ],
+              }),
               { status: 201 },
             ),
           );

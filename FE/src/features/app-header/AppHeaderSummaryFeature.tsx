@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { useAppHeaderSummaryRepository } from "./appHeaderDependencies";
+import {
+  useAppHeaderChecklistRevision,
+  useAppHeaderSummaryRepository,
+} from "./appHeaderDependencies";
 import { AppHeaderSummaryModel } from "./model/appHeaderSummary";
 import {
   AppHeaderAuthenticationRequiredError,
@@ -17,6 +20,7 @@ export function AppHeaderSummaryFeature({
   onAuthenticationRequired,
 }: AppHeaderSummaryFeatureProps) {
   const repository = useAppHeaderSummaryRepository();
+  const checklistRevision = useAppHeaderChecklistRevision();
   const [summary, setSummary] = useState<AppHeaderSummaryModel | null>(null);
 
   useEffect(() => {
@@ -46,7 +50,7 @@ export function AppHeaderSummaryFeature({
       isActive = false;
       controller.abort();
     };
-  }, [onAuthenticationRequired, repository]);
+  }, [checklistRevision, onAuthenticationRequired, repository]);
 
   const viewModel = createAppHeaderSummaryViewModel(summary);
 

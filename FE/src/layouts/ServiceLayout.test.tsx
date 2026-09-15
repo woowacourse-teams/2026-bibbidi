@@ -304,6 +304,97 @@ describe("ServiceLayout", () => {
     ).toHaveLength(1);
   });
 
+  it("준비 항목 추가 직후 헤더와 체크리스트 화면을 공통 캐시에서 함께 갱신한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items: [createChecklistItem(10, 1001, true)],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (
+          url === "/api/checklists/me/catalog-items" &&
+          init?.method === "POST"
+        ) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 1002,
+                    categoryId: 10,
+                    id: 11,
+                    status: "prev",
+                    title: "서버가 추가한 두 번째 할 일",
+                  },
+                ],
+              }),
+              { status: 201 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route
+        path="/preparation"
+        element={
+          <>
+            <PreparationRoadmapFeature />
+            <ChecklistFeature />
+          </>
+        }
+      />,
+      ["/preparation"],
+    );
+
+    expect(await screen.findByText("1/1")).toBeTruthy();
+    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
+    );
+
+    expect(await screen.findByText("1/2")).toBeTruthy();
+    expect(
+      within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
+        "50%",
+      ),
+    ).toBeTruthy();
+    expect(await screen.findByText("서버가 추가한 두 번째 할 일")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => url === "/api/checklists/me" && init?.method === "GET",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("Migration 중 체크리스트를 숨기고 완료 후 최신 서버 결과를 표시한다", async () => {
     let serializedValue: string | null = JSON.stringify({
       version: 1,
@@ -388,7 +479,17 @@ describe("ServiceLayout", () => {
     await act(async () => {
       resolveAddition(
         new Response(
-          JSON.stringify({ items: [{ id: 11, catalogItemId: 1002 }] }),
+          JSON.stringify({
+            items: [
+              {
+                catalogItemId: 1002,
+                categoryId: 10,
+                id: 11,
+                status: "prev",
+                title: "체크리스트 항목 11",
+              },
+            ],
+          }),
           { status: 201 },
         ),
       );
@@ -397,7 +498,7 @@ describe("ServiceLayout", () => {
     expect(await screen.findByText("체크리스트 항목 11")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("병합 완료 전 서버 상태를 숨기고 완료 후 최신 조회를 공유한다", async () => {
@@ -486,7 +587,17 @@ describe("ServiceLayout", () => {
     await act(async () => {
       resolveAddition(
         new Response(
-          JSON.stringify({ items: [{ id: 11, catalogItemId: 1002 }] }),
+          JSON.stringify({
+            items: [
+              {
+                catalogItemId: 1002,
+                categoryId: 10,
+                id: 11,
+                status: "prev",
+                title: "체크리스트 항목 11",
+              },
+            ],
+          }),
           { status: 201 },
         ),
       );
@@ -496,7 +607,7 @@ describe("ServiceLayout", () => {
     expect(await screen.findByText("50%")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(
       screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
     ).toBeNull();
@@ -549,7 +660,17 @@ describe("ServiceLayout", () => {
         ) {
           return Promise.resolve(
             new Response(
-              JSON.stringify({ items: [{ catalogItemId: 1001, id: 10 }] }),
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 1001,
+                    categoryId: 10,
+                    id: 10,
+                    status: "prev",
+                    title: "체크리스트 항목 10",
+                  },
+                ],
+              }),
               { status: 201 },
             ),
           );

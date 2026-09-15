@@ -28,7 +28,15 @@ function createLocalDataSource(catalogItemIds: number[] = []) {
 
 function createRemoteDataSource(catalogItemIds: number[] = []) {
   return {
-    addCatalogItemIds: vi.fn().mockResolvedValue(catalogItemIds),
+    addCatalogItemIds: vi.fn().mockResolvedValue(
+      catalogItemIds.map((catalogItemId, index) => ({
+        catalogItemId,
+        categoryId: 1,
+        id: index + 100,
+        status: "prev" as const,
+        title: `추가 항목 ${catalogItemId}`,
+      })),
+    ),
   };
 }
 
@@ -44,6 +52,7 @@ function createQueryRepository(
   exists = true,
 ): MyChecklistQueryRepository {
   return {
+    applyAddedItems: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue({
       exists,
       items: catalogItemIds.map((sourceCatalogItemId, index) => ({
@@ -55,7 +64,9 @@ function createQueryRepository(
         title: `체크리스트 항목 ${index + 1}`,
       })),
     }),
+    getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
 
@@ -183,7 +194,49 @@ describe("ChecklistRepository", () => {
     expect(commandRepository.ensureChecklist).toHaveBeenCalledWith(
       controller.signal,
     );
-    expect(queryRepository.invalidate).toHaveBeenCalledOnce();
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledWith([
+      {
+        appointments: [],
+        categoryId: 1,
+        id: 100,
+        isDone: false,
+        sourceCatalogItemId: 102,
+        title: "추가 항목 102",
+      },
+      {
+        appointments: [],
+        categoryId: 1,
+        id: 101,
+        isDone: false,
+        sourceCatalogItemId: 201,
+        title: "추가 항목 201",
+      },
+    ]);
+    expect(queryRepository.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("요청 ID가 아니라 서버가 실제 반환한 항목만 공통 캐시와 결과에 반영한다", async () => {
+    const remoteDataSource = createRemoteDataSource([201]);
+    const queryRepository = createQueryRepository([101]);
+    const repository = createChecklistRepository(
+      createLocalDataSource(),
+      remoteDataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.addCatalogItemIds("authenticated", ["102", "201"]),
+    ).resolves.toEqual(["201"]);
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledWith([
+      {
+        appointments: [],
+        categoryId: 1,
+        id: 100,
+        isDone: false,
+        sourceCatalogItemId: 201,
+        title: "추가 항목 201",
+      },
+    ]);
   });
 
   it("추가 중 체크리스트 없음 응답을 받으면 공통 생성 계층으로 재조정한 뒤 한 번 다시 추가한다", async () => {
@@ -192,12 +245,21 @@ describe("ChecklistRepository", () => {
       .mockRejectedValueOnce(
         new RemoteChecklistApiError(303, 404, "체크리스트를 찾을 수 없습니다."),
       )
-      .mockResolvedValueOnce([102]);
+      .mockResolvedValueOnce([
+        {
+          catalogItemId: 102,
+          categoryId: 1,
+          id: 100,
+          status: "prev",
+          title: "추가 항목 102",
+        },
+      ]);
     const commandRepository = createCommandRepository();
+    const queryRepository = createQueryRepository();
     const repository = createChecklistRepository(
       createLocalDataSource(),
       remoteDataSource,
-      createQueryRepository(),
+      queryRepository,
       commandRepository,
     );
 
@@ -207,6 +269,7 @@ describe("ChecklistRepository", () => {
     expect(commandRepository.ensureChecklist).toHaveBeenCalledOnce();
     expect(commandRepository.reconcileMissingChecklist).toHaveBeenCalledOnce();
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledTimes(2);
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledOnce();
   });
 
   it("공통 생성 계층의 인증 오류를 준비 목록 인증 오류로 변환한다", async () => {
@@ -301,14 +364,60 @@ describe("ChecklistRepository", () => {
     remoteDataSource.addCatalogItemIds.mockRejectedValue(
       new Error("network failed"),
     );
+    const queryRepository = createQueryRepository();
     const repository = createChecklistRepository(
       createLocalDataSource(),
       remoteDataSource,
+      queryRepository,
     );
 
     await expect(
       repository.addCatalogItemIds("authenticated", ["102"]),
     ).rejects.toBeInstanceOf(PreparationChecklistAdditionError);
+    expect(queryRepository.applyAddedItems).not.toHaveBeenCalled();
+  });
+
+  it("추가 응답 직전 요청이 취소되면 공통 캐시를 변경하지 않는다", async () => {
+    const remoteDataSource = createRemoteDataSource();
+    let resolveAddition: (
+      items: Awaited<ReturnType<typeof remoteDataSource.addCatalogItemIds>>,
+    ) => void = () => undefined;
+    remoteDataSource.addCatalogItemIds.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAddition = resolve;
+      }),
+    );
+    const queryRepository = createQueryRepository();
+    const repository = createChecklistRepository(
+      createLocalDataSource(),
+      remoteDataSource,
+      queryRepository,
+    );
+    const controller = new AbortController();
+    const request = repository.addCatalogItemIds(
+      "authenticated",
+      ["102"],
+      controller.signal,
+    );
+    await vi.waitFor(() =>
+      expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledOnce(),
+    );
+
+    controller.abort();
+    resolveAddition([
+      {
+        catalogItemId: 102,
+        categoryId: 1,
+        id: 100,
+        status: "prev",
+        title: "추가 항목 102",
+      },
+    ]);
+
+    await expect(request).rejects.toBeInstanceOf(
+      PreparationChecklistAdditionError,
+    );
+    expect(queryRepository.applyAddedItems).not.toHaveBeenCalled();
   });
 
   it("서버 체크리스트의 숫자 ID를 카탈로그 모델의 문자열 ID로 변환한다", async () => {

@@ -3,6 +3,7 @@ export {
   MyChecklistProvider,
   useMyChecklistCommandRepository,
   useMyChecklistQueryRepository,
+  useMyChecklistRevision,
 } from "./MyChecklistProvider";
 export { useChecklistQueryRepository } from "./checklistQueryDependencies";
 export type {
@@ -16,6 +17,10 @@ export type {
   MyChecklistItemModel,
   MyChecklistModel,
 } from "./model/myChecklist";
+export {
+  toMyChecklistItemModel,
+  type AddedChecklistCatalogItemModel,
+} from "./model/myChecklistAddition";
 export {
   ChecklistQueryAuthenticationRequiredError,
   ChecklistQueryLoadError,

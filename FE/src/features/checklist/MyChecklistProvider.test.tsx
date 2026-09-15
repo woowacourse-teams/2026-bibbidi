@@ -172,4 +172,34 @@ describe("MyChecklistProvider", () => {
     );
     expect(screen.getByRole("button", { name: "1" })).toBeTruthy();
   });
+
+  it("이전 인증 세션 저장소의 늦은 캐시 변경을 새 세션에 전달하지 않는다", () => {
+    const observeRepositories = vi.fn();
+    const observer = (
+      <RepositoryObserver onRepositories={observeRepositories} />
+    );
+    const { rerender } = render(
+      renderProvider(observer, "authenticated:first-user"),
+    );
+    const firstQueryRepository = observeRepositories.mock.calls[0][1];
+
+    rerender(renderProvider(observer, "authenticated:second-user"));
+    const secondQueryRepository = observeRepositories.mock.calls[1][1];
+    const secondSessionListener = vi.fn();
+    secondQueryRepository.subscribe(secondSessionListener);
+
+    firstQueryRepository.applyAddedItems([
+      {
+        appointments: [],
+        categoryId: 1,
+        id: 10,
+        isDone: false,
+        sourceCatalogItemId: 101,
+        title: "이전 세션 응답",
+      },
+    ]);
+
+    expect(secondQueryRepository.getRevision()).toBe(0);
+    expect(secondSessionListener).not.toHaveBeenCalled();
+  });
 });
