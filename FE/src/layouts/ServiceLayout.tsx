@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth } from "../features/auth";
-import { MyChecklistQueryProvider } from "../features/checklist";
+import { MyChecklistProvider } from "../features/checklist";
 import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
@@ -21,7 +21,7 @@ export function ServiceLayout() {
   }, [pathname]);
 
   return (
-    <MyChecklistQueryProvider
+    <MyChecklistProvider
       sessionKey={
         authState.status === "authenticated"
           ? `authenticated:${authState.user.nickname}`
@@ -60,6 +60,6 @@ export function ServiceLayout() {
           <FeedbackFeature />
         </div>
       </div>
-    </MyChecklistQueryProvider>
+    </MyChecklistProvider>
   );
 }

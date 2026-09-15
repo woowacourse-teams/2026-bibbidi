@@ -15,6 +15,7 @@ import {
 } from "./myChecklistQueryRepository";
 
 const checklist: MyChecklistModel = {
+  exists: true,
   items: [{ isDone: true, sourceCatalogItemId: 101 }],
 };
 
@@ -132,16 +133,18 @@ describe("MyChecklistQueryRepository", () => {
     expect(dataSource.getChecklist).toHaveBeenCalledTimes(2);
   });
 
-  it("체크리스트 없음 응답을 빈 체크리스트로 변환해 캐시한다", async () => {
+  it("체크리스트 없음 응답의 존재 여부를 보존해 캐시한다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.getChecklist).mockRejectedValue(
       new RemoteMyChecklistApiError(303, 404),
     );
     const repository = createMyChecklistQueryRepository(dataSource);
     await expect(repository.getChecklist()).resolves.toEqual({
+      exists: false,
       items: [],
     });
     await expect(repository.getChecklist()).resolves.toEqual({
+      exists: false,
       items: [],
     });
     expect(dataSource.getChecklist).toHaveBeenCalledOnce();

@@ -4,5 +4,6 @@ export interface MyChecklistItemModel {
 }
 
 export interface MyChecklistModel {
+  exists: boolean;
   items: MyChecklistItemModel[];
 }

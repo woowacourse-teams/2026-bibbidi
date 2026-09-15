@@ -576,6 +576,31 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     await act(async () => resolveAddition?.(["102"]));
   });
 
+  it("인증 대상이 바뀌면 진행 중인 추가 작업을 취소한다", async () => {
+    let additionSignal: AbortSignal | undefined;
+    checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
+      (_audience: string, _catalogItemIds: string[], signal?: AbortSignal) => {
+        additionSignal = signal;
+        return new Promise(() => {});
+      },
+    );
+    const { rerender } = await renderFeature();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+    expect(additionSignal?.aborted).toBe(false);
+
+    authMocks.authState = { status: "guest" };
+    rerender(
+      <div data-page-scroll-container>
+        <PreparationRoadmapFeature />
+      </div>,
+    );
+
+    expect(additionSignal?.aborted).toBe(true);
+  });
+
   it("추가 실패 시 화면을 유지하고 같은 동작을 다시 시도한다", async () => {
     checklistRepositoryMocks.addCatalogItemIds
       .mockRejectedValueOnce(
