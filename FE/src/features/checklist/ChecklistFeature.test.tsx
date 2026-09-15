@@ -173,6 +173,19 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
+
+  it("할 일 상세 패널을 열어도 체크리스트를 다시 조회하지 않는다", async () => {
+    render(<ChecklistFeature />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+
+    expect(
+      screen.getByRole("complementary", { name: "로컬 체크리스트 항목" }),
+    ).toBeTruthy();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
 });
 
 describe("ChecklistFeature 조회 상태와 요청 수명", () => {

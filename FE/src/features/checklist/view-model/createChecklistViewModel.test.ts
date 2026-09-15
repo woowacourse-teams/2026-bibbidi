@@ -18,7 +18,11 @@ function createItem(
   };
 }
 
-function createAppointment(id: number, date: string) {
+function createAppointment(
+  id: number,
+  date: string,
+  overrides: Partial<ChecklistQueryItemModel["appointments"][number]> = {},
+) {
   return {
     date,
     endTime: null,
@@ -28,6 +32,7 @@ function createAppointment(id: number, date: string) {
     place: null,
     startTime: null,
     title: `일정 ${id}`,
+    ...overrides,
   };
 }
 
@@ -87,6 +92,61 @@ describe("createChecklistViewModel", () => {
     expect(category?.tasks.map((task) => task.schedule)).toEqual([
       "9월 3일",
       "일정 없음",
+    ]);
+  });
+
+  it("일정 상세 필드를 서버 순서대로 화면용 값으로 변환한다", () => {
+    const [category] = createChecklistViewModel({
+      categories: [
+        {
+          id: "10",
+          items: [
+            createItem({
+              appointments: [
+                createAppointment(2, "2026-09-12", {
+                  endTime: "2026-09-12T20:30:00",
+                  memo: "계약 조건 확인",
+                  place: "온라인",
+                  startTime: "2026-09-12T19:00:00",
+                  title: "계약서 검토",
+                }),
+                createAppointment(1, "2026-09-08", {
+                  isDone: true,
+                  title: "계약금 입금",
+                }),
+              ],
+            }),
+          ],
+          title: "카테고리",
+        },
+      ],
+    });
+
+    expect(category?.tasks[0]?.appointments).toEqual([
+      {
+        date: "2026-09-12",
+        dateLabel: "9월 12일",
+        dayLabel: "12일",
+        id: 2,
+        isDone: false,
+        memoLabel: "계약 조건 확인",
+        monthLabel: "9월",
+        placeLabel: "온라인",
+        timeLabel: "오후 7시–오후 8시 30분",
+        title: "계약서 검토",
+      },
+      {
+        date: "2026-09-08",
+        dateLabel: "9월 8일",
+        dayLabel: "8일",
+        id: 1,
+        isDone: true,
+        memoLabel: "메모 없음",
+        monthLabel: "9월",
+        placeLabel: "장소 없음",
+        timeLabel: "시간 없음",
+        title: "계약금 입금",
+      },
     ]);
   });
 

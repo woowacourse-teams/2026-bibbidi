@@ -1,3 +1,24 @@
+.checklist-workspace {
+  width: min(60vw, 960px);
+  margin: 0 auto;
+}
+
+.checklist-workspace--detail-open {
+  display: grid;
+  width: 100%;
+  min-height: calc(100dvh - 96px);
+  grid-template-columns: minmax(0, 1fr) 480px;
+  align-items: start;
+  margin-top: -32px;
+  margin-bottom: -64px;
+}
+
+.checklist-workspace--detail-open .checklist-workspace__main {
+  width: 100%;
+  min-width: 0;
+  padding: 32px 48px 64px clamp(48px, 7.5vw, 120px);
+}
+
 .checklist {
   overflow: hidden;
   border: 1px solid var(--color-stroke-neutral-weak);
@@ -115,14 +136,36 @@
 }
 
 .checklist__task {
-  display: grid;
   min-height: 56px;
-  grid-template-columns: 20px minmax(0, 1fr) 180px 64px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  background: var(--color-bg-layer-default);
+}
+
+.checklist__task-button {
+  display: grid;
+  width: 100%;
+  min-height: 56px;
+  grid-template-columns: 20px minmax(0, 1fr) clamp(72px, 8%, 120px) 64px;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
-  background: var(--color-bg-layer-default);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.checklist__task-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: -3px;
+}
+
+.checklist__task--selected {
+  box-shadow: inset 3px 0 0 var(--color-stroke-brand-solid);
 }
 
 .checklist__task--complete {
@@ -186,4 +229,22 @@
 .checklist__task--complete .checklist__task-status {
   background: var(--color-bg-positive-badge);
   color: var(--color-fg-positive);
+}
+
+@media (max-width: 760px) {
+  .checklist-workspace,
+  .checklist-workspace--detail-open {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .checklist-workspace--detail-open .checklist-workspace__main {
+    padding: 0;
+  }
+
+  .checklist__task-button:disabled {
+    cursor: default;
+  }
 }
