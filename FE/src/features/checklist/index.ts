@@ -17,6 +17,9 @@ export type {
   MyChecklistModel,
 } from "./model/myChecklist";
 export {
+  ChecklistQueryAuthenticationRequiredError,
+  ChecklistQueryLoadError,
+  ChecklistQueryRequestAbortedError,
   createChecklistQueryRepository,
   UnknownChecklistCategoryError,
 } from "./repository/checklistQueryRepository";

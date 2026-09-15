@@ -7,7 +7,10 @@ import {
   RemoteCatalogRequestAbortedError,
   RemoteCatalogTimeoutError,
 } from "../../catalog/data-source/remoteCatalogDataSource";
-import { LocalChecklistDataSource } from "../data-source/localChecklistDataSource";
+import {
+  LocalChecklistDataSource,
+  LocalChecklistStorageError,
+} from "../data-source/localChecklistDataSource";
 import { MyChecklistItemModel } from "../model/myChecklist";
 import {
   MyChecklistAuthenticationRequiredError,
@@ -16,6 +19,9 @@ import {
   MyChecklistRequestAbortedError,
 } from "./myChecklistQueryRepository";
 import {
+  ChecklistQueryAuthenticationRequiredError,
+  ChecklistQueryLoadError,
+  ChecklistQueryRequestAbortedError,
   createChecklistQueryRepository,
   UnknownChecklistCategoryError,
 } from "./checklistQueryRepository";
@@ -132,6 +138,7 @@ describe("ChecklistQueryRepository", () => {
               appointments: [],
               categoryId: "10",
               checklistItemId: null,
+              id: "catalog-item-101",
               isDone: false,
               sourceCatalogItemId: 101,
               title: "첫 번째 항목",
@@ -140,6 +147,7 @@ describe("ChecklistQueryRepository", () => {
               appointments: [],
               categoryId: "10",
               checklistItemId: null,
+              id: "catalog-item-102",
               isDone: false,
               sourceCatalogItemId: 102,
               title: "두 번째 항목",
@@ -183,10 +191,16 @@ describe("ChecklistQueryRepository", () => {
     expect(
       result.categories[1]?.items.map((item) => item.checklistItemId),
     ).toEqual([10, 11]);
+    expect(
+      result.categories.flatMap((category) =>
+        category.items.map((item) => item.id),
+      ),
+    ).toEqual(["checklist-item-20", "checklist-item-10", "checklist-item-11"]);
     expect(result.categories[1]?.items[1]).toEqual({
       appointments: customItem.appointments,
       categoryId: "10",
       checklistItemId: 11,
+      id: "checklist-item-11",
       isDone: false,
       sourceCatalogItemId: null,
       title: "서버 항목 11",
@@ -228,34 +242,91 @@ describe("ChecklistQueryRepository", () => {
   });
 
   it.each([
-    new MyChecklistAuthenticationRequiredError(),
-    new MyChecklistLoadError(),
-    new MyChecklistRequestAbortedError(),
-  ])("공통 MyChecklist 조회 오류를 그대로 전달한다", async (error) => {
+    {
+      expectedError: ChecklistQueryAuthenticationRequiredError,
+      sourceError: new MyChecklistAuthenticationRequiredError(),
+    },
+    {
+      expectedError: ChecklistQueryLoadError,
+      sourceError: new MyChecklistLoadError(),
+    },
+    {
+      expectedError: ChecklistQueryRequestAbortedError,
+      sourceError: new MyChecklistRequestAbortedError(),
+    },
+  ])(
+    "공통 MyChecklist 오류를 $expectedError.name으로 변환한다",
+    async ({ expectedError, sourceError }) => {
+      const myChecklistRepository = createMyChecklistRepository();
+      vi.mocked(myChecklistRepository.getChecklist).mockRejectedValue(
+        sourceError,
+      );
+      const repository = createChecklistQueryRepository(
+        createCatalogRepository(),
+        createLocalDataSource(),
+        myChecklistRepository,
+      );
+
+      await expect(
+        repository.getChecklist("authenticated"),
+      ).rejects.toBeInstanceOf(expectedError);
+      await expect(
+        repository.getChecklist("authenticated"),
+      ).rejects.toMatchObject({ cause: sourceError });
+    },
+  );
+
+  it.each([
+    {
+      expectedError: ChecklistQueryLoadError,
+      sourceError: new RemoteCatalogNetworkError(),
+    },
+    {
+      expectedError: ChecklistQueryLoadError,
+      sourceError: new RemoteCatalogTimeoutError(),
+    },
+    {
+      expectedError: ChecklistQueryRequestAbortedError,
+      sourceError: new RemoteCatalogRequestAbortedError(),
+    },
+  ])(
+    "Catalog 오류를 $expectedError.name으로 변환한다",
+    async ({ expectedError, sourceError }) => {
+      const catalogRepository = createCatalogRepository();
+      vi.mocked(catalogRepository.getCatalog).mockRejectedValue(sourceError);
+      const repository = createChecklistQueryRepository(
+        catalogRepository,
+        createLocalDataSource(),
+        createMyChecklistRepository(),
+      );
+
+      await expect(
+        repository.getChecklist("authenticated"),
+      ).rejects.toBeInstanceOf(expectedError);
+      await expect(
+        repository.getChecklist("authenticated"),
+      ).rejects.toMatchObject({ cause: sourceError });
+    },
+  );
+
+  it("Local Storage 오류를 조회 오류로 변환한다", async () => {
+    const localDataSource = createLocalDataSource();
+    const sourceError = new LocalChecklistStorageError("read");
+    vi.mocked(localDataSource.getCatalogItemIds).mockImplementation(() => {
+      throw sourceError;
+    });
     const myChecklistRepository = createMyChecklistRepository();
-    vi.mocked(myChecklistRepository.getChecklist).mockRejectedValue(error);
     const repository = createChecklistQueryRepository(
       createCatalogRepository(),
-      createLocalDataSource(),
+      localDataSource,
       myChecklistRepository,
     );
 
-    await expect(repository.getChecklist("authenticated")).rejects.toBe(error);
-  });
-
-  it.each([
-    new RemoteCatalogNetworkError(),
-    new RemoteCatalogTimeoutError(),
-    new RemoteCatalogRequestAbortedError(),
-  ])("Catalog 조회 오류를 그대로 전달한다", async (error) => {
-    const catalogRepository = createCatalogRepository();
-    vi.mocked(catalogRepository.getCatalog).mockRejectedValue(error);
-    const repository = createChecklistQueryRepository(
-      catalogRepository,
-      createLocalDataSource(),
-      createMyChecklistRepository(),
+    await expect(repository.getChecklist("guest")).rejects.toMatchObject({
+      cause: sourceError,
+    });
+    await expect(repository.getChecklist("guest")).rejects.toBeInstanceOf(
+      ChecklistQueryLoadError,
     );
-
-    await expect(repository.getChecklist("authenticated")).rejects.toBe(error);
   });
 });

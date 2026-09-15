@@ -1,0 +1,131 @@
+import { describe, expect, it } from "vitest";
+
+import { ChecklistQueryItemModel } from "../model/checklistQuery";
+import { createChecklistViewModel } from "./createChecklistViewModel";
+
+function createItem(
+  overrides: Partial<ChecklistQueryItemModel>,
+): ChecklistQueryItemModel {
+  return {
+    appointments: [],
+    categoryId: "10",
+    checklistItemId: 1,
+    isDone: false,
+    sourceCatalogItemId: 101,
+    title: "할 일",
+    ...overrides,
+    id: overrides.id ?? "checklist-item-1",
+  };
+}
+
+function createAppointment(id: number, date: string) {
+  return {
+    date,
+    endTime: null,
+    id,
+    isDone: false,
+    memo: null,
+    place: null,
+    startTime: null,
+    title: `일정 ${id}`,
+  };
+}
+
+describe("createChecklistViewModel", () => {
+  it("완료 여부와 일정 유무로 완료·진행 중·미완료 상태를 만든다", () => {
+    const [category] = createChecklistViewModel({
+      categories: [
+        {
+          id: "10",
+          items: [
+            createItem({ checklistItemId: 1, isDone: true, title: "완료" }),
+            createItem({
+              appointments: [createAppointment(1, "2026-09-15")],
+              checklistItemId: 2,
+              title: "진행 중",
+            }),
+            createItem({ checklistItemId: 3, title: "미완료" }),
+          ],
+          title: "카테고리",
+        },
+      ],
+    });
+
+    expect(
+      category?.tasks.map(({ status, statusLabel }) => ({
+        status,
+        statusLabel,
+      })),
+    ).toEqual([
+      { status: "complete", statusLabel: "완료" },
+      { status: "in-progress", statusLabel: "진행 중" },
+      { status: "incomplete", statusLabel: "미완료" },
+    ]);
+  });
+
+  it("가장 빠른 일정 날짜를 UTC 변환 없이 M월 D일로 표시한다", () => {
+    const [category] = createChecklistViewModel({
+      categories: [
+        {
+          id: "10",
+          items: [
+            createItem({
+              appointments: [
+                createAppointment(1, "2026-10-02"),
+                createAppointment(2, "2026-09-03"),
+                createAppointment(3, "2026-09-03"),
+              ],
+              checklistItemId: 1,
+            }),
+            createItem({ checklistItemId: 2 }),
+          ],
+          title: "카테고리",
+        },
+      ],
+    });
+
+    expect(category?.tasks.map((task) => task.schedule)).toEqual([
+      "9월 3일",
+      "일정 없음",
+    ]);
+  });
+
+  it("전체 카테고리 순서와 항목 순서를 유지하고 진행률을 반올림한다", () => {
+    const viewModel = createChecklistViewModel({
+      categories: [
+        { id: "20", items: [], title: "빈 카테고리" },
+        {
+          id: "10",
+          items: [
+            createItem({ checklistItemId: 3, isDone: true, title: "세 번째" }),
+            createItem({ checklistItemId: 1, title: "첫 번째" }),
+            createItem({ checklistItemId: 2, title: "두 번째" }),
+          ],
+          title: "항목 카테고리",
+        },
+      ],
+    });
+
+    expect(viewModel.map((category) => category.title)).toEqual([
+      "빈 카테고리",
+      "항목 카테고리",
+    ]);
+    expect(viewModel[0]).toMatchObject({
+      countLabel: "0개",
+      expanded: false,
+      progress: 0,
+      progressLabel: "0%",
+    });
+    expect(viewModel[1]?.tasks.map((task) => task.title)).toEqual([
+      "세 번째",
+      "첫 번째",
+      "두 번째",
+    ]);
+    expect(viewModel[1]).toMatchObject({
+      countLabel: "3개",
+      expanded: true,
+      progress: 33,
+      progressLabel: "33%",
+    });
+  });
+});

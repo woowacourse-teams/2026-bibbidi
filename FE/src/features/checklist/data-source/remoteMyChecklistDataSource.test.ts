@@ -245,6 +245,67 @@ describe("parseMyChecklist", () => {
       RemoteMyChecklistContractError,
     );
   });
+
+  it.each(["2026/09/10", "2026-9-10", "2026-02-30", "2025-02-29"])(
+    "올바르지 않은 일정 날짜 %s를 거부한다",
+    (date) => {
+      expect(() =>
+        parseMyChecklist({
+          id: 1,
+          items: [
+            {
+              appointments: [
+                {
+                  date,
+                  endTime: null,
+                  id: 100,
+                  isDone: false,
+                  memo: null,
+                  place: null,
+                  startTime: null,
+                  title: "일정",
+                },
+              ],
+              categoryId: 1,
+              id: 10,
+              isDone: false,
+              sourceCatalogItemId: 101,
+              title: "항목",
+            },
+          ],
+        }),
+      ).toThrow(RemoteMyChecklistContractError);
+    },
+  );
+
+  it("윤년의 2월 29일을 허용한다", () => {
+    expect(
+      parseMyChecklist({
+        id: 1,
+        items: [
+          {
+            appointments: [
+              {
+                date: "2028-02-29",
+                endTime: null,
+                id: 100,
+                isDone: false,
+                memo: null,
+                place: null,
+                startTime: null,
+                title: "일정",
+              },
+            ],
+            categoryId: 1,
+            id: 10,
+            isDone: false,
+            sourceCatalogItemId: 101,
+            title: "항목",
+          },
+        ],
+      }).items[0]?.appointments[0]?.date,
+    ).toBe("2028-02-29");
+  });
 });
 
 describe("remoteMyChecklistDataSource.getChecklist", () => {

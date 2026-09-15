@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
+import { ChecklistFeature } from "../features/checklist";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { PreparationRoadmapFeature } from "../features/preparation/PreparationRoadmapFeature";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
@@ -258,6 +259,145 @@ describe("ServiceLayout", () => {
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
+  });
+
+  it("체크리스트 화면과 헤더가 내 체크리스트 GET 요청을 공유한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [createChecklistItem(10, 1001, true)],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/checklist" element={<ChecklistFeature />} />,
+      ["/checklist"],
+    );
+
+    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("Migration 중 체크리스트를 숨기고 완료 후 최신 서버 결과를 표시한다", async () => {
+    let serializedValue: string | null = JSON.stringify({
+      version: 1,
+      catalogItemIds: [1002],
+    });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => serializedValue),
+      removeItem: vi.fn(() => {
+        serializedValue = null;
+      }),
+      setItem: vi.fn((_key: string, value: string) => {
+        serializedValue = value;
+      }),
+    });
+    let resolveAddition: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          const checklistRequestCount = fetchMock.mock.calls.filter(
+            ([requestedUrl]) => requestedUrl === "/api/checklists/me",
+          ).length;
+
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items:
+                  checklistRequestCount === 1
+                    ? [createChecklistItem(10, 1001, true)]
+                    : [
+                        createChecklistItem(10, 1001, true),
+                        createChecklistItem(11, 1002),
+                      ],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists/me/catalog-items") {
+          return new Promise<Response>((resolve) => {
+            resolveAddition = resolve;
+          });
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/checklist" element={<ChecklistFeature />} />,
+      ["/checklist"],
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/checklists/me/catalog-items",
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByText("체크리스트를 불러오고 있어요.")).toBeTruthy();
+    expect(screen.queryByText("체크리스트 항목 10")).toBeNull();
+
+    await act(async () => {
+      resolveAddition(
+        new Response(
+          JSON.stringify({ items: [{ id: 11, catalogItemId: 1002 }] }),
+          { status: 201 },
+        ),
+      );
+    });
+
+    expect(await screen.findByText("체크리스트 항목 11")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(2);
   });
 
   it("병합 완료 전 서버 상태를 숨기고 완료 후 최신 조회를 공유한다", async () => {
