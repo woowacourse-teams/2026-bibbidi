@@ -1,5 +1,5 @@
-import { PreparationCatalogModel } from "../model/preparationRoadmap";
-import { parsePreparationCatalogResponse } from "./preparationCatalogResponse";
+import { CatalogModel } from "../model/catalog";
+import { parseCatalogResponse } from "./catalogResponse";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CATALOG_ENDPOINT = `${apiBaseUrl}/api/catalog`;
@@ -10,28 +10,35 @@ interface ApiErrorResponse {
   message: string;
 }
 
-export class RemotePreparationCatalogApiError extends Error {
+export class RemoteCatalogApiError extends Error {
   constructor(
     readonly errorCode: number,
     readonly status: number,
-    message = "준비 목록을 불러오지 못했습니다.",
+    message = "Catalog를 불러오지 못했습니다.",
   ) {
     super(message);
-    this.name = "RemotePreparationCatalogApiError";
+    this.name = "RemoteCatalogApiError";
   }
 }
 
-export class RemotePreparationCatalogNetworkError extends Error {
+export class RemoteCatalogNetworkError extends Error {
   constructor() {
-    super("준비 목록 요청 중 네트워크 오류가 발생했습니다.");
-    this.name = "RemotePreparationCatalogNetworkError";
+    super("Catalog 요청 중 네트워크 오류가 발생했습니다.");
+    this.name = "RemoteCatalogNetworkError";
   }
 }
 
-export class RemotePreparationCatalogTimeoutError extends Error {
+export class RemoteCatalogTimeoutError extends Error {
   constructor() {
-    super("준비 목록 요청 시간이 초과됐습니다.");
-    this.name = "RemotePreparationCatalogTimeoutError";
+    super("Catalog 요청 시간이 초과됐습니다.");
+    this.name = "RemoteCatalogTimeoutError";
+  }
+}
+
+export class RemoteCatalogRequestAbortedError extends Error {
+  constructor() {
+    super("Catalog 요청이 취소됐습니다.");
+    this.name = "RemoteCatalogRequestAbortedError";
   }
 }
 
@@ -47,19 +54,27 @@ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   );
 }
 
-function toRequestError(error: unknown, didTimeout: boolean): Error {
+function toRequestError(
+  error: unknown,
+  didTimeout: boolean,
+  callerSignal?: AbortSignal,
+): Error {
   if (didTimeout) {
-    return new RemotePreparationCatalogTimeoutError();
+    return new RemoteCatalogTimeoutError();
+  }
+
+  if (callerSignal?.aborted) {
+    return new RemoteCatalogRequestAbortedError();
   }
 
   if (isRecord(error) && error.name === "AbortError") {
-    return new RemotePreparationCatalogNetworkError();
+    return new RemoteCatalogNetworkError();
   }
 
-  return new RemotePreparationCatalogNetworkError();
+  return new RemoteCatalogNetworkError();
 }
 
-async function getPreparationCatalog(signal?: AbortSignal) {
+async function getCatalog(signal?: AbortSignal) {
   const controller = new AbortController();
   let didTimeout = false;
   const handleCallerAbort = () => controller.abort();
@@ -84,7 +99,7 @@ async function getPreparationCatalog(signal?: AbortSignal) {
         signal: controller.signal,
       });
     } catch (error) {
-      throw toRequestError(error, didTimeout);
+      throw toRequestError(error, didTimeout, signal);
     }
 
     let body: unknown;
@@ -97,11 +112,11 @@ async function getPreparationCatalog(signal?: AbortSignal) {
         (isRecord(error) && error.name === "AbortError") ||
         error instanceof TypeError
       ) {
-        throw toRequestError(error, didTimeout);
+        throw toRequestError(error, didTimeout, signal);
       }
 
       if (!response.ok) {
-        throw new RemotePreparationCatalogApiError(0, response.status);
+        throw new RemoteCatalogApiError(0, response.status);
       }
 
       throw new Error("준비 목록 성공 응답을 해석하지 못했습니다.", {
@@ -110,24 +125,24 @@ async function getPreparationCatalog(signal?: AbortSignal) {
     }
 
     if (!response.ok) {
-      throw new RemotePreparationCatalogApiError(
+      throw new RemoteCatalogApiError(
         isApiErrorResponse(body) ? body.errorCode : 0,
         response.status,
         isApiErrorResponse(body)
           ? body.message
-          : "준비 목록을 불러오지 못했습니다.",
+          : "Catalog를 불러오지 못했습니다.",
       );
     }
 
-    return parsePreparationCatalogResponse(body);
+    return parseCatalogResponse(body);
   } finally {
     window.clearTimeout(timeoutId);
     signal?.removeEventListener("abort", handleCallerAbort);
   }
 }
 
-export const remotePreparationCatalogDataSource = {
-  getCatalog(signal?: AbortSignal): Promise<PreparationCatalogModel> {
-    return getPreparationCatalog(signal);
+export const remoteCatalogDataSource = {
+  getCatalog(signal?: AbortSignal): Promise<CatalogModel> {
+    return getCatalog(signal);
   },
 };

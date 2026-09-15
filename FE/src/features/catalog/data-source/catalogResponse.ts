@@ -1,30 +1,37 @@
-import { PreparationCatalogModel } from "../model/preparationRoadmap";
+import { CatalogModel } from "../model/catalog";
 
-interface PreparationCatalogItemResponse {
+interface CatalogItemResponse {
   displayOrder: number;
   essential: boolean;
   id: number;
   title: string;
 }
 
-interface PreparationCatalogStepResponse {
+interface CatalogStepResponse {
   description?: string | null;
   displayOrder: number;
   iconUrl?: string | null;
   id: number;
-  items: PreparationCatalogItemResponse[];
+  items: CatalogItemResponse[];
   name: string;
 }
 
-interface PreparationCatalogCategoryResponse {
+interface CatalogCategoryResponse {
   displayOrder: number;
   id: number;
   name: string;
-  steps: PreparationCatalogStepResponse[];
+  steps: CatalogStepResponse[];
 }
 
-interface RemotePreparationCatalogResponse {
-  categories: PreparationCatalogCategoryResponse[];
+interface RemoteCatalogResponse {
+  categories: CatalogCategoryResponse[];
+}
+
+export class CatalogContractError extends Error {
+  constructor() {
+    super("Catalog 성공 응답 형식이 올바르지 않습니다.");
+    this.name = "CatalogContractError";
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -37,9 +44,7 @@ function isOptionalNullableString(
   return value === undefined || value === null || typeof value === "string";
 }
 
-function isPreparationCatalogItem(
-  value: unknown,
-): value is PreparationCatalogItemResponse {
+function isCatalogItem(value: unknown): value is CatalogItemResponse {
   return (
     isRecord(value) &&
     typeof value.displayOrder === "number" &&
@@ -49,9 +54,7 @@ function isPreparationCatalogItem(
   );
 }
 
-function isPreparationCatalogStep(
-  value: unknown,
-): value is PreparationCatalogStepResponse {
+function isCatalogStep(value: unknown): value is CatalogStepResponse {
   return (
     isRecord(value) &&
     isOptionalNullableString(value.description) &&
@@ -59,31 +62,27 @@ function isPreparationCatalogStep(
     isOptionalNullableString(value.iconUrl) &&
     typeof value.id === "number" &&
     Array.isArray(value.items) &&
-    value.items.every(isPreparationCatalogItem) &&
+    value.items.every(isCatalogItem) &&
     typeof value.name === "string"
   );
 }
 
-function isPreparationCatalogCategory(
-  value: unknown,
-): value is PreparationCatalogCategoryResponse {
+function isCatalogCategory(value: unknown): value is CatalogCategoryResponse {
   return (
     isRecord(value) &&
     typeof value.displayOrder === "number" &&
     typeof value.id === "number" &&
     typeof value.name === "string" &&
     Array.isArray(value.steps) &&
-    value.steps.every(isPreparationCatalogStep)
+    value.steps.every(isCatalogStep)
   );
 }
 
-function isPreparationCatalogResponse(
-  value: unknown,
-): value is RemotePreparationCatalogResponse {
+function isCatalogResponse(value: unknown): value is RemoteCatalogResponse {
   return (
     isRecord(value) &&
     Array.isArray(value.categories) &&
-    value.categories.every(isPreparationCatalogCategory)
+    value.categories.every(isCatalogCategory)
   );
 }
 
@@ -94,11 +93,9 @@ function byDisplayOrder(
   return first.displayOrder - second.displayOrder;
 }
 
-export function parsePreparationCatalogResponse(
-  value: unknown,
-): PreparationCatalogModel {
-  if (!isPreparationCatalogResponse(value)) {
-    throw new Error("준비 목록 성공 응답 형식이 올바르지 않습니다.");
+export function parseCatalogResponse(value: unknown): CatalogModel {
+  if (!isCatalogResponse(value)) {
+    throw new CatalogContractError();
   }
 
   const categories = [...value.categories].sort(byDisplayOrder);
@@ -124,7 +121,6 @@ export function parsePreparationCatalogResponse(
         tasks: [...step.items].sort(byDisplayOrder).map((item) => ({
           essential: item.essential,
           id: String(item.id),
-          included: false,
           title: item.title,
         })),
       })),

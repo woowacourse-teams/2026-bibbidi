@@ -1,7 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { useAppHeaderSummaryRepository } from "../app-header/appHeaderDependencies";
+import { usePreparationChecklistRepository } from "../preparation/preparationDependencies";
+import { preparationCatalogResponseFixture } from "../preparation/test/fixtures/preparationCatalogResponse.fixture";
+import { useChecklistQueryRepository } from "./checklistQueryDependencies";
 import {
   MyChecklistProvider,
   useMyChecklistCommandRepository,
@@ -36,6 +40,30 @@ function SessionStateProbe() {
   );
 }
 
+function SharedConsumersProbe() {
+  const headerRepository = useAppHeaderSummaryRepository();
+  const preparationRepository = usePreparationChecklistRepository();
+  const checklistRepository = useChecklistQueryRepository();
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void Promise.all([
+      headerRepository.getSummary(controller.signal),
+      preparationRepository.getCatalogItemIds(
+        "authenticated",
+        controller.signal,
+      ),
+      checklistRepository.getChecklist("authenticated", controller.signal),
+    ]).then(() => setIsComplete(true));
+
+    return () => controller.abort();
+  }, [checklistRepository, headerRepository, preparationRepository]);
+
+  return isComplete ? <p>조회 완료</p> : null;
+}
+
 function renderProvider(children: ReactNode, sessionKey: string) {
   return (
     <MyChecklistProvider sessionKey={sessionKey}>
@@ -43,6 +71,10 @@ function renderProvider(children: ReactNode, sessionKey: string) {
     </MyChecklistProvider>
   );
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("MyChecklistProvider", () => {
   it("같은 인증 세션에서는 저장소를 유지하고 세션이 바뀌면 교체한다", () => {
@@ -80,6 +112,51 @@ describe("MyChecklistProvider", () => {
     expect(() =>
       render(<RepositoryObserver onRepositories={vi.fn()} />),
     ).toThrowError(/MyChecklistProvider/);
+  });
+
+  it("헤더, 준비 목록, 체크리스트 조회 계층이 같은 서버 요청을 공유한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [
+                {
+                  appointments: [],
+                  categoryId: 10,
+                  id: 10,
+                  isDone: false,
+                  sourceCatalogItemId: 1001,
+                  title: "첫 번째 할 일",
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      renderProvider(<SharedConsumersProbe />, "authenticated:shared-user"),
+    );
+
+    expect(await screen.findByText("조회 완료")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
   });
 
   it("인증 세션이 바뀌어도 하위 UI 상태를 직접 초기화하지 않는다", () => {

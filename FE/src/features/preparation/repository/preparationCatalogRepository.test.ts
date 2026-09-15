@@ -9,9 +9,16 @@ describe("PreparationCatalogRepository", () => {
     };
     const repository = createPreparationCatalogRepository(dataSource);
 
-    await expect(repository.getCatalog()).resolves.toBe(
-      preparationCatalogFixture,
-    );
+    await expect(repository.getCatalog()).resolves.toEqual({
+      ...preparationCatalogFixture,
+      stepDetails: preparationCatalogFixture.stepDetails.map((stepDetail) => ({
+        ...stepDetail,
+        tasks: stepDetail.tasks.map((task) => ({
+          ...task,
+          included: false,
+        })),
+      })),
+    });
     expect(dataSource.getCatalog).toHaveBeenCalledOnce();
   });
 

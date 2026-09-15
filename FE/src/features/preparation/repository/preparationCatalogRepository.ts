@@ -1,8 +1,10 @@
-import { PreparationCatalogModel } from "../model/preparationRoadmap";
+import { CatalogDataSource } from "../../catalog/repository/catalogRepository";
+import {
+  createPreparationCatalogModel,
+  PreparationCatalogModel,
+} from "../model/preparationRoadmap";
 
-export interface PreparationCatalogDataSource {
-  getCatalog(signal?: AbortSignal): Promise<PreparationCatalogModel>;
-}
+export type PreparationCatalogDataSource = CatalogDataSource;
 
 export interface PreparationCatalogRepository {
   getCatalog(signal?: AbortSignal): Promise<PreparationCatalogModel>;
@@ -12,8 +14,10 @@ export function createPreparationCatalogRepository(
   dataSource: PreparationCatalogDataSource,
 ): PreparationCatalogRepository {
   return {
-    getCatalog(signal) {
-      return dataSource.getCatalog(signal);
+    async getCatalog(signal) {
+      const catalog = await dataSource.getCatalog(signal);
+
+      return createPreparationCatalogModel(catalog);
     },
   };
 }
