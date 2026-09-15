@@ -20,3 +20,4 @@
 {"type":"GRILL_ME_FINISHED","issue":102,"bootstrap":true,"timestamp":"2026-09-15T02:06:12.686Z"}
 {"type":"ADR_CHANGED","issue":102,"decision":"동일 날짜 재요청도 DB에 저장하여 users.updated_at을 갱신한다.","bootstrap":true,"timestamp":"2026-09-15T02:06:14.396Z"}
 {"type":"TURN_FINISHED","turnId":"adr-same-date-updated-at","assistantMessage":"동일한 결혼 예정일을 다시 저장할 때 users.updated_at을 갱신하기로 ADR을 변경했고, Repository 통합 테스트로 실제 UPDATE를 검증했다. macOS 전체 Backend 테스트·빌드와 Development Logger 테스트가 통과했다.","redacted":false,"diff":"turn-002.diff","diffStat":" .../repository/UserRepositoryIntegrationTest.java  | 33 ++++++++++++++++++++++\n 1 file changed, 33 insertions(+)","testResult":"PASSED","bootstrap":true,"timestamp":"2026-09-15T02:07:40.634Z"}
+{"type":"PR_REQUESTED","issue":102,"timestamp":"2026-09-15T02:08:24.508Z"}
