@@ -32,8 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChecklistService {
 
-    private static final int UNSCHEDULED_ITEM_LIMIT = 4;
-
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
     private final ChecklistAppointmentService checklistAppointmentService;
@@ -71,12 +69,12 @@ public class ChecklistService {
     }
 
     @Transactional(readOnly = true)
-    public List<UnscheduledChecklistItemResult> findUnscheduledItems(Long ownerId) {
+    public List<UnscheduledChecklistItemResult> findUnscheduledItems(Long ownerId, int limit) {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
         List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
         CategoryNames categoryNames = findCategoryNames(unscheduledItems);
-        List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems);
+        List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems, limit);
 
         return toResults(pickedItems, categoryNames);
     }
@@ -94,9 +92,9 @@ public class ChecklistService {
         return catalogService.findCategoryNames(categoryIds);
     }
 
-    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates) {
+    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates, int limit) {
         return shuffler.shuffle(candidates).stream()
-                .limit(UNSCHEDULED_ITEM_LIMIT)
+                .limit(limit)
                 .toList();
     }
 

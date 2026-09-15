@@ -181,7 +181,7 @@ class ChecklistServiceTest {
                 .willReturn(List.of(customItem, catalogItem));
 
         // when
-        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID);
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
 
         // then
         assertThat(results).containsExactly(
@@ -191,8 +191,8 @@ class ChecklistServiceTest {
     }
 
     @Test
-    @DisplayName("일정이 필요한 할 일이 4개보다 많으면 섞은 순서에서 앞의 4개만 돌려준다")
-    void shouldReturnFirstFourItemsInShuffledOrder() {
+    @DisplayName("일정이 필요한 할 일이 limit보다 많으면 섞은 순서에서 앞의 limit개만 돌려준다")
+    void shouldReturnFirstItemsUpToLimitInShuffledOrder() {
         // given
         List<ChecklistItem> items = List.of(
                 constructTestItem(200L),
@@ -208,12 +208,12 @@ class ChecklistServiceTest {
         given(shuffler.shuffle(items)).willReturn(items.reversed());
 
         // when
-        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID);
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 3);
 
         // then
         assertThat(results)
                 .extracting(UnscheduledChecklistItemResult::checklistItemId)
-                .containsExactly(205L, 204L, 203L, 202L);
+                .containsExactly(205L, 204L, 203L);
     }
 
     @Test
@@ -229,7 +229,7 @@ class ChecklistServiceTest {
                 .willReturn(new CategoryNames(Map.of()));
 
         // when
-        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID);
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
 
         // then
         assertThat(results).isEmpty();

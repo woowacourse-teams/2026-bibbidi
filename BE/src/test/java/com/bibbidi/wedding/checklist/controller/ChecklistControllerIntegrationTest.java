@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.controller;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -50,7 +51,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                     + "이미 담긴 준비 항목이 포함되면 요청 전체가 실패합니다.";
     private static final String FIND_UNSCHEDULED_SUMMARY = "일정이 필요한 할 일 조회";
     private static final String FIND_UNSCHEDULED_DESCRIPTION =
-            "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 4개 조회합니다. "
+            "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 limit개 조회합니다. "
                     + "준비 목록에서 담은 할 일과 직접 만든 할 일을 모두 포함하며, 대상이 없으면 빈 배열을 반환합니다.";
 
     @Autowired
@@ -231,7 +232,8 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
                         .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .param("limit", "4"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[*].checklistItemId",
@@ -249,6 +251,11 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
+                                        .queryParameters(
+                                                parameterWithName("limit")
+                                                        .description("조회할 최대 개수 (기본값 4, 최대 20)")
+                                                        .optional()
+                                        )
                                         .responseFields(
                                                 fieldWithPath("[].checklistItemId")
                                                         .description("할 일 ID. 일정 추가 API의 checklistItemId로 그대로 사용"),
@@ -260,6 +267,23 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                         )
                 );
+    }
+
+    @Test
+    @Sql("/checklist-catalog-fixture.sql")
+    @DisplayName("일정이 필요한 할 일을 limit 개수만큼만 조회한다")
+    void shouldFindUnscheduledItemsUpToLimit() throws Exception {
+        // given
+        addCatalogItem(100L);
+        addCatalogItem(101L);
+        writeCustomItem("청첩장 문구 정하기");
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .session(authenticatedSession())
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
