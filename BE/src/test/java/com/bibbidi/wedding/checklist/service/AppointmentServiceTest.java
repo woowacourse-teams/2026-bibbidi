@@ -3,6 +3,7 @@ package com.bibbidi.wedding.checklist.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -198,9 +199,10 @@ class AppointmentServiceTest {
     @DisplayName("가까운 일정을 저장소에서 조회해 결과로 변환한다")
     void shouldFindNearbyAppointmentsAsResults() {
         Appointment appointment = createAppointment();
-        given(appointmentRepository.findNearby(USER_ID)).willReturn(List.of(appointment));
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(List.of(appointment));
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6);
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6, LocalDateTime.now());
 
         assertThat(results).containsExactly(AppointmentResult.fromDomain(appointment));
     }
@@ -212,10 +214,10 @@ class AppointmentServiceTest {
         Appointment timedTomorrow = appointmentOnDate(
                 2L, LocalDate.of(2026, 9, 2), LocalDateTime.of(2026, 9, 2, 9, 0));
         Appointment dayAfterTomorrow = appointmentOnDate(3L, LocalDate.of(2026, 9, 3), null);
-        given(appointmentRepository.findNearby(USER_ID))
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(List.of(timelessTomorrow, dayAfterTomorrow, timedTomorrow));
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 10);
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 10, LocalDateTime.now());
 
         assertThat(results)
                 .extracting(AppointmentResult::id)
@@ -228,9 +230,10 @@ class AppointmentServiceTest {
         Appointment first = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
         Appointment second = appointmentOnDate(2L, LocalDate.of(2026, 9, 3), null);
         Appointment third = appointmentOnDate(3L, LocalDate.of(2026, 9, 4), null);
-        given(appointmentRepository.findNearby(USER_ID)).willReturn(List.of(first, second, third));
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(List.of(first, second, third));
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2);
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2, LocalDateTime.now());
 
         assertThat(results)
                 .extracting(AppointmentResult::id)

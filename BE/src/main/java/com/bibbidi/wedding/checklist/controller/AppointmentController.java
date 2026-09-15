@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -54,7 +55,8 @@ public class AppointmentController {
             @Auth Long userId,
             @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
     ) {
-        return appointmentService.findNearby(userId, limit).stream()
+        LocalDateTime requestedAt = LocalDateTime.now();
+        return appointmentService.findNearby(userId, limit, requestedAt).stream()
                 .map(NearbyAppointmentResponse::from)
                 .toList();
     }

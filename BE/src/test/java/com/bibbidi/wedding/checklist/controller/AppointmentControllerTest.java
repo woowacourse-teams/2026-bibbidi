@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.BDDMockito.then;
@@ -195,7 +196,7 @@ class AppointmentControllerTest {
     @Test
     @DisplayName("가까운 일정 조회 시 limit을 생략하면 기본값 6으로 서비스에 전달한다")
     void shouldUseDefaultLimitWhenNotProvided() throws Exception {
-        when(appointmentService.findNearby(1L, 6)).thenReturn(List.of(
+        when(appointmentService.findNearby(eq(1L), eq(6), any(LocalDateTime.class))).thenReturn(List.of(
                 new AppointmentResult(
                         1L, 10L, "title", LocalDate.of(2026, 9, 1),
                         LocalDateTime.of(2026, 9, 1, 10, 0),
@@ -208,20 +209,20 @@ class AppointmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1));
 
-        verify(appointmentService).findNearby(1L, 6);
+        verify(appointmentService).findNearby(eq(1L), eq(6), any(LocalDateTime.class));
     }
 
     @Test
     @DisplayName("가까운 일정 조회 시 limit 파라미터를 서비스에 그대로 전달한다")
     void shouldPassGivenLimitToService() throws Exception {
-        when(appointmentService.findNearby(1L, 3)).thenReturn(List.of());
+        when(appointmentService.findNearby(eq(1L), eq(3), any(LocalDateTime.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/appointments/me/nearby")
                         .session(authenticatedSession())
                         .param("limit", "3"))
                 .andExpect(status().isOk());
 
-        verify(appointmentService).findNearby(1L, 3);
+        verify(appointmentService).findNearby(eq(1L), eq(3), any(LocalDateTime.class));
     }
 
     @Test

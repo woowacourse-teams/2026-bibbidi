@@ -5,7 +5,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -96,8 +95,8 @@ public class AppointmentRepository {
                 .toList();
     }
 
-    public List<Appointment> findNearby(Long userId) {
-        return jpaAppointmentRepository.findNearby(userId, LocalDate.now(), LocalDateTime.now())
+    public List<Appointment> findNearby(Long userId, LocalDateTime now) {
+        return jpaAppointmentRepository.findNearby(userId, now.toLocalDate(), now)
                 .stream()
                 .map(appointmentMapper::toDomain)
                 .toList();

@@ -10,6 +10,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -97,8 +98,8 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<AppointmentResult> findNearby(Long userId, int limit) {
-        return appointmentRepository.findNearby(userId).stream()
+    public List<AppointmentResult> findNearby(Long userId, int limit, LocalDateTime now) {
+        return appointmentRepository.findNearby(userId, now).stream()
                 .sorted(nearbyOrder())
                 .limit(limit)
                 .map(AppointmentResult::fromDomain)
