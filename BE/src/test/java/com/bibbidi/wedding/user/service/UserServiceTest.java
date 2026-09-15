@@ -16,7 +16,6 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import com.bibbidi.wedding.user.repository.WeddingDateRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,16 +33,13 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private WeddingDateRepository weddingDateRepository;
-
-    @Mock
     private ChecklistService checklistService;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, weddingDateRepository, checklistService);
+        userService = new UserService(userRepository, checklistService);
     }
 
     @Test
@@ -195,12 +191,12 @@ class UserServiceTest {
     void shouldFindCurrentUserWeddingDate() {
         LocalDate weddingDate = LocalDate.of(2027, 5, 15);
         WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
-        given(weddingDateRepository.findByUserId(1L)).willReturn(currentWeddingDate);
+        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
 
         WeddingDateResult result = userService.findWeddingDate(1L);
 
         assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
-        then(weddingDateRepository).should().findByUserId(1L);
+        then(userRepository).should().findWeddingDateByUserId(1L);
     }
 
     @Test
@@ -208,17 +204,16 @@ class UserServiceTest {
     void shouldSaveSameWeddingDate() {
         LocalDate weddingDate = LocalDate.of(2027, 5, 15);
         WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
-        given(weddingDateRepository.findByUserId(1L)).willReturn(currentWeddingDate);
-        given(weddingDateRepository.save(any(WeddingDate.class))).willReturn(currentWeddingDate);
+        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
+        given(userRepository.saveWeddingDate(any(WeddingDate.class))).willReturn(currentWeddingDate);
 
         WeddingDateResult result = userService.updateWeddingDate(1L, weddingDate);
 
         assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
-        then(weddingDateRepository).should().save(argThat(changedWeddingDate ->
+        then(userRepository).should().saveWeddingDate(argThat(changedWeddingDate ->
                 changedWeddingDate.userId().equals(1L)
                         && changedWeddingDate.date().equals(weddingDate)
         ));
-        then(userRepository).shouldHaveNoInteractions();
         then(checklistService).shouldHaveNoInteractions();
     }
 

@@ -6,7 +6,6 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
-import com.bibbidi.wedding.user.repository.WeddingDateRepository;
 import java.time.LocalDate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -17,16 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final WeddingDateRepository weddingDateRepository;
     private final ChecklistService checklistService;
 
-    public UserService(
-            UserRepository userRepository,
-            WeddingDateRepository weddingDateRepository,
-            ChecklistService checklistService
-    ) {
+    public UserService(UserRepository userRepository, ChecklistService checklistService) {
         this.userRepository = userRepository;
-        this.weddingDateRepository = weddingDateRepository;
         this.checklistService = checklistService;
     }
 
@@ -71,15 +64,15 @@ public class UserService {
     }
 
     public WeddingDateResult findWeddingDate(Long currentUserId) {
-        WeddingDate weddingDate = weddingDateRepository.findByUserId(currentUserId);
+        WeddingDate weddingDate = userRepository.findWeddingDateByUserId(currentUserId);
         return WeddingDateResult.from(weddingDate);
     }
 
     @Transactional
     public WeddingDateResult updateWeddingDate(Long currentUserId, LocalDate weddingDate) {
-        WeddingDate currentWeddingDate = weddingDateRepository.findByUserId(currentUserId);
+        WeddingDate currentWeddingDate = userRepository.findWeddingDateByUserId(currentUserId);
         WeddingDate changedWeddingDate = currentWeddingDate.changeDate(weddingDate);
-        WeddingDate savedWeddingDate = weddingDateRepository.save(changedWeddingDate);
+        WeddingDate savedWeddingDate = userRepository.saveWeddingDate(changedWeddingDate);
         return WeddingDateResult.from(savedWeddingDate);
     }
 
