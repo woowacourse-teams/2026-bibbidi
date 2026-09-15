@@ -17,6 +17,19 @@
   overscroll-behavior-y: contain;
 }
 
+.service-layout__header {
+  display: contents;
+}
+
+.service-layout__header[hidden],
+.service-layout__mobile-dock[hidden] {
+  display: none;
+}
+
+.service-layout__content--mobile-detail {
+  overflow: hidden;
+}
+
 .service-layout .service-layout__content > * {
   min-height: 100%;
 }
@@ -33,6 +46,10 @@
     scroll-padding-bottom: calc(
       var(--mobile-dock-size) + var(--mobile-dock-offset) + 16px
     );
+  }
+
+  .service-layout__content--mobile-detail {
+    padding-bottom: 0;
   }
 
   .service-layout__mobile-dock {

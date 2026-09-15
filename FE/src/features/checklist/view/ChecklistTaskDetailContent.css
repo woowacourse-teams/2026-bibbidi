@@ -1,0 +1,171 @@
+.checklist-detail-content {
+  display: flex;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px;
+}
+
+.checklist-detail-content h3,
+.checklist-detail-content__properties,
+.checklist-detail-content__properties dd,
+.checklist-detail-content__empty,
+.checklist-detail-content__appointments {
+  margin: 0;
+}
+
+.checklist-detail-content h3 {
+  color: var(--color-fg-neutral);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.checklist-detail-content__properties {
+  margin-top: 8px;
+}
+
+.checklist-detail-content__properties > div {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.checklist-detail-content__properties dt,
+.checklist-detail-content__properties dd {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.checklist-detail-content__properties dd {
+  overflow: hidden;
+  color: var(--color-fg-neutral);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist-detail-content__task-status {
+  display: inline-flex;
+  min-width: 64px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.checklist-detail-content__task-status--in-progress {
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+}
+
+.checklist-detail-content__task-status--complete {
+  background: var(--color-bg-positive-badge);
+  color: var(--color-fg-positive);
+}
+
+.checklist-detail-content__appointments {
+  padding: 0;
+  list-style: none;
+}
+
+.checklist-detail-content__appointment {
+  display: grid;
+  min-height: 84px;
+  grid-template-columns: 48px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.checklist-detail-content__appointment-date {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-radius: 8px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.3;
+}
+
+.checklist-detail-content__appointment-date strong {
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+}
+
+.checklist-detail-content__appointment-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.checklist-detail-content__appointment-title,
+.checklist-detail-content__appointment-meta,
+.checklist-detail-content__appointment-memo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist-detail-content__appointment-title {
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.checklist-detail-content__appointment-meta,
+.checklist-detail-content__appointment-memo {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.checklist-detail-content__appointment-memo {
+  color: var(--color-fg-placeholder);
+}
+
+.checklist-detail-content__appointment-status {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-stroke-neutral);
+  border-radius: 50%;
+  color: var(--color-fg-on-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  place-items: center;
+}
+
+.checklist-detail-content__appointment-status--complete {
+  border-color: var(--color-stroke-brand-solid);
+  background: var(--color-bg-brand-solid);
+}
+
+.checklist-detail-content__empty {
+  margin-top: 8px;
+  padding: 32px 16px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 8px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  text-align: center;
+}
