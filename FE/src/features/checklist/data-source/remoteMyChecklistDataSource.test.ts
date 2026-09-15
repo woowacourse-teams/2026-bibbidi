@@ -16,30 +16,92 @@ afterEach(() => {
 });
 
 describe("parseMyChecklist", () => {
-  it("헤더와 준비 목록에 필요한 필드를 함께 추출한다", () => {
+  it("체크리스트 항목과 일정의 전체 필드를 추출한다", () => {
     expect(
       parseMyChecklist({
         id: 1,
         items: [
           {
-            appointments: [],
+            appointments: [
+              {
+                date: "2026-09-10",
+                endTime: "2026-09-10T11:00:00",
+                id: 100,
+                isDone: false,
+                memo: "상담 메모",
+                place: "상담 장소",
+                startTime: "2026-09-10T10:00:00",
+                title: "상담 일정",
+              },
+            ],
+            categoryId: 1,
             id: 10,
             isDone: true,
             sourceCatalogItemId: 101,
+            title: "웨딩홀 계약",
           },
           {
-            appointments: [{}],
+            appointments: [
+              {
+                date: "2026-09-11",
+                endTime: null,
+                id: 101,
+                isDone: true,
+                memo: null,
+                place: null,
+                startTime: null,
+                title: "날짜만 있는 일정",
+              },
+            ],
+            categoryId: 2,
             id: 11,
             isDone: false,
             sourceCatalogItemId: null,
+            title: "직접 작성 항목",
           },
         ],
       }),
     ).toEqual({
       exists: true,
       items: [
-        { isDone: true, sourceCatalogItemId: 101 },
-        { isDone: false, sourceCatalogItemId: null },
+        {
+          appointments: [
+            {
+              date: "2026-09-10",
+              endTime: "2026-09-10T11:00:00",
+              id: 100,
+              isDone: false,
+              memo: "상담 메모",
+              place: "상담 장소",
+              startTime: "2026-09-10T10:00:00",
+              title: "상담 일정",
+            },
+          ],
+          categoryId: 1,
+          id: 10,
+          isDone: true,
+          sourceCatalogItemId: 101,
+          title: "웨딩홀 계약",
+        },
+        {
+          appointments: [
+            {
+              date: "2026-09-11",
+              endTime: null,
+              id: 101,
+              isDone: true,
+              memo: null,
+              place: null,
+              startTime: null,
+              title: "날짜만 있는 일정",
+            },
+          ],
+          categoryId: 2,
+          id: 11,
+          isDone: false,
+          sourceCatalogItemId: null,
+          title: "직접 작성 항목",
+        },
       ],
     });
   });
@@ -48,11 +110,60 @@ describe("parseMyChecklist", () => {
     expect(
       parseMyChecklist({
         id: 1,
-        items: [{ catalogItemId: 201, id: 10, isDone: false }],
+        items: [
+          {
+            appointments: [],
+            catalogItemId: 201,
+            categoryId: 1,
+            id: 10,
+            isDone: false,
+            title: "기존 필드 항목",
+          },
+        ],
       }),
     ).toEqual({
       exists: true,
-      items: [{ isDone: false, sourceCatalogItemId: 201 }],
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: false,
+          sourceCatalogItemId: 201,
+          title: "기존 필드 항목",
+        },
+      ],
+    });
+  });
+
+  it("sourceCatalogItemId가 명시되면 null도 legacy 필드보다 우선한다", () => {
+    expect(
+      parseMyChecklist({
+        id: 1,
+        items: [
+          {
+            appointments: [],
+            catalogItemId: 201,
+            categoryId: 1,
+            id: 10,
+            isDone: false,
+            sourceCatalogItemId: null,
+            title: "직접 작성 항목",
+          },
+        ],
+      }),
+    ).toEqual({
+      exists: true,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: false,
+          sourceCatalogItemId: null,
+          title: "직접 작성 항목",
+        },
+      ],
     });
   });
 
@@ -65,8 +176,69 @@ describe("parseMyChecklist", () => {
 
   it.each([
     { id: 1 },
-    { id: 1, items: [{ isDone: "true", sourceCatalogItemId: 101 }] },
-    { id: 1, items: [{ isDone: true, sourceCatalogItemId: "101" }] },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: "true",
+          sourceCatalogItemId: 101,
+          title: "항목",
+        },
+      ],
+    },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: true,
+          sourceCatalogItemId: undefined,
+          title: "항목",
+        },
+      ],
+    },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: true,
+          sourceCatalogItemId: "101",
+          title: "항목",
+        },
+      ],
+    },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [
+            {
+              date: "2026-09-10",
+              endTime: undefined,
+              id: 100,
+              isDone: false,
+              memo: null,
+              place: null,
+              startTime: null,
+              title: "일정",
+            },
+          ],
+          categoryId: 1,
+          id: 10,
+          isDone: true,
+          sourceCatalogItemId: 101,
+          title: "항목",
+        },
+      ],
+    },
     { id: "1", items: [] },
   ])("잘못된 성공 응답을 거부한다", (body) => {
     expect(() => parseMyChecklist(body)).toThrow(
@@ -81,7 +253,16 @@ describe("remoteMyChecklistDataSource.getChecklist", () => {
       new Response(
         JSON.stringify({
           id: 1,
-          items: [{ id: 10, isDone: true, sourceCatalogItemId: 101 }],
+          items: [
+            {
+              appointments: [],
+              categoryId: 1,
+              id: 10,
+              isDone: true,
+              sourceCatalogItemId: 101,
+              title: "웨딩홀 계약",
+            },
+          ],
         }),
         { status: 200 },
       ),
@@ -90,7 +271,16 @@ describe("remoteMyChecklistDataSource.getChecklist", () => {
 
     await expect(remoteMyChecklistDataSource.getChecklist()).resolves.toEqual({
       exists: true,
-      items: [{ isDone: true, sourceCatalogItemId: 101 }],
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 10,
+          isDone: true,
+          sourceCatalogItemId: 101,
+          title: "웨딩홀 계약",
+        },
+      ],
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/checklists/me", {
       credentials: "include",

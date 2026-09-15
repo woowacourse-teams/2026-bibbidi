@@ -4,6 +4,7 @@ import {
   remotePreparationCatalogDataSource,
   RemotePreparationCatalogApiError,
   RemotePreparationCatalogNetworkError,
+  RemotePreparationCatalogRequestAbortedError,
   RemotePreparationCatalogTimeoutError,
 } from "./remotePreparationCatalogDataSource";
 import { parsePreparationCatalogResponse } from "./preparationCatalogResponse";
@@ -102,6 +103,31 @@ describe("remotePreparationCatalogDataSource.getCatalog", () => {
     await expectation;
   });
 
+  it("호출자의 요청 취소를 별도 오류로 변환한다", async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("aborted", "AbortError"));
+            });
+          }),
+      ),
+    );
+
+    const request = remotePreparationCatalogDataSource.getCatalog(
+      controller.signal,
+    );
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      RemotePreparationCatalogRequestAbortedError,
+    );
+    controller.abort();
+
+    await expectation;
+  });
+
   it("계약과 다른 성공 응답은 거부한다", async () => {
     vi.stubGlobal(
       "fetch",
@@ -114,7 +140,7 @@ describe("remotePreparationCatalogDataSource.getCatalog", () => {
 
     await expect(
       remotePreparationCatalogDataSource.getCatalog(),
-    ).rejects.toThrow("준비 목록 성공 응답 형식이 올바르지 않습니다.");
+    ).rejects.toThrow("Catalog 성공 응답 형식이 올바르지 않습니다.");
   });
   it("오류 응답의 코드와 상태를 API 오류로 변환한다", async () => {
     vi.stubGlobal(

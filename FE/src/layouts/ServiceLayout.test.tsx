@@ -16,6 +16,21 @@ import { PreparationRoadmapFeature } from "../features/preparation/PreparationRo
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { ServiceLayout } from "./ServiceLayout";
 
+function createChecklistItem(
+  id: number,
+  sourceCatalogItemId: number | null,
+  isDone = false,
+) {
+  return {
+    appointments: [],
+    categoryId: 10,
+    id,
+    isDone,
+    sourceCatalogItemId,
+    title: `체크리스트 항목 ${id}`,
+  };
+}
+
 beforeEach(() => {
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
@@ -129,9 +144,9 @@ describe("ServiceLayout", () => {
           JSON.stringify({
             id: 1,
             items: [
-              { id: 10, isDone: true },
-              { id: 11, isDone: false },
-              { id: 12, isDone: true },
+              createChecklistItem(10, null, true),
+              createChecklistItem(11, null),
+              createChecklistItem(12, null, true),
             ],
           }),
           { status: 200 },
@@ -218,8 +233,8 @@ describe("ServiceLayout", () => {
             JSON.stringify({
               id: 1,
               items: [
-                { id: 10, isDone: true, sourceCatalogItemId: 101 },
-                { id: 11, isDone: false, sourceCatalogItemId: 102 },
+                createChecklistItem(10, 101, true),
+                createChecklistItem(11, 102),
               ],
             }),
             { status: 200 },
@@ -290,24 +305,10 @@ describe("ServiceLayout", () => {
                 id: 1,
                 items:
                   checklistRequestCount === 1
-                    ? [
-                        {
-                          id: 10,
-                          isDone: true,
-                          sourceCatalogItemId: 1001,
-                        },
-                      ]
+                    ? [createChecklistItem(10, 1001, true)]
                     : [
-                        {
-                          id: 10,
-                          isDone: true,
-                          sourceCatalogItemId: 1001,
-                        },
-                        {
-                          id: 11,
-                          isDone: false,
-                          sourceCatalogItemId: 1002,
-                        },
+                        createChecklistItem(10, 1001, true),
+                        createChecklistItem(11, 1002),
                       ],
               }),
               { status: 200 },

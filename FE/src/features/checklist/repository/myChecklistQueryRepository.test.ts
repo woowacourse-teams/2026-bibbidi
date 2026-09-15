@@ -16,7 +16,16 @@ import {
 
 const checklist: MyChecklistModel = {
   exists: true,
-  items: [{ isDone: true, sourceCatalogItemId: 101 }],
+  items: [
+    {
+      appointments: [],
+      categoryId: 1,
+      id: 10,
+      isDone: true,
+      sourceCatalogItemId: 101,
+      title: "웨딩홀 계약",
+    },
+  ],
 };
 
 function createDataSource(): RemoteMyChecklistDataSource {
@@ -35,11 +44,13 @@ describe("MyChecklistQueryRepository", () => {
     const repository = createMyChecklistQueryRepository(dataSource);
     const headerRequest = repository.getChecklist();
     const preparationRequest = repository.getChecklist();
+    const checklistScreenRequest = repository.getChecklist();
 
     expect(dataSource.getChecklist).toHaveBeenCalledOnce();
     resolveChecklist(checklist);
     await expect(headerRequest).resolves.toBe(checklist);
     await expect(preparationRequest).resolves.toBe(checklist);
+    await expect(checklistScreenRequest).resolves.toBe(checklist);
     await expect(repository.getChecklist()).resolves.toBe(checklist);
     expect(dataSource.getChecklist).toHaveBeenCalledOnce();
   });

@@ -4,10 +4,23 @@ export {
   useMyChecklistCommandRepository,
   useMyChecklistQueryRepository,
 } from "./MyChecklistProvider";
+export { useChecklistQueryRepository } from "./checklistQueryDependencies";
 export type {
+  ChecklistAudience,
+  ChecklistQueryCategoryModel,
+  ChecklistQueryItemModel,
+  ChecklistQueryModel,
+} from "./model/checklistQuery";
+export type {
+  MyChecklistAppointmentModel,
   MyChecklistItemModel,
   MyChecklistModel,
 } from "./model/myChecklist";
+export {
+  createChecklistQueryRepository,
+  UnknownChecklistCategoryError,
+} from "./repository/checklistQueryRepository";
+export type { ChecklistQueryRepository } from "./repository/checklistQueryRepository";
 export type { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
 export {
   MyChecklistAuthenticationRequiredError,

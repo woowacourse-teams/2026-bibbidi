@@ -25,9 +25,30 @@ describe("AppHeaderSummaryRepository", () => {
     vi.mocked(checklistRepository.getChecklist).mockResolvedValue({
       exists: true,
       items: [
-        { isDone: true, sourceCatalogItemId: 101 },
-        { isDone: false, sourceCatalogItemId: 102 },
-        { isDone: true, sourceCatalogItemId: null },
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 1,
+          isDone: true,
+          sourceCatalogItemId: 101,
+          title: "완료 항목",
+        },
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 2,
+          isDone: false,
+          sourceCatalogItemId: 102,
+          title: "미완료 항목",
+        },
+        {
+          appointments: [],
+          categoryId: 1,
+          id: 3,
+          isDone: true,
+          sourceCatalogItemId: null,
+          title: "직접 작성 항목",
+        },
       ],
     });
     const repository = createAppHeaderSummaryRepository(checklistRepository);

@@ -1,4 +1,7 @@
-import { MyChecklistModel } from "../model/myChecklist";
+import {
+  MyChecklistAppointmentModel,
+  MyChecklistModel,
+} from "../model/myChecklist";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
@@ -68,11 +71,48 @@ function isValidCatalogItemId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
+function isValidId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function parseAppointment(value: unknown): MyChecklistAppointmentModel {
+  if (
+    !isRecord(value) ||
+    !isValidId(value.id) ||
+    typeof value.title !== "string" ||
+    typeof value.date !== "string" ||
+    !isNullableString(value.startTime) ||
+    !isNullableString(value.endTime) ||
+    !isNullableString(value.place) ||
+    !isNullableString(value.memo) ||
+    typeof value.isDone !== "boolean"
+  ) {
+    throw new RemoteMyChecklistContractError();
+  }
+
+  return {
+    date: value.date,
+    endTime: value.endTime,
+    id: value.id,
+    isDone: value.isDone,
+    memo: value.memo,
+    place: value.place,
+    startTime: value.startTime,
+    title: value.title,
+  };
+}
+
 function parseSourceCatalogItemId(
   item: Record<string, unknown>,
 ): number | null {
   const sourceCatalogItemId =
-    item.sourceCatalogItemId ?? item.catalogItemId ?? null;
+    "sourceCatalogItemId" in item
+      ? item.sourceCatalogItemId
+      : item.catalogItemId;
 
   if (
     sourceCatalogItemId !== null &&
@@ -85,25 +125,32 @@ function parseSourceCatalogItemId(
 }
 
 export function parseMyChecklist(value: unknown): MyChecklistModel {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== "number" ||
-    !Array.isArray(value.items) ||
-    value.items.some(
-      (item) => !isRecord(item) || typeof item.isDone !== "boolean",
-    )
-  ) {
+  if (!isRecord(value) || !isValidId(value.id) || !Array.isArray(value.items)) {
     throw new RemoteMyChecklistContractError();
   }
 
   return {
     exists: true,
     items: value.items.map((item) => {
-      const checklistItem = item as Record<string, unknown>;
+      if (
+        !isRecord(item) ||
+        !isValidId(item.id) ||
+        !isValidId(item.categoryId) ||
+        typeof item.title !== "string" ||
+        typeof item.isDone !== "boolean" ||
+        !Array.isArray(item.appointments) ||
+        (!("sourceCatalogItemId" in item) && !("catalogItemId" in item))
+      ) {
+        throw new RemoteMyChecklistContractError();
+      }
 
       return {
-        isDone: checklistItem.isDone as boolean,
-        sourceCatalogItemId: parseSourceCatalogItemId(checklistItem),
+        appointments: item.appointments.map(parseAppointment),
+        categoryId: item.categoryId,
+        id: item.id,
+        isDone: item.isDone,
+        sourceCatalogItemId: parseSourceCatalogItemId(item),
+        title: item.title,
       };
     }),
   };

@@ -1,28 +1,24 @@
+import type {
+  CatalogCategoryModel,
+  CatalogItemModel,
+  CatalogModel,
+  CatalogRoadmapModel,
+  CatalogStepModel,
+} from "../../catalog/model/catalog";
+
 export type PreparationStepStatus = "complete" | "in-progress" | "upcoming";
 export type PreparationAudience = "authenticated" | "guest";
 
-export interface PreparationCategoryModel {
-  id: string;
-  label: string;
-}
-
-export interface PreparationStepModel {
-  id: string;
-  iconUrl?: string;
-  order: number;
-  title: string;
-}
+export type PreparationCategoryModel = CatalogCategoryModel;
+export type PreparationStepModel = CatalogStepModel;
 
 export interface PreparationStepProgressModel {
   status: PreparationStepStatus;
   stepId: string;
 }
 
-export interface PreparationDetailTaskModel {
-  essential?: boolean;
-  id: string;
+export interface PreparationDetailTaskModel extends CatalogItemModel {
   included: boolean;
-  title: string;
 }
 
 export interface PreparationStepDetailModel {
@@ -31,15 +27,25 @@ export interface PreparationStepDetailModel {
   tasks: PreparationDetailTaskModel[];
 }
 
-export interface PreparationRoadmapModel {
-  categoryId: string;
-  steps: PreparationStepModel[];
+export type PreparationRoadmapModel = CatalogRoadmapModel;
+
+export interface PreparationCatalogModel extends Omit<
+  CatalogModel,
+  "stepDetails"
+> {
+  stepDetails: PreparationStepDetailModel[];
 }
 
-export interface PreparationCatalogModel {
-  categories: PreparationCategoryModel[];
-  roadmaps: PreparationRoadmapModel[];
-  stepDetails: PreparationStepDetailModel[];
+export function createPreparationCatalogModel(
+  catalog: CatalogModel,
+): PreparationCatalogModel {
+  return {
+    ...catalog,
+    stepDetails: catalog.stepDetails.map((stepDetail) => ({
+      ...stepDetail,
+      tasks: stepDetail.tasks.map((task) => ({ ...task, included: false })),
+    })),
+  };
 }
 
 export function applyChecklistCatalogItemIds(

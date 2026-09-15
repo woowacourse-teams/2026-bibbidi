@@ -7,6 +7,21 @@ import { ChecklistMigrationProvider } from "./ChecklistMigrationProvider";
 
 const STORAGE_KEY = "bibbidi:preparation-checklist";
 
+function createChecklistItem(
+  id: number,
+  sourceCatalogItemId: number | null,
+  isDone = false,
+) {
+  return {
+    appointments: [],
+    categoryId: 10,
+    id,
+    isDone,
+    sourceCatalogItemId,
+    title: `체크리스트 항목 ${id}`,
+  };
+}
+
 function createStorage(catalogItemIds: number[] = []) {
   let serializedValue =
     catalogItemIds.length === 0
@@ -103,24 +118,10 @@ describe("ChecklistMigrationProvider", () => {
                 id: 1,
                 items:
                   checklistRequestCount === 1
-                    ? [
-                        {
-                          id: 10,
-                          isDone: false,
-                          sourceCatalogItemId: 101,
-                        },
-                      ]
+                    ? [createChecklistItem(10, 101)]
                     : [
-                        {
-                          id: 10,
-                          isDone: false,
-                          sourceCatalogItemId: 101,
-                        },
-                        {
-                          id: 11,
-                          isDone: false,
-                          sourceCatalogItemId: 102,
-                        },
+                        createChecklistItem(10, 101),
+                        createChecklistItem(11, 102),
                       ],
               }),
               { status: 200 },
@@ -247,7 +248,7 @@ describe("ChecklistMigrationProvider", () => {
               JSON.stringify({
                 id: 1,
                 items: hasAddedCatalogItem
-                  ? [{ id: 10, isDone: false, sourceCatalogItemId: 101 }]
+                  ? [createChecklistItem(10, 101)]
                   : [],
               }),
               { status: 200 },
@@ -344,15 +345,7 @@ describe("ChecklistMigrationProvider", () => {
               JSON.stringify({
                 id: 1,
                 items:
-                  addRequestCount >= 2
-                    ? [
-                        {
-                          id: 10,
-                          isDone: false,
-                          sourceCatalogItemId: 101,
-                        },
-                      ]
-                    : [],
+                  addRequestCount >= 2 ? [createChecklistItem(10, 101)] : [],
               }),
               { status: 200 },
             ),

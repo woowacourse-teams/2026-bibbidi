@@ -6,6 +6,17 @@ import { AuthProvider, useAuth } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { LoginPage } from "./LoginPage";
 
+function createChecklistItem(id: number, sourceCatalogItemId: number | null) {
+  return {
+    appointments: [],
+    categoryId: 10,
+    id,
+    isDone: false,
+    sourceCatalogItemId,
+    title: `체크리스트 항목 ${id}`,
+  };
+}
+
 beforeEach(() => {
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
@@ -112,7 +123,7 @@ describe("LoginPage", () => {
         new Response(
           JSON.stringify({
             id: 1,
-            items: [{ id: 10, isDone: false, sourceCatalogItemId: 101 }],
+            items: [createChecklistItem(10, 101)],
           }),
           { status: 200 },
         ),

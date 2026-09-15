@@ -26,9 +26,13 @@ function createChecklist(
 ): MyChecklistModel {
   return {
     exists,
-    items: catalogItemIds.map((sourceCatalogItemId) => ({
+    items: catalogItemIds.map((sourceCatalogItemId, index) => ({
+      appointments: [],
+      categoryId: 1,
+      id: index + 1,
       isDone: false,
       sourceCatalogItemId,
+      title: `체크리스트 항목 ${index + 1}`,
     })),
   };
 }
