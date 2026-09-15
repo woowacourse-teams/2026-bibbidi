@@ -9,6 +9,7 @@ const STORAGE_KEY = "bibbidi:preparation-checklist";
 function createStorage(serializedValue: string | null = null) {
   return {
     getItem: vi.fn().mockReturnValue(serializedValue),
+    removeItem: vi.fn(),
     setItem: vi.fn(),
   } as unknown as Storage;
 }
@@ -65,6 +66,64 @@ describe("LocalChecklistDataSource", () => {
     );
   });
 
+  it("확인된 ID만 제거하고 남은 ID를 저장한다", () => {
+    const storage = createStorage(
+      JSON.stringify({ version: 1, catalogItemIds: [101, 102, 103] }),
+    );
+    const dataSource = createLocalChecklistDataSource(() => storage);
+
+    dataSource.removeCatalogItemIds([101, 103]);
+
+    expect(storage.setItem).toHaveBeenCalledWith(
+      STORAGE_KEY,
+      JSON.stringify({ version: 1, catalogItemIds: [102] }),
+    );
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it("모든 ID가 확인되면 저장소 키를 제거한다", () => {
+    const storage = createStorage(
+      JSON.stringify({ version: 1, catalogItemIds: [101, 102] }),
+    );
+    const dataSource = createLocalChecklistDataSource(() => storage);
+
+    dataSource.removeCatalogItemIds([101, 102]);
+
+    expect(storage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+    expect(storage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("정리 시점의 최신 저장값에서 확인된 ID만 제거한다", () => {
+    const storage = createStorage(
+      JSON.stringify({ version: 1, catalogItemIds: [101, 102] }),
+    );
+    const dataSource = createLocalChecklistDataSource(() => storage);
+
+    expect(dataSource.getCatalogItemIds()).toEqual([101, 102]);
+    vi.mocked(storage.getItem).mockReturnValue(
+      JSON.stringify({ version: 1, catalogItemIds: [101, 102, 103] }),
+    );
+
+    dataSource.removeCatalogItemIds([101, 102]);
+
+    expect(storage.setItem).toHaveBeenCalledWith(
+      STORAGE_KEY,
+      JSON.stringify({ version: 1, catalogItemIds: [103] }),
+    );
+  });
+
+  it("확인된 ID가 현재 저장값에 없으면 저장소를 수정하지 않는다", () => {
+    const storage = createStorage(
+      JSON.stringify({ version: 1, catalogItemIds: [101] }),
+    );
+    const dataSource = createLocalChecklistDataSource(() => storage);
+
+    dataSource.removeCatalogItemIds([102]);
+
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
   it("저장소 읽기 실패를 DataSource 오류로 변환한다", () => {
     const storage = createStorage();
     vi.mocked(storage.getItem).mockImplementation(() => {
@@ -99,5 +158,19 @@ describe("LocalChecklistDataSource", () => {
     } catch (error) {
       expect(error).toMatchObject({ operation: "write" });
     }
+  });
+
+  it("저장소 키 제거 실패를 DataSource 쓰기 오류로 변환한다", () => {
+    const storage = createStorage(
+      JSON.stringify({ version: 1, catalogItemIds: [101] }),
+    );
+    vi.mocked(storage.removeItem).mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const dataSource = createLocalChecklistDataSource(() => storage);
+
+    expect(() => dataSource.removeCatalogItemIds([101])).toThrowError(
+      LocalChecklistStorageError,
+    );
   });
 });

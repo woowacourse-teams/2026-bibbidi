@@ -13,8 +13,9 @@ import { AuthState, CurrentUser } from "./model/auth";
 
 interface AuthContextValue {
   authState: AuthState;
+  beginAuthentication: (user: CurrentUser) => void;
+  completeAuthentication: (user: CurrentUser) => void;
   refreshAuth: () => void;
-  setAuthenticatedUser: (user: CurrentUser) => void;
 }
 
 interface AuthProviderProps {
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getCurrentUser(controller.signal)
       .then((user) => {
         if (isActive) {
-          setAuthState({ status: "authenticated", user });
+          setAuthState({ status: "synchronizing", user });
         }
       })
       .catch((error: unknown) => {
@@ -65,8 +66,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [requestRevision]);
 
-  const setAuthenticatedUser = useCallback((user: CurrentUser) => {
-    setAuthState({ status: "authenticated", user });
+  const beginAuthentication = useCallback((user: CurrentUser) => {
+    setAuthState({ status: "synchronizing", user });
+  }, []);
+
+  const completeAuthentication = useCallback((user: CurrentUser) => {
+    setAuthState((currentState) => {
+      if (
+        currentState.status !== "synchronizing" ||
+        currentState.user.nickname !== user.nickname
+      ) {
+        return currentState;
+      }
+
+      return { status: "authenticated", user };
+    });
   }, []);
 
   const refreshAuth = useCallback(() => {
@@ -75,8 +89,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const contextValue = useMemo(
-    () => ({ authState, refreshAuth, setAuthenticatedUser }),
-    [authState, refreshAuth, setAuthenticatedUser],
+    () => ({
+      authState,
+      beginAuthentication,
+      completeAuthentication,
+      refreshAuth,
+    }),
+    [authState, beginAuthentication, completeAuthentication, refreshAuth],
   );
 
   let content = children;

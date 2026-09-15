@@ -82,7 +82,7 @@ describe("MyChecklistProvider", () => {
     ).toThrowError(/MyChecklistProvider/);
   });
 
-  it("인증 세션이 바뀌면 하위의 세션별 상태를 초기화한다", () => {
+  it("인증 세션이 바뀌어도 하위 UI 상태를 직접 초기화하지 않는다", () => {
     const { rerender } = render(
       renderProvider(<SessionStateProbe />, "authenticated:first-user"),
     );
@@ -93,6 +93,6 @@ describe("MyChecklistProvider", () => {
     rerender(
       renderProvider(<SessionStateProbe />, "authenticated:second-user"),
     );
-    expect(screen.getByRole("button", { name: "0" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1" })).toBeTruthy();
   });
 });

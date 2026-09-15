@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router/dom";
 
 import { router } from "./app/router";
 import { AuthProvider } from "./features/auth";
+import { ChecklistMigrationProvider } from "./features/checklist-migration";
 import { analytics } from "./infrastructure/analytics";
 import "./styles/colors.css";
 import "./index.css";
@@ -19,7 +20,9 @@ analytics.initialize();
 createRoot(rootElement).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <ChecklistMigrationProvider>
+        <RouterProvider router={router} />
+      </ChecklistMigrationProvider>
     </AuthProvider>
   </StrictMode>,
 );

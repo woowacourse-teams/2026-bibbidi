@@ -10,15 +10,22 @@ afterEach(() => {
 function AuthStateView() {
   const { authState } = useAuth();
 
-  if (authState.status === "authenticated") {
-    return <p>로그인 사용자 {authState.user.nickname}</p>;
+  if (
+    authState.status === "authenticated" ||
+    authState.status === "synchronizing"
+  ) {
+    return (
+      <p>
+        {authState.status} 사용자 {authState.user.nickname}
+      </p>
+    );
   }
 
   return <p>{authState.status}</p>;
 }
 
 describe("AuthProvider", () => {
-  it("현재 사용자 응답으로 로그인 상태를 복원한다", async () => {
+  it("현재 사용자 응답으로 체크리스트 동기화 상태를 시작한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -35,7 +42,9 @@ describe("AuthProvider", () => {
     );
 
     expect(screen.getByText("loading")).toBeTruthy();
-    expect(await screen.findByText("로그인 사용자 bibbidi")).toBeTruthy();
+    expect(
+      await screen.findByText("synchronizing 사용자 bibbidi"),
+    ).toBeTruthy();
   });
 
   it.each([401, 404])("%i 응답을 비로그인 상태로 처리한다", async (status) => {
@@ -111,7 +120,9 @@ describe("AuthProvider", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
-    expect(await screen.findByText("로그인 사용자 bibbidi")).toBeTruthy();
+    expect(
+      await screen.findByText("synchronizing 사용자 bibbidi"),
+    ).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

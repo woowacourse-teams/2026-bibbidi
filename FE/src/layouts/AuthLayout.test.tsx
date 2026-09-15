@@ -1,9 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
+import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { AuthLayout } from "./AuthLayout";
+
+beforeEach(() => {
+  vi.stubGlobal("localStorage", {
+    getItem: vi.fn().mockReturnValue(null),
+    removeItem: vi.fn(),
+    setItem: vi.fn(),
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,14 +31,16 @@ describe("AuthLayout", () => {
 
     render(
       <AuthProvider>
-        <MemoryRouter initialEntries={["/login"]}>
-          <Routes>
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<h1>로그인 페이지</h1>} />
-            </Route>
-            <Route path="/" element={<h1>홈 페이지</h1>} />
-          </Routes>
-        </MemoryRouter>
+        <ChecklistMigrationProvider>
+          <MemoryRouter initialEntries={["/login"]}>
+            <Routes>
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<h1>로그인 페이지</h1>} />
+              </Route>
+              <Route path="/" element={<h1>홈 페이지</h1>} />
+            </Routes>
+          </MemoryRouter>
+        </ChecklistMigrationProvider>
       </AuthProvider>,
     );
 

@@ -4,13 +4,13 @@ import { useAuth } from "../features/auth";
 import { LoginForm } from "../features/login";
 
 export function LoginPage() {
-  const { setAuthenticatedUser } = useAuth();
+  const { beginAuthentication } = useAuth();
   const navigate = useNavigate();
 
   return (
     <LoginForm
       onSuccess={(result) => {
-        setAuthenticatedUser({ nickname: result.nickname });
+        beginAuthentication({ nickname: result.nickname });
         navigate("/", { replace: true });
       }}
       signupLink={<Link to="/signup">회원가입</Link>}
