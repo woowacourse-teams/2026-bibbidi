@@ -1,6 +1,5 @@
 import {
   calculateChecklistProgress,
-  ChecklistCategoryModel,
   ChecklistTaskStatus,
 } from "../model/checklist";
 import {
@@ -15,11 +14,25 @@ const statusLabels: Record<ChecklistTaskStatus, string> = {
 };
 
 export interface ChecklistTaskViewModel {
+  appointments: ChecklistAppointmentViewModel[];
   id: string;
   title: string;
   schedule: string;
   status: ChecklistTaskStatus;
   statusLabel: string;
+}
+
+export interface ChecklistAppointmentViewModel {
+  date: string;
+  dateLabel: string;
+  dayLabel: string;
+  id: number;
+  isDone: boolean;
+  memoLabel: string;
+  monthLabel: string;
+  placeLabel: string;
+  timeLabel: string;
+  title: string;
 }
 
 export interface ChecklistCategoryViewModel {
@@ -50,6 +63,66 @@ function formatScheduleDate(date: string): string {
   return `${Number(match[2])}월 ${Number(match[3])}일`;
 }
 
+function formatAppointmentTime(time: string): string {
+  const match = /(?:^|T)(\d{2}):(\d{2})(?::\d{2})?$/.exec(time);
+
+  if (!match) {
+    return time;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = hour < 12 ? "오전" : "오후";
+  const displayHour = hour % 12 || 12;
+
+  return minute === 0
+    ? `${period} ${displayHour}시`
+    : `${period} ${displayHour}시 ${minute}분`;
+}
+
+function getAppointmentTimeLabel(
+  startTime: string | null,
+  endTime: string | null,
+): string {
+  if (startTime && endTime) {
+    return `${formatAppointmentTime(startTime)}–${formatAppointmentTime(endTime)}`;
+  }
+
+  if (startTime) {
+    return formatAppointmentTime(startTime);
+  }
+
+  if (endTime) {
+    return `${formatAppointmentTime(endTime)} 종료`;
+  }
+
+  return "시간 없음";
+}
+
+function createAppointmentViewModel(
+  appointment: ChecklistQueryItemModel["appointments"][number],
+): ChecklistAppointmentViewModel {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(appointment.date);
+  const month = dateMatch ? Number(dateMatch[2]) : undefined;
+  const day = dateMatch ? Number(dateMatch[3]) : undefined;
+
+  return {
+    date: appointment.date,
+    dateLabel: formatScheduleDate(appointment.date),
+    dayLabel: day === undefined ? appointment.date : `${day}일`,
+    id: appointment.id,
+    isDone: appointment.isDone,
+    memoLabel: appointment.memo?.trim() || "메모 없음",
+    monthLabel: month === undefined ? "날짜" : `${month}월`,
+    placeLabel: appointment.place?.trim() || "장소 없음",
+    timeLabel: getAppointmentTimeLabel(
+      appointment.startTime,
+      appointment.endTime,
+    ),
+    title: appointment.title,
+  };
+}
+
 function getTaskSchedule(item: ChecklistQueryItemModel): string {
   const earliestDate = item.appointments.reduce<string | undefined>(
     (currentDate, appointment) =>
@@ -64,13 +137,12 @@ function getTaskSchedule(item: ChecklistQueryItemModel): string {
     : formatScheduleDate(earliestDate);
 }
 
-function createChecklistCategories(
-  checklist: ChecklistQueryModel,
-): ChecklistCategoryModel[] {
+function createChecklistCategories(checklist: ChecklistQueryModel) {
   return checklist.categories.map((category) => ({
     expanded: category.items.length > 0,
     id: category.id,
     tasks: category.items.map((item) => ({
+      appointments: item.appointments.map(createAppointmentViewModel),
       id: item.id,
       schedule: getTaskSchedule(item),
       status: getTaskStatus(item),

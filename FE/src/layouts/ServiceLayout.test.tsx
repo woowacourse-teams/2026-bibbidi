@@ -261,7 +261,7 @@ describe("ServiceLayout", () => {
     ).toHaveLength(1);
   });
 
-  it("체크리스트 화면과 헤더가 내 체크리스트 GET 요청을 공유한다", async () => {
+  it("체크리스트 화면·헤더·상세 패널이 내 체크리스트 GET 요청을 공유한다", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
@@ -298,7 +298,13 @@ describe("ServiceLayout", () => {
       ["/checklist"],
     );
 
-    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /체크리스트 항목 10/ }),
+    );
+
+    expect(
+      screen.getByRole("complementary", { name: "체크리스트 항목 10" }),
+    ).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
