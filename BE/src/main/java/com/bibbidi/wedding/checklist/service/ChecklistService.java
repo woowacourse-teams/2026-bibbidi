@@ -3,6 +3,7 @@ package com.bibbidi.wedding.checklist.service;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
@@ -14,29 +15,37 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.common.random.Shuffler;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class ChecklistService {
+
+    private static final int UNSCHEDULED_ITEM_LIMIT = 4;
 
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
     private final ChecklistAppointmentService checklistAppointmentService;
+    private final Shuffler shuffler;
 
     public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService,
-                            ChecklistAppointmentService checklistAppointmentService) {
+                            ChecklistAppointmentService checklistAppointmentService, Shuffler shuffler) {
         this.checklistRepository = checklistRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentService = checklistAppointmentService;
+        this.shuffler = shuffler;
     }
 
     @Transactional
@@ -60,6 +69,58 @@ public class ChecklistService {
         ChecklistProgress progress = checklist.calculateProgress();
 
         return ChecklistProgressResult.from(progress);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UnscheduledChecklistItemResult> findUnscheduledItems(Long ownerId) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+
+        List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
+        CategoryNames categoryNames = findCategoryNames(unscheduledItems);
+        List<ChecklistItem> candidates = excludeUncategorizedItems(unscheduledItems, categoryNames);
+        List<ChecklistItem> pickedItems = pickRandomly(candidates);
+
+        return toResults(pickedItems, categoryNames);
+    }
+
+    private List<ChecklistItem> excludeScheduledItems(Checklist checklist) {
+        Set<Long> scheduledItemIds = checklistAppointmentService
+                .findScheduledChecklistItemIds(checklist.undoneItemIds());
+        return checklist.unscheduledItems(scheduledItemIds);
+    }
+
+    private CategoryNames findCategoryNames(List<ChecklistItem> items) {
+        Set<Long> categoryIds = items.stream()
+                .map(ChecklistItem::categoryId)
+                .collect(Collectors.toSet());
+        return catalogService.findCategoryNames(categoryIds);
+    }
+
+    private List<ChecklistItem> excludeUncategorizedItems(List<ChecklistItem> items, CategoryNames categoryNames) {
+        return items.stream()
+                .filter(item -> hasCategoryName(item, categoryNames))
+                .toList();
+    }
+
+    private boolean hasCategoryName(ChecklistItem item, CategoryNames categoryNames) {
+        if (categoryNames.contains(item.categoryId())) {
+            return true;
+        }
+
+        log.warn("카테고리를 찾을 수 없는 할 일입니다. checklistItemId={}, categoryId={}", item.id(), item.categoryId());
+        return false;
+    }
+
+    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates) {
+        return shuffler.shuffle(candidates).stream()
+                .limit(UNSCHEDULED_ITEM_LIMIT)
+                .toList();
+    }
+
+    private List<UnscheduledChecklistItemResult> toResults(List<ChecklistItem> items, CategoryNames categoryNames) {
+        return items.stream()
+                .map(item -> UnscheduledChecklistItemResult.from(item, categoryNames.nameOf(item.categoryId())))
+                .toList();
     }
 
     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(
