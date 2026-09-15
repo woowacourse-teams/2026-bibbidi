@@ -1,12 +1,14 @@
 export { ChecklistFeature } from "./ChecklistFeature";
 export {
-  MyChecklistQueryProvider,
+  MyChecklistProvider,
+  useMyChecklistCommandRepository,
   useMyChecklistQueryRepository,
-} from "./MyChecklistQueryProvider";
+} from "./MyChecklistProvider";
 export type {
   MyChecklistItemModel,
   MyChecklistModel,
 } from "./model/myChecklist";
+export type { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
 export {
   MyChecklistAuthenticationRequiredError,
   MyChecklistLoadError,

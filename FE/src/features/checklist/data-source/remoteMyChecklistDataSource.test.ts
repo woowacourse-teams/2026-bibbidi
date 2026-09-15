@@ -36,6 +36,7 @@ describe("parseMyChecklist", () => {
         ],
       }),
     ).toEqual({
+      exists: true,
       items: [
         { isDone: true, sourceCatalogItemId: 101 },
         { isDone: false, sourceCatalogItemId: null },
@@ -50,12 +51,16 @@ describe("parseMyChecklist", () => {
         items: [{ catalogItemId: 201, id: 10, isDone: false }],
       }),
     ).toEqual({
+      exists: true,
       items: [{ isDone: false, sourceCatalogItemId: 201 }],
     });
   });
 
   it("빈 items를 처리한다", () => {
-    expect(parseMyChecklist({ id: 1, items: [] })).toEqual({ items: [] });
+    expect(parseMyChecklist({ id: 1, items: [] })).toEqual({
+      exists: true,
+      items: [],
+    });
   });
 
   it.each([
@@ -84,6 +89,7 @@ describe("remoteMyChecklistDataSource.getChecklist", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(remoteMyChecklistDataSource.getChecklist()).resolves.toEqual({
+      exists: true,
       items: [{ isDone: true, sourceCatalogItemId: 101 }],
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/checklists/me", {

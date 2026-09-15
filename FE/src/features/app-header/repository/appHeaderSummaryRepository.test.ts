@@ -23,6 +23,7 @@ describe("AppHeaderSummaryRepository", () => {
   it("공통 체크리스트를 헤더 요약 Model로 변환한다", async () => {
     const checklistRepository = createChecklistRepository();
     vi.mocked(checklistRepository.getChecklist).mockResolvedValue({
+      exists: true,
       items: [
         { isDone: true, sourceCatalogItemId: 101 },
         { isDone: false, sourceCatalogItemId: 102 },
@@ -39,19 +40,23 @@ describe("AppHeaderSummaryRepository", () => {
     expect(checklistRepository.getChecklist).toHaveBeenCalledWith(undefined);
   });
 
-  it("빈 체크리스트를 0/0 헤더 Model로 변환한다", async () => {
-    const checklistRepository = createChecklistRepository();
-    vi.mocked(checklistRepository.getChecklist).mockResolvedValue({
-      items: [],
-    });
-    const repository = createAppHeaderSummaryRepository(checklistRepository);
+  it.each([true, false])(
+    "빈 체크리스트와 체크리스트 없음 모두 0/0 헤더 Model로 변환한다",
+    async (exists) => {
+      const checklistRepository = createChecklistRepository();
+      vi.mocked(checklistRepository.getChecklist).mockResolvedValue({
+        exists,
+        items: [],
+      });
+      const repository = createAppHeaderSummaryRepository(checklistRepository);
 
-    await expect(repository.getSummary()).resolves.toEqual({
-      completedTaskCount: 0,
-      totalTaskCount: 0,
-      weddingDate: { status: "unset" },
-    });
-  });
+      await expect(repository.getSummary()).resolves.toEqual({
+        completedTaskCount: 0,
+        totalTaskCount: 0,
+        weddingDate: { status: "unset" },
+      });
+    },
+  );
 
   it("공통 인증 오류를 헤더 인증 만료 의미로 변환한다", async () => {
     const checklistRepository = createChecklistRepository();

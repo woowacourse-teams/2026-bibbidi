@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -261,6 +268,98 @@ describe("ServiceLayout", () => {
       await screen.findByRole("heading", { name: "준비 로드맵" }),
     ).toBeTruthy();
     expect(await screen.findByText("50%")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("체크리스트가 없으면 생성한 뒤 준비 항목을 추가한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                errorCode: 303,
+                message: "체크리스트를 찾을 수 없습니다.",
+              }),
+              { status: 404 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists" && init?.method === "POST") {
+          return Promise.resolve(
+            new Response(JSON.stringify(1), { status: 201 }),
+          );
+        }
+
+        if (
+          url === "/api/checklists/me/catalog-items" &&
+          init?.method === "POST"
+        ) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ items: [{ catalogItemId: 1001, id: 10 }] }),
+              { status: 201 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/preparation"]}>
+          <Routes>
+            <Route element={<ServiceLayout />}>
+              <Route
+                path="/preparation"
+                element={<PreparationRoadmapFeature />}
+              />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    const addButton = await screen.findByRole("button", {
+      name: "첫 번째 할 일 추가",
+    });
+    fireEvent.click(addButton);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
+      ).toBeNull(),
+    );
+    const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
+    const createRequestIndex = requestedUrls.indexOf("/api/checklists");
+    const addRequestIndex = requestedUrls.indexOf(
+      "/api/checklists/me/catalog-items",
+    );
+
+    expect(createRequestIndex).toBeGreaterThanOrEqual(0);
+    expect(addRequestIndex).toBeGreaterThan(createRequestIndex);
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

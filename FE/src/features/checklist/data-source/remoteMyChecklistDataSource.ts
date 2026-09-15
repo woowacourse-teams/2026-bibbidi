@@ -97,6 +97,7 @@ export function parseMyChecklist(value: unknown): MyChecklistModel {
   }
 
   return {
+    exists: true,
     items: value.items.map((item) => {
       const checklistItem = item as Record<string, unknown>;
 

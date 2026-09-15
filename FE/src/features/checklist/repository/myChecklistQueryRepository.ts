@@ -49,7 +49,7 @@ async function loadChecklist(
       error.status === 404 &&
       error.errorCode === 303
     ) {
-      return { items: [] };
+      return { exists: false, items: [] };
     }
 
     if (

@@ -27,16 +27,30 @@ export class RemoteChecklistApiError extends Error {
 }
 
 export class RemoteChecklistNetworkError extends Error {
-  constructor() {
-    super("체크리스트 요청 중 네트워크 오류가 발생했습니다.");
+  constructor(options?: ErrorOptions) {
+    super("체크리스트 요청 중 네트워크 오류가 발생했습니다.", options);
     this.name = "RemoteChecklistNetworkError";
   }
 }
 
 export class RemoteChecklistTimeoutError extends Error {
-  constructor() {
-    super("체크리스트 요청 시간이 초과됐습니다.");
+  constructor(options?: ErrorOptions) {
+    super("체크리스트 요청 시간이 초과됐습니다.", options);
     this.name = "RemoteChecklistTimeoutError";
+  }
+}
+
+class RemoteChecklistRequestAbortedError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("체크리스트 요청이 취소됐습니다.", options);
+    this.name = "RemoteChecklistRequestAbortedError";
+  }
+}
+
+class RemoteChecklistContractError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "RemoteChecklistContractError";
   }
 }
 
@@ -72,18 +86,23 @@ export function parseAddedChecklistCatalogItemIds(value: unknown): number[] {
   return [...new Set(catalogItemIds)];
 }
 
-function toRequestError(didTimeout: boolean): Error {
+function toRequestError(
+  error: unknown,
+  didTimeout: boolean,
+  callerSignal?: AbortSignal,
+): Error {
   if (didTimeout) {
-    return new RemoteChecklistTimeoutError();
+    return new RemoteChecklistTimeoutError({ cause: error });
   }
 
-  return new RemoteChecklistNetworkError();
+  if (callerSignal?.aborted) {
+    return new RemoteChecklistRequestAbortedError({ cause: error });
+  }
+
+  return new RemoteChecklistNetworkError({ cause: error });
 }
 
-async function addCatalogItemIds(
-  catalogItemIds: number[],
-  signal?: AbortSignal,
-): Promise<number[]> {
+function createRequestController(signal?: AbortSignal) {
   const controller = new AbortController();
   let didTimeout = false;
   const handleCallerAbort = () => controller.abort();
@@ -98,6 +117,22 @@ async function addCatalogItemIds(
     signal?.addEventListener("abort", handleCallerAbort, { once: true });
   }
 
+  return {
+    controller,
+    didTimeout: () => didTimeout,
+    dispose() {
+      window.clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", handleCallerAbort);
+    },
+  };
+}
+
+async function addCatalogItemIds(
+  catalogItemIds: number[],
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const request = createRequestController(signal);
+
   try {
     let response: Response;
 
@@ -109,10 +144,10 @@ async function addCatalogItemIds(
           "Content-Type": "application/json",
         },
         method: "POST",
-        signal: controller.signal,
+        signal: request.controller.signal,
       });
-    } catch {
-      throw toRequestError(didTimeout);
+    } catch (error) {
+      throw toRequestError(error, request.didTimeout(), signal);
     }
 
     let body: unknown;
@@ -120,17 +155,18 @@ async function addCatalogItemIds(
     try {
       body = await response.json();
     } catch (error) {
-      if (didTimeout || error instanceof TypeError) {
-        throw toRequestError(didTimeout);
+      if (request.didTimeout() || signal?.aborted) {
+        throw toRequestError(error, request.didTimeout(), signal);
       }
 
       if (!response.ok) {
         throw new RemoteChecklistApiError(0, response.status);
       }
 
-      throw new Error("체크리스트 추가 성공 응답을 해석하지 못했습니다.", {
-        cause: error,
-      });
+      throw new RemoteChecklistContractError(
+        "체크리스트 추가 성공 응답을 해석하지 못했습니다.",
+        { cause: error },
+      );
     }
 
     if (!response.ok) {
@@ -145,8 +181,7 @@ async function addCatalogItemIds(
 
     return parseAddedChecklistCatalogItemIds(body);
   } finally {
-    window.clearTimeout(timeoutId);
-    signal?.removeEventListener("abort", handleCallerAbort);
+    request.dispose();
   }
 }
 
