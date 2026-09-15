@@ -1,12 +1,10 @@
 package com.bibbidi.wedding.checklist.controller.dto.resp;
 
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
-public record AppointmentResponse(
+public record NearbyAppointmentResponse(
         Long id,
         Long checklistItemId,
         String title,
@@ -15,12 +13,11 @@ public record AppointmentResponse(
         LocalDateTime endTime,
         String place,
         String memo,
-        boolean isDone,
-        List<AppointmentConflict> conflicts
+        boolean isDone
 ) {
 
-    public static AppointmentResponse from(AppointmentResult appointment) {
-        return new AppointmentResponse(
+    public static NearbyAppointmentResponse from(AppointmentResult appointment) {
+        return new NearbyAppointmentResponse(
                 appointment.id(),
                 appointment.checklistItemId(),
                 appointment.title(),
@@ -29,9 +26,7 @@ public record AppointmentResponse(
                 appointment.endTime(),
                 appointment.place(),
                 appointment.memo(),
-                appointment.isDone(),
-                appointment.conflicts()
+                appointment.isDone()
         );
     }
-
 }

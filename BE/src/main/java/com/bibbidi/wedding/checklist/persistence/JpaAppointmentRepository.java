@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.persistence;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -66,5 +67,21 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
             Long userId,
             LocalDateTime startTime,
             LocalDateTime endTime
+    );
+
+    @Query("""
+            SELECT appointment
+            FROM JpaAppointmentEntity appointment
+            JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
+            WHERE item.checklist.ownerId = :userId
+              AND appointment.isDone = false
+              AND (appointment.date > :today
+                   OR (appointment.date = :today
+                       AND (appointment.startTime IS NULL OR appointment.startTime >= :now)))
+            """)
+    List<JpaAppointmentEntity> findNearby(
+            @Param("userId") Long userId,
+            @Param("today") LocalDate today,
+            @Param("now") LocalDateTime now
     );
 }

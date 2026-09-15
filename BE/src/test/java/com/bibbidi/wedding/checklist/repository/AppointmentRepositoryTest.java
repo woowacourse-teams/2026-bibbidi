@@ -294,6 +294,78 @@ class AppointmentRepositoryTest {
         return saveChecklistItem(checklist);
     }
 
+    @Test
+    @DisplayName("완료되지 않은 오늘 이후 일정만 가까운 일정으로 조회한다")
+    void shouldFindOnlyRemainingUpcomingAppointmentsAsNearby() {
+        Long itemId = saveOwnedChecklistItem();
+        Appointment tomorrow = saveAppointmentOnDate(itemId, LocalDate.now().plusDays(1), null, "내일 일정");
+        saveAppointmentOnDate(itemId, LocalDate.now().minusDays(1), null, "지난 일정");
+        saveDoneAppointmentOnDate(itemId, LocalDate.now().plusDays(1), "완료된 미래 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactly(tomorrow.id());
+    }
+
+    @Test
+    @DisplayName("오늘 날짜 일정은 시작 시각이 현재 이후이거나 시각이 없을 때만 가까운 일정에 포함한다")
+    void shouldIncludeTodaysAppointmentOnlyWhenNotYetStartedOrTimeless() {
+        Long itemId = saveOwnedChecklistItem();
+        Appointment upcomingToday = saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().plusHours(1), "이따 일정");
+        Appointment timelessToday = saveAppointmentOnDate(itemId, LocalDate.now(), null, "시각 없는 오늘 일정");
+        saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().minusHours(1), "지난 오늘 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactlyInAnyOrder(upcomingToday.id(), timelessToday.id());
+    }
+
+    @Test
+    @DisplayName("다른 사용자 소유 일정은 가까운 일정에 포함하지 않는다")
+    void shouldExcludeOtherUsersAppointmentFromNearby() {
+        JpaChecklistEntity otherUsersChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 2L));
+        Long otherUsersItemId = saveChecklistItem(otherUsersChecklist);
+        saveAppointmentOnDate(otherUsersItemId, LocalDate.now().plusDays(1), null, "다른 사용자 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L);
+
+        assertThat(found).isEmpty();
+    }
+
+    private Appointment saveAppointmentOnDate(Long checklistItemId, LocalDate date, LocalDateTime startTime, String title) {
+        return appointmentRepository.save(new Appointment(
+                null,
+                checklistItemId,
+                title,
+                date,
+                startTime,
+                startTime,
+                startTime == null ? null : "place",
+                null,
+                false,
+                false
+        ));
+    }
+
+    private Appointment saveDoneAppointmentOnDate(Long checklistItemId, LocalDate date, String title) {
+        return appointmentRepository.save(new Appointment(
+                null,
+                checklistItemId,
+                title,
+                date,
+                null,
+                null,
+                null,
+                null,
+                true,
+                false
+        ));
+    }
+
     private static Appointment probe(int startHour, int startMinute, int endHour, int endMinute) {
         return new Appointment(
                 999L,
