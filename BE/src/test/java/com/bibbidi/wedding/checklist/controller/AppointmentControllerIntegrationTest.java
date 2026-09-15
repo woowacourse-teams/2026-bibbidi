@@ -6,6 +6,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -592,6 +593,79 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @DisplayName("인증된 사용자가 가까운 일정을 조회한다")
+    void shouldReturnNearbyAppointmentsForAuthenticatedUser() throws Exception {
+        createAppointment(LocalDate.now().minusDays(1), false);
+        createAppointment(LocalDate.now().plusDays(1), true);
+        Long nearbyAppointmentId = createAppointment(LocalDate.now().plusDays(2), false);
+
+        mockMvc.perform(get("/api/appointments/me/nearby")
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(nearbyAppointmentId))
+                .andDo(document(
+                                "appointments-nearby",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("가까운 일정 조회")
+                                        .description("완료되지 않은 일정 중 오늘 이후의 일정을 가까운 순서로 조회합니다.")
+                                        .responseSchema(schema("NearbyAppointmentResponse"))
+                                        .queryParameters(
+                                                parameterWithName("limit")
+                                                        .description("조회할 최대 개수 (기본값 6, 최대 20)")
+                                                        .optional()
+                                        )
+                                        .responseFields(nearbyAppointmentResponseFields())
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("limit 파라미터만큼만 가까운 일정을 조회한다")
+    void shouldLimitNearbyAppointmentsByLimitParam() throws Exception {
+        createAppointment(LocalDate.now().plusDays(1), false);
+        createAppointment(LocalDate.now().plusDays(2), false);
+        createAppointment(LocalDate.now().plusDays(3), false);
+
+        mockMvc.perform(get("/api/appointments/me/nearby")
+                        .session(authenticatedSession())
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("limit이 허용 범위를 벗어나면 가까운 일정 조회를 거부한다")
+    void shouldRejectNearbyRequestWhenLimitIsOutOfRange() throws Exception {
+        mockMvc.perform(get("/api/appointments/me/nearby")
+                        .session(authenticatedSession())
+                        .param("limit", "21"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 가까운 일정 조회 요청을 거부한다")
+    void shouldRejectNearbyRequestWhenUserIsUnauthenticated() throws Exception {
+        mockMvc.perform(get("/api/appointments/me/nearby"))
+                .andExpect(status().isUnauthorized())
+                .andDo(document(
+                                "appointments-nearby-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Appointment")
+                                        .summary("인증 없이 가까운 일정 조회")
+                                        .description("인증되지 않은 요청은 거부합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(errorResponseFields())
+                                        .build()
+                                )
+                        )
+                );
+    }
+
     private void changeChecklistItemStatusToDone() throws Exception {
         mockMvc.perform(put("/api/checklist-items/{itemId}/status", 1L)
                         .session(authenticatedSession())
@@ -703,6 +777,20 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
         System.arraycopy(conflictFields, 0, fields, appointmentFields.length, conflictFields.length);
         return fields;
+    }
+
+    private static FieldDescriptor[] nearbyAppointmentResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("[].id").description("일정 ID"),
+                fieldWithPath("[].checklistItemId").description("체크리스트 항목 ID"),
+                fieldWithPath("[].title").description("일정 제목"),
+                fieldWithPath("[].date").description("일정 날짜"),
+                fieldWithPath("[].place").description("장소"),
+                fieldWithPath("[].memo").description("메모"),
+                fieldWithPath("[].isDone").description("완료 여부"),
+                fieldWithPath("[].startTime").description("시작 일시"),
+                fieldWithPath("[].endTime").description("종료 일시")
+        };
     }
 
     private static FieldDescriptor[] errorResponseFields() {

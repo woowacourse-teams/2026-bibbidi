@@ -8,9 +8,10 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,7 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentCreationResult create(AppointmentCreationCommand command) {
+    public AppointmentResult create(AppointmentCreationCommand command) {
         checklistService.validateItemOwnership(command.checklistItemId(), command.userId());
 
         Appointment appointment = new Appointment(
@@ -46,13 +47,13 @@ public class AppointmentService {
         Appointment saved = appointmentRepository.save(appointment);
         List<AppointmentConflict> conflicts = findConflictingWithNewAppointment(command.userId(), saved);
 
-        return AppointmentCreationResult
+        return AppointmentResult
                 .fromDomain(saved)
                 .withConflicts(conflicts);
     }
 
     @Transactional
-    public AppointmentUpdateResult update(AppointmentUpdateCommand command) {
+    public AppointmentResult update(AppointmentUpdateCommand command) {
         Appointment appointment = appointmentRepository.findById(command.appointmentId());
         checklistService.validateItemOwnership(appointment.checklistItemId(), command.userId());
 
@@ -68,7 +69,7 @@ public class AppointmentService {
         Appointment saved = appointmentRepository.save(updated);
         List<AppointmentConflict> conflicts = findConflictingWithNewAppointment(command.userId(), saved);
 
-        return AppointmentUpdateResult.fromDomain(saved)
+        return AppointmentResult.fromDomain(saved)
                 .withConflicts(conflicts);
     }
 
@@ -94,6 +95,21 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId);
         checklistService.validateItemOwnership(appointment.checklistItemId(), userId);
         appointmentRepository.deleteById(appointmentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResult> findNearby(Long userId, int limit, LocalDateTime now) {
+        return appointmentRepository.findNearby(userId, now).stream()
+                .sorted(nearbyOrder())
+                .limit(limit)
+                .map(AppointmentResult::fromDomain)
+                .toList();
+    }
+
+    private Comparator<Appointment> nearbyOrder() {
+        return comparing(Appointment::date)
+                .thenComparing(Appointment::startTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Appointment::id);
     }
 
     @Transactional

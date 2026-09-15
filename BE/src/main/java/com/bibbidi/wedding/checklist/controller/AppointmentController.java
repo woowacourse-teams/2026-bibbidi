@@ -4,22 +4,28 @@ import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest
 import com.bibbidi.wedding.checklist.controller.dto.req.UpdateAppointmentRequest;
 import com.bibbidi.wedding.checklist.controller.dto.resp.AppointmentCompletionResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.AppointmentResponse;
+import com.bibbidi.wedding.checklist.controller.dto.resp.NearbyAppointmentResponse;
 import com.bibbidi.wedding.checklist.service.AppointmentService;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
 import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,8 +46,19 @@ public class AppointmentController {
             @Valid @RequestBody CreateAppointmentRequest request
     ) {
         AppointmentCreationCommand command = AppointmentCreationCommand.fromRequest(userId, checklistItemId, request);
-        AppointmentCreationResult result = appointmentService.create(command);
+        AppointmentResult result = appointmentService.create(command);
         return AppointmentResponse.from(result);
+    }
+
+    @GetMapping("/api/appointments/me/nearby")
+    public List<NearbyAppointmentResponse> findNearby(
+            @Auth Long userId,
+            @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
+    ) {
+        LocalDateTime requestedAt = LocalDateTime.now();
+        return appointmentService.findNearby(userId, limit, requestedAt).stream()
+                .map(NearbyAppointmentResponse::from)
+                .toList();
     }
 
     @PutMapping("/api/appointments/{appointmentId}")
@@ -51,7 +68,7 @@ public class AppointmentController {
             @Valid @RequestBody UpdateAppointmentRequest request
     ) {
         AppointmentUpdateCommand command = AppointmentUpdateCommand.fromRequest(appointmentId, userId, request);
-        AppointmentUpdateResult result = appointmentService.update(command);
+        AppointmentResult result = appointmentService.update(command);
         return AppointmentResponse.from(result);
     }
 

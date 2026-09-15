@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record AppointmentUpdateResult(
+public record AppointmentResult(
         Long id,
         Long checklistItemId,
         String title,
@@ -18,7 +18,7 @@ public record AppointmentUpdateResult(
         List<AppointmentConflict> conflicts
 ) {
 
-    public AppointmentUpdateResult(
+    public AppointmentResult(
             Long id,
             Long checklistItemId,
             String title,
@@ -43,8 +43,8 @@ public record AppointmentUpdateResult(
         );
     }
 
-    public static AppointmentUpdateResult fromDomain(Appointment appointment) {
-        return new AppointmentUpdateResult(
+    public static AppointmentResult fromDomain(Appointment appointment) {
+        return new AppointmentResult(
                 appointment.id(),
                 appointment.checklistItemId(),
                 appointment.title(),
@@ -58,8 +58,8 @@ public record AppointmentUpdateResult(
         );
     }
 
-    public AppointmentUpdateResult withConflicts(List<AppointmentConflict> conflicts) {
-        return new AppointmentUpdateResult(
+    public AppointmentResult withConflicts(List<AppointmentConflict> conflicts) {
+        return new AppointmentResult(
                 id,
                 checklistItemId,
                 title,

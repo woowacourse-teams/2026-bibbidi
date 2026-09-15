@@ -3,6 +3,7 @@ package com.bibbidi.wedding.checklist.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -14,7 +15,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -161,7 +162,7 @@ class AppointmentServiceTest {
         given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
                 .willReturn(List.of(conflictingAppointment));
 
-        AppointmentCreationResult result = appointmentService.create(createCommand());
+        AppointmentResult result = appointmentService.create(createCommand());
 
         assertThat(result.conflicts()).containsExactly(conflict);
     }
@@ -192,6 +193,66 @@ class AppointmentServiceTest {
                 )
                 .containsExactly(APPOINTMENT_ID, true, CHECKLIST_ITEM_ID, false);
         then(checklistService).should().changeItemStatusByAppointment(USER_ID, CHECKLIST_ITEM_ID, true);
+    }
+
+    @Test
+    @DisplayName("가까운 일정을 저장소에서 조회해 결과로 변환한다")
+    void shouldFindNearbyAppointmentsAsResults() {
+        Appointment appointment = createAppointment();
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(List.of(appointment));
+
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6, LocalDateTime.now());
+
+        assertThat(results).containsExactly(AppointmentResult.fromDomain(appointment));
+    }
+
+    @Test
+    @DisplayName("가까운 일정은 날짜, 시각(시각 있는 일정 우선) 순으로 정렬한다")
+    void shouldOrderNearbyAppointmentsByDateThenTimedFirst() {
+        Appointment timelessTomorrow = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
+        Appointment timedTomorrow = appointmentOnDate(
+                2L, LocalDate.of(2026, 9, 2), LocalDateTime.of(2026, 9, 2, 9, 0));
+        Appointment dayAfterTomorrow = appointmentOnDate(3L, LocalDate.of(2026, 9, 3), null);
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(List.of(timelessTomorrow, dayAfterTomorrow, timedTomorrow));
+
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 10, LocalDateTime.now());
+
+        assertThat(results)
+                .extracting(AppointmentResult::id)
+                .containsExactly(timedTomorrow.id(), timelessTomorrow.id(), dayAfterTomorrow.id());
+    }
+
+    @Test
+    @DisplayName("가까운 일정 조회는 요청한 개수만큼만 반환한다")
+    void shouldLimitNearbyAppointmentsToRequestedCount() {
+        Appointment first = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
+        Appointment second = appointmentOnDate(2L, LocalDate.of(2026, 9, 3), null);
+        Appointment third = appointmentOnDate(3L, LocalDate.of(2026, 9, 4), null);
+        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(List.of(first, second, third));
+
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2, LocalDateTime.now());
+
+        assertThat(results)
+                .extracting(AppointmentResult::id)
+                .containsExactly(first.id(), second.id());
+    }
+
+    private static Appointment appointmentOnDate(Long id, LocalDate date, LocalDateTime startTime) {
+        return new Appointment(
+                id,
+                CHECKLIST_ITEM_ID,
+                "title",
+                date,
+                startTime,
+                startTime,
+                startTime == null ? null : "place",
+                null,
+                false,
+                false
+        );
     }
 
     private static Appointment createAppointment() {
