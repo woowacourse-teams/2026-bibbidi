@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
@@ -30,6 +30,16 @@ function createChecklistItem(
     sourceCatalogItemId,
     title: `체크리스트 항목 ${id}`,
   };
+}
+
+function LocationDisplay() {
+  const location = useLocation();
+
+  return (
+    <div data-testid="service-location">
+      {`${location.pathname}${location.search}`}
+    </div>
+  );
 }
 
 beforeEach(() => {
@@ -294,7 +304,15 @@ describe("ServiceLayout", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     renderServiceLayout(
-      <Route path="/checklist" element={<ChecklistFeature />} />,
+      <Route
+        path="/checklist"
+        element={
+          <>
+            <ChecklistFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
       ["/checklist"],
     );
 
@@ -305,6 +323,15 @@ describe("ServiceLayout", () => {
     expect(
       screen.getByRole("complementary", { name: "체크리스트 항목 10" }),
     ).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist?taskId=checklist-item-10",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 상세 닫기" }));
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist",
+    );
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

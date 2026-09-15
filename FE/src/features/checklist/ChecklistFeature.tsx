@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 
 import { useAuth } from "../auth";
 import {
@@ -16,12 +17,21 @@ import { ChecklistState } from "./view/ChecklistState";
 
 type ChecklistRequestState =
   | { audience?: ChecklistAudience; status: "loading" }
-  | { audience: ChecklistAudience; status: "empty" }
+  | {
+      audience: ChecklistAudience;
+      checklistRevision: number;
+      requestId: number;
+      requestRevision: number;
+      status: "empty";
+    }
   | { audience: ChecklistAudience; status: "authentication-required" }
   | { audience: ChecklistAudience; status: "error" }
   | {
       audience: ChecklistAudience;
       checklist: ChecklistQueryModel;
+      checklistRevision: number;
+      requestId: number;
+      requestRevision: number;
       status: "success";
     };
 
@@ -33,9 +43,11 @@ export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
   const checklistRepository = useChecklistQueryRepository();
   const checklistRevision = useChecklistRevision();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
+  const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
@@ -49,6 +61,8 @@ export function ChecklistFeature() {
       return;
     }
 
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
     const controller = new AbortController();
     let ignoresResult = false;
 
@@ -60,11 +74,24 @@ export function ChecklistFeature() {
         }
 
         if (checklist.categories.length === 0) {
-          setRequestState({ audience, status: "empty" });
+          setRequestState({
+            audience,
+            checklistRevision,
+            requestId,
+            requestRevision,
+            status: "empty",
+          });
           return;
         }
 
-        setRequestState({ audience, checklist, status: "success" });
+        setRequestState({
+          audience,
+          checklist,
+          checklistRevision,
+          requestId,
+          requestRevision,
+          status: "success",
+        });
       })
       .catch((error: unknown) => {
         if (
@@ -98,6 +125,70 @@ export function ChecklistFeature() {
     checklistRevision,
     refreshAuth,
     requestRevision,
+  ]);
+
+  const selectedTaskId = searchParams.get("taskId");
+  const updateTaskSelection = useCallback(
+    (taskId: string | null, replace = false) => {
+      setSearchParams(
+        (currentSearchParams) => {
+          const nextSearchParams = new URLSearchParams(currentSearchParams);
+
+          if (taskId === null) {
+            nextSearchParams.delete("taskId");
+          } else {
+            nextSearchParams.set("taskId", taskId);
+          }
+
+          return nextSearchParams;
+        },
+        { replace },
+      );
+    },
+    [setSearchParams],
+  );
+  const closeTaskDetail = useCallback(() => {
+    if (selectedTaskId !== null) {
+      updateTaskSelection(null);
+    }
+  }, [selectedTaskId, updateTaskSelection]);
+  const selectTask = useCallback(
+    (taskId: string) => {
+      if (taskId !== selectedTaskId) {
+        updateTaskSelection(taskId);
+      }
+    },
+    [selectedTaskId, updateTaskSelection],
+  );
+
+  useEffect(() => {
+    if (
+      selectedTaskId === null ||
+      requestState.audience !== audience ||
+      (requestState.status !== "empty" && requestState.status !== "success") ||
+      requestState.checklistRevision !== checklistRevision ||
+      requestState.requestId !== latestRequestIdRef.current ||
+      requestState.requestRevision !== requestRevision
+    ) {
+      return;
+    }
+
+    const selectedTaskExists =
+      requestState.status === "success" &&
+      requestState.checklist.categories.some((category) =>
+        category.items.some((item) => item.id === selectedTaskId),
+      );
+
+    if (!selectedTaskExists) {
+      updateTaskSelection(null, true);
+    }
+  }, [
+    audience,
+    checklistRevision,
+    requestRevision,
+    requestState,
+    selectedTaskId,
+    updateTaskSelection,
   ]);
 
   const handleRetry = () => {
@@ -145,6 +236,11 @@ export function ChecklistFeature() {
   }
 
   return (
-    <Checklist categories={createChecklistViewModel(requestState.checklist)} />
+    <Checklist
+      categories={createChecklistViewModel(requestState.checklist)}
+      onCloseTaskDetail={closeTaskDetail}
+      onSelectTask={selectTask}
+      selectedTaskId={selectedTaskId}
+    />
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,6 +71,25 @@ function setDesktopDetailPanelSupport(matches: boolean) {
   );
 }
 
+function ChecklistHarness({
+  categories = createChecklistViewModel(createChecklistQuery()),
+  initialSelectedTaskId = null,
+}: {
+  categories?: ReturnType<typeof createChecklistViewModel>;
+  initialSelectedTaskId?: string | null;
+}) {
+  const [selectedTaskId, setSelectedTaskId] = useState(initialSelectedTaskId);
+
+  return (
+    <Checklist
+      categories={categories}
+      onCloseTaskDetail={() => setSelectedTaskId(null)}
+      onSelectTask={setSelectedTaskId}
+      selectedTaskId={selectedTaskId}
+    />
+  );
+}
+
 beforeEach(() => {
   setDesktopDetailPanelSupport(true);
 });
@@ -80,11 +100,7 @@ afterEach(() => {
 
 describe("Checklist 웹 상세 패널", () => {
   it("선택한 할 일의 API 기반 상세 정보와 전체 일정을 서버 순서로 표시한다", () => {
-    render(
-      <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
-      />,
-    );
+    render(<ChecklistHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
 
@@ -111,11 +127,7 @@ describe("Checklist 웹 상세 패널", () => {
   });
 
   it("다른 할 일을 선택하면 패널 내용을 교체하고 빈 일정 상태를 표시한다", () => {
-    render(
-      <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
-      />,
-    );
+    render(<ChecklistHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
     fireEvent.click(screen.getByRole("button", { name: /웨딩홀 투어/ }));
@@ -132,11 +144,7 @@ describe("Checklist 웹 상세 패널", () => {
   });
 
   it("닫기 버튼과 Escape 키로 패널을 닫고 선택한 항목으로 포커스를 돌린다", () => {
-    render(
-      <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
-      />,
-    );
+    render(<ChecklistHarness />);
 
     const firstTask = screen.getByRole("button", { name: /웨딩홀 계약/ });
     fireEvent.click(firstTask);
@@ -153,19 +161,30 @@ describe("Checklist 웹 상세 패널", () => {
     expect(document.activeElement).toBe(secondTask);
   });
 
-  it("선택 항목이 갱신 결과에서 사라지면 선택을 해제하고 같은 ID가 재등장해도 패널을 열지 않는다", () => {
+  it("선택 항목이 사라지면 stale 상세와 unmount된 선택 버튼 ref를 사용하지 않는다", () => {
+    const onCloseTaskDetail = vi.fn();
+    const onSelectTask = vi.fn();
+    const categories = createChecklistViewModel(createChecklistQuery());
     const view = render(
       <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
+        categories={categories}
+        onCloseTaskDetail={onCloseTaskDetail}
+        onSelectTask={onSelectTask}
+        selectedTaskId="checklist-item-10"
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
+    const removedTaskButton = screen.getByRole("button", {
+      name: /웨딩홀 계약/,
+    });
 
     view.rerender(
       <Checklist
         categories={createChecklistViewModel({
           categories: [{ id: "10", items: [], title: "예식장" }],
         })}
+        onCloseTaskDetail={onCloseTaskDetail}
+        onSelectTask={onSelectTask}
+        selectedTaskId="checklist-item-10"
       />,
     );
 
@@ -174,25 +193,24 @@ describe("Checklist 웹 상세 패널", () => {
 
     view.rerender(
       <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
+        categories={createChecklistViewModel({
+          categories: [{ id: "10", items: [], title: "예식장" }],
+        })}
+        onCloseTaskDetail={onCloseTaskDetail}
+        onSelectTask={onSelectTask}
+        selectedTaskId={null}
       />,
     );
 
-    expect(screen.queryByRole("complementary")).toBeNull();
-    expect(
-      screen
-        .getByRole("button", { name: /웨딩홀 계약/ })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
+    expect(removedTaskButton.isConnected).toBe(false);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "예식장" }),
+    );
   });
 
   it("모바일에서는 상세 패널을 열지 않고 기존 목록을 유지한다", () => {
     setDesktopDetailPanelSupport(false);
-    render(
-      <Checklist
-        categories={createChecklistViewModel(createChecklistQuery())}
-      />,
-    );
+    render(<ChecklistHarness />);
 
     const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
     expect(task.hasAttribute("disabled")).toBe(true);
