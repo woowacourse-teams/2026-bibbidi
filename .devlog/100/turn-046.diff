@@ -1,0 +1,21 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 03476e02966c506d4bc79d524aa3c334afa80d55..113045213c91e17512cad01b2383503e7df3830b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -113,13 +113,13 @@ public class ChecklistService {
+         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+         List<CatalogItemDetailSnapshot> allItems = catalogService.findAllItemDetails();
+ 
+-        List<CatalogItemDetailSnapshot> candidates = selectCandidates(checklist, allItems);
+-        List<CatalogItemDetailSnapshot> pickedItems = pickRandomly(candidates, limit);
++        List<CatalogItemDetailSnapshot> allRecommendedItems = chooseAllRecommendedItems(checklist, allItems);
++        List<CatalogItemDetailSnapshot> randomRecommendedItems = pickRandomly(allRecommendedItems, limit);
+ 
+-        return toResults(pickedItems);
++        return toResults(randomRecommendedItems);
+     }
+ 
+-    private List<CatalogItemDetailSnapshot> selectCandidates(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
++    private List<CatalogItemDetailSnapshot> chooseAllRecommendedItems(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
+         List<CatalogItemDetailSnapshot> alreadyAddedItems = selectAlreadyAddedItems(checklist, allItems);
+         List<CatalogItemDetailSnapshot> notYetAddedItems = selectNotYetAddedItems(checklist, allItems);

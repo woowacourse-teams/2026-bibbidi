@@ -1,0 +1,311 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java
+index f78cad480434f78d08a033f0ae5a0e54a797d697..2e98f0356c2494ecdd40057a49b67f6bc0ac1ed8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java
+@@ -7,4 +7,8 @@ public record CatalogItemDetailSnapshot(
+         int phase,
+         String stepName
+ ) {
++
++    public boolean isUpTo(int basePhase) {
++        return phase <= basePhase;
++    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index efc47bb958793e2cb34b9f58496a1b9e4792e0b1..4c38337d711378bd6dd58f128169c51383915829 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.service;
+ 
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import com.bibbidi.wedding.checklist.domain.Appointment;
+@@ -16,6 +17,7 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
++import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.checklist.util.Shuffler;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -25,6 +27,7 @@ import java.util.LinkedHashSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
++import java.util.function.Predicate;
+ import java.util.stream.Collectors;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+@@ -32,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
+ @Service
+ public class ChecklistService {
+ 
++    private static final int FIRST_PHASE = 1;
++
+     private final ChecklistRepository checklistRepository;
+     private final CatalogService catalogService;
+     private final ChecklistAppointmentService checklistAppointmentService;
+@@ -92,7 +97,7 @@ public class ChecklistService {
+         return catalogService.findCategoryNames(categoryIds);
+     }
+ 
+-    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates, int limit) {
++    private <T> List<T> pickRandomly(List<T> candidates, int limit) {
+         return shuffler.shuffle(candidates).stream()
+                 .limit(limit)
+                 .toList();
+@@ -104,6 +109,58 @@ public class ChecklistService {
+                 .toList();
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<RecommendedCatalogItemResult> findRecommendedCatalogItems(Long ownerId, int limit) {
++        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
++        List<CatalogItemDetailSnapshot> allItems = catalogService.findAllItemDetails();
++
++        List<CatalogItemDetailSnapshot> candidates = findCandidates(checklist, allItems);
++        List<CatalogItemDetailSnapshot> pickedItems = pickRandomly(candidates, limit);
++
++        return toResults(pickedItems);
++    }
++
++    private List<CatalogItemDetailSnapshot> findCandidates(
++            Checklist checklist,
++            List<CatalogItemDetailSnapshot> allItems
++    ) {
++        List<CatalogItemDetailSnapshot> addedItems = filter(allItems, item -> checklist.hasAdded(item.id()));
++        List<CatalogItemDetailSnapshot> notAddedItems = filter(allItems, item -> !checklist.hasAdded(item.id()));
++
++        int basePhase = basePhase(addedItems, notAddedItems);
++        return filter(notAddedItems, item -> item.isUpTo(basePhase));
++    }
++
++    private int basePhase(
++            List<CatalogItemDetailSnapshot> addedItems,
++            List<CatalogItemDetailSnapshot> notAddedItems
++    ) {
++        int maxAddedPhase = addedItems.stream()
++                .mapToInt(CatalogItemDetailSnapshot::phase)
++                .max()
++                .orElse(FIRST_PHASE);
++        int minNotAddedPhase = notAddedItems.stream()
++                .mapToInt(CatalogItemDetailSnapshot::phase)
++                .min()
++                .orElse(FIRST_PHASE);
++        return Math.max(maxAddedPhase, minNotAddedPhase);
++    }
++
++    private List<CatalogItemDetailSnapshot> filter(
++            List<CatalogItemDetailSnapshot> items,
++            Predicate<CatalogItemDetailSnapshot> condition
++    ) {
++        return items.stream()
++                .filter(condition)
++                .toList();
++    }
++
++    private List<RecommendedCatalogItemResult> toResults(List<CatalogItemDetailSnapshot> items) {
++        return items.stream()
++                .map(RecommendedCatalogItemResult::from)
++                .toList();
++    }
++
+     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(
+             Checklist checklist) {
+         List<ChecklistItem> checklistItems = getChecklistItems(checklist);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/RecommendedCatalogItemResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/RecommendedCatalogItemResult.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f8fe2d79bf33f162171597bdea82e88c95a64a7a
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/RecommendedCatalogItemResult.java
+@@ -0,0 +1,22 @@
++package com.bibbidi.wedding.checklist.service.dto;
++
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
++
++public record RecommendedCatalogItemResult(
++        Long catalogItemId,
++        String title,
++        String categoryName,
++        int phase,
++        String stepName
++) {
++
++    public static RecommendedCatalogItemResult from(CatalogItemDetailSnapshot itemDetail) {
++        return new RecommendedCatalogItemResult(
++                itemDetail.id(),
++                itemDetail.title(),
++                itemDetail.categoryName(),
++                itemDetail.phase(),
++                itemDetail.stepName()
++        );
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+index fbd5a4bd58efb636e4dff83394b2df12cb01d1b8..edee5d5e6e9b6ae3fc528e359ab331e47d1f6c18 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+@@ -15,6 +15,7 @@ import static org.mockito.Mockito.never;
+ 
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import com.bibbidi.wedding.checklist.domain.Appointment;
+@@ -27,6 +28,7 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
++import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.checklist.util.Shuffler;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -54,6 +56,22 @@ class ChecklistServiceTest {
+     private static final Long CONTRACT_ITEM_ID = 100L;
+     private static final Long ESTIMATE_ITEM_ID = 101L;
+ 
++    private static final CatalogItemDetailSnapshot HALL_TOUR =
++            new CatalogItemDetailSnapshot(1L, "웨딩홀 투어", "웨딩홀", 1, "웨딩홀 정하기");
++    private static final CatalogItemDetailSnapshot HALL_CONTRACT =
++            new CatalogItemDetailSnapshot(2L, "웨딩홀 계약", "웨딩홀", 1, "웨딩홀 정하기");
++    private static final CatalogItemDetailSnapshot CEREMONY_TYPE =
++            new CatalogItemDetailSnapshot(3L, "예식 형태 결정", "웨딩홀", 2, "예식 진행 방식 결정");
++    private static final CatalogItemDetailSnapshot HOST_BOOKING =
++            new CatalogItemDetailSnapshot(6L, "주례·사회자 섭외", "웨딩홀", 3, "예식 진행 인원 섭외");
++    private static final CatalogItemDetailSnapshot STYLING_CONSULTING =
++            new CatalogItemDetailSnapshot(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약");
++    private static final CatalogItemDetailSnapshot DRESS_SHOP =
++            new CatalogItemDetailSnapshot(44L, "드레스샵 확정", "스드메", 2, "스드메 업체 확정");
++    private static final List<CatalogItemDetailSnapshot> ALL_ITEM_DETAILS = List.of(
++            HALL_TOUR, HALL_CONTRACT, CEREMONY_TYPE, HOST_BOOKING, STYLING_CONSULTING, DRESS_SHOP
++    );
++
+     @Mock
+     private ChecklistRepository checklistRepository;
+ 
+@@ -235,6 +253,121 @@ class ChecklistServiceTest {
+         assertThat(results).isEmpty();
+     }
+ 
++    @Test
++    @DisplayName("준비 목록에서 담은 할 일이 없으면 1단계 준비 항목을 추천한다")
++    void shouldRecommendFirstPhaseItemsWhenNothingAddedFromCatalog() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(constructTestItem(200L))
++        ));
++        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
++        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
++
++        // when
++        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
++
++        // then
++        assertThat(results)
++                .extracting(RecommendedCatalogItemResult::catalogItemId)
++                .containsExactlyInAnyOrder(HALL_TOUR.id(), HALL_CONTRACT.id(), STYLING_CONSULTING.id());
++    }
++
++    @Test
++    @DisplayName("담은 준비 항목의 가장 큰 단계 이하에서 카테고리와 상관없이 담지 않은 항목을 추천한다")
++    void shouldRecommendNotAddedItemsUpToMaxAddedPhaseAcrossCategories() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(
++                        constructTestItem(200L, ChecklistItemStatus.DONE, HALL_TOUR.id()),
++                        constructTestItem(201L, ChecklistItemStatus.PREV, DRESS_SHOP.id())
++                )
++        ));
++        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
++        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
++
++        // when
++        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
++
++        // then
++        assertThat(results)
++                .extracting(RecommendedCatalogItemResult::catalogItemId)
++                .containsExactlyInAnyOrder(HALL_CONTRACT.id(), CEREMONY_TYPE.id(), STYLING_CONSULTING.id());
++    }
++
++    @Test
++    @DisplayName("기준 단계 이하의 준비 항목을 모두 담았으면 담지 않은 항목이 남은 다음 단계를 추천한다")
++    void shouldRecommendNextPhaseItemsWhenAllItemsUpToBasePhaseAdded() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(
++                        constructTestItem(200L, ChecklistItemStatus.PREV, HALL_TOUR.id()),
++                        constructTestItem(201L, ChecklistItemStatus.PREV, HALL_CONTRACT.id()),
++                        constructTestItem(202L, ChecklistItemStatus.PREV, STYLING_CONSULTING.id())
++                )
++        ));
++        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
++        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
++
++        // when
++        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
++
++        // then
++        assertThat(results)
++                .extracting(RecommendedCatalogItemResult::catalogItemId)
++                .containsExactlyInAnyOrder(CEREMONY_TYPE.id(), DRESS_SHOP.id());
++    }
++
++    @Test
++    @DisplayName("준비 항목을 모두 담았으면 추천할 항목이 없다")
++    void shouldReturnEmptyWhenAllCatalogItemsAdded() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(
++                        constructTestItem(200L, ChecklistItemStatus.PREV, HALL_TOUR.id()),
++                        constructTestItem(201L, ChecklistItemStatus.PREV, HALL_CONTRACT.id()),
++                        constructTestItem(202L, ChecklistItemStatus.PREV, CEREMONY_TYPE.id()),
++                        constructTestItem(203L, ChecklistItemStatus.PREV, HOST_BOOKING.id()),
++                        constructTestItem(204L, ChecklistItemStatus.PREV, STYLING_CONSULTING.id()),
++                        constructTestItem(205L, ChecklistItemStatus.PREV, DRESS_SHOP.id())
++                )
++        ));
++        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
++        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
++
++        // when
++        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
++
++        // then
++        assertThat(results).isEmpty();
++    }
++
++    @Test
++    @DisplayName("추천 후보를 섞은 순서에서 앞의 limit개만 준비 항목 정보와 함께 돌려준다")
++    void shouldReturnFirstRecommendedItemsUpToLimitInShuffledOrder() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of()));
++        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
++        given(shuffler.shuffle(List.of(HALL_TOUR, HALL_CONTRACT, STYLING_CONSULTING)))
++                .willReturn(List.of(STYLING_CONSULTING, HALL_CONTRACT, HALL_TOUR));
++
++        // when
++        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 2);
++
++        // then
++        assertThat(results).containsExactly(
++                new RecommendedCatalogItemResult(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약"),
++                new RecommendedCatalogItemResult(2L, "웨딩홀 계약", "웨딩홀", 1, "웨딩홀 정하기")
++        );
++    }
++
+     @Test
+     @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권 검증을 통과한다")
+     void shouldValidateItemOwnershipWhenItemBelongsToOwnersChecklist() {
