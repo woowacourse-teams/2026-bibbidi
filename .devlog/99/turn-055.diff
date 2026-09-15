@@ -1,0 +1,174 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+index decfac2e8a13d837467d7c02fac2070ab0d3b96a..cdfa4a4b7bd0b93bccc7b38f9a94553c4dcc446a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+@@ -15,6 +15,8 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult
+ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
++import jakarta.validation.constraints.Max;
++import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.NotEmpty;
+ import jakarta.validation.constraints.NotNull;
+ import java.util.List;
+@@ -22,6 +24,7 @@ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestParam;
+ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+@@ -54,8 +57,11 @@ public class ChecklistController {
+     }
+ 
+     @GetMapping("/api/checklists/me/unscheduled-items")
+-    public List<UnscheduledChecklistItemResponse> findUnscheduledItems(@Auth Long userId) {
+-        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(userId);
++    public List<UnscheduledChecklistItemResponse> findUnscheduledItems(
++            @Auth Long userId,
++            @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit
++    ) {
++        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(userId, limit);
+         return results.stream()
+                 .map(UnscheduledChecklistItemResponse::from)
+                 .toList();
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+index 1ec342e1dfea81c9e8843e950ab4a60927194f88..606f95f1266ab634b4e3008096bd47a45f98fdc8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.controller;
+ 
+ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+ import static com.epages.restdocs.apispec.Schema.schema;
+ import static org.hamcrest.Matchers.containsInAnyOrder;
+@@ -50,7 +51,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                     + "이미 담긴 준비 항목이 포함되면 요청 전체가 실패합니다.";
+     private static final String FIND_UNSCHEDULED_SUMMARY = "일정이 필요한 할 일 조회";
+     private static final String FIND_UNSCHEDULED_DESCRIPTION =
+-            "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 4개 조회합니다. "
++            "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 limit개 조회합니다. "
+                     + "준비 목록에서 담은 할 일과 직접 만든 할 일을 모두 포함하며, 대상이 없으면 빈 배열을 반환합니다.";
+ 
+     @Autowired
+@@ -231,7 +232,8 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+         // when, then
+         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                         .session(authenticatedSession())
+-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
++                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
++                        .param("limit", "4"))
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.length()").value(2))
+                 .andExpect(jsonPath("$[*].checklistItemId",
+@@ -249,6 +251,11 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                 headerWithName(HttpHeaders.COOKIE)
+                                                         .description(SESSION_COOKIE_DESCRIPTION)
+                                         )
++                                        .queryParameters(
++                                                parameterWithName("limit")
++                                                        .description("조회할 최대 개수 (기본값 4, 최대 20)")
++                                                        .optional()
++                                        )
+                                         .responseFields(
+                                                 fieldWithPath("[].checklistItemId")
+                                                         .description("할 일 ID. 일정 추가 API의 checklistItemId로 그대로 사용"),
+@@ -262,6 +269,23 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 );
+     }
+ 
++    @Test
++    @Sql("/checklist-catalog-fixture.sql")
++    @DisplayName("일정이 필요한 할 일을 limit 개수만큼만 조회한다")
++    void shouldFindUnscheduledItemsUpToLimit() throws Exception {
++        // given
++        addCatalogItem(100L);
++        addCatalogItem(101L);
++        writeCustomItem("청첩장 문구 정하기");
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "2"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(2));
++    }
++
+     @Test
+     @DisplayName("인증되지 않은 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
+     void shouldRequireAuthenticationToFindUnscheduledItems() throws Exception {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
+index e2c02f8d9607ec30f8fcfdefb82b0b8dd130fbc4..c7591fcf0a80488e26a9b27a07e614df2f409c16 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
+@@ -1,6 +1,7 @@
+ package com.bibbidi.wedding.checklist.controller;
+ 
+ import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+@@ -13,6 +14,7 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+ import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
+@@ -183,4 +185,51 @@ class ChecklistControllerTest {
+                 .andExpect(status().isUnauthorized())
+                 .andExpect(jsonPath("$.errorCode").value(201));
+     }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일 조회 시 limit을 생략하면 기본값 4로 서비스에 전달한다")
++    void shouldUseDefaultLimitWhenFindingUnscheduledItems() throws Exception {
++        // given
++        when(checklistService.findUnscheduledItems(USER_ID, 4)).thenReturn(List.of(unscheduledItemResult()));
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$[0].checklistItemId").value(31));
++    }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일 조회 시 limit 파라미터를 서비스에 그대로 전달한다")
++    void shouldPassGivenLimitWhenFindingUnscheduledItems() throws Exception {
++        // given
++        when(checklistService.findUnscheduledItems(USER_ID, 20)).thenReturn(List.of(unscheduledItemResult()));
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "20"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$[0].checklistItemId").value(31));
++    }
++
++    @Test
++    @DisplayName("limit이 1보다 작거나 20보다 크면 일정이 필요한 할 일 조회를 거절한다")
++    void shouldRejectFindUnscheduledItemsWhenLimitIsOutOfRange() throws Exception {
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "0"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101));
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "21"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101));
++    }
++
++    private static UnscheduledChecklistItemResult unscheduledItemResult() {
++        return new UnscheduledChecklistItemResult(31L, "웨딩홀 투어", "웨딩홀", ChecklistItemStatus.PREV);
++    }
+ }

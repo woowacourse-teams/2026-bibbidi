@@ -141,4 +141,16 @@ class ChecklistAppointmentServiceTest {
 
         then(appointmentRepository).shouldHaveNoInteractions();
     }
+
+    @Test
+    @DisplayName("지정한 할 일들의 일정을 한 번에 조회한다")
+    void shouldFindAllAppointmentsByChecklistItemIds() {
+        List<Appointment> appointments = List.of(appointment(1L), appointment(2L));
+        given(appointmentRepository.findAllByChecklistItemIdIn(List.of(10L, 11L)))
+                .willReturn(appointments);
+
+        List<Appointment> found = checklistAppointmentService.findAllByChecklistItemIds(List.of(10L, 11L));
+
+        assertThat(found).isEqualTo(appointments);
+    }
 }

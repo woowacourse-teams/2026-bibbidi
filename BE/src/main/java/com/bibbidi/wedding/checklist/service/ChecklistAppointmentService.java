@@ -22,6 +22,11 @@ public class ChecklistAppointmentService {
     }
 
     @Transactional(readOnly = true)
+    public List<Appointment> findAllByChecklistItemIds(List<Long> checklistItemIds) {
+        return appointmentRepository.findAllByChecklistItemIdIn(checklistItemIds);
+    }
+
+    @Transactional(readOnly = true)
     public List<AppointmentSummaryResult> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(List<Long> checklistItemIds) {
         if (checklistItemIds.isEmpty()) {
             return List.of();

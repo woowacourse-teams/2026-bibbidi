@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,51 @@ class ChecklistTest {
                         ChecklistProgress::allDone
                 )
                 .containsExactly(3, 1, 2, 33, false);
+    }
+
+    @Test
+    @DisplayName("완료되지 않은 할 일의 ID만 돌려준다")
+    void shouldReturnOnlyUndoneItemIds() {
+        // given
+        Checklist checklist = new Checklist(
+                1L,
+                OWNER_ID,
+                List.of(
+                        item(1L, null, ChecklistItemStatus.DONE),
+                        item(2L, null, ChecklistItemStatus.PREV),
+                        item(3L, null, ChecklistItemStatus.CONTINUE)
+                )
+        );
+
+        // when
+        List<Long> undoneItemIds = checklist.undoneItemIds();
+
+        // then
+        assertThat(undoneItemIds).containsExactly(2L, 3L);
+    }
+
+    @Test
+    @DisplayName("일정이 필요한 할 일만 고른다")
+    void shouldReturnOnlyUnscheduledItems() {
+        // given
+        Checklist checklist = new Checklist(
+                1L,
+                OWNER_ID,
+                List.of(
+                        item(1L, null, ChecklistItemStatus.DONE),
+                        item(2L, null, ChecklistItemStatus.PREV),
+                        item(3L, null, ChecklistItemStatus.CONTINUE),
+                        item(4L, 100L, ChecklistItemStatus.PREV)
+                )
+        );
+
+        // when
+        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(List.of(appointmentOf(2L)));
+
+        // then
+        assertThat(unscheduledItems)
+                .extracting(ChecklistItem::id)
+                .containsExactly(3L, 4L);
     }
 
     @Test
@@ -224,6 +270,21 @@ class ChecklistTest {
                 "계약서 확인",
                 sourceCatalogItemId,
                 status
+        );
+    }
+
+    private static Appointment appointmentOf(Long checklistItemId) {
+        return new Appointment(
+                null,
+                checklistItemId,
+                "웨딩홀 투어",
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false
         );
     }
 }

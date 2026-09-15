@@ -141,6 +141,10 @@ public final class Appointment {
         return endTime;
     }
 
+    public boolean belongsTo(Long checklistItemId) {
+        return this.checklistItemId.equals(checklistItemId);
+    }
+
     public boolean conflictsWith(Appointment other) {
         if (!hasConfirmedSchedule() || !other.hasConfirmedSchedule()) {
             return false;

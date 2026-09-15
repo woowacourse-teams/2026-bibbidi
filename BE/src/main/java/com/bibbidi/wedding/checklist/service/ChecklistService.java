@@ -3,6 +3,8 @@ package com.bibbidi.wedding.checklist.service;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
@@ -14,6 +16,8 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Comparator;
@@ -31,12 +35,14 @@ public class ChecklistService {
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
     private final ChecklistAppointmentService checklistAppointmentService;
+    private final Shuffler shuffler;
 
     public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService,
-                            ChecklistAppointmentService checklistAppointmentService) {
+                            ChecklistAppointmentService checklistAppointmentService, Shuffler shuffler) {
         this.checklistRepository = checklistRepository;
         this.catalogService = catalogService;
         this.checklistAppointmentService = checklistAppointmentService;
+        this.shuffler = shuffler;
     }
 
     @Transactional
@@ -60,6 +66,42 @@ public class ChecklistService {
         ChecklistProgress progress = checklist.calculateProgress();
 
         return ChecklistProgressResult.from(progress);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UnscheduledChecklistItemResult> findUnscheduledItems(Long ownerId, int limit) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+
+        List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
+        CategoryNames categoryNames = findCategoryNames(unscheduledItems);
+        List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems, limit);
+
+        return toResults(pickedItems, categoryNames);
+    }
+
+    private List<ChecklistItem> excludeScheduledItems(Checklist checklist) {
+        List<Appointment> appointments = checklistAppointmentService
+                .findAllByChecklistItemIds(checklist.undoneItemIds());
+        return checklist.unscheduledItems(appointments);
+    }
+
+    private CategoryNames findCategoryNames(List<ChecklistItem> items) {
+        Set<Long> categoryIds = items.stream()
+                .map(ChecklistItem::categoryId)
+                .collect(Collectors.toSet());
+        return catalogService.findCategoryNames(categoryIds);
+    }
+
+    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates, int limit) {
+        return shuffler.shuffle(candidates).stream()
+                .limit(limit)
+                .toList();
+    }
+
+    private List<UnscheduledChecklistItemResult> toResults(List<ChecklistItem> items, CategoryNames categoryNames) {
+        return items.stream()
+                .map(item -> UnscheduledChecklistItemResult.from(item, categoryNames.nameOf(item.categoryId())))
+                .toList();
     }
 
     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(

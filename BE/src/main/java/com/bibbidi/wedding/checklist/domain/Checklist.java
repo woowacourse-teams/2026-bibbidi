@@ -68,6 +68,19 @@ public final class Checklist {
                 .toList();
     }
 
+    public List<Long> undoneItemIds() {
+        return items.stream()
+                .filter(item -> !item.isDone())
+                .map(ChecklistItem::id)
+                .toList();
+    }
+
+    public List<ChecklistItem> unscheduledItems(List<Appointment> appointments) {
+        return items.stream()
+                .filter(item -> item.needsSchedule(appointments))
+                .toList();
+    }
+
     public Long id() {
         return id;
     }

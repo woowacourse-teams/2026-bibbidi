@@ -16,6 +16,8 @@ import static org.mockito.Mockito.never;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
@@ -25,10 +27,14 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +63,9 @@ class ChecklistServiceTest {
     @Mock
     private ChecklistAppointmentService checklistAppointmentService;
 
+    @Mock
+    private Shuffler shuffler;
+
     private ChecklistService checklistService;
 
     @BeforeEach
@@ -64,7 +73,8 @@ class ChecklistServiceTest {
         checklistService = new ChecklistService(
                 checklistRepository,
                 catalogService,
-                checklistAppointmentService
+                checklistAppointmentService,
+                shuffler
         );
     }
 
@@ -148,6 +158,81 @@ class ChecklistServiceTest {
                 )
                 .containsExactly(3, 2, 1, 67, false);
         then(checklistAppointmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("일정이 필요한 할 일을 카테고리 이름과 함께 돌려준다")
+    void shouldFindUnscheduledItemsWithCategoryName() {
+        // given
+        ChecklistItem customItem = constructTestItem(200L);
+        ChecklistItem doneItem = constructTestItem(201L, ChecklistItemStatus.DONE, null);
+        ChecklistItem catalogItem = constructTestItem(202L, ChecklistItemStatus.CONTINUE, CONTRACT_ITEM_ID);
+        ChecklistItem scheduledItem = constructTestItem(203L);
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(customItem, doneItem, catalogItem, scheduledItem)
+        ));
+        given(checklistAppointmentService.findAllByChecklistItemIds(List.of(200L, 202L, 203L)))
+                .willReturn(List.of(appointmentOf(scheduledItem)));
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
+                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
+        given(shuffler.shuffle(List.of(customItem, catalogItem)))
+                .willReturn(List.of(customItem, catalogItem));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
+
+        // then
+        assertThat(results).containsExactly(
+                new UnscheduledChecklistItemResult(200L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV),
+                new UnscheduledChecklistItemResult(202L, "계약서 확인", "웨딩홀", ChecklistItemStatus.CONTINUE)
+        );
+    }
+
+    @Test
+    @DisplayName("일정이 필요한 할 일이 limit보다 많으면 섞은 순서에서 앞의 limit개만 돌려준다")
+    void shouldReturnFirstItemsUpToLimitInShuffledOrder() {
+        // given
+        List<ChecklistItem> items = List.of(
+                constructTestItem(200L),
+                constructTestItem(201L),
+                constructTestItem(202L),
+                constructTestItem(203L),
+                constructTestItem(204L),
+                constructTestItem(205L)
+        );
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, items));
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
+                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
+        given(shuffler.shuffle(items)).willReturn(items.reversed());
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 3);
+
+        // then
+        assertThat(results)
+                .extracting(UnscheduledChecklistItemResult::checklistItemId)
+                .containsExactly(205L, 204L, 203L);
+    }
+
+    @Test
+    @DisplayName("일정이 필요한 할 일이 없으면 빈 목록을 돌려준다")
+    void shouldReturnEmptyWhenNoItemNeedsSchedule() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(constructTestItem(200L, ChecklistItemStatus.DONE, null))
+        ));
+        given(catalogService.findCategoryNames(Set.of()))
+                .willReturn(new CategoryNames(Map.of()));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
+
+        // then
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -601,6 +686,21 @@ class ChecklistServiceTest {
                 "계약서 확인",
                 sourceCatalogItemId,
                 status
+        );
+    }
+
+    private static Appointment appointmentOf(ChecklistItem item) {
+        return new Appointment(
+                null,
+                item.id(),
+                "웨딩홀 투어",
+                java.time.LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false
         );
     }
 }
