@@ -106,7 +106,7 @@ public class AppointmentService {
                 .toList();
     }
 
-    private static Comparator<Appointment> nearbyOrder() {
+    private Comparator<Appointment> nearbyOrder() {
         return comparing(Appointment::date)
                 .thenComparing(Appointment::startTime, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(Appointment::id);

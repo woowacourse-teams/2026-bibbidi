@@ -48,3 +48,9 @@
 {"type":"TURN_FINISHED","turnId":"9","diff":"turn-008.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-15T08:24:12.433Z"}
 {"type":"USER_PROMPTED","issue":101,"turnId":"10","prompt":"ㅇㅇ 커밋해","redacted":false,"timestamp":"2026-09-15T08:24:16.011Z"}
 {"type":"COMMIT_CONFIRMED","issue":101,"tree":"dca5d0e7fd1b114f0a3e8a9e932418a95e9c519d","timestamp":"2026-09-15T08:24:24.224Z"}
+{"type":"TURN_FINISHED","turnId":"10","diff":"turn-009.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-15T08:24:44.954Z"}
+{"type":"USER_PROMPTED","issue":101,"turnId":"11","prompt":"다시 commit","redacted":false,"timestamp":"2026-09-15T08:29:15.150Z"}
+{"type":"COMMIT_EXPLAINED","issue":101,"explanation":"AppointmentService.nearbyOrder()에서 static 제거.","diffStat":" .../java/com/bibbidi/wedding/checklist/service/AppointmentService.java  | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)","tree":"1b698d61b3c3b1d3cf5cfa054cd7a52478d7a2f2","timestamp":"2026-09-15T08:29:26.154Z"}
+{"type":"TURN_FINISHED","turnId":"11","diff":"turn-010.diff","diffStat":" BE/src/main/java/com/bibbidi/wedding/checklist/service/AppointmentService.java | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)","testResult":"NOT_RUN","timestamp":"2026-09-15T08:29:29.922Z"}
+{"type":"USER_PROMPTED","issue":101,"turnId":"12","prompt":"ㅇㅇ 커밋해","redacted":false,"timestamp":"2026-09-15T08:29:33.684Z"}
+{"type":"COMMIT_CONFIRMED","issue":101,"tree":"1b698d61b3c3b1d3cf5cfa054cd7a52478d7a2f2","timestamp":"2026-09-15T08:29:38.066Z"}
