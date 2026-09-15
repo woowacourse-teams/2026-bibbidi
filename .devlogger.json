@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "repository": "woowacourse-teams/2026-bibbidi",
+  "defaultBaseBranch": "release-be",
+  "issueTemplate": ".github/ISSUE_TEMPLATE/development.md",
+  "pullRequestTemplate": ".github/pull_request_template.md",
+  "validation": [
+    {
+      "key": "logger-test",
+      "paths": [
+        ".agents/",
+        ".claude/",
+        ".codex/",
+        ".devlogger.json",
+        ".github/ISSUE_TEMPLATE/",
+        ".github/pull_request_template.md",
+        "packages/development-logger/"
+      ],
+      "commands": ["node --test packages/development-logger/test/index.test.mjs"]
+    },
+    {
+      "key": "be-test",
+      "paths": ["BE/"],
+      "commands": ["BE/gradlew test", "BE/gradlew.bat test"]
+    },
+    {
+      "key": "be-build",
+      "paths": ["BE/"],
+      "commands": ["BE/gradlew build", "BE/gradlew.bat build"]
+    },
+    {
+      "key": "fe-typecheck",
+      "paths": ["FE/"],
+      "commands": ["pnpm --filter bibbidi-fe typecheck"]
+    },
+    {
+      "key": "fe-build",
+      "paths": ["FE/"],
+      "commands": ["pnpm --filter bibbidi-fe build", "pnpm web:build"]
+    },
+    {
+      "key": "app-lint",
+      "paths": ["APP/"],
+      "commands": ["pnpm --filter @bibbidi/app lint"]
+    },
+    {
+      "key": "app-typecheck",
+      "paths": ["APP/"],
+      "commands": ["pnpm --filter @bibbidi/app typecheck", "pnpm app:typecheck"]
+    },
+    {
+      "key": "app-build-web",
+      "paths": ["APP/"],
+      "commands": ["pnpm --filter @bibbidi/app build:web"]
+    }
+  ]
+}
