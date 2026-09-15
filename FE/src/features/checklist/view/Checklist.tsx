@@ -1,4 +1,4 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
@@ -29,13 +29,20 @@ export function Checklist({ categories }: ChecklistProps) {
   );
   const [isDesktopDetailPanelSupported, setIsDesktopDetailPanelSupported] =
     useState(supportsDesktopDetailPanel);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [selection, setSelection] = useState<{
+    button: HTMLButtonElement;
+    taskId: string;
+  } | null>(null);
+  const selectedTaskId = selection?.taskId ?? null;
   const selectedTaskContext = categories
     .flatMap((category) =>
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
+
+  if (selectedTaskId !== null && !selectedTaskContext) {
+    setSelection(null);
+  }
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") {
@@ -47,7 +54,7 @@ export function Checklist({ categories }: ChecklistProps) {
       setIsDesktopDetailPanelSupported(mediaQuery.matches);
 
       if (!mediaQuery.matches) {
-        setSelectedTaskId(null);
+        setSelection(null);
       }
     };
 
@@ -63,15 +70,15 @@ export function Checklist({ categories }: ChecklistProps) {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        selectedTaskButtonRef.current?.focus();
-        setSelectedTaskId(null);
+        selection?.button.focus();
+        setSelection(null);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTaskContext]);
+  }, [selectedTaskContext, selection]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategoryIds((currentIds) => {
@@ -87,14 +94,12 @@ export function Checklist({ categories }: ChecklistProps) {
     });
   };
 
-  const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
-    selectedTaskButtonRef.current = event.currentTarget;
-    setSelectedTaskId(taskId);
-  };
+  const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) =>
+    setSelection({ button: event.currentTarget, taskId });
 
   const closeTaskDetail = () => {
-    selectedTaskButtonRef.current?.focus();
-    setSelectedTaskId(null);
+    selection?.button.focus();
+    setSelection(null);
   };
 
   return (

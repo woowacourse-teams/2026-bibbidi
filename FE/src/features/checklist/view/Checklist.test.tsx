@@ -153,7 +153,7 @@ describe("Checklist 웹 상세 패널", () => {
     expect(document.activeElement).toBe(secondTask);
   });
 
-  it("선택 항목이 갱신 결과에서 사라지면 이전 상세 정보를 표시하지 않는다", () => {
+  it("선택 항목이 갱신 결과에서 사라지면 선택을 해제하고 같은 ID가 재등장해도 패널을 열지 않는다", () => {
     const view = render(
       <Checklist
         categories={createChecklistViewModel(createChecklistQuery())}
@@ -171,6 +171,19 @@ describe("Checklist 웹 상세 패널", () => {
 
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.queryByText("계약 조건 확인")).toBeNull();
+
+    view.rerender(
+      <Checklist
+        categories={createChecklistViewModel(createChecklistQuery())}
+      />,
+    );
+
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: /웨딩홀 계약/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
   });
 
   it("모바일에서는 상세 패널을 열지 않고 기존 목록을 유지한다", () => {
