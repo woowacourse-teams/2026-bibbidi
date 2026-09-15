@@ -7,7 +7,10 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
+import { installMatchMedia } from "../../test/matchMedia";
 
 const authMocks = vi.hoisted(() => ({
   authState: { status: "guest" } as
@@ -114,6 +117,10 @@ beforeEach(() => {
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
   repositoryMocks.current = { getChecklist: repositoryMocks.getChecklist };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("ChecklistFeature 인증 상태별 조회", () => {
@@ -291,6 +298,141 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(getCurrentUrl()).toBe("/checklist");
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(document.activeElement).toBe(firstTaskButton);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("모바일에서 URL로 상세를 열고 브라우저 뒤로가기로 목록에 복귀한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    renderChecklistFeature();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(
+      screen.getByRole("region", { name: "로컬 체크리스트 항목" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+
+    expect(getCurrentUrl()).toBe("/checklist");
+    expect(
+      screen.queryByRole("region", { name: "로컬 체크리스트 항목" }),
+    ).toBeNull();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("모바일 목록에서 연 상세의 상단 뒤로가기는 중복 목록 entry를 남기지 않는다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    renderChecklistFeature(["/outside", "/checklist"]);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+    );
+
+    expect(getCurrentUrl()).toBe("/checklist");
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+    expect(getCurrentUrl()).toBe("/outside");
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("모바일 상세 직접 접근의 상단 뒤로가기는 현재 entry를 목록으로 교체한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    renderChecklistFeature([
+      "/outside",
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    ]);
+
+    const detailPage = await screen.findByRole("region", {
+      name: "로컬 체크리스트 항목",
+    });
+    fireEvent.click(
+      within(detailPage).getByRole("button", {
+        name: "체크리스트로 돌아가기",
+      }),
+    );
+
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
+    expect(
+      screen.queryByRole("region", { name: "로컬 체크리스트 항목" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+    expect(getCurrentUrl()).toBe("/outside");
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("모바일 상세 직접 접근은 로딩과 오류 중에도 상세 셸과 안전한 뒤로가기를 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    let rejectChecklist: (reason?: unknown) => void = () => undefined;
+    repositoryMocks.getChecklist.mockImplementation(
+      () =>
+        new Promise<ChecklistQueryModel>((_resolve, reject) => {
+          rejectChecklist = reject;
+        }),
+    );
+    renderChecklistFeature([
+      "/outside",
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    ]);
+
+    const loadingDetailPage = screen.getByRole("region", {
+      name: "할 일 상세",
+    });
+    expect(within(loadingDetailPage).getByRole("status")).toBeTruthy();
+
+    await act(async () => {
+      rejectChecklist(new ChecklistQueryLoadError());
+    });
+
+    const errorDetailPage = await screen.findByRole("region", {
+      name: "할 일 상세",
+    });
+    expect(within(errorDetailPage).getByRole("alert")).toBeTruthy();
+    fireEvent.click(
+      within(errorDetailPage).getByRole("button", {
+        name: "체크리스트로 돌아가기",
+      }),
+    );
+
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
+    expect(screen.queryByRole("region", { name: "할 일 상세" })).toBeNull();
+  });
+
+  it("breakpoint 전환은 URL과 history를 변경하지 않고 같은 항목을 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    renderChecklistFeature([
+      "/checklist?source=before",
+      "/checklist?taskId=catalog-item-101",
+    ]);
+
+    expect(
+      await screen.findByRole("complementary", {
+        name: "로컬 체크리스트 항목",
+      }),
+    ).toBeTruthy();
+
+    act(() => media.setMatches(true));
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(
+      screen.getByRole("region", { name: "로컬 체크리스트 항목" }),
+    ).toBeTruthy();
+
+    act(() => media.setMatches(false));
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(
+      screen.getByRole("complementary", {
+        name: "로컬 체크리스트 항목",
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+    expect(getCurrentUrl()).toBe("/checklist?source=before");
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 

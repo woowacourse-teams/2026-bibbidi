@@ -1,24 +1,17 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
 
+import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
+import { ChecklistTaskDetailPage } from "./ChecklistTaskDetailPage";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
+  onBackTaskDetail: () => void;
   onCloseTaskDetail: () => void;
   onSelectTask: (taskId: string) => void;
   selectedTaskId: string | null;
-}
-
-const desktopDetailPanelQuery = "(min-width: 761px)";
-
-function supportsDesktopDetailPanel() {
-  return (
-    typeof window === "undefined" ||
-    typeof window.matchMedia !== "function" ||
-    window.matchMedia(desktopDetailPanelQuery).matches
-  );
 }
 
 function canRestoreFocus(
@@ -34,6 +27,7 @@ function canRestoreFocus(
 
 export function Checklist({
   categories,
+  onBackTaskDetail,
   onCloseTaskDetail,
   onSelectTask,
   selectedTaskId,
@@ -46,8 +40,7 @@ export function Checklist({
           .map((category) => category.id),
       ),
   );
-  const [isDesktopDetailPanelSupported, setIsDesktopDetailPanelSupported] =
-    useState(supportsDesktopDetailPanel);
+  const isMobileLayout = useIsMobileLayout();
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -57,25 +50,6 @@ export function Checklist({
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia(desktopDetailPanelQuery);
-    const handleChange = () => {
-      setIsDesktopDetailPanelSupported(mediaQuery.matches);
-
-      if (!mediaQuery.matches) {
-        onCloseTaskDetail();
-      }
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [onCloseTaskDetail]);
 
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
@@ -105,14 +79,23 @@ export function Checklist({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onCloseTaskDetail();
+        if (isMobileLayout) {
+          onBackTaskDetail();
+        } else {
+          onCloseTaskDetail();
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCloseTaskDetail, selectedTaskContext]);
+  }, [
+    isMobileLayout,
+    onBackTaskDetail,
+    onCloseTaskDetail,
+    selectedTaskContext,
+  ]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategoryIds((currentIds) => {
@@ -136,12 +119,20 @@ export function Checklist({
   return (
     <div
       className={`checklist-workspace${
-        selectedTaskContext && isDesktopDetailPanelSupported
+        selectedTaskContext && !isMobileLayout
           ? " checklist-workspace--detail-open"
+          : ""
+      }${
+        selectedTaskContext && isMobileLayout
+          ? " checklist-workspace--mobile-detail-open"
           : ""
       }`}
     >
-      <div className="checklist-workspace__main">
+      <div
+        aria-hidden={selectedTaskContext && isMobileLayout ? true : undefined}
+        className="checklist-workspace__main"
+        inert={selectedTaskContext && isMobileLayout ? true : undefined}
+      >
         <div aria-label="결혼 준비 체크리스트" className="checklist">
           {categories.map((category, categoryIndex) => {
             const isExpanded = expandedCategoryIds.has(category.id);
@@ -221,12 +212,13 @@ export function Checklist({
                         key={task.id}
                       >
                         <button
-                          aria-controls="checklist-task-detail-panel"
-                          aria-expanded={
-                            isDesktopDetailPanelSupported && isSelected
+                          aria-controls={
+                            isMobileLayout
+                              ? "checklist-task-detail-page"
+                              : "checklist-task-detail-panel"
                           }
+                          aria-expanded={isSelected}
                           className="checklist__task-button"
-                          disabled={!isDesktopDetailPanelSupported}
                           onClick={(event) => selectTask(task.id, event)}
                           ref={(button) => {
                             if (button) {
@@ -263,10 +255,18 @@ export function Checklist({
         </div>
       </div>
 
-      {selectedTaskContext && isDesktopDetailPanelSupported ? (
+      {selectedTaskContext && !isMobileLayout ? (
         <ChecklistTaskDetailPanel
           categoryTitle={selectedTaskContext.categoryTitle}
           onClose={onCloseTaskDetail}
+          task={selectedTaskContext.task}
+        />
+      ) : null}
+
+      {selectedTaskContext && isMobileLayout ? (
+        <ChecklistTaskDetailPage
+          categoryTitle={selectedTaskContext.categoryTitle}
+          onBack={onBackTaskDetail}
           task={selectedTaskContext.task}
         />
       ) : null}

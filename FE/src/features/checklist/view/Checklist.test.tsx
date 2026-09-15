@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistQueryModel } from "../model/checklistQuery";
 import { createChecklistViewModel } from "../view-model/createChecklistViewModel";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
+import { installMatchMedia } from "../../../test/matchMedia";
 import { Checklist } from "./Checklist";
 
 function createChecklistQuery(): ChecklistQueryModel {
@@ -58,19 +60,6 @@ function createChecklistQuery(): ChecklistQueryModel {
   };
 }
 
-function setDesktopDetailPanelSupport(matches: boolean) {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn().mockReturnValue({
-      addEventListener: vi.fn(),
-      matches,
-      media: "(min-width: 761px)",
-      onchange: null,
-      removeEventListener: vi.fn(),
-    }),
-  );
-}
-
 function ChecklistHarness({
   categories = createChecklistViewModel(createChecklistQuery()),
   initialSelectedTaskId = null,
@@ -83,6 +72,7 @@ function ChecklistHarness({
   return (
     <Checklist
       categories={categories}
+      onBackTaskDetail={() => setSelectedTaskId(null)}
       onCloseTaskDetail={() => setSelectedTaskId(null)}
       onSelectTask={setSelectedTaskId}
       selectedTaskId={selectedTaskId}
@@ -91,7 +81,7 @@ function ChecklistHarness({
 }
 
 beforeEach(() => {
-  setDesktopDetailPanelSupport(true);
+  installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
 });
 
 afterEach(() => {
@@ -113,7 +103,7 @@ describe("Checklist 웹 상세 패널", () => {
         .map(
           (appointment) =>
             appointment.querySelector(
-              ".checklist-detail-panel__appointment-title",
+              ".checklist-detail-content__appointment-title",
             )?.textContent,
         ),
     ).toEqual(["계약서 검토", "계약금 입금"]);
@@ -168,6 +158,7 @@ describe("Checklist 웹 상세 패널", () => {
     const view = render(
       <Checklist
         categories={categories}
+        onBackTaskDetail={onCloseTaskDetail}
         onCloseTaskDetail={onCloseTaskDetail}
         onSelectTask={onSelectTask}
         selectedTaskId="checklist-item-10"
@@ -182,6 +173,7 @@ describe("Checklist 웹 상세 패널", () => {
         categories={createChecklistViewModel({
           categories: [{ id: "10", items: [], title: "예식장" }],
         })}
+        onBackTaskDetail={onCloseTaskDetail}
         onCloseTaskDetail={onCloseTaskDetail}
         onSelectTask={onSelectTask}
         selectedTaskId="checklist-item-10"
@@ -196,6 +188,7 @@ describe("Checklist 웹 상세 패널", () => {
         categories={createChecklistViewModel({
           categories: [{ id: "10", items: [], title: "예식장" }],
         })}
+        onBackTaskDetail={onCloseTaskDetail}
         onCloseTaskDetail={onCloseTaskDetail}
         onSelectTask={onSelectTask}
         selectedTaskId={null}
@@ -208,14 +201,68 @@ describe("Checklist 웹 상세 패널", () => {
     );
   });
 
-  it("모바일에서는 상세 패널을 열지 않고 기존 목록을 유지한다", () => {
-    setDesktopDetailPanelSupport(false);
+  it("모바일에서는 공통 상세 콘텐츠를 전체 화면으로 표시하고 배경 목록을 비활성화한다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(<ChecklistHarness />);
 
     const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
-    expect(task.hasAttribute("disabled")).toBe(true);
     fireEvent.click(task);
 
     expect(screen.queryByRole("complementary")).toBeNull();
+    const detailPage = screen.getByRole("region", { name: "웨딩홀 계약" });
+    expect(within(detailPage).getByText("예식장")).toBeTruthy();
+    expect(within(detailPage).getByText("계약 조건 확인")).toBeTruthy();
+    expect(
+      within(detailPage).getByRole("button", {
+        name: "체크리스트로 돌아가기",
+      }),
+    ).toBe(document.activeElement);
+
+    const background = document.querySelector(".checklist-workspace__main");
+    expect(background?.getAttribute("aria-hidden")).toBe("true");
+    expect(background?.hasAttribute("inert")).toBe(true);
+
+    fireEvent.click(
+      within(detailPage).getByRole("button", {
+        name: "체크리스트로 돌아가기",
+      }),
+    );
+
+    expect(screen.queryByRole("region", { name: "웨딩홀 계약" })).toBeNull();
+    expect(document.activeElement).toBe(task);
+  });
+
+  it("모바일 전체 화면에서도 일정이 없으면 공통 빈 상태를 표시한다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(<ChecklistHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 투어/ }));
+
+    const detailPage = screen.getByRole("region", { name: "웨딩홀 투어" });
+    expect(
+      within(detailPage).getByRole("heading", { name: "일정 0개" }),
+    ).toBeTruthy();
+    expect(within(detailPage).getByText("등록된 일정이 없어요.")).toBeTruthy();
+  });
+
+  it("breakpoint 전환 시 선택을 유지하며 같은 공통 콘텐츠의 표현만 바꾼다", () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    render(<ChecklistHarness initialSelectedTaskId="checklist-item-10" />);
+
+    expect(
+      screen.getByRole("complementary", { name: "웨딩홀 계약" }),
+    ).toBeTruthy();
+
+    act(() => media.setMatches(true));
+
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.getByRole("region", { name: "웨딩홀 계약" })).toBeTruthy();
+
+    act(() => media.setMatches(false));
+
+    expect(screen.queryByRole("region", { name: "웨딩홀 계약" })).toBeNull();
+    expect(
+      screen.getByRole("complementary", { name: "웨딩홀 계약" }),
+    ).toBeTruthy();
   });
 });

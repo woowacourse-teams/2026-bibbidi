@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
+import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
 import {
   useChecklistQueryRepository,
@@ -14,6 +15,7 @@ import {
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
+import { ChecklistTaskDetailPageShell } from "./view/ChecklistTaskDetailPage";
 
 type ChecklistRequestState =
   | { audience?: ChecklistAudience; status: "loading" }
@@ -39,16 +41,38 @@ function isRequestAborted(error: unknown): boolean {
   return error instanceof ChecklistQueryRequestAbortedError;
 }
 
+const checklistDetailDepthStateKey = "checklistDetailDepth";
+
+function getChecklistDetailDepth(state: unknown) {
+  if (typeof state !== "object" || state === null) {
+    return null;
+  }
+
+  const depth = Reflect.get(state, checklistDetailDepthStateKey);
+
+  return Number.isInteger(depth) && Number(depth) > 0 ? Number(depth) : null;
+}
+
+function createChecklistDetailState(state: unknown, depth: number) {
+  return {
+    ...(typeof state === "object" && state !== null ? state : {}),
+    [checklistDetailDepthStateKey]: depth,
+  };
+}
+
 export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
   const checklistRepository = useChecklistQueryRepository();
   const checklistRevision = useChecklistRevision();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
+  const isMobileLayout = useIsMobileLayout();
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
       ? "authenticated"
@@ -129,21 +153,21 @@ export function ChecklistFeature() {
 
   const selectedTaskId = searchParams.get("taskId");
   const updateTaskSelection = useCallback(
-    (taskId: string | null, replace = false) => {
-      setSearchParams(
-        (currentSearchParams) => {
-          const nextSearchParams = new URLSearchParams(currentSearchParams);
+    (
+      taskId: string | null,
+      options: { replace?: boolean; state?: unknown } = {},
+    ) => {
+      setSearchParams((currentSearchParams) => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams);
 
-          if (taskId === null) {
-            nextSearchParams.delete("taskId");
-          } else {
-            nextSearchParams.set("taskId", taskId);
-          }
+        if (taskId === null) {
+          nextSearchParams.delete("taskId");
+        } else {
+          nextSearchParams.set("taskId", taskId);
+        }
 
-          return nextSearchParams;
-        },
-        { replace },
-      );
+        return nextSearchParams;
+      }, options);
     },
     [setSearchParams],
   );
@@ -152,13 +176,39 @@ export function ChecklistFeature() {
       updateTaskSelection(null);
     }
   }, [selectedTaskId, updateTaskSelection]);
+  const backFromTaskDetail = useCallback(() => {
+    if (selectedTaskId === null) {
+      return;
+    }
+
+    const detailDepth = getChecklistDetailDepth(location.state);
+
+    if (detailDepth !== null) {
+      navigate(-detailDepth);
+    } else {
+      updateTaskSelection(null, { replace: true });
+    }
+  }, [location.state, navigate, selectedTaskId, updateTaskSelection]);
   const selectTask = useCallback(
     (taskId: string) => {
       if (taskId !== selectedTaskId) {
-        updateTaskSelection(taskId);
+        const currentDetailDepth = getChecklistDetailDepth(location.state);
+        const nextDetailDepth =
+          selectedTaskId === null
+            ? 1
+            : currentDetailDepth === null
+              ? null
+              : currentDetailDepth + 1;
+
+        updateTaskSelection(taskId, {
+          state:
+            nextDetailDepth === null
+              ? undefined
+              : createChecklistDetailState(location.state, nextDetailDepth),
+        });
       }
     },
-    [selectedTaskId, updateTaskSelection],
+    [location.state, selectedTaskId, updateTaskSelection],
   );
 
   useEffect(() => {
@@ -180,7 +230,7 @@ export function ChecklistFeature() {
       );
 
     if (!selectedTaskExists) {
-      updateTaskSelection(null, true);
+      updateTaskSelection(null, { replace: true });
     }
   }, [
     audience,
@@ -201,8 +251,20 @@ export function ChecklistFeature() {
     setRequestRevision((revision) => revision + 1);
   };
 
+  const renderChecklistState = (state: ReactNode) =>
+    isMobileLayout && selectedTaskId !== null ? (
+      <ChecklistTaskDetailPageShell
+        onBack={backFromTaskDetail}
+        title="할 일 상세"
+      >
+        {state}
+      </ChecklistTaskDetailPageShell>
+    ) : (
+      state
+    );
+
   if (!audience) {
-    return (
+    return renderChecklistState(
       <ChecklistState
         onRetry={
           requestState.status === "authentication-required"
@@ -214,30 +276,33 @@ export function ChecklistFeature() {
             ? "authentication-required"
             : "loading"
         }
-      />
+      />,
     );
   }
 
   if (requestState.audience !== audience) {
-    return <ChecklistState status="loading" />;
+    return renderChecklistState(<ChecklistState status="loading" />);
   }
 
   if (
     requestState.status === "authentication-required" ||
     requestState.status === "error"
   ) {
-    return (
-      <ChecklistState onRetry={handleRetry} status={requestState.status} />
+    return renderChecklistState(
+      <ChecklistState onRetry={handleRetry} status={requestState.status} />,
     );
   }
 
   if (requestState.status !== "success") {
-    return <ChecklistState status={requestState.status} />;
+    return renderChecklistState(
+      <ChecklistState status={requestState.status} />,
+    );
   }
 
   return (
     <Checklist
       categories={createChecklistViewModel(requestState.checklist)}
+      onBackTaskDetail={backFromTaskDetail}
       onCloseTaskDetail={closeTaskDetail}
       onSelectTask={selectTask}
       selectedTaskId={selectedTaskId}

@@ -15,6 +15,8 @@ import { ChecklistFeature } from "../features/checklist";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { PreparationRoadmapFeature } from "../features/preparation/PreparationRoadmapFeature";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../shared/responsive";
+import { installMatchMedia } from "../test/matchMedia";
 import { ServiceLayout } from "./ServiceLayout";
 
 function createChecklistItem(
@@ -335,6 +337,145 @@ describe("ServiceLayout", () => {
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
+  });
+
+  it("모바일 상세에서 앱 chrome과 배경을 비활성화하고 목록 스크롤과 공통 GET을 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [createChecklistItem(10, 1001, true)],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderServiceLayout(
+      <Route
+        path="/checklist"
+        element={
+          <>
+            <ChecklistFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
+      ["/checklist"],
+    );
+    const taskButton = await screen.findByRole("button", {
+      name: /체크리스트 항목 10/,
+    });
+    const content = container.querySelector<HTMLElement>(
+      ".service-layout__content",
+    );
+    expect(content).not.toBeNull();
+    if (!content) {
+      return;
+    }
+    content.scrollTop = 320;
+
+    fireEvent.click(taskButton);
+
+    expect(
+      screen.getByRole("region", { name: "체크리스트 항목 10" }),
+    ).toBeTruthy();
+    const appHeader = container.querySelector(".service-layout__header");
+    expect(appHeader?.hasAttribute("hidden")).toBe(true);
+    expect(appHeader?.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /체크리스트 항목 10/ }),
+    ).toBeNull();
+    expect(taskButton.isConnected).toBe(true);
+    expect(taskButton.closest("[inert]")).not.toBeNull();
+    expect(
+      content.classList.contains("service-layout__content--mobile-detail"),
+    ).toBe(true);
+    expect(content.scrollTop).toBe(320);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+
+    act(() => media.setMatches(false));
+
+    expect(
+      screen.getByRole("complementary", { name: "체크리스트 항목 10" }),
+    ).toBeTruthy();
+    expect(appHeader?.hasAttribute("hidden")).toBe(false);
+    expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist?taskId=checklist-item-10",
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+
+    act(() => media.setMatches(true));
+    fireEvent.click(
+      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+    );
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist",
+    );
+    expect(content.scrollTop).toBe(320);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("모바일 체크리스트의 taskId가 비어 있으면 앱 chrome을 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+
+    const { container } = renderServiceLayout(
+      <Route path="/checklist" element={<div>체크리스트 화면</div>} />,
+      ["/checklist?taskId="],
+    );
+
+    expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.classList.contains("service-layout__content--mobile-detail"),
+    ).toBe(false);
   });
 
   it("준비 항목 추가 직후 헤더와 체크리스트 화면을 공통 캐시에서 함께 갱신한다", async () => {
