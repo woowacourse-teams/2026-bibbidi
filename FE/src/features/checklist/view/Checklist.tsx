@@ -1,4 +1,4 @@
-import { MouseEvent, useEffect, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
@@ -6,6 +6,9 @@ import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
+  onCloseTaskDetail: () => void;
+  onSelectTask: (taskId: string) => void;
+  selectedTaskId: string | null;
 }
 
 const desktopDetailPanelQuery = "(min-width: 761px)";
@@ -18,7 +21,23 @@ function supportsDesktopDetailPanel() {
   );
 }
 
-export function Checklist({ categories }: ChecklistProps) {
+function canRestoreFocus(
+  button: HTMLButtonElement | null,
+): button is HTMLButtonElement {
+  return (
+    button !== null &&
+    button.isConnected &&
+    !button.disabled &&
+    button.closest("[hidden]") === null
+  );
+}
+
+export function Checklist({
+  categories,
+  onCloseTaskDetail,
+  onSelectTask,
+  selectedTaskId,
+}: ChecklistProps) {
   const [expandedCategoryIds, setExpandedCategoryIds] = useState(
     () =>
       new Set(
@@ -29,20 +48,15 @@ export function Checklist({ categories }: ChecklistProps) {
   );
   const [isDesktopDetailPanelSupported, setIsDesktopDetailPanelSupported] =
     useState(supportsDesktopDetailPanel);
-  const [selection, setSelection] = useState<{
-    button: HTMLButtonElement;
-    taskId: string;
-  } | null>(null);
-  const selectedTaskId = selection?.taskId ?? null;
+  const checklistRef = useRef<HTMLDivElement>(null);
+  const previousSelectedTaskIdRef = useRef(selectedTaskId);
+  const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
+  const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const selectedTaskContext = categories
     .flatMap((category) =>
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
-
-  if (selectedTaskId !== null && !selectedTaskContext) {
-    setSelection(null);
-  }
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") {
@@ -54,14 +68,35 @@ export function Checklist({ categories }: ChecklistProps) {
       setIsDesktopDetailPanelSupported(mediaQuery.matches);
 
       if (!mediaQuery.matches) {
-        setSelection(null);
+        onCloseTaskDetail();
       }
     };
 
     mediaQuery.addEventListener("change", handleChange);
 
     return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
+  }, [onCloseTaskDetail]);
+
+  useEffect(() => {
+    const previousSelectedTaskId = previousSelectedTaskIdRef.current;
+
+    if (previousSelectedTaskId !== null && selectedTaskId === null) {
+      const previousTaskButton =
+        taskButtonRefs.current.get(previousSelectedTaskId) ??
+        selectedTaskButtonRef.current;
+
+      if (canRestoreFocus(previousTaskButton)) {
+        previousTaskButton.focus();
+      } else {
+        checklistRef.current?.focus();
+      }
+    }
+
+    selectedTaskButtonRef.current = selectedTaskContext
+      ? (taskButtonRefs.current.get(selectedTaskContext.task.id) ?? null)
+      : null;
+    previousSelectedTaskIdRef.current = selectedTaskId;
+  }, [selectedTaskContext, selectedTaskId]);
 
   useEffect(() => {
     if (!selectedTaskContext) {
@@ -70,15 +105,14 @@ export function Checklist({ categories }: ChecklistProps) {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        selection?.button.focus();
-        setSelection(null);
+        onCloseTaskDetail();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTaskContext, selection]);
+  }, [onCloseTaskDetail, selectedTaskContext]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategoryIds((currentIds) => {
@@ -94,12 +128,9 @@ export function Checklist({ categories }: ChecklistProps) {
     });
   };
 
-  const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) =>
-    setSelection({ button: event.currentTarget, taskId });
-
-  const closeTaskDetail = () => {
-    selection?.button.focus();
-    setSelection(null);
+  const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
+    selectedTaskButtonRef.current = event.currentTarget;
+    onSelectTask(taskId);
   };
 
   return (
@@ -111,7 +142,12 @@ export function Checklist({ categories }: ChecklistProps) {
       }`}
     >
       <div className="checklist-workspace__main">
-        <div aria-label="결혼 준비 체크리스트" className="checklist">
+        <div
+          aria-label="결혼 준비 체크리스트"
+          className="checklist"
+          ref={checklistRef}
+          tabIndex={-1}
+        >
           {categories.map((category) => {
             const isExpanded = expandedCategoryIds.has(category.id);
             const taskListId = `${category.id}-tasks`;
@@ -196,6 +232,13 @@ export function Checklist({ categories }: ChecklistProps) {
                           className="checklist__task-button"
                           disabled={!isDesktopDetailPanelSupported}
                           onClick={(event) => selectTask(task.id, event)}
+                          ref={(button) => {
+                            if (button) {
+                              taskButtonRefs.current.set(task.id, button);
+                            } else {
+                              taskButtonRefs.current.delete(task.id);
+                            }
+                          }}
                           type="button"
                         >
                           <span
@@ -227,7 +270,7 @@ export function Checklist({ categories }: ChecklistProps) {
       {selectedTaskContext && isDesktopDetailPanelSupported ? (
         <ChecklistTaskDetailPanel
           categoryTitle={selectedTaskContext.categoryTitle}
-          onClose={closeTaskDetail}
+          onClose={onCloseTaskDetail}
           task={selectedTaskContext.task}
         />
       ) : null}

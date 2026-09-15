@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({
@@ -69,6 +70,43 @@ function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQuer
   };
 }
 
+function RouterControls() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <div data-testid="current-url">
+        {`${location.pathname}${location.search}`}
+      </div>
+      <button onClick={() => navigate(-1)} type="button">
+        브라우저 뒤로가기
+      </button>
+    </>
+  );
+}
+
+function ChecklistFeatureTestApp({
+  initialEntries = ["/checklist"],
+}: {
+  initialEntries?: string[];
+}) {
+  return (
+    <MemoryRouter initialEntries={initialEntries}>
+      <ChecklistFeature />
+      <RouterControls />
+    </MemoryRouter>
+  );
+}
+
+function renderChecklistFeature(initialEntries?: string[]) {
+  return render(<ChecklistFeatureTestApp initialEntries={initialEntries} />);
+}
+
+function getCurrentUrl() {
+  return screen.getByTestId("current-url").textContent;
+}
+
 beforeEach(() => {
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
@@ -82,7 +120,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("인증 확인 중에는 접근 가능한 로딩 상태를 표시하고 조회하지 않는다", () => {
     authMocks.authState = { status: "loading" };
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     expect(screen.getByRole("status").textContent).toBe(
       "체크리스트를 불러오고 있어요.",
@@ -91,14 +129,14 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   });
 
   it("synchronizing 중에는 이전 guest 결과를 숨기고 새로 조회하지 않는다", async () => {
-    const view = render(<ChecklistFeature />);
+    const view = renderChecklistFeature();
     expect(await screen.findByText("로컬 체크리스트 항목")).toBeTruthy();
 
     authMocks.authState = {
       status: "synchronizing",
       user: { nickname: "bibbidi" },
     };
-    view.rerender(<ChecklistFeature />);
+    view.rerender(<ChecklistFeatureTestApp />);
 
     expect(screen.queryByText("로컬 체크리스트 항목")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe(
@@ -108,7 +146,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   });
 
   it("비로그인 audience의 Local Storage 조합 결과를 표시한다", async () => {
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     expect(await screen.findByText("로컬 체크리스트 항목")).toBeTruthy();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledWith(
@@ -151,7 +189,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       ],
     });
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     await screen.findByText("직접 작성 항목");
     expect(
@@ -166,16 +204,16 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   });
 
   it("단순 리렌더링으로 조회를 반복하지 않는다", async () => {
-    const view = render(<ChecklistFeature />);
+    const view = renderChecklistFeature();
     await screen.findByText("로컬 체크리스트 항목");
 
-    view.rerender(<ChecklistFeature />);
+    view.rerender(<ChecklistFeatureTestApp />);
 
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
   it("할 일 상세 패널을 열어도 체크리스트를 다시 조회하지 않는다", async () => {
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     fireEvent.click(
       await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
@@ -188,11 +226,184 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   });
 });
 
+describe("ChecklistFeature 상세 URL 선택", () => {
+  it("할 일 클릭과 닫기·Escape를 URL에 반영하고 다른 query와 포커스를 유지한다", async () => {
+    const checklist = createChecklist("URL 인코딩 할 일");
+    checklist.categories[1]!.items[0]!.id = "task-한글";
+    repositoryMocks.getChecklist.mockResolvedValue(checklist);
+    renderChecklistFeature(["/checklist?filter=remaining"]);
+
+    const taskButton = await screen.findByRole("button", {
+      name: /URL 인코딩 할 일/,
+    });
+    fireEvent.click(taskButton);
+
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=task-%ED%95%9C%EA%B8%80",
+    );
+    expect(
+      screen.getByRole("complementary", { name: "URL 인코딩 할 일" }),
+    ).toBeTruthy();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 상세 닫기" }));
+
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(taskButton);
+
+    fireEvent.click(taskButton);
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(taskButton);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("브라우저 뒤로가기로 이전 선택과 목록 상태를 복원한다", async () => {
+    const checklist = createChecklist("첫 번째 할 일");
+    checklist.categories[1]!.items.push({
+      ...checklist.categories[1]!.items[0]!,
+      id: "catalog-item-102",
+      sourceCatalogItemId: 102,
+      title: "두 번째 할 일",
+    });
+    repositoryMocks.getChecklist.mockResolvedValue(checklist);
+    renderChecklistFeature();
+
+    const firstTaskButton = await screen.findByRole("button", {
+      name: /첫 번째 할 일/,
+    });
+    fireEvent.click(firstTaskButton);
+    fireEvent.click(screen.getByRole("button", { name: /두 번째 할 일/ }));
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-102");
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(
+      screen.getByRole("complementary", { name: "첫 번째 할 일" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+
+    expect(getCurrentUrl()).toBe("/checklist");
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(firstTaskButton);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("상세 URL을 로딩 중 유지하고 데이터가 준비되면 패널을 연다", async () => {
+    let resolveChecklist: (checklist: ChecklistQueryModel) => void = () =>
+      undefined;
+    repositoryMocks.getChecklist.mockImplementation(
+      () =>
+        new Promise<ChecklistQueryModel>((resolve) => {
+          resolveChecklist = resolve;
+        }),
+    );
+    renderChecklistFeature([
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    ]);
+
+    expect(screen.getByText("체크리스트를 불러오고 있어요.")).toBeTruthy();
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    );
+
+    await act(async () => {
+      resolveChecklist(createChecklist("직접 접근한 할 일"));
+    });
+
+    expect(
+      await screen.findByRole("complementary", {
+        name: "직접 접근한 할 일",
+      }),
+    ).toBeTruthy();
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    );
+  });
+
+  it("잘못된 taskId를 로딩 완료 후 replace로 제거한다", async () => {
+    let resolveChecklist: (checklist: ChecklistQueryModel) => void = () =>
+      undefined;
+    repositoryMocks.getChecklist.mockImplementation(
+      () =>
+        new Promise<ChecklistQueryModel>((resolve) => {
+          resolveChecklist = resolve;
+        }),
+    );
+    renderChecklistFeature([
+      "/checklist?source=previous",
+      "/checklist?filter=remaining&taskId=missing-task",
+    ]);
+
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=missing-task",
+    );
+
+    await act(async () => {
+      resolveChecklist(createChecklist());
+    });
+
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?filter=remaining"),
+    );
+    expect(screen.queryByRole("complementary")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+    expect(getCurrentUrl()).toBe("/checklist?source=previous");
+  });
+
+  it("새 데이터 요청 중에는 taskId를 유지하고 선택 항목이 사라진 결과에서 함께 정리한다", async () => {
+    let resolveRefreshedChecklist: (
+      checklist: ChecklistQueryModel,
+    ) => void = () => undefined;
+    repositoryMocks.getChecklist
+      .mockResolvedValueOnce(createChecklist("사라질 할 일"))
+      .mockImplementationOnce(
+        () =>
+          new Promise<ChecklistQueryModel>((resolve) => {
+            resolveRefreshedChecklist = resolve;
+          }),
+      );
+    const view = renderChecklistFeature([
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    ]);
+    expect(
+      await screen.findByRole("complementary", { name: "사라질 할 일" }),
+    ).toBeTruthy();
+
+    repositoryMocks.checklistRevision = 1;
+    view.rerender(<ChecklistFeatureTestApp />);
+    await waitFor(() =>
+      expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2),
+    );
+
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=catalog-item-101",
+    );
+
+    await act(async () => {
+      resolveRefreshedChecklist({
+        categories: [{ id: "10", items: [], title: "첫 번째 카테고리" }],
+      });
+    });
+
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?filter=remaining"),
+    );
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+});
+
 describe("ChecklistFeature 조회 상태와 요청 수명", () => {
   it("Catalog 카테고리가 없으면 전체 빈 상태를 표시한다", async () => {
     repositoryMocks.getChecklist.mockResolvedValue({ categories: [] });
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     expect(await screen.findByText("표시할 체크리스트가 없어요.")).toBeTruthy();
   });
@@ -202,7 +413,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       categories: [{ id: "10", items: [], title: "빈 카테고리" }],
     });
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     const category = (
       await screen.findByRole("heading", { name: "빈 카테고리" })
@@ -218,7 +429,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       .mockRejectedValueOnce(new ChecklistQueryLoadError())
       .mockResolvedValueOnce(createChecklist("재시도 결과"));
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     expect(
       await screen.findByText("체크리스트를 불러오지 못했어요."),
@@ -238,7 +449,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       new ChecklistQueryAuthenticationRequiredError(),
     );
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     expect(
       await screen.findByText(
@@ -253,7 +464,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       new ChecklistQueryRequestAbortedError(),
     );
 
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
 
     await waitFor(() =>
       expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce(),
@@ -282,14 +493,14 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
             resolveAuthenticated = resolve;
           }),
       );
-    const view = render(<ChecklistFeature />);
+    const view = renderChecklistFeature();
     await waitFor(() => expect(firstSignal).toBeDefined());
 
     authMocks.authState = {
       status: "authenticated",
       user: { nickname: "bibbidi" },
     };
-    view.rerender(<ChecklistFeature />);
+    view.rerender(<ChecklistFeatureTestApp />);
 
     expect(firstSignal?.aborted).toBe(true);
     await act(async () => {
@@ -316,7 +527,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       },
     );
     repositoryMocks.current = { getChecklist: firstGetChecklist };
-    const view = render(<ChecklistFeature />);
+    const view = renderChecklistFeature();
     await waitFor(() => expect(firstSignal).toBeDefined());
 
     authMocks.authState = {
@@ -327,7 +538,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
       .fn()
       .mockResolvedValue(createChecklist("두 번째 사용자 결과"));
     repositoryMocks.current = { getChecklist: secondGetChecklist };
-    view.rerender(<ChecklistFeature />);
+    view.rerender(<ChecklistFeatureTestApp />);
 
     expect(firstSignal?.aborted).toBe(true);
     expect(await screen.findByText("두 번째 사용자 결과")).toBeTruthy();
@@ -341,7 +552,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
         return new Promise<ChecklistQueryModel>(() => undefined);
       },
     );
-    const view = render(<ChecklistFeature />);
+    const view = renderChecklistFeature();
     await waitFor(() => expect(requestSignal).toBeDefined());
 
     view.unmount();
@@ -352,7 +563,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
 
 describe("ChecklistFeature 기존 UI", () => {
   it("카테고리를 기존 순서대로 표시하고 accordion을 열고 닫는다", async () => {
-    render(<ChecklistFeature />);
+    renderChecklistFeature();
     await screen.findByText("로컬 체크리스트 항목");
 
     expect(
