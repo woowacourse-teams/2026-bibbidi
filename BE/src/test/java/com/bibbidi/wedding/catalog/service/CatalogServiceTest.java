@@ -11,7 +11,10 @@ import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +62,23 @@ class CatalogServiceTest {
                 .singleElement()
                 .extracting(CatalogItemSnapshot::id, CatalogItemSnapshot::categoryId, CatalogItemSnapshot::title)
                 .containsExactly(FIRST_ITEM_ID, 1L, "첫 번째 할 일");
+    }
+
+    @Test
+    @DisplayName("요청한 카테고리 중 준비 목록에 있는 카테고리의 이름만 조회한다")
+    void shouldFindCategoryNames() {
+        // given
+        Catalog catalog = new Catalog(List.of(
+                new Category(1L, "웨딩홀", 1, List.of()),
+                new Category(2L, "드레스", 2, List.of())
+        ));
+        when(catalogRepository.findCatalog()).thenReturn(catalog);
+
+        // when
+        CategoryNames categoryNames = catalogService.findCategoryNames(Set.of(1L, 99L));
+
+        // then
+        assertThat(categoryNames).isEqualTo(new CategoryNames(Map.of(1L, "웨딩홀")));
     }
 
     @Test
