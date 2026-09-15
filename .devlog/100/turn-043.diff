@@ -1,0 +1,15 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 4c38337d711378bd6dd58f128169c51383915829..d8d6f5d2138a14e5be2b6d449f4b1701acd3a3dd 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -120,10 +120,7 @@ public class ChecklistService {
+         return toResults(pickedItems);
+     }
+ 
+-    private List<CatalogItemDetailSnapshot> findCandidates(
+-            Checklist checklist,
+-            List<CatalogItemDetailSnapshot> allItems
+-    ) {
++    private List<CatalogItemDetailSnapshot> findCandidates(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
+         List<CatalogItemDetailSnapshot> addedItems = filter(allItems, item -> checklist.hasAdded(item.id()));
+         List<CatalogItemDetailSnapshot> notAddedItems = filter(allItems, item -> !checklist.hasAdded(item.id()));

@@ -1,0 +1,52 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 599f20d4d9ef089731d3ebc577e85dbcc430336e..ccf07d94fd8ab0f08e737ba5e3a59bc1210f39dd 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -123,7 +123,7 @@ public class ChecklistService {
+         List<CatalogItemDetailSnapshot> alreadyAddedItems = selectAlreadyAddedItems(checklist, allItems);
+         List<CatalogItemDetailSnapshot> notYetAddedItems = selectNotYetAddedItems(checklist, allItems);
+ 
+-        int maxRecommendablePhase = calculateMaxRecommendablePhase(alreadyAddedItems, notYetAddedItems);
++        int maxRecommendablePhase = decideMaxRecommendablePhase(alreadyAddedItems, notYetAddedItems);
+         return selectItemsUpToPhase(notYetAddedItems, maxRecommendablePhase);
+     }
+ 
+@@ -139,22 +139,31 @@ public class ChecklistService {
+                 .toList();
+     }
+ 
+-    private int calculateMaxRecommendablePhase(List<CatalogItemDetailSnapshot> alreadyAddedItems, List<CatalogItemDetailSnapshot> notYetAddedItems) {
+-        return Math.max(calculateMaxPhase(alreadyAddedItems), calculateMinPhase(notYetAddedItems));
++    private int decideMaxRecommendablePhase(List<CatalogItemDetailSnapshot> alreadyAddedItems, List<CatalogItemDetailSnapshot> notYetAddedItems) {
++        int currentPhase = decideCurrentPhase(alreadyAddedItems);
++        if (hasAddedAllItemsUpTo(currentPhase, notYetAddedItems)) {
++            return decideNextPhase(notYetAddedItems, currentPhase);
++        }
++        return currentPhase;
+     }
+ 
+-    private int calculateMaxPhase(List<CatalogItemDetailSnapshot> items) {
+-        return items.stream()
++    private int decideCurrentPhase(List<CatalogItemDetailSnapshot> alreadyAddedItems) {
++        return alreadyAddedItems.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .max()
+                 .orElse(FIRST_PHASE);
+     }
+ 
+-    private int calculateMinPhase(List<CatalogItemDetailSnapshot> items) {
+-        return items.stream()
++    private boolean hasAddedAllItemsUpTo(int phase, List<CatalogItemDetailSnapshot> notYetAddedItems) {
++        return notYetAddedItems.stream()
++                .noneMatch(item -> item.isUpTo(phase));
++    }
++
++    private int decideNextPhase(List<CatalogItemDetailSnapshot> notYetAddedItems, int currentPhase) {
++        return notYetAddedItems.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .min()
+-                .orElse(FIRST_PHASE);
++                .orElse(currentPhase);
+     }
+ 
+     private List<CatalogItemDetailSnapshot> selectItemsUpToPhase(List<CatalogItemDetailSnapshot> items, int phase) {

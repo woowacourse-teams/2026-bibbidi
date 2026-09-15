@@ -1,0 +1,2161 @@
+diff --git a/BE/.claude/settings.json b/BE/.claude/settings.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..17cba5c2fe56d5f2901c80fd80e73805dc8680d4
+--- /dev/null
++++ b/BE/.claude/settings.json
+@@ -0,0 +1,9 @@
++{
++  "hooks": {
++    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 15, "statusMessage": "작업 시작 상태를 기록하는 중" }] }],
++    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "Issue와 요청을 연결하는 중" }] }],
++    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "이 작업을 해도 되는지 확인하는 중" }] }],
++    "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "테스트 결과를 기록하는 중" }] }],
++    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "이번 턴에서 바뀐 코드를 기록하는 중" }] }]
++  }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c5a9c8c990dff49c2e8e149ac8ded5139476133
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java
+@@ -0,0 +1,22 @@
++package com.bibbidi.wedding.catalog.domain;
++
++import java.util.Collection;
++import org.jspecify.annotations.NonNull;
++import org.jspecify.annotations.Nullable;
++
++public record CandidateItem(
++        @Nullable Long itemId,
++        @NonNull String title,
++        @NonNull String categoryName,
++        int phase,
++        @NonNull String stepName
++) {
++
++    public boolean isAddedIn(Collection<Long> addedItemIds) {
++        return addedItemIds.contains(itemId);
++    }
++
++    public boolean isUpTo(int basePhase) {
++        return phase <= basePhase;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
+index 999a0d6a6c43eff10d2608ad981077de768b87c1..1c1eee91d870af50175067a92ef7505101f21c6d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
+@@ -1,11 +1,15 @@
+ package com.bibbidi.wedding.catalog.domain;
+ 
++import java.util.Collection;
+ import java.util.Comparator;
+ import java.util.List;
++import java.util.function.Predicate;
+ import org.jspecify.annotations.NonNull;
+ 
+ public final class Catalog {
+ 
++    private static final int FIRST_PHASE = 1;
++
+     private final List<Category> categories;
+ 
+     public Catalog(@NonNull List<Category> categories) {
+@@ -16,6 +20,41 @@ public final class Catalog {
+         return categories;
+     }
+ 
++    public List<CandidateItem> findCandidates(Collection<Long> addedItemIds) {
++        List<CandidateItem> allItems = candidateItems();
++        List<CandidateItem> addedItems = filter(allItems, item -> item.isAddedIn(addedItemIds));
++        List<CandidateItem> notAddedItems = filter(allItems, item -> !item.isAddedIn(addedItemIds));
++
++        int basePhase = Math.max(maxPhaseOf(addedItems), minPhaseOf(notAddedItems));
++        return filter(notAddedItems, item -> item.isUpTo(basePhase));
++    }
++
++    private List<CandidateItem> candidateItems() {
++        return categories.stream()
++                .flatMap(category -> category.candidateItems().stream())
++                .toList();
++    }
++
++    private static List<CandidateItem> filter(List<CandidateItem> items, Predicate<CandidateItem> condition) {
++        return items.stream()
++                .filter(condition)
++                .toList();
++    }
++
++    private static int maxPhaseOf(List<CandidateItem> items) {
++        return items.stream()
++                .mapToInt(CandidateItem::phase)
++                .max()
++                .orElse(FIRST_PHASE);
++    }
++
++    private static int minPhaseOf(List<CandidateItem> items) {
++        return items.stream()
++                .mapToInt(CandidateItem::phase)
++                .min()
++                .orElse(FIRST_PHASE);
++    }
++
+     private static List<Category> sortByDisplayOrder(List<Category> categories) {
+         return categories.stream()
+                 .sorted(Comparator.comparingInt(Category::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
+index 8cc4cb2395dec5be1e7386c158f8f0b1292b3b3e..210065dee7dce239e4f27ae0801dc8d77f9ce08b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
+@@ -48,6 +48,12 @@ public final class Category {
+                 .toList();
+     }
+ 
++    public List<CandidateItem> candidateItems() {
++        return steps.stream()
++                .flatMap(step -> step.candidateItems(name).stream())
++                .toList();
++    }
++
+     private static List<Step> sortByDisplayOrder(List<Step> steps) {
+         return steps.stream()
+                 .sorted(Comparator.comparingInt(Step::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
+index e7e1eebe003189873b0d4cfbda0b6380de6a9241..886312796e42d00d1d66e130607a54d8d7eb6ed7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
+@@ -54,6 +54,12 @@ public final class Step {
+         return items;
+     }
+ 
++    public List<CandidateItem> candidateItems(String categoryName) {
++        return items.stream()
++                .map(item -> new CandidateItem(item.id(), item.title(), categoryName, displayOrder, name))
++                .toList();
++    }
++
+     private static List<Item> sortByDisplayOrder(List<Item> items) {
+         return items.stream()
+                 .sorted(Comparator.comparingInt(Item::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java b/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
+index c7419708ca7a3e2c59762d2ea0116648ece921ea..8dd347b176f976220e8b5c62b5e1fff7280a79c5 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
+@@ -1,10 +1,14 @@
+ package com.bibbidi.wedding.catalog.service;
+ 
+ import com.bibbidi.wedding.catalog.domain.Catalog;
++import com.bibbidi.wedding.catalog.domain.Category;
+ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
++import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import java.util.Collection;
+ import java.util.List;
++import java.util.Map;
++import java.util.stream.Collectors;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -27,6 +31,16 @@ public class CatalogService {
+                 .toList();
+     }
+ 
++    @Transactional(readOnly = true)
++    public CategoryNames findCategoryNames(Collection<Long> categoryIds) {
++        Catalog catalog = catalogRepository.findCatalog();
++
++        Map<Long, String> namesByCategoryId = catalog.categories().stream()
++                .filter(category -> categoryIds.contains(category.id()))
++                .collect(Collectors.toMap(Category::id, Category::name));
++        return new CategoryNames(namesByCategoryId);
++    }
++
+     @Transactional(readOnly = true)
+     public void validateCategoryExists(Long categoryId) {
+         catalogRepository.validateCategoryExists(categoryId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CategoryNames.java b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CategoryNames.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb8c388062dabe2091f5195acbf82d5f11f9673d
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CategoryNames.java
+@@ -0,0 +1,10 @@
++package com.bibbidi.wedding.catalog.service.dto;
++
++import java.util.Map;
++
++public record CategoryNames(Map<Long, String> namesByCategoryId) {
++
++    public String nameOf(Long categoryId) {
++        return namesByCategoryId.get(categoryId);
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+index b6d55beb2ad4b09b5ee43f537bcd43600dd27624..1ab97f97f082b449c89c002373bb85a088f6181f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+@@ -4,22 +4,28 @@ import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest
+ import com.bibbidi.wedding.checklist.controller.dto.req.UpdateAppointmentRequest;
+ import com.bibbidi.wedding.checklist.controller.dto.resp.AppointmentCompletionResponse;
+ import com.bibbidi.wedding.checklist.controller.dto.resp.AppointmentResponse;
++import com.bibbidi.wedding.checklist.controller.dto.resp.NearbyAppointmentResponse;
+ import com.bibbidi.wedding.checklist.service.AppointmentService;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
+ import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
++import jakarta.validation.constraints.Max;
++import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.NotNull;
++import java.time.LocalDateTime;
++import java.util.List;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.PutMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestParam;
+ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+@@ -40,10 +46,21 @@ public class AppointmentController {
+             @Valid @RequestBody CreateAppointmentRequest request
+     ) {
+         AppointmentCreationCommand command = AppointmentCreationCommand.fromRequest(userId, checklistItemId, request);
+-        AppointmentCreationResult result = appointmentService.create(command);
++        AppointmentResult result = appointmentService.create(command);
+         return AppointmentResponse.from(result);
+     }
+ 
++    @GetMapping("/api/appointments/me/nearby")
++    public List<NearbyAppointmentResponse> findNearby(
++            @Auth Long userId,
++            @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
++    ) {
++        LocalDateTime requestedAt = LocalDateTime.now();
++        return appointmentService.findNearby(userId, limit, requestedAt).stream()
++                .map(NearbyAppointmentResponse::from)
++                .toList();
++    }
++
+     @PutMapping("/api/appointments/{appointmentId}")
+     public AppointmentResponse update(
+             @Auth Long userId,
+@@ -51,7 +68,7 @@ public class AppointmentController {
+             @Valid @RequestBody UpdateAppointmentRequest request
+     ) {
+         AppointmentUpdateCommand command = AppointmentUpdateCommand.fromRequest(appointmentId, userId, request);
+-        AppointmentUpdateResult result = appointmentService.update(command);
++        AppointmentResult result = appointmentService.update(command);
+         return AppointmentResponse.from(result);
+     }
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+index d68713c2b0d9999f9e37522c97a586e20f274b20..cdfa4a4b7bd0b93bccc7b38f9a94553c4dcc446a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+@@ -5,14 +5,18 @@ import com.bibbidi.wedding.checklist.controller.dto.resp.AddCatalogItemsResponse
+ import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
+ import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistProgressResponse;
+ import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistWithAppointmentsResponse;
++import com.bibbidi.wedding.checklist.controller.dto.resp.UnscheduledChecklistItemResponse;
+ import com.bibbidi.wedding.checklist.service.ChecklistService;
+ import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
++import jakarta.validation.constraints.Max;
++import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.NotEmpty;
+ import jakarta.validation.constraints.NotNull;
+ import java.util.List;
+@@ -20,6 +24,7 @@ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestParam;
+ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+@@ -51,6 +56,17 @@ public class ChecklistController {
+         return ChecklistProgressResponse.from(result);
+     }
+ 
++    @GetMapping("/api/checklists/me/unscheduled-items")
++    public List<UnscheduledChecklistItemResponse> findUnscheduledItems(
++            @Auth Long userId,
++            @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit
++    ) {
++        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(userId, limit);
++        return results.stream()
++                .map(UnscheduledChecklistItemResponse::from)
++                .toList();
++    }
++
+     @ResponseStatus(HttpStatus.CREATED)
+     @PostMapping("/api/checklists/me/catalog-items")
+     public AddCatalogItemsResponse addItemsFromCatalog(
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/AppointmentResponse.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/AppointmentResponse.java
+index 21fd93805d605ec4dd682b3b8a2f1b6e59a09c0d..f6bdfdab1912b598594564ae8a64afce1c1c5e67 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/AppointmentResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/AppointmentResponse.java
+@@ -1,7 +1,6 @@
+ package com.bibbidi.wedding.checklist.controller.dto.resp;
+ 
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+@@ -20,22 +19,7 @@ public record AppointmentResponse(
+         List<AppointmentConflict> conflicts
+ ) {
+ 
+-    public static AppointmentResponse from(AppointmentCreationResult appointment) {
+-        return new AppointmentResponse(
+-                appointment.id(),
+-                appointment.checklistItemId(),
+-                appointment.title(),
+-                appointment.date(),
+-                appointment.startTime(),
+-                appointment.endTime(),
+-                appointment.place(),
+-                appointment.memo(),
+-                appointment.isDone(),
+-                appointment.conflicts()
+-        );
+-    }
+-
+-    public static AppointmentResponse from(AppointmentUpdateResult appointment) {
++    public static AppointmentResponse from(AppointmentResult appointment) {
+         return new AppointmentResponse(
+                 appointment.id(),
+                 appointment.checklistItemId(),
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/NearbyAppointmentResponse.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/NearbyAppointmentResponse.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..33858062e6ad328cee8b3aa52c8282a5fb0d10a4
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/NearbyAppointmentResponse.java
+@@ -0,0 +1,32 @@
++package com.bibbidi.wedding.checklist.controller.dto.resp;
++
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++
++public record NearbyAppointmentResponse(
++        Long id,
++        Long checklistItemId,
++        String title,
++        LocalDate date,
++        LocalDateTime startTime,
++        LocalDateTime endTime,
++        String place,
++        String memo,
++        boolean isDone
++) {
++
++    public static NearbyAppointmentResponse from(AppointmentResult appointment) {
++        return new NearbyAppointmentResponse(
++                appointment.id(),
++                appointment.checklistItemId(),
++                appointment.title(),
++                appointment.date(),
++                appointment.startTime(),
++                appointment.endTime(),
++                appointment.place(),
++                appointment.memo(),
++                appointment.isDone()
++        );
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/UnscheduledChecklistItemResponse.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/UnscheduledChecklistItemResponse.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..990ebd4d8af55f072790fac401497ebcee20c587
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/UnscheduledChecklistItemResponse.java
+@@ -0,0 +1,20 @@
++package com.bibbidi.wedding.checklist.controller.dto.resp;
++
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
++
++public record UnscheduledChecklistItemResponse(
++        Long checklistItemId,
++        String title,
++        String categoryName,
++        String status
++) {
++
++    public static UnscheduledChecklistItemResponse from(UnscheduledChecklistItemResult result) {
++        return new UnscheduledChecklistItemResponse(
++                result.checklistItemId(),
++                result.title(),
++                result.categoryName(),
++                result.status().value()
++        );
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
+index 1d5f61641d8bb28e84cddf71dcc7fa378d2b0d62..22b4973d0935c7b5d8950a14d1f2d84f863ca72d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
+@@ -141,6 +141,10 @@ public final class Appointment {
+         return endTime;
+     }
+ 
++    public boolean belongsTo(Long checklistItemId) {
++        return this.checklistItemId.equals(checklistItemId);
++    }
++
+     public boolean conflictsWith(Appointment other) {
+         if (!hasConfirmedSchedule() || !other.hasConfirmedSchedule()) {
+             return false;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
+index 1d6e5302c47799c53a4d319170670a85d71d4487..f164f3361292c9ec65355381d4ac6019ab11f2d7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
+@@ -68,6 +68,19 @@ public final class Checklist {
+                 .toList();
+     }
+ 
++    public List<Long> undoneItemIds() {
++        return items.stream()
++                .filter(item -> !item.isDone())
++                .map(ChecklistItem::id)
++                .toList();
++    }
++
++    public List<ChecklistItem> unscheduledItems(List<Appointment> appointments) {
++        return items.stream()
++                .filter(item -> item.needsSchedule(appointments))
++                .toList();
++    }
++
+     public Long id() {
+         return id;
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+index 83250bd87b0f52e8c5c1ea772c6767d235777850..84f05708f92bebf977b50117fe9d48efe70a2a98 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.domain;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.util.List;
+ import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+ 
+@@ -111,4 +112,8 @@ public final class ChecklistItem {
+     public boolean isDone() {
+         return status == ChecklistItemStatus.DONE;
+     }
++
++    public boolean needsSchedule(List<Appointment> appointments) {
++        return !isDone() && appointments.stream().noneMatch(appointment -> appointment.belongsTo(id));
++    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+index 1eef91126289b29848a189d76e15c2df6701a2a1..74e3acdacc8769115783475f09770c77200bf9d1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.checklist.persistence;
+ 
++import java.time.LocalDate;
+ import java.time.LocalDateTime;
+ import java.util.List;
+ import java.util.Optional;
+@@ -54,6 +55,8 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
+             List<Long> checklistItemIds
+     );
+ 
++    List<JpaAppointmentEntity> findAllByChecklistItemIdIn(List<Long> checklistItemIds);
++
+     @Query("""
+             SELECT appointment
+             FROM JpaAppointmentEntity appointment
+@@ -67,4 +70,20 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
+             LocalDateTime startTime,
+             LocalDateTime endTime
+     );
++
++    @Query("""
++            SELECT appointment
++            FROM JpaAppointmentEntity appointment
++            JOIN JpaChecklistItemEntity item ON item.id = appointment.checklistItemId
++            WHERE item.checklist.ownerId = :userId
++              AND appointment.isDone = false
++              AND (appointment.date > :date
++                   OR (appointment.date = :date
++                       AND (appointment.startTime IS NULL OR appointment.startTime >= :time)))
++            """)
++    List<JpaAppointmentEntity> findNearby(
++            @Param("userId") Long userId,
++            @Param("date") LocalDate date,
++            @Param("time") LocalDateTime time
++    );
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+index 43d7cfb9b36927551ea3ad8fd110f6c46f857099..33a35adf498edfb1839e3440e91b674280598222 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+@@ -5,6 +5,7 @@ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
+ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.time.LocalDateTime;
+ import java.util.List;
+ import org.jspecify.annotations.NonNull;
+ import org.springframework.stereotype.Repository;
+@@ -52,6 +53,12 @@ public class AppointmentRepository {
+                 .toList();
+     }
+ 
++    public List<Appointment> findAllByChecklistItemIdIn(List<Long> checklistItemIds) {
++        return jpaAppointmentRepository.findAllByChecklistItemIdIn(checklistItemIds).stream()
++                .map(appointmentMapper::toDomain)
++                .toList();
++    }
++
+     private List<Appointment> findAllByChecklistItemIdAndIsDone(Long checklistItemId, boolean isDone) {
+         return jpaAppointmentRepository.findAllByChecklistItemIdAndIsDone(checklistItemId, isDone)
+                 .stream()
+@@ -94,6 +101,13 @@ public class AppointmentRepository {
+                 .toList();
+     }
+ 
++    public List<Appointment> findNearby(Long userId, LocalDateTime now) {
++        return jpaAppointmentRepository.findNearby(userId, now.toLocalDate(), now)
++                .stream()
++                .map(appointmentMapper::toDomain)
++                .toList();
++    }
++
+     private @NonNull JpaAppointmentEntity getJpaAppointmentEntity(Long id) {
+         return jpaAppointmentRepository.findById(id)
+                 .orElseThrow(
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/AppointmentService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/AppointmentService.java
+index 1ccdb3df9b8a90534460c7950e3ea02300a1460b..7efbe64b3a815f51eb6ff907877a32b698486b3f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/AppointmentService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/AppointmentService.java
+@@ -8,9 +8,10 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
++import java.time.LocalDateTime;
++import java.util.Comparator;
+ import java.util.List;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+@@ -27,7 +28,7 @@ public class AppointmentService {
+     }
+ 
+     @Transactional
+-    public AppointmentCreationResult create(AppointmentCreationCommand command) {
++    public AppointmentResult create(AppointmentCreationCommand command) {
+         checklistService.validateItemOwnership(command.checklistItemId(), command.userId());
+ 
+         Appointment appointment = new Appointment(
+@@ -46,13 +47,13 @@ public class AppointmentService {
+         Appointment saved = appointmentRepository.save(appointment);
+         List<AppointmentConflict> conflicts = findConflictingWithNewAppointment(command.userId(), saved);
+ 
+-        return AppointmentCreationResult
++        return AppointmentResult
+                 .fromDomain(saved)
+                 .withConflicts(conflicts);
+     }
+ 
+     @Transactional
+-    public AppointmentUpdateResult update(AppointmentUpdateCommand command) {
++    public AppointmentResult update(AppointmentUpdateCommand command) {
+         Appointment appointment = appointmentRepository.findById(command.appointmentId());
+         checklistService.validateItemOwnership(appointment.checklistItemId(), command.userId());
+ 
+@@ -68,7 +69,7 @@ public class AppointmentService {
+         Appointment saved = appointmentRepository.save(updated);
+         List<AppointmentConflict> conflicts = findConflictingWithNewAppointment(command.userId(), saved);
+ 
+-        return AppointmentUpdateResult.fromDomain(saved)
++        return AppointmentResult.fromDomain(saved)
+                 .withConflicts(conflicts);
+     }
+ 
+@@ -96,6 +97,21 @@ public class AppointmentService {
+         appointmentRepository.deleteById(appointmentId);
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<AppointmentResult> findNearby(Long userId, int limit, LocalDateTime now) {
++        return appointmentRepository.findNearby(userId, now).stream()
++                .sorted(nearbyOrder())
++                .limit(limit)
++                .map(AppointmentResult::fromDomain)
++                .toList();
++    }
++
++    private Comparator<Appointment> nearbyOrder() {
++        return comparing(Appointment::date)
++                .thenComparing(Appointment::startTime, Comparator.nullsLast(Comparator.naturalOrder()))
++                .thenComparing(Appointment::id);
++    }
++
+     @Transactional
+     public void changeAllToNewChecklistItemIds(Long newChecklistItemId, List<Long> targetAppointmentIds) {
+         if (targetAppointmentIds.isEmpty()) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+index f0985175bfebe5cc3e776a1cc2bb5cb2e5e196eb..7fb9b593cf8a8e1229be73c30850a65a246f6979 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+@@ -21,6 +21,11 @@ public class ChecklistAppointmentService {
+         return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<Appointment> findAllByChecklistItemIds(List<Long> checklistItemIds) {
++        return appointmentRepository.findAllByChecklistItemIdIn(checklistItemIds);
++    }
++
+     @Transactional(readOnly = true)
+     public List<AppointmentSummaryResult> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(List<Long> checklistItemIds) {
+         if (checklistItemIds.isEmpty()) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 3749ca6205adcfc7fde5579df10bbd3768948010..efc47bb958793e2cb34b9f58496a1b9e4792e0b1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -3,6 +3,8 @@ package com.bibbidi.wedding.checklist.service;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
++import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
++import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.domain.Checklist;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+@@ -14,6 +16,8 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
++import com.bibbidi.wedding.checklist.util.Shuffler;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.Comparator;
+@@ -31,12 +35,14 @@ public class ChecklistService {
+     private final ChecklistRepository checklistRepository;
+     private final CatalogService catalogService;
+     private final ChecklistAppointmentService checklistAppointmentService;
++    private final Shuffler shuffler;
+ 
+     public ChecklistService(ChecklistRepository checklistRepository, CatalogService catalogService,
+-                            ChecklistAppointmentService checklistAppointmentService) {
++                            ChecklistAppointmentService checklistAppointmentService, Shuffler shuffler) {
+         this.checklistRepository = checklistRepository;
+         this.catalogService = catalogService;
+         this.checklistAppointmentService = checklistAppointmentService;
++        this.shuffler = shuffler;
+     }
+ 
+     @Transactional
+@@ -62,6 +68,42 @@ public class ChecklistService {
+         return ChecklistProgressResult.from(progress);
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<UnscheduledChecklistItemResult> findUnscheduledItems(Long ownerId, int limit) {
++        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
++
++        List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
++        CategoryNames categoryNames = findCategoryNames(unscheduledItems);
++        List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems, limit);
++
++        return toResults(pickedItems, categoryNames);
++    }
++
++    private List<ChecklistItem> excludeScheduledItems(Checklist checklist) {
++        List<Appointment> appointments = checklistAppointmentService
++                .findAllByChecklistItemIds(checklist.undoneItemIds());
++        return checklist.unscheduledItems(appointments);
++    }
++
++    private CategoryNames findCategoryNames(List<ChecklistItem> items) {
++        Set<Long> categoryIds = items.stream()
++                .map(ChecklistItem::categoryId)
++                .collect(Collectors.toSet());
++        return catalogService.findCategoryNames(categoryIds);
++    }
++
++    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates, int limit) {
++        return shuffler.shuffle(candidates).stream()
++                .limit(limit)
++                .toList();
++    }
++
++    private List<UnscheduledChecklistItemResult> toResults(List<ChecklistItem> items, CategoryNames categoryNames) {
++        return items.stream()
++                .map(item -> UnscheduledChecklistItemResult.from(item, categoryNames.nameOf(item.categoryId())))
++                .toList();
++    }
++
+     private List<ChecklistItemWithAppointmentsResult> getChecklistItemWithAppointmentsResults(
+             Checklist checklist) {
+         List<ChecklistItem> checklistItems = getChecklistItems(checklist);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentCreationResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentCreationResult.java
+deleted file mode 100644
+index a22d655c986c0bb9351a9e5049b18fe03ff11679..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentCreationResult.java
++++ /dev/null
+@@ -1,75 +0,0 @@
+-package com.bibbidi.wedding.checklist.service.dto;
+-
+-import com.bibbidi.wedding.checklist.domain.Appointment;
+-import java.time.LocalDate;
+-import java.time.LocalDateTime;
+-import java.util.List;
+-
+-public record AppointmentCreationResult(
+-        Long id,
+-        Long checklistItemId,
+-        String title,
+-        LocalDate date,
+-        LocalDateTime startTime,
+-        LocalDateTime endTime,
+-        String place,
+-        String memo,
+-        boolean isDone,
+-        List<AppointmentConflict> conflicts
+-) {
+-    public AppointmentCreationResult(
+-            Long id,
+-            Long checklistItemId,
+-            String title,
+-            LocalDate date,
+-            LocalDateTime startTime,
+-            LocalDateTime endTime,
+-            String place,
+-            String memo,
+-            boolean isDone
+-    ) {
+-        this(
+-                id,
+-                checklistItemId,
+-                title,
+-                date,
+-                startTime,
+-                endTime,
+-                place,
+-                memo,
+-                isDone,
+-                List.of()
+-        );
+-
+-    }
+-
+-    public static AppointmentCreationResult fromDomain(Appointment appointment) {
+-        return new AppointmentCreationResult(
+-                appointment.id(),
+-                appointment.checklistItemId(),
+-                appointment.title(),
+-                appointment.date(),
+-                appointment.startTime(),
+-                appointment.endTime(),
+-                appointment.place(),
+-                appointment.memo(),
+-                appointment.isDone(),
+-                List.of()
+-        );
+-    }
+-
+-    public AppointmentCreationResult withConflicts(List<AppointmentConflict> conflicts) {
+-        return new AppointmentCreationResult(
+-                id,
+-                checklistItemId,
+-                title,
+-                date,
+-                startTime,
+-                endTime,
+-                place,
+-                memo,
+-                isDone,
+-                conflicts
+-        );
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentUpdateResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentResult.java
+similarity index 83%
+rename from BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentUpdateResult.java
+rename to BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentResult.java
+index 93044d2c4665c4f1a36f3c2fc20e45076025c66f..398a5226d4b4d9fc5daf6e02321a9286353e92fc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentUpdateResult.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/AppointmentResult.java
+@@ -5,7 +5,7 @@ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+ import java.util.List;
+ 
+-public record AppointmentUpdateResult(
++public record AppointmentResult(
+         Long id,
+         Long checklistItemId,
+         String title,
+@@ -18,7 +18,7 @@ public record AppointmentUpdateResult(
+         List<AppointmentConflict> conflicts
+ ) {
+ 
+-    public AppointmentUpdateResult(
++    public AppointmentResult(
+             Long id,
+             Long checklistItemId,
+             String title,
+@@ -43,8 +43,8 @@ public record AppointmentUpdateResult(
+         );
+     }
+ 
+-    public static AppointmentUpdateResult fromDomain(Appointment appointment) {
+-        return new AppointmentUpdateResult(
++    public static AppointmentResult fromDomain(Appointment appointment) {
++        return new AppointmentResult(
+                 appointment.id(),
+                 appointment.checklistItemId(),
+                 appointment.title(),
+@@ -58,8 +58,8 @@ public record AppointmentUpdateResult(
+         );
+     }
+ 
+-    public AppointmentUpdateResult withConflicts(List<AppointmentConflict> conflicts) {
+-        return new AppointmentUpdateResult(
++    public AppointmentResult withConflicts(List<AppointmentConflict> conflicts) {
++        return new AppointmentResult(
+                 id,
+                 checklistItemId,
+                 title,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/UnscheduledChecklistItemResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/UnscheduledChecklistItemResult.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..76a7a5bb6232f04caf666450f6bb1c7b55b38ae7
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/UnscheduledChecklistItemResult.java
+@@ -0,0 +1,21 @@
++package com.bibbidi.wedding.checklist.service.dto;
++
++import com.bibbidi.wedding.checklist.domain.ChecklistItem;
++import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
++
++public record UnscheduledChecklistItemResult(
++        Long checklistItemId,
++        String title,
++        String categoryName,
++        ChecklistItemStatus status
++) {
++
++    public static UnscheduledChecklistItemResult from(ChecklistItem item, String categoryName) {
++        return new UnscheduledChecklistItemResult(
++                item.id(),
++                item.title(),
++                categoryName,
++                item.status()
++        );
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/util/RandomShuffler.java b/BE/src/main/java/com/bibbidi/wedding/checklist/util/RandomShuffler.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ddef2e096dcbd3f44dffb38a8953fd85664674a
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/util/RandomShuffler.java
+@@ -0,0 +1,17 @@
++package com.bibbidi.wedding.checklist.util;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++import org.springframework.stereotype.Component;
++
++@Component
++public class RandomShuffler implements Shuffler {
++
++    @Override
++    public <T> List<T> shuffle(List<T> values) {
++        List<T> shuffled = new ArrayList<>(values);
++        Collections.shuffle(shuffled);
++        return shuffled;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/util/Shuffler.java b/BE/src/main/java/com/bibbidi/wedding/checklist/util/Shuffler.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..588feafa9e59332db80a620fc97c494ee97ccb54
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/util/Shuffler.java
+@@ -0,0 +1,8 @@
++package com.bibbidi.wedding.checklist.util;
++
++import java.util.List;
++
++public interface Shuffler {
++
++    <T> List<T> shuffle(List<T> values);
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java b/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
+index a020ed382713905624ee028bb6766a5d69e02e87..a8abeaa6b38d93de2d557ff6e2e728896cac283e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
+@@ -11,6 +11,115 @@ class CatalogTest {
+     private static final Item FIRST_ITEM = new Item(1L, "첫 번째 할 일", 1, true);
+     private static final Item SECOND_ITEM = new Item(2L, "두 번째 할 일", 2, false);
+ 
++    private static Catalog constructPhasedCatalog() {
++        Step venueFirstStep = new Step(1L, "웨딩홀 정하기", null, null, 1, List.of(
++                new Item(1L, "웨딩홀 투어", 1, true),
++                new Item(2L, "웨딩홀 계약", 2, true)
++        ));
++        Step venueSecondStep = new Step(2L, "예식 진행 방식 결정", null, null, 2, List.of(
++                new Item(3L, "예식 형태 결정", 1, true)
++        ));
++        Step venueThirdStep = new Step(3L, "예식 진행 인원 섭외", null, null, 3, List.of(
++                new Item(6L, "주례·사회자 섭외", 1, true)
++        ));
++        Step stylingFirstStep = new Step(10L, "스드메 패키지 계약", null, null, 1, List.of(
++                new Item(39L, "스드메 상담", 1, true)
++        ));
++        Step stylingSecondStep = new Step(11L, "스드메 업체 확정", null, null, 2, List.of(
++                new Item(44L, "드레스샵 확정", 1, true)
++        ));
++        return new Catalog(List.of(
++                new Category(1L, "웨딩홀", 1, List.of(venueFirstStep, venueSecondStep, venueThirdStep)),
++                new Category(2L, "스드메", 2, List.of(stylingFirstStep, stylingSecondStep))
++        ));
++    }
++
++    @Test
++    @DisplayName("담은 준비 항목이 없으면 첫 번째 단계의 준비 항목을 후보로 찾는다")
++    void shouldFindFirstPhaseItemsWhenNothingAdded() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of());
++
++        // then
++        assertThat(candidates)
++                .extracting(CandidateItem::itemId)
++                .containsExactlyInAnyOrder(1L, 2L, 39L);
++    }
++
++    @Test
++    @DisplayName("담은 준비 항목의 가장 큰 단계 이하라면 카테고리가 달라도 후보로 찾는다")
++    void shouldFindItemsUpToMaxAddedPhaseAcrossCategoriesWhenItemAdded() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of(44L));
++
++        // then
++        assertThat(candidates)
++                .extracting(CandidateItem::itemId)
++                .containsExactlyInAnyOrder(1L, 2L, 3L, 39L);
++    }
++
++    @Test
++    @DisplayName("이미 담은 준비 항목은 후보에서 뺀다")
++    void shouldExcludeAddedItemsWhenFindingCandidates() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L));
++
++        // then
++        assertThat(candidates)
++                .extracting(CandidateItem::itemId)
++                .containsExactlyInAnyOrder(2L, 39L);
++    }
++
++    @Test
++    @DisplayName("기준 단계 이하의 준비 항목을 모두 담았으면 담지 않은 항목이 남은 다음 단계를 후보로 찾는다")
++    void shouldFindNextPhaseItemsWhenAllItemsUpToBasePhaseAdded() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L, 2L, 39L));
++
++        // then
++        assertThat(candidates)
++                .extracting(CandidateItem::itemId)
++                .containsExactlyInAnyOrder(3L, 44L);
++    }
++
++    @Test
++    @DisplayName("준비 항목을 모두 담았으면 후보가 없다")
++    void shouldFindNoCandidateWhenAllItemsAdded() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L, 2L, 3L, 6L, 39L, 44L));
++
++        // then
++        assertThat(candidates).isEmpty();
++    }
++
++    @Test
++    @DisplayName("후보에 카테고리 이름과 단계 번호와 단계 이름을 함께 담는다")
++    void shouldAttachCategoryAndStepWhenFindingCandidates() {
++        // given
++        Catalog catalog = constructPhasedCatalog();
++
++        // when
++        List<CandidateItem> candidates = catalog.findCandidates(List.of());
++
++        // then
++        assertThat(candidates).contains(new CandidateItem(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약"));
++    }
++
+     @Test
+     @DisplayName("준비 영역과 단계와 항목을 모두 노출 순서대로 정렬한다")
+     void shouldSortEveryLevelByDisplayOrder() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
+index d93de7bf8df153fe3c5ee2a788ac41a4f5ae03e6..ec2dc54842b1360c3167759695b29439384b9ae0 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
+@@ -11,7 +11,10 @@ import com.bibbidi.wedding.catalog.domain.Item;
+ import com.bibbidi.wedding.catalog.domain.Step;
+ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
++import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import java.util.List;
++import java.util.Map;
++import java.util.Set;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ 
+@@ -61,6 +64,23 @@ class CatalogServiceTest {
+                 .containsExactly(FIRST_ITEM_ID, 1L, "첫 번째 할 일");
+     }
+ 
++    @Test
++    @DisplayName("요청한 카테고리 중 준비 목록에 있는 카테고리의 이름만 조회한다")
++    void shouldFindCategoryNames() {
++        // given
++        Catalog catalog = new Catalog(List.of(
++                new Category(1L, "웨딩홀", 1, List.of()),
++                new Category(2L, "드레스", 2, List.of())
++        ));
++        when(catalogRepository.findCatalog()).thenReturn(catalog);
++
++        // when
++        CategoryNames categoryNames = catalogService.findCategoryNames(Set.of(1L, 99L));
++
++        // then
++        assertThat(categoryNames).isEqualTo(new CategoryNames(Map.of(1L, "웨딩홀")));
++    }
++
+     @Test
+     @DisplayName("카테고리 존재 검증을 카탈로그 저장소에 위임한다")
+     void shouldValidateCategoryExists() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
+index 4fbf34f6bdcf749de2a6da735963cc867070c12b..ac9382cf06efb183c367471d67a03bff21dfa934 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
+@@ -6,6 +6,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+ import static com.epages.restdocs.apispec.Schema.schema;
+ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+@@ -592,6 +593,79 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(status().isBadRequest());
+     }
+ 
++    @Test
++    @DisplayName("인증된 사용자가 가까운 일정을 조회한다")
++    void shouldReturnNearbyAppointmentsForAuthenticatedUser() throws Exception {
++        createAppointment(LocalDate.now().minusDays(1), false);
++        createAppointment(LocalDate.now().plusDays(1), true);
++        Long nearbyAppointmentId = createAppointment(LocalDate.now().plusDays(2), false);
++
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(1))
++                .andExpect(jsonPath("$[0].id").value(nearbyAppointmentId))
++                .andDo(document(
++                                "appointments-nearby",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("가까운 일정 조회")
++                                        .description("완료되지 않은 일정 중 오늘 이후의 일정을 가까운 순서로 조회합니다.")
++                                        .responseSchema(schema("NearbyAppointmentResponse"))
++                                        .queryParameters(
++                                                parameterWithName("limit")
++                                                        .description("조회할 최대 개수 (기본값 6, 최대 20)")
++                                                        .optional()
++                                        )
++                                        .responseFields(nearbyAppointmentResponseFields())
++                                        .build()
++                                )
++                        )
++                );
++    }
++
++    @Test
++    @DisplayName("limit 파라미터만큼만 가까운 일정을 조회한다")
++    void shouldLimitNearbyAppointmentsByLimitParam() throws Exception {
++        createAppointment(LocalDate.now().plusDays(1), false);
++        createAppointment(LocalDate.now().plusDays(2), false);
++        createAppointment(LocalDate.now().plusDays(3), false);
++
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession())
++                        .param("limit", "2"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(2));
++    }
++
++    @Test
++    @DisplayName("limit이 허용 범위를 벗어나면 가까운 일정 조회를 거부한다")
++    void shouldRejectNearbyRequestWhenLimitIsOutOfRange() throws Exception {
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession())
++                        .param("limit", "21"))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    @DisplayName("인증되지 않은 가까운 일정 조회 요청을 거부한다")
++    void shouldRejectNearbyRequestWhenUserIsUnauthenticated() throws Exception {
++        mockMvc.perform(get("/api/appointments/me/nearby"))
++                .andExpect(status().isUnauthorized())
++                .andDo(document(
++                                "appointments-nearby-unauthorized",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("인증 없이 가까운 일정 조회")
++                                        .description("인증되지 않은 요청은 거부합니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
++    }
++
+     private void changeChecklistItemStatusToDone() throws Exception {
+         mockMvc.perform(put("/api/checklist-items/{itemId}/status", 1L)
+                         .session(authenticatedSession())
+@@ -705,6 +779,20 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+         return fields;
+     }
+ 
++    private static FieldDescriptor[] nearbyAppointmentResponseFields() {
++        return new FieldDescriptor[]{
++                fieldWithPath("[].id").description("일정 ID"),
++                fieldWithPath("[].checklistItemId").description("체크리스트 항목 ID"),
++                fieldWithPath("[].title").description("일정 제목"),
++                fieldWithPath("[].date").description("일정 날짜"),
++                fieldWithPath("[].place").description("장소"),
++                fieldWithPath("[].memo").description("메모"),
++                fieldWithPath("[].isDone").description("완료 여부"),
++                fieldWithPath("[].startTime").description("시작 일시"),
++                fieldWithPath("[].endTime").description("종료 일시")
++        };
++    }
++
+     private static FieldDescriptor[] errorResponseFields() {
+         return new FieldDescriptor[]{
+                 fieldWithPath("errorCode").description("오류 코드"),
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerTest.java
+index 2923e22c87cc5f22fec7fa287ee8f8985b3941f8..ef549f782952e352e5a23b64ac11b6b6fcad5ab1 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerTest.java
+@@ -2,27 +2,30 @@ package com.bibbidi.wedding.checklist.controller;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.eq;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.when;
+ import static org.mockito.BDDMockito.then;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+ import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
+ import com.bibbidi.wedding.checklist.controller.dto.req.UpdateAppointmentRequest;
+ import com.bibbidi.wedding.checklist.service.AppointmentService;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateResult;
+ import com.bibbidi.wedding.auth.config.AuthWebConfig;
+ import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
+ import com.bibbidi.wedding.auth.session.AuthSession;
+ import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
++import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.mockito.ArgumentCaptor;
+@@ -56,7 +59,7 @@ class AppointmentControllerTest {
+                 LocalDateTime.of(2026, 9, 1, 10, 0),
+                 LocalDateTime.of(2026, 9, 1, 11, 0), "place", "memo"
+         );
+-        AppointmentCreationResult serviceResult = new AppointmentCreationResult(
++        AppointmentResult serviceResult = new AppointmentResult(
+                 1L,
+                 1L, request.title(),
+                 request.date(),
+@@ -129,7 +132,7 @@ class AppointmentControllerTest {
+                 LocalDateTime.of(2026, 10, 1, 14, 0),
+                 LocalDateTime.of(2026, 10, 1, 15, 0), "updated place", "updated memo"
+         );
+-        AppointmentUpdateResult result = new AppointmentUpdateResult(
++        AppointmentResult result = new AppointmentResult(
+                 1L, 1L, request.title(), request.date(), request.startTime(), request.endTime(),
+                 request.place(), request.memo(), true);
+         when(appointmentService.update(any(AppointmentUpdateCommand.class))).thenReturn(result);
+@@ -190,6 +193,63 @@ class AppointmentControllerTest {
+         then(appointmentService).should().delete(1L, 1L);
+     }
+ 
++    @Test
++    @DisplayName("가까운 일정 조회 시 limit을 생략하면 기본값 6으로 서비스에 전달한다")
++    void shouldUseDefaultLimitWhenNotProvided() throws Exception {
++        when(appointmentService.findNearby(eq(1L), eq(6), any(LocalDateTime.class))).thenReturn(List.of(
++                new AppointmentResult(
++                        1L, 10L, "title", LocalDate.of(2026, 9, 1),
++                        LocalDateTime.of(2026, 9, 1, 10, 0),
++                        LocalDateTime.of(2026, 9, 1, 11, 0),
++                        "place", "memo", false)
++        ));
++
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$[0].id").value(1));
++
++        verify(appointmentService).findNearby(eq(1L), eq(6), any(LocalDateTime.class));
++    }
++
++    @Test
++    @DisplayName("가까운 일정 조회 시 limit 파라미터를 서비스에 그대로 전달한다")
++    void shouldPassGivenLimitToService() throws Exception {
++        when(appointmentService.findNearby(eq(1L), eq(3), any(LocalDateTime.class))).thenReturn(List.of());
++
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession())
++                        .param("limit", "3"))
++                .andExpect(status().isOk());
++
++        verify(appointmentService).findNearby(eq(1L), eq(3), any(LocalDateTime.class));
++    }
++
++    @Test
++    @DisplayName("limit이 최대값을 넘으면 가까운 일정 조회를 거부한다")
++    void shouldRejectNearbyRequestWhenLimitExceedsMax() throws Exception {
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession())
++                        .param("limit", "21"))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    @DisplayName("limit이 1보다 작으면 가까운 일정 조회를 거부한다")
++    void shouldRejectNearbyRequestWhenLimitIsBelowMinimum() throws Exception {
++        mockMvc.perform(get("/api/appointments/me/nearby")
++                        .session(authenticatedSession())
++                        .param("limit", "0"))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    @DisplayName("미인증 가까운 일정 조회 요청을 거부한다")
++    void shouldRejectNearbyRequestWhenUnauthenticated() throws Exception {
++        mockMvc.perform(get("/api/appointments/me/nearby"))
++                .andExpect(status().isUnauthorized());
++    }
++
+     private static MockHttpSession authenticatedSession() {
+         MockHttpSession session = new MockHttpSession();
+         session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, 1L);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+index 0996ec50bb67f0555b9f616e84a646bd581e492c..606f95f1266ab634b4e3008096bd47a45f98fdc8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+@@ -2,8 +2,12 @@ package com.bibbidi.wedding.checklist.controller;
+ 
+ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+ import static com.epages.restdocs.apispec.Schema.schema;
++import static org.hamcrest.Matchers.containsInAnyOrder;
++import static org.hamcrest.Matchers.everyItem;
++import static org.hamcrest.Matchers.is;
+ import static org.hamcrest.Matchers.nullValue;
+ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+@@ -12,9 +16,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+ import com.bibbidi.wedding.auth.session.AuthSession;
++import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
+ import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.epages.restdocs.apispec.ResourceSnippetParameters;
++import java.time.LocalDate;
+ import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -43,6 +49,10 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+     private static final String ADD_DESCRIPTION =
+             "선택한 준비 항목의 제목과 카테고리를 복사해 현재 사용자의 체크리스트에 할 일로 추가합니다. "
+                     + "이미 담긴 준비 항목이 포함되면 요청 전체가 실패합니다.";
++    private static final String FIND_UNSCHEDULED_SUMMARY = "일정이 필요한 할 일 조회";
++    private static final String FIND_UNSCHEDULED_DESCRIPTION =
++            "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 limit개 조회합니다. "
++                    + "준비 목록에서 담은 할 일과 직접 만든 할 일을 모두 포함하며, 대상이 없으면 빈 배열을 반환합니다.";
+ 
+     @Autowired
+     private ObjectMapper objectMapper;
+@@ -209,6 +219,165 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(status().isUnauthorized());
+     }
+ 
++    @Test
++    @Sql("/checklist-catalog-fixture.sql")
++    @DisplayName("일정이 없는 할 일을 준비 목록에서 담은 할 일과 직접 만든 할 일 구분 없이 조회한다")
++    void shouldFindUnscheduledItems() throws Exception {
++        // given
++        long catalogSourcedItemId = addCatalogItem(100L);
++        long scheduledItemId = addCatalogItem(101L);
++        long customItemId = writeCustomItem("청첩장 문구 정하기");
++        addAppointment(scheduledItemId);
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
++                        .param("limit", "4"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(2))
++                .andExpect(jsonPath("$[*].checklistItemId",
++                        containsInAnyOrder((int) catalogSourcedItemId, (int) customItemId)))
++                .andExpect(jsonPath("$[*].categoryName", everyItem(is("웨딩홀"))))
++                .andExpect(jsonPath("$[*].status", everyItem(is("prev"))))
++                .andDo(document(
++                                "checklists-find-unscheduled-items",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Checklist")
++                                        .summary(FIND_UNSCHEDULED_SUMMARY)
++                                        .description(FIND_UNSCHEDULED_DESCRIPTION)
++                                        .responseSchema(schema("UnscheduledChecklistItemResponse"))
++                                        .requestHeaders(
++                                                headerWithName(HttpHeaders.COOKIE)
++                                                        .description(SESSION_COOKIE_DESCRIPTION)
++                                        )
++                                        .queryParameters(
++                                                parameterWithName("limit")
++                                                        .description("조회할 최대 개수 (기본값 4, 최대 20)")
++                                                        .optional()
++                                        )
++                                        .responseFields(
++                                                fieldWithPath("[].checklistItemId")
++                                                        .description("할 일 ID. 일정 추가 API의 checklistItemId로 그대로 사용"),
++                                                fieldWithPath("[].title").description("할 일 제목"),
++                                                fieldWithPath("[].categoryName").description("할 일이 속한 카테고리 이름"),
++                                                fieldWithPath("[].status").description("할 일 상태. prev, continue")
++                                        )
++                                        .build()
++                                )
++                        )
++                );
++    }
++
++    @Test
++    @Sql("/checklist-catalog-fixture.sql")
++    @DisplayName("일정이 필요한 할 일을 limit 개수만큼만 조회한다")
++    void shouldFindUnscheduledItemsUpToLimit() throws Exception {
++        // given
++        addCatalogItem(100L);
++        addCatalogItem(101L);
++        writeCustomItem("청첩장 문구 정하기");
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "2"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(2));
++    }
++
++    @Test
++    @DisplayName("인증되지 않은 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
++    void shouldRequireAuthenticationToFindUnscheduledItems() throws Exception {
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items"))
++                .andExpect(status().isUnauthorized())
++                .andExpect(jsonPath("$.errorCode").value(201))
++                .andDo(document(
++                                "checklists-find-unscheduled-items-unauthorized",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Checklist")
++                                        .summary(FIND_UNSCHEDULED_SUMMARY)
++                                        .description("인증되지 않은 사용자의 일정이 필요한 할 일 조회 요청은 거절합니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .responseFields(
++                                                fieldWithPath("errorCode").description("오류 코드"),
++                                                fieldWithPath("message").description("오류 메시지")
++                                        )
++                                        .build()
++                                )
++                        )
++                );
++    }
++
++    @Test
++    @DisplayName("체크리스트가 없는 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
++    void shouldRejectFindUnscheduledItemsWhenChecklistDoesNotExist() throws Exception {
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
++                .andExpect(status().isNotFound())
++                .andExpect(jsonPath("$.errorCode").value(303))
++                .andDo(document(
++                                "checklists-find-unscheduled-items-not-found",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Checklist")
++                                        .summary(FIND_UNSCHEDULED_SUMMARY)
++                                        .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .requestHeaders(
++                                                headerWithName(HttpHeaders.COOKIE)
++                                                        .description(SESSION_COOKIE_DESCRIPTION)
++                                        )
++                                        .responseFields(
++                                                fieldWithPath("errorCode").description("오류 코드"),
++                                                fieldWithPath("message").description("오류 메시지")
++                                        )
++                                        .build()
++                                )
++                        )
++                );
++    }
++
++    private long addCatalogItem(Long catalogItemId) throws Exception {
++        String response = mockMvc.perform(post("/api/checklists/me/catalog-items")
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(List.of(catalogItemId))))
++                .andExpect(status().isCreated())
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++        return objectMapper.readTree(response).get("items").get(0).get("id").asLong();
++    }
++
++    private long writeCustomItem(String title) throws Exception {
++        String response = mockMvc.perform(post("/api/checklists/me/items")
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new CreateChecklistItemRequest(title, 2L))))
++                .andExpect(status().isCreated())
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++        return objectMapper.readTree(response).get("id").asLong();
++    }
++
++    private void addAppointment(long checklistItemId) throws Exception {
++        CreateAppointmentRequest request = new CreateAppointmentRequest(
++                "웨딩홀 투어",
++                LocalDate.of(2026, 10, 1),
++                null,
++                null,
++                null,
++                null
++        );
++        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", checklistItemId)
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(request)))
++                .andExpect(status().isCreated());
++    }
++
+     @Test
+     @DisplayName("이미 체크리스트를 가진 사용자의 생성 요청은 거절하고 사용자 계정은 유지한다")
+     void shouldRejectDuplicateChecklistAndKeepUser() throws Exception {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
+index e2c02f8d9607ec30f8fcfdefb82b0b8dd130fbc4..c7591fcf0a80488e26a9b27a07e614df2f409c16 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerTest.java
+@@ -1,6 +1,7 @@
+ package com.bibbidi.wedding.checklist.controller;
+ 
+ import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+@@ -13,6 +14,7 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+ import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
+@@ -183,4 +185,51 @@ class ChecklistControllerTest {
+                 .andExpect(status().isUnauthorized())
+                 .andExpect(jsonPath("$.errorCode").value(201));
+     }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일 조회 시 limit을 생략하면 기본값 4로 서비스에 전달한다")
++    void shouldUseDefaultLimitWhenFindingUnscheduledItems() throws Exception {
++        // given
++        when(checklistService.findUnscheduledItems(USER_ID, 4)).thenReturn(List.of(unscheduledItemResult()));
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$[0].checklistItemId").value(31));
++    }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일 조회 시 limit 파라미터를 서비스에 그대로 전달한다")
++    void shouldPassGivenLimitWhenFindingUnscheduledItems() throws Exception {
++        // given
++        when(checklistService.findUnscheduledItems(USER_ID, 20)).thenReturn(List.of(unscheduledItemResult()));
++
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "20"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$[0].checklistItemId").value(31));
++    }
++
++    @Test
++    @DisplayName("limit이 1보다 작거나 20보다 크면 일정이 필요한 할 일 조회를 거절한다")
++    void shouldRejectFindUnscheduledItemsWhenLimitIsOutOfRange() throws Exception {
++        // when, then
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "0"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101));
++        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
++                        .session(authenticatedSession())
++                        .param("limit", "21"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101));
++    }
++
++    private static UnscheduledChecklistItemResult unscheduledItemResult() {
++        return new UnscheduledChecklistItemResult(31L, "웨딩홀 투어", "웨딩홀", ChecklistItemStatus.PREV);
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
+index de2c74269a6d191102c15312a6b0faa5a3e3ac4f..0bb4e304f750668fcb38b6cb6773bd62d64ad9c1 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
+@@ -253,6 +253,32 @@ class AppointmentTest {
+         assertThat(crossingMidnight.conflictsWith(nextDay)).isTrue();
+     }
+ 
++    @Test
++    @DisplayName("일정이 달린 할 일에는 속한다")
++    void shouldBelongToChecklistItemOfAppointment() {
++        // given
++        Appointment appointment = constructTestAppointment(false);
++
++        // when
++        boolean belongsTo = appointment.belongsTo(CHECKLIST_ITEM_ID);
++
++        // then
++        assertThat(belongsTo).isTrue();
++    }
++
++    @Test
++    @DisplayName("다른 할 일에는 속하지 않는다")
++    void shouldNotBelongToOtherChecklistItem() {
++        // given
++        Appointment appointment = constructTestAppointment(false);
++
++        // when
++        boolean belongsTo = appointment.belongsTo(2L);
++
++        // then
++        assertThat(belongsTo).isFalse();
++    }
++
+     private static Appointment at(int startHour, int startMinute, int endHour, int endMinute) {
+         return appointmentWithTime(
+                 LocalDateTime.of(2026, 9, 1, startHour, startMinute),
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+index 34ec0eb98d5be1b3c1de4cca1b1d0e4224090e6c..57e08fb168494456fcd989299a1dc3f5b6a008bf 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.time.LocalDate;
++import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ 
+@@ -267,6 +269,45 @@ class ChecklistItemTest {
+                 .isEqualTo(ClientError.COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE);
+     }
+ 
++    @Test
++    @DisplayName("완료되지 않았고 다른 할 일의 일정만 있는 할 일은 일정이 필요하다")
++    void shouldNeedScheduleWhenItemIsIncompleteAndUnscheduled() {
++        // given
++        ChecklistItem item = constructTestItem();
++        ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
++        List<Appointment> otherItemAppointments = List.of(appointmentOf(2L));
++
++        // when, then
++        assertThat(item.needsSchedule(otherItemAppointments)).isTrue();
++        assertThat(progressed.needsSchedule(otherItemAppointments)).isTrue();
++    }
++
++    @Test
++    @DisplayName("일정이 있는 할 일은 일정이 필요하지 않다")
++    void shouldNotNeedScheduleWhenItemIsScheduled() {
++        // given
++        ChecklistItem item = constructTestItem();
++
++        // when
++        boolean needsSchedule = item.needsSchedule(List.of(appointmentOf(item.id())));
++
++        // then
++        assertThat(needsSchedule).isFalse();
++    }
++
++    @Test
++    @DisplayName("완료된 할 일은 일정이 없어도 일정이 필요하지 않다")
++    void shouldNotNeedScheduleWhenItemIsDone() {
++        // given
++        ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
++
++        // when
++        boolean needsSchedule = item.needsSchedule(List.of());
++
++        // then
++        assertThat(needsSchedule).isFalse();
++    }
++
+     private static ChecklistItem constructCustomItem() {
+         return new ChecklistItem(
+                 1L,
+@@ -276,4 +317,19 @@ class ChecklistItemTest {
+                 ChecklistItemStatus.PREV
+         );
+     }
++
++    private static Appointment appointmentOf(Long checklistItemId) {
++        return new Appointment(
++                null,
++                checklistItemId,
++                "Consultation",
++                LocalDate.of(2026, 9, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+index b8fe66963ae8ce46fe9bfa8ab3a51f24c2301c3d..5bfb50ad435ee87d1abd70da66f89c815b9f0eb3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.time.LocalDate;
+ import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -68,6 +69,51 @@ class ChecklistTest {
+                 .containsExactly(3, 1, 2, 33, false);
+     }
+ 
++    @Test
++    @DisplayName("완료되지 않은 할 일의 ID만 돌려준다")
++    void shouldReturnOnlyUndoneItemIds() {
++        // given
++        Checklist checklist = new Checklist(
++                1L,
++                OWNER_ID,
++                List.of(
++                        item(1L, null, ChecklistItemStatus.DONE),
++                        item(2L, null, ChecklistItemStatus.PREV),
++                        item(3L, null, ChecklistItemStatus.CONTINUE)
++                )
++        );
++
++        // when
++        List<Long> undoneItemIds = checklist.undoneItemIds();
++
++        // then
++        assertThat(undoneItemIds).containsExactly(2L, 3L);
++    }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일만 고른다")
++    void shouldReturnOnlyUnscheduledItems() {
++        // given
++        Checklist checklist = new Checklist(
++                1L,
++                OWNER_ID,
++                List.of(
++                        item(1L, null, ChecklistItemStatus.DONE),
++                        item(2L, null, ChecklistItemStatus.PREV),
++                        item(3L, null, ChecklistItemStatus.CONTINUE),
++                        item(4L, 100L, ChecklistItemStatus.PREV)
++                )
++        );
++
++        // when
++        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(List.of(appointmentOf(2L)));
++
++        // then
++        assertThat(unscheduledItems)
++                .extracting(ChecklistItem::id)
++                .containsExactly(3L, 4L);
++    }
++
+     @Test
+     @DisplayName("체크리스트의 소유자는 접근할 수 있다")
+     void shouldAllowAccessByOwner() {
+@@ -226,4 +272,19 @@ class ChecklistTest {
+                 status
+         );
+     }
++
++    private static Appointment appointmentOf(Long checklistItemId) {
++        return new Appointment(
++                null,
++                checklistItemId,
++                "웨딩홀 투어",
++                LocalDate.of(2026, 9, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+index 720046da49126fcf18f870eab475d05c6eba4fa6..e954247d73cf4830cd1311a10b1c93280bf2a4c3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+@@ -139,6 +139,30 @@ class AppointmentRepositoryTest {
+         assertThat(hasRemaining).isFalse();
+     }
+ 
++    @Test
++    @DisplayName("지정한 할 일들의 일정을 완료 여부와 관계없이 모두 조회한다")
++    void shouldFindAllAppointmentsOfGivenChecklistItems() {
++        Appointment remaining = saveAppointment(10L, "아직 안 끝낸 일정");
++        Appointment done = saveDoneAppointment(11L, "이미 끝낸 일정");
++        saveAppointment(20L, "지정하지 않은 할 일의 일정");
++
++        List<Appointment> found = appointmentRepository.findAllByChecklistItemIdIn(List.of(10L, 11L, 12L));
++
++        assertThat(found)
++                .extracting(Appointment::id)
++                .containsExactlyInAnyOrder(remaining.id(), done.id());
++    }
++
++    @Test
++    @DisplayName("지정한 할 일 ID가 없으면 빈 일정 목록을 조회한다")
++    void shouldFindNoAppointmentWhenChecklistItemIdsAreEmpty() {
++        saveAppointment(10L, "지정하지 않은 할 일의 일정");
++
++        List<Appointment> found = appointmentRepository.findAllByChecklistItemIdIn(List.of());
++
++        assertThat(found).isEmpty();
++    }
++
+     @Test
+     @DisplayName("할 일에 남은 미완료 일정만 조회한다")
+     void shouldFindOnlyRemainingAppointmentsOfChecklistItem() {
+@@ -294,6 +318,78 @@ class AppointmentRepositoryTest {
+         return saveChecklistItem(checklist);
+     }
+ 
++    @Test
++    @DisplayName("완료되지 않은 오늘 이후 일정만 가까운 일정으로 조회한다")
++    void shouldFindOnlyRemainingUpcomingAppointmentsAsNearby() {
++        Long itemId = saveOwnedChecklistItem();
++        Appointment tomorrow = saveAppointmentOnDate(itemId, LocalDate.now().plusDays(1), null, "내일 일정");
++        saveAppointmentOnDate(itemId, LocalDate.now().minusDays(1), null, "지난 일정");
++        saveDoneAppointmentOnDate(itemId, LocalDate.now().plusDays(1), "완료된 미래 일정");
++
++        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
++
++        assertThat(found)
++                .extracting(Appointment::id)
++                .containsExactly(tomorrow.id());
++    }
++
++    @Test
++    @DisplayName("오늘 날짜 일정은 시작 시각이 현재 이후이거나 시각이 없을 때만 가까운 일정에 포함한다")
++    void shouldIncludeTodaysAppointmentOnlyWhenNotYetStartedOrTimeless() {
++        Long itemId = saveOwnedChecklistItem();
++        Appointment upcomingToday = saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().plusHours(1), "이따 일정");
++        Appointment timelessToday = saveAppointmentOnDate(itemId, LocalDate.now(), null, "시각 없는 오늘 일정");
++        saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().minusHours(1), "지난 오늘 일정");
++
++        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
++
++        assertThat(found)
++                .extracting(Appointment::id)
++                .containsExactlyInAnyOrder(upcomingToday.id(), timelessToday.id());
++    }
++
++    @Test
++    @DisplayName("다른 사용자 소유 일정은 가까운 일정에 포함하지 않는다")
++    void shouldExcludeOtherUsersAppointmentFromNearby() {
++        JpaChecklistEntity otherUsersChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 2L));
++        Long otherUsersItemId = saveChecklistItem(otherUsersChecklist);
++        saveAppointmentOnDate(otherUsersItemId, LocalDate.now().plusDays(1), null, "다른 사용자 일정");
++
++        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
++
++        assertThat(found).isEmpty();
++    }
++
++    private Appointment saveAppointmentOnDate(Long checklistItemId, LocalDate date, LocalDateTime startTime, String title) {
++        return appointmentRepository.save(new Appointment(
++                null,
++                checklistItemId,
++                title,
++                date,
++                startTime,
++                startTime,
++                startTime == null ? null : "place",
++                null,
++                false,
++                false
++        ));
++    }
++
++    private Appointment saveDoneAppointmentOnDate(Long checklistItemId, LocalDate date, String title) {
++        return appointmentRepository.save(new Appointment(
++                null,
++                checklistItemId,
++                title,
++                date,
++                null,
++                null,
++                null,
++                null,
++                true,
++                false
++        ));
++    }
++
+     private static Appointment probe(int startHour, int startMinute, int endHour, int endMinute) {
+         return new Appointment(
+                 999L,
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/AppointmentServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/AppointmentServiceTest.java
+index 3779f60e609bd6f7dd94930e94016e3464cb0b6c..ce5310a496f35aaae9cbf762cbabba31a984243c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/AppointmentServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/AppointmentServiceTest.java
+@@ -3,6 +3,7 @@ package com.bibbidi.wedding.checklist.service;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.eq;
+ import static org.mockito.BDDMockito.given;
+ import static org.mockito.BDDMockito.then;
+ import static org.mockito.BDDMockito.willThrow;
+@@ -14,7 +15,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionCommand;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentConflict;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
+-import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationResult;
++import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+@@ -161,7 +162,7 @@ class AppointmentServiceTest {
+         given(appointmentRepository.findOverlapCandidates(USER_ID, saved))
+                 .willReturn(List.of(conflictingAppointment));
+ 
+-        AppointmentCreationResult result = appointmentService.create(createCommand());
++        AppointmentResult result = appointmentService.create(createCommand());
+ 
+         assertThat(result.conflicts()).containsExactly(conflict);
+     }
+@@ -194,6 +195,66 @@ class AppointmentServiceTest {
+         then(checklistService).should().changeItemStatusByAppointment(USER_ID, CHECKLIST_ITEM_ID, true);
+     }
+ 
++    @Test
++    @DisplayName("가까운 일정을 저장소에서 조회해 결과로 변환한다")
++    void shouldFindNearbyAppointmentsAsResults() {
++        Appointment appointment = createAppointment();
++        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
++                .willReturn(List.of(appointment));
++
++        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6, LocalDateTime.now());
++
++        assertThat(results).containsExactly(AppointmentResult.fromDomain(appointment));
++    }
++
++    @Test
++    @DisplayName("가까운 일정은 날짜, 시각(시각 있는 일정 우선) 순으로 정렬한다")
++    void shouldOrderNearbyAppointmentsByDateThenTimedFirst() {
++        Appointment timelessTomorrow = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
++        Appointment timedTomorrow = appointmentOnDate(
++                2L, LocalDate.of(2026, 9, 2), LocalDateTime.of(2026, 9, 2, 9, 0));
++        Appointment dayAfterTomorrow = appointmentOnDate(3L, LocalDate.of(2026, 9, 3), null);
++        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
++                .willReturn(List.of(timelessTomorrow, dayAfterTomorrow, timedTomorrow));
++
++        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 10, LocalDateTime.now());
++
++        assertThat(results)
++                .extracting(AppointmentResult::id)
++                .containsExactly(timedTomorrow.id(), timelessTomorrow.id(), dayAfterTomorrow.id());
++    }
++
++    @Test
++    @DisplayName("가까운 일정 조회는 요청한 개수만큼만 반환한다")
++    void shouldLimitNearbyAppointmentsToRequestedCount() {
++        Appointment first = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
++        Appointment second = appointmentOnDate(2L, LocalDate.of(2026, 9, 3), null);
++        Appointment third = appointmentOnDate(3L, LocalDate.of(2026, 9, 4), null);
++        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
++                .willReturn(List.of(first, second, third));
++
++        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2, LocalDateTime.now());
++
++        assertThat(results)
++                .extracting(AppointmentResult::id)
++                .containsExactly(first.id(), second.id());
++    }
++
++    private static Appointment appointmentOnDate(Long id, LocalDate date, LocalDateTime startTime) {
++        return new Appointment(
++                id,
++                CHECKLIST_ITEM_ID,
++                "title",
++                date,
++                startTime,
++                startTime,
++                startTime == null ? null : "place",
++                null,
++                false,
++                false
++        );
++    }
++
+     private static Appointment createAppointment() {
+         return new Appointment(
+                 APPOINTMENT_ID,
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+index 0ef197a8572e67f0cbcf2e25a43e69702d1b3b72..2b9f75e5ae60493a623ffd8a73918c28118892c6 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+@@ -141,4 +141,16 @@ class ChecklistAppointmentServiceTest {
+ 
+         then(appointmentRepository).shouldHaveNoInteractions();
+     }
++
++    @Test
++    @DisplayName("지정한 할 일들의 일정을 한 번에 조회한다")
++    void shouldFindAllAppointmentsByChecklistItemIds() {
++        List<Appointment> appointments = List.of(appointment(1L), appointment(2L));
++        given(appointmentRepository.findAllByChecklistItemIdIn(List.of(10L, 11L)))
++                .willReturn(appointments);
++
++        List<Appointment> found = checklistAppointmentService.findAllByChecklistItemIds(List.of(10L, 11L));
++
++        assertThat(found).isEqualTo(appointments);
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+index fc17086fa4251248fed07375f79905a434dd83b6..fbd5a4bd58efb636e4dff83394b2df12cb01d1b8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+@@ -16,6 +16,8 @@ import static org.mockito.Mockito.never;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
++import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
++import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.domain.Checklist;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+@@ -25,10 +27,14 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
++import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
++import com.bibbidi.wedding.checklist.util.Shuffler;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
++import java.util.Map;
+ import java.util.Optional;
++import java.util.Set;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -57,6 +63,9 @@ class ChecklistServiceTest {
+     @Mock
+     private ChecklistAppointmentService checklistAppointmentService;
+ 
++    @Mock
++    private Shuffler shuffler;
++
+     private ChecklistService checklistService;
+ 
+     @BeforeEach
+@@ -64,7 +73,8 @@ class ChecklistServiceTest {
+         checklistService = new ChecklistService(
+                 checklistRepository,
+                 catalogService,
+-                checklistAppointmentService
++                checklistAppointmentService,
++                shuffler
+         );
+     }
+ 
+@@ -150,6 +160,81 @@ class ChecklistServiceTest {
+         then(checklistAppointmentService).shouldHaveNoInteractions();
+     }
+ 
++    @Test
++    @DisplayName("일정이 필요한 할 일을 카테고리 이름과 함께 돌려준다")
++    void shouldFindUnscheduledItemsWithCategoryName() {
++        // given
++        ChecklistItem customItem = constructTestItem(200L);
++        ChecklistItem doneItem = constructTestItem(201L, ChecklistItemStatus.DONE, null);
++        ChecklistItem catalogItem = constructTestItem(202L, ChecklistItemStatus.CONTINUE, CONTRACT_ITEM_ID);
++        ChecklistItem scheduledItem = constructTestItem(203L);
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(customItem, doneItem, catalogItem, scheduledItem)
++        ));
++        given(checklistAppointmentService.findAllByChecklistItemIds(List.of(200L, 202L, 203L)))
++                .willReturn(List.of(appointmentOf(scheduledItem)));
++        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
++                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
++        given(shuffler.shuffle(List.of(customItem, catalogItem)))
++                .willReturn(List.of(customItem, catalogItem));
++
++        // when
++        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
++
++        // then
++        assertThat(results).containsExactly(
++                new UnscheduledChecklistItemResult(200L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV),
++                new UnscheduledChecklistItemResult(202L, "계약서 확인", "웨딩홀", ChecklistItemStatus.CONTINUE)
++        );
++    }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일이 limit보다 많으면 섞은 순서에서 앞의 limit개만 돌려준다")
++    void shouldReturnFirstItemsUpToLimitInShuffledOrder() {
++        // given
++        List<ChecklistItem> items = List.of(
++                constructTestItem(200L),
++                constructTestItem(201L),
++                constructTestItem(202L),
++                constructTestItem(203L),
++                constructTestItem(204L),
++                constructTestItem(205L)
++        );
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, items));
++        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
++                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
++        given(shuffler.shuffle(items)).willReturn(items.reversed());
++
++        // when
++        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 3);
++
++        // then
++        assertThat(results)
++                .extracting(UnscheduledChecklistItemResult::checklistItemId)
++                .containsExactly(205L, 204L, 203L);
++    }
++
++    @Test
++    @DisplayName("일정이 필요한 할 일이 없으면 빈 목록을 돌려준다")
++    void shouldReturnEmptyWhenNoItemNeedsSchedule() {
++        // given
++        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
++                CHECKLIST_ID,
++                OWNER_ID,
++                List.of(constructTestItem(200L, ChecklistItemStatus.DONE, null))
++        ));
++        given(catalogService.findCategoryNames(Set.of()))
++                .willReturn(new CategoryNames(Map.of()));
++
++        // when
++        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 4);
++
++        // then
++        assertThat(results).isEmpty();
++    }
++
+     @Test
+     @DisplayName("자신의 체크리스트에 속한 할 일이면 소유권 검증을 통과한다")
+     void shouldValidateItemOwnershipWhenItemBelongsToOwnersChecklist() {
+@@ -603,4 +688,19 @@ class ChecklistServiceTest {
+                 status
+         );
+     }
++
++    private static Appointment appointmentOf(ChecklistItem item) {
++        return new Appointment(
++                null,
++                item.id(),
++                "웨딩홀 투어",
++                java.time.LocalDate.of(2026, 10, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }

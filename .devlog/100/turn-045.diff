@@ -1,0 +1,77 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index d8d6f5d2138a14e5be2b6d449f4b1701acd3a3dd..03476e02966c506d4bc79d524aa3c334afa80d55 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -27,7 +27,6 @@ import java.util.LinkedHashSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+-import java.util.function.Predicate;
+ import java.util.stream.Collectors;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+@@ -114,41 +113,47 @@ public class ChecklistService {
+         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+         List<CatalogItemDetailSnapshot> allItems = catalogService.findAllItemDetails();
+ 
+-        List<CatalogItemDetailSnapshot> candidates = findCandidates(checklist, allItems);
++        List<CatalogItemDetailSnapshot> candidates = selectCandidates(checklist, allItems);
+         List<CatalogItemDetailSnapshot> pickedItems = pickRandomly(candidates, limit);
+ 
+         return toResults(pickedItems);
+     }
+ 
+-    private List<CatalogItemDetailSnapshot> findCandidates(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
+-        List<CatalogItemDetailSnapshot> addedItems = filter(allItems, item -> checklist.hasAdded(item.id()));
+-        List<CatalogItemDetailSnapshot> notAddedItems = filter(allItems, item -> !checklist.hasAdded(item.id()));
++    private List<CatalogItemDetailSnapshot> selectCandidates(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
++        List<CatalogItemDetailSnapshot> alreadyAddedItems = selectAlreadyAddedItems(checklist, allItems);
++        List<CatalogItemDetailSnapshot> notYetAddedItems = selectNotYetAddedItems(checklist, allItems);
+ 
+-        int basePhase = basePhase(addedItems, notAddedItems);
+-        return filter(notAddedItems, item -> item.isUpTo(basePhase));
++        int maxRecommendablePhase = calculateMaxRecommendablePhase(alreadyAddedItems, notYetAddedItems);
++        return selectItemsUpToPhase(notYetAddedItems, maxRecommendablePhase);
+     }
+ 
+-    private int basePhase(
+-            List<CatalogItemDetailSnapshot> addedItems,
+-            List<CatalogItemDetailSnapshot> notAddedItems
+-    ) {
+-        int maxAddedPhase = addedItems.stream()
++    private List<CatalogItemDetailSnapshot> selectAlreadyAddedItems(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
++        return allItems.stream()
++                .filter(item -> checklist.hasAdded(item.id()))
++                .toList();
++    }
++
++    private List<CatalogItemDetailSnapshot> selectNotYetAddedItems(Checklist checklist, List<CatalogItemDetailSnapshot> allItems) {
++        return allItems.stream()
++                .filter(item -> !checklist.hasAdded(item.id()))
++                .toList();
++    }
++
++    private int calculateMaxRecommendablePhase(List<CatalogItemDetailSnapshot> alreadyAddedItems, List<CatalogItemDetailSnapshot> notYetAddedItems) {
++        int maxAlreadyAddedPhase = alreadyAddedItems.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .max()
+                 .orElse(FIRST_PHASE);
+-        int minNotAddedPhase = notAddedItems.stream()
++        int minNotYetAddedPhase = notYetAddedItems.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .min()
+                 .orElse(FIRST_PHASE);
+-        return Math.max(maxAddedPhase, minNotAddedPhase);
++        return Math.max(maxAlreadyAddedPhase, minNotYetAddedPhase);
+     }
+ 
+-    private List<CatalogItemDetailSnapshot> filter(
+-            List<CatalogItemDetailSnapshot> items,
+-            Predicate<CatalogItemDetailSnapshot> condition
+-    ) {
++    private List<CatalogItemDetailSnapshot> selectItemsUpToPhase(List<CatalogItemDetailSnapshot> items, int phase) {
+         return items.stream()
+-                .filter(condition)
++                .filter(item -> item.isUpTo(phase))
+                 .toList();
+     }

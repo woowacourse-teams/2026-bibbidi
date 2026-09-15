@@ -1,0 +1,122 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 57efa4eb2ea662f85c352fcdb098bef049126dda..f98222697abef1e585c003d3bb1b70b32e651974 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -35,8 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
+ @Service
+ public class ChecklistService {
+ 
+-    private static final int FIRST_PHASE = 1;
+-
+     private final ChecklistRepository checklistRepository;
+     private final CatalogService catalogService;
+     private final ChecklistAppointmentService checklistAppointmentService;
+@@ -112,28 +110,21 @@ public class ChecklistService {
+     @Transactional(readOnly = true)
+     public List<RecommendedCatalogItemResult> findRecommendedCatalogItems(Long ownerId, int limit) {
+         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+-        CatalogItemDetails allItems = new CatalogItemDetails(catalogService.findAllItemDetails());
++        CatalogItemDetails catalogItems = new CatalogItemDetails(catalogService.findAllItemDetails());
+ 
+-        List<CatalogItemDetailSnapshot> allRecommendedItems = chooseAllRecommendedItems(checklist, allItems);
++        List<CatalogItemDetailSnapshot> allRecommendedItems = chooseAllRecommendedItems(checklist, catalogItems);
+         List<CatalogItemDetailSnapshot> randomRecommendedItems = pickRandomly(allRecommendedItems, limit);
+ 
+         return toResults(randomRecommendedItems);
+     }
+ 
+-    private List<CatalogItemDetailSnapshot> chooseAllRecommendedItems(Checklist checklist, CatalogItemDetails allItems) {
+-        CatalogItemDetails alreadyAddedItems = allItems.addedTo(checklist);
+-        CatalogItemDetails notYetAddedItems = allItems.notAddedTo(checklist);
+-
+-        int maxRecommendablePhase = decideMaxRecommendablePhase(alreadyAddedItems, notYetAddedItems);
+-        return notYetAddedItems.upTo(maxRecommendablePhase).values();
+-    }
++    private List<CatalogItemDetailSnapshot> chooseAllRecommendedItems(Checklist checklist, CatalogItemDetails catalogItems) {
++        CatalogItemDetails alreadyAddedItems = catalogItems.selectAddedTo(checklist);
++        CatalogItemDetails notYetAddedItems = catalogItems.excludeAddedTo(checklist);
+ 
+-    private int decideMaxRecommendablePhase(CatalogItemDetails alreadyAddedItems, CatalogItemDetails notYetAddedItems) {
+-        int currentPhase = alreadyAddedItems.highestPhaseOr(FIRST_PHASE);
+-        if (notYetAddedItems.hasItemUpTo(currentPhase)) {
+-            return currentPhase;
+-        }
+-        return notYetAddedItems.lowestPhaseOr(currentPhase);
++        int currentPhase = alreadyAddedItems.findLastPhase();
++        CatalogItemDetails recommendedItems = notYetAddedItems.recommendBasedOn(currentPhase);
++        return recommendedItems.values();
+     }
+ 
+     private List<RecommendedCatalogItemResult> toResults(List<CatalogItemDetailSnapshot> items) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/CatalogItemDetails.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/CatalogItemDetails.java
+index 99660bc60ff2cdaf03afdc48ecc0b7d2d2ab55ba..18bbc5973c65f98fd2e33655664dfeadab8efe09 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/CatalogItemDetails.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/CatalogItemDetails.java
+@@ -6,40 +6,50 @@ import java.util.List;
+ 
+ public record CatalogItemDetails(List<CatalogItemDetailSnapshot> values) {
+ 
+-    public CatalogItemDetails addedTo(Checklist checklist) {
++    private static final int FIRST_PHASE = 1;
++
++    public CatalogItemDetails selectAddedTo(Checklist checklist) {
+         return new CatalogItemDetails(values.stream()
+                 .filter(item -> checklist.hasAdded(item.id()))
+                 .toList());
+     }
+ 
+-    public CatalogItemDetails notAddedTo(Checklist checklist) {
++    public CatalogItemDetails excludeAddedTo(Checklist checklist) {
+         return new CatalogItemDetails(values.stream()
+                 .filter(item -> !checklist.hasAdded(item.id()))
+                 .toList());
+     }
+ 
+-    public CatalogItemDetails upTo(int phase) {
+-        return new CatalogItemDetails(values.stream()
+-                .filter(item -> item.isUpTo(phase))
+-                .toList());
++    public int findLastPhase() {
++        return values.stream()
++                .mapToInt(CatalogItemDetailSnapshot::phase)
++                .max()
++                .orElse(FIRST_PHASE);
+     }
+ 
+-    public boolean hasItemUpTo(int phase) {
+-        return values.stream()
+-                .anyMatch(item -> item.isUpTo(phase));
++    public CatalogItemDetails recommendBasedOn(int currentPhase) {
++        CatalogItemDetails itemsUpToCurrentPhase = selectUpTo(currentPhase);
++        if (itemsUpToCurrentPhase.isEmpty()) {
++            return selectEarliestPhase();
++        }
++        return itemsUpToCurrentPhase;
+     }
+ 
+-    public int highestPhaseOr(int defaultPhase) {
+-        return values.stream()
+-                .mapToInt(CatalogItemDetailSnapshot::phase)
+-                .max()
+-                .orElse(defaultPhase);
++    private CatalogItemDetails selectUpTo(int phase) {
++        return new CatalogItemDetails(values.stream()
++                .filter(item -> item.isUpTo(phase))
++                .toList());
+     }
+ 
+-    public int lowestPhaseOr(int defaultPhase) {
+-        return values.stream()
++    private CatalogItemDetails selectEarliestPhase() {
++        int earliestPhase = values.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .min()
+-                .orElse(defaultPhase);
++                .orElse(FIRST_PHASE);
++        return selectUpTo(earliestPhase);
++    }
++
++    private boolean isEmpty() {
++        return values.isEmpty();
+     }
+ }
