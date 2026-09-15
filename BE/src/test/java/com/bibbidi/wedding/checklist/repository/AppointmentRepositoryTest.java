@@ -174,6 +174,30 @@ class AppointmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("지정한 할 일들의 일정을 완료 여부와 관계없이 모두 조회한다")
+    void shouldFindAllAppointmentsOfGivenChecklistItems() {
+        Appointment remaining = saveAppointment(10L, "아직 안 끝낸 일정");
+        Appointment done = saveDoneAppointment(11L, "이미 끝낸 일정");
+        saveAppointment(20L, "지정하지 않은 할 일의 일정");
+
+        List<Appointment> found = appointmentRepository.findAllByChecklistItemIdIn(List.of(10L, 11L, 12L));
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactlyInAnyOrder(remaining.id(), done.id());
+    }
+
+    @Test
+    @DisplayName("지정한 할 일 ID가 없으면 빈 일정 목록을 조회한다")
+    void shouldFindNoAppointmentWhenChecklistItemIdsAreEmpty() {
+        saveAppointment(10L, "지정하지 않은 할 일의 일정");
+
+        List<Appointment> found = appointmentRepository.findAllByChecklistItemIdIn(List.of());
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
     @DisplayName("할 일에 남은 미완료 일정만 조회한다")
     void shouldFindOnlyRemainingAppointmentsOfChecklistItem() {
         Appointment remaining = saveAppointment(10L, "아직 안 끝낸 일정");
