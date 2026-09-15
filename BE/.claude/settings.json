@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 15, "statusMessage": "작업 시작 상태를 기록하는 중" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "Issue와 요청을 연결하는 중" }] }],
+    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "이 작업을 해도 되는지 확인하는 중" }] }],
+    "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 20, "statusMessage": "테스트 결과를 기록하는 중" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/../packages/development-logger/src/cli.mjs\" hook claude", "timeout": 30, "statusMessage": "이번 턴에서 바뀐 코드를 기록하는 중" }] }]
+  }
+}
