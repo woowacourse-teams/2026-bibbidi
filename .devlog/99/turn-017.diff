@@ -1,0 +1,54 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+index 937ee62c256d7af8f3c3d59a80d553bfadf6d235..a5b5500c7e69e4d5f1fbc38ba5919fbc2afb78e4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+@@ -24,10 +24,6 @@ public class ChecklistAppointmentService {
+ 
+     @Transactional(readOnly = true)
+     public Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds) {
+-        if (checklistItemIds.isEmpty()) {
+-            return Set.of();
+-        }
+-
+         return appointmentRepository.findScheduledChecklistItemIds(checklistItemIds);
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+index 82f9484050732757f525e973597c3a766311adfe..852f48f60cdbea1dec82f4677f2798313874afdf 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+@@ -163,6 +163,16 @@ class AppointmentRepositoryTest {
+         assertThat(found).isEmpty();
+     }
+ 
++    @Test
++    @DisplayName("지정한 할 일 ID가 없으면 빈 ID 목록을 조회한다")
++    void shouldFindNoScheduledChecklistItemIdWhenChecklistItemIdsAreEmpty() {
++        saveAppointment(10L, "지정하지 않은 할 일의 일정");
++
++        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of());
++
++        assertThat(found).isEmpty();
++    }
++
+     @Test
+     @DisplayName("할 일에 남은 미완료 일정만 조회한다")
+     void shouldFindOnlyRemainingAppointmentsOfChecklistItem() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+index 68b63daf488bd923b1255f40ce8f80be0d422125..2bd24d3ea70a31e68f0e1438eb61d5bd8ce334c0 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+@@ -153,13 +153,4 @@ class ChecklistAppointmentServiceTest {
+ 
+         assertThat(found).containsExactly(10L);
+     }
+-
+-    @Test
+-    @DisplayName("조회할 할 일이 없으면 저장소를 호출하지 않고 빈 ID 목록을 돌려준다")
+-    void shouldSkipScheduledChecklistItemIdsLookupWhenChecklistItemIdsAreEmpty() {
+-        Set<Long> found = checklistAppointmentService.findScheduledChecklistItemIds(List.of());
+-
+-        assertThat(found).isEmpty();
+-        then(appointmentRepository).shouldHaveNoInteractions();
+-    }
+ }

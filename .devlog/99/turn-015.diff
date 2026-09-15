@@ -1,0 +1,156 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+index 1eef91126289b29848a189d76e15c2df6701a2a1..ee1d228f07f724363baf7bef71f8cad5ed3cc945 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+@@ -3,6 +3,7 @@ package com.bibbidi.wedding.checklist.persistence;
+ import java.time.LocalDateTime;
+ import java.util.List;
+ import java.util.Optional;
++import java.util.Set;
+ import org.springframework.data.jpa.repository.JpaRepository;
+ import org.springframework.data.jpa.repository.Modifying;
+ import org.springframework.data.jpa.repository.Query;
+@@ -42,6 +43,13 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
+             """)
+     boolean existsRemainingByChecklistItemId(Long checklistItemId);
+ 
++    @Query("""
++            SELECT DISTINCT appointment.checklistItemId
++            FROM JpaAppointmentEntity appointment
++            WHERE appointment.checklistItemId IN :checklistItemIds
++            """)
++    Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds);
++
+     @Query("""
+             SELECT appointment
+             FROM JpaAppointmentEntity appointment
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+index 43d7cfb9b36927551ea3ad8fd110f6c46f857099..09ecaae9fdc7d114aba0872eb6a2474c68b8d9b2 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+@@ -6,6 +6,7 @@ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
++import java.util.Set;
+ import org.jspecify.annotations.NonNull;
+ import org.springframework.stereotype.Repository;
+ 
+@@ -38,6 +39,10 @@ public class AppointmentRepository {
+         return jpaAppointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+     }
+ 
++    public Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds) {
++        return jpaAppointmentRepository.findScheduledChecklistItemIds(checklistItemIds);
++    }
++
+     public List<Appointment> findAllRemainingByChecklistItemId(Long checklistItemId) {
+         return findAllByChecklistItemIdAndIsDone(checklistItemId, false);
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+index f0985175bfebe5cc3e776a1cc2bb5cb2e5e196eb..937ee62c256d7af8f3c3d59a80d553bfadf6d235 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+@@ -4,6 +4,7 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import java.util.List;
++import java.util.Set;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -21,6 +22,15 @@ public class ChecklistAppointmentService {
+         return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+     }
+ 
++    @Transactional(readOnly = true)
++    public Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds) {
++        if (checklistItemIds.isEmpty()) {
++            return Set.of();
++        }
++
++        return appointmentRepository.findScheduledChecklistItemIds(checklistItemIds);
++    }
++
+     @Transactional(readOnly = true)
+     public List<AppointmentSummaryResult> findAllByChecklistItemIdInOrderByCreatedAtAscIdAsc(List<Long> checklistItemIds) {
+         if (checklistItemIds.isEmpty()) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+index 720046da49126fcf18f870eab475d05c6eba4fa6..82f9484050732757f525e973597c3a766311adfe 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+@@ -13,6 +13,7 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+ import java.util.List;
++import java.util.Set;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+@@ -139,6 +140,29 @@ class AppointmentRepositoryTest {
+         assertThat(hasRemaining).isFalse();
+     }
+ 
++    @Test
++    @DisplayName("지정한 할 일 중 일정이 하나라도 있는 할 일 ID만 조회한다")
++    void shouldFindOnlyScheduledChecklistItemIds() {
++        saveAppointment(10L, "아직 안 끝낸 일정");
++        saveAppointment(10L, "같은 할 일의 다른 일정");
++        saveDoneAppointment(11L, "이미 끝낸 일정");
++        saveAppointment(20L, "지정하지 않은 할 일의 일정");
++
++        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L, 12L));
++
++        assertThat(found).containsExactlyInAnyOrder(10L, 11L);
++    }
++
++    @Test
++    @DisplayName("지정한 할 일에 일정이 하나도 없으면 빈 ID 목록을 조회한다")
++    void shouldFindNoScheduledChecklistItemIdWhenNoAppointmentExists() {
++        saveAppointment(20L, "지정하지 않은 할 일의 일정");
++
++        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L));
++
++        assertThat(found).isEmpty();
++    }
++
+     @Test
+     @DisplayName("할 일에 남은 미완료 일정만 조회한다")
+     void shouldFindOnlyRemainingAppointmentsOfChecklistItem() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+index 0ef197a8572e67f0cbcf2e25a43e69702d1b3b72..68b63daf488bd923b1255f40ce8f80be0d422125 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+@@ -8,6 +8,7 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
+ import java.time.LocalDate;
+ import java.util.List;
++import java.util.Set;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -141,4 +142,24 @@ class ChecklistAppointmentServiceTest {
+ 
+         then(appointmentRepository).shouldHaveNoInteractions();
+     }
++
++    @Test
++    @DisplayName("지정한 할 일 중 일정이 있는 할 일 ID를 한 번에 조회한다")
++    void shouldFindScheduledChecklistItemIds() {
++        given(appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L)))
++                .willReturn(Set.of(10L));
++
++        Set<Long> found = checklistAppointmentService.findScheduledChecklistItemIds(List.of(10L, 11L));
++
++        assertThat(found).containsExactly(10L);
++    }
++
++    @Test
++    @DisplayName("조회할 할 일이 없으면 저장소를 호출하지 않고 빈 ID 목록을 돌려준다")
++    void shouldSkipScheduledChecklistItemIdsLookupWhenChecklistItemIdsAreEmpty() {
++        Set<Long> found = checklistAppointmentService.findScheduledChecklistItemIds(List.of());
++
++        assertThat(found).isEmpty();
++        then(appointmentRepository).shouldHaveNoInteractions();
++    }
+ }
