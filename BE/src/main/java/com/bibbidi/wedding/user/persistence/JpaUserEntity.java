@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
@@ -23,13 +24,17 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "wedding_date")
+    private LocalDate weddingDate;
+
     protected JpaUserEntity() {
     }
 
-    public JpaUserEntity(Long id, String nickname, String passwordHash) {
+    public JpaUserEntity(Long id, String nickname, String passwordHash, LocalDate weddingDate) {
         this.id = id;
         this.nickname = nickname;
         this.passwordHash = passwordHash;
+        this.weddingDate = weddingDate;
     }
 
     public Long id() {
@@ -42,5 +47,9 @@ public class JpaUserEntity extends BaseTimeEntity {
 
     public String passwordHash() {
         return passwordHash;
+    }
+
+    public LocalDate weddingDate() {
+        return weddingDate;
     }
 }
