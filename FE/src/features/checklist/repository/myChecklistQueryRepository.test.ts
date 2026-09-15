@@ -198,6 +198,41 @@ describe("MyChecklistQueryRepository", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("초기 조회 전에 추가가 성공하면 조회를 유지하고 서버 결과 뒤에 추가 항목을 병합한다", async () => {
+    let resolveChecklist: (value: MyChecklistModel) => void = () => undefined;
+    let dataSourceSignal: AbortSignal | undefined;
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockImplementation((signal) => {
+      dataSourceSignal = signal;
+
+      return new Promise((resolve) => {
+        resolveChecklist = resolve;
+      });
+    });
+    const repository = createMyChecklistQueryRepository(dataSource);
+    const initialRequest = repository.getChecklist();
+    const addedItem = {
+      appointments: [],
+      categoryId: 2,
+      id: 11,
+      isDone: false,
+      sourceCatalogItemId: 102,
+      title: "드레스 계약",
+    };
+
+    repository.applyAddedItems([addedItem, { ...addedItem }]);
+
+    expect(dataSourceSignal?.aborted).toBe(false);
+    resolveChecklist(checklist);
+    const mergedChecklist = {
+      exists: true,
+      items: [checklist.items[0], addedItem],
+    };
+    await expect(initialRequest).resolves.toEqual(mergedChecklist);
+    await expect(repository.getChecklist()).resolves.toEqual(mergedChecklist);
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+  });
+
   it("기존 항목과 성공 응답 안의 중복 ID를 캐시에 한 번만 반영한다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);

@@ -37,6 +37,7 @@ export class MyChecklistRequestAbortedError extends Error {
 interface InFlightRequest {
   controller: AbortController;
   promise: Promise<MyChecklistModel>;
+  result?: MyChecklistModel;
   subscribers: Set<symbol>;
 }
 
@@ -75,8 +76,10 @@ export function createMyChecklistQueryRepository(
 ): MyChecklistQueryRepository {
   let cachedResult: MyChecklistModel | undefined;
   let inFlightRequest: InFlightRequest | undefined;
+  let hasPendingAdditionResult = false;
   let revision = 0;
   const listeners = new Set<() => void>();
+  const pendingAddedItems = new Map<number, MyChecklistItemModel>();
 
   const notify = () => {
     revision += 1;
@@ -91,10 +94,49 @@ export function createMyChecklistQueryRepository(
     notify();
   };
 
+  const mergeAddedItems = (
+    checklist: MyChecklistModel,
+    items: Iterable<MyChecklistItemModel>,
+  ): MyChecklistModel => {
+    const knownItemIds = new Set(checklist.items.map((item) => item.id));
+    const addedItems = [...items].filter((item) => {
+      if (knownItemIds.has(item.id)) {
+        return false;
+      }
+
+      knownItemIds.add(item.id);
+      return true;
+    });
+
+    return {
+      exists: true,
+      items: [...checklist.items, ...addedItems],
+    };
+  };
+
+  const mergePendingAddedItems = (
+    checklist: MyChecklistModel,
+  ): MyChecklistModel => {
+    if (!hasPendingAdditionResult) {
+      return checklist;
+    }
+
+    const mergedChecklist = mergeAddedItems(
+      checklist,
+      pendingAddedItems.values(),
+    );
+    hasPendingAdditionResult = false;
+    pendingAddedItems.clear();
+
+    return mergedChecklist;
+  };
+
   const invalidate = () => {
     cachedResult = undefined;
     inFlightRequest?.controller.abort();
     inFlightRequest = undefined;
+    hasPendingAdditionResult = false;
+    pendingAddedItems.clear();
   };
 
   const startRequest = (): InFlightRequest => {
@@ -108,8 +150,10 @@ export function createMyChecklistQueryRepository(
     request.promise.then(
       (checklist) => {
         if (inFlightRequest === request) {
+          const mergedChecklist = mergePendingAddedItems(checklist);
+          request.result = mergedChecklist;
           inFlightRequest = undefined;
-          setCachedResult(checklist);
+          setCachedResult(mergedChecklist);
         }
       },
       () => {
@@ -169,7 +213,7 @@ export function createMyChecklistQueryRepository(
           if (!isSettled) {
             isSettled = true;
             cleanup();
-            resolve(checklist);
+            resolve(cachedResult ?? request.result ?? checklist);
           }
         },
         (error: unknown) => {
@@ -184,28 +228,31 @@ export function createMyChecklistQueryRepository(
 
   return {
     applyAddedItems(items) {
-      inFlightRequest?.controller.abort();
-      inFlightRequest = undefined;
+      if (!cachedResult && inFlightRequest) {
+        hasPendingAdditionResult = true;
 
-      const currentItems = cachedResult?.items ?? [];
-      const knownItemIds = new Set(currentItems.map((item) => item.id));
-      const addedItems = items.filter((item) => {
-        if (knownItemIds.has(item.id)) {
-          return false;
+        for (const item of items) {
+          if (!pendingAddedItems.has(item.id)) {
+            pendingAddedItems.set(item.id, item);
+          }
         }
 
-        knownItemIds.add(item.id);
-        return true;
-      });
-
-      if (cachedResult?.exists === true && addedItems.length === 0) {
         return;
       }
 
-      setCachedResult({
-        exists: true,
-        items: [...currentItems, ...addedItems],
-      });
+      const nextChecklist = mergeAddedItems(
+        cachedResult ?? { exists: false, items: [] },
+        items,
+      );
+
+      if (
+        cachedResult?.exists === true &&
+        nextChecklist.items.length === cachedResult.items.length
+      ) {
+        return;
+      }
+
+      setCachedResult(nextChecklist);
     },
     getChecklist(signal) {
       if (signal?.aborted) {
