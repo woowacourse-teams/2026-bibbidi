@@ -5,6 +5,7 @@ import com.bibbidi.wedding.checklist.controller.dto.resp.AddCatalogItemsResponse
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistProgressResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistWithAppointmentsResponse;
+import com.bibbidi.wedding.checklist.controller.dto.resp.RecommendedCatalogItemResponse;
 import com.bibbidi.wedding.checklist.controller.dto.resp.UnscheduledChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -12,6 +13,7 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
@@ -64,6 +66,14 @@ public class ChecklistController {
         List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(userId, limit);
         return results.stream()
                 .map(UnscheduledChecklistItemResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/api/checklists/me/recommended-catalog-items")
+    public List<RecommendedCatalogItemResponse> findRecommendedCatalogItems(@Auth Long userId, @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit) {
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(userId, limit);
+        return results.stream()
+                .map(RecommendedCatalogItemResponse::from)
                 .toList();
     }
 

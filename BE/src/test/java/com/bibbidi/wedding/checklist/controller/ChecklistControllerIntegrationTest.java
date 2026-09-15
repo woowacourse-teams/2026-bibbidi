@@ -53,6 +53,11 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     private static final String FIND_UNSCHEDULED_DESCRIPTION =
             "완료되지 않았고 연결된 일정이 하나도 없는 현재 사용자의 할 일을 랜덤으로 최대 limit개 조회합니다. "
                     + "준비 목록에서 담은 할 일과 직접 만든 할 일을 모두 포함하며, 대상이 없으면 빈 배열을 반환합니다.";
+    private static final String FIND_RECOMMENDED_SUMMARY = "추가하면 좋은 할 일 조회";
+    private static final String FIND_RECOMMENDED_DESCRIPTION =
+            "현재 사용자가 준비 목록에서 담은 항목 중 가장 높은 단계까지, 아직 담지 않은 준비 항목을 랜덤으로 최대 limit개 조회합니다. "
+                    + "담은 항목이 없으면 1단계를, 그 단계까지 모두 담았으면 담지 않은 항목이 남은 가장 이른 단계를 추천하며, "
+                    + "준비 항목을 모두 담았으면 빈 배열을 반환합니다.";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -322,6 +327,103 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                 resource(ResourceSnippetParameters.builder()
                                         .tag("Checklist")
                                         .summary(FIND_UNSCHEDULED_SUMMARY)
+                                        .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @Sql("/checklist-recommendation-fixture.sql")
+    @DisplayName("담은 준비 항목의 가장 높은 단계까지 아직 담지 않은 준비 항목을 추천한다")
+    void shouldFindRecommendedCatalogItems() throws Exception {
+        // given
+        addCatalogItem(101L);
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .param("limit", "4"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[*].catalogItemId", containsInAnyOrder(100, 200, 201)))
+                .andDo(document(
+                                "checklists-find-recommended-catalog-items",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(FIND_RECOMMENDED_SUMMARY)
+                                        .description(FIND_RECOMMENDED_DESCRIPTION)
+                                        .responseSchema(schema("RecommendedCatalogItemResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .queryParameters(
+                                                parameterWithName("limit")
+                                                        .description("조회할 최대 개수 (기본값 4, 최대 20)")
+                                                        .optional()
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("[].catalogItemId")
+                                                        .description("준비 항목 ID. 내 할 일에 추가 API의 catalogItemIds로 그대로 사용"),
+                                                fieldWithPath("[].title").description("준비 항목 제목"),
+                                                fieldWithPath("[].categoryName").description("준비 항목이 속한 카테고리 이름"),
+                                                fieldWithPath("[].phase").description("준비 항목이 속한 단계 번호"),
+                                                fieldWithPath("[].stepName").description("준비 항목이 속한 단계 이름")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자의 추가하면 좋은 할 일 조회 요청을 거절한다")
+    void shouldRequireAuthenticationToFindRecommendedCatalogItems() throws Exception {
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andDo(document(
+                                "checklists-find-recommended-catalog-items-unauthorized",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(FIND_RECOMMENDED_SUMMARY)
+                                        .description("인증되지 않은 사용자의 추가하면 좋은 할 일 조회 요청은 거절합니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build()
+                                )
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("체크리스트가 없는 사용자의 추가하면 좋은 할 일 조회 요청을 거절한다")
+    void shouldRejectFindRecommendedCatalogItemsWhenChecklistDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(303))
+                .andDo(document(
+                                "checklists-find-recommended-catalog-items-not-found",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(FIND_RECOMMENDED_SUMMARY)
                                         .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
