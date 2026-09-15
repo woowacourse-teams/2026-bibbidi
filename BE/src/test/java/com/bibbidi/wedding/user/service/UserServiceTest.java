@@ -219,6 +219,7 @@ class UserServiceTest {
                         && changedUser.passwordHash().equals("password-hash")
                         && changedUser.weddingDate().equals(weddingDate)
         ));
+        then(checklistService).shouldHaveNoInteractions();
     }
 
     @Test

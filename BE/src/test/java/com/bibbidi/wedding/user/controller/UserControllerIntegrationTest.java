@@ -236,6 +236,34 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
+    @DisplayName("저장한 결혼 예정일을 다른 날짜로 변경한다")
+    void shouldChangeWeddingDate() throws Exception {
+        MockHttpSession session = authenticatedSession(currentUserId);
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WeddingDateRequest(LocalDate.of(2027, 5, 15))
+                        )))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WeddingDateRequest(LocalDate.of(2028, 6, 16))
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2028-06-16"));
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value("2028-06-16"));
+    }
+
+    @Test
     @DisplayName("닉네임과 비밀번호를 변경해도 결혼 예정일을 유지한다")
     void shouldKeepWeddingDateWhenNicknameAndPasswordChange() throws Exception {
         MockHttpSession session = authenticatedSession(currentUserId);
@@ -280,6 +308,28 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
                 .andExpect(jsonPath("$.errors[0].field").value("weddingDate"))
                 .andExpect(jsonPath("$.errors[0].message").value("결혼 예정일은 비어 있을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 날짜는 요청을 거절하고 결혼 예정일을 저장하지 않는다")
+    void shouldRejectInvalidWeddingDate() throws Exception {
+        MockHttpSession session = authenticatedSession(currentUserId);
+        String invalidRequestBody = objectMapper.writeValueAsString(
+                new WeddingDateRequest(LocalDate.of(2027, 5, 15))
+        ).replace("2027-05-15", "2027-02-30");
+
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
+
+        mockMvc.perform(get("/api/users/me/wedding-date")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weddingDate").value((Object) null));
     }
 
     @Test
