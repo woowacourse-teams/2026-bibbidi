@@ -4,6 +4,13 @@
   "defaultBaseBranch": "release-be",
   "issueTemplate": ".github/ISSUE_TEMPLATE/development.md",
   "pullRequestTemplate": ".github/pull_request_template.md",
+  "typeLabels": {
+    "feature": "type: feature",
+    "fix": "type: fix",
+    "hotfix": "type: hotfix",
+    "chore": "type: chore",
+    "docs": "type: docs"
+  },
   "validation": [
     {
       "key": "logger-test",

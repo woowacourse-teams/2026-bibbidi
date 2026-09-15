@@ -36,6 +36,17 @@ export function diffStat(root, before, after) {
   return run('git', ['diff', '--stat', before, after, '--', '.', ':(exclude).devlog', ':(exclude).devlog/**'], { cwd: root });
 }
 
+export function headTree(root) {
+  const result = tryRun('git', ['rev-parse', '--verify', 'HEAD^{tree}'], { cwd: root });
+  return result.ok ? result.output : null;
+}
+
+export function hasCodeChanges(root, tree) {
+  const head = headTree(root);
+  if (!head) return true;
+  return Boolean(run('git', ['diff', '--name-only', head, tree, '--', '.', ':(exclude).devlog', ':(exclude).devlog/**'], { cwd: root }));
+}
+
 export function changedFiles(root, baseBranch) {
   const mergeBase = run('git', ['merge-base', 'HEAD', baseBranch], { cwd: root });
   const committed = run('git', ['diff', '--name-only', `${mergeBase}..HEAD`], { cwd: root })

@@ -1,13 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractIssueNumber, hasInitialAdr } from '../src/issue.mjs';
+import { extractIssueNumber, hasInitialAdr, issueFromCommand } from '../src/issue.mjs';
 import { redact } from '../src/redaction.mjs';
 
 test('GitHub URL과 일반 표기에서 Issue ID를 추출한다', () => {
   assert.equal(extractIssueNumber('https://github.com/org/repo/issues/106'), 106);
   assert.equal(extractIssueNumber('Issue 42 구현해줘'), 42);
   assert.equal(extractIssueNumber('#7 작업 시작'), 7);
+  assert.equal(extractIssueNumber('99번 이슈 개발하자'), 99);
+  assert.equal(extractIssueNumber('이슈 99번 이어서 하자'), 99);
   assert.equal(extractIssueNumber('번호가 없다'), null);
+});
+
+test('에이전트가 조회한 같은 저장소의 Issue 번호를 찾는다', () => {
+  assert.equal(issueFromCommand('gh issue view 99', 'org/repo'), 99);
+  assert.equal(issueFromCommand('gh issue view #99 --repo org/repo --json title,body', 'org/repo'), 99);
+  assert.equal(issueFromCommand('cd /repo && gh issue view https://github.com/org/repo/issues/42 --comments', 'org/repo'), 42);
+  assert.equal(issueFromCommand('gh issue view 99 --repo other/repo', 'org/repo'), null);
+  assert.equal(issueFromCommand('gh issue list --limit 5', 'org/repo'), null);
 });
 
 test('최초 ADR의 필수 절을 확인한다', () => {
@@ -25,4 +35,3 @@ test('명백한 비밀값을 마스킹하고 일반 문장은 보존한다', () 
   const plain = redact('0분 일정 테스트도 추가해줘.');
   assert.deepEqual(plain, { value: '0분 일정 테스트도 추가해줘.', redacted: false });
 });
-

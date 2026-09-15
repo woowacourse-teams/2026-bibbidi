@@ -1,11 +1,10 @@
 {
   "description": "GitHub Issue 기반 AI Development Logger",
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 15, "statusMessage": "개발 Session 기준 상태를 기록하는 중" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "Issue와 사용자 요구사항을 연결하는 중" }] }],
-    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "개발 Lifecycle Gate를 확인하는 중" }] }],
-    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "검증 결과를 기록하는 중" }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "Turn 결과와 Diff를 기록하는 중" }] }]
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 15, "statusMessage": "작업 시작 상태를 기록하는 중" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "Issue와 요청을 연결하는 중" }] }],
+    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "이 작업을 해도 되는지 확인하는 중" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 20, "statusMessage": "테스트 결과를 기록하는 중" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node packages/development-logger/src/cli.mjs hook codex", "commandWindows": "node packages/development-logger/src/cli.mjs hook codex", "timeout": 30, "statusMessage": "이번 턴에서 바뀐 코드를 기록하는 중" }] }]
   }
 }
-
