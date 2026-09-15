@@ -17,9 +17,9 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsRe
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.common.random.Shuffler;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;

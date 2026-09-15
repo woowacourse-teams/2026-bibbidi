@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.common.random;
+package com.bibbidi.wedding.checklist.util;
 
 import java.util.ArrayList;
 import java.util.Collections;
