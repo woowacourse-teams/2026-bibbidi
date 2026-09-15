@@ -6,7 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.util.Set;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -269,15 +270,16 @@ class ChecklistItemTest {
     }
 
     @Test
-    @DisplayName("완료되지 않았고 일정이 없는 할 일은 일정이 필요하다")
+    @DisplayName("완료되지 않았고 다른 할 일의 일정만 있는 할 일은 일정이 필요하다")
     void shouldNeedScheduleWhenItemIsIncompleteAndUnscheduled() {
         // given
         ChecklistItem item = constructTestItem();
         ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
+        List<Appointment> otherItemAppointments = List.of(appointmentOf(2L));
 
         // when, then
-        assertThat(item.needsSchedule(Set.of())).isTrue();
-        assertThat(progressed.needsSchedule(Set.of())).isTrue();
+        assertThat(item.needsSchedule(otherItemAppointments)).isTrue();
+        assertThat(progressed.needsSchedule(otherItemAppointments)).isTrue();
     }
 
     @Test
@@ -287,7 +289,7 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem();
 
         // when
-        boolean needsSchedule = item.needsSchedule(Set.of(item.id()));
+        boolean needsSchedule = item.needsSchedule(List.of(appointmentOf(item.id())));
 
         // then
         assertThat(needsSchedule).isFalse();
@@ -300,7 +302,7 @@ class ChecklistItemTest {
         ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
 
         // when
-        boolean needsSchedule = item.needsSchedule(Set.of());
+        boolean needsSchedule = item.needsSchedule(List.of());
 
         // then
         assertThat(needsSchedule).isFalse();
@@ -313,6 +315,21 @@ class ChecklistItemTest {
                 "Wedding hall consultation",
                 null,
                 ChecklistItemStatus.PREV
+        );
+    }
+
+    private static Appointment appointmentOf(Long checklistItemId) {
+        return new Appointment(
+                null,
+                checklistItemId,
+                "Consultation",
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false
         );
     }
 }

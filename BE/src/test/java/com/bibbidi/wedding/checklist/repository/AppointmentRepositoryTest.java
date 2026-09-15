@@ -13,7 +13,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,39 +137,6 @@ class AppointmentRepositoryTest {
         boolean hasRemaining = appointmentRepository.existsRemainingByChecklistItemId(10L);
 
         assertThat(hasRemaining).isFalse();
-    }
-
-    @Test
-    @DisplayName("지정한 할 일 중 일정이 하나라도 있는 할 일 ID만 조회한다")
-    void shouldFindOnlyScheduledChecklistItemIds() {
-        saveAppointment(10L, "아직 안 끝낸 일정");
-        saveAppointment(10L, "같은 할 일의 다른 일정");
-        saveDoneAppointment(11L, "이미 끝낸 일정");
-        saveAppointment(20L, "지정하지 않은 할 일의 일정");
-
-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L, 12L));
-
-        assertThat(found).containsExactlyInAnyOrder(10L, 11L);
-    }
-
-    @Test
-    @DisplayName("지정한 할 일에 일정이 하나도 없으면 빈 ID 목록을 조회한다")
-    void shouldFindNoScheduledChecklistItemIdWhenNoAppointmentExists() {
-        saveAppointment(20L, "지정하지 않은 할 일의 일정");
-
-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L));
-
-        assertThat(found).isEmpty();
-    }
-
-    @Test
-    @DisplayName("지정한 할 일 ID가 없으면 빈 ID 목록을 조회한다")
-    void shouldFindNoScheduledChecklistItemIdWhenChecklistItemIdsAreEmpty() {
-        saveAppointment(10L, "지정하지 않은 할 일의 일정");
-
-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of());
-
-        assertThat(found).isEmpty();
     }
 
     @Test

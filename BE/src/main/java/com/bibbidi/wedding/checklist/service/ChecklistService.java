@@ -4,6 +4,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
@@ -84,9 +85,9 @@ public class ChecklistService {
     }
 
     private List<ChecklistItem> excludeScheduledItems(Checklist checklist) {
-        Set<Long> scheduledItemIds = checklistAppointmentService
-                .findScheduledChecklistItemIds(checklist.undoneItemIds());
-        return checklist.unscheduledItems(scheduledItemIds);
+        List<Appointment> appointments = checklistAppointmentService
+                .findAllByChecklistItemIds(checklist.undoneItemIds());
+        return checklist.unscheduledItems(appointments);
     }
 
     private CategoryNames findCategoryNames(List<ChecklistItem> items) {

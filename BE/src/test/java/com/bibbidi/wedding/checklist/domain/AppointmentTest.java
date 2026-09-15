@@ -253,6 +253,38 @@ class AppointmentTest {
         assertThat(crossingMidnight.conflictsWith(nextDay)).isTrue();
     }
 
+    @Test
+    @DisplayName("일정이 달린 할 일에는 속한다")
+    void shouldBelongToChecklistItemOfAppointment() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+        ChecklistItem checklistItem = checklistItem(CHECKLIST_ITEM_ID);
+
+        // when
+        boolean belongsTo = appointment.belongsTo(checklistItem);
+
+        // then
+        assertThat(belongsTo).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 할 일에는 속하지 않는다")
+    void shouldNotBelongToOtherChecklistItem() {
+        // given
+        Appointment appointment = constructTestAppointment(false);
+        ChecklistItem otherChecklistItem = checklistItem(2L);
+
+        // when
+        boolean belongsTo = appointment.belongsTo(otherChecklistItem);
+
+        // then
+        assertThat(belongsTo).isFalse();
+    }
+
+    private static ChecklistItem checklistItem(Long id) {
+        return new ChecklistItem(id, 10L, "Wedding hall consultation", null, ChecklistItemStatus.PREV);
+    }
+
     private static Appointment at(int startHour, int startMinute, int endHour, int endMinute) {
         return appointmentWithTime(
                 LocalDateTime.of(2026, 9, 1, startHour, startMinute),

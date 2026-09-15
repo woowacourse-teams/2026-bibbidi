@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -106,7 +106,7 @@ class ChecklistTest {
         );
 
         // when
-        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(Set.of(2L));
+        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(List.of(appointmentOf(2L)));
 
         // then
         assertThat(unscheduledItems)
@@ -270,6 +270,21 @@ class ChecklistTest {
                 "계약서 확인",
                 sourceCatalogItemId,
                 status
+        );
+    }
+
+    private static Appointment appointmentOf(Long checklistItemId) {
+        return new Appointment(
+                null,
+                checklistItemId,
+                "웨딩홀 투어",
+                LocalDate.of(2026, 9, 1),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false
         );
     }
 }

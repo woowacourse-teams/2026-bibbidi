@@ -8,7 +8,6 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -141,17 +140,6 @@ class ChecklistAppointmentServiceTest {
         checklistAppointmentService.deleteAllByChecklistItemIds(List.of());
 
         then(appointmentRepository).shouldHaveNoInteractions();
-    }
-
-    @Test
-    @DisplayName("지정한 할 일 중 일정이 있는 할 일 ID를 한 번에 조회한다")
-    void shouldFindScheduledChecklistItemIds() {
-        given(appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L)))
-                .willReturn(Set.of(10L));
-
-        Set<Long> found = checklistAppointmentService.findScheduledChecklistItemIds(List.of(10L, 11L));
-
-        assertThat(found).containsExactly(10L);
     }
 
     @Test

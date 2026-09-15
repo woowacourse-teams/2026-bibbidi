@@ -4,7 +4,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 public final class Checklist {
@@ -76,9 +75,9 @@ public final class Checklist {
                 .toList();
     }
 
-    public List<ChecklistItem> unscheduledItems(Set<Long> scheduledItemIds) {
+    public List<ChecklistItem> unscheduledItems(List<Appointment> appointments) {
         return items.stream()
-                .filter(item -> item.needsSchedule(scheduledItemIds))
+                .filter(item -> item.needsSchedule(appointments))
                 .toList();
     }
 

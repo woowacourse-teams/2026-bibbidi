@@ -17,6 +17,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+import com.bibbidi.wedding.checklist.domain.Appointment;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
@@ -172,8 +173,8 @@ class ChecklistServiceTest {
                 OWNER_ID,
                 List.of(customItem, doneItem, catalogItem, scheduledItem)
         ));
-        given(checklistAppointmentService.findScheduledChecklistItemIds(List.of(200L, 202L, 203L)))
-                .willReturn(Set.of(203L));
+        given(checklistAppointmentService.findAllByChecklistItemIds(List.of(200L, 202L, 203L)))
+                .willReturn(List.of(appointmentOf(scheduledItem)));
         given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
                 .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
         given(shuffler.shuffle(List.of(customItem, catalogItem)))
@@ -710,6 +711,21 @@ class ChecklistServiceTest {
                 "계약서 확인",
                 sourceCatalogItemId,
                 status
+        );
+    }
+
+    private static Appointment appointmentOf(ChecklistItem item) {
+        return new Appointment(
+                null,
+                item.id(),
+                "웨딩홀 투어",
+                java.time.LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false
         );
     }
 }

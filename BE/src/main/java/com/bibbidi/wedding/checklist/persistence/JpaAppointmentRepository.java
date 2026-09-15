@@ -3,7 +3,6 @@ package com.bibbidi.wedding.checklist.persistence;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -42,13 +41,6 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
               AND appointment.isDone = false
             """)
     boolean existsRemainingByChecklistItemId(Long checklistItemId);
-
-    @Query("""
-            SELECT DISTINCT appointment.checklistItemId
-            FROM JpaAppointmentEntity appointment
-            WHERE appointment.checklistItemId IN :checklistItemIds
-            """)
-    Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds);
 
     @Query("""
             SELECT appointment
