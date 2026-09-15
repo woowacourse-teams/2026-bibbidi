@@ -5,6 +5,7 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.repository.UserRepository;
+import java.time.LocalDate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +25,7 @@ public class UserService {
     @Transactional
     public UserResult createUser(String nickname, String passwordHash) {
         try {
-            User user = new User(null, nickname, passwordHash);
+            User user = new User(null, nickname, passwordHash, null);
             User savedUser = userRepository.save(user);
 
             return UserResult.from(savedUser);
@@ -59,6 +60,19 @@ public class UserService {
     public UserResult findCurrentUserInfo(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
         return UserResult.from(user);
+    }
+
+    public WeddingDateResult findWeddingDate(Long currentUserId) {
+        User user = userRepository.findById(currentUserId);
+        return WeddingDateResult.from(user);
+    }
+
+    @Transactional
+    public WeddingDateResult updateWeddingDate(Long currentUserId, LocalDate weddingDate) {
+        User user = userRepository.findById(currentUserId);
+        User changedUser = user.changeWeddingDate(weddingDate);
+        User savedUser = userRepository.save(changedUser);
+        return WeddingDateResult.from(savedUser);
     }
 
     @Transactional
