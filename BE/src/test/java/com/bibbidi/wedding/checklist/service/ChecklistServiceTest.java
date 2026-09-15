@@ -15,6 +15,7 @@ import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import com.bibbidi.wedding.checklist.domain.Appointment;
@@ -27,6 +28,7 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -53,6 +55,22 @@ class ChecklistServiceTest {
     private static final Long CATEGORY_ID = 2L;
     private static final Long CONTRACT_ITEM_ID = 100L;
     private static final Long ESTIMATE_ITEM_ID = 101L;
+
+    private static final CatalogItemDetailSnapshot HALL_TOUR =
+            new CatalogItemDetailSnapshot(1L, "웨딩홀 투어", "웨딩홀", 1, "웨딩홀 정하기");
+    private static final CatalogItemDetailSnapshot HALL_CONTRACT =
+            new CatalogItemDetailSnapshot(2L, "웨딩홀 계약", "웨딩홀", 1, "웨딩홀 정하기");
+    private static final CatalogItemDetailSnapshot CEREMONY_TYPE =
+            new CatalogItemDetailSnapshot(3L, "예식 형태 결정", "웨딩홀", 2, "예식 진행 방식 결정");
+    private static final CatalogItemDetailSnapshot HOST_BOOKING =
+            new CatalogItemDetailSnapshot(6L, "주례·사회자 섭외", "웨딩홀", 3, "예식 진행 인원 섭외");
+    private static final CatalogItemDetailSnapshot STYLING_CONSULTING =
+            new CatalogItemDetailSnapshot(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약");
+    private static final CatalogItemDetailSnapshot DRESS_SHOP =
+            new CatalogItemDetailSnapshot(44L, "드레스샵 확정", "스드메", 2, "스드메 업체 확정");
+    private static final List<CatalogItemDetailSnapshot> ALL_ITEM_DETAILS = List.of(
+            HALL_TOUR, HALL_CONTRACT, CEREMONY_TYPE, HOST_BOOKING, STYLING_CONSULTING, DRESS_SHOP
+    );
 
     @Mock
     private ChecklistRepository checklistRepository;
@@ -233,6 +251,121 @@ class ChecklistServiceTest {
 
         // then
         assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 담은 할 일이 없으면 1단계 준비 항목을 추천한다")
+    void shouldRecommendFirstPhaseItemsWhenNothingAddedFromCatalog() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(constructTestItem(200L))
+        ));
+        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
+        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
+
+        // then
+        assertThat(results)
+                .extracting(RecommendedCatalogItemResult::catalogItemId)
+                .containsExactlyInAnyOrder(HALL_TOUR.id(), HALL_CONTRACT.id(), STYLING_CONSULTING.id());
+    }
+
+    @Test
+    @DisplayName("담은 준비 항목의 가장 큰 단계 이하에서 카테고리와 상관없이 담지 않은 항목을 추천한다")
+    void shouldRecommendNotAddedItemsUpToMaxAddedPhaseAcrossCategories() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(
+                        constructTestItem(200L, ChecklistItemStatus.DONE, HALL_TOUR.id()),
+                        constructTestItem(201L, ChecklistItemStatus.PREV, DRESS_SHOP.id())
+                )
+        ));
+        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
+        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
+
+        // then
+        assertThat(results)
+                .extracting(RecommendedCatalogItemResult::catalogItemId)
+                .containsExactlyInAnyOrder(HALL_CONTRACT.id(), CEREMONY_TYPE.id(), STYLING_CONSULTING.id());
+    }
+
+    @Test
+    @DisplayName("기준 단계 이하의 준비 항목을 모두 담았으면 담지 않은 항목이 남은 다음 단계를 추천한다")
+    void shouldRecommendNextPhaseItemsWhenAllItemsUpToBasePhaseAdded() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(
+                        constructTestItem(200L, ChecklistItemStatus.PREV, HALL_TOUR.id()),
+                        constructTestItem(201L, ChecklistItemStatus.PREV, HALL_CONTRACT.id()),
+                        constructTestItem(202L, ChecklistItemStatus.PREV, STYLING_CONSULTING.id())
+                )
+        ));
+        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
+        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
+
+        // then
+        assertThat(results)
+                .extracting(RecommendedCatalogItemResult::catalogItemId)
+                .containsExactlyInAnyOrder(CEREMONY_TYPE.id(), DRESS_SHOP.id());
+    }
+
+    @Test
+    @DisplayName("준비 항목을 모두 담았으면 추천할 항목이 없다")
+    void shouldReturnEmptyWhenAllCatalogItemsAdded() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
+                CHECKLIST_ID,
+                OWNER_ID,
+                List.of(
+                        constructTestItem(200L, ChecklistItemStatus.PREV, HALL_TOUR.id()),
+                        constructTestItem(201L, ChecklistItemStatus.PREV, HALL_CONTRACT.id()),
+                        constructTestItem(202L, ChecklistItemStatus.PREV, CEREMONY_TYPE.id()),
+                        constructTestItem(203L, ChecklistItemStatus.PREV, HOST_BOOKING.id()),
+                        constructTestItem(204L, ChecklistItemStatus.PREV, STYLING_CONSULTING.id()),
+                        constructTestItem(205L, ChecklistItemStatus.PREV, DRESS_SHOP.id())
+                )
+        ));
+        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
+        given(shuffler.shuffle(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 20);
+
+        // then
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("추천 후보를 섞은 순서에서 앞의 limit개만 준비 항목 정보와 함께 돌려준다")
+    void shouldReturnFirstRecommendedItemsUpToLimitInShuffledOrder() {
+        // given
+        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, List.of()));
+        given(catalogService.findAllItemDetails()).willReturn(ALL_ITEM_DETAILS);
+        given(shuffler.shuffle(List.of(HALL_TOUR, HALL_CONTRACT, STYLING_CONSULTING)))
+                .willReturn(List.of(STYLING_CONSULTING, HALL_CONTRACT, HALL_TOUR));
+
+        // when
+        List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(OWNER_ID, 2);
+
+        // then
+        assertThat(results).containsExactly(
+                new RecommendedCatalogItemResult(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약"),
+                new RecommendedCatalogItemResult(2L, "웨딩홀 계약", "웨딩홀", 1, "웨딩홀 정하기")
+        );
     }
 
     @Test

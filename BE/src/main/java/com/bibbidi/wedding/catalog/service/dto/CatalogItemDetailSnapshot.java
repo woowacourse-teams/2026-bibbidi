@@ -7,4 +7,8 @@ public record CatalogItemDetailSnapshot(
         int phase,
         String stepName
 ) {
+
+    public boolean isUpTo(int basePhase) {
+        return phase <= basePhase;
+    }
 }
