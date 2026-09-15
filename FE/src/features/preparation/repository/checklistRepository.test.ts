@@ -21,6 +21,7 @@ import {
 function createLocalDataSource(catalogItemIds: number[] = []) {
   return {
     getCatalogItemIds: vi.fn().mockReturnValue(catalogItemIds),
+    removeCatalogItemIds: vi.fn(),
     setCatalogItemIds: vi.fn(),
   };
 }

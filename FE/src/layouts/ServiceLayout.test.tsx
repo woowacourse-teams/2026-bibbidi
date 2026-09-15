@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import {
   act,
   fireEvent,
@@ -7,16 +8,42 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
+import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { PreparationRoadmapFeature } from "../features/preparation/PreparationRoadmapFeature";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { ServiceLayout } from "./ServiceLayout";
 
+beforeEach(() => {
+  vi.stubGlobal("localStorage", {
+    getItem: vi.fn().mockReturnValue(null),
+    removeItem: vi.fn(),
+    setItem: vi.fn(),
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+function renderServiceLayout(
+  routes: ReactNode,
+  initialEntries: string[] = ["/"],
+) {
+  return render(
+    <AuthProvider>
+      <ChecklistMigrationProvider>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route element={<ServiceLayout />}>{routes}</Route>
+          </Routes>
+        </MemoryRouter>
+      </ChecklistMigrationProvider>
+    </AuthProvider>,
+  );
+}
 
 describe("ServiceLayout", () => {
   it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
@@ -31,17 +58,7 @@ describe("ServiceLayout", () => {
       ),
     );
 
-    render(
-      <AuthProvider>
-        <MemoryRouter>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route path="/" element={<div>홈 화면</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
-    );
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(screen.getByText("홈 화면")).toBeTruthy();
     expect(
@@ -69,17 +86,12 @@ describe("ServiceLayout", () => {
       ),
     );
 
-    const { container } = render(
-      <AuthProvider>
-        <MemoryRouter initialEntries={["/preparation"]}>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route path="/" element={<div>홈 화면</div>} />
-              <Route path="/preparation" element={<div>준비 목록 화면</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
+    const { container } = renderServiceLayout(
+      <>
+        <Route path="/" element={<div>홈 화면</div>} />
+        <Route path="/preparation" element={<div>준비 목록 화면</div>} />
+      </>,
+      ["/preparation"],
     );
     await screen.findByText("준비 목록 화면");
     const content = container.querySelector<HTMLElement>(
@@ -127,17 +139,7 @@ describe("ServiceLayout", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route path="/" element={<div>홈 화면</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
-    );
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(await screen.findByText("67%")).toBeTruthy();
@@ -161,17 +163,7 @@ describe("ServiceLayout", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route path="/" element={<div>홈 화면</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
-    );
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "회원가입" })).toBeTruthy();
@@ -198,17 +190,7 @@ describe("ServiceLayout", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route path="/" element={<div>홈 화면</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
-    );
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -249,19 +231,9 @@ describe("ServiceLayout", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter initialEntries={["/preparation"]}>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route
-                path="/preparation"
-                element={<PreparationRoadmapFeature />}
-              />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
     );
 
     expect(
@@ -271,6 +243,125 @@ describe("ServiceLayout", () => {
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
+  });
+
+  it("병합 완료 전 서버 상태를 숨기고 완료 후 최신 조회를 공유한다", async () => {
+    let serializedValue: string | null = JSON.stringify({
+      version: 1,
+      catalogItemIds: [1002],
+    });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => serializedValue),
+      removeItem: vi.fn(() => {
+        serializedValue = null;
+      }),
+      setItem: vi.fn((_key: string, value: string) => {
+        serializedValue = value;
+      }),
+    });
+    let resolveAddition: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          const checklistRequestCount = fetchMock.mock.calls.filter(
+            ([requestedUrl]) => requestedUrl === "/api/checklists/me",
+          ).length;
+
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items:
+                  checklistRequestCount === 1
+                    ? [
+                        {
+                          id: 10,
+                          isDone: true,
+                          sourceCatalogItemId: 1001,
+                        },
+                      ]
+                    : [
+                        {
+                          id: 10,
+                          isDone: true,
+                          sourceCatalogItemId: 1001,
+                        },
+                        {
+                          id: 11,
+                          isDone: false,
+                          sourceCatalogItemId: 1002,
+                        },
+                      ],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists/me/catalog-items") {
+          return new Promise<Response>((resolve) => {
+            resolveAddition = resolve;
+          });
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/checklists/me/catalog-items",
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByLabelText("현재 사용자 비")).toBeNull();
+    expect(
+      screen.getByRole("status", { name: "로그인 상태 확인 중" }),
+    ).toBeTruthy();
+
+    await act(async () => {
+      resolveAddition(
+        new Response(
+          JSON.stringify({ items: [{ id: 11, catalogItemId: 1002 }] }),
+          { status: 201 },
+        ),
+      );
+    });
+
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(2);
+    expect(
+      screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "두 번째 할 일 추가" }),
+    ).toBeNull();
   });
 
   it("체크리스트가 없으면 생성한 뒤 준비 항목을 추가한다", async () => {
@@ -327,19 +418,9 @@ describe("ServiceLayout", () => {
       });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter initialEntries={["/preparation"]}>
-          <Routes>
-            <Route element={<ServiceLayout />}>
-              <Route
-                path="/preparation"
-                element={<PreparationRoadmapFeature />}
-              />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
     );
 
     const addButton = await screen.findByRole("button", {

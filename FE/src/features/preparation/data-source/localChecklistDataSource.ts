@@ -18,6 +18,7 @@ export class LocalChecklistStorageError extends Error {
 
 export interface LocalChecklistDataSource {
   getCatalogItemIds(): number[];
+  removeCatalogItemIds(catalogItemIds: number[]): void;
   setCatalogItemIds(catalogItemIds: number[]): void;
 }
 
@@ -52,17 +53,54 @@ function parseStorageValue(serializedValue: string): number[] {
 export function createLocalChecklistDataSource(
   getStorage: () => Storage,
 ): LocalChecklistDataSource {
-  return {
-    getCatalogItemIds() {
-      let serializedValue: string | null;
+  const getCatalogItemIds = () => {
+    let serializedValue: string | null;
 
-      try {
-        serializedValue = getStorage().getItem(LOCAL_CHECKLIST_STORAGE_KEY);
-      } catch (error) {
-        throw new LocalChecklistStorageError("read", { cause: error });
+    try {
+      serializedValue = getStorage().getItem(LOCAL_CHECKLIST_STORAGE_KEY);
+    } catch (error) {
+      throw new LocalChecklistStorageError("read", { cause: error });
+    }
+
+    return serializedValue === null ? [] : parseStorageValue(serializedValue);
+  };
+
+  return {
+    getCatalogItemIds,
+    removeCatalogItemIds(catalogItemIds) {
+      const resolvedCatalogItemIds = new Set(
+        catalogItemIds.filter(isValidCatalogItemId),
+      );
+
+      if (resolvedCatalogItemIds.size === 0) {
+        return;
       }
 
-      return serializedValue === null ? [] : parseStorageValue(serializedValue);
+      const currentCatalogItemIds = getCatalogItemIds();
+      const remainingCatalogItemIds = currentCatalogItemIds.filter(
+        (catalogItemId) => !resolvedCatalogItemIds.has(catalogItemId),
+      );
+
+      if (remainingCatalogItemIds.length === currentCatalogItemIds.length) {
+        return;
+      }
+
+      try {
+        if (remainingCatalogItemIds.length === 0) {
+          getStorage().removeItem(LOCAL_CHECKLIST_STORAGE_KEY);
+          return;
+        }
+
+        getStorage().setItem(
+          LOCAL_CHECKLIST_STORAGE_KEY,
+          JSON.stringify({
+            version: LOCAL_CHECKLIST_SCHEMA_VERSION,
+            catalogItemIds: remainingCatalogItemIds,
+          } satisfies LocalChecklistStorageValue),
+        );
+      } catch (error) {
+        throw new LocalChecklistStorageError("write", { cause: error });
+      }
     },
     setCatalogItemIds(catalogItemIds) {
       const storageValue: LocalChecklistStorageValue = {

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import { createContext, ReactNode, useContext, useMemo } from "react";
 
 import { createMyChecklistRepositoriesDependency } from "./checklistDependencies";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
@@ -22,15 +22,13 @@ export function MyChecklistProvider({
   children,
   sessionKey,
 }: MyChecklistProviderProps) {
-  return (
-    <MyChecklistSessionProvider key={sessionKey}>
-      {children}
-    </MyChecklistSessionProvider>
-  );
-}
+  const scope = useMemo(() => {
+    if (sessionKey.length === 0) {
+      throw new Error("체크리스트 세션 키가 필요합니다.");
+    }
 
-function MyChecklistSessionProvider({ children }: { children: ReactNode }) {
-  const [scope] = useState(createMyChecklistRepositoriesDependency);
+    return createMyChecklistRepositoriesDependency();
+  }, [sessionKey]);
 
   return (
     <MyChecklistContext.Provider value={scope}>

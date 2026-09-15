@@ -3,7 +3,6 @@ import { Outlet, useLocation } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth } from "../features/auth";
-import { MyChecklistProvider } from "../features/checklist";
 import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
@@ -21,45 +20,37 @@ export function ServiceLayout() {
   }, [pathname]);
 
   return (
-    <MyChecklistProvider
-      sessionKey={
-        authState.status === "authenticated"
-          ? `authenticated:${authState.user.nickname}`
-          : authState.status
-      }
-    >
-      <div className="service-layout">
-        <AppHeader
-          user={
-            authState.status === "authenticated"
-              ? {
-                  kind: "authenticated",
-                  summary: (
-                    <AppHeaderSummaryFeature
-                      onAuthenticationRequired={refreshAuth}
-                    />
-                  ),
-                  userInitial: authState.user.nickname.charAt(0),
-                }
-              : authState.status === "guest"
-                ? { kind: "guest" }
-                : { kind: "pending" }
-          }
-        />
+    <div className="service-layout">
+      <AppHeader
+        user={
+          authState.status === "authenticated"
+            ? {
+                kind: "authenticated",
+                summary: (
+                  <AppHeaderSummaryFeature
+                    onAuthenticationRequired={refreshAuth}
+                  />
+                ),
+                userInitial: authState.user.nickname.charAt(0),
+              }
+            : authState.status === "guest"
+              ? { kind: "guest" }
+              : { kind: "pending" }
+        }
+      />
 
-        <div
-          className="service-layout__content"
-          data-page-scroll-container
-          ref={contentRef}
-        >
-          <Outlet />
-        </div>
-
-        <div className="service-layout__mobile-dock">
-          <AppBottomNavigation />
-          <FeedbackFeature />
-        </div>
+      <div
+        className="service-layout__content"
+        data-page-scroll-container
+        ref={contentRef}
+      >
+        <Outlet />
       </div>
-    </MyChecklistProvider>
+
+      <div className="service-layout__mobile-dock">
+        <AppBottomNavigation />
+        <FeedbackFeature />
+      </div>
+    </div>
   );
 }
