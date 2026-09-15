@@ -14,10 +14,12 @@ export function ServiceLayout() {
   const { pathname, search } = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobileLayout = useIsMobileLayout();
+  const selectedTaskId = new URLSearchParams(search).get("taskId");
   const isMobileChecklistDetailOpen =
     isMobileLayout &&
     pathname === "/checklist" &&
-    new URLSearchParams(search).has("taskId");
+    selectedTaskId !== null &&
+    selectedTaskId.length > 0;
 
   useLayoutEffect(() => {
     if (contentRef.current) {

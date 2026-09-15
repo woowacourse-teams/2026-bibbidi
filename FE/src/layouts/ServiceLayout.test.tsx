@@ -449,6 +449,35 @@ describe("ServiceLayout", () => {
     ).toHaveLength(1);
   });
 
+  it("모바일 체크리스트의 taskId가 비어 있으면 앱 chrome을 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+
+    const { container } = renderServiceLayout(
+      <Route path="/checklist" element={<div>체크리스트 화면</div>} />,
+      ["/checklist?taskId="],
+    );
+
+    expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.classList.contains("service-layout__content--mobile-detail"),
+    ).toBe(false);
+  });
+
   it("준비 항목 추가 직후 헤더와 체크리스트 화면을 공통 캐시에서 함께 갱신한다", async () => {
     const fetchMock = vi
       .fn()
