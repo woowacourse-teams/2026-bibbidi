@@ -1,0 +1,141 @@
+.app-header-summary__popover-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: transparent;
+}
+
+.app-header-summary__popover {
+  position: absolute;
+  z-index: 31;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-height: calc(100dvh - 116px);
+  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 16%);
+  white-space: normal;
+}
+
+.app-header-summary__popover h2 {
+  margin: 0 0 16px;
+  color: var(--color-fg-neutral);
+  font-size: 16px;
+}
+
+.app-header-summary__popover button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-header-summary__calendar-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+
+.app-header-summary__calendar-navigation strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.app-header-summary__calendar-navigation button,
+.app-header-summary__calendar-day {
+  display: grid;
+  min-width: 32px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font: inherit;
+}
+
+.app-header-summary__calendar-navigation button:hover,
+.app-header-summary__calendar-day:hover {
+  background: var(--color-bg-neutral-weak);
+}
+
+.app-header-summary__calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+
+.app-header-summary__weekday {
+  padding: 6px 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+}
+
+.app-header-summary__calendar-day[aria-pressed="true"] {
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+
+.app-header-summary__calendar-day[aria-current="date"]:not(
+    [aria-pressed="true"]
+  ) {
+  box-shadow: inset 0 0 0 1px var(--color-bg-brand-solid);
+}
+
+.app-header-summary__selection,
+.app-header-summary__error {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.app-header-summary__error {
+  color: var(--color-fg-critical);
+}
+
+.app-header-summary__popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.app-header-summary__popover-actions button {
+  min-width: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 6px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+}
+
+.app-header-summary__popover-actions button:last-child {
+  border-color: var(--color-bg-brand-solid);
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+
+.app-header-summary__popover-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+@media (max-width: 760px) {
+  .app-header-summary__popover {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: 360px;
+    max-height: calc(100dvh - 84px);
+    margin: 0 auto;
+  }
+}

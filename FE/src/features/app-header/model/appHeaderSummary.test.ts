@@ -17,7 +17,6 @@ describe("AppHeaderSummaryModel", () => {
     ).toEqual({
       completedTaskCount: 2,
       totalTaskCount: 4,
-      weddingDate: { status: "unset" },
     });
   });
 

@@ -20,6 +20,44 @@
   gap: 8px;
 }
 
+.app-header-summary__wedding-date {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-header-summary__d-day-button,
+.app-header-summary__retry {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.app-header-summary__d-day-button {
+  padding: 6px 0;
+  text-align: left;
+}
+
+.app-header-summary__d-day-button:hover strong,
+.app-header-summary__retry:hover {
+  color: var(--color-fg-brand);
+}
+
+.app-header-summary__retry {
+  flex: none;
+  padding: 4px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+}
+
+.app-header-summary__d-day-button:focus-visible,
+.app-header-summary__retry:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
 .app-header-summary__d-day-mobile {
   display: none;
 }

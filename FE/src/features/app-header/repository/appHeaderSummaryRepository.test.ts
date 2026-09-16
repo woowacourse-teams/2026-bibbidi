@@ -62,7 +62,6 @@ describe("AppHeaderSummaryRepository", () => {
     await expect(repository.getSummary()).resolves.toEqual({
       completedTaskCount: 2,
       totalTaskCount: 3,
-      weddingDate: { status: "unset" },
     });
     expect(checklistRepository.getChecklist).toHaveBeenCalledWith(undefined);
   });
@@ -80,7 +79,6 @@ describe("AppHeaderSummaryRepository", () => {
       await expect(repository.getSummary()).resolves.toEqual({
         completedTaskCount: 0,
         totalTaskCount: 0,
-        weddingDate: { status: "unset" },
       });
     },
   );
