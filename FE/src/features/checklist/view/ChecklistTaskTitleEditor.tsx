@@ -128,6 +128,10 @@ export function ChecklistTaskTitleEditor({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
     if (event.key === "Enter") {
       event.preventDefault();
       void submit();

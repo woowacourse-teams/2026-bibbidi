@@ -423,6 +423,9 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.change(input, { target: { value: "  청첩장 문구 최종 확정  " } });
+    fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
+    expect(changeTitle).not.toHaveBeenCalled();
+
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
 

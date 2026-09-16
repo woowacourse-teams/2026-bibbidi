@@ -27,9 +27,11 @@ export function useChecklistItemEditing(
   const [titleFeedback, setTitleFeedback] =
     useState<ChecklistItemChangeFeedback>(idleFeedback);
   const controllerRef = useRef<AbortController | undefined>(undefined);
+  const requestGenerationRef = useRef(0);
 
   useEffect(
     () => () => {
+      requestGenerationRef.current += 1;
       controllerRef.current?.abort();
     },
     [],
@@ -40,6 +42,7 @@ export function useChecklistItemEditing(
       return;
     }
 
+    requestGenerationRef.current += 1;
     controllerRef.current?.abort();
     controllerRef.current = undefined;
     let isActive = true;
@@ -66,14 +69,25 @@ export function useChecklistItemEditing(
       }
 
       const controller = new AbortController();
+      const requestGeneration = requestGenerationRef.current + 1;
+      requestGenerationRef.current = requestGeneration;
       controllerRef.current = controller;
       setTitleFeedback({ itemId, status: "pending" });
 
       try {
         await request(controller.signal);
+
+        if (requestGenerationRef.current !== requestGeneration) {
+          return false;
+        }
+
         setTitleFeedback(idleFeedback);
         return true;
       } catch (error) {
+        if (requestGenerationRef.current !== requestGeneration) {
+          return false;
+        }
+
         if (
           controller.signal.aborted ||
           error instanceof MyChecklistRequestAbortedError
