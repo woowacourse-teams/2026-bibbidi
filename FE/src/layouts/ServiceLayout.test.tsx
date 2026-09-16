@@ -178,26 +178,39 @@ describe("ServiceLayout", () => {
   });
 
   it("현재 사용자 닉네임으로 로그인 헤더를 표시한다", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "비비디" }), {
-          status: 200,
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 1,
-            items: [
-              createChecklistItem(10, null, "done"),
-              createChecklistItem(11, null),
-              createChecklistItem(12, null, "done"),
-            ],
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), {
+            status: 200,
           }),
-          { status: 200 },
-        ),
-      );
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [
+                createChecklistItem(10, null, "done"),
+                createChecklistItem(11, null),
+                createChecklistItem(12, null, "done"),
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
@@ -206,8 +219,7 @@ describe("ServiceLayout", () => {
     expect(await screen.findByText("67%")).toBeTruthy();
     expect(screen.getByText("2/3")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "로그인" })).toBeNull();
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(fetchMock).toHaveBeenCalledWith(
       "/api/checklists/me",
       expect.objectContaining({ credentials: "include", method: "GET" }),
     );
@@ -318,29 +330,44 @@ describe("ServiceLayout", () => {
   });
 
   it("체크리스트 인증 만료 시 로그인 상태를 다시 확인한다", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
-          { status: 401 },
-        ),
-      )
-      .mockResolvedValueOnce(
+    let currentUserRequests = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        currentUserRequests += 1;
+        return Promise.resolve(
+          currentUserRequests === 1
+            ? new Response(JSON.stringify({ nickname: "비비디" }), {
+                status: 200,
+              })
+            : new Response(
+                JSON.stringify({
+                  errorCode: 201,
+                  message: "로그인이 필요합니다.",
+                }),
+                { status: 401 },
+              ),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      return Promise.resolve(
         new Response(
           JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
           { status: 401 },
         ),
       );
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("준비 목록과 헤더가 내 체크리스트 조회를 공유한다", async () => {

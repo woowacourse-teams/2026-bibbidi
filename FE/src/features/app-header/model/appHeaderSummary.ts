@@ -1,13 +1,8 @@
 import type { ChecklistItemStatus } from "../../checklist";
 
-export interface AppHeaderWeddingDateModel {
-  status: "unset";
-}
-
 export interface AppHeaderSummaryModel {
   completedTaskCount: number;
   totalTaskCount: number;
-  weddingDate: AppHeaderWeddingDateModel;
 }
 
 export interface AppHeaderChecklistItem {
@@ -20,7 +15,6 @@ export function createAppHeaderSummaryModel(
   return {
     completedTaskCount: items.filter((item) => item.status === "done").length,
     totalTaskCount: items.length,
-    weddingDate: { status: "unset" },
   };
 }
 
