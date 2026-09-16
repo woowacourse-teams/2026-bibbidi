@@ -606,14 +606,23 @@ describe("Checklist 할 일 편집", () => {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
-    fireEvent.click(screen.getByRole("option", { name: "예복 준비" }));
+    const currentOption = screen.getByRole("option", { name: "예식 준비" });
+    const nextOption = screen.getByRole("option", { name: "예복 준비" });
+
+    act(() => nextOption.focus());
+    fireEvent.click(nextOption);
 
     expect((await screen.findByRole("alert")).textContent).toContain(
       "카테고리를 변경하지 못했습니다.",
     );
     expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(document.activeElement).toBe(nextOption);
+    expect(nextOption.getAttribute("tabindex")).toBe("0");
+    expect(nextOption.getAttribute("aria-selected")).toBe("false");
+    expect(currentOption.getAttribute("tabindex")).toBe("-1");
+    expect(currentOption.getAttribute("aria-selected")).toBe("true");
 
-    fireEvent.click(screen.getByRole("option", { name: "예복 준비" }));
+    fireEvent.click(nextOption);
     await waitFor(() => expect(changeCategory).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
   });

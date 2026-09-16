@@ -185,6 +185,8 @@ export function ChecklistTaskCategoryEditor({
       return;
     }
 
+    setActiveCategoryId(categoryId);
+
     if (categoryId === task.categoryId) {
       close();
       return;
@@ -303,6 +305,7 @@ export function ChecklistTaskCategoryEditor({
                     className="checklist-category-editor__option"
                     disabled={isSaving}
                     onClick={() => void selectCategory(category.id)}
+                    onFocus={() => setActiveCategoryId(category.id)}
                     ref={(button) => {
                       if (button) {
                         optionRefs.current.set(category.id, button);
