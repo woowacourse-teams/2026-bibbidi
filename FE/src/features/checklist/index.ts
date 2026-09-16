@@ -37,3 +37,4 @@ export {
   MyChecklistRequestAbortedError,
 } from "./repository/myChecklistQueryRepository";
 export type { MyChecklistQueryRepository } from "./repository/myChecklistQueryRepository";
+export type { ChecklistAppointmentCreationInput } from "./useChecklistAppointmentCreation";

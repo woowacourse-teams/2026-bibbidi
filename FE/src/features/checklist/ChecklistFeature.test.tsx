@@ -74,6 +74,7 @@ import {
   CustomChecklistItemCreationError,
 } from "./repository/myChecklistCommandRepository";
 import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
+import { ChecklistAppointmentCreationInput } from "./useChecklistAppointmentCreation";
 
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
   return {
@@ -139,19 +140,33 @@ function RouterControls() {
 
 function ChecklistFeatureTestApp({
   initialEntries = ["/checklist"],
+  onSubmitAppointment,
 }: {
   initialEntries?: string[];
+  onSubmitAppointment?: (
+    input: ChecklistAppointmentCreationInput,
+  ) => Promise<boolean | void> | boolean | void;
 }) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
-      <ChecklistFeature />
+      <ChecklistFeature onSubmitAppointment={onSubmitAppointment} />
       <RouterControls />
     </MemoryRouter>
   );
 }
 
-function renderChecklistFeature(initialEntries?: string[]) {
-  return render(<ChecklistFeatureTestApp initialEntries={initialEntries} />);
+function renderChecklistFeature(
+  initialEntries?: string[],
+  onSubmitAppointment?: (
+    input: ChecklistAppointmentCreationInput,
+  ) => Promise<boolean | void> | boolean | void,
+) {
+  return render(
+    <ChecklistFeatureTestApp
+      initialEntries={initialEntries}
+      onSubmitAppointment={onSubmitAppointment}
+    />,
+  );
 }
 
 function getCurrentUrl() {
@@ -473,7 +488,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
   });
 
-  it("로그인 사용자도 같은 일정 추가 진입점을 사용하되 후속 입력 UI와 API는 실행하지 않는다", async () => {
+  it("로그인 사용자는 같은 일정 추가 진입점에서 데스크톱 입력 패널을 연다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { nickname: "bibbidi" },
@@ -491,6 +506,13 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     );
 
     expect(screen.queryByRole("dialog")).toBeNull();
+    const creationPanel = screen.getByRole("complementary", {
+      name: "일정 추가",
+    });
+    expect(within(creationPanel).getByRole("textbox", { name: /제목/ })).toBe(
+      document.activeElement,
+    );
+    expect(within(creationPanel).getByText("청첩장 문구 정하기")).toBeTruthy();
     expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
     expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
@@ -498,6 +520,324 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.changeItemStatus).not.toHaveBeenCalled();
     expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
     expect(repositoryMocks.hasRemainingAppointments).not.toHaveBeenCalled();
+  });
+
+  it("검증을 통과한 일정 값을 로컬 날짜·시간 문자열로 submit 경계에 전달한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    const onSubmitAppointment = vi.fn().mockResolvedValue(true);
+    renderChecklistFeature(
+      ["/checklist?taskId=checklist-item-500"],
+      onSubmitAppointment,
+    );
+
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    const addScheduleButton = within(detailPanel).getByRole("button", {
+      name: "일정 추가",
+    });
+    fireEvent.click(addScheduleButton);
+
+    const creationPanel = screen.getByRole("complementary", {
+      name: "일정 추가",
+    });
+    fireEvent.change(within(creationPanel).getByLabelText(/제목/), {
+      target: { value: " 웨딩홀 상담 " },
+    });
+    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
+      target: { value: "2026-09-01" },
+    });
+    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
+      target: { value: "10:00" },
+    });
+    fireEvent.change(within(creationPanel).getByLabelText("종료 시간"), {
+      target: { value: "11:30" },
+    });
+    fireEvent.change(within(creationPanel).getByLabelText(/장소/), {
+      target: { value: " 웨딩홀 " },
+    });
+    fireEvent.change(within(creationPanel).getByLabelText("메모"), {
+      target: { value: " 견적서 지참 " },
+    });
+    fireEvent.click(
+      within(creationPanel).getByRole("button", { name: "저장" }),
+    );
+
+    await waitFor(() =>
+      expect(onSubmitAppointment).toHaveBeenCalledWith({
+        checklistItemId: 500,
+        date: "2026-09-01",
+        endTime: "2026-09-01T11:30:00",
+        memo: "견적서 지참",
+        place: "웨딩홀",
+        startTime: "2026-09-01T10:00:00",
+        title: "웨딩홀 상담",
+      }),
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "일정 추가" }),
+    ).toBeNull();
+    const restoredDetail = screen.getByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    await waitFor(() =>
+      expect(
+        within(restoredDetail).getByRole("button", { name: "일정 추가" }),
+      ).toBe(document.activeElement),
+    );
+    expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
+  });
+
+  it("일정 입력 오류를 각 필드에 연결하고 첫 오류 입력으로 초점을 이동한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPanel).getByRole("button", { name: "일정 추가" }),
+    );
+    const creationPanel = screen.getByRole("complementary", {
+      name: "일정 추가",
+    });
+    const titleInput = within(creationPanel).getByRole("textbox", {
+      name: /제목/,
+    });
+    const dateInput = within(creationPanel).getByLabelText(/날짜/);
+    fireEvent.click(
+      within(creationPanel).getByRole("button", { name: "저장" }),
+    );
+
+    const titleError =
+      within(creationPanel).getByText("일정 제목을 입력해 주세요.");
+    const dateError = within(creationPanel).getByText("날짜를 선택해 주세요.");
+    expect(titleInput.getAttribute("aria-invalid")).toBe("true");
+    expect(titleInput.getAttribute("aria-describedby")).toBe(titleError.id);
+    expect(dateInput.getAttribute("aria-invalid")).toBe("true");
+    expect(dateInput.getAttribute("aria-describedby")).toBe(dateError.id);
+    expect(document.activeElement).toBe(titleInput);
+
+    fireEvent.change(titleInput, { target: { value: "상담" } });
+    fireEvent.change(dateInput, { target: { value: "2026-09-01" } });
+    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
+      target: { value: "18:00" },
+    });
+    const endTimeInput = within(creationPanel).getByLabelText("종료 시간");
+    fireEvent.change(endTimeInput, { target: { value: "17:00" } });
+    fireEvent.click(
+      within(creationPanel).getByRole("button", { name: "저장" }),
+    );
+
+    const timeError = within(creationPanel).getByText(
+      "종료 시간은 시작 시간보다 빠를 수 없어요.",
+    );
+    expect(endTimeInput.getAttribute("aria-describedby")).toBe(timeError.id);
+    await waitFor(() => expect(document.activeElement).toBe(endTimeInput));
+  });
+
+  it("제출 중 상태를 입력 View에 전달해 취소와 중복 저장을 막는다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    let resolveSubmission: ((result: boolean) => void) | undefined;
+    const onSubmitAppointment = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSubmission = resolve;
+        }),
+    );
+    renderChecklistFeature(
+      ["/checklist?taskId=checklist-item-500"],
+      onSubmitAppointment,
+    );
+
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPanel).getByRole("button", { name: "일정 추가" }),
+    );
+    const creationPanel = screen.getByRole("complementary", {
+      name: "일정 추가",
+    });
+    fireEvent.change(
+      within(creationPanel).getByRole("textbox", { name: /제목/ }),
+      {
+        target: { value: "상담" },
+      },
+    );
+    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
+      target: { value: "2026-09-01" },
+    });
+    fireEvent.click(
+      within(creationPanel).getByRole("button", { name: "저장" }),
+    );
+
+    const submittingButton = await within(creationPanel).findByRole("button", {
+      name: "저장 중",
+    });
+    const cancelButton = within(creationPanel).getByRole("button", {
+      name: "취소",
+    });
+    expect((submittingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(submittingButton.getAttribute("aria-busy")).toBe("true");
+    expect((cancelButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(submittingButton);
+    fireEvent.click(cancelButton);
+    expect(onSubmitAppointment).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("complementary", { name: "일정 추가" }),
+    ).toBeTruthy();
+
+    await act(async () => resolveSubmission?.(true));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "일정 추가" }),
+      ).toBeNull(),
+    );
+  });
+
+  it("일정 입력 취소 시 draft를 버리고 진입점으로 초점을 복원한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPanel).getByRole("button", { name: "일정 추가" }),
+    );
+    fireEvent.change(screen.getByLabelText(/제목/), {
+      target: { value: "버릴 일정" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    const restoredButton = screen.getByRole("button", { name: "일정 추가" });
+    await waitFor(() => expect(restoredButton).toBe(document.activeElement));
+    fireEvent.click(restoredButton);
+    expect(
+      (screen.getByRole("textbox", { name: /제목/ }) as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("일정 입력 중 다른 할 일을 선택하면 새 선택 항목의 초점을 유지하고 draft를 버린다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    const checklist = createAuthenticatedChecklist();
+    checklist.categories[0].items.push({
+      appointments: [],
+      categoryId: "10",
+      checklistItemId: 501,
+      id: "checklist-item-501",
+      sourceCatalogItemId: 101,
+      status: "prev",
+      title: "예식장 상담하기",
+    });
+    repositoryMocks.getChecklist.mockResolvedValue(checklist);
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    const firstDetailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(firstDetailPanel).getByRole("button", { name: "일정 추가" }),
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: /제목/ }), {
+      target: { value: "다른 할 일에 노출되면 안 되는 일정" },
+    });
+
+    const nextTaskButton = screen.getByRole("button", {
+      name: /예식장 상담하기/,
+    });
+    nextTaskButton.focus();
+    fireEvent.click(nextTaskButton);
+
+    expect(
+      await screen.findByRole("complementary", { name: "예식장 상담하기" }),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(nextTaskButton);
+    expect(
+      screen.queryByRole("complementary", { name: "일정 추가" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "일정 추가" }));
+    expect(
+      (screen.getByRole("textbox", { name: /제목/ }) as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("로그인 모바일 상세에서 일정 입력을 열고 Escape로 닫아 초점을 복원한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    const detailPage = await screen.findByRole("region", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPage).getByRole("button", { name: "일정 추가" }),
+    );
+
+    const creationDialog = screen.getByRole("dialog", { name: "일정 추가" });
+    expect(within(creationDialog).getByRole("textbox", { name: /제목/ })).toBe(
+      document.activeElement,
+    );
+    const backButton = within(creationDialog).getByRole("button", {
+      name: "할 일 상세로 돌아가기",
+    });
+    const saveButton = within(creationDialog).getByRole("button", {
+      name: "저장",
+    });
+    backButton.focus();
+    fireEvent.keyDown(backButton, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(saveButton);
+    fireEvent.keyDown(saveButton, { key: "Tab" });
+    expect(document.activeElement).toBe(backButton);
+    within(creationDialog).getByRole("textbox", { name: /제목/ }).focus();
+    fireEvent.keyDown(document.activeElement ?? creationDialog, {
+      key: "Escape",
+    });
+
+    expect(screen.queryByRole("dialog", { name: "일정 추가" })).toBeNull();
+    const restoredPage = screen.getByRole("region", {
+      name: "청첩장 문구 정하기",
+    });
+    await waitFor(() =>
+      expect(
+        within(restoredPage).getByRole("button", { name: "일정 추가" }),
+      ).toBe(document.activeElement),
+    );
   });
 
   it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {

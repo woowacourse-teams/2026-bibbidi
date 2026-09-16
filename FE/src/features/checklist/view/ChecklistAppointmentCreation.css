@@ -1,0 +1,219 @@
+.checklist-appointment-creation {
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+}
+
+.checklist-appointment-creation--desktop {
+  position: sticky;
+  top: 0;
+  height: calc(100dvh - 96px);
+  overflow: hidden;
+  border-left: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.checklist-appointment-creation__form {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.checklist-appointment-creation__header {
+  display: flex;
+  min-height: 72px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.checklist-appointment-creation__header > span:first-of-type {
+  min-width: 0;
+}
+
+.checklist-appointment-creation__header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.checklist-appointment-creation__header small {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist-appointment-creation__header > button,
+.checklist-appointment-creation__header > span[aria-hidden="true"] {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 28px;
+  place-items: center;
+}
+
+.checklist-appointment-creation__header svg {
+  width: 24px;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.checklist-appointment-creation__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.checklist-appointment-creation__field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklist-appointment-creation__field-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checklist-appointment-creation__field label,
+.checklist-appointment-creation__field-header label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.checklist-appointment-creation__field-header span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+}
+
+.checklist-appointment-creation em {
+  color: var(--color-fg-critical);
+  font-style: normal;
+}
+
+.checklist-appointment-creation input,
+.checklist-appointment-creation textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 10px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  font: inherit;
+}
+
+.checklist-appointment-creation textarea {
+  min-height: 104px;
+  padding-block: 12px;
+  resize: vertical;
+}
+
+.checklist-appointment-creation__time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.checklist-appointment-creation [aria-invalid="true"] {
+  border-color: var(--color-stroke-critical-solid);
+}
+
+.checklist-appointment-creation__field p,
+.checklist-appointment-creation__feedback {
+  margin: 0;
+  color: var(--color-fg-critical);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.checklist-appointment-creation__footer {
+  display: grid;
+  min-height: 88px;
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.checklist-appointment-creation__footer button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.checklist-appointment-creation__footer button:last-child {
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+
+.checklist-appointment-creation button:focus-visible,
+.checklist-appointment-creation input:focus-visible,
+.checklist-appointment-creation textarea:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.checklist-appointment-creation button:disabled,
+.checklist-appointment-creation input:disabled,
+.checklist-appointment-creation textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 760px) {
+  .checklist-appointment-creation--mobile {
+    position: fixed;
+    z-index: 60;
+    inset: 0;
+    height: 100dvh;
+  }
+
+  .checklist-appointment-creation__header {
+    min-height: calc(64px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 8px 0;
+  }
+
+  .checklist-appointment-creation__header > span:first-of-type {
+    text-align: center;
+  }
+
+  .checklist-appointment-creation__header h2 {
+    font-size: 17px;
+  }
+
+  .checklist-appointment-creation__body {
+    padding: 24px 16px;
+    overscroll-behavior-y: contain;
+  }
+
+  .checklist-appointment-creation__footer {
+    min-height: calc(84px + env(safe-area-inset-bottom));
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+}
