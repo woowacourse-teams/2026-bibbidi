@@ -9,13 +9,14 @@ describe("AppHeaderSummaryModel", () => {
   it("체크리스트의 완료 항목 수와 전체 항목 수를 계산한다", () => {
     expect(
       createAppHeaderSummaryModel([
-        { isDone: true },
-        { isDone: false },
-        { isDone: true },
+        { status: "done" },
+        { status: "continue" },
+        { status: "prev" },
+        { status: "done" },
       ]),
     ).toEqual({
       completedTaskCount: 2,
-      totalTaskCount: 3,
+      totalTaskCount: 4,
       weddingDate: { status: "unset" },
     });
   });

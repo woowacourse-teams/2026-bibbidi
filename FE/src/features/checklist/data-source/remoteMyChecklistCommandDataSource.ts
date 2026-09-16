@@ -1,3 +1,8 @@
+import {
+  ChecklistItemStatus,
+  isChecklistItemStatus,
+} from "../model/myChecklist";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
 const CUSTOM_CHECKLIST_ITEM_ENDPOINT = `${CHECKLIST_ENDPOINT}/me/items`;
@@ -32,7 +37,7 @@ export interface ChecklistItemChangeResponse {
   catalogItemId: number | null;
   categoryId: number;
   id: number;
-  status: "continue" | "done" | "prev";
+  status: ChecklistItemStatus;
   title: string;
 }
 
@@ -185,9 +190,7 @@ function isChecklistItemChangeResponse(
     (value.catalogItemId === null || isValidChecklistId(value.catalogItemId)) &&
     isValidChecklistId(value.categoryId) &&
     typeof value.title === "string" &&
-    (value.status === "prev" ||
-      value.status === "continue" ||
-      value.status === "done")
+    isChecklistItemStatus(value.status)
   );
 }
 

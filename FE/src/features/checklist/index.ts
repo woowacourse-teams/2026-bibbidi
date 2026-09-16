@@ -13,6 +13,7 @@ export type {
   ChecklistQueryModel,
 } from "./model/checklistQuery";
 export type {
+  ChecklistItemStatus,
   MyChecklistAppointmentModel,
   MyChecklistItemModel,
   MyChecklistModel,

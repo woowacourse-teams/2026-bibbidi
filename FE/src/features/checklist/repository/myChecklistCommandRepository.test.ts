@@ -283,8 +283,8 @@ describe("MyChecklistCommandRepository", () => {
         appointments: [],
         categoryId: 2,
         id: 501,
-        isDone: true,
         sourceCatalogItemId: null,
+        status: "done",
         title: "청첩장 문구 정하기",
       },
     ]);

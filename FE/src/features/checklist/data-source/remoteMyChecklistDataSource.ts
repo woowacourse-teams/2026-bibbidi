@@ -1,4 +1,5 @@
 import {
+  isChecklistItemStatus,
   MyChecklistAppointmentModel,
   MyChecklistModel,
 } from "../model/myChecklist";
@@ -170,7 +171,7 @@ export function parseMyChecklist(value: unknown): MyChecklistModel {
         !isValidId(item.id) ||
         !isValidId(item.categoryId) ||
         typeof item.title !== "string" ||
-        typeof item.isDone !== "boolean" ||
+        !isChecklistItemStatus(item.status) ||
         !Array.isArray(item.appointments) ||
         (!("sourceCatalogItemId" in item) && !("catalogItemId" in item))
       ) {
@@ -181,8 +182,8 @@ export function parseMyChecklist(value: unknown): MyChecklistModel {
         appointments: item.appointments.map(parseAppointment),
         categoryId: item.categoryId,
         id: item.id,
-        isDone: item.isDone,
         sourceCatalogItemId: parseSourceCatalogItemId(item),
+        status: item.status,
         title: item.title,
       };
     }),
