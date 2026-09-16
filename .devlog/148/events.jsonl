@@ -30,3 +30,4 @@
 {"type":"TURN_FINISHED","turnId":"9","diff":"turn-009.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-16T08:03:15.285Z"}
 {"type":"USER_PROMPTED","issue":148,"turnId":"10","prompt":"리뷰 요청에 대한 내용은 빼도 돼","redacted":false,"timestamp":"2026-09-16T08:03:37.654Z"}
 {"type":"PR_PLANNED","issue":148,"summary":["`GET /api/checklists/me` 응답에서 할 일의 `isDone`을 `status`(`prev` / `continue` / `done`)로 바꿨다. 일정의 `isDone`은 그대로다."],"review":[],"timestamp":"2026-09-16T08:03:40.966Z"}
+{"type":"PR_REQUESTED","issue":148,"timestamp":"2026-09-16T08:03:59.431Z"}
