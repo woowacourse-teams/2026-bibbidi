@@ -51,15 +51,14 @@ export function RecommendedSchedule({ viewModel }: RecommendedScheduleProps) {
 
       <ul className="recommended-schedule__list">
         {viewModel.items.map((item) => (
-          <li className="recommended-schedule-card" key={item.id}>
+          <li className="recommended-schedule-card" key={item.catalogItemId}>
             <div className="recommended-schedule-card__top">
               <span>{item.categoryLabel}</span>
-              <span>{item.recommendedTimingLabel}</span>
             </div>
 
             <div className="recommended-schedule-card__body">
               <h3>{item.title}</h3>
-              <p>{item.reason}</p>
+              <p>{item.stepName}</p>
             </div>
 
             <button

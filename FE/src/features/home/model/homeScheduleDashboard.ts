@@ -1,4 +1,4 @@
-import { RecommendedScheduleListModel } from "./recommendedSchedule";
+import { RecommendedCatalogItemListModel } from "./recommendedCatalogItem";
 import { UnscheduledTaskListModel } from "./unscheduledTask";
 import { UpcomingScheduleListModel } from "./upcomingSchedule";
 
@@ -37,7 +37,7 @@ export type HomeScheduleDashboardUnscheduledModel =
   | HomeScheduleDashboardUnscheduledCompleteModel;
 
 export interface HomeScheduleDashboardRecommendedCompleteModel {
-  schedules: RecommendedScheduleListModel;
+  recommendedItems: RecommendedCatalogItemListModel;
   status: "complete";
 }
 

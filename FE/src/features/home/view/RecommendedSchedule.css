@@ -90,10 +90,6 @@
   white-space: nowrap;
 }
 
-.recommended-schedule-card__top span:last-child {
-  flex: none;
-}
-
 .recommended-schedule-card__body {
   min-width: 0;
 }
