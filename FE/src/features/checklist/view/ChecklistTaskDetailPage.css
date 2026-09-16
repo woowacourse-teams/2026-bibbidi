@@ -36,6 +36,10 @@
   white-space: nowrap;
 }
 
+.checklist-detail-page__header .checklist-title-editor h2 {
+  text-align: center;
+}
+
 .checklist-detail-page__back {
   display: grid;
   width: 44px;

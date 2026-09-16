@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
 import {
+  useChecklistCommandRepository,
   useChecklistQueryRepository,
   useChecklistRevision,
 } from "./checklistQueryDependencies";
@@ -13,6 +14,7 @@ import {
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
+import { useChecklistItemEditing } from "./useChecklistItemEditing";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
 import { ChecklistTaskDetailPageShell } from "./view/ChecklistTaskDetailPage";
@@ -62,8 +64,20 @@ function createChecklistDetailState(state: unknown, depth: number) {
 
 export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
+  const audience: ChecklistAudience | undefined =
+    authState.status === "authenticated"
+      ? "authenticated"
+      : authState.status === "guest"
+        ? "guest"
+        : undefined;
   const checklistRepository = useChecklistQueryRepository();
+  const checklistCommandRepository = useChecklistCommandRepository();
   const checklistRevision = useChecklistRevision();
+  const itemEditing = useChecklistItemEditing(
+    checklistCommandRepository,
+    refreshAuth,
+    audience,
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,12 +87,6 @@ export function ChecklistFeature() {
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const isMobileLayout = useIsMobileLayout();
-  const audience: ChecklistAudience | undefined =
-    authState.status === "authenticated"
-      ? "authenticated"
-      : authState.status === "guest"
-        ? "guest"
-        : undefined;
 
   useEffect(() => {
     if (!audience) {
@@ -302,6 +310,7 @@ export function ChecklistFeature() {
   return (
     <Checklist
       categories={createChecklistViewModel(requestState.checklist)}
+      itemEditing={audience === "authenticated" ? itemEditing : undefined}
       onBackTaskDetail={backFromTaskDetail}
       onCloseTaskDetail={closeTaskDetail}
       onSelectTask={selectTask}

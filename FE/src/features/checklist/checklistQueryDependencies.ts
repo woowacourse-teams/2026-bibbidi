@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { catalogRepository } from "../catalog";
 import {
+  useMyChecklistCommandRepository,
   useMyChecklistQueryRepository,
   useMyChecklistRevision,
 } from "./MyChecklistProvider";
@@ -24,4 +25,8 @@ export function useChecklistQueryRepository() {
 
 export function useChecklistRevision() {
   return useMyChecklistRevision();
+}
+
+export function useChecklistCommandRepository() {
+  return useMyChecklistCommandRepository();
 }

@@ -22,10 +22,17 @@ const authMocks = vi.hoisted(() => ({
   refreshAuth: vi.fn(),
 }));
 const repositoryMocks = vi.hoisted(() => {
+  const changeItemTitle = vi.fn();
   const getChecklist = vi.fn();
 
   return {
+    changeItemTitle,
     checklistRevision: 0,
+    command: {
+      changeItemTitle,
+      ensureChecklist: vi.fn(),
+      reconcileMissingChecklist: vi.fn(),
+    },
     current: { getChecklist },
     getChecklist,
   };
@@ -38,6 +45,7 @@ vi.mock("../auth", () => ({
   }),
 }));
 vi.mock("./checklistQueryDependencies", () => ({
+  useChecklistCommandRepository: () => repositoryMocks.command,
   useChecklistQueryRepository: () => repositoryMocks.current,
   useChecklistRevision: () => repositoryMocks.checklistRevision,
 }));
@@ -49,6 +57,7 @@ import {
   ChecklistQueryLoadError,
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
+import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
 
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
   return {
@@ -69,6 +78,29 @@ function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQuer
         ],
         title: "첫 번째 카테고리",
       },
+    ],
+  };
+}
+
+function createAuthenticatedChecklist(): ChecklistQueryModel {
+  return {
+    categories: [
+      {
+        id: "10",
+        items: [
+          {
+            appointments: [],
+            categoryId: "10",
+            checklistItemId: 500,
+            id: "checklist-item-500",
+            isDone: false,
+            sourceCatalogItemId: null,
+            title: "청첩장 문구 정하기",
+          },
+        ],
+        title: "예식 준비",
+      },
+      { id: "20", items: [], title: "예복 준비" },
     ],
   };
 }
@@ -113,6 +145,8 @@ function getCurrentUrl() {
 beforeEach(() => {
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
+  repositoryMocks.changeItemTitle.mockReset();
+  repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.checklistRevision = 0;
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
@@ -160,6 +194,22 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       "guest",
       expect.any(AbortSignal),
     );
+  });
+
+  it("비로그인 상태에서는 서버 항목 형태가 들어와도 제목 편집을 노출하지 않는다", async () => {
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    expect(
+      await screen.findByRole("complementary", {
+        name: "청첩장 문구 정하기",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "할 일 제목 수정" }),
+    ).toBeNull();
   });
 
   it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
@@ -729,6 +779,81 @@ describe("ChecklistFeature 기존 UI", () => {
     expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
     expect(
       screen.getByRole("list", { name: "첫 번째 카테고리 할 일" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("ChecklistFeature 할 일 편집 조정", () => {
+  beforeEach(() => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+  });
+
+  it("제목 변경을 Command Repository에 위임하고 URL과 공통 GET을 유지한다", async () => {
+    renderChecklistFeature([
+      "/checklist?filter=remaining&taskId=checklist-item-500",
+    ]);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+    );
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+    fireEvent.change(input, { target: { value: "  청첩장 문구 확정  " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(repositoryMocks.changeItemTitle).toHaveBeenCalledWith(
+        500,
+        "청첩장 문구 확정",
+        expect.any(AbortSignal),
+      ),
+    );
+
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=checklist-item-500",
+    );
+  });
+
+  it("수정 인증 오류의 재확인 흐름이 끝난 뒤에도 상세과 draft를 유지한다", async () => {
+    repositoryMocks.changeItemTitle.mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    const view = renderChecklistFeature([
+      "/checklist?taskId=checklist-item-500",
+    ]);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+    );
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+    fireEvent.change(input, { target: { value: "로그인 만료 후 유지" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
+    authMocks.authState = { status: "loading" };
+    view.rerender(<ChecklistFeatureTestApp />);
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    view.rerender(<ChecklistFeatureTestApp />);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "로그인이 필요합니다.",
+    );
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe(
+      "로그인 만료 후 유지",
+    );
+    expect(
+      screen.getByRole("complementary", { name: /제목 수정/ }),
     ).toBeTruthy();
   });
 });

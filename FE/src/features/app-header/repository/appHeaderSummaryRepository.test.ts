@@ -15,6 +15,7 @@ import {
 function createChecklistRepository(): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyItemTitleUpdate: vi.fn(),
     getChecklist: vi.fn(),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),

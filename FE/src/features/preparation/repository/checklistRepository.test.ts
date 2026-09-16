@@ -42,6 +42,7 @@ function createRemoteDataSource(catalogItemIds: number[] = []) {
 
 function createCommandRepository(): MyChecklistCommandRepository {
   return {
+    changeItemTitle: vi.fn().mockResolvedValue(undefined),
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
     reconcileMissingChecklist: vi.fn().mockResolvedValue(undefined),
   };
@@ -53,6 +54,7 @@ function createQueryRepository(
 ): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyItemTitleUpdate: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue({
       exists,
       items: catalogItemIds.map((sourceCatalogItemId, index) => ({
