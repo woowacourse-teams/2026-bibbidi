@@ -23,24 +23,30 @@ const authMocks = vi.hoisted(() => ({
 }));
 const repositoryMocks = vi.hoisted(() => {
   const changeItemCategory = vi.fn();
+  const changeItemStatus = vi.fn();
   const changeItemTitle = vi.fn();
   const createCustomItem = vi.fn();
   const getChecklist = vi.fn();
+  const hasRemainingAppointments = vi.fn();
 
   return {
     changeItemCategory,
+    changeItemStatus,
     changeItemTitle,
     createCustomItem,
     checklistRevision: 0,
     command: {
       changeItemCategory,
+      changeItemStatus,
       changeItemTitle,
       createCustomItem,
       ensureChecklist: vi.fn(),
+      hasRemainingAppointments,
       reconcileMissingChecklist: vi.fn(),
     },
     current: { getChecklist },
     getChecklist,
+    hasRemainingAppointments,
   };
 });
 
@@ -63,7 +69,10 @@ import {
   ChecklistQueryLoadError,
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
-import { CustomChecklistItemCreationError } from "./repository/myChecklistCommandRepository";
+import {
+  ChecklistItemChangeError,
+  CustomChecklistItemCreationError,
+} from "./repository/myChecklistCommandRepository";
 import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
 
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
@@ -154,6 +163,8 @@ beforeEach(() => {
   authMocks.refreshAuth.mockReset();
   repositoryMocks.changeItemCategory.mockReset();
   repositoryMocks.changeItemCategory.mockResolvedValue(undefined);
+  repositoryMocks.changeItemStatus.mockReset();
+  repositoryMocks.changeItemStatus.mockResolvedValue(undefined);
   repositoryMocks.changeItemTitle.mockReset();
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.createCustomItem.mockReset();
@@ -161,6 +172,8 @@ beforeEach(() => {
   repositoryMocks.checklistRevision = 0;
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
+  repositoryMocks.hasRemainingAppointments.mockReset();
+  repositoryMocks.hasRemainingAppointments.mockResolvedValue(false);
   repositoryMocks.current = { getChecklist: repositoryMocks.getChecklist };
 });
 
@@ -1201,6 +1214,41 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     expect(getCurrentUrl()).toBe(
       "/checklist?filter=remaining&taskId=checklist-item-500",
     );
+  });
+
+  it("상태 변경 후 재조회만 실패하면 부분 성공을 안내하고 다시 조회한다", async () => {
+    repositoryMocks.hasRemainingAppointments.mockResolvedValue(true);
+    repositoryMocks.changeItemStatus.mockRejectedValue(
+      new ChecklistItemChangeError(
+        "refresh-failed",
+        "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+      ),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "상태 변경, 현재 미완료",
+      }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
+
+    expect(
+      await screen.findByText(
+        "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findAllByText("청첩장 문구 정하기")).toHaveLength(2);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
+    expect(repositoryMocks.changeItemStatus).toHaveBeenCalledOnce();
   });
 
   it("수정 인증 오류의 재확인 흐름이 끝난 뒤에도 상세과 draft를 유지한다", async () => {

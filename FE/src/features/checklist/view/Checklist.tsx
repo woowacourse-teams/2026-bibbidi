@@ -75,6 +75,26 @@ export function Checklist({
     (task) => task.status === "complete",
   ).length;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
+  const pendingStatusConfirmation = itemEditing?.statusConfirmation ?? null;
+  const statusConfirmation =
+    pendingStatusConfirmation?.itemId ===
+    selectedTaskContext?.task.checklistItemId
+      ? pendingStatusConfirmation
+      : null;
+  const isStatusConfirmationOpen = statusConfirmation !== null;
+  const statusFeedback = itemEditing?.changeFeedback;
+  const isStatusChangePending =
+    statusConfirmation !== null &&
+    statusFeedback?.status === "pending" &&
+    statusFeedback.itemId === statusConfirmation.itemId &&
+    statusFeedback.kind === "status";
+  const statusConfirmationError =
+    statusConfirmation !== null &&
+    statusFeedback?.status === "error" &&
+    statusFeedback.itemId === statusConfirmation.itemId &&
+    statusFeedback.kind === "status"
+      ? statusFeedback.errorMessage
+      : undefined;
 
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
@@ -172,10 +192,20 @@ export function Checklist({
     >
       <div
         aria-hidden={
-          isMobileForegroundOpen || isLoginRequiredOpen ? true : undefined
+          isMobileForegroundOpen ||
+          isLoginRequiredOpen ||
+          isStatusConfirmationOpen
+            ? true
+            : undefined
         }
         className="checklist-workspace__main"
-        inert={isMobileForegroundOpen || isLoginRequiredOpen ? true : undefined}
+        inert={
+          isMobileForegroundOpen ||
+          isLoginRequiredOpen ||
+          isStatusConfirmationOpen
+            ? true
+            : undefined
+        }
       >
         <div aria-label="결혼 준비 체크리스트" className="checklist">
           <header className="checklist__toolbar">
@@ -322,9 +352,13 @@ export function Checklist({
       </div>
 
       <div
-        aria-hidden={isLoginRequiredOpen ? true : undefined}
+        aria-hidden={
+          isLoginRequiredOpen || isStatusConfirmationOpen ? true : undefined
+        }
         className="checklist-workspace__foreground"
-        inert={isLoginRequiredOpen ? true : undefined}
+        inert={
+          isLoginRequiredOpen || isStatusConfirmationOpen ? true : undefined
+        }
       >
         {selectedTaskContext && !isMobileLayout && !isTaskCreationOpen ? (
           <ChecklistTaskDetailPanel
@@ -379,6 +413,49 @@ export function Checklist({
           }
           onEscape={onCancelLoginRequired}
           title="로그인이 필요해요"
+        />
+      ) : null}
+
+      {statusConfirmation ? (
+        <ChecklistModalDialog
+          actions={
+            <>
+              <button
+                disabled={isStatusChangePending}
+                onClick={() =>
+                  itemEditing?.cancelStatusChange(statusConfirmation.itemId)
+                }
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                disabled={isStatusChangePending}
+                onClick={() =>
+                  void itemEditing?.confirmStatusChange(
+                    statusConfirmation.itemId,
+                  )
+                }
+                type="button"
+              >
+                {isStatusChangePending ? "변경 중" : "함께 완료"}
+              </button>
+            </>
+          }
+          description={
+            <>
+              이 할 일을 완료하면 아직 남아 있는 일정도 함께 완료돼요.
+              {statusConfirmationError ? (
+                <p role="alert">{statusConfirmationError}</p>
+              ) : null}
+            </>
+          }
+          onEscape={() => {
+            if (!isStatusChangePending) {
+              itemEditing?.cancelStatusChange(statusConfirmation.itemId);
+            }
+          }}
+          title="남은 일정도 완료할까요?"
         />
       ) : null}
     </div>

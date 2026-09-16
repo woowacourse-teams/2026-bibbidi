@@ -11,6 +11,9 @@ import {
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationNetworkError,
   RemoteMyChecklistCreationRequestAbortedError,
+  RemoteRemainingAppointmentsApiError,
+  RemoteRemainingAppointmentsNetworkError,
+  RemoteRemainingAppointmentsRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
 import {
   ChecklistItemChangeError,
@@ -20,6 +23,7 @@ import {
 } from "./myChecklistCommandRepository";
 import {
   MyChecklistAuthenticationRequiredError,
+  MyChecklistLoadError,
   MyChecklistQueryRepository,
   MyChecklistRequestAbortedError,
 } from "./myChecklistQueryRepository";
@@ -27,9 +31,11 @@ import {
 function createDataSource(): RemoteMyChecklistCommandDataSource {
   return {
     changeChecklistItemCategory: vi.fn(),
+    changeChecklistItemStatus: vi.fn(),
     changeChecklistItemTitle: vi.fn(),
     createChecklist: vi.fn().mockResolvedValue(1),
     createCustomChecklistItem: vi.fn(),
+    hasRemainingAppointments: vi.fn(),
   };
 }
 
@@ -41,11 +47,122 @@ function createQueryRepository(exists = true): MyChecklistQueryRepository {
     getChecklist: vi.fn().mockResolvedValue({ exists, items: [] }),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    refresh: vi.fn().mockResolvedValue({ exists, items: [] }),
     subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
 
 describe("MyChecklistCommandRepository", () => {
+  it.each(["prev", "continue", "done"] as const)(
+    "상태 %s 변경 성공 후 일정까지 포함한 정규 체크리스트를 재조회한다",
+    async (status) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.changeChecklistItemStatus).mockResolvedValue({
+        catalogItemId: null,
+        categoryId: 2,
+        id: 500,
+        status,
+        title: "청첩장 문구 정하기",
+      });
+      const queryRepository = createQueryRepository();
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        queryRepository,
+      );
+
+      await repository.changeItemStatus(500, status);
+
+      expect(dataSource.changeChecklistItemStatus).toHaveBeenCalledWith(
+        500,
+        status,
+        undefined,
+      );
+      expect(queryRepository.refresh).toHaveBeenCalledOnce();
+      expect(queryRepository.applyItemCategoryUpdate).not.toHaveBeenCalled();
+      expect(queryRepository.applyItemTitleUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("PUT 성공 후 정규 재조회 실패를 부분 성공 오류로 구분한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeChecklistItemStatus).mockResolvedValue({
+      catalogItemId: null,
+      categoryId: 2,
+      id: 500,
+      status: "done",
+      title: "청첩장 문구 정하기",
+    });
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.refresh).mockRejectedValue(
+      new MyChecklistLoadError(),
+    );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.changeItemStatus(500, "done"),
+    ).rejects.toMatchObject({
+      reason: "refresh-failed",
+      message:
+        "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+    });
+  });
+
+  it.each([true, false])(
+    "남은 일정 존재 여부 %s를 명시적으로 전달한다",
+    async (hasRemainingAppointments) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.hasRemainingAppointments).mockResolvedValue(
+        hasRemainingAppointments,
+      );
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        createQueryRepository(),
+      );
+
+      await expect(repository.hasRemainingAppointments(500)).resolves.toBe(
+        hasRemainingAppointments,
+      );
+    },
+  );
+
+  it("남은 일정 인증·권한·취소·네트워크 오류를 도메인 오류로 변환한다", async () => {
+    const dataSource = createDataSource();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    vi.mocked(dataSource.hasRemainingAppointments).mockRejectedValueOnce(
+      new RemoteRemainingAppointmentsApiError(201, 401),
+    );
+    await expect(
+      repository.hasRemainingAppointments(500),
+    ).rejects.toBeInstanceOf(MyChecklistAuthenticationRequiredError);
+
+    vi.mocked(dataSource.hasRemainingAppointments).mockRejectedValueOnce(
+      new RemoteRemainingAppointmentsApiError(203, 403, "권한 없음"),
+    );
+    await expect(
+      repository.hasRemainingAppointments(500),
+    ).rejects.toMatchObject({ reason: "forbidden" });
+
+    vi.mocked(dataSource.hasRemainingAppointments).mockRejectedValueOnce(
+      new RemoteRemainingAppointmentsRequestAbortedError(),
+    );
+    await expect(
+      repository.hasRemainingAppointments(500),
+    ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
+
+    vi.mocked(dataSource.hasRemainingAppointments).mockRejectedValueOnce(
+      new RemoteRemainingAppointmentsNetworkError(),
+    );
+    await expect(
+      repository.hasRemainingAppointments(500),
+    ).rejects.toMatchObject({ reason: "unknown" });
+  });
   it("카테고리를 변경하고 성공 응답의 categoryId만 공통 캐시에 반영한다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.changeChecklistItemCategory).mockResolvedValue({

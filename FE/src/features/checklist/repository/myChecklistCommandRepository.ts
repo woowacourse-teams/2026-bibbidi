@@ -4,12 +4,17 @@ import {
   RemoteMyChecklistCommandDataSource,
   RemoteChecklistItemChangeApiError,
   RemoteChecklistItemChangeRequestAbortedError,
+  RemoteRemainingAppointmentsApiError,
+  RemoteRemainingAppointmentsRequestAbortedError,
   RemoteCustomChecklistItemCreationApiError,
   RemoteCustomChecklistItemCreationRequestAbortedError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
-import { MyChecklistItemModel } from "../model/myChecklist";
+import {
+  ChecklistItemStatus,
+  MyChecklistItemModel,
+} from "../model/myChecklist";
 import {
   MyChecklistAuthenticationRequiredError,
   MyChecklistQueryRepository,
@@ -27,12 +32,21 @@ export interface MyChecklistCommandRepository {
     title: string,
     signal?: AbortSignal,
   ): Promise<void>;
+  changeItemStatus(
+    itemId: number,
+    status: ChecklistItemStatus,
+    signal?: AbortSignal,
+  ): Promise<void>;
   createCustomItem(
     title: string,
     categoryId: string,
     signal?: AbortSignal,
   ): Promise<void>;
   ensureChecklist(signal?: AbortSignal): Promise<void>;
+  hasRemainingAppointments(
+    itemId: number,
+    signal?: AbortSignal,
+  ): Promise<boolean>;
   reconcileMissingChecklist(signal?: AbortSignal): Promise<void>;
 }
 
@@ -42,6 +56,7 @@ export type ChecklistItemChangeFailureReason =
   | "category-not-changeable"
   | "category-not-found"
   | "item-not-found"
+  | "refresh-failed"
   | "title-not-changeable"
   | "unknown";
 
@@ -70,9 +85,10 @@ export class CustomChecklistItemCreationError extends Error {
   }
 }
 
-function getChecklistItemChangeFailureReason(
-  error: RemoteChecklistItemChangeApiError,
-): ChecklistItemChangeFailureReason {
+function getChecklistItemChangeFailureReason(error: {
+  errorCode: number;
+  status: number;
+}): ChecklistItemChangeFailureReason {
   if (error.status === 400 || error.errorCode === 101) {
     return "invalid-request";
   }
@@ -342,6 +358,53 @@ export function createMyChecklistCommandRepository(
           queryRepository.applyItemTitleUpdate(itemId, changedItem.title),
       );
     },
+    async changeItemStatus(itemId, status, signal) {
+      let didChangeStatus = false;
+
+      try {
+        await dataSource.changeChecklistItemStatus(itemId, status, signal);
+        didChangeStatus = true;
+        await queryRepository.refresh(signal);
+      } catch (error) {
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
+          throw error;
+        }
+
+        if (
+          error instanceof RemoteChecklistItemChangeApiError &&
+          (error.status === 401 || error.errorCode === 201)
+        ) {
+          throw new MyChecklistAuthenticationRequiredError({ cause: error });
+        }
+
+        if (
+          error instanceof RemoteChecklistItemChangeRequestAbortedError ||
+          error instanceof MyChecklistRequestAbortedError
+        ) {
+          throw new MyChecklistRequestAbortedError({ cause: error });
+        }
+
+        if (didChangeStatus) {
+          throw new ChecklistItemChangeError(
+            "refresh-failed",
+            "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+            { cause: error },
+          );
+        }
+
+        if (error instanceof RemoteChecklistItemChangeApiError) {
+          throw new ChecklistItemChangeError(
+            getChecklistItemChangeFailureReason(error),
+            getSafeMutationMessage(error),
+            { cause: error },
+          );
+        }
+
+        throw new ChecklistItemChangeError("unknown", undefined, {
+          cause: error,
+        });
+      }
+    },
     async createCustomItem(title, categoryId, signal) {
       const normalizedTitle = title.trim();
 
@@ -412,6 +475,36 @@ export function createMyChecklistCommandRepository(
       ]);
     },
     ensureChecklist,
+    async hasRemainingAppointments(itemId, signal) {
+      try {
+        return await dataSource.hasRemainingAppointments(itemId, signal);
+      } catch (error) {
+        if (
+          error instanceof RemoteRemainingAppointmentsApiError &&
+          (error.status === 401 || error.errorCode === 201)
+        ) {
+          throw new MyChecklistAuthenticationRequiredError({ cause: error });
+        }
+
+        if (error instanceof RemoteRemainingAppointmentsRequestAbortedError) {
+          throw new MyChecklistRequestAbortedError({ cause: error });
+        }
+
+        if (error instanceof RemoteRemainingAppointmentsApiError) {
+          throw new ChecklistItemChangeError(
+            getChecklistItemChangeFailureReason(error),
+            getSafeMutationMessage(error),
+            { cause: error },
+          );
+        }
+
+        throw new ChecklistItemChangeError(
+          "unknown",
+          "남은 일정을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
+          { cause: error },
+        );
+      }
+    },
     reconcileMissingChecklist,
   };
 }

@@ -5,6 +5,7 @@ import {
 } from "../view-model/createChecklistViewModel";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistTaskCategoryEditor } from "./ChecklistTaskCategoryEditor";
+import { ChecklistTaskStatusEditor } from "./ChecklistTaskStatusEditor";
 import "./ChecklistTaskDetailContent.css";
 
 interface ChecklistTaskDetailContentProps {
@@ -81,11 +82,7 @@ export function ChecklistTaskDetailContent({
           <div>
             <dt>상태</dt>
             <dd>
-              <span
-                className={`checklist-detail-content__task-status checklist-detail-content__task-status--${task.status}`}
-              >
-                {task.statusLabel}
-              </span>
+              <ChecklistTaskStatusEditor editing={editing} task={task} />
             </dd>
           </div>
         </dl>

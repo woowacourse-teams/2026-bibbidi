@@ -5,6 +5,8 @@ import {
   ChecklistItemChangeFeedback,
   ChecklistItemChangeKind,
   ChecklistItemEditingController,
+  ChecklistItemStatusConfirmation,
+  ChecklistItemStatusEditSession,
   ChecklistItemTitleEditSession,
 } from "./model/checklistEditing";
 import { ChecklistAudience } from "./model/checklistQuery";
@@ -23,20 +25,33 @@ export function useChecklistItemEditing(
   commandRepository: MyChecklistCommandRepository,
   refreshAuth: () => void,
   audience: ChecklistAudience | undefined,
+  activeItemId?: number | null,
+  onRefreshFailed?: (message: string) => void,
 ): ChecklistItemEditingController {
   const [categoryEditSession, setCategoryEditSession] =
     useState<ChecklistItemCategoryEditSession | null>(null);
   const [titleEditSession, setTitleEditSession] =
     useState<ChecklistItemTitleEditSession | null>(null);
+  const [statusEditSession, setStatusEditSession] =
+    useState<ChecklistItemStatusEditSession | null>(null);
+  const [statusConfirmation, setStatusConfirmation] =
+    useState<ChecklistItemStatusConfirmation | null>(null);
   const [changeFeedback, setChangeFeedback] =
     useState<ChecklistItemChangeFeedback>(idleFeedback);
-  const controllerRef = useRef<AbortController | undefined>(undefined);
+  const activeRequestRef = useRef<
+    | {
+        controller: AbortController;
+        itemId: number;
+        kind: ChecklistItemChangeKind;
+      }
+    | undefined
+  >(undefined);
   const requestGenerationRef = useRef(0);
 
   useEffect(
     () => () => {
       requestGenerationRef.current += 1;
-      controllerRef.current?.abort();
+      activeRequestRef.current?.controller.abort();
     },
     [],
   );
@@ -47,13 +62,15 @@ export function useChecklistItemEditing(
     }
 
     requestGenerationRef.current += 1;
-    controllerRef.current?.abort();
-    controllerRef.current = undefined;
+    activeRequestRef.current?.controller.abort();
+    activeRequestRef.current = undefined;
     let isActive = true;
 
     queueMicrotask(() => {
       if (isActive) {
         setCategoryEditSession(null);
+        setStatusEditSession(null);
+        setStatusConfirmation(null);
         setTitleEditSession(null);
         setChangeFeedback(idleFeedback);
       }
@@ -64,34 +81,77 @@ export function useChecklistItemEditing(
     };
   }, [audience]);
 
-  const runChange = useCallback(
-    async (
+  useEffect(() => {
+    if (activeItemId === undefined) {
+      return;
+    }
+
+    const activeRequest = activeRequestRef.current;
+
+    if (
+      activeRequest?.kind === "status" &&
+      activeRequest.itemId !== activeItemId
+    ) {
+      requestGenerationRef.current += 1;
+      activeRequest.controller.abort();
+      activeRequestRef.current = undefined;
+    }
+
+    let isActive = true;
+
+    queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
+      setStatusEditSession((current) =>
+        current && current.itemId !== activeItemId ? null : current,
+      );
+      setStatusConfirmation((current) =>
+        current && current.itemId !== activeItemId ? null : current,
+      );
+      setChangeFeedback((current) =>
+        current.status !== "idle" &&
+        current.kind === "status" &&
+        current.itemId !== activeItemId
+          ? idleFeedback
+          : current,
+      );
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeItemId]);
+
+  const runRequest = useCallback(
+    async <T>(
       itemId: number,
       kind: ChecklistItemChangeKind,
-      request: (signal: AbortSignal) => Promise<void>,
-    ): Promise<boolean> => {
-      if (controllerRef.current) {
-        return false;
+      request: (signal: AbortSignal) => Promise<T>,
+    ): Promise<{ ok: true; value: T } | { error?: unknown; ok: false }> => {
+      if (activeRequestRef.current) {
+        return { ok: false };
       }
 
       const controller = new AbortController();
       const requestGeneration = requestGenerationRef.current + 1;
       requestGenerationRef.current = requestGeneration;
-      controllerRef.current = controller;
+      activeRequestRef.current = { controller, itemId, kind };
       setChangeFeedback({ itemId, kind, status: "pending" });
 
       try {
-        await request(controller.signal);
+        const value = await request(controller.signal);
 
         if (requestGenerationRef.current !== requestGeneration) {
-          return false;
+          return { ok: false };
         }
 
         setChangeFeedback(idleFeedback);
-        return true;
+        return { ok: true, value };
       } catch (error) {
         if (requestGenerationRef.current !== requestGeneration) {
-          return false;
+          return { error, ok: false };
         }
 
         if (
@@ -99,7 +159,7 @@ export function useChecklistItemEditing(
           error instanceof MyChecklistRequestAbortedError
         ) {
           setChangeFeedback(idleFeedback);
-          return false;
+          return { ok: false };
         }
 
         if (error instanceof MyChecklistAuthenticationRequiredError) {
@@ -110,7 +170,14 @@ export function useChecklistItemEditing(
             kind,
             status: "error",
           });
-          return false;
+          return { ok: false };
+        }
+
+        if (
+          error instanceof ChecklistItemChangeError &&
+          error.reason === "refresh-failed"
+        ) {
+          onRefreshFailed?.(error.message);
         }
 
         setChangeFeedback({
@@ -122,36 +189,102 @@ export function useChecklistItemEditing(
           kind,
           status: "error",
         });
-        return false;
+        return { error, ok: false };
       } finally {
-        if (controllerRef.current === controller) {
-          controllerRef.current = undefined;
+        if (activeRequestRef.current?.controller === controller) {
+          activeRequestRef.current = undefined;
         }
       }
     },
-    [refreshAuth],
+    [onRefreshFailed, refreshAuth],
   );
 
   return {
     categoryEditSession,
+    cancelStatusChange: useCallback((itemId: number) => {
+      setStatusConfirmation((current) =>
+        current?.itemId === itemId ? null : current,
+      );
+      setChangeFeedback((current) =>
+        current.status === "error" && current.itemId === itemId
+          ? idleFeedback
+          : current,
+      );
+    }, []),
     changeCategory: useCallback(
-      (itemId: number, categoryId: string) =>
-        runChange(itemId, "category", (signal) =>
-          commandRepository.changeItemCategory(
-            itemId,
-            Number(categoryId),
-            signal,
-          ),
-        ),
-      [commandRepository, runChange],
+      async (itemId: number, categoryId: string) =>
+        (
+          await runRequest(itemId, "category", (signal) =>
+            commandRepository.changeItemCategory(
+              itemId,
+              Number(categoryId),
+              signal,
+            ),
+          )
+        ).ok,
+      [commandRepository, runRequest],
     ),
     changeFeedback,
     changeTitle: useCallback(
-      (itemId: number, title: string) =>
-        runChange(itemId, "title", (signal) =>
-          commandRepository.changeItemTitle(itemId, title, signal),
-        ),
-      [commandRepository, runChange],
+      async (itemId: number, title: string) =>
+        (
+          await runRequest(itemId, "title", (signal) =>
+            commandRepository.changeItemTitle(itemId, title, signal),
+          )
+        ).ok,
+      [commandRepository, runRequest],
+    ),
+    confirmStatusChange: useCallback(
+      async (itemId: number) => {
+        if (statusConfirmation?.itemId !== itemId) {
+          return false;
+        }
+
+        const result = await runRequest(itemId, "status", (signal) =>
+          commandRepository.changeItemStatus(
+            itemId,
+            statusConfirmation.status,
+            signal,
+          ),
+        );
+
+        const didStatusChangeButRefreshFail =
+          !result.ok &&
+          result.error instanceof ChecklistItemChangeError &&
+          result.error.reason === "refresh-failed";
+
+        if (result.ok || didStatusChangeButRefreshFail) {
+          setStatusConfirmation(null);
+        }
+
+        return result.ok;
+      },
+      [commandRepository, runRequest, statusConfirmation],
+    ),
+    requestStatusChange: useCallback(
+      async (itemId, status) => {
+        if (status === "done") {
+          const remainingResult = await runRequest(itemId, "status", (signal) =>
+            commandRepository.hasRemainingAppointments(itemId, signal),
+          );
+
+          if (!remainingResult.ok) {
+            return "failed";
+          }
+
+          if (remainingResult.value) {
+            setStatusConfirmation({ itemId, status: "done" });
+            return "confirmation-required";
+          }
+        }
+
+        const changeResult = await runRequest(itemId, "status", (signal) =>
+          commandRepository.changeItemStatus(itemId, status, signal),
+        );
+
+        return changeResult.ok ? "changed" : "failed";
+      },
+      [commandRepository, runRequest],
     ),
     clearError: useCallback((itemId: number) => {
       setChangeFeedback((current) =>
@@ -165,6 +298,11 @@ export function useChecklistItemEditing(
         current?.itemId === itemId ? null : current,
       );
     }, []),
+    finishStatusEditing: useCallback((itemId: number) => {
+      setStatusEditSession((current) =>
+        current?.itemId === itemId ? null : current,
+      );
+    }, []),
     finishTitleEditing: useCallback((itemId: number) => {
       setTitleEditSession((current) =>
         current?.itemId === itemId ? null : current,
@@ -172,12 +310,21 @@ export function useChecklistItemEditing(
     }, []),
     startCategoryEditing: useCallback((itemId: number) => {
       setTitleEditSession(null);
+      setStatusEditSession(null);
       setCategoryEditSession({ itemId });
+    }, []),
+    startStatusEditing: useCallback((itemId: number) => {
+      setCategoryEditSession(null);
+      setTitleEditSession(null);
+      setStatusEditSession({ itemId });
     }, []),
     startTitleEditing: useCallback((itemId: number, title: string) => {
       setCategoryEditSession(null);
+      setStatusEditSession(null);
       setTitleEditSession({ draft: title, itemId });
     }, []),
+    statusConfirmation,
+    statusEditSession,
     titleEditSession,
     updateTitleDraft: useCallback((itemId: number, draft: string) => {
       setTitleEditSession((current) =>

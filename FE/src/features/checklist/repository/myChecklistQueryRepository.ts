@@ -12,6 +12,7 @@ export interface MyChecklistQueryRepository {
   getChecklist(signal?: AbortSignal): Promise<MyChecklistModel>;
   getRevision(): number;
   invalidate(): void;
+  refresh(signal?: AbortSignal): Promise<MyChecklistModel>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -251,6 +252,20 @@ export function createMyChecklistQueryRepository(
     return true;
   };
 
+  const getChecklist = (signal?: AbortSignal): Promise<MyChecklistModel> => {
+    if (signal?.aborted) {
+      return Promise.reject(new MyChecklistRequestAbortedError());
+    }
+
+    if (cachedResult) {
+      return Promise.resolve(cachedResult);
+    }
+
+    const request = inFlightRequest ?? startRequest();
+
+    return subscribe(request, signal);
+  };
+
   return {
     applyAddedItems(items) {
       if (!cachedResult && inFlightRequest) {
@@ -285,23 +300,21 @@ export function createMyChecklistQueryRepository(
     applyItemTitleUpdate(itemId, title) {
       return applyItemUpdate(itemId, (item) => ({ ...item, title }));
     },
-    getChecklist(signal) {
-      if (signal?.aborted) {
-        return Promise.reject(new MyChecklistRequestAbortedError());
-      }
-
-      if (cachedResult) {
-        return Promise.resolve(cachedResult);
-      }
-
-      const request = inFlightRequest ?? startRequest();
-
-      return subscribe(request, signal);
-    },
+    getChecklist,
     getRevision() {
       return revision;
     },
     invalidate,
+    refresh(signal) {
+      if (signal?.aborted) {
+        return getChecklist(signal);
+      }
+
+      invalidate();
+      notify();
+
+      return getChecklist(signal);
+    },
     subscribe(listener) {
       listeners.add(listener);
 

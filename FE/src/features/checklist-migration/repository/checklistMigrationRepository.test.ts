@@ -80,9 +80,11 @@ function createAddedItems(
 function createCommandRepository(): MyChecklistCommandRepository {
   return {
     changeItemCategory: vi.fn().mockResolvedValue(undefined),
+    changeItemStatus: vi.fn().mockResolvedValue(undefined),
     changeItemTitle: vi.fn().mockResolvedValue(undefined),
     createCustomItem: vi.fn().mockResolvedValue(undefined),
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
+    hasRemainingAppointments: vi.fn().mockResolvedValue(false),
     reconcileMissingChecklist: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -95,6 +97,7 @@ function createQueryRepository(): MyChecklistQueryRepository {
     getChecklist: vi.fn().mockResolvedValue(createChecklist([])),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    refresh: vi.fn().mockResolvedValue(createChecklist([])),
     subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }

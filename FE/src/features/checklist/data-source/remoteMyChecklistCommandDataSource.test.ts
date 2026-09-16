@@ -17,6 +17,11 @@ import {
   RemoteMyChecklistCreationNetworkError,
   RemoteMyChecklistCreationRequestAbortedError,
   RemoteMyChecklistCreationTimeoutError,
+  RemoteRemainingAppointmentsApiError,
+  RemoteRemainingAppointmentsContractError,
+  RemoteRemainingAppointmentsNetworkError,
+  RemoteRemainingAppointmentsRequestAbortedError,
+  RemoteRemainingAppointmentsTimeoutError,
 } from "./remoteMyChecklistCommandDataSource";
 
 const changedItemResponse = {
@@ -26,6 +31,8 @@ const changedItemResponse = {
   status: "continue",
   title: "청첩장 문구 최종 확정",
 } as const;
+
+const doneItemResponse = { ...changedItemResponse, status: "done" } as const;
 
 const createdCustomItemResponse = {
   catalogItemId: null,
@@ -551,6 +558,269 @@ describe("remoteMyChecklistCommandDataSource.changeChecklistItemTitle", () => {
       RemoteChecklistItemChangeRequestAbortedError,
     );
     controller.abort();
+
+    await expectation;
+  });
+});
+
+describe("remoteMyChecklistCommandDataSource.hasRemainingAppointments", () => {
+  it.each([true, false])(
+    "인증 쿠키를 포함한 정확한 GET 요청으로 boolean %s를 파싱한다",
+    async (body) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        remoteMyChecklistCommandDataSource.hasRemainingAppointments(500),
+      ).resolves.toBe(body);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/checklist-items/500/remaining-appointments",
+        {
+          credentials: "include",
+          method: "GET",
+          signal: expect.any(AbortSignal),
+        },
+      );
+    },
+  );
+
+  it.each([{}, "true", 1, null])(
+    "boolean이 아닌 성공 응답 %j를 거부한다",
+    async (body) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(JSON.stringify(body), { status: 200 }),
+          ),
+      );
+
+      await expect(
+        remoteMyChecklistCommandDataSource.hasRemainingAppointments(500),
+      ).rejects.toBeInstanceOf(RemoteRemainingAppointmentsContractError);
+    },
+  );
+
+  it.each([
+    [201, 401],
+    [203, 403],
+    [304, 404],
+  ])("API 오류 %s/%s를 보존한다", async (errorCode, status) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ errorCode, message: "조회 실패" }), {
+          status,
+        }),
+      ),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(500),
+    ).rejects.toEqual(
+      new RemoteRemainingAppointmentsApiError(errorCode, status, "조회 실패"),
+    );
+  });
+
+  it("네트워크 오류를 구분한다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("failed")));
+
+    await expect(
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(500),
+    ).rejects.toBeInstanceOf(RemoteRemainingAppointmentsNetworkError);
+  });
+
+  it("타임아웃과 호출자 취소를 구분한다", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError")),
+            );
+          }),
+      ),
+    );
+
+    const timeoutRequest =
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(500);
+    const timeoutExpectation = expect(timeoutRequest).rejects.toBeInstanceOf(
+      RemoteRemainingAppointmentsTimeoutError,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    await timeoutExpectation;
+
+    vi.useRealTimers();
+    const controller = new AbortController();
+    const abortedRequest =
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(
+        500,
+        controller.signal,
+      );
+    const abortExpectation = expect(abortedRequest).rejects.toBeInstanceOf(
+      RemoteRemainingAppointmentsRequestAbortedError,
+    );
+    controller.abort();
+    await abortExpectation;
+  });
+
+  it("이미 취소된 signal은 요청 취소 오류로 처리한다", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        expect(init.signal?.aborted).toBe(true);
+        return Promise.reject(new DOMException("aborted", "AbortError"));
+      }),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(
+        500,
+        controller.signal,
+      ),
+    ).rejects.toBeInstanceOf(RemoteRemainingAppointmentsRequestAbortedError);
+  });
+
+  it("응답 body 파싱 중 발생한 타임아웃을 계약 오류로 오인하지 않는다", async () => {
+    vi.useFakeTimers();
+    let resolveJson: (value: boolean) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: () =>
+          new Promise<boolean>((resolve) => {
+            resolveJson = resolve;
+          }),
+        ok: true,
+        status: 200,
+      } as Response),
+    );
+    const request =
+      remoteMyChecklistCommandDataSource.hasRemainingAppointments(500);
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      RemoteRemainingAppointmentsTimeoutError,
+    );
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    resolveJson(false);
+
+    await expectation;
+  });
+});
+
+describe("remoteMyChecklistCommandDataSource.changeChecklistItemStatus", () => {
+  it.each(["prev", "continue", "done"] as const)(
+    "상태 %s를 raw 소문자 문자열로 PUT하고 응답을 파싱한다",
+    async (status) => {
+      const response = { ...changedItemResponse, status };
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(response), { status: 200 }),
+        );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        remoteMyChecklistCommandDataSource.changeChecklistItemStatus(
+          500,
+          status,
+        ),
+      ).resolves.toEqual(response);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/checklist-items/500/status",
+        {
+          body: status,
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          method: "PUT",
+          signal: expect.any(AbortSignal),
+        },
+      );
+    },
+  );
+
+  it.each([
+    { ...doneItemResponse, id: 501 },
+    { ...doneItemResponse, status: undefined },
+    { ...doneItemResponse, status: "complete" },
+    { ...doneItemResponse, status: "prev" },
+    { ...doneItemResponse, title: undefined },
+  ])("잘못된 상태 변경 성공 응답을 거부한다", async (body) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemStatus(500, "done"),
+    ).rejects.toBeInstanceOf(RemoteChecklistItemChangeContractError);
+  });
+
+  it.each([
+    [101, 400],
+    [201, 401],
+    [203, 403],
+    [304, 404],
+  ])("상태 변경 API 오류 %s/%s를 보존한다", async (errorCode, status) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ errorCode, message: "변경 실패" }), {
+          status,
+        }),
+      ),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemStatus(500, "done"),
+    ).rejects.toEqual(
+      new RemoteChecklistItemChangeApiError(errorCode, status, "변경 실패"),
+    );
+  });
+
+  it("응답 body 파싱 중 호출자가 취소해도 성공으로 처리하지 않는다", async () => {
+    const controller = new AbortController();
+    let resolveJson: (value: typeof changedItemResponse) => void = () =>
+      undefined;
+    let markJsonStarted: () => void = () => undefined;
+    const jsonStarted = new Promise<void>((resolve) => {
+      markJsonStarted = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: () => {
+          markJsonStarted();
+          return new Promise<typeof changedItemResponse>((resolve) => {
+            resolveJson = resolve;
+          });
+        },
+        ok: true,
+        status: 200,
+      } as Response),
+    );
+    const request =
+      remoteMyChecklistCommandDataSource.changeChecklistItemStatus(
+        500,
+        "continue",
+        controller.signal,
+      );
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      RemoteChecklistItemChangeRequestAbortedError,
+    );
+
+    await jsonStarted;
+    controller.abort();
+    resolveJson(changedItemResponse);
 
     await expectation;
   });

@@ -20,6 +20,7 @@ function createChecklistRepository(): MyChecklistQueryRepository {
     getChecklist: vi.fn(),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    refresh: vi.fn(),
     subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
