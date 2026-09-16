@@ -12,8 +12,10 @@ import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +65,42 @@ class CatalogRepositoryTest {
                 .extracting(Item::id)
                 .containsExactly(item.id());
         assertThat(catalog.categories().getLast().steps()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("준비 항목 전체를 카테고리 이름과 단계 번호와 단계 이름과 함께 조회한다")
+    void shouldFindAllItemDetailsWithCategoryAndStep() {
+        // given
+        JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        JpaCategoryEntity styling = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
+        JpaStepEntity hallChoice = jpaStepRepository.save(new JpaStepEntity(
+                null, weddingHall.id(), "웨딩홀 정하기", null, null, 1
+        ));
+        JpaStepEntity ceremonyStyle = jpaStepRepository.save(new JpaStepEntity(
+                null, weddingHall.id(), "예식 진행 방식 결정", null, null, 2
+        ));
+        JpaStepEntity packageContract = jpaStepRepository.save(new JpaStepEntity(
+                null, styling.id(), "스드메 패키지 계약", null, null, 1
+        ));
+        JpaCatalogItemEntity hallTour = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, hallChoice.id(), "웨딩홀 투어", 1, true
+        ));
+        JpaCatalogItemEntity ceremonyType = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, ceremonyStyle.id(), "예식 형태 결정", 1, true
+        ));
+        JpaCatalogItemEntity stylingConsulting = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, packageContract.id(), "스드메 상담", 1, true
+        ));
+
+        // when
+        List<CatalogItemDetailSnapshot> itemDetails = catalogRepository.findAllItemDetails();
+
+        // then
+        assertThat(itemDetails).containsExactlyInAnyOrder(
+                new CatalogItemDetailSnapshot(hallTour.id(), "웨딩홀 투어", "웨딩홀", 1, "웨딩홀 정하기"),
+                new CatalogItemDetailSnapshot(ceremonyType.id(), "예식 형태 결정", "웨딩홀", 2, "예식 진행 방식 결정"),
+                new CatalogItemDetailSnapshot(stylingConsulting.id(), "스드메 상담", "스드메", 1, "스드메 패키지 계약")
+        );
     }
 
     @Test

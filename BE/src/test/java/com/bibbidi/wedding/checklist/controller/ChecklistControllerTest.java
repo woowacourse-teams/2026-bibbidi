@@ -14,6 +14,7 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
+import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -229,7 +230,58 @@ class ChecklistControllerTest {
                 .andExpect(jsonPath("$.errorCode").value(101));
     }
 
+    @Test
+    @DisplayName("추가하면 좋은 할 일 조회 시 limit을 생략하면 기본값 4로 서비스에 전달하고 준비 항목 정보를 응답한다")
+    void shouldUseDefaultLimitWhenFindingRecommendedCatalogItems() throws Exception {
+        // given
+        when(checklistService.findRecommendedCatalogItems(USER_ID, 4)).thenReturn(List.of(recommendedCatalogItemResult()));
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].catalogItemId").value(6))
+                .andExpect(jsonPath("$[0].title").value("주례·사회자 섭외"))
+                .andExpect(jsonPath("$[0].categoryName").value("웨딩홀"))
+                .andExpect(jsonPath("$[0].phase").value(3))
+                .andExpect(jsonPath("$[0].stepName").value("예식 진행 인원 섭외"));
+    }
+
+    @Test
+    @DisplayName("추가하면 좋은 할 일 조회 시 limit 파라미터를 서비스에 그대로 전달한다")
+    void shouldPassGivenLimitWhenFindingRecommendedCatalogItems() throws Exception {
+        // given
+        when(checklistService.findRecommendedCatalogItems(USER_ID, 20)).thenReturn(List.of(recommendedCatalogItemResult()));
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession())
+                        .param("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].catalogItemId").value(6));
+    }
+
+    @Test
+    @DisplayName("limit이 1보다 작거나 20보다 크면 추가하면 좋은 할 일 조회를 거절한다")
+    void shouldRejectFindRecommendedCatalogItemsWhenLimitIsOutOfRange() throws Exception {
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession())
+                        .param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+        mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
+                        .session(authenticatedSession())
+                        .param("limit", "21"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
     private static UnscheduledChecklistItemResult unscheduledItemResult() {
         return new UnscheduledChecklistItemResult(31L, "웨딩홀 투어", "웨딩홀", ChecklistItemStatus.PREV);
+    }
+
+    private static RecommendedCatalogItemResult recommendedCatalogItemResult() {
+        return new RecommendedCatalogItemResult(6L, "주례·사회자 섭외", "웨딩홀", 3, "예식 진행 인원 섭외");
     }
 }

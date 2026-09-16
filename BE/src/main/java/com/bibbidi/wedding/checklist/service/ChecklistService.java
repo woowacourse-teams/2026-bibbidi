@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.service;
 
 import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
 import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import com.bibbidi.wedding.checklist.domain.Appointment;
@@ -11,11 +12,13 @@ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.domain.ChecklistProgress;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
+import com.bibbidi.wedding.checklist.service.dto.CatalogItemDetails;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistCreationResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -31,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChecklistService {
+
+    private static final int FIRST_PHASE = 1;
 
     private final ChecklistRepository checklistRepository;
     private final CatalogService catalogService;
@@ -92,7 +97,7 @@ public class ChecklistService {
         return catalogService.findCategoryNames(categoryIds);
     }
 
-    private List<ChecklistItem> pickRandomly(List<ChecklistItem> candidates, int limit) {
+    private <T> List<T> pickRandomly(List<T> candidates, int limit) {
         return shuffler.shuffle(candidates).stream()
                 .limit(limit)
                 .toList();
@@ -101,6 +106,39 @@ public class ChecklistService {
     private List<UnscheduledChecklistItemResult> toResults(List<ChecklistItem> items, CategoryNames categoryNames) {
         return items.stream()
                 .map(item -> UnscheduledChecklistItemResult.from(item, categoryNames.nameOf(item.categoryId())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecommendedCatalogItemResult> findRecommendedCatalogItems(Long ownerId, int limit) {
+        Checklist checklist = checklistRepository.getByOwnerId(ownerId);
+        CatalogItemDetails catalogItems = new CatalogItemDetails(catalogService.findAllItemDetails());
+
+        List<CatalogItemDetailSnapshot> allRecommendedItems = chooseAllRecommendedItems(checklist, catalogItems);
+        List<CatalogItemDetailSnapshot> randomRecommendedItems = pickRandomly(allRecommendedItems, limit);
+
+        return toResults(randomRecommendedItems);
+    }
+
+    private List<CatalogItemDetailSnapshot> chooseAllRecommendedItems(Checklist checklist, CatalogItemDetails catalogItems) {
+        CatalogItemDetails alreadyAddedItems = catalogItems.selectIn(checklist);
+        CatalogItemDetails notYetAddedItems = catalogItems.selectNotIn(checklist);
+
+        int currentPhase = decideCurrentPhase(alreadyAddedItems);
+        CatalogItemDetails recommendedItems = notYetAddedItems.recommendBasedOn(currentPhase);
+        return recommendedItems.values();
+    }
+
+    private int decideCurrentPhase(CatalogItemDetails alreadyAddedItems) {
+        if (alreadyAddedItems.isEmpty()) {
+            return FIRST_PHASE;
+        }
+        return alreadyAddedItems.findLastPhase();
+    }
+
+    private List<RecommendedCatalogItemResult> toResults(List<CatalogItemDetailSnapshot> items) {
+        return items.stream()
+                .map(RecommendedCatalogItemResult::from)
                 .toList();
     }
 

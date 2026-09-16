@@ -1,0 +1,424 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java
+deleted file mode 100644
+index 6c5a9c8c990dff49c2e8e149ac8ded5139476133..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/CandidateItem.java
++++ /dev/null
+@@ -1,22 +0,0 @@
+-package com.bibbidi.wedding.catalog.domain;
+-
+-import java.util.Collection;
+-import org.jspecify.annotations.NonNull;
+-import org.jspecify.annotations.Nullable;
+-
+-public record CandidateItem(
+-        @Nullable Long itemId,
+-        @NonNull String title,
+-        @NonNull String categoryName,
+-        int phase,
+-        @NonNull String stepName
+-) {
+-
+-    public boolean isAddedIn(Collection<Long> addedItemIds) {
+-        return addedItemIds.contains(itemId);
+-    }
+-
+-    public boolean isUpTo(int basePhase) {
+-        return phase <= basePhase;
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
+index 1c1eee91d870af50175067a92ef7505101f21c6d..999a0d6a6c43eff10d2608ad981077de768b87c1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Catalog.java
+@@ -1,15 +1,11 @@
+ package com.bibbidi.wedding.catalog.domain;
+ 
+-import java.util.Collection;
+ import java.util.Comparator;
+ import java.util.List;
+-import java.util.function.Predicate;
+ import org.jspecify.annotations.NonNull;
+ 
+ public final class Catalog {
+ 
+-    private static final int FIRST_PHASE = 1;
+-
+     private final List<Category> categories;
+ 
+     public Catalog(@NonNull List<Category> categories) {
+@@ -20,41 +16,6 @@ public final class Catalog {
+         return categories;
+     }
+ 
+-    public List<CandidateItem> findCandidates(Collection<Long> addedItemIds) {
+-        List<CandidateItem> allItems = candidateItems();
+-        List<CandidateItem> addedItems = filter(allItems, item -> item.isAddedIn(addedItemIds));
+-        List<CandidateItem> notAddedItems = filter(allItems, item -> !item.isAddedIn(addedItemIds));
+-
+-        int basePhase = Math.max(maxPhaseOf(addedItems), minPhaseOf(notAddedItems));
+-        return filter(notAddedItems, item -> item.isUpTo(basePhase));
+-    }
+-
+-    private List<CandidateItem> candidateItems() {
+-        return categories.stream()
+-                .flatMap(category -> category.candidateItems().stream())
+-                .toList();
+-    }
+-
+-    private static List<CandidateItem> filter(List<CandidateItem> items, Predicate<CandidateItem> condition) {
+-        return items.stream()
+-                .filter(condition)
+-                .toList();
+-    }
+-
+-    private static int maxPhaseOf(List<CandidateItem> items) {
+-        return items.stream()
+-                .mapToInt(CandidateItem::phase)
+-                .max()
+-                .orElse(FIRST_PHASE);
+-    }
+-
+-    private static int minPhaseOf(List<CandidateItem> items) {
+-        return items.stream()
+-                .mapToInt(CandidateItem::phase)
+-                .min()
+-                .orElse(FIRST_PHASE);
+-    }
+-
+     private static List<Category> sortByDisplayOrder(List<Category> categories) {
+         return categories.stream()
+                 .sorted(Comparator.comparingInt(Category::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
+index 210065dee7dce239e4f27ae0801dc8d77f9ce08b..8cc4cb2395dec5be1e7386c158f8f0b1292b3b3e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Category.java
+@@ -48,12 +48,6 @@ public final class Category {
+                 .toList();
+     }
+ 
+-    public List<CandidateItem> candidateItems() {
+-        return steps.stream()
+-                .flatMap(step -> step.candidateItems(name).stream())
+-                .toList();
+-    }
+-
+     private static List<Step> sortByDisplayOrder(List<Step> steps) {
+         return steps.stream()
+                 .sorted(Comparator.comparingInt(Step::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
+index 886312796e42d00d1d66e130607a54d8d7eb6ed7..e7e1eebe003189873b0d4cfbda0b6380de6a9241 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/domain/Step.java
+@@ -54,12 +54,6 @@ public final class Step {
+         return items;
+     }
+ 
+-    public List<CandidateItem> candidateItems(String categoryName) {
+-        return items.stream()
+-                .map(item -> new CandidateItem(item.id(), item.title(), categoryName, displayOrder, name))
+-                .toList();
+-    }
+-
+     private static List<Item> sortByDisplayOrder(List<Item> items) {
+         return items.stream()
+                 .sorted(Comparator.comparingInt(Item::displayOrder))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/persistence/JpaCatalogItemRepository.java b/BE/src/main/java/com/bibbidi/wedding/catalog/persistence/JpaCatalogItemRepository.java
+index a92029c9d6e843326f6f4a1011effcb40e69238d..8a7d82c68a049d4147ed2921f0e99b664814ba05 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/persistence/JpaCatalogItemRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/persistence/JpaCatalogItemRepository.java
+@@ -1,6 +1,18 @@
+ package com.bibbidi.wedding.catalog.persistence;
+ 
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
++import java.util.List;
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
+ 
+ public interface JpaCatalogItemRepository extends JpaRepository<JpaCatalogItemEntity, Long> {
++
++    @Query("""
++            SELECT new com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot(
++                    item.id, item.title, category.name, step.displayOrder, step.name)
++            FROM JpaCatalogItemEntity item
++            JOIN JpaStepEntity step ON step.id = item.stepId
++            JOIN JpaCategoryEntity category ON category.id = step.categoryId
++            """)
++    List<CatalogItemDetailSnapshot> findAllDetails();
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/repository/CatalogRepository.java b/BE/src/main/java/com/bibbidi/wedding/catalog/repository/CatalogRepository.java
+index 1cc80de1e41606ec89cde6daded96a528233eed0..ae9b5bb075c6d17c20b63087030c5e8005e7aa5e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/repository/CatalogRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/repository/CatalogRepository.java
+@@ -4,8 +4,10 @@ import com.bibbidi.wedding.catalog.domain.Catalog;
+ import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
+ import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
+ import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.util.List;
+ import org.springframework.stereotype.Repository;
+ 
+ @Repository
+@@ -44,4 +46,8 @@ public class CatalogRepository {
+                 jpaCatalogItemRepository.findAll()
+         );
+     }
++
++    public List<CatalogItemDetailSnapshot> findAllItemDetails() {
++        return jpaCatalogItemRepository.findAllDetails();
++    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java b/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
+index 8dd347b176f976220e8b5c62b5e1fff7280a79c5..cb3cb07543701bc912fdb6e55cece4dce57338ff 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/service/CatalogService.java
+@@ -3,6 +3,7 @@ package com.bibbidi.wedding.catalog.service;
+ import com.bibbidi.wedding.catalog.domain.Catalog;
+ import com.bibbidi.wedding.catalog.domain.Category;
+ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import java.util.Collection;
+@@ -31,6 +32,11 @@ public class CatalogService {
+                 .toList();
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<CatalogItemDetailSnapshot> findAllItemDetails() {
++        return catalogRepository.findAllItemDetails();
++    }
++
+     @Transactional(readOnly = true)
+     public CategoryNames findCategoryNames(Collection<Long> categoryIds) {
+         Catalog catalog = catalogRepository.findCatalog();
+diff --git a/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f78cad480434f78d08a033f0ae5a0e54a797d697
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/catalog/service/dto/CatalogItemDetailSnapshot.java
+@@ -0,0 +1,10 @@
++package com.bibbidi.wedding.catalog.service.dto;
++
++public record CatalogItemDetailSnapshot(
++        Long id,
++        String title,
++        String categoryName,
++        int phase,
++        String stepName
++) {
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java b/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
+index a8abeaa6b38d93de2d557ff6e2e728896cac283e..a020ed382713905624ee028bb6766a5d69e02e87 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/catalog/domain/CatalogTest.java
+@@ -11,115 +11,6 @@ class CatalogTest {
+     private static final Item FIRST_ITEM = new Item(1L, "첫 번째 할 일", 1, true);
+     private static final Item SECOND_ITEM = new Item(2L, "두 번째 할 일", 2, false);
+ 
+-    private static Catalog constructPhasedCatalog() {
+-        Step venueFirstStep = new Step(1L, "웨딩홀 정하기", null, null, 1, List.of(
+-                new Item(1L, "웨딩홀 투어", 1, true),
+-                new Item(2L, "웨딩홀 계약", 2, true)
+-        ));
+-        Step venueSecondStep = new Step(2L, "예식 진행 방식 결정", null, null, 2, List.of(
+-                new Item(3L, "예식 형태 결정", 1, true)
+-        ));
+-        Step venueThirdStep = new Step(3L, "예식 진행 인원 섭외", null, null, 3, List.of(
+-                new Item(6L, "주례·사회자 섭외", 1, true)
+-        ));
+-        Step stylingFirstStep = new Step(10L, "스드메 패키지 계약", null, null, 1, List.of(
+-                new Item(39L, "스드메 상담", 1, true)
+-        ));
+-        Step stylingSecondStep = new Step(11L, "스드메 업체 확정", null, null, 2, List.of(
+-                new Item(44L, "드레스샵 확정", 1, true)
+-        ));
+-        return new Catalog(List.of(
+-                new Category(1L, "웨딩홀", 1, List.of(venueFirstStep, venueSecondStep, venueThirdStep)),
+-                new Category(2L, "스드메", 2, List.of(stylingFirstStep, stylingSecondStep))
+-        ));
+-    }
+-
+-    @Test
+-    @DisplayName("담은 준비 항목이 없으면 첫 번째 단계의 준비 항목을 후보로 찾는다")
+-    void shouldFindFirstPhaseItemsWhenNothingAdded() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of());
+-
+-        // then
+-        assertThat(candidates)
+-                .extracting(CandidateItem::itemId)
+-                .containsExactlyInAnyOrder(1L, 2L, 39L);
+-    }
+-
+-    @Test
+-    @DisplayName("담은 준비 항목의 가장 큰 단계 이하라면 카테고리가 달라도 후보로 찾는다")
+-    void shouldFindItemsUpToMaxAddedPhaseAcrossCategoriesWhenItemAdded() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of(44L));
+-
+-        // then
+-        assertThat(candidates)
+-                .extracting(CandidateItem::itemId)
+-                .containsExactlyInAnyOrder(1L, 2L, 3L, 39L);
+-    }
+-
+-    @Test
+-    @DisplayName("이미 담은 준비 항목은 후보에서 뺀다")
+-    void shouldExcludeAddedItemsWhenFindingCandidates() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L));
+-
+-        // then
+-        assertThat(candidates)
+-                .extracting(CandidateItem::itemId)
+-                .containsExactlyInAnyOrder(2L, 39L);
+-    }
+-
+-    @Test
+-    @DisplayName("기준 단계 이하의 준비 항목을 모두 담았으면 담지 않은 항목이 남은 다음 단계를 후보로 찾는다")
+-    void shouldFindNextPhaseItemsWhenAllItemsUpToBasePhaseAdded() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L, 2L, 39L));
+-
+-        // then
+-        assertThat(candidates)
+-                .extracting(CandidateItem::itemId)
+-                .containsExactlyInAnyOrder(3L, 44L);
+-    }
+-
+-    @Test
+-    @DisplayName("준비 항목을 모두 담았으면 후보가 없다")
+-    void shouldFindNoCandidateWhenAllItemsAdded() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of(1L, 2L, 3L, 6L, 39L, 44L));
+-
+-        // then
+-        assertThat(candidates).isEmpty();
+-    }
+-
+-    @Test
+-    @DisplayName("후보에 카테고리 이름과 단계 번호와 단계 이름을 함께 담는다")
+-    void shouldAttachCategoryAndStepWhenFindingCandidates() {
+-        // given
+-        Catalog catalog = constructPhasedCatalog();
+-
+-        // when
+-        List<CandidateItem> candidates = catalog.findCandidates(List.of());
+-
+-        // then
+-        assertThat(candidates).contains(new CandidateItem(39L, "스드메 상담", "스드메", 1, "스드메 패키지 계약"));
+-    }
+-
+     @Test
+     @DisplayName("준비 영역과 단계와 항목을 모두 노출 순서대로 정렬한다")
+     void shouldSortEveryLevelByDisplayOrder() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/catalog/repository/CatalogRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/catalog/repository/CatalogRepositoryTest.java
+index aa232fa405386a57e964926801941a15b99f1c45..82ee6ed5d39ec2ce2f1ea53f9823f7e122162ffb 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/catalog/repository/CatalogRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/catalog/repository/CatalogRepositoryTest.java
+@@ -12,8 +12,10 @@ import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
+ import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
+ import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
+ import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+@@ -65,6 +67,42 @@ class CatalogRepositoryTest {
+         assertThat(catalog.categories().getLast().steps()).isEmpty();
+     }
+ 
++    @Test
++    @DisplayName("준비 항목 전체를 카테고리 이름과 단계 번호와 단계 이름과 함께 조회한다")
++    void shouldFindAllItemDetailsWithCategoryAndStep() {
++        // given
++        JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
++        JpaCategoryEntity styling = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
++        JpaStepEntity hallChoice = jpaStepRepository.save(new JpaStepEntity(
++                null, weddingHall.id(), "웨딩홀 정하기", null, null, 1
++        ));
++        JpaStepEntity ceremonyStyle = jpaStepRepository.save(new JpaStepEntity(
++                null, weddingHall.id(), "예식 진행 방식 결정", null, null, 2
++        ));
++        JpaStepEntity packageContract = jpaStepRepository.save(new JpaStepEntity(
++                null, styling.id(), "스드메 패키지 계약", null, null, 1
++        ));
++        JpaCatalogItemEntity hallTour = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
++                null, hallChoice.id(), "웨딩홀 투어", 1, true
++        ));
++        JpaCatalogItemEntity ceremonyType = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
++                null, ceremonyStyle.id(), "예식 형태 결정", 1, true
++        ));
++        JpaCatalogItemEntity stylingConsulting = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
++                null, packageContract.id(), "스드메 상담", 1, true
++        ));
++
++        // when
++        List<CatalogItemDetailSnapshot> itemDetails = catalogRepository.findAllItemDetails();
++
++        // then
++        assertThat(itemDetails).containsExactlyInAnyOrder(
++                new CatalogItemDetailSnapshot(hallTour.id(), "웨딩홀 투어", "웨딩홀", 1, "웨딩홀 정하기"),
++                new CatalogItemDetailSnapshot(ceremonyType.id(), "예식 형태 결정", "웨딩홀", 2, "예식 진행 방식 결정"),
++                new CatalogItemDetailSnapshot(stylingConsulting.id(), "스드메 상담", "스드메", 1, "스드메 패키지 계약")
++        );
++    }
++
+     @Test
+     @DisplayName("존재하는 카테고리의 검증을 통과시킨다")
+     void shouldValidateExistingCategory() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
+index ec2dc54842b1360c3167759695b29439384b9ae0..3d0a4c93737e89a88c364b356c661882c0c40ad2 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/catalog/service/CatalogServiceTest.java
+@@ -10,6 +10,7 @@ import com.bibbidi.wedding.catalog.domain.Category;
+ import com.bibbidi.wedding.catalog.domain.Item;
+ import com.bibbidi.wedding.catalog.domain.Step;
+ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
++import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
+ import java.util.List;
+@@ -64,6 +65,22 @@ class CatalogServiceTest {
+                 .containsExactly(FIRST_ITEM_ID, 1L, "첫 번째 할 일");
+     }
+ 
++    @Test
++    @DisplayName("준비 항목 전체를 카테고리와 단계 정보와 함께 조회한다")
++    void shouldFindAllItemDetails() {
++        // given
++        List<CatalogItemDetailSnapshot> itemDetails = List.of(
++                new CatalogItemDetailSnapshot(FIRST_ITEM_ID, "첫 번째 할 일", "웨딩홀", 1, "계약")
++        );
++        when(catalogRepository.findAllItemDetails()).thenReturn(itemDetails);
++
++        // when
++        List<CatalogItemDetailSnapshot> found = catalogService.findAllItemDetails();
++
++        // then
++        assertThat(found).isEqualTo(itemDetails);
++    }
++
+     @Test
+     @DisplayName("요청한 카테고리 중 준비 목록에 있는 카테고리의 이름만 조회한다")
+     void shouldFindCategoryNames() {

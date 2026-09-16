@@ -10,6 +10,7 @@ import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import java.util.List;
@@ -62,6 +63,22 @@ class CatalogServiceTest {
                 .singleElement()
                 .extracting(CatalogItemSnapshot::id, CatalogItemSnapshot::categoryId, CatalogItemSnapshot::title)
                 .containsExactly(FIRST_ITEM_ID, 1L, "첫 번째 할 일");
+    }
+
+    @Test
+    @DisplayName("준비 항목 전체를 카테고리와 단계 정보와 함께 조회한다")
+    void shouldFindAllItemDetails() {
+        // given
+        List<CatalogItemDetailSnapshot> itemDetails = List.of(
+                new CatalogItemDetailSnapshot(FIRST_ITEM_ID, "첫 번째 할 일", "웨딩홀", 1, "계약")
+        );
+        when(catalogRepository.findAllItemDetails()).thenReturn(itemDetails);
+
+        // when
+        List<CatalogItemDetailSnapshot> found = catalogService.findAllItemDetails();
+
+        // then
+        assertThat(found).isEqualTo(itemDetails);
     }
 
     @Test

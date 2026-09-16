@@ -81,6 +81,11 @@ public final class Checklist {
                 .toList();
     }
 
+    public boolean hasAdded(Long catalogItemId) {
+        return items.stream()
+                .anyMatch(item -> item.cameFrom(catalogItemId));
+    }
+
     public Long id() {
         return id;
     }

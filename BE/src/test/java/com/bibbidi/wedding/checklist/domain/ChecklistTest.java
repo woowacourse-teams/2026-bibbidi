@@ -115,6 +115,41 @@ class ChecklistTest {
     }
 
     @Test
+    @DisplayName("준비 목록에서 담은 항목이면 할 일을 완료했어도 담은 것으로 판단한다")
+    void shouldHaveAddedCatalogItemWhenItemIsDone() {
+        // given
+        Checklist checklist = new Checklist(
+                1L,
+                OWNER_ID,
+                List.of(
+                        item(1L, 100L, ChecklistItemStatus.DONE),
+                        item(2L, 101L, ChecklistItemStatus.CONTINUE)
+                )
+        );
+
+        // when, then
+        assertThat(checklist.hasAdded(100L)).isTrue();
+        assertThat(checklist.hasAdded(101L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("담지 않은 준비 항목이면 직접 만든 할 일이 있어도 담지 않은 것으로 판단한다")
+    void shouldNotHaveAddedCatalogItemWhenNoItemCameFromIt() {
+        // given
+        Checklist checklist = new Checklist(
+                1L,
+                OWNER_ID,
+                List.of(
+                        item(1L, null, ChecklistItemStatus.PREV),
+                        item(2L, 100L, ChecklistItemStatus.PREV)
+                )
+        );
+
+        // when, then
+        assertThat(checklist.hasAdded(101L)).isFalse();
+    }
+
+    @Test
     @DisplayName("체크리스트의 소유자는 접근할 수 있다")
     void shouldAllowAccessByOwner() {
         // given

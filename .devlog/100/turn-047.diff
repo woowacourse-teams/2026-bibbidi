@@ -1,0 +1,29 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 113045213c91e17512cad01b2383503e7df3830b..599f20d4d9ef089731d3ebc577e85dbcc430336e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -140,15 +140,21 @@ public class ChecklistService {
+     }
+ 
+     private int calculateMaxRecommendablePhase(List<CatalogItemDetailSnapshot> alreadyAddedItems, List<CatalogItemDetailSnapshot> notYetAddedItems) {
+-        int maxAlreadyAddedPhase = alreadyAddedItems.stream()
++        return Math.max(calculateMaxPhase(alreadyAddedItems), calculateMinPhase(notYetAddedItems));
++    }
++
++    private int calculateMaxPhase(List<CatalogItemDetailSnapshot> items) {
++        return items.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .max()
+                 .orElse(FIRST_PHASE);
+-        int minNotYetAddedPhase = notYetAddedItems.stream()
++    }
++
++    private int calculateMinPhase(List<CatalogItemDetailSnapshot> items) {
++        return items.stream()
+                 .mapToInt(CatalogItemDetailSnapshot::phase)
+                 .min()
+                 .orElse(FIRST_PHASE);
+-        return Math.max(maxAlreadyAddedPhase, minNotYetAddedPhase);
+     }
+ 
+     private List<CatalogItemDetailSnapshot> selectItemsUpToPhase(List<CatalogItemDetailSnapshot> items, int phase) {
