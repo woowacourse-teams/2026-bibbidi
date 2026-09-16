@@ -31,7 +31,11 @@ type ChecklistRequestState =
       status: "empty";
     }
   | { audience: ChecklistAudience; status: "authentication-required" }
-  | { audience: ChecklistAudience; status: "error" }
+  | {
+      audience: ChecklistAudience;
+      errorMessage?: string;
+      status: "error";
+    }
   | {
       audience: ChecklistAudience;
       checklist: ChecklistQueryModel;
@@ -92,11 +96,30 @@ export function ChecklistFeature() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get("taskId");
+  const [requestState, setRequestState] = useState<ChecklistRequestState>({
+    status: "loading",
+  });
+  const refreshFailureRef = useRef<{
+    audience: ChecklistAudience;
+    message: string;
+  }>(undefined);
+  const handleRefreshFailed = useCallback(
+    (message: string) => {
+      if (!audience) {
+        return;
+      }
+
+      refreshFailureRef.current = { audience, message };
+      setRequestState({ audience, errorMessage: message, status: "error" });
+    },
+    [audience, setRequestState],
+  );
   const itemEditing = useChecklistItemEditing(
     checklistCommandRepository,
     refreshAuth,
     audience,
     getSelectedChecklistItemId(selectedTaskId),
+    handleRefreshFailed,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,
@@ -104,9 +127,6 @@ export function ChecklistFeature() {
     audience,
     sessionIdentity,
   );
-  const [requestState, setRequestState] = useState<ChecklistRequestState>({
-    status: "loading",
-  });
   const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
@@ -155,6 +175,8 @@ export function ChecklistFeature() {
           return;
         }
 
+        refreshFailureRef.current = undefined;
+
         if (checklist.categories.length === 0) {
           setRequestState({
             audience,
@@ -191,9 +213,19 @@ export function ChecklistFeature() {
           refreshAuth();
         }
 
+        if (requiresAuthentication) {
+          setRequestState({ audience, status: "authentication-required" });
+          return;
+        }
+
+        const refreshFailure = refreshFailureRef.current;
         setRequestState({
           audience,
-          status: requiresAuthentication ? "authentication-required" : "error",
+          errorMessage:
+            refreshFailure?.audience === audience
+              ? refreshFailure.message
+              : undefined,
+          status: "error",
         });
       });
 
@@ -305,6 +337,7 @@ export function ChecklistFeature() {
       return;
     }
 
+    refreshFailureRef.current = undefined;
     setRequestState({ audience, status: "loading" });
     setRequestRevision((revision) => revision + 1);
   };
@@ -347,7 +380,15 @@ export function ChecklistFeature() {
     requestState.status === "error"
   ) {
     return renderChecklistState(
-      <ChecklistState onRetry={handleRetry} status={requestState.status} />,
+      <ChecklistState
+        errorMessage={
+          requestState.status === "error"
+            ? requestState.errorMessage
+            : undefined
+        }
+        onRetry={handleRetry}
+        status={requestState.status}
+      />,
     );
   }
 

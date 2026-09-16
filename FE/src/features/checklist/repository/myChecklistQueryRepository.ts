@@ -306,6 +306,10 @@ export function createMyChecklistQueryRepository(
     },
     invalidate,
     refresh(signal) {
+      if (signal?.aborted) {
+        return getChecklist(signal);
+      }
+
       invalidate();
       notify();
 

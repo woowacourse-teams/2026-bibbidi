@@ -81,6 +81,37 @@ describe("MyChecklistQueryRepository", () => {
     await expect(preparationRequest).resolves.toBe(checklist);
   });
 
+  it("이미 취소된 refresh는 캐시와 다른 구독자의 공통 요청을 무효화하지 않는다", async () => {
+    let resolveChecklist: (value: MyChecklistModel) => void = () => undefined;
+    let dataSourceSignal: AbortSignal | undefined;
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockImplementation((signal) => {
+      dataSourceSignal = signal;
+      return new Promise((resolve) => {
+        resolveChecklist = resolve;
+      });
+    });
+    const repository = createMyChecklistQueryRepository(dataSource);
+    const sharedRequest = repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+    const revision = repository.getRevision();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(repository.refresh(controller.signal)).rejects.toBeInstanceOf(
+      MyChecklistRequestAbortedError,
+    );
+
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+    expect(dataSourceSignal?.aborted).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+    expect(repository.getRevision()).toBe(revision);
+
+    resolveChecklist(checklist);
+    await expect(sharedRequest).resolves.toBe(checklist);
+  });
+
   it("모든 구독자가 취소되면 공통 요청을 취소한다", async () => {
     let dataSourceSignal: AbortSignal | undefined;
     const dataSource = createDataSource();

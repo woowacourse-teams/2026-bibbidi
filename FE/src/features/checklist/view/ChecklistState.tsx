@@ -1,11 +1,16 @@
 import "./ChecklistState.css";
 
 interface ChecklistStateProps {
+  errorMessage?: string;
   onRetry?: () => void;
   status: "authentication-required" | "empty" | "error" | "loading";
 }
 
-export function ChecklistState({ onRetry, status }: ChecklistStateProps) {
+export function ChecklistState({
+  errorMessage,
+  onRetry,
+  status,
+}: ChecklistStateProps) {
   if (status === "loading") {
     return (
       <div className="checklist-state" role="status">
@@ -35,7 +40,7 @@ export function ChecklistState({ onRetry, status }: ChecklistStateProps) {
 
   return (
     <div className="checklist-state" role="alert">
-      <p>체크리스트를 불러오지 못했어요.</p>
+      <p>{errorMessage ?? "체크리스트를 불러오지 못했어요."}</p>
       <button onClick={onRetry} type="button">
         다시 시도
       </button>

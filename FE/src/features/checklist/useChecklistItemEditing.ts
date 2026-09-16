@@ -26,6 +26,7 @@ export function useChecklistItemEditing(
   refreshAuth: () => void,
   audience: ChecklistAudience | undefined,
   activeItemId?: number | null,
+  onRefreshFailed?: (message: string) => void,
 ): ChecklistItemEditingController {
   const [categoryEditSession, setCategoryEditSession] =
     useState<ChecklistItemCategoryEditSession | null>(null);
@@ -172,6 +173,13 @@ export function useChecklistItemEditing(
           return { ok: false };
         }
 
+        if (
+          error instanceof ChecklistItemChangeError &&
+          error.reason === "refresh-failed"
+        ) {
+          onRefreshFailed?.(error.message);
+        }
+
         setChangeFeedback({
           errorMessage:
             error instanceof ChecklistItemChangeError
@@ -188,7 +196,7 @@ export function useChecklistItemEditing(
         }
       }
     },
-    [refreshAuth],
+    [onRefreshFailed, refreshAuth],
   );
 
   return {

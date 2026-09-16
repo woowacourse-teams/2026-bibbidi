@@ -129,11 +129,13 @@ function createEditableChecklistQuery(): ChecklistQueryModel {
 
 function EditableChecklistHarness({
   changeCategory = vi.fn().mockResolvedValue(true),
+  confirmStatusChange = vi.fn().mockResolvedValue(true),
   changeTitle = vi.fn().mockResolvedValue(true),
   requestStatusChange = vi.fn().mockResolvedValue("changed"),
   initialSelectedTaskId = "checklist-item-500",
 }: {
   changeCategory?: (itemId: number, categoryId: string) => Promise<boolean>;
+  confirmStatusChange?: (itemId: number) => Promise<boolean>;
   changeTitle?: (itemId: number, title: string) => Promise<boolean>;
   requestStatusChange?: ChecklistItemEditingController["requestStatusChange"];
   initialSelectedTaskId?: string | null;
@@ -213,18 +215,25 @@ function EditableChecklistHarness({
     },
     changeFeedback,
     async confirmStatusChange(itemId) {
-      setChecklist((current) => ({
-        categories: current.categories.map((category) => ({
-          ...category,
-          items: category.items.map((item) =>
-            item.checklistItemId === itemId
-              ? { ...item, status: "done" }
-              : item,
-          ),
-        })),
-      }));
-      setStatusConfirmation(null);
-      return true;
+      setChangeFeedback({ itemId, kind: "status", status: "pending" });
+      const didChange = await confirmStatusChange(itemId);
+
+      if (didChange) {
+        setChecklist((current) => ({
+          categories: current.categories.map((category) => ({
+            ...category,
+            items: category.items.map((item) =>
+              item.checklistItemId === itemId
+                ? { ...item, status: "done" }
+                : item,
+            ),
+          })),
+        }));
+        setStatusConfirmation(null);
+        setChangeFeedback({ status: "idle" });
+      }
+
+      return didChange;
     },
     async requestStatusChange(itemId, status) {
       setChangeFeedback({ itemId, kind: "status", status: "pending" });
@@ -669,6 +678,43 @@ describe("Checklist 할 일 편집", () => {
         .getAttribute("aria-valuenow"),
     ).toBe("50");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("완료 변경 중 Escape는 dialog에서 소비하고 활성 요청을 유지한다", async () => {
+    let resolveStatusChange: (value: boolean) => void = () => undefined;
+    const confirmStatusChange = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveStatusChange = resolve;
+        }),
+    );
+    render(
+      <EditableChecklistHarness
+        confirmStatusChange={confirmStatusChange}
+        requestStatusChange={vi.fn().mockResolvedValue("confirmation-required")}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
+
+    expect(
+      within(dialog).getByRole("button", { name: "변경 중" }),
+    ).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.querySelector(".checklist-detail-panel")).not.toBeNull();
+    expect(confirmStatusChange).toHaveBeenCalledOnce();
+
+    await act(async () => resolveStatusChange(true));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("상태 사전 조회 중 다른 항목을 선택하면 이전 항목 확인창을 표시하지 않는다", async () => {

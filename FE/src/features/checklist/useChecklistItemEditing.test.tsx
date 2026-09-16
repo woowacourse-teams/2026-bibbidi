@@ -296,8 +296,15 @@ describe("useChecklistItemEditing 상태 변경", () => {
         "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
       ),
     );
+    const onRefreshFailed = vi.fn();
     const { result } = renderHook(() =>
-      useChecklistItemEditing(repository, vi.fn(), "authenticated", 500),
+      useChecklistItemEditing(
+        repository,
+        vi.fn(),
+        "authenticated",
+        500,
+        onRefreshFailed,
+      ),
     );
 
     await act(async () => {
@@ -319,6 +326,9 @@ describe("useChecklistItemEditing 상태 변경", () => {
       500,
       "done",
       expect.any(AbortSignal),
+    );
+    expect(onRefreshFailed).toHaveBeenCalledWith(
+      "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
     );
     await expect(result.current.confirmStatusChange(500)).resolves.toBe(false);
     expect(repository.changeItemStatus).toHaveBeenCalledOnce();

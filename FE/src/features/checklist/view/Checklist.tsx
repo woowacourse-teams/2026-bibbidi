@@ -450,11 +450,11 @@ export function Checklist({
               ) : null}
             </>
           }
-          onEscape={
-            isStatusChangePending
-              ? undefined
-              : () => itemEditing?.cancelStatusChange(statusConfirmation.itemId)
-          }
+          onEscape={() => {
+            if (!isStatusChangePending) {
+              itemEditing?.cancelStatusChange(statusConfirmation.itemId);
+            }
+          }}
           title="남은 일정도 완료할까요?"
         />
       ) : null}
