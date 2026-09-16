@@ -24,7 +24,7 @@ describe("createUpcomingScheduleViewModel", () => {
       ],
     });
 
-    expect(viewModel.countLabel).toBe("2개");
+    expect(viewModel).not.toHaveProperty("countLabel");
     expect(viewModel.items.map((item) => item.id)).toEqual(["2", "1"]);
     expect(viewModel.items[0]).toMatchObject({
       detailLabel: "시간 미정 · 장소 없음",

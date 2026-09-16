@@ -4,19 +4,19 @@ import {
 } from "../model/unscheduledTask";
 
 const statusLabels: Record<UnscheduledTaskStatus, string> = {
-  "in-progress": "진행 중",
+  continue: "진행 중",
+  prev: "미완료",
 };
 
 export interface UnscheduledTaskItemViewModel {
   categoryLabel: string;
-  id: string;
+  id: number;
   statusLabel: string;
   title: string;
 }
 
 export interface UnscheduledTaskViewModel {
   addScheduleLabel: string;
-  countLabel: string;
   items: UnscheduledTaskItemViewModel[];
   title: string;
 }
@@ -26,7 +26,6 @@ export function createUnscheduledTaskViewModel(
 ): UnscheduledTaskViewModel {
   return {
     addScheduleLabel: "일정 추가",
-    countLabel: `${model.tasks.length}개`,
     items: model.tasks.map((task) => ({
       categoryLabel: task.category,
       id: task.id,

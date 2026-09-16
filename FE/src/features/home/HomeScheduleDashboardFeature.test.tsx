@@ -6,7 +6,13 @@ import { HomeScheduleDashboardFeature } from "./HomeScheduleDashboardFeature";
 import {
   NearbyAppointmentsAuthenticationRequiredError,
   NearbyAppointmentsRepository,
+  NearbyAppointmentsRequestAbortedError,
 } from "./repository/nearbyAppointmentsRepository";
+import {
+  UnscheduledTasksAuthenticationRequiredError,
+  UnscheduledTasksRepository,
+  UnscheduledTasksRequestAbortedError,
+} from "./repository/unscheduledTasksRepository";
 
 vi.mock("../auth", () => ({
   useAuth: vi.fn(),
@@ -18,6 +24,21 @@ function createRepository(): NearbyAppointmentsRepository {
   return {
     getNearbyAppointments: vi.fn().mockResolvedValue([]),
   };
+}
+
+function createUnscheduledRepository(): UnscheduledTasksRepository {
+  return {
+    getUnscheduledTasks: vi.fn().mockResolvedValue([]),
+  };
+}
+
+function createDeferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolveRequest) => {
+    resolve = resolveRequest;
+  });
+
+  return { promise, resolve };
 }
 
 beforeEach(() => {
@@ -42,6 +63,7 @@ describe("HomeScheduleDashboardFeature", () => {
       >[0]
     >[0] = () => undefined;
     const repository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
     vi.mocked(repository.getNearbyAppointments).mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve;
@@ -51,11 +73,16 @@ describe("HomeScheduleDashboardFeature", () => {
     render(
       <HomeScheduleDashboardFeature
         getReferenceDate={() => "2026-09-16"}
-        repository={repository}
+        nearbyRepository={repository}
+        unscheduledRepository={unscheduledRepository}
       />,
     );
 
     expect(screen.getByText("가까운 일정을 불러오는 중입니다.")).toBeTruthy();
+    expect(
+      screen.getByText("일정이 필요한 할 일을 불러오는 중입니다."),
+    ).toBeTruthy();
+    expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledOnce();
 
     await act(async () => {
       resolveRequest([
@@ -79,7 +106,7 @@ describe("HomeScheduleDashboardFeature", () => {
     const upcomingSection = screen.getByRole("region", {
       name: "가까운 일정",
     });
-    expect(within(upcomingSection).getByText("2개")).toBeTruthy();
+    expect(within(upcomingSection).queryByText("2개")).toBeNull();
     expect(
       within(upcomingSection)
         .getAllByRole("heading", { level: 3 })
@@ -105,20 +132,22 @@ describe("HomeScheduleDashboardFeature", () => {
     render(
       <HomeScheduleDashboardFeature
         getReferenceDate={() => "2026-09-16"}
-        repository={createRepository()}
+        nearbyRepository={createRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
       />,
     );
 
     expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
     expect(
-      within(screen.getByRole("region", { name: "가까운 일정" })).getByText(
+      within(screen.getByRole("region", { name: "가까운 일정" })).queryByText(
         "0개",
       ),
-    ).toBeTruthy();
+    ).toBeNull();
   });
 
   it("오류를 Error UI로 전환하고 다시 시도한다", async () => {
     const repository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
     vi.mocked(repository.getNearbyAppointments)
       .mockRejectedValueOnce(new Error("서버 내부 메시지"))
       .mockResolvedValueOnce([]);
@@ -126,7 +155,8 @@ describe("HomeScheduleDashboardFeature", () => {
     render(
       <HomeScheduleDashboardFeature
         getReferenceDate={() => "2026-09-16"}
-        repository={repository}
+        nearbyRepository={repository}
+        unscheduledRepository={unscheduledRepository}
       />,
     );
 
@@ -136,6 +166,7 @@ describe("HomeScheduleDashboardFeature", () => {
 
     expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
     expect(repository.getNearbyAppointments).toHaveBeenCalledTimes(2);
+    expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledOnce();
   });
 
   it("인증 오류에서 refreshAuth를 호출한다", async () => {
@@ -147,7 +178,8 @@ describe("HomeScheduleDashboardFeature", () => {
     render(
       <HomeScheduleDashboardFeature
         getReferenceDate={() => "2026-09-16"}
-        repository={repository}
+        nearbyRepository={repository}
+        unscheduledRepository={createUnscheduledRepository()}
       />,
     );
 
@@ -159,16 +191,239 @@ describe("HomeScheduleDashboardFeature", () => {
 
   it("unmount 시 진행 중인 요청을 취소한다", () => {
     const repository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
     vi.mocked(repository.getNearbyAppointments).mockReturnValue(
       new Promise(() => undefined),
     );
+    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockReturnValue(
+      new Promise(() => undefined),
+    );
     const { unmount } = render(
-      <HomeScheduleDashboardFeature repository={repository} />,
+      <HomeScheduleDashboardFeature
+        nearbyRepository={repository}
+        unscheduledRepository={unscheduledRepository}
+      />,
     );
     const signal = vi.mocked(repository.getNearbyAppointments).mock.calls[0][0];
+    const unscheduledSignal = vi.mocked(
+      unscheduledRepository.getUnscheduledTasks,
+    ).mock.calls[0][0];
 
     expect(signal?.aborted).toBe(false);
+    expect(unscheduledSignal?.aborted).toBe(false);
     unmount();
     expect(signal?.aborted).toBe(true);
+    expect(unscheduledSignal?.aborted).toBe(true);
+  });
+
+  it("일정이 필요한 할 일의 Loading에서 API 순서와 상태 라벨을 유지한 Complete 목록으로 전환한다", async () => {
+    const deferred =
+      createDeferred<
+        Awaited<ReturnType<UnscheduledTasksRepository["getUnscheduledTasks"]>>
+      >();
+    const nearbyRepository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
+    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockReturnValue(
+      deferred.promise,
+    );
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+
+    expect(
+      screen.getByText("일정이 필요한 할 일을 불러오는 중입니다."),
+    ).toBeTruthy();
+    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+
+    await act(async () => {
+      deferred.resolve([
+        {
+          category: "가족",
+          id: 44,
+          status: "continue",
+          title: "부모님께 인사",
+        },
+        { category: "웨딩홀", id: 31, status: "prev", title: "웨딩홀 투어" },
+        { category: "예식", id: 52, status: "prev", title: "식순 준비" },
+      ]);
+    });
+
+    const section = screen.getByRole("region", {
+      name: "일정이 필요한 할 일",
+    });
+    expect(within(section).queryByText("3개")).toBeNull();
+    expect(within(section).getByRole("list").parentElement).toBe(section);
+    expect(
+      within(section)
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["부모님께 인사", "웨딩홀 투어", "식순 준비"]);
+    expect(within(section).getByText("진행 중")).toBeTruthy();
+    expect(within(section).getAllByText("미완료")).toHaveLength(2);
+    expect(within(section).getByText("가족")).toBeTruthy();
+    expect(within(section).getByText("웨딩홀")).toBeTruthy();
+    const addButtons = within(section).getAllByRole("button", {
+      name: "일정 추가",
+    });
+    expect(addButtons).toHaveLength(3);
+    expect(addButtons.every((button) => button.hasAttribute("disabled"))).toBe(
+      true,
+    );
+  });
+
+  it("일정이 필요한 할 일의 빈 응답을 Empty UI로 전환한다", async () => {
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    expect(
+      await screen.findByText("일정이 필요한 할 일이 없어요"),
+    ).toBeTruthy();
+    expect(
+      within(
+        screen.getByRole("region", { name: "일정이 필요한 할 일" }),
+      ).queryByText("0개"),
+    ).toBeNull();
+  });
+
+  it("일정이 필요한 할 일 오류만 재시도하고 가까운 일정 결과를 유지한다", async () => {
+    const nearbyRepository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
+    vi.mocked(unscheduledRepository.getUnscheduledTasks)
+      .mockRejectedValueOnce(new Error("서버 내부 메시지"))
+      .mockResolvedValueOnce([]);
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+
+    expect(await screen.findByText("할 일을 불러오지 못했어요")).toBeTruthy();
+    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+    expect(screen.queryByText("서버 내부 메시지")).toBeNull();
+    fireEvent.click(
+      within(
+        screen.getByRole("region", { name: "일정이 필요한 할 일" }),
+      ).getByRole("button", { name: "다시 시도" }),
+    );
+
+    expect(
+      await screen.findByText("일정이 필요한 할 일이 없어요"),
+    ).toBeTruthy();
+    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
+    expect(nearbyRepository.getNearbyAppointments).toHaveBeenCalledOnce();
+    expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledTimes(2);
+  });
+
+  it("가까운 일정 오류가 일정이 필요한 할 일의 정상 결과를 숨기지 않는다", async () => {
+    const nearbyRepository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
+    vi.mocked(nearbyRepository.getNearbyAppointments).mockRejectedValue(
+      new Error("일정 서버 오류"),
+    );
+    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockResolvedValue([
+      { category: "웨딩홀", id: 31, status: "prev", title: "웨딩홀 투어" },
+    ]);
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+
+    expect(await screen.findByText("일정을 불러오지 못했어요")).toBeTruthy();
+    expect(await screen.findByText("웨딩홀 투어")).toBeTruthy();
+  });
+
+  it("일정이 필요한 할 일 인증 오류에서 refreshAuth를 호출한다", async () => {
+    const unscheduledRepository = createUnscheduledRepository();
+    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockRejectedValue(
+      new UnscheduledTasksAuthenticationRequiredError(),
+    );
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(refreshAuth).toHaveBeenCalledOnce();
+    expect(screen.queryByText("할 일을 불러오지 못했어요")).toBeNull();
+  });
+
+  it("호출자 취소는 어느 영역에서도 오류로 표시하지 않는다", async () => {
+    const nearbyRepository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
+    vi.mocked(nearbyRepository.getNearbyAppointments).mockRejectedValue(
+      new NearbyAppointmentsRequestAbortedError(),
+    );
+    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockRejectedValue(
+      new UnscheduledTasksRequestAbortedError(),
+    );
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(screen.queryByText("일정을 불러오지 못했어요")).toBeNull();
+    expect(screen.queryByText("할 일을 불러오지 못했어요")).toBeNull();
+  });
+
+  it("요청 교체 시 이전 요청을 취소하고 늦은 응답을 무시한다", async () => {
+    const previousRequest =
+      createDeferred<
+        Awaited<ReturnType<UnscheduledTasksRepository["getUnscheduledTasks"]>>
+      >();
+    const previousRepository = createUnscheduledRepository();
+    const nextRepository = createUnscheduledRepository();
+    const nearbyRepository = createRepository();
+    vi.mocked(previousRepository.getUnscheduledTasks).mockReturnValue(
+      previousRequest.promise,
+    );
+    vi.mocked(nextRepository.getUnscheduledTasks).mockResolvedValue([
+      { category: "가족", id: 44, status: "continue", title: "새 응답" },
+    ]);
+
+    const { rerender } = render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={previousRepository}
+      />,
+    );
+    const previousSignal = vi.mocked(previousRepository.getUnscheduledTasks)
+      .mock.calls[0][0];
+
+    rerender(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        unscheduledRepository={nextRepository}
+      />,
+    );
+
+    expect(previousSignal?.aborted).toBe(true);
+    expect(await screen.findByText("새 응답")).toBeTruthy();
+    await act(async () => {
+      previousRequest.resolve([
+        { category: "웨딩홀", id: 31, status: "prev", title: "늦은 응답" },
+      ]);
+    });
+    expect(screen.queryByText("늦은 응답")).toBeNull();
+    expect(nearbyRepository.getNearbyAppointments).toHaveBeenCalledOnce();
   });
 });
