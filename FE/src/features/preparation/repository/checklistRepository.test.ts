@@ -44,6 +44,7 @@ function createCommandRepository(): MyChecklistCommandRepository {
   return {
     changeItemCategory: vi.fn().mockResolvedValue(undefined),
     changeItemTitle: vi.fn().mockResolvedValue(undefined),
+    createCustomItem: vi.fn().mockResolvedValue(undefined),
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
     reconcileMissingChecklist: vi.fn().mockResolvedValue(undefined),
   };

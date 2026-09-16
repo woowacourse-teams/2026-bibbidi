@@ -97,6 +97,18 @@ function StatefulCreationHarness({
   );
 }
 
+function SessionAwareCreationHarness({
+  onOpenChange,
+  sessionIdentity,
+}: {
+  onOpenChange: (isOpen: boolean) => void;
+  sessionIdentity: string;
+}) {
+  useChecklistTaskCreation({ onOpenChange, sessionIdentity });
+
+  return null;
+}
+
 function openForm() {
   fireEvent.click(screen.getByRole("button", { name: "할 일 추가 열기" }));
   return screen.getByRole("complementary", { name: "할 일 추가" });
@@ -112,6 +124,28 @@ afterEach(() => {
 });
 
 describe("할 일 추가 폼", () => {
+  it("닫힌 작성 세션은 사용자 변경 시 중복 close navigation을 만들지 않는다", async () => {
+    const onOpenChange = vi.fn();
+    const view = render(
+      <SessionAwareCreationHarness
+        onOpenChange={onOpenChange}
+        sessionIdentity="authenticated:first"
+      />,
+    );
+
+    view.rerender(
+      <SessionAwareCreationHarness
+        onOpenChange={onOpenChange}
+        sessionIdentity="authenticated:second"
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("데스크톱 패널을 열고 제목 입력에 초점을 둔다", () => {
     render(<CreationHarness onSubmit={vi.fn()} />);
 
