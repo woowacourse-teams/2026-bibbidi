@@ -14,6 +14,7 @@ import { UnscheduledTask } from "./UnscheduledTask";
 import { UpcomingSchedule } from "./UpcomingSchedule";
 
 interface HomeScheduleDashboardProps {
+  onRetryRecommended: () => void;
   onRetryUnscheduled: () => void;
   onRetryUpcoming: () => void;
   viewModel: HomeScheduleDashboardViewModel;
@@ -184,7 +185,6 @@ function RecommendedScheduleSkeleton() {
     <li className="home-dashboard-loading__recommended-card">
       <div className="home-dashboard-loading__recommended-meta">
         <span className="home-dashboard-loading__recommended-category" />
-        <span className="home-dashboard-loading__recommended-timing" />
       </div>
       <span className="home-dashboard-loading__recommended-title" />
       <span className="home-dashboard-loading__recommended-description" />
@@ -334,19 +334,29 @@ function UnscheduledTaskSection({
 }
 
 function RecommendedScheduleSection({
+  onRetry,
   viewModel,
 }: {
+  onRetry: () => void;
   viewModel: HomeScheduleDashboardRecommendedViewModel;
 }) {
   switch (viewModel.status) {
     case "loading":
       return <RecommendedScheduleLoading viewModel={viewModel} />;
     case "empty":
+      return (
+        <DashboardResultSection
+          className="home-dashboard-state__section--recommended"
+          id="dashboard-recommended-schedule"
+          viewModel={viewModel}
+        />
+      );
     case "error":
       return (
         <DashboardResultSection
           className="home-dashboard-state__section--recommended"
           id="dashboard-recommended-schedule"
+          onAction={onRetry}
           viewModel={viewModel}
         />
       );
@@ -358,6 +368,7 @@ function RecommendedScheduleSection({
 }
 
 export function HomeScheduleDashboard({
+  onRetryRecommended,
   onRetryUnscheduled,
   onRetryUpcoming,
   viewModel,
@@ -374,7 +385,10 @@ export function HomeScheduleDashboard({
           viewModel={viewModel.unscheduled}
         />
       </div>
-      <RecommendedScheduleSection viewModel={viewModel.recommended} />
+      <RecommendedScheduleSection
+        onRetry={onRetryRecommended}
+        viewModel={viewModel.recommended}
+      />
     </section>
   );
 }

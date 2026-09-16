@@ -179,7 +179,7 @@ function createRecommendedViewModel(
   switch (model.status) {
     case "loading":
       return {
-        loadingLabel: "추천 일정을 불러오는 중입니다.",
+        loadingLabel: "추천 할 일을 불러오는 중입니다.",
         status: model.status,
       };
     case "empty":
@@ -188,24 +188,24 @@ function createRecommendedViewModel(
         result: {
           actionLabel: "준비 목록 보기",
           actionVariant: "link",
-          description: "현재 준비 단계에 필요한 일정을 모두 추가했어요",
+          description: "새로 추가할 준비 목록의 할 일이 없어요",
           icon: "calendar-heart",
           isActionDisabled: true,
-          title: "추천할 일정이 없어요",
+          title: "추천할 일이 없어요",
           tone: "neutral",
         },
         status: model.status,
-        title: "추가하면 좋은 일정",
+        title: "추천 할 일",
       };
     case "error":
       return {
-        result: createErrorResult("추천 일정을 불러오지 못했어요"),
+        result: createErrorResult("추천 할 일을 불러오지 못했어요", false),
         status: model.status,
-        title: "추가하면 좋은 일정",
+        title: "추천 할 일",
       };
     case "complete":
       return {
-        content: createRecommendedScheduleViewModel(model.schedules),
+        content: createRecommendedScheduleViewModel(model.recommendedItems),
         status: model.status,
       };
     default:

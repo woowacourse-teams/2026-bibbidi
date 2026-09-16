@@ -3,19 +3,25 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth";
 import {
   nearbyAppointmentsRepository,
+  recommendedCatalogItemsRepository,
   unscheduledTasksRepository,
 } from "./homeDependencies";
 import {
   HomeScheduleDashboardModel,
+  HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
   HomeScheduleDashboardUpcomingModel,
 } from "./model/homeScheduleDashboard";
-import { recommendedScheduleListMock } from "./model/recommendedSchedule.mock";
 import { NearbyAppointmentsRepository } from "./repository/nearbyAppointmentsRepository";
 import {
   NearbyAppointmentsAuthenticationRequiredError,
   NearbyAppointmentsRequestAbortedError,
 } from "./repository/nearbyAppointmentsRepository";
+import {
+  RecommendedCatalogItemsAuthenticationRequiredError,
+  RecommendedCatalogItemsRepository,
+  RecommendedCatalogItemsRequestAbortedError,
+} from "./repository/recommendedCatalogItemsRepository";
 import {
   UnscheduledTasksAuthenticationRequiredError,
   UnscheduledTasksRepository,
@@ -26,8 +32,7 @@ import { HomeScheduleDashboard } from "./view/HomeScheduleDashboard";
 
 const initialModel: HomeScheduleDashboardModel = {
   recommended: {
-    schedules: recommendedScheduleListMock,
-    status: "complete",
+    status: "loading",
   },
   unscheduled: {
     status: "loading",
@@ -48,21 +53,27 @@ function getLocalDate(now = new Date()) {
 interface HomeScheduleDashboardFeatureProps {
   getReferenceDate?: () => string;
   nearbyRepository?: NearbyAppointmentsRepository;
+  recommendedRepository?: RecommendedCatalogItemsRepository;
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
 export function HomeScheduleDashboardFeature({
   getReferenceDate = getLocalDate,
   nearbyRepository = nearbyAppointmentsRepository,
+  recommendedRepository = recommendedCatalogItemsRepository,
   unscheduledRepository = unscheduledTasksRepository,
 }: HomeScheduleDashboardFeatureProps) {
   const { refreshAuth } = useAuth();
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
+  const [recommended, setRecommended] =
+    useState<HomeScheduleDashboardRecommendedModel>(initialModel.recommended);
   const [upcoming, setUpcoming] = useState<HomeScheduleDashboardUpcomingModel>(
     initialModel.upcoming,
   );
   const [unscheduledRequestRevision, setUnscheduledRequestRevision] =
+    useState(0);
+  const [recommendedRequestRevision, setRecommendedRequestRevision] =
     useState(0);
   const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
 
@@ -155,6 +166,47 @@ export function HomeScheduleDashboardFeature({
     };
   }, [refreshAuth, unscheduledRepository, unscheduledRequestRevision]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let isActive = true;
+
+    recommendedRepository.getRecommendedCatalogItems(controller.signal).then(
+      (items) => {
+        if (!isActive) {
+          return;
+        }
+
+        setRecommended(
+          items.length === 0
+            ? { status: "empty" }
+            : { recommendedItems: { items }, status: "complete" },
+        );
+      },
+      (error: unknown) => {
+        if (
+          !isActive ||
+          error instanceof RecommendedCatalogItemsRequestAbortedError
+        ) {
+          return;
+        }
+
+        if (
+          error instanceof RecommendedCatalogItemsAuthenticationRequiredError
+        ) {
+          refreshAuth();
+          return;
+        }
+
+        setRecommended({ status: "error" });
+      },
+    );
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [recommendedRepository, recommendedRequestRevision, refreshAuth]);
+
   const retryUpcoming = useCallback(() => {
     setUpcoming({ status: "loading" });
     setUpcomingRequestRevision((revision) => revision + 1);
@@ -165,14 +217,21 @@ export function HomeScheduleDashboardFeature({
     setUnscheduledRequestRevision((revision) => revision + 1);
   }, []);
 
+  const retryRecommended = useCallback(() => {
+    setRecommended({ status: "loading" });
+    setRecommendedRequestRevision((revision) => revision + 1);
+  }, []);
+
   const viewModel = createHomeScheduleDashboardViewModel({
     ...initialModel,
+    recommended,
     unscheduled,
     upcoming,
   });
 
   return (
     <HomeScheduleDashboard
+      onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
       onRetryUpcoming={retryUpcoming}
       viewModel={viewModel}
