@@ -14,6 +14,10 @@ import {
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
+import {
+  ChecklistAppointmentCreationInput,
+  useChecklistAppointmentCreation,
+} from "./useChecklistAppointmentCreation";
 import { useChecklistTaskCreation } from "./useChecklistTaskCreation";
 import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationCommand";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
@@ -47,6 +51,12 @@ type ChecklistRequestState =
 
 type LoginRequiredReason = "schedule-creation" | "task-creation";
 
+interface ChecklistFeatureProps {
+  onSubmitAppointment?: (
+    input: ChecklistAppointmentCreationInput,
+  ) => Promise<boolean | void> | boolean | void;
+}
+
 function isRequestAborted(error: unknown): boolean {
   return error instanceof ChecklistQueryRequestAbortedError;
 }
@@ -77,7 +87,9 @@ function getSelectedChecklistItemId(taskId: string | null): number | null {
   return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : null;
 }
 
-export function ChecklistFeature() {
+export function ChecklistFeature({
+  onSubmitAppointment,
+}: ChecklistFeatureProps = {}) {
   const { authState, refreshAuth } = useAuth();
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
@@ -98,6 +110,7 @@ export function ChecklistFeature() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get("taskId");
+  const selectedChecklistItemId = getSelectedChecklistItemId(selectedTaskId);
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
@@ -120,7 +133,7 @@ export function ChecklistFeature() {
     checklistCommandRepository,
     refreshAuth,
     audience,
-    getSelectedChecklistItemId(selectedTaskId),
+    selectedChecklistItemId,
     handleRefreshFailed,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
@@ -160,11 +173,34 @@ export function ChecklistFeature() {
     sessionIdentity,
     submissionState: taskCreationCommand.submissionState,
   });
+  const appointmentCreationChecklistItemId =
+    requestState.status === "success" &&
+    requestState.audience === audience &&
+    requestState.checklist.categories.some((category) =>
+      category.items.some(
+        (item) =>
+          item.id === selectedTaskId &&
+          item.checklistItemId === selectedChecklistItemId,
+      ),
+    )
+      ? selectedChecklistItemId
+      : null;
+  const appointmentCreation = useChecklistAppointmentCreation({
+    checklistItemId: appointmentCreationChecklistItemId,
+    isAuthenticated: audience === "authenticated",
+    onSubmit: onSubmitAppointment,
+    sessionIdentity,
+  });
   const requestScheduleCreation = useCallback(() => {
     if (audience === "guest") {
       setLoginRequiredReason("schedule-creation");
+      return;
     }
-  }, [audience]);
+
+    if (audience === "authenticated") {
+      appointmentCreation.open();
+    }
+  }, [appointmentCreation, audience]);
 
   useEffect(() => {
     if (!audience) {
@@ -408,6 +444,9 @@ export function ChecklistFeature() {
 
   return (
     <Checklist
+      appointmentCreation={
+        audience === "authenticated" ? appointmentCreation : undefined
+      }
       categories={createChecklistViewModel(requestState.checklist)}
       isAuthenticated={audience === "authenticated"}
       itemEditing={audience === "authenticated" ? itemEditing : undefined}

@@ -14,6 +14,7 @@
 @media (min-width: 761px) {
   .service-layout:has(
     .checklist-detail-panel,
+    .checklist-appointment-creation--desktop,
     .checklist-task-creation--desktop
   ) {
     --service-side-panel-width: 480px;

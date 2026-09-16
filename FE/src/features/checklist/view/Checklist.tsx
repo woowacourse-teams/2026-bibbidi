@@ -2,15 +2,18 @@ import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
+import { ChecklistAppointmentCreationController } from "../useChecklistAppointmentCreation";
 import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
+import { ChecklistAppointmentCreation } from "./ChecklistAppointmentCreation";
 import { ChecklistModalDialog } from "./ChecklistModalDialog";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailPage } from "./ChecklistTaskDetailPage";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
+  appointmentCreation?: ChecklistAppointmentCreationController;
   categories: ChecklistCategoryViewModel[];
   isAuthenticated?: boolean;
   itemEditing?: ChecklistItemEditingController;
@@ -38,6 +41,7 @@ function canRestoreFocus(
 }
 
 export function Checklist({
+  appointmentCreation,
   categories,
   isAuthenticated = false,
   itemEditing,
@@ -64,6 +68,12 @@ export function Checklist({
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const addTaskButtonRef = useRef<HTMLButtonElement>(null);
   const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
+  const wasAppointmentCreationOpenRef = useRef(
+    appointmentCreation?.isOpen ?? false,
+  );
+  const appointmentCreationTaskIdRef = useRef(
+    appointmentCreation?.isOpen ? selectedTaskId : null,
+  );
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
   const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -77,6 +87,7 @@ export function Checklist({
     (task) => task.status === "complete",
   ).length;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
+  const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
   const pendingStatusConfirmation = itemEditing?.statusConfirmation ?? null;
   const statusConfirmation =
     pendingStatusConfirmation?.itemId ===
@@ -133,7 +144,33 @@ export function Checklist({
   }, [isTaskCreationOpen, selectedTaskContext]);
 
   useEffect(() => {
-    if (!selectedTaskContext) {
+    if (
+      !wasAppointmentCreationOpenRef.current &&
+      isAppointmentCreationOpen &&
+      selectedTaskContext
+    ) {
+      appointmentCreationTaskIdRef.current = selectedTaskContext.task.id;
+    }
+
+    if (
+      wasAppointmentCreationOpenRef.current &&
+      !isAppointmentCreationOpen &&
+      selectedTaskContext?.task.id === appointmentCreationTaskIdRef.current
+    ) {
+      document
+        .getElementById(`${selectedTaskContext.task.id}-add-appointment`)
+        ?.focus();
+    }
+
+    if (!isAppointmentCreationOpen) {
+      appointmentCreationTaskIdRef.current = null;
+    }
+
+    wasAppointmentCreationOpenRef.current = isAppointmentCreationOpen;
+  }, [isAppointmentCreationOpen, selectedTaskContext]);
+
+  useEffect(() => {
+    if (!selectedTaskContext || isAppointmentCreationOpen) {
       return;
     }
 
@@ -152,6 +189,7 @@ export function Checklist({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     isMobileLayout,
+    isAppointmentCreationOpen,
     onBackTaskDetail,
     onCloseTaskDetail,
     selectedTaskContext,
@@ -363,7 +401,10 @@ export function Checklist({
           isLoginRequiredOpen || isStatusConfirmationOpen ? true : undefined
         }
       >
-        {selectedTaskContext && !isMobileLayout && !isTaskCreationOpen ? (
+        {selectedTaskContext &&
+        !isMobileLayout &&
+        !isTaskCreationOpen &&
+        !isAppointmentCreationOpen ? (
           <ChecklistTaskDetailPanel
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
@@ -374,7 +415,10 @@ export function Checklist({
           />
         ) : null}
 
-        {selectedTaskContext && isMobileLayout && !isTaskCreationOpen ? (
+        {selectedTaskContext &&
+        isMobileLayout &&
+        !isTaskCreationOpen &&
+        !isAppointmentCreationOpen ? (
           <ChecklistTaskDetailPage
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
@@ -389,6 +433,15 @@ export function Checklist({
           <ChecklistTaskCreation
             categories={categories}
             controller={taskCreation}
+          />
+        ) : null}
+
+        {selectedTaskContext &&
+        appointmentCreation &&
+        isAppointmentCreationOpen ? (
+          <ChecklistAppointmentCreation
+            controller={appointmentCreation}
+            taskTitle={selectedTaskContext.task.title}
           />
         ) : null}
       </div>

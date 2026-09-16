@@ -98,6 +98,7 @@ export function ChecklistTaskDetailContent({
           {onRequestScheduleCreation ? (
             <button
               className="checklist-detail-content__add-appointment"
+              id={`${task.id}-add-appointment`}
               onClick={(event) => {
                 event.currentTarget.focus();
                 onRequestScheduleCreation();
