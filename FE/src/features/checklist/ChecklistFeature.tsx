@@ -14,6 +14,11 @@ import {
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
+import {
+  ChecklistTaskCreationInput,
+  ChecklistTaskCreationSubmissionState,
+  useChecklistTaskCreation,
+} from "./useChecklistTaskCreation";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
@@ -62,7 +67,17 @@ function createChecklistDetailState(state: unknown, depth: number) {
   };
 }
 
-export function ChecklistFeature() {
+export interface ChecklistFeatureProps {
+  customTaskSubmissionState?: ChecklistTaskCreationSubmissionState;
+  onSubmitCustomTask?: (
+    input: ChecklistTaskCreationInput,
+  ) => Promise<void> | void;
+}
+
+export function ChecklistFeature({
+  customTaskSubmissionState,
+  onSubmitCustomTask,
+}: ChecklistFeatureProps = {}) {
   const { authState, refreshAuth } = useAuth();
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
@@ -84,9 +99,36 @@ export function ChecklistFeature() {
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
+  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const isMobileLayout = useIsMobileLayout();
+  const selectedTaskId = searchParams.get("taskId");
+  const isTaskCreationOpen =
+    searchParams.get("addTask") === "true" && selectedTaskId === null;
+  const updateTaskCreation = useCallback(
+    (isOpen: boolean) => {
+      setSearchParams((currentSearchParams) => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams);
+
+        if (isOpen) {
+          nextSearchParams.set("addTask", "true");
+          nextSearchParams.delete("taskId");
+        } else {
+          nextSearchParams.delete("addTask");
+        }
+
+        return nextSearchParams;
+      });
+    },
+    [setSearchParams],
+  );
+  const taskCreation = useChecklistTaskCreation({
+    isOpen: audience === "authenticated" && isTaskCreationOpen,
+    onOpenChange: updateTaskCreation,
+    onSubmit: onSubmitCustomTask,
+    submissionState: customTaskSubmissionState,
+  });
 
   useEffect(() => {
     if (!audience) {
@@ -159,7 +201,6 @@ export function ChecklistFeature() {
     requestRevision,
   ]);
 
-  const selectedTaskId = searchParams.get("taskId");
   const updateTaskSelection = useCallback(
     (
       taskId: string | null,
@@ -172,6 +213,7 @@ export function ChecklistFeature() {
           nextSearchParams.delete("taskId");
         } else {
           nextSearchParams.set("taskId", taskId);
+          nextSearchParams.delete("addTask");
         }
 
         return nextSearchParams;
@@ -199,7 +241,7 @@ export function ChecklistFeature() {
   }, [location.state, navigate, selectedTaskId, updateTaskSelection]);
   const selectTask = useCallback(
     (taskId: string) => {
-      if (taskId !== selectedTaskId) {
+      if (taskId !== selectedTaskId || isTaskCreationOpen) {
         const currentDetailDepth = getChecklistDetailDepth(location.state);
         const nextDetailDepth =
           selectedTaskId === null
@@ -216,7 +258,7 @@ export function ChecklistFeature() {
         });
       }
     },
-    [location.state, selectedTaskId, updateTaskSelection],
+    [isTaskCreationOpen, location.state, selectedTaskId, updateTaskSelection],
   );
 
   useEffect(() => {
@@ -310,11 +352,26 @@ export function ChecklistFeature() {
   return (
     <Checklist
       categories={createChecklistViewModel(requestState.checklist)}
+      isAuthenticated={audience === "authenticated"}
+      isLoginRequiredOpen={isLoginRequiredOpen}
       itemEditing={audience === "authenticated" ? itemEditing : undefined}
       onBackTaskDetail={backFromTaskDetail}
+      onCancelLoginRequired={() => setIsLoginRequiredOpen(false)}
       onCloseTaskDetail={closeTaskDetail}
+      onOpenTaskCreation={() => {
+        if (audience === "authenticated") {
+          taskCreation.open();
+        } else {
+          setIsLoginRequiredOpen(true);
+        }
+      }}
       onSelectTask={selectTask}
+      onVisitLogin={() => {
+        setIsLoginRequiredOpen(false);
+        navigate("/login");
+      }}
       selectedTaskId={selectedTaskId}
+      taskCreation={taskCreation}
     />
   );
 }

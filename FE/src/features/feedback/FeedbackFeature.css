@@ -1,6 +1,6 @@
 .feedback-feature {
   position: fixed;
-  right: 28px;
+  right: calc(var(--service-side-panel-width, 0px) + 28px);
   bottom: 28px;
   z-index: 20;
   display: flex;

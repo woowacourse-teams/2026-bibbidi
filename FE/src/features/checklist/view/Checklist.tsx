@@ -2,18 +2,27 @@ import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
+import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
+import { ChecklistModalDialog } from "./ChecklistModalDialog";
+import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailPage } from "./ChecklistTaskDetailPage";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
+  isAuthenticated?: boolean;
+  isLoginRequiredOpen?: boolean;
   itemEditing?: ChecklistItemEditingController;
   onBackTaskDetail: () => void;
+  onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
+  onOpenTaskCreation?: () => void;
   onSelectTask: (taskId: string) => void;
+  onVisitLogin?: () => void;
   selectedTaskId: string | null;
+  taskCreation?: ChecklistTaskCreationController;
 }
 
 function canRestoreFocus(
@@ -29,11 +38,17 @@ function canRestoreFocus(
 
 export function Checklist({
   categories,
+  isAuthenticated = false,
+  isLoginRequiredOpen = false,
   itemEditing,
   onBackTaskDetail,
+  onCancelLoginRequired,
   onCloseTaskDetail,
+  onOpenTaskCreation,
   onSelectTask,
+  onVisitLogin,
   selectedTaskId,
+  taskCreation,
 }: ChecklistProps) {
   const [expandedCategoryIds, setExpandedCategoryIds] = useState(
     () =>
@@ -45,6 +60,8 @@ export function Checklist({
   );
   const isMobileLayout = useIsMobileLayout();
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
+  const addTaskButtonRef = useRef<HTMLButtonElement>(null);
+  const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
   const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -53,6 +70,11 @@ export function Checklist({
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
+  const tasks = categories.flatMap((category) => category.tasks);
+  const completedTaskCount = tasks.filter(
+    (task) => task.status === "complete",
+  ).length;
+  const isTaskCreationOpen = taskCreation?.isOpen ?? false;
 
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
@@ -74,6 +96,18 @@ export function Checklist({
       : null;
     previousSelectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskContext, selectedTaskId]);
+
+  useEffect(() => {
+    if (
+      wasTaskCreationOpenRef.current &&
+      !isTaskCreationOpen &&
+      !selectedTaskContext
+    ) {
+      addTaskButtonRef.current?.focus();
+    }
+
+    wasTaskCreationOpenRef.current = isTaskCreationOpen;
+  }, [isTaskCreationOpen, selectedTaskContext]);
 
   useEffect(() => {
     if (!selectedTaskContext) {
@@ -119,12 +153,17 @@ export function Checklist({
     onSelectTask(taskId);
   };
 
+  const isMobileForegroundOpen =
+    isMobileLayout && (selectedTaskContext !== undefined || isTaskCreationOpen);
+
   return (
     <div
       className={`checklist-workspace${
-        selectedTaskContext && !isMobileLayout
-          ? " checklist-workspace--detail-open"
-          : ""
+        isTaskCreationOpen && !isMobileLayout
+          ? " checklist-workspace--add-open"
+          : selectedTaskContext && !isMobileLayout
+            ? " checklist-workspace--detail-open"
+            : ""
       }${
         selectedTaskContext && isMobileLayout
           ? " checklist-workspace--mobile-detail-open"
@@ -132,11 +171,35 @@ export function Checklist({
       }`}
     >
       <div
-        aria-hidden={selectedTaskContext && isMobileLayout ? true : undefined}
+        aria-hidden={
+          isMobileForegroundOpen || isLoginRequiredOpen ? true : undefined
+        }
         className="checklist-workspace__main"
-        inert={selectedTaskContext && isMobileLayout ? true : undefined}
+        inert={isMobileForegroundOpen || isLoginRequiredOpen ? true : undefined}
       >
         <div aria-label="결혼 준비 체크리스트" className="checklist">
+          <header className="checklist__toolbar">
+            <div className="checklist__summary">
+              <h1>체크리스트</h1>
+              <p>
+                {isAuthenticated
+                  ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
+                  : "기기에서 저장 중"}
+              </p>
+            </div>
+            <button
+              className="checklist__add-task"
+              onClick={() => {
+                addTaskButtonRef.current?.focus();
+                onOpenTaskCreation?.();
+              }}
+              ref={addTaskButtonRef}
+              type="button"
+            >
+              <span aria-hidden="true">＋</span>할 일 추가
+            </button>
+          </header>
+
           {categories.map((category, categoryIndex) => {
             const isExpanded = expandedCategoryIds.has(category.id);
             const taskListId = `${category.id}-tasks`;
@@ -258,23 +321,64 @@ export function Checklist({
         </div>
       </div>
 
-      {selectedTaskContext && !isMobileLayout ? (
-        <ChecklistTaskDetailPanel
-          categories={categories}
-          categoryTitle={selectedTaskContext.categoryTitle}
-          editing={itemEditing}
-          onClose={onCloseTaskDetail}
-          task={selectedTaskContext.task}
-        />
-      ) : null}
+      <div
+        aria-hidden={isLoginRequiredOpen ? true : undefined}
+        className="checklist-workspace__foreground"
+        inert={isLoginRequiredOpen ? true : undefined}
+      >
+        {selectedTaskContext && !isMobileLayout && !isTaskCreationOpen ? (
+          <ChecklistTaskDetailPanel
+            categories={categories}
+            categoryTitle={selectedTaskContext.categoryTitle}
+            editing={itemEditing}
+            onClose={onCloseTaskDetail}
+            task={selectedTaskContext.task}
+          />
+        ) : null}
 
-      {selectedTaskContext && isMobileLayout ? (
-        <ChecklistTaskDetailPage
-          categories={categories}
-          categoryTitle={selectedTaskContext.categoryTitle}
-          editing={itemEditing}
-          onBack={onBackTaskDetail}
-          task={selectedTaskContext.task}
+        {selectedTaskContext && isMobileLayout && !isTaskCreationOpen ? (
+          <ChecklistTaskDetailPage
+            categories={categories}
+            categoryTitle={selectedTaskContext.categoryTitle}
+            editing={itemEditing}
+            onBack={onBackTaskDetail}
+            task={selectedTaskContext.task}
+          />
+        ) : null}
+
+        {taskCreation && isTaskCreationOpen ? (
+          <ChecklistTaskCreation
+            categories={categories}
+            controller={taskCreation}
+          />
+        ) : null}
+      </div>
+
+      {isLoginRequiredOpen ? (
+        <ChecklistModalDialog
+          actions={
+            <>
+              <button
+                className="checklist-dialog__button checklist-dialog__button--secondary"
+                onClick={onCancelLoginRequired}
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                className="checklist-dialog__button checklist-dialog__button--primary"
+                onClick={onVisitLogin}
+                type="button"
+              >
+                로그인
+              </button>
+            </>
+          }
+          description={
+            "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
+          }
+          onEscape={onCancelLoginRequired}
+          title="로그인이 필요해요"
         />
       ) : null}
     </div>

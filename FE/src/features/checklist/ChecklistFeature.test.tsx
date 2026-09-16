@@ -286,6 +286,130 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     ).toBeTruthy();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
+
+  it("비로그인 사용자에게 CTA와 로그인 안내를 제공하고 기존 로그인 경로로 이동한다", async () => {
+    renderChecklistFeature();
+    const addTaskButton = await screen.findByRole("button", {
+      name: "할 일 추가",
+    });
+
+    fireEvent.click(addTaskButton);
+    let dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    const background = document.querySelector(".checklist-workspace__main");
+    expect(background?.hasAttribute("inert")).toBe(true);
+    expect(background?.getAttribute("aria-hidden")).toBe("true");
+    expect(
+      within(dialog).getByText(/나만의 할 일을 추가하려면 로그인해 주세요/),
+    ).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "취소" })).toBe(
+      document.activeElement,
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(
+      screen.queryByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeNull();
+    expect(background?.hasAttribute("inert")).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(addTaskButton));
+
+    fireEvent.click(addTaskButton);
+    dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
+
+    expect(getCurrentUrl()).toBe("/login");
+  });
+
+  it("로그인 안내가 열리면 상세 패널을 포함한 배경 전체를 비활성화한다", async () => {
+    renderChecklistFeature();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+    const detailPanel = screen.getByRole("complementary", {
+      name: "로컬 체크리스트 항목",
+    });
+    const foreground = detailPanel.closest(".checklist-workspace__foreground");
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeTruthy();
+    expect(foreground?.hasAttribute("inert")).toBe(true);
+    expect(foreground?.getAttribute("aria-hidden")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(foreground?.hasAttribute("inert")).toBe(false);
+    expect(
+      screen.getByRole("complementary", { name: "로컬 체크리스트 항목" }),
+    ).toBe(detailPanel);
+  });
+
+  it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature();
+
+    fireEvent.click(await screen.findByRole("button", { name: "할 일 추가" }));
+
+    expect(getCurrentUrl()).toBe("/checklist?addTask=true");
+    const panel = screen.getByRole("complementary", { name: "할 일 추가" });
+    expect(within(panel).getByRole("textbox", { name: /할 일 제목/ })).toBe(
+      document.activeElement,
+    );
+    expect(
+      within(panel).getByRole("combobox", { name: /카테고리/ }),
+    ).toBeTruthy();
+    expect(
+      within(panel).getByRole("option", { name: "예식 준비" }),
+    ).toBeTruthy();
+    expect(
+      within(panel).getByRole("option", { name: "예복 준비" }),
+    ).toBeTruthy();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?filter=remaining"]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "할 일 추가" }));
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining&addTask=true");
+    expect(
+      screen.getByRole("complementary", { name: "할 일 추가" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /청첩장 문구 정하기/ }));
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=checklist-item-500",
+    );
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("complementary", { name: "할 일 추가" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+    expect(getCurrentUrl()).toBe("/checklist?filter=remaining&addTask=true");
+    expect(
+      screen.getByRole("complementary", { name: "할 일 추가" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("complementary", { name: "청첩장 문구 정하기" }),
+    ).toBeNull();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
 });
 
 describe("ChecklistFeature 상세 URL 선택", () => {
