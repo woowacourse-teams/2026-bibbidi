@@ -1,4 +1,5 @@
 export { ChecklistFeature } from "./ChecklistFeature";
+export type { ChecklistFeatureProps } from "./ChecklistFeature";
 export {
   MyChecklistProvider,
   useMyChecklistCommandRepository,
@@ -12,6 +13,10 @@ export type {
   ChecklistQueryItemModel,
   ChecklistQueryModel,
 } from "./model/checklistQuery";
+export type {
+  ChecklistTaskCreationInput,
+  ChecklistTaskCreationSubmissionState,
+} from "./useChecklistTaskCreation";
 export type {
   MyChecklistAppointmentModel,
   MyChecklistItemModel,
