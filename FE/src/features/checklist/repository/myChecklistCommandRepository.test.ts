@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   RemoteMyChecklistCommandDataSource,
+  RemoteChecklistItemChangeApiError,
+  RemoteChecklistItemChangeNetworkError,
+  RemoteChecklistItemChangeRequestAbortedError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationNetworkError,
   RemoteMyChecklistCreationRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
 import {
+  ChecklistItemChangeError,
   createMyChecklistCommandRepository,
   MyChecklistCreationError,
 } from "./myChecklistCommandRepository";
@@ -17,12 +21,16 @@ import {
 } from "./myChecklistQueryRepository";
 
 function createDataSource(): RemoteMyChecklistCommandDataSource {
-  return { createChecklist: vi.fn().mockResolvedValue(1) };
+  return {
+    changeChecklistItemTitle: vi.fn(),
+    createChecklist: vi.fn().mockResolvedValue(1),
+  };
 }
 
 function createQueryRepository(exists = true): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyItemTitleUpdate: vi.fn().mockReturnValue(true),
     getChecklist: vi.fn().mockResolvedValue({ exists, items: [] }),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
@@ -31,6 +39,145 @@ function createQueryRepository(exists = true): MyChecklistQueryRepository {
 }
 
 describe("MyChecklistCommandRepository", () => {
+  it("제목을 trim해 변경하고 성공 응답의 제목만 공통 캐시에 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeChecklistItemTitle).mockResolvedValue({
+      catalogItemId: null,
+      categoryId: 2,
+      id: 500,
+      status: "continue",
+      title: "청첩장 문구 최종 확정",
+    });
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await repository.changeItemTitle(500, "  청첩장 문구 최종 확정  ");
+
+    expect(dataSource.changeChecklistItemTitle).toHaveBeenCalledWith(
+      500,
+      "청첩장 문구 최종 확정",
+      undefined,
+    );
+    expect(queryRepository.applyItemTitleUpdate).toHaveBeenCalledWith(
+      500,
+      "청첩장 문구 최종 확정",
+    );
+    expect(queryRepository.getChecklist).not.toHaveBeenCalled();
+  });
+
+  it.each(["   ", "가".repeat(51)])(
+    "잘못된 제목은 원격 요청 전에 거부한다",
+    async (title) => {
+      const dataSource = createDataSource();
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        createQueryRepository(),
+      );
+
+      await expect(
+        repository.changeItemTitle(500, title),
+      ).rejects.toMatchObject({
+        reason: "invalid-request",
+      });
+      expect(dataSource.changeChecklistItemTitle).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [101, 400, "invalid-request"],
+    [203, 403, "forbidden"],
+    [304, 404, "item-not-found"],
+    [405, 422, "title-not-changeable"],
+  ] as const)(
+    "수정 API 오류를 Feature용 원인과 안전한 메시지로 변환한다",
+    async (errorCode, status, reason) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.changeChecklistItemTitle).mockRejectedValue(
+        new RemoteChecklistItemChangeApiError(
+          errorCode,
+          status,
+          "서버 안내 메시지",
+        ),
+      );
+      const queryRepository = createQueryRepository();
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        queryRepository,
+      );
+
+      const request = repository.changeItemTitle(500, "새 제목");
+
+      await expect(request).rejects.toMatchObject({
+        message: "서버 안내 메시지",
+        reason,
+      });
+      expect(queryRepository.applyItemTitleUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    new RemoteChecklistItemChangeApiError(0, 401),
+    new RemoteChecklistItemChangeApiError(201, 500),
+  ])("수정 API 인증 오류를 공통 인증 오류로 변환한다", async (error) => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeChecklistItemTitle).mockRejectedValue(error);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.changeItemTitle(500, "새 제목"),
+    ).rejects.toBeInstanceOf(MyChecklistAuthenticationRequiredError);
+  });
+
+  it("수정 요청 취소를 공통 요청 취소 오류로 변환한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeChecklistItemTitle).mockRejectedValue(
+      new RemoteChecklistItemChangeRequestAbortedError(),
+    );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.changeItemTitle(500, "새 제목"),
+    ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
+  });
+
+  it("네트워크·계약 오류와 캐시 반영 실패를 일반 수정 오류로 변환한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeChecklistItemTitle).mockRejectedValueOnce(
+      new RemoteChecklistItemChangeNetworkError(),
+    );
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.changeItemTitle(500, "새 제목"),
+    ).rejects.toBeInstanceOf(ChecklistItemChangeError);
+
+    vi.mocked(dataSource.changeChecklistItemTitle).mockResolvedValueOnce({
+      catalogItemId: null,
+      categoryId: 2,
+      id: 500,
+      status: "prev",
+      title: "새 제목",
+    });
+    vi.mocked(queryRepository.applyItemTitleUpdate).mockReturnValueOnce(false);
+
+    await expect(
+      repository.changeItemTitle(500, "새 제목"),
+    ).rejects.toBeInstanceOf(ChecklistItemChangeError);
+  });
+
   it("체크리스트가 존재하면 생성하지 않는다", async () => {
     const dataSource = createDataSource();
     const queryRepository = createQueryRepository();

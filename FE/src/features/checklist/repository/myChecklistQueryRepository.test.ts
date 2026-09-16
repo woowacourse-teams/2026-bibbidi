@@ -198,6 +198,74 @@ describe("MyChecklistQueryRepository", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("제목 부분 갱신은 다른 metadata·항목 순서·공통 GET 캐시를 보존한다", async () => {
+    const firstItem = {
+      ...checklist.items[0],
+      appointments: [
+        {
+          date: "2026-09-20",
+          endTime: null,
+          id: 91,
+          isDone: false,
+          memo: "기존 메모",
+          place: "서울",
+          startTime: null,
+          title: "기존 일정",
+        },
+      ],
+      sourceCatalogItemId: null,
+    };
+    const secondItem = {
+      appointments: [],
+      categoryId: 2,
+      id: 11,
+      isDone: false,
+      sourceCatalogItemId: 102,
+      title: "다른 항목",
+    };
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [firstItem, secondItem],
+    });
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+
+    expect(repository.applyItemTitleUpdate(10, "새 제목")).toBe(true);
+
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [
+        {
+          ...firstItem,
+          title: "새 제목",
+        },
+        secondItem,
+      ],
+    });
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledOnce();
+    expect(repository.getRevision()).toBe(2);
+  });
+
+  it("캐시에 없는 항목 수정은 캐시와 revision을 변경하지 않는다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+    const revision = repository.getRevision();
+
+    expect(repository.applyItemTitleUpdate(999, "없는 항목")).toBe(false);
+
+    await expect(repository.getChecklist()).resolves.toBe(checklist);
+    expect(repository.getRevision()).toBe(revision);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("초기 조회 전에 추가가 성공하면 조회를 유지하고 서버 결과 뒤에 추가 항목을 병합한다", async () => {
     let resolveChecklist: (value: MyChecklistModel) => void = () => undefined;
     let dataSourceSignal: AbortSignal | undefined;

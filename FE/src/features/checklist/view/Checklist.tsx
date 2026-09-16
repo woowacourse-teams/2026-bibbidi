@@ -1,6 +1,7 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
+import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
 import { ChecklistTaskDetailPage } from "./ChecklistTaskDetailPage";
@@ -8,6 +9,7 @@ import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
+  itemEditing?: ChecklistItemEditingController;
   onBackTaskDetail: () => void;
   onCloseTaskDetail: () => void;
   onSelectTask: (taskId: string) => void;
@@ -27,6 +29,7 @@ function canRestoreFocus(
 
 export function Checklist({
   categories,
+  itemEditing,
   onBackTaskDetail,
   onCloseTaskDetail,
   onSelectTask,
@@ -258,6 +261,7 @@ export function Checklist({
       {selectedTaskContext && !isMobileLayout ? (
         <ChecklistTaskDetailPanel
           categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
           onClose={onCloseTaskDetail}
           task={selectedTaskContext.task}
         />
@@ -266,6 +270,7 @@ export function Checklist({
       {selectedTaskContext && isMobileLayout ? (
         <ChecklistTaskDetailPage
           categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
           onBack={onBackTaskDetail}
           task={selectedTaskContext.task}
         />

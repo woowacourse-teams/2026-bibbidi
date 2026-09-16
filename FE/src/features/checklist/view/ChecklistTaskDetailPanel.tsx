@@ -1,15 +1,19 @@
+import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
+import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailPanel.css";
 
 interface ChecklistTaskDetailPanelProps {
   categoryTitle: string;
+  editing?: ChecklistItemEditingController;
   onClose: () => void;
   task: ChecklistTaskViewModel;
 }
 
 export function ChecklistTaskDetailPanel({
   categoryTitle,
+  editing,
   onClose,
   task,
 }: ChecklistTaskDetailPanelProps) {
@@ -22,7 +26,11 @@ export function ChecklistTaskDetailPanel({
       id="checklist-task-detail-panel"
     >
       <header className="checklist-detail-panel__header">
-        <h2 id={titleId}>{task.title}</h2>
+        <ChecklistTaskTitleEditor
+          editing={editing}
+          task={task}
+          titleId={titleId}
+        />
         <button
           aria-label="할 일 상세 닫기"
           className="checklist-detail-panel__close"

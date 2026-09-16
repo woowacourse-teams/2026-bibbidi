@@ -2,12 +2,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   remoteMyChecklistCommandDataSource,
+  RemoteChecklistItemChangeApiError,
+  RemoteChecklistItemChangeContractError,
+  RemoteChecklistItemChangeNetworkError,
+  RemoteChecklistItemChangeRequestAbortedError,
+  RemoteChecklistItemChangeTimeoutError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationContractError,
   RemoteMyChecklistCreationNetworkError,
   RemoteMyChecklistCreationRequestAbortedError,
   RemoteMyChecklistCreationTimeoutError,
 } from "./remoteMyChecklistCommandDataSource";
+
+const changedItemResponse = {
+  catalogItemId: null,
+  categoryId: 2,
+  id: 500,
+  status: "continue",
+  title: "청첩장 문구 최종 확정",
+} as const;
 
 afterEach(() => {
   vi.useRealTimers();
@@ -124,6 +137,147 @@ describe("remoteMyChecklistCommandDataSource.createChecklist", () => {
     );
     const expectation = expect(request).rejects.toBeInstanceOf(
       RemoteMyChecklistCreationRequestAbortedError,
+    );
+    controller.abort();
+
+    await expectation;
+  });
+});
+
+describe("remoteMyChecklistCommandDataSource.changeChecklistItemTitle", () => {
+  it("제목을 객체나 quoted string으로 감싸지 않은 raw 문자열로 전송한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify(changedItemResponse), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+        500,
+        "청첩장 문구 최종 확정",
+      ),
+    ).resolves.toEqual(changedItemResponse);
+    expect(fetchMock).toHaveBeenCalledWith("/api/checklist-items/500/title", {
+      body: "청첩장 문구 최종 확정",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetchMock.mock.calls[0]?.[1]?.body.startsWith("{")).toBe(false);
+    expect(fetchMock.mock.calls[0]?.[1]?.body.startsWith('"')).toBe(false);
+  });
+
+  it.each([
+    [201, changedItemResponse],
+    [200, { ...changedItemResponse, id: 0 }],
+    [200, { ...changedItemResponse, id: 501 }],
+    [200, { ...changedItemResponse, catalogItemId: -1 }],
+    [200, { ...changedItemResponse, categoryId: "2" }],
+    [200, { ...changedItemResponse, title: 3 }],
+    [200, { ...changedItemResponse, status: "unknown" }],
+  ])("성공 응답 전체 계약을 검증한다", async (status, body) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+        500,
+        "새 제목",
+      ),
+    ).rejects.toBeInstanceOf(RemoteChecklistItemChangeContractError);
+  });
+
+  it("API 오류의 상태와 안전하게 파싱한 서버 메시지를 보존한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            errorCode: 405,
+            message: "준비 목록에서 추가한 할 일은 제목을 변경할 수 없습니다.",
+          }),
+          { status: 422 },
+        ),
+      ),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+        500,
+        "새 제목",
+      ),
+    ).rejects.toEqual(
+      new RemoteChecklistItemChangeApiError(
+        405,
+        422,
+        "준비 목록에서 추가한 할 일은 제목을 변경할 수 없습니다.",
+      ),
+    );
+  });
+
+  it("네트워크 오류를 구분한다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("failed")));
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+        500,
+        "새 제목",
+      ),
+    ).rejects.toBeInstanceOf(RemoteChecklistItemChangeNetworkError);
+  });
+
+  it("요청이 10초 동안 완료되지 않으면 타임아웃 오류로 변환한다", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("aborted", "AbortError"));
+            });
+          }),
+      ),
+    );
+
+    const request = remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+      500,
+      "새 제목",
+    );
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      RemoteChecklistItemChangeTimeoutError,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expectation;
+  });
+
+  it("호출자의 요청 취소를 별도 오류로 변환한다", async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("aborted", "AbortError"));
+            });
+          }),
+      ),
+    );
+
+    const request = remoteMyChecklistCommandDataSource.changeChecklistItemTitle(
+      500,
+      "새 제목",
+      controller.signal,
+    );
+    const expectation = expect(request).rejects.toBeInstanceOf(
+      RemoteChecklistItemChangeRequestAbortedError,
     );
     controller.abort();
 

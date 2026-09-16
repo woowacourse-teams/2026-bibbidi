@@ -1,11 +1,14 @@
 import { ReactNode, useEffect, useRef } from "react";
 
+import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
+import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailPage.css";
 
 interface ChecklistTaskDetailPageProps {
   categoryTitle: string;
+  editing?: ChecklistItemEditingController;
   onBack: () => void;
   task: ChecklistTaskViewModel;
 }
@@ -13,7 +16,7 @@ interface ChecklistTaskDetailPageProps {
 interface ChecklistTaskDetailPageShellProps {
   children: ReactNode;
   onBack: () => void;
-  title: string;
+  title: ReactNode;
   titleId?: string;
 }
 
@@ -53,7 +56,7 @@ export function ChecklistTaskDetailPageShell({
         >
           <BackIcon />
         </button>
-        <h2 id={titleId}>{title}</h2>
+        {typeof title === "string" ? <h2 id={titleId}>{title}</h2> : title}
         <span aria-hidden="true" className="checklist-detail-page__spacer" />
       </header>
 
@@ -64,13 +67,20 @@ export function ChecklistTaskDetailPageShell({
 
 export function ChecklistTaskDetailPage({
   categoryTitle,
+  editing,
   onBack,
   task,
 }: ChecklistTaskDetailPageProps) {
   return (
     <ChecklistTaskDetailPageShell
       onBack={onBack}
-      title={task.title}
+      title={
+        <ChecklistTaskTitleEditor
+          editing={editing}
+          task={task}
+          titleId={`${task.id}-detail-title`}
+        />
+      }
       titleId={`${task.id}-detail-title`}
     >
       <ChecklistTaskDetailContent categoryTitle={categoryTitle} task={task} />

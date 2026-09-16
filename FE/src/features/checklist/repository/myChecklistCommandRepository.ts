@@ -1,5 +1,7 @@
 import {
   RemoteMyChecklistCommandDataSource,
+  RemoteChecklistItemChangeApiError,
+  RemoteChecklistItemChangeRequestAbortedError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
@@ -10,8 +12,61 @@ import {
 } from "./myChecklistQueryRepository";
 
 export interface MyChecklistCommandRepository {
+  changeItemTitle(
+    itemId: number,
+    title: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
   ensureChecklist(signal?: AbortSignal): Promise<void>;
   reconcileMissingChecklist(signal?: AbortSignal): Promise<void>;
+}
+
+export type ChecklistItemChangeFailureReason =
+  | "forbidden"
+  | "invalid-request"
+  | "item-not-found"
+  | "title-not-changeable"
+  | "unknown";
+
+export class ChecklistItemChangeError extends Error {
+  constructor(
+    readonly reason: ChecklistItemChangeFailureReason,
+    message = "할 일을 수정하지 못했습니다. 잠시 후 다시 시도해주세요.",
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "ChecklistItemChangeError";
+  }
+}
+
+function getChecklistItemChangeFailureReason(
+  error: RemoteChecklistItemChangeApiError,
+): ChecklistItemChangeFailureReason {
+  if (error.status === 400 || error.errorCode === 101) {
+    return "invalid-request";
+  }
+
+  if (error.status === 403 || error.errorCode === 203) {
+    return "forbidden";
+  }
+
+  if (error.errorCode === 304) {
+    return "item-not-found";
+  }
+
+  if (error.errorCode === 405) {
+    return "title-not-changeable";
+  }
+
+  return "unknown";
+}
+
+function getSafeMutationMessage(
+  error: RemoteChecklistItemChangeApiError,
+): string | undefined {
+  const message = error.message.trim();
+
+  return message.length > 0 && message.length <= 200 ? message : undefined;
 }
 
 export class MyChecklistCreationError extends Error {
@@ -44,6 +99,55 @@ export function createMyChecklistCommandRepository(
   queryRepository: MyChecklistQueryRepository,
 ): MyChecklistCommandRepository {
   let hasConfirmedChecklist = false;
+
+  const changeChecklistItemTitle = async (
+    itemId: number,
+    title: string,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    try {
+      const changedItem = await dataSource.changeChecklistItemTitle(
+        itemId,
+        title,
+        signal,
+      );
+      const updateApplied = queryRepository.applyItemTitleUpdate(
+        itemId,
+        changedItem.title,
+      );
+
+      if (!updateApplied) {
+        throw new ChecklistItemChangeError("unknown");
+      }
+    } catch (error) {
+      if (
+        error instanceof RemoteChecklistItemChangeApiError &&
+        (error.status === 401 || error.errorCode === 201)
+      ) {
+        throw new MyChecklistAuthenticationRequiredError({ cause: error });
+      }
+
+      if (error instanceof RemoteChecklistItemChangeRequestAbortedError) {
+        throw new MyChecklistRequestAbortedError({ cause: error });
+      }
+
+      if (error instanceof ChecklistItemChangeError) {
+        throw error;
+      }
+
+      if (error instanceof RemoteChecklistItemChangeApiError) {
+        throw new ChecklistItemChangeError(
+          getChecklistItemChangeFailureReason(error),
+          getSafeMutationMessage(error),
+          { cause: error },
+        );
+      }
+
+      throw new ChecklistItemChangeError("unknown", undefined, {
+        cause: error,
+      });
+    }
+  };
 
   const ensureChecklist = async (signal?: AbortSignal): Promise<void> => {
     if (hasConfirmedChecklist) {
@@ -90,6 +194,25 @@ export function createMyChecklistCommandRepository(
   };
 
   return {
+    async changeItemTitle(itemId, title, signal) {
+      const normalizedTitle = title.trim();
+
+      if (normalizedTitle.length === 0) {
+        throw new ChecklistItemChangeError(
+          "invalid-request",
+          "할 일 제목을 입력해주세요.",
+        );
+      }
+
+      if (normalizedTitle.length > 50) {
+        throw new ChecklistItemChangeError(
+          "invalid-request",
+          "할 일 제목은 50자 이하로 입력해주세요.",
+        );
+      }
+
+      return changeChecklistItemTitle(itemId, normalizedTitle, signal);
+    },
     ensureChecklist,
     async reconcileMissingChecklist(signal) {
       hasConfirmedChecklist = false;

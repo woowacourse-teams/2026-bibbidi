@@ -1,8 +1,20 @@
 import { useState } from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistQueryModel } from "../model/checklistQuery";
+import {
+  ChecklistItemChangeFeedback,
+  ChecklistItemEditingController,
+  ChecklistItemTitleEditSession,
+} from "../model/checklistEditing";
 import { createChecklistViewModel } from "../view-model/createChecklistViewModel";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
@@ -72,6 +84,118 @@ function ChecklistHarness({
   return (
     <Checklist
       categories={categories}
+      onBackTaskDetail={() => setSelectedTaskId(null)}
+      onCloseTaskDetail={() => setSelectedTaskId(null)}
+      onSelectTask={setSelectedTaskId}
+      selectedTaskId={selectedTaskId}
+    />
+  );
+}
+
+function createEditableChecklistQuery(): ChecklistQueryModel {
+  return {
+    categories: [
+      {
+        id: "10",
+        items: [
+          {
+            appointments: [],
+            categoryId: "10",
+            checklistItemId: 500,
+            id: "checklist-item-500",
+            isDone: false,
+            sourceCatalogItemId: null,
+            title: "청첩장 문구 정하기",
+          },
+          {
+            appointments: [],
+            categoryId: "10",
+            checklistItemId: 501,
+            id: "checklist-item-501",
+            isDone: false,
+            sourceCatalogItemId: 101,
+            title: "준비 목록 항목",
+          },
+        ],
+        title: "예식 준비",
+      },
+      { id: "20", items: [], title: "예복 준비" },
+    ],
+  };
+}
+
+function EditableChecklistHarness({
+  changeTitle = vi.fn().mockResolvedValue(true),
+  initialSelectedTaskId = "checklist-item-500",
+}: {
+  changeTitle?: (itemId: number, title: string) => Promise<boolean>;
+  initialSelectedTaskId?: string | null;
+}) {
+  const [checklist, setChecklist] = useState(createEditableChecklistQuery);
+  const [selectedTaskId, setSelectedTaskId] = useState(initialSelectedTaskId);
+  const [titleEditSession, setTitleEditSession] =
+    useState<ChecklistItemTitleEditSession | null>(null);
+  const [titleFeedback, setTitleFeedback] =
+    useState<ChecklistItemChangeFeedback>({ status: "idle" });
+
+  const updateTitle = (itemId: number, title: string) => {
+    setChecklist((current) => ({
+      categories: current.categories.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.checklistItemId === itemId ? { ...item, title } : item,
+        ),
+      })),
+    }));
+  };
+
+  const editing: ChecklistItemEditingController = {
+    async changeTitle(itemId, title) {
+      setTitleFeedback({ itemId, status: "pending" });
+      const didChange = await changeTitle(itemId, title);
+
+      if (didChange) {
+        updateTitle(itemId, title);
+        setTitleFeedback({ status: "idle" });
+      } else {
+        setTitleFeedback({
+          errorMessage: "제목을 변경하지 못했습니다.",
+          itemId,
+          status: "error",
+        });
+      }
+
+      return didChange;
+    },
+    clearError(itemId) {
+      const clear = (current: ChecklistItemChangeFeedback) =>
+        current.status === "error" && current.itemId === itemId
+          ? ({ status: "idle" } as const)
+          : current;
+
+      setTitleFeedback(clear);
+    },
+    finishTitleEditing(itemId) {
+      setTitleEditSession((current) =>
+        current?.itemId === itemId ? null : current,
+      );
+    },
+    startTitleEditing(itemId, title) {
+      setTitleEditSession({ draft: title, itemId });
+    },
+    titleEditSession,
+    titleFeedback,
+    updateTitleDraft(itemId, draft) {
+      setTitleEditSession((current) =>
+        current?.itemId === itemId ? { draft, itemId } : current,
+      );
+    },
+  };
+
+  return (
+    <Checklist
+      categories={createChecklistViewModel(checklist)}
+      itemEditing={editing}
       onBackTaskDetail={() => setSelectedTaskId(null)}
       onCloseTaskDetail={() => setSelectedTaskId(null)}
       onSelectTask={setSelectedTaskId}
@@ -263,6 +387,138 @@ describe("Checklist 웹 상세 패널", () => {
     expect(screen.queryByRole("region", { name: "웨딩홀 계약" })).toBeNull();
     expect(
       screen.getByRole("complementary", { name: "웨딩홀 계약" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("Checklist 할 일 편집", () => {
+  it("직접 작성 항목에만 제목 수정 동작을 노출한다", () => {
+    render(<EditableChecklistHarness />);
+
+    expect(
+      screen.getByRole("button", { name: "할 일 제목 수정" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
+
+    expect(
+      screen.queryByRole("button", { name: "할 일 제목 수정" }),
+    ).toBeNull();
+  });
+
+  it("연필 버튼으로 제목을 선택한 인라인 입력을 열고 Enter로 trim한 제목을 한 번 저장한다", async () => {
+    let resolveChange: (value: boolean) => void = () => undefined;
+    const changeTitle = vi.fn().mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveChange = resolve;
+      }),
+    );
+    render(<EditableChecklistHarness changeTitle={changeTitle} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+    expect(document.activeElement).toBe(input);
+    expect((input as HTMLInputElement).selectionStart).toBe(0);
+    expect((input as HTMLInputElement).selectionEnd).toBe(
+      "청첩장 문구 정하기".length,
+    );
+
+    fireEvent.change(input, { target: { value: "  청첩장 문구 최종 확정  " } });
+    fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
+    expect(changeTitle).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
+
+    expect(changeTitle).toHaveBeenCalledOnce();
+    expect(changeTitle).toHaveBeenCalledWith(500, "청첩장 문구 최종 확정");
+
+    await act(async () => resolveChange(true));
+    expect(
+      await screen.findByRole("heading", { name: "청첩장 문구 최종 확정" }),
+    ).toBeTruthy();
+  });
+
+  it("빈 제목·50자 초과·동일 제목을 요청 전에 처리한다", async () => {
+    const changeTitle = vi.fn().mockResolvedValue(true);
+    render(<EditableChecklistHarness changeTitle={changeTitle} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
+    expect(screen.getByRole("alert").textContent).toContain("입력해주세요");
+
+    fireEvent.change(input, { target: { value: "가".repeat(51) } });
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
+    expect(screen.getByRole("alert").textContent).toContain("50자 이하");
+
+    fireEvent.change(input, { target: { value: "  청첩장 문구 정하기  " } });
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
+
+    expect(changeTitle).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+        document.activeElement,
+      ),
+    );
+  });
+
+  it("제목 저장 실패는 draft와 오류를 유지하고 Escape는 편집만 취소한다", async () => {
+    let resolveChange: (value: boolean) => void = () => undefined;
+    const changeTitle = vi.fn().mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveChange = resolve;
+      }),
+    );
+    render(<EditableChecklistHarness changeTitle={changeTitle} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+    fireEvent.change(input, { target: { value: "실패 후 유지할 제목" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await act(async () => resolveChange(false));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "제목을 변경하지 못했습니다.",
+    );
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: "할 일 제목",
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("실패 후 유지할 제목");
+
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.getByRole("complementary")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "할 일 제목" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+        document.activeElement,
+      ),
+    );
+  });
+
+  it("모바일에서도 같은 공통 편집 컴포넌트를 사용하고 제목 Escape가 전체 화면을 닫지 않는다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(<EditableChecklistHarness />);
+
+    const detailPage = screen.getByRole("region", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPage).getByRole("button", { name: "할 일 제목 수정" }),
+    );
+    const input = within(detailPage).getByRole("textbox", {
+      name: "할 일 제목",
+    });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(
+      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
 });
