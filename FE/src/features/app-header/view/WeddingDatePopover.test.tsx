@@ -90,6 +90,24 @@ describe("WeddingDatePopover", () => {
     );
   });
 
+  it.each([
+    ["0001-01-01", "ArrowLeft", "1년 1월 1일"],
+    ["9999-12-31", "ArrowRight", "9999년 12월 31일"],
+  ])(
+    "지원 범위 경계 %s에서 %s 키 이동을 경계 날짜로 제한한다",
+    async (initialDate, key, accessibleName) => {
+      renderPopover({ initialDate });
+      const boundaryDay = screen.getByRole("button", {
+        name: accessibleName,
+      });
+
+      fireEvent.keyDown(boundaryDay, { key });
+
+      await waitFor(() => expect(document.activeElement).toBe(boundaryDay));
+      expect(screen.queryByText(/(?:0|10000)년/)).toBeNull();
+    },
+  );
+
   it("Escape와 바깥 클릭으로 닫고 닫힌 뒤 트리거에 초점을 복원한다", async () => {
     const first = renderPopover();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });

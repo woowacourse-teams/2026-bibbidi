@@ -21,6 +21,8 @@ interface WeddingDatePopoverProps {
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 const focusableSelector = "button:not(:disabled)";
+const MINIMUM_DATE = "0001-01-01";
+const MAXIMUM_DATE = "9999-12-31";
 
 function getFocusableElements(container: HTMLElement | null) {
   return Array.from(
@@ -54,8 +56,18 @@ function shiftDate(date: string, days: number) {
   const { year, month, day } = dateParts(date);
   const shifted = new Date(0);
   shifted.setUTCFullYear(year, month - 1, day + days);
+  const shiftedYear = shifted.getUTCFullYear();
+
+  if (shiftedYear < 1) {
+    return MINIMUM_DATE;
+  }
+
+  if (shiftedYear > 9999) {
+    return MAXIMUM_DATE;
+  }
+
   return formatDate(
-    shifted.getUTCFullYear(),
+    shiftedYear,
     shifted.getUTCMonth() + 1,
     shifted.getUTCDate(),
   );
