@@ -22,6 +22,40 @@
   line-height: 1.4;
 }
 
+.checklist-detail-content__appointments-header {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.checklist-detail-content__add-appointment {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-brand);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.checklist-detail-content__add-appointment:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.checklist-detail-content__add-appointment span {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .checklist-detail-content__properties {
   margin-top: 8px;
 }

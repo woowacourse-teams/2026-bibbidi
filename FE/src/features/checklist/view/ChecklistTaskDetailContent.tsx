@@ -12,6 +12,7 @@ interface ChecklistTaskDetailContentProps {
   categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
   editing?: ChecklistItemEditingController;
+  onRequestScheduleCreation?: () => void;
   task: ChecklistTaskViewModel;
 }
 
@@ -61,6 +62,7 @@ export function ChecklistTaskDetailContent({
   categories,
   categoryTitle,
   editing,
+  onRequestScheduleCreation,
   task,
 }: ChecklistTaskDetailContentProps) {
   return (
@@ -89,9 +91,24 @@ export function ChecklistTaskDetailContent({
       </section>
 
       <section aria-labelledby={`${task.id}-appointments-title`}>
-        <h3 id={`${task.id}-appointments-title`}>
-          일정 {task.appointments.length}개
-        </h3>
+        <div className="checklist-detail-content__appointments-header">
+          <h3 id={`${task.id}-appointments-title`}>
+            일정 {task.appointments.length}개
+          </h3>
+          {onRequestScheduleCreation ? (
+            <button
+              className="checklist-detail-content__add-appointment"
+              onClick={(event) => {
+                event.currentTarget.focus();
+                onRequestScheduleCreation();
+              }}
+              type="button"
+            >
+              <span aria-hidden="true">＋</span>
+              일정 추가
+            </button>
+          ) : null}
+        </div>
         {task.appointments.length === 0 ? (
           <p className="checklist-detail-content__empty">
             등록된 일정이 없어요.

@@ -363,6 +363,143 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     ).toBe(detailPanel);
   });
 
+  it("비로그인 데스크톱 상세에서 일정 추가 의도를 로그인 안내로 제한한다", async () => {
+    renderChecklistFeature();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+    const detailPanel = screen.getByRole("complementary", {
+      name: "로컬 체크리스트 항목",
+    });
+    const addScheduleButton = within(detailPanel).getByRole("button", {
+      name: "일정 추가",
+    });
+
+    fireEvent.click(addScheduleButton);
+
+    let dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    const main = document.querySelector(".checklist-workspace__main");
+    const foreground = detailPanel.closest(".checklist-workspace__foreground");
+    expect(
+      within(dialog).getByText(/일정을 추가하려면 로그인해 주세요/),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText(/나만의 할 일을 추가하려면/)).toBeNull();
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(main?.hasAttribute("inert")).toBe(true);
+    expect(main?.getAttribute("aria-hidden")).toBe("true");
+    expect(foreground?.hasAttribute("inert")).toBe(true);
+    expect(foreground?.getAttribute("aria-hidden")).toBe("true");
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemCategory).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemStatus).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    expect(repositoryMocks.hasRemainingAppointments).not.toHaveBeenCalled();
+
+    const cancelButton = within(dialog).getByRole("button", { name: "취소" });
+    const loginButton = within(dialog).getByRole("button", { name: "로그인" });
+    expect(document.activeElement).toBe(cancelButton);
+    loginButton.focus();
+    fireEvent.keyDown(loginButton, { key: "Tab" });
+    expect(document.activeElement).toBe(cancelButton);
+    fireEvent.keyDown(cancelButton, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(loginButton);
+
+    fireEvent.click(cancelButton);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
+    expect(main?.hasAttribute("inert")).toBe(false);
+    expect(foreground?.hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(addScheduleButton);
+    dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByRole("complementary", { name: "로컬 체크리스트 항목" }),
+    ).toBe(detailPanel);
+    await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
+
+    fireEvent.click(addScheduleButton);
+    const backdrop = document.querySelector<HTMLElement>(
+      ".checklist-dialog__backdrop",
+    );
+    expect(backdrop).not.toBeNull();
+    if (backdrop) {
+      fireEvent.mouseDown(backdrop);
+    }
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
+
+    fireEvent.click(addScheduleButton);
+    dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
+    expect(getCurrentUrl()).toBe("/login");
+  });
+
+  it("비로그인 모바일 상세에서도 일정 추가 안내와 초점 복원을 제공한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    renderChecklistFeature();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+    const detailPage = screen.getByRole("region", {
+      name: "로컬 체크리스트 항목",
+    });
+    const addScheduleButton = within(detailPage).getByRole("button", {
+      name: "일정 추가",
+    });
+
+    fireEvent.click(addScheduleButton);
+
+    const dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
+    const foreground = detailPage.closest(".checklist-workspace__foreground");
+    expect(
+      within(dialog).getByText(/일정을 추가하려면 로그인해 주세요/),
+    ).toBeTruthy();
+    expect(foreground?.hasAttribute("inert")).toBe(true);
+    expect(foreground?.getAttribute("aria-hidden")).toBe("true");
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("region", { name: "로컬 체크리스트 항목" })).toBe(
+      detailPage,
+    );
+    await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
+    expect(foreground?.hasAttribute("inert")).toBe(false);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
+  });
+
+  it("로그인 사용자도 같은 일정 추가 진입점을 사용하되 후속 입력 UI와 API는 실행하지 않는다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(
+      within(detailPanel).getByRole("button", { name: "일정 추가" }),
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemCategory).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemStatus).not.toHaveBeenCalled();
+    expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    expect(repositoryMocks.hasRemainingAppointments).not.toHaveBeenCalled();
+  });
+
   it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {
     authMocks.authState = {
       status: "authenticated",

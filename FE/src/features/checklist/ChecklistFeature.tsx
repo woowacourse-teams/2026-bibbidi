@@ -45,6 +45,8 @@ type ChecklistRequestState =
       status: "success";
     };
 
+type LoginRequiredReason = "schedule-creation" | "task-creation";
+
 function isRequestAborted(error: unknown): boolean {
   return error instanceof ChecklistQueryRequestAbortedError;
 }
@@ -127,7 +129,8 @@ export function ChecklistFeature() {
     audience,
     sessionIdentity,
   );
-  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
+  const [loginRequiredReason, setLoginRequiredReason] =
+    useState<LoginRequiredReason | null>(null);
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const isMobileLayout = useIsMobileLayout();
@@ -157,6 +160,11 @@ export function ChecklistFeature() {
     sessionIdentity,
     submissionState: taskCreationCommand.submissionState,
   });
+  const requestScheduleCreation = useCallback(() => {
+    if (audience === "guest") {
+      setLoginRequiredReason("schedule-creation");
+    }
+  }, [audience]);
 
   useEffect(() => {
     if (!audience) {
@@ -402,21 +410,22 @@ export function ChecklistFeature() {
     <Checklist
       categories={createChecklistViewModel(requestState.checklist)}
       isAuthenticated={audience === "authenticated"}
-      isLoginRequiredOpen={isLoginRequiredOpen}
       itemEditing={audience === "authenticated" ? itemEditing : undefined}
+      loginRequiredReason={loginRequiredReason}
       onBackTaskDetail={backFromTaskDetail}
-      onCancelLoginRequired={() => setIsLoginRequiredOpen(false)}
+      onCancelLoginRequired={() => setLoginRequiredReason(null)}
       onCloseTaskDetail={closeTaskDetail}
       onOpenTaskCreation={() => {
         if (audience === "authenticated") {
           taskCreation.open();
         } else {
-          setIsLoginRequiredOpen(true);
+          setLoginRequiredReason("task-creation");
         }
       }}
+      onRequestScheduleCreation={requestScheduleCreation}
       onSelectTask={selectTask}
       onVisitLogin={() => {
-        setIsLoginRequiredOpen(false);
+        setLoginRequiredReason(null);
         navigate("/login");
       }}
       selectedTaskId={selectedTaskId}

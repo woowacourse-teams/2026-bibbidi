@@ -12,6 +12,7 @@ interface ChecklistTaskDetailPanelProps {
   categoryTitle: string;
   editing?: ChecklistItemEditingController;
   onClose: () => void;
+  onRequestScheduleCreation?: () => void;
   task: ChecklistTaskViewModel;
 }
 
@@ -20,6 +21,7 @@ export function ChecklistTaskDetailPanel({
   categoryTitle,
   editing,
   onClose,
+  onRequestScheduleCreation,
   task,
 }: ChecklistTaskDetailPanelProps) {
   const titleId = `${task.id}-detail-title`;
@@ -50,6 +52,7 @@ export function ChecklistTaskDetailPanel({
         categories={categories}
         categoryTitle={categoryTitle}
         editing={editing}
+        onRequestScheduleCreation={onRequestScheduleCreation}
         task={task}
       />
     </aside>
