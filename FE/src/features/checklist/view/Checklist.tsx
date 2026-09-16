@@ -13,12 +13,13 @@ import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
   isAuthenticated?: boolean;
-  isLoginRequiredOpen?: boolean;
   itemEditing?: ChecklistItemEditingController;
+  loginRequiredReason?: "schedule-creation" | "task-creation" | null;
   onBackTaskDetail: () => void;
   onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
   onOpenTaskCreation?: () => void;
+  onRequestScheduleCreation?: () => void;
   onSelectTask: (taskId: string) => void;
   onVisitLogin?: () => void;
   selectedTaskId: string | null;
@@ -39,12 +40,13 @@ function canRestoreFocus(
 export function Checklist({
   categories,
   isAuthenticated = false,
-  isLoginRequiredOpen = false,
   itemEditing,
+  loginRequiredReason = null,
   onBackTaskDetail,
   onCancelLoginRequired,
   onCloseTaskDetail,
   onOpenTaskCreation,
+  onRequestScheduleCreation,
   onSelectTask,
   onVisitLogin,
   selectedTaskId,
@@ -82,6 +84,7 @@ export function Checklist({
       ? pendingStatusConfirmation
       : null;
   const isStatusConfirmationOpen = statusConfirmation !== null;
+  const isLoginRequiredOpen = loginRequiredReason !== null;
   const statusFeedback = itemEditing?.changeFeedback;
   const isStatusChangePending =
     statusConfirmation !== null &&
@@ -366,6 +369,7 @@ export function Checklist({
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
             onClose={onCloseTaskDetail}
+            onRequestScheduleCreation={onRequestScheduleCreation}
             task={selectedTaskContext.task}
           />
         ) : null}
@@ -376,6 +380,7 @@ export function Checklist({
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
             onBack={onBackTaskDetail}
+            onRequestScheduleCreation={onRequestScheduleCreation}
             task={selectedTaskContext.task}
           />
         ) : null}
@@ -409,8 +414,11 @@ export function Checklist({
             </>
           }
           description={
-            "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
+            loginRequiredReason === "schedule-creation"
+              ? "일정을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
+              : "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
           }
+          onBackdropPress={onCancelLoginRequired}
           onEscape={onCancelLoginRequired}
           title="로그인이 필요해요"
         />

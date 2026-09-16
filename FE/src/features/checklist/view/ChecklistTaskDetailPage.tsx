@@ -14,6 +14,7 @@ interface ChecklistTaskDetailPageProps {
   categoryTitle: string;
   editing?: ChecklistItemEditingController;
   onBack: () => void;
+  onRequestScheduleCreation?: () => void;
   task: ChecklistTaskViewModel;
 }
 
@@ -74,6 +75,7 @@ export function ChecklistTaskDetailPage({
   categoryTitle,
   editing,
   onBack,
+  onRequestScheduleCreation,
   task,
 }: ChecklistTaskDetailPageProps) {
   return (
@@ -92,6 +94,7 @@ export function ChecklistTaskDetailPage({
         categories={categories}
         categoryTitle={categoryTitle}
         editing={editing}
+        onRequestScheduleCreation={onRequestScheduleCreation}
         task={task}
       />
     </ChecklistTaskDetailPageShell>

@@ -6,6 +6,7 @@ import { containTabFocus, focusFirstElement } from "./containTabFocus";
 interface ChecklistModalDialogProps {
   actions: ReactNode;
   description: ReactNode;
+  onBackdropPress?: () => void;
   onEscape?: () => void;
   title: string;
   variant?: "default" | "critical";
@@ -14,28 +15,31 @@ interface ChecklistModalDialogProps {
 export function ChecklistModalDialog({
   actions,
   description,
+  onBackdropPress,
   onEscape,
   title,
   variant = "default",
 }: ChecklistModalDialogProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const reactId = useId();
   const titleId = `checklist-dialog-title-${reactId}`;
   const descriptionId = `checklist-dialog-description-${reactId}`;
 
   useEffect(() => {
+    const dialog = dialogRef.current;
     const previouslyFocused =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    if (dialogRef.current) {
-      focusFirstElement(dialogRef.current);
+    if (dialog) {
+      focusFirstElement(dialog);
     }
 
     return () => {
       if (previouslyFocused?.isConnected) {
         queueMicrotask(() => {
-          if (previouslyFocused.isConnected) {
+          if (!dialog?.isConnected && previouslyFocused.isConnected) {
             previouslyFocused.focus();
           }
         });
@@ -44,9 +48,10 @@ export function ChecklistModalDialog({
   }, []);
 
   useEffect(() => {
+    const backdrop = backdropRef.current;
     const dialog = dialogRef.current;
 
-    if (!dialog) {
+    if (!backdrop || !dialog) {
       return;
     }
 
@@ -60,14 +65,23 @@ export function ChecklistModalDialog({
 
       containTabFocus(event, dialog);
     };
+    const handleBackdropMouseDown = (event: globalThis.MouseEvent) => {
+      if (event.target === backdrop) {
+        onBackdropPress?.();
+      }
+    };
 
     dialog.addEventListener("keydown", handleKeyDown);
+    backdrop.addEventListener("mousedown", handleBackdropMouseDown);
 
-    return () => dialog.removeEventListener("keydown", handleKeyDown);
-  }, [onEscape]);
+    return () => {
+      dialog.removeEventListener("keydown", handleKeyDown);
+      backdrop.removeEventListener("mousedown", handleBackdropMouseDown);
+    };
+  }, [onBackdropPress, onEscape]);
 
   return (
-    <div className="checklist-dialog__backdrop">
+    <div className="checklist-dialog__backdrop" ref={backdropRef}>
       <div
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
