@@ -7,9 +7,6 @@
 }
 
 .upcoming-schedule__header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   margin-bottom: 20px;
 }
 
@@ -19,16 +16,6 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
-}
-
-.upcoming-schedule__count {
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: var(--color-bg-neutral-weak);
-  color: var(--color-fg-neutral-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
 }
 
 .upcoming-schedule__list {

@@ -17,7 +17,6 @@ export interface UpcomingScheduleItemViewModel {
 }
 
 export interface UpcomingScheduleViewModel {
-  countLabel: string;
   items: UpcomingScheduleItemViewModel[];
   title: string;
 }
@@ -91,7 +90,6 @@ export function createUpcomingScheduleViewModel(
   model: UpcomingScheduleListModel,
 ): UpcomingScheduleViewModel {
   return {
-    countLabel: `${model.schedules.length}개`,
     items: model.schedules.map((schedule) =>
       createItemViewModel(schedule, model.referenceDate),
     ),

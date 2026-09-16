@@ -1,8 +1,8 @@
-export type UnscheduledTaskStatus = "in-progress";
+export type UnscheduledTaskStatus = "continue" | "prev";
 
 export interface UnscheduledTaskModel {
   category: string;
-  id: string;
+  id: number;
   status: UnscheduledTaskStatus;
   title: string;
 }

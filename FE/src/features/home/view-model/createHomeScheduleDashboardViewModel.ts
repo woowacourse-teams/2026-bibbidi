@@ -35,7 +35,7 @@ export interface HomeScheduleDashboardResultViewModel {
 export interface HomeScheduleDashboardResultSectionViewModel<
   TStatus extends "empty" | "error" = "empty" | "error",
 > {
-  countLabel: string | null;
+  countLabel?: string;
   result: HomeScheduleDashboardResultViewModel;
   status: TStatus;
   title: string;
@@ -80,10 +80,6 @@ export interface HomeScheduleDashboardViewModel {
   upcoming: HomeScheduleDashboardUpcomingViewModel;
 }
 
-function formatCount(count: number) {
-  return `${count}개`;
-}
-
 function createErrorResult(
   title: string,
   isActionDisabled = true,
@@ -110,7 +106,6 @@ function createUpcomingViewModel(
       };
     case "empty":
       return {
-        countLabel: formatCount(0),
         result: {
           actionLabel: "체크리스트 보기",
           actionVariant: "link",
@@ -125,7 +120,6 @@ function createUpcomingViewModel(
       };
     case "error":
       return {
-        countLabel: null,
         result: createErrorResult("일정을 불러오지 못했어요", false),
         status: model.status,
         title: "가까운 일정",
@@ -151,7 +145,6 @@ function createUnscheduledViewModel(
       };
     case "empty":
       return {
-        countLabel: formatCount(0),
         result: {
           actionLabel: "체크리스트 보기",
           actionVariant: "link",
@@ -166,8 +159,7 @@ function createUnscheduledViewModel(
       };
     case "error":
       return {
-        countLabel: null,
-        result: createErrorResult("할 일을 불러오지 못했어요"),
+        result: createErrorResult("할 일을 불러오지 못했어요", false),
         status: model.status,
         title: "일정이 필요한 할 일",
       };
@@ -192,7 +184,7 @@ function createRecommendedViewModel(
       };
     case "empty":
       return {
-        countLabel: formatCount(0),
+        countLabel: "0개",
         result: {
           actionLabel: "준비 목록 보기",
           actionVariant: "link",
@@ -207,7 +199,6 @@ function createRecommendedViewModel(
       };
     case "error":
       return {
-        countLabel: null,
         result: createErrorResult("추천 일정을 불러오지 못했어요"),
         status: model.status,
         title: "추가하면 좋은 일정",

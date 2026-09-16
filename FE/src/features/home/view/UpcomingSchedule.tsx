@@ -27,7 +27,6 @@ export function UpcomingSchedule({ viewModel }: UpcomingScheduleProps) {
     >
       <header className="upcoming-schedule__header">
         <h2 id="upcoming-schedule-title">{viewModel.title}</h2>
-        <span className="upcoming-schedule__count">{viewModel.countLabel}</span>
       </header>
 
       <ul className="upcoming-schedule__list">

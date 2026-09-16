@@ -14,6 +14,7 @@ import { UnscheduledTask } from "./UnscheduledTask";
 import { UpcomingSchedule } from "./UpcomingSchedule";
 
 interface HomeScheduleDashboardProps {
+  onRetryUnscheduled: () => void;
   onRetryUpcoming: () => void;
   viewModel: HomeScheduleDashboardViewModel;
 }
@@ -128,7 +129,7 @@ function DashboardResultSection({
     >
       <header className="home-dashboard-state__section-header">
         <h2 id={`${id}-title`}>{viewModel.title}</h2>
-        {viewModel.countLabel !== null && (
+        {viewModel.countLabel !== undefined && (
           <span className="home-dashboard-state__count">
             {viewModel.countLabel}
           </span>
@@ -139,11 +140,17 @@ function DashboardResultSection({
   );
 }
 
-function SkeletonSectionHeader() {
+function SkeletonSectionHeader({
+  showAction = true,
+}: {
+  showAction?: boolean;
+}) {
   return (
     <div className="home-dashboard-loading__section-header">
       <span className="home-dashboard-loading__section-title" />
-      <span className="home-dashboard-loading__section-action" />
+      {showAction && (
+        <span className="home-dashboard-loading__section-action" />
+      )}
     </div>
   );
 }
@@ -208,7 +215,7 @@ function UpcomingScheduleLoading({
     <section aria-busy="true" className="home-dashboard-loading__section">
       <LoadingStatus viewModel={viewModel} />
       <div aria-hidden="true">
-        <SkeletonSectionHeader />
+        <SkeletonSectionHeader showAction={false} />
         <ul className="home-dashboard-loading__upcoming-list">
           {Array.from({ length: 6 }, (_, index) => (
             <UpcomingScheduleSkeleton key={index} />
@@ -228,7 +235,7 @@ function UnscheduledTaskLoading({
     <section aria-busy="true" className="home-dashboard-loading__section">
       <LoadingStatus viewModel={viewModel} />
       <div aria-hidden="true">
-        <SkeletonSectionHeader />
+        <SkeletonSectionHeader showAction={false} />
         <ul className="home-dashboard-loading__unscheduled-list">
           {Array.from({ length: 3 }, (_, index) => (
             <UnscheduledTaskSkeleton key={index} />
@@ -295,18 +302,27 @@ function UpcomingScheduleSection({
 }
 
 function UnscheduledTaskSection({
+  onRetry,
   viewModel,
 }: {
+  onRetry: () => void;
   viewModel: HomeScheduleDashboardUnscheduledViewModel;
 }) {
   switch (viewModel.status) {
     case "loading":
       return <UnscheduledTaskLoading viewModel={viewModel} />;
     case "empty":
+      return (
+        <DashboardResultSection
+          id="dashboard-unscheduled-task"
+          viewModel={viewModel}
+        />
+      );
     case "error":
       return (
         <DashboardResultSection
           id="dashboard-unscheduled-task"
+          onAction={onRetry}
           viewModel={viewModel}
         />
       );
@@ -342,6 +358,7 @@ function RecommendedScheduleSection({
 }
 
 export function HomeScheduleDashboard({
+  onRetryUnscheduled,
   onRetryUpcoming,
   viewModel,
 }: HomeScheduleDashboardProps) {
@@ -352,7 +369,10 @@ export function HomeScheduleDashboard({
           onRetry={onRetryUpcoming}
           viewModel={viewModel.upcoming}
         />
-        <UnscheduledTaskSection viewModel={viewModel.unscheduled} />
+        <UnscheduledTaskSection
+          onRetry={onRetryUnscheduled}
+          viewModel={viewModel.unscheduled}
+        />
       </div>
       <RecommendedScheduleSection viewModel={viewModel.recommended} />
     </section>
