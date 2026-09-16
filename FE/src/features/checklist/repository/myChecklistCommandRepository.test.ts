@@ -16,6 +16,13 @@ import {
   RemoteRemainingAppointmentsRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
 import {
+  RemoteAppointmentCreationApiError,
+  RemoteAppointmentCreationContractError,
+  RemoteAppointmentCreationNetworkError,
+  RemoteAppointmentCreationRequestAbortedError,
+  RemoteAppointmentCreationTimeoutError,
+} from "../data-source/remoteAppointmentCreationDataSource";
+import {
   ChecklistItemChangeError,
   createMyChecklistCommandRepository,
   CustomChecklistItemCreationError,
@@ -34,6 +41,7 @@ function createDataSource(): RemoteMyChecklistCommandDataSource {
     changeChecklistItemStatus: vi.fn(),
     changeChecklistItemTitle: vi.fn(),
     createChecklist: vi.fn().mockResolvedValue(1),
+    createAppointment: vi.fn(),
     createCustomChecklistItem: vi.fn(),
     hasRemainingAppointments: vi.fn(),
   };
@@ -51,6 +59,82 @@ function createQueryRepository(exists = true): MyChecklistQueryRepository {
     subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }
+
+const appointmentRequest = {
+  title: "상담",
+  date: "2026-09-20",
+  startTime: null,
+  endTime: null,
+  place: null,
+  memo: null,
+};
+
+describe("MyChecklistCommandRepository.createAppointment", () => {
+  it("POST 생성 명령만 수행하고 조회 캐시는 Feature에 맡긴다", async () => {
+    const dataSource = createDataSource();
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+    const controller = new AbortController();
+    await repository.createAppointment(
+      500,
+      appointmentRequest,
+      controller.signal,
+    );
+    expect(dataSource.createAppointment).toHaveBeenCalledWith(
+      500,
+      appointmentRequest,
+      controller.signal,
+    );
+    expect(queryRepository.invalidate).not.toHaveBeenCalled();
+    expect(queryRepository.getChecklist).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new RemoteAppointmentCreationApiError(400, 101), "invalid-request"],
+    [new RemoteAppointmentCreationApiError(404, 304), "item-not-found"],
+    [new RemoteAppointmentCreationApiError(403, 203), "forbidden"],
+    [new RemoteAppointmentCreationApiError(500, 0), "api"],
+    [new RemoteAppointmentCreationNetworkError(), "network"],
+    [new RemoteAppointmentCreationTimeoutError(), "timeout"],
+    [new RemoteAppointmentCreationContractError("response"), "contract"],
+  ] as const)(
+    "원격 %s 오류를 안전한 %s 오류로 변환한다",
+    async (error, reason) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.createAppointment).mockRejectedValue(error);
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        createQueryRepository(),
+      );
+      await expect(
+        repository.createAppointment(500, appointmentRequest),
+      ).rejects.toMatchObject({ reason });
+    },
+  );
+
+  it("401은 인증 오류로, 호출자 취소는 취소 오류로 변환한다", async () => {
+    const dataSource = createDataSource();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+    vi.mocked(dataSource.createAppointment).mockRejectedValueOnce(
+      new RemoteAppointmentCreationApiError(401, 201),
+    );
+    await expect(
+      repository.createAppointment(500, appointmentRequest),
+    ).rejects.toBeInstanceOf(MyChecklistAuthenticationRequiredError);
+    vi.mocked(dataSource.createAppointment).mockRejectedValueOnce(
+      new RemoteAppointmentCreationRequestAbortedError(),
+    );
+    await expect(
+      repository.createAppointment(500, appointmentRequest),
+    ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
+  });
+});
 
 describe("MyChecklistCommandRepository", () => {
   it.each(["prev", "continue", "done"] as const)(

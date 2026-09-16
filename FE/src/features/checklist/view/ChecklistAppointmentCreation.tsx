@@ -300,12 +300,6 @@ export function ChecklistAppointmentCreation({
             />
           </div>
 
-          {!controller.canSubmit ? (
-            <p className="checklist-appointment-creation__availability">
-              일정 저장 기능은 준비 중이에요.
-            </p>
-          ) : null}
-
           {controller.submissionState.status === "error" ? (
             <div
               className="checklist-appointment-creation__feedback"
@@ -330,7 +324,11 @@ export function ChecklistAppointmentCreation({
             disabled={!controller.canSubmit || isSubmitting}
             type="submit"
           >
-            {isSubmitting ? "저장 중" : "저장"}
+            {isSubmitting
+              ? "저장 중"
+              : controller.submissionState.status === "error"
+                ? controller.submissionState.retryLabel
+                : "저장"}
           </button>
         </footer>
       </form>

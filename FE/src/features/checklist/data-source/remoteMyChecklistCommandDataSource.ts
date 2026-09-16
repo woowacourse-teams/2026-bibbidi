@@ -2,6 +2,11 @@ import {
   ChecklistItemStatus,
   isChecklistItemStatus,
 } from "../model/myChecklist";
+import {
+  AppointmentCreationRequest,
+  AppointmentCreationResponse,
+  createRemoteAppointment,
+} from "./remoteAppointmentCreationDataSource";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
@@ -15,6 +20,11 @@ interface ApiErrorResponse {
 }
 
 export interface RemoteMyChecklistCommandDataSource {
+  createAppointment(
+    itemId: number,
+    request: AppointmentCreationRequest,
+    signal?: AbortSignal,
+  ): Promise<AppointmentCreationResponse>;
   changeChecklistItemCategory(
     itemId: number,
     categoryId: number,
@@ -664,6 +674,7 @@ export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSou
     changeChecklistItemStatus,
     changeChecklistItemTitle,
     createChecklist,
+    createAppointment: createRemoteAppointment,
     createCustomChecklistItem,
     hasRemainingAppointments,
   };

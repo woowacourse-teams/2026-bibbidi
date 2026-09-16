@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+import { AppointmentCreationError } from "./model/appointmentCreation";
+import { MyChecklistRequestAbortedError } from "./repository/myChecklistQueryRepository";
+
 export const CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH = 255;
 
 export interface ChecklistAppointmentCreationInput {
@@ -15,7 +18,7 @@ export interface ChecklistAppointmentCreationInput {
 export type ChecklistAppointmentCreationSubmissionState =
   | { status: "idle" }
   | { status: "submitting" }
-  | { message?: string; status: "error" };
+  | { message: string; retryLabel: string; status: "error" };
 
 export interface ChecklistAppointmentCreationDraft {
   date: string;
@@ -42,7 +45,9 @@ interface UseChecklistAppointmentCreationOptions {
   isAuthenticated: boolean;
   onSubmit?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void;
+  onRetryRefresh?: (signal: AbortSignal) => Promise<void>;
   sessionIdentity?: string;
 }
 
@@ -210,6 +215,7 @@ export function useChecklistAppointmentCreation({
   checklistItemId,
   isAuthenticated,
   onSubmit,
+  onRetryRefresh,
   sessionIdentity,
 }: UseChecklistAppointmentCreationOptions): ChecklistAppointmentCreationController {
   const [draft, setDraft] = useState(emptyDraft);
@@ -223,6 +229,9 @@ export function useChecklistAppointmentCreation({
   const [activeContextKey, setActiveContextKey] = useState(contextKey);
   const requestGenerationRef = useRef(0);
   const submissionInFlightRef = useRef(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const needsRefreshRef = useRef(false);
+  const commandRef = useRef({ onSubmit, onRetryRefresh });
   const isMountedRef = useRef(true);
   const isCurrentContext = activeContextKey === contextKey;
 
@@ -231,6 +240,7 @@ export function useChecklistAppointmentCreation({
 
     return () => {
       isMountedRef.current = false;
+      requestControllerRef.current?.abort();
       requestGenerationRef.current += 1;
       submissionInFlightRef.current = false;
     };
@@ -242,6 +252,9 @@ export function useChecklistAppointmentCreation({
     }
 
     requestGenerationRef.current += 1;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    needsRefreshRef.current = false;
     submissionInFlightRef.current = false;
     let isActive = true;
 
@@ -262,6 +275,37 @@ export function useChecklistAppointmentCreation({
     };
   }, [activeContextKey, contextKey]);
 
+  useEffect(() => {
+    const previousCommand = commandRef.current;
+    commandRef.current = { onSubmit, onRetryRefresh };
+    if (
+      (previousCommand.onSubmit === onSubmit &&
+        previousCommand.onRetryRefresh === onRetryRefresh) ||
+      !submissionInFlightRef.current
+    ) {
+      return;
+    }
+
+    requestGenerationRef.current += 1;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    submissionInFlightRef.current = false;
+    needsRefreshRef.current = false;
+    let isActive = true;
+
+    queueMicrotask(() => {
+      if (!isActive) return;
+      setDraft(emptyDraft);
+      setErrors({});
+      setSubmissionState(idleSubmissionState);
+      setIsOpen(false);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [onSubmit, onRetryRefresh]);
+
   const replaceError = (
     field: ChecklistAppointmentCreationField,
     message?: string,
@@ -281,6 +325,9 @@ export function useChecklistAppointmentCreation({
 
   const resetAndClose = () => {
     requestGenerationRef.current += 1;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    needsRefreshRef.current = false;
     submissionInFlightRef.current = false;
     setDraft(emptyDraft);
     setErrors({});
@@ -353,11 +400,13 @@ export function useChecklistAppointmentCreation({
 
       const requestGeneration = requestGenerationRef.current + 1;
       requestGenerationRef.current = requestGeneration;
+      const requestController = new AbortController();
+      requestControllerRef.current = requestController;
       submissionInFlightRef.current = true;
       setSubmissionState({ status: "submitting" });
 
       try {
-        const didSucceed = await onSubmit({
+        const input = {
           checklistItemId,
           date: draft.date,
           endTime: localDateTime(draft.date, draft.endTime),
@@ -365,7 +414,11 @@ export function useChecklistAppointmentCreation({
           place: optionalText(draft.place),
           startTime: localDateTime(draft.date, draft.startTime),
           title: draft.title.trim(),
-        });
+        };
+        const didSucceed =
+          needsRefreshRef.current && onRetryRefresh
+            ? await onRetryRefresh(requestController.signal).then(() => true)
+            : await onSubmit(input, requestController.signal);
 
         if (
           !isMountedRef.current ||
@@ -375,22 +428,35 @@ export function useChecklistAppointmentCreation({
         }
 
         if (didSucceed !== false) {
+          requestControllerRef.current = null;
           resetAndClose();
         } else {
           setSubmissionState(idleSubmissionState);
         }
-      } catch {
+      } catch (error) {
         if (
           isMountedRef.current &&
-          requestGenerationRef.current === requestGeneration
+          requestGenerationRef.current === requestGeneration &&
+          !requestController.signal.aborted &&
+          !(error instanceof MyChecklistRequestAbortedError)
         ) {
+          needsRefreshRef.current =
+            error instanceof AppointmentCreationError &&
+            error.reason === "refresh-failed";
           setSubmissionState({
-            message: "일정을 저장하지 못했어요. 다시 시도해 주세요.",
+            message:
+              error instanceof AppointmentCreationError
+                ? error.message
+                : "일정을 저장하지 못했어요. 다시 시도해 주세요.",
+            retryLabel: needsRefreshRef.current
+              ? "목록 다시 불러오기"
+              : "다시 시도",
             status: "error",
           });
         }
       } finally {
         if (requestGenerationRef.current === requestGeneration) {
+          requestControllerRef.current = null;
           submissionInFlightRef.current = false;
         }
       }

@@ -20,6 +20,7 @@ function Harness({
   isAuthenticated?: boolean;
   onSubmit?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void;
   sessionIdentity?: string;
 }) {
@@ -120,15 +121,18 @@ describe("useChecklistAppointmentCreation", () => {
 
     expect(await submit()).toBeNull();
     expect(onSubmit).toHaveBeenCalledOnce();
-    expect(onSubmit).toHaveBeenCalledWith({
-      checklistItemId: 500,
-      date: "2028-02-29",
-      endTime: undefined,
-      memo: undefined,
-      place: undefined,
-      startTime: "2028-02-29T09:05:00",
-      title: "웨딩홀 상담",
-    });
+    expect(onSubmit).toHaveBeenCalledWith(
+      {
+        checklistItemId: 500,
+        date: "2028-02-29",
+        endTime: undefined,
+        memo: undefined,
+        place: undefined,
+        startTime: "2028-02-29T09:05:00",
+        title: "웨딩홀 상담",
+      },
+      expect.any(AbortSignal),
+    );
     expect(controller.isOpen).toBe(false);
     expect(controller.draft.title).toBe("");
   });
@@ -167,6 +171,31 @@ describe("useChecklistAppointmentCreation", () => {
       resolveSubmission?.(true);
       await firstSubmission;
     });
+    expect(controller.isOpen).toBe(false);
+  });
+
+  it("저장 실패 후 입력을 유지하고 같은 값으로 다시 제출한다", async () => {
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("internal secret"))
+      .mockResolvedValue(true);
+    render(<Harness onSubmit={onSubmit} />);
+    withController(() => {
+      controller.open();
+      controller.changeTitle("상담");
+      controller.changeDate("2026-09-20");
+    });
+    await submit();
+    expect(controller.isOpen).toBe(true);
+    expect(controller.draft.title).toBe("상담");
+    expect(controller.submissionState).toEqual({
+      status: "error",
+      message: "일정을 저장하지 못했어요. 다시 시도해 주세요.",
+      retryLabel: "다시 시도",
+    });
+    await submit();
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit.mock.calls[0][0]).toEqual(onSubmit.mock.calls[1][0]);
     expect(controller.isOpen).toBe(false);
   });
 
@@ -231,9 +260,11 @@ describe("useChecklistAppointmentCreation", () => {
 
   it("제출 중 unmount되어도 완료 결과로 상태를 다시 노출하지 않는다", async () => {
     let resolveSubmission: (() => void) | undefined;
+    let requestSignal: AbortSignal | undefined;
     const onSubmit = vi.fn(
-      () =>
+      (_input: ChecklistAppointmentCreationInput, signal: AbortSignal) =>
         new Promise<void>((resolve) => {
+          requestSignal = signal;
           resolveSubmission = resolve;
         }),
     );
@@ -249,11 +280,84 @@ describe("useChecklistAppointmentCreation", () => {
       submission = controller.submit();
     });
     view.unmount();
+    expect(requestSignal?.aborted).toBe(true);
 
     await act(async () => {
       resolveSubmission?.();
       await submission;
     });
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["인증 대상", { sessionIdentity: "authenticated:other" }],
+    ["선택 항목", { checklistItemId: 501 }],
+    ["인증 상태", { isAuthenticated: false }],
+  ])(
+    "제출 중 %s 변경 시 이전 요청을 취소하고 결과를 무시한다",
+    async (_, props) => {
+      let requestSignal: AbortSignal | undefined;
+      let resolveSubmission: (() => void) | undefined;
+      const onSubmit = vi.fn(
+        (_input: ChecklistAppointmentCreationInput, signal: AbortSignal) => {
+          requestSignal = signal;
+          return new Promise<void>((resolve) => {
+            resolveSubmission = resolve;
+          });
+        },
+      );
+      const view = render(<Harness onSubmit={onSubmit} />);
+      withController(() => {
+        controller.open();
+        controller.changeTitle("상담");
+        controller.changeDate("2026-09-20");
+      });
+      let submission: Promise<unknown> | undefined;
+      act(() => {
+        submission = controller.submit();
+      });
+      view.rerender(<Harness onSubmit={onSubmit} {...props} />);
+      await waitFor(() => expect(requestSignal?.aborted).toBe(true));
+      await act(async () => {
+        resolveSubmission?.();
+        await submission;
+      });
+      expect(controller.isOpen).toBe(false);
+      expect(controller.submissionState.status).toBe("idle");
+    },
+  );
+
+  it("생성 명령이 교체되면 이전 요청을 취소하고 오래된 결과를 무시한다", async () => {
+    let requestSignal: AbortSignal | undefined;
+    let resolveSubmission: (() => void) | undefined;
+    const previousSubmit = vi.fn(
+      (_input: ChecklistAppointmentCreationInput, signal: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise<void>((resolve) => {
+          resolveSubmission = resolve;
+        });
+      },
+    );
+    const nextSubmit = vi.fn();
+    const view = render(<Harness onSubmit={previousSubmit} />);
+    withController(() => {
+      controller.open();
+      controller.changeTitle("상담");
+      controller.changeDate("2026-09-20");
+    });
+    let submission: Promise<unknown> | undefined;
+    act(() => {
+      submission = controller.submit();
+    });
+    view.rerender(<Harness onSubmit={nextSubmit} />);
+    await waitFor(() => expect(requestSignal?.aborted).toBe(true));
+    await act(async () => {
+      resolveSubmission?.();
+      await submission;
+    });
+    expect(controller.isOpen).toBe(false);
+    expect(controller.draft.title).toBe("");
+    expect(controller.submissionState.status).toBe("idle");
+    expect(nextSubmit).not.toHaveBeenCalled();
   });
 });

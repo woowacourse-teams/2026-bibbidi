@@ -24,6 +24,7 @@ function createRepository(
     createCustomItem,
     ensureChecklist: vi.fn(),
     hasRemainingAppointments: vi.fn(),
+    createAppointment: vi.fn(),
     reconcileMissingChecklist: vi.fn(),
   };
 }

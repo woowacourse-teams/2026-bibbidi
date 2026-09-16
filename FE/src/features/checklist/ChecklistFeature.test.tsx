@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { useSyncExternalStore } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +29,9 @@ const repositoryMocks = vi.hoisted(() => {
   const createCustomItem = vi.fn();
   const getChecklist = vi.fn();
   const hasRemainingAppointments = vi.fn();
+  const cacheGetChecklist = vi.fn();
+  const cacheInvalidate = vi.fn();
+  const revisionListeners = new Set<() => void>();
 
   return {
     changeItemCategory,
@@ -35,6 +39,11 @@ const repositoryMocks = vi.hoisted(() => {
     changeItemTitle,
     createCustomItem,
     checklistRevision: 0,
+    publishRevision() {
+      this.checklistRevision += 1;
+      for (const listener of revisionListeners) listener();
+    },
+    revisionListeners,
     command: {
       changeItemCategory,
       changeItemStatus,
@@ -42,8 +51,12 @@ const repositoryMocks = vi.hoisted(() => {
       createCustomItem,
       ensureChecklist: vi.fn(),
       hasRemainingAppointments,
+      createAppointment: vi.fn(),
       reconcileMissingChecklist: vi.fn(),
     },
+    cache: { getChecklist: cacheGetChecklist, invalidate: cacheInvalidate },
+    cacheGetChecklist,
+    cacheInvalidate,
     current: { getChecklist },
     getChecklist,
     hasRemainingAppointments,
@@ -58,8 +71,16 @@ vi.mock("../auth", () => ({
 }));
 vi.mock("./checklistQueryDependencies", () => ({
   useChecklistCommandRepository: () => repositoryMocks.command,
+  useChecklistCacheRepository: () => repositoryMocks.cache,
   useChecklistQueryRepository: () => repositoryMocks.current,
-  useChecklistRevision: () => repositoryMocks.checklistRevision,
+  useChecklistRevision: () =>
+    useSyncExternalStore(
+      (listener) => {
+        repositoryMocks.revisionListeners.add(listener);
+        return () => repositoryMocks.revisionListeners.delete(listener);
+      },
+      () => repositoryMocks.checklistRevision,
+    ),
 }));
 
 import { ChecklistFeature } from "./ChecklistFeature";
@@ -73,7 +94,10 @@ import {
   ChecklistItemChangeError,
   CustomChecklistItemCreationError,
 } from "./repository/myChecklistCommandRepository";
-import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
+import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistLoadError,
+} from "./repository/myChecklistQueryRepository";
 import { ChecklistAppointmentCreationInput } from "./useChecklistAppointmentCreation";
 
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
@@ -184,6 +208,14 @@ beforeEach(() => {
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.createCustomItem.mockReset();
   repositoryMocks.createCustomItem.mockResolvedValue(undefined);
+  repositoryMocks.command.createAppointment.mockReset();
+  repositoryMocks.command.createAppointment.mockResolvedValue(undefined);
+  repositoryMocks.cacheGetChecklist.mockReset();
+  repositoryMocks.cacheGetChecklist.mockResolvedValue({
+    exists: true,
+    items: [],
+  });
+  repositoryMocks.cacheInvalidate.mockReset();
   repositoryMocks.checklistRevision = 0;
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
@@ -514,15 +546,15 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     );
     expect(within(creationPanel).getByText("청첩장 문구 정하기")).toBeTruthy();
     expect(
-      within(creationPanel).getByText("일정 저장 기능은 준비 중이에요."),
-    ).toBeTruthy();
+      within(creationPanel).queryByText("일정 저장 기능은 준비 중이에요."),
+    ).toBeNull();
     expect(
       (
         within(creationPanel).getByRole("button", {
           name: "저장",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(true);
+    ).toBe(false);
     expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
     expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
@@ -580,15 +612,18 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     );
 
     await waitFor(() =>
-      expect(onSubmitAppointment).toHaveBeenCalledWith({
-        checklistItemId: 500,
-        date: "2026-09-01",
-        endTime: "2026-09-01T11:30:00",
-        memo: "견적서 지참",
-        place: "웨딩홀",
-        startTime: "2026-09-01T10:00:00",
-        title: "웨딩홀 상담",
-      }),
+      expect(onSubmitAppointment).toHaveBeenCalledWith(
+        {
+          checklistItemId: 500,
+          date: "2026-09-01",
+          endTime: "2026-09-01T11:30:00",
+          memo: "견적서 지참",
+          place: "웨딩홀",
+          startTime: "2026-09-01T10:00:00",
+          title: "웨딩홀 상담",
+        },
+        expect.any(AbortSignal),
+      ),
     );
     expect(
       screen.queryByRole("complementary", { name: "일정 추가" }),
@@ -602,6 +637,174 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       ).toBe(document.activeElement),
     );
     expect(repositoryMocks.createCustomItem).not.toHaveBeenCalled();
+  });
+
+  it("생성 성공 후 기존 체크리스트 revision으로 상세 목록과 대표 날짜를 갱신한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.cacheGetChecklist.mockImplementation(async () => {
+      const updated = createAuthenticatedChecklist();
+      updated.categories[0].items[0].appointments.push({
+        id: 77,
+        title: "웨딩홀 상담",
+        date: "2026-09-20",
+        startTime: null,
+        endTime: null,
+        place: null,
+        memo: null,
+        isDone: false,
+      });
+      repositoryMocks.getChecklist.mockResolvedValue(updated);
+      repositoryMocks.publishRevision();
+      return { exists: true, items: [] };
+    });
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    const detail = await screen.findByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    fireEvent.click(within(detail).getByRole("button", { name: "일정 추가" }));
+    const form = screen.getByRole("complementary", { name: "일정 추가" });
+    fireEvent.change(within(form).getByLabelText(/제목/), {
+      target: { value: "웨딩홀 상담" },
+    });
+    fireEvent.change(within(form).getByLabelText(/날짜/), {
+      target: { value: "2026-09-20" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "저장" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "일정 추가" }),
+      ).toBeNull(),
+    );
+    await screen.findByText("웨딩홀 상담");
+    const updatedDetail = screen.getByRole("complementary", {
+      name: "청첩장 문구 정하기",
+    });
+    expect(within(updatedDetail).getByText("일정 1개")).toBeTruthy();
+    expect(
+      document.querySelector(".checklist__task-schedule")?.textContent,
+    ).toBe("9월 20일");
+    await waitFor(() =>
+      expect(
+        within(updatedDetail).getByRole("button", { name: "일정 추가" }),
+      ).toBe(document.activeElement),
+    );
+    expect(repositoryMocks.command.createAppointment).toHaveBeenCalledWith(
+      500,
+      {
+        title: "웨딩홀 상담",
+        date: "2026-09-20",
+        startTime: null,
+        endTime: null,
+        place: null,
+        memo: null,
+      },
+      expect.any(AbortSignal),
+    );
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
+    expect(repositoryMocks.cacheInvalidate).toHaveBeenCalledOnce();
+    expect(repositoryMocks.cacheGetChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("401은 refreshAuth로 연결하고 내부 메시지를 입력 UI에 표시하지 않는다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.command.createAppointment.mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    const form = screen.getByRole("complementary", { name: "일정 추가" });
+    fireEvent.change(within(form).getByLabelText(/제목/), {
+      target: { value: "상담" },
+    });
+    fireEvent.change(within(form).getByLabelText(/날짜/), {
+      target: { value: "2026-09-20" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
+    expect(within(form).getByRole("alert").textContent).toBe(
+      "일정을 저장하지 못했어요. 다시 시도해 주세요.",
+    );
+  });
+
+  it("생성 후 체크리스트 재조회에서 401이면 인증을 갱신하고 POST를 반복하지 않는다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.cacheGetChecklist.mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    const form = screen.getByRole("complementary", { name: "일정 추가" });
+    fireEvent.change(within(form).getByLabelText(/제목/), {
+      target: { value: "상담" },
+    });
+    fireEvent.change(within(form).getByLabelText(/날짜/), {
+      target: { value: "2026-09-20" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
+    expect(within(form).getByRole("alert").textContent).toBe(
+      "일정은 저장됐어요. 목록을 다시 불러와 주세요.",
+    );
+    expect(repositoryMocks.command.createAppointment).toHaveBeenCalledOnce();
+  });
+
+  it("생성 후 조회만 실패하면 입력을 유지하고 재시도에서 POST를 반복하지 않는다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.cacheGetChecklist
+      .mockRejectedValueOnce(new MyChecklistLoadError())
+      .mockImplementation(async () => {
+        repositoryMocks.publishRevision();
+        return { exists: true, items: [] };
+      });
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    const form = screen.getByRole("complementary", { name: "일정 추가" });
+    const titleInput = within(form).getByLabelText(/제목/) as HTMLInputElement;
+    fireEvent.change(titleInput, { target: { value: "상담" } });
+    fireEvent.change(within(form).getByLabelText(/날짜/), {
+      target: { value: "2026-09-20" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "저장" }));
+    await within(form).findByText(
+      "일정은 저장됐어요. 목록을 다시 불러와 주세요.",
+    );
+    expect(titleInput.value).toBe("상담");
+    fireEvent.click(
+      within(form).getByRole("button", { name: "목록 다시 불러오기" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "일정 추가" }),
+      ).toBeNull(),
+    );
+    expect(repositoryMocks.command.createAppointment).toHaveBeenCalledOnce();
+    expect(repositoryMocks.cacheGetChecklist).toHaveBeenCalledTimes(2);
+    expect(repositoryMocks.cacheInvalidate).toHaveBeenCalledTimes(2);
   });
 
   it("일정 입력 오류를 각 필드에 연결하고 첫 오류 입력으로 초점을 이동한다", async () => {
