@@ -1,17 +1,19 @@
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 
-import { useAuth } from "../features/auth";
+import { getSafeLoginReturnPath, useAuth } from "../features/auth";
 import { LoginForm } from "../features/login";
 
 export function LoginPage() {
   const { beginAuthentication } = useAuth();
+  const { search } = useLocation();
   const navigate = useNavigate();
+  const returnPath = getSafeLoginReturnPath(search);
 
   return (
     <LoginForm
       onSuccess={(result) => {
         beginAuthentication({ nickname: result.nickname });
-        navigate("/", { replace: true });
+        navigate(returnPath ?? "/", { replace: true });
       }}
       signupLink={<Link to="/signup">회원가입</Link>}
     />

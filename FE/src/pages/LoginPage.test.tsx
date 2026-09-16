@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("LoginPage", () => {
-  it("로그인이 완료되면 홈으로 이동한다", async () => {
+  it("일반 로그인이 완료되면 준비 목록인 루트로 이동한다", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -186,4 +186,54 @@ describe("LoginPage", () => {
       "bibbidi:preparation-checklist",
     );
   });
+
+  it.each([
+    ["/login?returnTo=%2Fplanner", "플래너 페이지"],
+    ["/login?returnTo=https%3A%2F%2Fevil.example", "준비 목록 페이지"],
+    ["/login?returnTo=%2Fchecklist", "준비 목록 페이지"],
+  ])(
+    "%s 로그인 성공 후 검증된 경로로 이동한다",
+    async (initialEntry, expectedPage) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            status: 200,
+          }),
+        );
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(
+        <AuthProvider>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <ChecklistMigrationProvider>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<h1>준비 목록 페이지</h1>} />
+                <Route path="/planner" element={<h1>플래너 페이지</h1>} />
+              </Routes>
+            </ChecklistMigrationProvider>
+          </MemoryRouter>
+        </AuthProvider>,
+      );
+
+      fireEvent.change(await screen.findByLabelText("닉네임"), {
+        target: { value: "bibbidi" },
+      });
+      fireEvent.change(screen.getByLabelText("비밀번호"), {
+        target: { value: "wish" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+      expect(
+        await screen.findByRole("heading", { name: expectedPage }),
+      ).toBeTruthy();
+    },
+  );
 });

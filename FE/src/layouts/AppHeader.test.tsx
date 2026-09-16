@@ -63,33 +63,58 @@ describe("AppHeader", () => {
     );
   });
 
-  it("하단 메뉴는 전체 서비스 경로와 현재 경로를 표시한다", () => {
+  it("하단 메뉴를 홈, 체크리스트, 플래너 순서로 표시한다", () => {
     render(
-      <MemoryRouter initialEntries={["/preparation"]}>
+      <MemoryRouter initialEntries={["/"]}>
         <AppBottomNavigation />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "홈" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "체크리스트" })).toBeTruthy();
+    const links = screen.getByRole("navigation", { name: "하단 메뉴" });
     expect(
-      screen
-        .getByRole("link", { name: "준비 목록" })
-        .getAttribute("aria-current"),
+      Array.from(links.querySelectorAll("a"), (link) => link.textContent),
+    ).toEqual(["홈", "체크리스트", "플래너"]);
+    expect(screen.getByRole("link", { name: "홈" }).getAttribute("href")).toBe(
+      "/",
+    );
+    expect(
+      screen.getByRole("link", { name: "홈" }).getAttribute("aria-current"),
     ).toBe("page");
   });
 
-  it("브랜드와 전체 서비스 메뉴를 실제 경로에 연결한다", () => {
+  it("브랜드와 데스크톱 메뉴를 실제 경로에 연결한다", () => {
     renderHeader({ kind: "guest" });
 
     expect(
       screen.getByRole("link", { name: "비비디 홈" }).getAttribute("href"),
     ).toBe("/");
+    const desktopLinks = Array.from(
+      screen
+        .getByRole("navigation", { name: "주요 메뉴" })
+        .querySelectorAll("a"),
+      (link) => [link.textContent, link.getAttribute("href")],
+    );
+    expect(desktopLinks).toEqual([
+      ["체크리스트", "/checklist"],
+      ["플래너", "/planner"],
+    ]);
+    expect(screen.queryByRole("link", { name: "준비 목록" })).toBeNull();
+  });
+
+  it("모바일 홈은 하위가 아닌 루트에서만 활성화된다", () => {
+    render(
+      <MemoryRouter initialEntries={["/checklist"]}>
+        <AppBottomNavigation />
+      </MemoryRouter>,
+    );
+
     expect(
-      screen.getByRole("link", { name: "체크리스트" }).getAttribute("href"),
-    ).toBe("/checklist");
+      screen.getByRole("link", { name: "홈" }).hasAttribute("aria-current"),
+    ).toBe(false);
     expect(
-      screen.getByRole("link", { name: "준비 목록" }).getAttribute("href"),
-    ).toBe("/preparation");
+      screen
+        .getByRole("link", { name: "체크리스트" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
