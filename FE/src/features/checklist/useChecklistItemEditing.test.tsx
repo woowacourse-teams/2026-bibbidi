@@ -23,6 +23,7 @@ function createRepository(
   return {
     changeItemCategory: vi.fn(),
     changeItemTitle,
+    createCustomItem: vi.fn(),
     ensureChecklist: vi.fn(),
     reconcileMissingChecklist: vi.fn(),
   };

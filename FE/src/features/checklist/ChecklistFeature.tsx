@@ -14,11 +14,8 @@ import {
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
-import {
-  ChecklistTaskCreationInput,
-  ChecklistTaskCreationSubmissionState,
-  useChecklistTaskCreation,
-} from "./useChecklistTaskCreation";
+import { useChecklistTaskCreation } from "./useChecklistTaskCreation";
+import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationCommand";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
@@ -67,21 +64,17 @@ function createChecklistDetailState(state: unknown, depth: number) {
   };
 }
 
-export interface ChecklistFeatureProps {
-  customTaskSubmissionState?: ChecklistTaskCreationSubmissionState;
-  onSubmitCustomTask?: (
-    input: ChecklistTaskCreationInput,
-  ) => Promise<void> | void;
-}
-
-export function ChecklistFeature({
-  customTaskSubmissionState,
-  onSubmitCustomTask,
-}: ChecklistFeatureProps = {}) {
+export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
   const audience: ChecklistAudience | undefined =
     authState.status === "authenticated"
       ? "authenticated"
+      : authState.status === "guest"
+        ? "guest"
+        : undefined;
+  const sessionIdentity =
+    authState.status === "authenticated" || authState.status === "synchronizing"
+      ? `authenticated:${authState.user.nickname}`
       : authState.status === "guest"
         ? "guest"
         : undefined;
@@ -92,6 +85,12 @@ export function ChecklistFeature({
     checklistCommandRepository,
     refreshAuth,
     audience,
+  );
+  const taskCreationCommand = useChecklistTaskCreationCommand(
+    checklistCommandRepository,
+    refreshAuth,
+    audience,
+    sessionIdentity,
   );
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,8 +125,9 @@ export function ChecklistFeature({
   const taskCreation = useChecklistTaskCreation({
     isOpen: audience === "authenticated" && isTaskCreationOpen,
     onOpenChange: updateTaskCreation,
-    onSubmit: onSubmitCustomTask,
-    submissionState: customTaskSubmissionState,
+    onSubmit: taskCreationCommand.submit,
+    sessionIdentity,
+    submissionState: taskCreationCommand.submissionState,
   });
 
   useEffect(() => {

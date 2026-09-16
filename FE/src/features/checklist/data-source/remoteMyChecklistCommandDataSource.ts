@@ -1,5 +1,6 @@
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
+const CUSTOM_CHECKLIST_ITEM_ENDPOINT = `${CHECKLIST_ENDPOINT}/me/items`;
 const CHECKLIST_ITEM_ENDPOINT = `${apiBaseUrl}/api/checklist-items`;
 const CHECKLIST_COMMAND_TIMEOUT_MS = 10_000;
 
@@ -20,6 +21,11 @@ export interface RemoteMyChecklistCommandDataSource {
     signal?: AbortSignal,
   ): Promise<ChecklistItemChangeResponse>;
   createChecklist(signal?: AbortSignal): Promise<number>;
+  createCustomChecklistItem(
+    title: string,
+    categoryId: number,
+    signal?: AbortSignal,
+  ): Promise<CustomChecklistItemCreationResponse>;
 }
 
 export interface ChecklistItemChangeResponse {
@@ -28,6 +34,13 @@ export interface ChecklistItemChangeResponse {
   id: number;
   status: "continue" | "done" | "prev";
   title: string;
+}
+
+export interface CustomChecklistItemCreationResponse extends Omit<
+  ChecklistItemChangeResponse,
+  "catalogItemId"
+> {
+  catalogItemId: null;
 }
 
 export class RemoteMyChecklistCreationApiError extends Error {
@@ -108,6 +121,45 @@ export class RemoteChecklistItemChangeRequestAbortedError extends Error {
   }
 }
 
+export class RemoteCustomChecklistItemCreationApiError extends Error {
+  constructor(
+    readonly errorCode: number,
+    readonly status: number,
+    message = "할 일을 추가하지 못했습니다.",
+  ) {
+    super(message);
+    this.name = "RemoteCustomChecklistItemCreationApiError";
+  }
+}
+
+export class RemoteCustomChecklistItemCreationContractError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("할 일 추가 성공 응답 형식이 올바르지 않습니다.", options);
+    this.name = "RemoteCustomChecklistItemCreationContractError";
+  }
+}
+
+export class RemoteCustomChecklistItemCreationNetworkError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("할 일 추가 중 네트워크 오류가 발생했습니다.", options);
+    this.name = "RemoteCustomChecklistItemCreationNetworkError";
+  }
+}
+
+export class RemoteCustomChecklistItemCreationTimeoutError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("할 일 추가 요청 시간이 초과됐습니다.", options);
+    this.name = "RemoteCustomChecklistItemCreationTimeoutError";
+  }
+}
+
+export class RemoteCustomChecklistItemCreationRequestAbortedError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("할 일 추가 요청이 취소됐습니다.", options);
+    this.name = "RemoteCustomChecklistItemCreationRequestAbortedError";
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -137,6 +189,12 @@ function isChecklistItemChangeResponse(
       value.status === "continue" ||
       value.status === "done")
   );
+}
+
+function isCustomChecklistItemCreationResponse(
+  value: unknown,
+): value is CustomChecklistItemCreationResponse {
+  return isChecklistItemChangeResponse(value) && value.catalogItemId === null;
 }
 
 function toRequestError(
@@ -211,6 +269,114 @@ async function createChecklist(signal?: AbortSignal): Promise<number> {
 
     if (response.status !== 201 || !isValidChecklistId(body)) {
       throw new RemoteMyChecklistCreationContractError();
+    }
+
+    return body;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
+  }
+}
+
+function toCustomChecklistItemCreationRequestError(
+  error: unknown,
+  didTimeout: boolean,
+  callerSignal?: AbortSignal,
+): Error {
+  if (didTimeout) {
+    return new RemoteCustomChecklistItemCreationTimeoutError({ cause: error });
+  }
+
+  if (callerSignal?.aborted) {
+    return new RemoteCustomChecklistItemCreationRequestAbortedError({
+      cause: error,
+    });
+  }
+
+  return new RemoteCustomChecklistItemCreationNetworkError({ cause: error });
+}
+
+async function createCustomChecklistItem(
+  title: string,
+  categoryId: number,
+  signal?: AbortSignal,
+): Promise<CustomChecklistItemCreationResponse> {
+  const controller = new AbortController();
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, CHECKLIST_COMMAND_TIMEOUT_MS);
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
+
+  try {
+    let response: Response;
+
+    try {
+      response = await fetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
+        body: JSON.stringify({ categoryId, title }),
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      throw toCustomChecklistItemCreationRequestError(
+        error,
+        didTimeout,
+        signal,
+      );
+    }
+
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (didTimeout || signal?.aborted) {
+        throw toCustomChecklistItemCreationRequestError(
+          error,
+          didTimeout,
+          signal,
+        );
+      }
+
+      if (!response.ok) {
+        throw new RemoteCustomChecklistItemCreationApiError(0, response.status);
+      }
+
+      throw new RemoteCustomChecklistItemCreationContractError({
+        cause: error,
+      });
+    }
+
+    if (didTimeout || signal?.aborted) {
+      throw toCustomChecklistItemCreationRequestError(
+        new DOMException("aborted", "AbortError"),
+        didTimeout,
+        signal,
+      );
+    }
+
+    if (!response.ok) {
+      throw new RemoteCustomChecklistItemCreationApiError(
+        isApiErrorResponse(body) ? body.errorCode : 0,
+        response.status,
+        isApiErrorResponse(body) ? body.message : undefined,
+      );
+    }
+
+    if (
+      response.status !== 201 ||
+      !isCustomChecklistItemCreationResponse(body)
+    ) {
+      throw new RemoteCustomChecklistItemCreationContractError();
     }
 
     return body;
@@ -330,4 +496,9 @@ function changeChecklistItemTitle(
 }
 
 export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSource =
-  { changeChecklistItemCategory, changeChecklistItemTitle, createChecklist };
+  {
+    changeChecklistItemCategory,
+    changeChecklistItemTitle,
+    createChecklist,
+    createCustomChecklistItem,
+  };

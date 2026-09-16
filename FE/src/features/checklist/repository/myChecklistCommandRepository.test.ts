@@ -5,6 +5,9 @@ import {
   RemoteChecklistItemChangeApiError,
   RemoteChecklistItemChangeNetworkError,
   RemoteChecklistItemChangeRequestAbortedError,
+  RemoteCustomChecklistItemCreationApiError,
+  RemoteCustomChecklistItemCreationNetworkError,
+  RemoteCustomChecklistItemCreationRequestAbortedError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationNetworkError,
   RemoteMyChecklistCreationRequestAbortedError,
@@ -12,6 +15,7 @@ import {
 import {
   ChecklistItemChangeError,
   createMyChecklistCommandRepository,
+  CustomChecklistItemCreationError,
   MyChecklistCreationError,
 } from "./myChecklistCommandRepository";
 import {
@@ -25,6 +29,7 @@ function createDataSource(): RemoteMyChecklistCommandDataSource {
     changeChecklistItemCategory: vi.fn(),
     changeChecklistItemTitle: vi.fn(),
     createChecklist: vi.fn().mockResolvedValue(1),
+    createCustomChecklistItem: vi.fn(),
   };
 }
 
@@ -247,6 +252,210 @@ describe("MyChecklistCommandRepository", () => {
     await expect(
       repository.changeItemTitle(500, "새 제목"),
     ).rejects.toBeInstanceOf(ChecklistItemChangeError);
+  });
+
+  it("직접 작성 할 일을 정규화해 생성하고 성공 응답을 공통 캐시에 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem).mockResolvedValue({
+      catalogItemId: null,
+      categoryId: 2,
+      id: 501,
+      status: "done",
+      title: "청첩장 문구 정하기",
+    });
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.createCustomItem("  청첩장 문구 정하기  ", "2"),
+    ).resolves.toBeUndefined();
+    expect(dataSource.createCustomChecklistItem).toHaveBeenCalledWith(
+      "청첩장 문구 정하기",
+      2,
+      undefined,
+    );
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledOnce();
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledWith([
+      {
+        appointments: [],
+        categoryId: 2,
+        id: 501,
+        isDone: true,
+        sourceCatalogItemId: null,
+        title: "청첩장 문구 정하기",
+      },
+    ]);
+    expect(queryRepository.getChecklist).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["   ", "2"],
+    ["가".repeat(51), "2"],
+    ["제목", ""],
+    ["제목", "0"],
+    ["제목", "1.5"],
+    ["제목", "1e2"],
+    ["제목", String(Number.MAX_SAFE_INTEGER + 1)],
+  ])(
+    "잘못된 생성 입력은 원격 요청 전에 거부한다",
+    async (title, categoryId) => {
+      const dataSource = createDataSource();
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        createQueryRepository(),
+      );
+
+      await expect(
+        repository.createCustomItem(title, categoryId),
+      ).rejects.toMatchObject({ reason: "invalid-request" });
+      expect(dataSource.createCustomChecklistItem).not.toHaveBeenCalled();
+    },
+  );
+
+  it("체크리스트 없음은 체크리스트를 생성한 뒤 정확히 한 번 재시도하고 한 번 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem)
+      .mockRejectedValueOnce(
+        new RemoteCustomChecklistItemCreationApiError(
+          303,
+          404,
+          "체크리스트를 찾을 수 없습니다.",
+        ),
+      )
+      .mockResolvedValueOnce({
+        catalogItemId: null,
+        categoryId: 2,
+        id: 501,
+        status: "prev",
+        title: "새 할 일",
+      });
+    const queryRepository = createQueryRepository(false);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).resolves.toBeUndefined();
+    expect(dataSource.createCustomChecklistItem).toHaveBeenCalledTimes(2);
+    expect(dataSource.createChecklist).toHaveBeenCalledOnce();
+    expect(queryRepository.invalidate).toHaveBeenCalledTimes(2);
+    expect(queryRepository.applyAddedItems).toHaveBeenCalledOnce();
+  });
+
+  it("재시도도 실패하면 추가 복구를 반복하거나 캐시를 변경하지 않는다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem).mockRejectedValue(
+      new RemoteCustomChecklistItemCreationApiError(
+        303,
+        404,
+        "체크리스트를 찾을 수 없습니다.",
+      ),
+    );
+    const queryRepository = createQueryRepository(false);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).rejects.toBeInstanceOf(CustomChecklistItemCreationError);
+    expect(dataSource.createCustomChecklistItem).toHaveBeenCalledTimes(2);
+    expect(dataSource.createChecklist).toHaveBeenCalledOnce();
+    expect(queryRepository.applyAddedItems).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [101, 400, "invalid-request"],
+    [305, 404, "category-not-found"],
+  ] as const)(
+    "생성 API 오류를 Feature용 원인과 안전한 메시지로 변환한다",
+    async (errorCode, status, reason) => {
+      const dataSource = createDataSource();
+      vi.mocked(dataSource.createCustomChecklistItem).mockRejectedValue(
+        new RemoteCustomChecklistItemCreationApiError(
+          errorCode,
+          status,
+          "사용자 안내 메시지",
+        ),
+      );
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        createQueryRepository(),
+      );
+
+      await expect(
+        repository.createCustomItem("새 할 일", "2"),
+      ).rejects.toMatchObject({ message: "사용자 안내 메시지", reason });
+    },
+  );
+
+  it("알 수 없는 서버 메시지와 네트워크 오류에는 안전한 공통 문구를 사용한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem)
+      .mockRejectedValueOnce(
+        new RemoteCustomChecklistItemCreationApiError(
+          901,
+          500,
+          "내부 구현 정보",
+        ),
+      )
+      .mockRejectedValueOnce(
+        new RemoteCustomChecklistItemCreationNetworkError(),
+      );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).rejects.toMatchObject({
+      message: "할 일을 추가하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      reason: "unknown",
+    });
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).rejects.toMatchObject({
+      message: "할 일을 추가하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      reason: "unknown",
+    });
+  });
+
+  it.each([
+    new RemoteCustomChecklistItemCreationApiError(0, 401),
+    new RemoteCustomChecklistItemCreationApiError(201, 500),
+  ])("생성 API 인증 오류를 공통 인증 오류로 변환한다", async (error) => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem).mockRejectedValue(error);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).rejects.toBeInstanceOf(MyChecklistAuthenticationRequiredError);
+  });
+
+  it("생성 요청 취소를 공통 요청 취소 오류로 변환한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.createCustomChecklistItem).mockRejectedValue(
+      new RemoteCustomChecklistItemCreationRequestAbortedError(),
+    );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.createCustomItem("새 할 일", "2"),
+    ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
   });
 
   it("체크리스트가 존재하면 생성하지 않는다", async () => {

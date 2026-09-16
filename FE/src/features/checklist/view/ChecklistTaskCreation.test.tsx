@@ -34,7 +34,9 @@ const categories: ChecklistCategoryViewModel[] = [
 ];
 
 interface CreationHarnessProps {
-  onSubmit?: (input: ChecklistTaskCreationInput) => Promise<void> | void;
+  onSubmit?: (
+    input: ChecklistTaskCreationInput,
+  ) => Promise<boolean | void> | boolean | void;
   submissionState?: ChecklistTaskCreationSubmissionState;
 }
 
@@ -97,6 +99,18 @@ function StatefulCreationHarness({
   );
 }
 
+function SessionAwareCreationHarness({
+  onOpenChange,
+  sessionIdentity,
+}: {
+  onOpenChange: (isOpen: boolean) => void;
+  sessionIdentity: string;
+}) {
+  useChecklistTaskCreation({ onOpenChange, sessionIdentity });
+
+  return null;
+}
+
 function openForm() {
   fireEvent.click(screen.getByRole("button", { name: "할 일 추가 열기" }));
   return screen.getByRole("complementary", { name: "할 일 추가" });
@@ -112,6 +126,88 @@ afterEach(() => {
 });
 
 describe("할 일 추가 폼", () => {
+  it.each([
+    ["void", () => undefined],
+    ["Promise<void>", () => Promise.resolve(undefined)],
+    ["true", () => true],
+  ])(
+    "%s 제출 성공 시 작성 화면과 draft를 초기화한다",
+    async (_label, onSubmit) => {
+      render(<CreationHarness onSubmit={onSubmit} />);
+      const panel = openForm();
+      fireEvent.change(within(panel).getByRole("textbox"), {
+        target: { value: "새 할 일" },
+      });
+      fireEvent.change(within(panel).getByRole("combobox"), {
+        target: { value: "10" },
+      });
+      fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(
+        screen.queryByRole("complementary", { name: "할 일 추가" }),
+      ).toBeNull();
+
+      const reopenedPanel = openForm();
+      expect(
+        (within(reopenedPanel).getByRole("textbox") as HTMLInputElement).value,
+      ).toBe("");
+      expect(
+        (within(reopenedPanel).getByRole("combobox") as HTMLSelectElement)
+          .value,
+      ).toBe("");
+    },
+  );
+
+  it("명시적 false 제출 실패 시 작성 화면과 draft를 유지한다", async () => {
+    render(<CreationHarness onSubmit={() => false} />);
+    const panel = openForm();
+    fireEvent.change(within(panel).getByRole("textbox"), {
+      target: { value: "작성 중인 할 일" },
+    });
+    fireEvent.change(within(panel).getByRole("combobox"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("complementary", { name: "할 일 추가" })).toBe(
+      panel,
+    );
+    expect((within(panel).getByRole("textbox") as HTMLInputElement).value).toBe(
+      "작성 중인 할 일",
+    );
+    expect(
+      (within(panel).getByRole("combobox") as HTMLSelectElement).value,
+    ).toBe("20");
+  });
+
+  it("닫힌 작성 세션은 사용자 변경 시 중복 close navigation을 만들지 않는다", async () => {
+    const onOpenChange = vi.fn();
+    const view = render(
+      <SessionAwareCreationHarness
+        onOpenChange={onOpenChange}
+        sessionIdentity="authenticated:first"
+      />,
+    );
+
+    view.rerender(
+      <SessionAwareCreationHarness
+        onOpenChange={onOpenChange}
+        sessionIdentity="authenticated:second"
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("데스크톱 패널을 열고 제목 입력에 초점을 둔다", () => {
     render(<CreationHarness onSubmit={vi.fn()} />);
 

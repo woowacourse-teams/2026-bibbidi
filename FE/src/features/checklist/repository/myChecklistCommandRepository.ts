@@ -1,11 +1,15 @@
 import {
   ChecklistItemChangeResponse,
+  CustomChecklistItemCreationResponse,
   RemoteMyChecklistCommandDataSource,
   RemoteChecklistItemChangeApiError,
   RemoteChecklistItemChangeRequestAbortedError,
+  RemoteCustomChecklistItemCreationApiError,
+  RemoteCustomChecklistItemCreationRequestAbortedError,
   RemoteMyChecklistCreationApiError,
   RemoteMyChecklistCreationRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
+import { MyChecklistItemModel } from "../model/myChecklist";
 import {
   MyChecklistAuthenticationRequiredError,
   MyChecklistQueryRepository,
@@ -21,6 +25,11 @@ export interface MyChecklistCommandRepository {
   changeItemTitle(
     itemId: number,
     title: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  createCustomItem(
+    title: string,
+    categoryId: string,
     signal?: AbortSignal,
   ): Promise<void>;
   ensureChecklist(signal?: AbortSignal): Promise<void>;
@@ -44,6 +53,20 @@ export class ChecklistItemChangeError extends Error {
   ) {
     super(message, options);
     this.name = "ChecklistItemChangeError";
+  }
+}
+
+export type CustomChecklistItemCreationFailureReason =
+  "category-not-found" | "invalid-request" | "unknown";
+
+export class CustomChecklistItemCreationError extends Error {
+  constructor(
+    readonly reason: CustomChecklistItemCreationFailureReason,
+    message = "할 일을 추가하지 못했습니다. 잠시 후 다시 시도해주세요.",
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "CustomChecklistItemCreationError";
   }
 }
 
@@ -77,12 +100,39 @@ function getChecklistItemChangeFailureReason(
   return "unknown";
 }
 
-function getSafeMutationMessage(
-  error: RemoteChecklistItemChangeApiError,
-): string | undefined {
+function getSafeMutationMessage(error: {
+  message: string;
+}): string | undefined {
   const message = error.message.trim();
 
   return message.length > 0 && message.length <= 200 ? message : undefined;
+}
+
+function getCustomChecklistItemCreationFailureReason(
+  error: RemoteCustomChecklistItemCreationApiError,
+): CustomChecklistItemCreationFailureReason {
+  if (error.status === 400 || error.errorCode === 101) {
+    return "invalid-request";
+  }
+
+  if (error.errorCode === 305) {
+    return "category-not-found";
+  }
+
+  return "unknown";
+}
+
+function toCustomChecklistItemModel(
+  item: CustomChecklistItemCreationResponse,
+): MyChecklistItemModel {
+  return {
+    appointments: [],
+    categoryId: item.categoryId,
+    id: item.id,
+    isDone: item.status === "done",
+    sourceCatalogItemId: null,
+    title: item.title,
+  };
 }
 
 export class MyChecklistCreationError extends Error {
@@ -115,6 +165,44 @@ export function createMyChecklistCommandRepository(
   queryRepository: MyChecklistQueryRepository,
 ): MyChecklistCommandRepository {
   let hasConfirmedChecklist = false;
+
+  const throwCustomChecklistItemCreationError = (error: unknown): never => {
+    if (error instanceof MyChecklistAuthenticationRequiredError) {
+      throw error;
+    }
+
+    if (
+      error instanceof MyChecklistRequestAbortedError ||
+      error instanceof RemoteCustomChecklistItemCreationRequestAbortedError
+    ) {
+      throw new MyChecklistRequestAbortedError({ cause: error });
+    }
+
+    if (
+      error instanceof RemoteCustomChecklistItemCreationApiError &&
+      (error.status === 401 || error.errorCode === 201)
+    ) {
+      throw new MyChecklistAuthenticationRequiredError({ cause: error });
+    }
+
+    if (error instanceof CustomChecklistItemCreationError) {
+      throw error;
+    }
+
+    if (error instanceof RemoteCustomChecklistItemCreationApiError) {
+      const reason = getCustomChecklistItemCreationFailureReason(error);
+      const safeMessage =
+        reason === "unknown" ? undefined : getSafeMutationMessage(error);
+
+      throw new CustomChecklistItemCreationError(reason, safeMessage, {
+        cause: error,
+      });
+    }
+
+    throw new CustomChecklistItemCreationError("unknown", undefined, {
+      cause: error,
+    });
+  };
 
   const changeChecklistItem = async (
     request: () => Promise<ChecklistItemChangeResponse>,
@@ -201,6 +289,14 @@ export function createMyChecklistCommandRepository(
     }
   };
 
+  const reconcileMissingChecklist = async (
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    hasConfirmedChecklist = false;
+    queryRepository.invalidate();
+    await ensureChecklist(signal);
+  };
+
   return {
     changeItemCategory(itemId, categoryId, signal) {
       if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
@@ -246,11 +342,76 @@ export function createMyChecklistCommandRepository(
           queryRepository.applyItemTitleUpdate(itemId, changedItem.title),
       );
     },
-    ensureChecklist,
-    async reconcileMissingChecklist(signal) {
-      hasConfirmedChecklist = false;
-      queryRepository.invalidate();
-      await ensureChecklist(signal);
+    async createCustomItem(title, categoryId, signal) {
+      const normalizedTitle = title.trim();
+
+      if (normalizedTitle.length === 0) {
+        throw new CustomChecklistItemCreationError(
+          "invalid-request",
+          "할 일 제목을 입력해주세요.",
+        );
+      }
+
+      if (normalizedTitle.length > 50) {
+        throw new CustomChecklistItemCreationError(
+          "invalid-request",
+          "할 일 제목은 50자 이하로 입력해주세요.",
+        );
+      }
+
+      if (!/^[1-9]\d*$/.test(categoryId)) {
+        throw new CustomChecklistItemCreationError(
+          "invalid-request",
+          "카테고리를 선택해주세요.",
+        );
+      }
+
+      const categoryIdNumber = Number(categoryId);
+
+      if (!Number.isSafeInteger(categoryIdNumber)) {
+        throw new CustomChecklistItemCreationError(
+          "invalid-request",
+          "카테고리를 선택해주세요.",
+        );
+      }
+
+      const request = () =>
+        dataSource.createCustomChecklistItem(
+          normalizedTitle,
+          categoryIdNumber,
+          signal,
+        );
+      let createdItem: CustomChecklistItemCreationResponse;
+
+      try {
+        createdItem = await request();
+      } catch (error) {
+        const isChecklistMissing =
+          error instanceof RemoteCustomChecklistItemCreationApiError &&
+          error.status === 404 &&
+          error.errorCode === 303;
+
+        if (!isChecklistMissing) {
+          return throwCustomChecklistItemCreationError(error);
+        }
+
+        try {
+          await reconcileMissingChecklist(signal);
+          createdItem = await request();
+        } catch (retryError) {
+          return throwCustomChecklistItemCreationError(retryError);
+        }
+      }
+
+      if (signal?.aborted) {
+        throw new MyChecklistRequestAbortedError();
+      }
+
+      queryRepository.applyAddedItems([
+        toCustomChecklistItemModel(createdItem),
+      ]);
     },
+    ensureChecklist,
+    reconcileMissingChecklist,
   };
 }

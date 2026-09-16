@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const CHECKLIST_TASK_TITLE_MAX_LENGTH = 50;
 
@@ -46,7 +46,10 @@ function validateCategory(categoryId: string | null) {
 interface UseChecklistTaskCreationOptions {
   isOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
-  onSubmit?: (input: ChecklistTaskCreationInput) => Promise<void> | void;
+  onSubmit?: (
+    input: ChecklistTaskCreationInput,
+  ) => Promise<boolean | void> | boolean | void;
+  sessionIdentity?: string;
   submissionState?: ChecklistTaskCreationSubmissionState;
 }
 
@@ -72,15 +75,57 @@ export function useChecklistTaskCreation({
   isOpen: controlledIsOpen,
   onOpenChange,
   onSubmit,
+  sessionIdentity,
   submissionState = { status: "idle" },
 }: UseChecklistTaskCreationOptions): ChecklistTaskCreationController {
   const [draft, setDraft] = useState<ChecklistTaskCreationDraft>(emptyDraft);
   const [errors, setErrors] = useState<ChecklistTaskCreationErrors>({});
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
+  const previousSessionIdentityRef = useRef(sessionIdentity);
   const isOpen = controlledIsOpen ?? uncontrolledIsOpen;
+  const wasOpenRef = useRef(isOpen);
   const isSubmitting = submissionState.status === "submitting";
   const isDirty = draft.title.length > 0 || draft.categoryId !== null;
+
+  useEffect(() => {
+    if (
+      sessionIdentity === undefined ||
+      previousSessionIdentityRef.current === sessionIdentity
+    ) {
+      return;
+    }
+
+    previousSessionIdentityRef.current = sessionIdentity;
+    const shouldClose = isOpen || wasOpenRef.current;
+    let isActive = true;
+
+    queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
+      setDraft(emptyDraft);
+      setErrors({});
+      setIsDiscardDialogOpen(false);
+
+      if (controlledIsOpen === undefined) {
+        setUncontrolledIsOpen(false);
+      }
+
+      if (shouldClose) {
+        onOpenChange?.(false);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [controlledIsOpen, isOpen, onOpenChange, sessionIdentity]);
+
+  useEffect(() => {
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const setIsOpen = (nextIsOpen: boolean) => {
     if (controlledIsOpen === undefined) {
@@ -172,10 +217,16 @@ export function useChecklistTaskCreation({
       }
 
       if (draft.categoryId !== null && onSubmit) {
-        await onSubmit({
+        const didSucceed = await onSubmit({
           categoryId: draft.categoryId,
           title: draft.title.trim(),
         });
+
+        if (didSucceed !== false) {
+          setIsDiscardDialogOpen(false);
+          setIsOpen(false);
+          reset();
+        }
       }
 
       return null;

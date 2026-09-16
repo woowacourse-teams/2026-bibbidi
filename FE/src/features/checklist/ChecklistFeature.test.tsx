@@ -24,15 +24,18 @@ const authMocks = vi.hoisted(() => ({
 const repositoryMocks = vi.hoisted(() => {
   const changeItemCategory = vi.fn();
   const changeItemTitle = vi.fn();
+  const createCustomItem = vi.fn();
   const getChecklist = vi.fn();
 
   return {
     changeItemCategory,
     changeItemTitle,
+    createCustomItem,
     checklistRevision: 0,
     command: {
       changeItemCategory,
       changeItemTitle,
+      createCustomItem,
       ensureChecklist: vi.fn(),
       reconcileMissingChecklist: vi.fn(),
     },
@@ -60,6 +63,7 @@ import {
   ChecklistQueryLoadError,
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
+import { CustomChecklistItemCreationError } from "./repository/myChecklistCommandRepository";
 import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
 
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
@@ -152,6 +156,8 @@ beforeEach(() => {
   repositoryMocks.changeItemCategory.mockResolvedValue(undefined);
   repositoryMocks.changeItemTitle.mockReset();
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
+  repositoryMocks.createCustomItem.mockReset();
+  repositoryMocks.createCustomItem.mockResolvedValue(undefined);
   repositoryMocks.checklistRevision = 0;
   repositoryMocks.getChecklist.mockReset();
   repositoryMocks.getChecklist.mockResolvedValue(createChecklist());
@@ -371,6 +377,193 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       within(panel).getByRole("option", { name: "예복 준비" }),
     ).toBeTruthy();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("실제 생성 명령을 연결하고 성공 후 작성 상태와 URL을 초기화한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    let resolveCreation: () => void = () => undefined;
+    repositoryMocks.createCustomItem.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreation = resolve;
+        }),
+    );
+    renderChecklistFeature(["/checklist?filter=remaining"]);
+    const addTaskButton = await screen.findByRole("button", {
+      name: "할 일 추가",
+    });
+    fireEvent.click(addTaskButton);
+    const panel = screen.getByRole("complementary", { name: "할 일 추가" });
+    fireEvent.change(within(panel).getByRole("textbox"), {
+      target: { value: "  청첩장 문구 확정  " },
+    });
+    fireEvent.change(within(panel).getByRole("combobox"), {
+      target: { value: "10" },
+    });
+
+    fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+
+    await waitFor(() =>
+      expect(repositoryMocks.createCustomItem).toHaveBeenCalledWith(
+        "청첩장 문구 확정",
+        "10",
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(
+      within(panel)
+        .getByRole("button", { name: "추가 중" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(within(panel).getByRole("button", { name: "추가 중" }));
+    expect(repositoryMocks.createCustomItem).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      resolveCreation();
+    });
+
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?filter=remaining"),
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "할 일 추가" }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(addTaskButton);
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+
+    fireEvent.click(addTaskButton);
+    const reopenedPanel = screen.getByRole("complementary", {
+      name: "할 일 추가",
+    });
+    expect(
+      (within(reopenedPanel).getByRole("textbox") as HTMLInputElement).value,
+    ).toBe("");
+    expect(
+      (within(reopenedPanel).getByRole("combobox") as HTMLSelectElement).value,
+    ).toBe("");
+  });
+
+  it("생성 실패 시 작성값과 패널을 유지하고 오류를 지운 뒤 재시도한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.createCustomItem
+      .mockRejectedValueOnce(
+        new CustomChecklistItemCreationError(
+          "category-not-found",
+          "카테고리를 찾을 수 없습니다.",
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+    renderChecklistFeature();
+    fireEvent.click(await screen.findByRole("button", { name: "할 일 추가" }));
+    const panel = screen.getByRole("complementary", { name: "할 일 추가" });
+    const title = within(panel).getByRole("textbox");
+    fireEvent.change(title, { target: { value: "작성값 유지" } });
+    fireEvent.change(within(panel).getByRole("combobox"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+
+    expect((await within(panel).findByRole("alert")).textContent).toBe(
+      "카테고리를 찾을 수 없습니다.",
+    );
+    expect((title as HTMLInputElement).value).toBe("작성값 유지");
+    expect(getCurrentUrl()).toBe("/checklist?addTask=true");
+
+    fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+    await waitFor(() =>
+      expect(
+        within(panel).queryByText("카테고리를 찾을 수 없습니다."),
+      ).toBeNull(),
+    );
+    await waitFor(() => expect(getCurrentUrl()).toBe("/checklist"));
+    expect(repositoryMocks.createCustomItem).toHaveBeenCalledTimes(2);
+  });
+
+  it("생성 인증 오류를 refreshAuth에 연결하고 인증 확인 중 draft와 URL을 유지한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    repositoryMocks.createCustomItem.mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    const view = renderChecklistFeature();
+    fireEvent.click(await screen.findByRole("button", { name: "할 일 추가" }));
+    const panel = screen.getByRole("complementary", { name: "할 일 추가" });
+    fireEvent.change(within(panel).getByRole("textbox"), {
+      target: { value: "인증 후 유지" },
+    });
+    fireEvent.change(within(panel).getByRole("combobox"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
+
+    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
+    authMocks.authState = { status: "loading" };
+    view.rerender(<ChecklistFeatureTestApp />);
+    expect(getCurrentUrl()).toBe("/checklist?addTask=true");
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    view.rerender(<ChecklistFeatureTestApp />);
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "로그인이 필요합니다.",
+    );
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe(
+      "인증 후 유지",
+    );
+  });
+
+  it("인증 사용자가 바뀌면 이전 작성 세션과 addTask URL을 초기화한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "first" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    const view = renderChecklistFeature();
+    fireEvent.click(await screen.findByRole("button", { name: "할 일 추가" }));
+    const panel = screen.getByRole("complementary", { name: "할 일 추가" });
+    fireEvent.change(within(panel).getByRole("textbox"), {
+      target: { value: "첫 사용자 작성값" },
+    });
+    fireEvent.change(within(panel).getByRole("combobox"), {
+      target: { value: "10" },
+    });
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "second" },
+    };
+    view.rerender(<ChecklistFeatureTestApp />);
+
+    await waitFor(() => expect(getCurrentUrl()).toBe("/checklist"));
+    expect(
+      screen.queryByRole("complementary", { name: "할 일 추가" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
   });
 
   it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
