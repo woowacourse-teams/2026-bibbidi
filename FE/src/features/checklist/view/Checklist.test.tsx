@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistQueryModel } from "../model/checklistQuery";
 import {
+  ChecklistItemCategoryEditSession,
   ChecklistItemChangeFeedback,
   ChecklistItemEditingController,
   ChecklistItemTitleEditSession,
@@ -125,18 +126,46 @@ function createEditableChecklistQuery(): ChecklistQueryModel {
 }
 
 function EditableChecklistHarness({
+  changeCategory = vi.fn().mockResolvedValue(true),
   changeTitle = vi.fn().mockResolvedValue(true),
   initialSelectedTaskId = "checklist-item-500",
 }: {
+  changeCategory?: (itemId: number, categoryId: string) => Promise<boolean>;
   changeTitle?: (itemId: number, title: string) => Promise<boolean>;
   initialSelectedTaskId?: string | null;
 }) {
   const [checklist, setChecklist] = useState(createEditableChecklistQuery);
   const [selectedTaskId, setSelectedTaskId] = useState(initialSelectedTaskId);
+  const [categoryEditSession, setCategoryEditSession] =
+    useState<ChecklistItemCategoryEditSession | null>(null);
   const [titleEditSession, setTitleEditSession] =
     useState<ChecklistItemTitleEditSession | null>(null);
-  const [titleFeedback, setTitleFeedback] =
+  const [changeFeedback, setChangeFeedback] =
     useState<ChecklistItemChangeFeedback>({ status: "idle" });
+
+  const updateCategory = (itemId: number, categoryId: string) => {
+    setChecklist((current) => {
+      const changedItem = current.categories
+        .flatMap((category) => category.items)
+        .find((item) => item.checklistItemId === itemId);
+
+      if (!changedItem) {
+        return current;
+      }
+
+      return {
+        categories: current.categories.map((category) => ({
+          ...category,
+          items: [
+            ...category.items.filter((item) => item.checklistItemId !== itemId),
+            ...(category.id === categoryId
+              ? [{ ...changedItem, categoryId }]
+              : []),
+          ],
+        })),
+      };
+    });
+  };
 
   const updateTitle = (itemId: number, title: string) => {
     setChecklist((current) => ({
@@ -150,17 +179,38 @@ function EditableChecklistHarness({
   };
 
   const editing: ChecklistItemEditingController = {
+    categoryEditSession,
+    async changeCategory(itemId, categoryId) {
+      setChangeFeedback({ itemId, kind: "category", status: "pending" });
+      const didChange = await changeCategory(itemId, categoryId);
+
+      if (didChange) {
+        updateCategory(itemId, categoryId);
+        setChangeFeedback({ status: "idle" });
+      } else {
+        setChangeFeedback({
+          errorMessage: "카테고리를 변경하지 못했습니다.",
+          itemId,
+          kind: "category",
+          status: "error",
+        });
+      }
+
+      return didChange;
+    },
+    changeFeedback,
     async changeTitle(itemId, title) {
-      setTitleFeedback({ itemId, status: "pending" });
+      setChangeFeedback({ itemId, kind: "title", status: "pending" });
       const didChange = await changeTitle(itemId, title);
 
       if (didChange) {
         updateTitle(itemId, title);
-        setTitleFeedback({ status: "idle" });
+        setChangeFeedback({ status: "idle" });
       } else {
-        setTitleFeedback({
+        setChangeFeedback({
           errorMessage: "제목을 변경하지 못했습니다.",
           itemId,
+          kind: "title",
           status: "error",
         });
       }
@@ -173,18 +223,27 @@ function EditableChecklistHarness({
           ? ({ status: "idle" } as const)
           : current;
 
-      setTitleFeedback(clear);
+      setChangeFeedback(clear);
+    },
+    finishCategoryEditing(itemId) {
+      setCategoryEditSession((current) =>
+        current?.itemId === itemId ? null : current,
+      );
     },
     finishTitleEditing(itemId) {
       setTitleEditSession((current) =>
         current?.itemId === itemId ? null : current,
       );
     },
+    startCategoryEditing(itemId) {
+      setTitleEditSession(null);
+      setCategoryEditSession({ itemId });
+    },
     startTitleEditing(itemId, title) {
+      setCategoryEditSession(null);
       setTitleEditSession({ draft: title, itemId });
     },
     titleEditSession,
-    titleFeedback,
     updateTitleDraft(itemId, draft) {
       setTitleEditSession((current) =>
         current?.itemId === itemId ? { draft, itemId } : current,
@@ -209,6 +268,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -392,17 +452,205 @@ describe("Checklist 웹 상세 패널", () => {
 });
 
 describe("Checklist 할 일 편집", () => {
-  it("직접 작성 항목에만 제목 수정 동작을 노출한다", () => {
+  it("직접 작성 항목에만 제목과 카테고리 수정 동작을 노출한다", () => {
     render(<EditableChecklistHarness />);
 
     expect(
       screen.getByRole("button", { name: "할 일 제목 수정" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
     expect(
       screen.queryByRole("button", { name: "할 일 제목 수정" }),
     ).toBeNull();
+    expect(screen.queryByRole("button", { name: /카테고리 변경/ })).toBeNull();
+    expect(
+      within(screen.getByRole("complementary")).getByText("예식 준비"),
+    ).toBeTruthy();
+  });
+
+  it("카테고리 팝오버는 현재 값을 표시하고 키보드·바깥 클릭으로 닫은 뒤 포커스를 복원한다", async () => {
+    const changeCategory = vi.fn().mockResolvedValue(true);
+    render(<EditableChecklistHarness changeCategory={changeCategory} />);
+    const trigger = screen.getByRole("button", {
+      name: "카테고리 변경, 현재 예식 준비",
+    });
+
+    fireEvent.click(trigger);
+    const currentOption = screen.getByRole("option", { name: "예식 준비" });
+    const nextOption = screen.getByRole("option", { name: "예복 준비" });
+    expect(currentOption.getAttribute("aria-selected")).toBe("true");
+    expect(currentOption.getAttribute("tabindex")).toBe("0");
+    expect(nextOption.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(currentOption);
+
+    fireEvent.keyDown(currentOption, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(nextOption);
+    expect(currentOption.getAttribute("tabindex")).toBe("-1");
+    expect(nextOption.getAttribute("tabindex")).toBe("0");
+    fireEvent.keyDown(nextOption, { key: "Escape" });
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("complementary")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("option", { name: "예식 준비" }));
+    expect(changeCategory).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("카테고리 팝오버는 아래 공간이 부족하면 viewport 안쪽 위로 배치한다", () => {
+    vi.stubGlobal("innerWidth", 375);
+    vi.stubGlobal("innerHeight", 768);
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        return this.classList.contains("checklist-category-editor__trigger")
+          ? DOMRect.fromRect({ height: 32, width: 70, x: 280, y: 700 })
+          : DOMRect.fromRect();
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockReturnValue(240);
+    render(<EditableChecklistHarness />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+
+    const popover = document.querySelector(
+      ".checklist-category-editor__popover",
+    ) as HTMLDivElement;
+    expect(popover.style.left).toBe("110px");
+    expect(popover.style.maxHeight).toBe("682px");
+    expect(popover.style.top).toBe("454px");
+    expect(popover.style.width).toBe("240px");
+
+    rectSpy.mockRestore();
+    scrollHeightSpy.mockRestore();
+  });
+
+  it("새 카테고리를 한 번 저장하고 같은 상세 선택을 유지한 채 항목을 이동한다", async () => {
+    let resolveChange: (value: boolean) => void = () => undefined;
+    const changeCategory = vi.fn().mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveChange = resolve;
+      }),
+    );
+    render(<EditableChecklistHarness changeCategory={changeCategory} />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    const nextOption = screen.getByRole("option", { name: "예복 준비" });
+    fireEvent.click(nextOption);
+    fireEvent.click(nextOption);
+
+    expect(changeCategory).toHaveBeenCalledOnce();
+    expect(changeCategory).toHaveBeenCalledWith(500, "20");
+    expect(
+      screen
+        .getByRole("button", { name: "할 일 제목 수정" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+
+    await act(async () => resolveChange(true));
+
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예복 준비",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "할 일 제목 수정" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    const movedCategoryList = document.getElementById("20-tasks");
+    expect(movedCategoryList).toBeTruthy();
+    expect(
+      within(movedCategoryList as HTMLElement).getByRole("button", {
+        hidden: true,
+        name: /청첩장 문구 정하기/,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("카테고리 저장 실패는 팝오버와 오류를 유지해 재시도할 수 있다", async () => {
+    const changeCategory = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    render(<EditableChecklistHarness changeCategory={changeCategory} />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    const currentOption = screen.getByRole("option", { name: "예식 준비" });
+    const nextOption = screen.getByRole("option", { name: "예복 준비" });
+
+    act(() => nextOption.focus());
+    fireEvent.click(nextOption);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "카테고리를 변경하지 못했습니다.",
+    );
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(document.activeElement).toBe(nextOption);
+    expect(nextOption.getAttribute("tabindex")).toBe("0");
+    expect(nextOption.getAttribute("aria-selected")).toBe("false");
+    expect(currentOption.getAttribute("tabindex")).toBe("-1");
+    expect(currentOption.getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(nextOption);
+    await waitFor(() => expect(changeCategory).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("breakpoint 전환 중에도 카테고리 팝오버 상태를 공유하고 요청하지 않는다", () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    const changeCategory = vi.fn().mockResolvedValue(true);
+    render(<EditableChecklistHarness changeCategory={changeCategory} />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    expect(screen.getByRole("listbox")).toBeTruthy();
+
+    act(() => media.setMatches(true));
+    expect(
+      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("listbox")).toBeTruthy();
+
+    act(() => media.setMatches(false));
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(changeCategory).not.toHaveBeenCalled();
   });
 
   it("연필 버튼으로 제목을 선택한 인라인 입력을 열고 Enter로 trim한 제목을 한 번 저장한다", async () => {
@@ -502,7 +750,7 @@ describe("Checklist 할 일 편집", () => {
     );
   });
 
-  it("모바일에서도 같은 공통 편집 컴포넌트를 사용하고 제목 Escape가 전체 화면을 닫지 않는다", () => {
+  it("모바일에서도 같은 공통 편집 컴포넌트를 사용하고 편집 Escape가 전체 화면을 닫지 않는다", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(<EditableChecklistHarness />);
 
@@ -517,6 +765,21 @@ describe("Checklist 할 일 편집", () => {
     });
     fireEvent.keyDown(input, { key: "Escape" });
 
+    expect(
+      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      within(detailPage).getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    fireEvent.keyDown(
+      within(detailPage).getByRole("option", { name: "예식 준비" }),
+      { key: "Escape" },
+    );
+
+    expect(screen.queryByRole("listbox")).toBeNull();
     expect(
       screen.getByRole("region", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();

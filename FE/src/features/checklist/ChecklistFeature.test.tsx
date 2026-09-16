@@ -22,13 +22,16 @@ const authMocks = vi.hoisted(() => ({
   refreshAuth: vi.fn(),
 }));
 const repositoryMocks = vi.hoisted(() => {
+  const changeItemCategory = vi.fn();
   const changeItemTitle = vi.fn();
   const getChecklist = vi.fn();
 
   return {
+    changeItemCategory,
     changeItemTitle,
     checklistRevision: 0,
     command: {
+      changeItemCategory,
       changeItemTitle,
       ensureChecklist: vi.fn(),
       reconcileMissingChecklist: vi.fn(),
@@ -145,6 +148,8 @@ function getCurrentUrl() {
 beforeEach(() => {
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
+  repositoryMocks.changeItemCategory.mockReset();
+  repositoryMocks.changeItemCategory.mockResolvedValue(undefined);
   repositoryMocks.changeItemTitle.mockReset();
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.checklistRevision = 0;
@@ -792,6 +797,67 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
     );
+  });
+
+  it("카테고리 변경을 Command Repository에 위임하고 URL과 공통 GET을 유지한다", async () => {
+    renderChecklistFeature([
+      "/checklist?filter=remaining&taskId=checklist-item-500",
+    ]);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "예복 준비" }));
+
+    await waitFor(() =>
+      expect(repositoryMocks.changeItemCategory).toHaveBeenCalledWith(
+        500,
+        20,
+        expect.any(AbortSignal),
+      ),
+    );
+
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(getCurrentUrl()).toBe(
+      "/checklist?filter=remaining&taskId=checklist-item-500",
+    );
+  });
+
+  it("카테고리 수정 인증 오류의 재확인 흐름에서도 상세과 팝오버를 유지한다", async () => {
+    repositoryMocks.changeItemCategory.mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    const view = renderChecklistFeature([
+      "/checklist?taskId=checklist-item-500",
+    ]);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "예복 준비" }));
+
+    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
+    authMocks.authState = { status: "loading" };
+    view.rerender(<ChecklistFeatureTestApp />);
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    view.rerender(<ChecklistFeatureTestApp />);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "로그인이 필요합니다.",
+    );
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
   });
 
   it("제목 변경을 Command Repository에 위임하고 URL과 공통 GET을 유지한다", async () => {

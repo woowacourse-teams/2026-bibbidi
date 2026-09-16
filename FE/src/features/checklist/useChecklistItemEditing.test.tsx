@@ -21,6 +21,7 @@ function createRepository(
   changeItemTitle: MyChecklistCommandRepository["changeItemTitle"],
 ): MyChecklistCommandRepository {
   return {
+    changeItemCategory: vi.fn(),
     changeItemTitle,
     ensureChecklist: vi.fn(),
     reconcileMissingChecklist: vi.fn(),
@@ -59,14 +60,15 @@ describe("useChecklistItemEditing 요청 세대", () => {
     await act(async () => firstRequest.resolve());
 
     await expect(firstResult).resolves.toBe(false);
-    expect(result.current.titleFeedback).toEqual({
+    expect(result.current.changeFeedback).toEqual({
       itemId: 501,
+      kind: "title",
       status: "pending",
     });
 
     await act(async () => secondRequest.resolve());
     await expect(secondResult).resolves.toBe(true);
-    expect(result.current.titleFeedback).toEqual({ status: "idle" });
+    expect(result.current.changeFeedback).toEqual({ status: "idle" });
   });
 
   it("이전 요청의 늦은 인증 오류가 새 요청 상태나 인증 갱신에 영향을 주지 않는다", async () => {
@@ -102,8 +104,9 @@ describe("useChecklistItemEditing 요청 세대", () => {
 
     await expect(firstResult).resolves.toBe(false);
     expect(refreshAuth).not.toHaveBeenCalled();
-    expect(result.current.titleFeedback).toEqual({
+    expect(result.current.changeFeedback).toEqual({
       itemId: 501,
+      kind: "title",
       status: "pending",
     });
 

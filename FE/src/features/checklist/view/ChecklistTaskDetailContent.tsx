@@ -1,11 +1,16 @@
 import {
+  ChecklistCategoryViewModel,
   ChecklistAppointmentViewModel,
   ChecklistTaskViewModel,
 } from "../view-model/createChecklistViewModel";
+import { ChecklistItemEditingController } from "../model/checklistEditing";
+import { ChecklistTaskCategoryEditor } from "./ChecklistTaskCategoryEditor";
 import "./ChecklistTaskDetailContent.css";
 
 interface ChecklistTaskDetailContentProps {
+  categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
+  editing?: ChecklistItemEditingController;
   task: ChecklistTaskViewModel;
 }
 
@@ -52,7 +57,9 @@ function ChecklistAppointment({
 }
 
 export function ChecklistTaskDetailContent({
+  categories,
   categoryTitle,
+  editing,
   task,
 }: ChecklistTaskDetailContentProps) {
   return (
@@ -62,7 +69,14 @@ export function ChecklistTaskDetailContent({
         <dl className="checklist-detail-content__properties">
           <div>
             <dt>카테고리</dt>
-            <dd>{categoryTitle}</dd>
+            <dd className="checklist-detail-content__category-value">
+              <ChecklistTaskCategoryEditor
+                categories={categories}
+                categoryTitle={categoryTitle}
+                editing={editing}
+                task={task}
+              />
+            </dd>
           </div>
           <div>
             <dt>상태</dt>

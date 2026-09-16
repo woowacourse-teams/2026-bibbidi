@@ -260,6 +260,7 @@ export function Checklist({
 
       {selectedTaskContext && !isMobileLayout ? (
         <ChecklistTaskDetailPanel
+          categories={categories}
           categoryTitle={selectedTaskContext.categoryTitle}
           editing={itemEditing}
           onClose={onCloseTaskDetail}
@@ -269,6 +270,7 @@ export function Checklist({
 
       {selectedTaskContext && isMobileLayout ? (
         <ChecklistTaskDetailPage
+          categories={categories}
           categoryTitle={selectedTaskContext.categoryTitle}
           editing={itemEditing}
           onBack={onBackTaskDetail}

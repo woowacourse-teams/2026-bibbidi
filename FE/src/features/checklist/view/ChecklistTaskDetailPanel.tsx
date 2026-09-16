@@ -1,10 +1,14 @@
 import { ChecklistItemEditingController } from "../model/checklistEditing";
-import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
+import {
+  ChecklistCategoryViewModel,
+  ChecklistTaskViewModel,
+} from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
 import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailPanel.css";
 
 interface ChecklistTaskDetailPanelProps {
+  categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
   editing?: ChecklistItemEditingController;
   onClose: () => void;
@@ -12,6 +16,7 @@ interface ChecklistTaskDetailPanelProps {
 }
 
 export function ChecklistTaskDetailPanel({
+  categories,
   categoryTitle,
   editing,
   onClose,
@@ -41,7 +46,12 @@ export function ChecklistTaskDetailPanel({
         </button>
       </header>
 
-      <ChecklistTaskDetailContent categoryTitle={categoryTitle} task={task} />
+      <ChecklistTaskDetailContent
+        categories={categories}
+        categoryTitle={categoryTitle}
+        editing={editing}
+        task={task}
+      />
     </aside>
   );
 }
