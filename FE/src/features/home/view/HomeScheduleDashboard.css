@@ -307,11 +307,6 @@
   color: var(--color-fg-critical);
 }
 
-.home-dashboard-state__result--positive .home-dashboard-state__result-asset {
-  background: var(--color-bg-positive-weak);
-  color: var(--color-fg-positive);
-}
-
 .home-dashboard-state__result-asset svg {
   width: 26px;
   height: 26px;
@@ -319,13 +314,6 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.7;
-}
-
-.home-dashboard-state__result--positive
-  .home-dashboard-state__result-asset
-  svg {
-  width: 28px;
-  height: 28px;
 }
 
 .home-dashboard-state__result h3,

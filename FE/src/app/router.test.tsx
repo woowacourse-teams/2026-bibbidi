@@ -29,6 +29,12 @@ function installFetch(currentUserResponse: Response) {
         );
       }
 
+      if (url === "/api/appointments/me/nearby?limit=6") {
+        return Promise.resolve(
+          new Response(JSON.stringify([]), { status: 200 }),
+        );
+      }
+
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     }),
   );
@@ -123,5 +129,68 @@ describe("appRoutes", () => {
       await screen.findByRole("heading", { name: "가까운 일정" }),
     ).toBeTruthy();
     expect(screen.getByRole("main", { name: "플래너" })).toBeTruthy();
+    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+  });
+
+  it("플래너 조회 중 로그인 세션이 사라지면 로그인 화면으로 이동한다", async () => {
+    let currentUserRequestCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/users/me") {
+          currentUserRequestCount += 1;
+
+          return Promise.resolve(
+            currentUserRequestCount === 1
+              ? new Response(JSON.stringify({ nickname: "bibbidi" }), {
+                  status: 200,
+                })
+              : new Response(
+                  JSON.stringify({
+                    errorCode: 201,
+                    message: "로그인이 필요합니다.",
+                  }),
+                  { status: 401 },
+                ),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ id: 1, items: [] }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/appointments/me/nearby?limit=6") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                errorCode: 201,
+                message: "로그인이 필요합니다.",
+              }),
+              { status: 401 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      }),
+    );
+    const router = renderRouter(["/planner"]);
+
+    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toBe("?returnTo=%2Fplanner");
+    expect(currentUserRequestCount).toBe(2);
   });
 });

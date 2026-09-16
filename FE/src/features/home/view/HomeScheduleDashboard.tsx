@@ -11,14 +11,17 @@ import {
 import "./HomeScheduleDashboard.css";
 import { RecommendedSchedule } from "./RecommendedSchedule";
 import { UnscheduledTask } from "./UnscheduledTask";
+import { UpcomingSchedule } from "./UpcomingSchedule";
 
 interface HomeScheduleDashboardProps {
+  onRetryUpcoming: () => void;
   viewModel: HomeScheduleDashboardViewModel;
 }
 
 interface DashboardResultSectionProps {
   className?: string;
   id: string;
+  onAction?: () => void;
   viewModel: HomeScheduleDashboardResultSectionViewModel;
 }
 
@@ -59,13 +62,6 @@ function ResultIcon({ icon }: { icon: HomeScheduleDashboardResultIcon }) {
           <path d="M12 18s-3-1.7-3-4a1.8 1.8 0 0 1 3-1.3 1.8 1.8 0 0 1 3 1.3c0 2.3-3 4-3 4Z" />
         </svg>
       );
-    case "complete":
-      return (
-        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="9" />
-          <path d="m8 12 2.7 2.7L16.5 9" />
-        </svg>
-      );
     default:
       return assertNever(icon);
   }
@@ -89,8 +85,10 @@ function RefreshIcon() {
 }
 
 function DashboardResult({
+  onAction,
   viewModel,
 }: {
+  onAction?: () => void;
   viewModel: HomeScheduleDashboardResultViewModel;
 }) {
   return (
@@ -106,6 +104,7 @@ function DashboardResult({
       <button
         className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
         disabled={viewModel.isActionDisabled}
+        onClick={onAction}
         type="button"
       >
         {viewModel.actionVariant === "button" && <RefreshIcon />}
@@ -119,6 +118,7 @@ function DashboardResult({
 function DashboardResultSection({
   className = "",
   id,
+  onAction,
   viewModel,
 }: DashboardResultSectionProps) {
   return (
@@ -134,7 +134,7 @@ function DashboardResultSection({
           </span>
         )}
       </header>
-      <DashboardResult viewModel={viewModel.result} />
+      <DashboardResult onAction={onAction} viewModel={viewModel.result} />
     </section>
   );
 }
@@ -263,22 +263,32 @@ function RecommendedScheduleLoading({
 }
 
 function UpcomingScheduleSection({
+  onRetry,
   viewModel,
 }: {
+  onRetry: () => void;
   viewModel: HomeScheduleDashboardUpcomingViewModel;
 }) {
   switch (viewModel.status) {
     case "loading":
       return <UpcomingScheduleLoading viewModel={viewModel} />;
     case "empty":
-    case "error":
-    case "complete":
       return (
         <DashboardResultSection
           id="dashboard-upcoming-schedule"
           viewModel={viewModel}
         />
       );
+    case "error":
+      return (
+        <DashboardResultSection
+          id="dashboard-upcoming-schedule"
+          onAction={onRetry}
+          viewModel={viewModel}
+        />
+      );
+    case "complete":
+      return <UpcomingSchedule viewModel={viewModel.content} />;
     default:
       return assertNever(viewModel);
   }
@@ -332,12 +342,16 @@ function RecommendedScheduleSection({
 }
 
 export function HomeScheduleDashboard({
+  onRetryUpcoming,
   viewModel,
 }: HomeScheduleDashboardProps) {
   return (
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
-        <UpcomingScheduleSection viewModel={viewModel.upcoming} />
+        <UpcomingScheduleSection
+          onRetry={onRetryUpcoming}
+          viewModel={viewModel.upcoming}
+        />
         <UnscheduledTaskSection viewModel={viewModel.unscheduled} />
       </div>
       <RecommendedScheduleSection viewModel={viewModel.recommended} />

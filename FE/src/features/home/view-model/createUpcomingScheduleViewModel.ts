@@ -1,15 +1,9 @@
 import {
   UpcomingScheduleListModel,
   UpcomingScheduleModel,
-  UpcomingScheduleStatus,
 } from "../model/upcomingSchedule";
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
-
-const statusLabels: Record<UpcomingScheduleStatus, string> = {
-  "in-progress": "진행 중",
-  upcoming: "예정",
-};
 
 export interface UpcomingScheduleItemViewModel {
   dateTime: string;
@@ -17,7 +11,7 @@ export interface UpcomingScheduleItemViewModel {
   detailLabel: string;
   id: string;
   relativeDateLabel: string;
-  status: UpcomingScheduleStatus;
+  status: "upcoming";
   statusLabel: string;
   title: string;
 }
@@ -47,16 +41,20 @@ function formatDate(date: string) {
   return `${month}월 ${day}일`;
 }
 
-function formatTime(time: string | null) {
-  if (time === null) {
+function formatTime(startTime: string | null) {
+  if (startTime === null) {
     return "시간 미정";
   }
 
-  const [hour, minute] = time.split(":").map(Number);
+  const [hour, minute] = startTime.slice(11, 16).split(":").map(Number);
   const period = hour < 12 ? "오전" : "오후";
   const displayHour = hour % 12 || 12;
 
   return `${period} ${displayHour}:${String(minute).padStart(2, "0")}`;
+}
+
+function formatPlace(place: string | null) {
+  return place === null || place.trim().length === 0 ? "장소 없음" : place;
 }
 
 function formatRelativeDate(daysUntil: number) {
@@ -80,11 +78,11 @@ function createItemViewModel(
   return {
     dateTime: schedule.date,
     dateLabel: formatDate(schedule.date),
-    detailLabel: `${formatTime(schedule.time)} · ${schedule.location}`,
-    id: schedule.id,
+    detailLabel: `${formatTime(schedule.startTime)} · ${formatPlace(schedule.place)}`,
+    id: String(schedule.id),
     relativeDateLabel: formatRelativeDate(daysUntil),
-    status: schedule.status,
-    statusLabel: statusLabels[schedule.status],
+    status: "upcoming",
+    statusLabel: "예정",
     title: schedule.title,
   };
 }
@@ -92,13 +90,9 @@ function createItemViewModel(
 export function createUpcomingScheduleViewModel(
   model: UpcomingScheduleListModel,
 ): UpcomingScheduleViewModel {
-  const schedulesByDate = [...model.schedules].sort(
-    (left, right) => parseDateAsUtc(left.date) - parseDateAsUtc(right.date),
-  );
-
   return {
-    countLabel: `${schedulesByDate.length}개`,
-    items: schedulesByDate.map((schedule) =>
+    countLabel: `${model.schedules.length}개`,
+    items: model.schedules.map((schedule) =>
       createItemViewModel(schedule, model.referenceDate),
     ),
     title: "가까운 일정",

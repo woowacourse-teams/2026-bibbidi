@@ -1,11 +1,8 @@
-export type UpcomingScheduleStatus = "in-progress" | "upcoming";
-
 export interface UpcomingScheduleModel {
   date: string;
-  id: string;
-  location: string;
-  status: UpcomingScheduleStatus;
-  time: string | null;
+  id: number;
+  place: string | null;
+  startTime: string | null;
   title: string;
 }
 

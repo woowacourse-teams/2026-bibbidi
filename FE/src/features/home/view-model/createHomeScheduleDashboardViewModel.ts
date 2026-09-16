@@ -12,12 +12,15 @@ import {
   createUnscheduledTaskViewModel,
   UnscheduledTaskViewModel,
 } from "./createUnscheduledTaskViewModel";
+import {
+  createUpcomingScheduleViewModel,
+  UpcomingScheduleViewModel,
+} from "./createUpcomingScheduleViewModel";
 
 export type HomeScheduleDashboardResultIcon =
-  "alert" | "calendar-check" | "calendar-days" | "calendar-heart" | "complete";
+  "alert" | "calendar-check" | "calendar-days" | "calendar-heart";
 
-export type HomeScheduleDashboardResultTone =
-  "critical" | "neutral" | "positive";
+export type HomeScheduleDashboardResultTone = "critical" | "neutral";
 
 export interface HomeScheduleDashboardResultViewModel {
   actionLabel: string;
@@ -30,8 +33,7 @@ export interface HomeScheduleDashboardResultViewModel {
 }
 
 export interface HomeScheduleDashboardResultSectionViewModel<
-  TStatus extends "complete" | "empty" | "error" =
-    "complete" | "empty" | "error",
+  TStatus extends "empty" | "error" = "empty" | "error",
 > {
   countLabel: string | null;
   result: HomeScheduleDashboardResultViewModel;
@@ -46,7 +48,11 @@ export interface HomeScheduleDashboardLoadingSectionViewModel {
 
 export type HomeScheduleDashboardUpcomingViewModel =
   | HomeScheduleDashboardLoadingSectionViewModel
-  | HomeScheduleDashboardResultSectionViewModel;
+  | HomeScheduleDashboardResultSectionViewModel<"empty" | "error">
+  | {
+      content: UpcomingScheduleViewModel;
+      status: "complete";
+    };
 
 export interface HomeScheduleDashboardUnscheduledCompleteViewModel {
   content: UnscheduledTaskViewModel;
@@ -80,13 +86,14 @@ function formatCount(count: number) {
 
 function createErrorResult(
   title: string,
+  isActionDisabled = true,
 ): HomeScheduleDashboardResultViewModel {
   return {
     actionLabel: "다시 시도",
     actionVariant: "button",
     description: "잠시 후 다시 시도해주세요",
     icon: "alert",
-    isActionDisabled: true,
+    isActionDisabled,
     title,
     tone: "critical",
   };
@@ -119,24 +126,14 @@ function createUpcomingViewModel(
     case "error":
       return {
         countLabel: null,
-        result: createErrorResult("일정을 불러오지 못했어요"),
+        result: createErrorResult("일정을 불러오지 못했어요", false),
         status: model.status,
         title: "가까운 일정",
       };
     case "complete":
       return {
-        countLabel: formatCount(model.count),
-        result: {
-          actionLabel: "완료한 일정 보기",
-          actionVariant: "link",
-          description: "완료한 일정은 체크리스트에서 다시 확인할 수 있어요",
-          icon: "complete",
-          isActionDisabled: true,
-          title: "가까운 일정을 모두 완료했어요",
-          tone: "positive",
-        },
+        content: createUpcomingScheduleViewModel(model.schedules),
         status: model.status,
-        title: "가까운 일정",
       };
     default:
       return assertNever(model);

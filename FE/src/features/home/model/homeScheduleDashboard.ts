@@ -1,5 +1,6 @@
 import { RecommendedScheduleListModel } from "./recommendedSchedule";
 import { UnscheduledTaskListModel } from "./unscheduledTask";
+import { UpcomingScheduleListModel } from "./upcomingSchedule";
 
 export interface HomeScheduleDashboardLoadingSectionModel {
   status: "loading";
@@ -14,7 +15,7 @@ export interface HomeScheduleDashboardErrorSectionModel {
 }
 
 export interface HomeScheduleDashboardUpcomingCompleteModel {
-  count: number;
+  schedules: UpcomingScheduleListModel;
   status: "complete";
 }
 

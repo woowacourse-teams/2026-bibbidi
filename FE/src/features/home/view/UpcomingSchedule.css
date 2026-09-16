@@ -99,11 +99,6 @@
   color: var(--color-fg-neutral-muted);
 }
 
-.upcoming-schedule-card__status--in-progress {
-  background: var(--color-bg-informative-weak);
-  color: var(--color-fg-informative);
-}
-
 .upcoming-schedule-card__title {
   margin: 0;
   color: var(--color-fg-neutral);
