@@ -119,6 +119,7 @@ function createMyChecklistRepository(
     getChecklist: vi.fn().mockResolvedValue({ exists, items }),
     getRevision: vi.fn().mockReturnValue(0),
     invalidate: vi.fn(),
+    refresh: vi.fn().mockResolvedValue({ exists, items }),
     subscribe: vi.fn().mockReturnValue(() => undefined),
   };
 }

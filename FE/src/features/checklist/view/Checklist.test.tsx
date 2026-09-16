@@ -14,6 +14,8 @@ import {
   ChecklistItemCategoryEditSession,
   ChecklistItemChangeFeedback,
   ChecklistItemEditingController,
+  ChecklistItemStatusConfirmation,
+  ChecklistItemStatusEditSession,
   ChecklistItemTitleEditSession,
 } from "../model/checklistEditing";
 import { createChecklistViewModel } from "../view-model/createChecklistViewModel";
@@ -128,10 +130,12 @@ function createEditableChecklistQuery(): ChecklistQueryModel {
 function EditableChecklistHarness({
   changeCategory = vi.fn().mockResolvedValue(true),
   changeTitle = vi.fn().mockResolvedValue(true),
+  requestStatusChange = vi.fn().mockResolvedValue("changed"),
   initialSelectedTaskId = "checklist-item-500",
 }: {
   changeCategory?: (itemId: number, categoryId: string) => Promise<boolean>;
   changeTitle?: (itemId: number, title: string) => Promise<boolean>;
+  requestStatusChange?: ChecklistItemEditingController["requestStatusChange"];
   initialSelectedTaskId?: string | null;
 }) {
   const [checklist, setChecklist] = useState(createEditableChecklistQuery);
@@ -140,6 +144,10 @@ function EditableChecklistHarness({
     useState<ChecklistItemCategoryEditSession | null>(null);
   const [titleEditSession, setTitleEditSession] =
     useState<ChecklistItemTitleEditSession | null>(null);
+  const [statusEditSession, setStatusEditSession] =
+    useState<ChecklistItemStatusEditSession | null>(null);
+  const [statusConfirmation, setStatusConfirmation] =
+    useState<ChecklistItemStatusConfirmation | null>(null);
   const [changeFeedback, setChangeFeedback] =
     useState<ChecklistItemChangeFeedback>({ status: "idle" });
 
@@ -180,6 +188,11 @@ function EditableChecklistHarness({
 
   const editing: ChecklistItemEditingController = {
     categoryEditSession,
+    cancelStatusChange(itemId) {
+      setStatusConfirmation((current) =>
+        current?.itemId === itemId ? null : current,
+      );
+    },
     async changeCategory(itemId, categoryId) {
       setChangeFeedback({ itemId, kind: "category", status: "pending" });
       const didChange = await changeCategory(itemId, categoryId);
@@ -199,6 +212,48 @@ function EditableChecklistHarness({
       return didChange;
     },
     changeFeedback,
+    async confirmStatusChange(itemId) {
+      setChecklist((current) => ({
+        categories: current.categories.map((category) => ({
+          ...category,
+          items: category.items.map((item) =>
+            item.checklistItemId === itemId
+              ? { ...item, status: "done" }
+              : item,
+          ),
+        })),
+      }));
+      setStatusConfirmation(null);
+      return true;
+    },
+    async requestStatusChange(itemId, status) {
+      setChangeFeedback({ itemId, kind: "status", status: "pending" });
+      const result = await requestStatusChange(itemId, status);
+
+      if (result === "confirmation-required") {
+        setChangeFeedback({ status: "idle" });
+        setStatusConfirmation({ itemId, status: "done" });
+      } else if (result === "changed") {
+        setChangeFeedback({ status: "idle" });
+        setChecklist((current) => ({
+          categories: current.categories.map((category) => ({
+            ...category,
+            items: category.items.map((item) =>
+              item.checklistItemId === itemId ? { ...item, status } : item,
+            ),
+          })),
+        }));
+      } else {
+        setChangeFeedback({
+          errorMessage: "남은 일정을 확인하지 못했습니다.",
+          itemId,
+          kind: "status",
+          status: "error",
+        });
+      }
+
+      return result;
+    },
     async changeTitle(itemId, title) {
       setChangeFeedback({ itemId, kind: "title", status: "pending" });
       const didChange = await changeTitle(itemId, title);
@@ -235,14 +290,28 @@ function EditableChecklistHarness({
         current?.itemId === itemId ? null : current,
       );
     },
+    finishStatusEditing(itemId) {
+      setStatusEditSession((current) =>
+        current?.itemId === itemId ? null : current,
+      );
+    },
     startCategoryEditing(itemId) {
       setTitleEditSession(null);
+      setStatusEditSession(null);
       setCategoryEditSession({ itemId });
+    },
+    startStatusEditing(itemId) {
+      setCategoryEditSession(null);
+      setTitleEditSession(null);
+      setStatusEditSession({ itemId });
     },
     startTitleEditing(itemId, title) {
       setCategoryEditSession(null);
+      setStatusEditSession(null);
       setTitleEditSession({ draft: title, itemId });
     },
+    statusConfirmation,
+    statusEditSession,
     titleEditSession,
     updateTitleDraft(itemId, draft) {
       setTitleEditSession((current) =>
@@ -463,6 +532,9 @@ describe("Checklist 할 일 편집", () => {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
     expect(
@@ -470,8 +542,180 @@ describe("Checklist 할 일 편집", () => {
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /카테고리 변경/ })).toBeNull();
     expect(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    ).toBeTruthy();
+    expect(
       within(screen.getByRole("complementary")).getByText("예식 준비"),
     ).toBeTruthy();
+  });
+
+  it("상태 팝오버는 현재 상태와 세 옵션을 표시하고 같은 상태는 요청하지 않는다", async () => {
+    const requestStatusChange = vi.fn().mockResolvedValue("changed");
+    render(
+      <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: "상태 변경, 현재 미완료",
+    });
+
+    fireEvent.click(trigger);
+    const incomplete = screen.getByRole("option", { name: "미완료" });
+    const inProgress = screen.getByRole("option", { name: "진행 중" });
+    const complete = screen.getByRole("option", { name: "완료" });
+    expect(incomplete.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(incomplete);
+
+    fireEvent.keyDown(incomplete, { key: "End" });
+    expect(document.activeElement).toBe(complete);
+    fireEvent.keyDown(complete, { key: "Home" });
+    expect(document.activeElement).toBe(incomplete);
+    fireEvent.keyDown(incomplete, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(inProgress);
+    fireEvent.keyDown(inProgress, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(incomplete);
+
+    fireEvent.click(incomplete);
+    expect(requestStatusChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("상태 팝오버는 Escape와 바깥 클릭으로 닫고 트리거로 포커스를 복원한다", async () => {
+    render(<EditableChecklistHarness />);
+    const trigger = screen.getByRole("button", {
+      name: "상태 변경, 현재 미완료",
+    });
+
+    fireEvent.click(trigger);
+    fireEvent.keyDown(screen.getByRole("option", { name: "미완료" }), {
+      key: "Escape",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("남은 일정 조회 실패는 완료 PUT 없이 팝오버에 접근 가능한 오류를 표시한다", async () => {
+    const requestStatusChange = vi.fn().mockResolvedValue("failed");
+    render(
+      <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "남은 일정을 확인하지 못했습니다.",
+    );
+    expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
+    expect(requestStatusChange).toHaveBeenCalledOnce();
+  });
+
+  it("남은 일정이 있는 완료 선택은 확인 dialog를 표시하고 취소 뒤 포커스를 복원한다", async () => {
+    const requestStatusChange = vi
+      .fn()
+      .mockResolvedValue("confirmation-required");
+    render(
+      <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: "상태 변경, 현재 미완료",
+    });
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    expect(within(dialog).getByText(/함께 완료돼요/)).toBeTruthy();
+    expect(requestStatusChange).toHaveBeenCalledWith(500, "done");
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole("button", { name: "취소" }),
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("완료 확인 dialog에서 함께 완료를 선택하면 완료 상태를 반영한다", async () => {
+    render(
+      <EditableChecklistHarness
+        requestStatusChange={vi.fn().mockResolvedValue("confirmation-required")}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
+
+    expect(
+      await screen.findByRole("button", { name: "상태 변경, 현재 완료" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("progressbar", { name: "예식 준비 진행률" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("50");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("상태 사전 조회 중 다른 항목을 선택하면 이전 항목 확인창을 표시하지 않는다", async () => {
+    let resolveStatusChange: (value: "confirmation-required") => void = () =>
+      undefined;
+    const requestStatusChange = vi.fn().mockReturnValue(
+      new Promise<"confirmation-required">((resolve) => {
+        resolveStatusChange = resolve;
+      }),
+    );
+    render(
+      <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "완료" }));
+    fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
+
+    await act(async () => resolveStatusChange("confirmation-required"));
+
+    expect(
+      screen.getByRole("complementary", { name: "준비 목록 항목" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("상태·카테고리·제목 편집은 동시에 열리지 않는다", () => {
+    render(<EditableChecklistHarness />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "카테고리 변경, 현재 예식 준비",
+      }),
+    );
+    expect(screen.getByRole("listbox", { name: "카테고리 선택" })).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+    );
+    expect(screen.queryByRole("listbox", { name: "카테고리 선택" })).toBeNull();
+    expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "할 일 제목" })).toBeTruthy();
   });
 
   it("카테고리 팝오버는 현재 값을 표시하고 키보드·바깥 클릭으로 닫은 뒤 포커스를 복원한다", async () => {
@@ -776,6 +1020,21 @@ describe("Checklist 할 일 편집", () => {
     );
     fireEvent.keyDown(
       within(detailPage).getByRole("option", { name: "예식 준비" }),
+      { key: "Escape" },
+    );
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(
+      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      within(detailPage).getByRole("button", {
+        name: "상태 변경, 현재 미완료",
+      }),
+    );
+    fireEvent.keyDown(
+      within(detailPage).getByRole("option", { name: "미완료" }),
       { key: "Escape" },
     );
 

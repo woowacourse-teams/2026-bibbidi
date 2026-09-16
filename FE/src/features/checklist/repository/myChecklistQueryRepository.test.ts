@@ -144,6 +144,47 @@ describe("MyChecklistQueryRepository", () => {
     expect(dataSource.getChecklist).toHaveBeenCalledTimes(2);
   });
 
+  it("refresh는 오래된 캐시를 즉시 무효화해 알리고 정규 응답으로 다시 알린다", async () => {
+    const refreshedChecklist = {
+      ...checklist,
+      items: [{ ...checklist.items[0], status: "continue" as const }],
+    };
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist)
+      .mockResolvedValueOnce(checklist)
+      .mockResolvedValueOnce(refreshedChecklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+    const revision = repository.getRevision();
+
+    await expect(repository.refresh()).resolves.toEqual(refreshedChecklist);
+
+    expect(dataSource.getChecklist).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(repository.getRevision()).toBe(revision + 2);
+    await expect(repository.getChecklist()).resolves.toEqual(
+      refreshedChecklist,
+    );
+  });
+
+  it("refresh 실패 뒤 오래된 캐시를 재사용하지 않고 다음 조회를 재시도한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist)
+      .mockResolvedValueOnce(checklist)
+      .mockRejectedValueOnce(new RemoteMyChecklistNetworkError())
+      .mockResolvedValueOnce(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+
+    await expect(repository.refresh()).rejects.toBeInstanceOf(
+      MyChecklistLoadError,
+    );
+    await expect(repository.getChecklist()).resolves.toEqual(checklist);
+    expect(dataSource.getChecklist).toHaveBeenCalledTimes(3);
+  });
+
   it("서버가 추가한 항목만 기존 캐시 뒤에 반영하고 별도 조회 없이 구독자에게 알린다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);

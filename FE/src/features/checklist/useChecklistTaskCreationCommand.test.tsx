@@ -19,9 +19,11 @@ function createRepository(
 ): MyChecklistCommandRepository {
   return {
     changeItemCategory: vi.fn(),
+    changeItemStatus: vi.fn(),
     changeItemTitle: vi.fn(),
     createCustomItem,
     ensureChecklist: vi.fn(),
+    hasRemainingAppointments: vi.fn(),
     reconcileMissingChecklist: vi.fn(),
   };
 }

@@ -64,6 +64,13 @@ function createChecklistDetailState(state: unknown, depth: number) {
   };
 }
 
+function getSelectedChecklistItemId(taskId: string | null): number | null {
+  const match = /^checklist-item-(\d+)$/.exec(taskId ?? "");
+  const itemId = match ? Number(match[1]) : Number.NaN;
+
+  return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : null;
+}
+
 export function ChecklistFeature() {
   const { authState, refreshAuth } = useAuth();
   const audience: ChecklistAudience | undefined =
@@ -81,10 +88,15 @@ export function ChecklistFeature() {
   const checklistRepository = useChecklistQueryRepository();
   const checklistCommandRepository = useChecklistCommandRepository();
   const checklistRevision = useChecklistRevision();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedTaskId = searchParams.get("taskId");
   const itemEditing = useChecklistItemEditing(
     checklistCommandRepository,
     refreshAuth,
     audience,
+    getSelectedChecklistItemId(selectedTaskId),
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,
@@ -92,9 +104,6 @@ export function ChecklistFeature() {
     audience,
     sessionIdentity,
   );
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
@@ -102,7 +111,6 @@ export function ChecklistFeature() {
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const isMobileLayout = useIsMobileLayout();
-  const selectedTaskId = searchParams.get("taskId");
   const isTaskCreationOpen =
     searchParams.get("addTask") === "true" && selectedTaskId === null;
   const updateTaskCreation = useCallback(

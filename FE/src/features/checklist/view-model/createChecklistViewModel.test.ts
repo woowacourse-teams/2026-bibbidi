@@ -37,6 +37,38 @@ function createAppointment(
 }
 
 describe("createChecklistViewModel", () => {
+  it("로그인 서버 항목은 원본 종류와 무관하게 상태를 수정하고 guest 항목은 읽기 전용이다", () => {
+    const [category] = createChecklistViewModel({
+      categories: [
+        {
+          id: "10",
+          items: [
+            createItem({
+              checklistItemId: 1,
+              sourceCatalogItemId: 101,
+              status: "continue",
+            }),
+            createItem({
+              checklistItemId: null,
+              sourceCatalogItemId: 102,
+            }),
+          ],
+          title: "카테고리",
+        },
+      ],
+    });
+
+    expect(category?.tasks[0]).toMatchObject({
+      checklistItemStatus: "continue",
+      isEditable: false,
+      isStatusEditable: true,
+    });
+    expect(category?.tasks[1]).toMatchObject({
+      isEditable: false,
+      isStatusEditable: false,
+    });
+  });
+
   it("명시적인 API 상태를 일정 유무와 관계없이 화면 상태로 변환한다", () => {
     const [category] = createChecklistViewModel({
       categories: [

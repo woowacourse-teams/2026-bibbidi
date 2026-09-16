@@ -26,9 +26,11 @@ const taskStatusByChecklistItemStatus: Record<
 export interface ChecklistTaskViewModel {
   appointments: ChecklistAppointmentViewModel[];
   categoryId: string;
+  checklistItemStatus: ChecklistItemStatus;
   checklistItemId: number | null;
   id: string;
   isEditable: boolean;
+  isStatusEditable: boolean;
   title: string;
   schedule: string;
   status: ChecklistTaskStatus;
@@ -153,10 +155,12 @@ function createChecklistCategories(checklist: ChecklistQueryModel) {
     tasks: category.items.map((item) => ({
       appointments: item.appointments.map(createAppointmentViewModel),
       categoryId: item.categoryId,
+      checklistItemStatus: item.status,
       checklistItemId: item.checklistItemId,
       id: item.id,
       isEditable:
         item.checklistItemId !== null && item.sourceCatalogItemId === null,
+      isStatusEditable: item.checklistItemId !== null,
       schedule: getTaskSchedule(item),
       status: getTaskStatus(item),
       title: item.title,
