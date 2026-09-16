@@ -57,10 +57,6 @@ interface ChecklistFeatureProps {
   ) => Promise<boolean | void> | boolean | void;
 }
 
-function acceptAppointmentCreationBoundary() {
-  return true;
-}
-
 function isRequestAborted(error: unknown): boolean {
   return error instanceof ChecklistQueryRequestAbortedError;
 }
@@ -92,7 +88,7 @@ function getSelectedChecklistItemId(taskId: string | null): number | null {
 }
 
 export function ChecklistFeature({
-  onSubmitAppointment = acceptAppointmentCreationBoundary,
+  onSubmitAppointment,
 }: ChecklistFeatureProps = {}) {
   const { authState, refreshAuth } = useAuth();
   const audience: ChecklistAudience | undefined =

@@ -27,6 +27,7 @@ export function ChecklistAppointmentCreation({
 }: ChecklistAppointmentCreationProps) {
   const isMobileLayout = useIsMobileLayout();
   const formRef = useRef<HTMLFormElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
@@ -38,6 +39,12 @@ export function ChecklistAppointmentCreation({
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (controller.submissionState.status === "error") {
+      errorSummaryRef.current?.focus();
+    }
+  }, [controller.submissionState.status]);
 
   useEffect(() => {
     const form = formRef.current;
@@ -293,13 +300,20 @@ export function ChecklistAppointmentCreation({
             />
           </div>
 
-          {controller.submissionState.status === "error" ? (
-            <p
-              className="checklist-appointment-creation__feedback"
-              role="alert"
-            >
-              {controller.submissionState.message}
+          {!controller.canSubmit ? (
+            <p className="checklist-appointment-creation__availability">
+              일정 저장 기능은 준비 중이에요.
             </p>
+          ) : null}
+
+          {controller.submissionState.status === "error" ? (
+            <div
+              className="checklist-appointment-creation__feedback"
+              ref={errorSummaryRef}
+              tabIndex={-1}
+            >
+              <p role="alert">{controller.submissionState.message}</p>
+            </div>
           ) : null}
         </div>
 

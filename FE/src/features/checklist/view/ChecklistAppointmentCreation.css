@@ -147,6 +147,21 @@
   line-height: 1.5;
 }
 
+.checklist-appointment-creation__feedback p,
+.checklist-appointment-creation__availability {
+  margin: 0;
+}
+
+.checklist-appointment-creation__availability {
+  color: var(--color-fg-neutral-muted);
+  font-size: 13px;
+}
+
+.checklist-appointment-creation__feedback:focus {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
 .checklist-appointment-creation__footer {
   display: grid;
   min-height: 88px;

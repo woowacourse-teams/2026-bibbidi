@@ -153,6 +153,18 @@ function validateTime(time: string, label: string) {
     : `${label}을 HH:mm 형식으로 입력해 주세요.`;
 }
 
+function validateEndTime(startTime: string, endTime: string) {
+  const formatError = validateTime(endTime, "종료 시간");
+
+  if (formatError) {
+    return formatError;
+  }
+
+  return startTime && endTime && isValidTime(startTime) && startTime > endTime
+    ? "종료 시간은 시작 시간보다 빠를 수 없어요."
+    : undefined;
+}
+
 function validatePlace(place: string) {
   return place.trim().length > CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH
     ? "장소는 255자 이하로 입력해 주세요."
@@ -162,25 +174,13 @@ function validatePlace(place: string) {
 function validateDraft(
   draft: ChecklistAppointmentCreationDraft,
 ): ChecklistAppointmentCreationErrors {
-  const errors: ChecklistAppointmentCreationErrors = {
+  return {
     date: validateDate(draft.date),
-    endTime: validateTime(draft.endTime, "종료 시간"),
+    endTime: validateEndTime(draft.startTime, draft.endTime),
     place: validatePlace(draft.place),
     startTime: validateTime(draft.startTime, "시작 시간"),
     title: validateTitle(draft.title),
   };
-
-  if (
-    !errors.startTime &&
-    !errors.endTime &&
-    draft.startTime.length > 0 &&
-    draft.endTime.length > 0 &&
-    draft.startTime > draft.endTime
-  ) {
-    errors.endTime = "종료 시간은 시작 시간보다 빠를 수 없어요.";
-  }
-
-  return errors;
 }
 
 function firstErrorField(
@@ -303,14 +303,7 @@ export function useChecklistAppointmentCreation({
     changeEndTime: (endTime) => {
       setDraft((current) => ({ ...current, endTime }));
       if (errors.endTime) {
-        const timeError = validateTime(endTime, "종료 시간");
-        replaceError(
-          "endTime",
-          timeError ??
-            (draft.startTime && endTime && draft.startTime > endTime
-              ? "종료 시간은 시작 시간보다 빠를 수 없어요."
-              : undefined),
-        );
+        replaceError("endTime", validateEndTime(draft.startTime, endTime));
       }
     },
     changeMemo: (memo) => setDraft((current) => ({ ...current, memo })),
@@ -323,15 +316,8 @@ export function useChecklistAppointmentCreation({
       if (errors.startTime) {
         replaceError("startTime", validateTime(startTime, "시작 시간"));
       }
-      if (errors.endTime && draft.endTime) {
-        const endTimeError = validateTime(draft.endTime, "종료 시간");
-        replaceError(
-          "endTime",
-          endTimeError ??
-            (startTime && startTime > draft.endTime
-              ? "종료 시간은 시작 시간보다 빠를 수 없어요."
-              : undefined),
-        );
+      if (errors.endTime) {
+        replaceError("endTime", validateEndTime(startTime, draft.endTime));
       }
     },
     changeTitle: (title) => {
@@ -412,19 +398,13 @@ export function useChecklistAppointmentCreation({
       return null;
     },
     touchDate: () => replaceError("date", validateDate(draft.date)),
-    touchEndTime: () => {
-      const timeError = validateTime(draft.endTime, "종료 시간");
-      replaceError(
-        "endTime",
-        timeError ??
-          (draft.startTime && draft.endTime && draft.startTime > draft.endTime
-            ? "종료 시간은 시작 시간보다 빠를 수 없어요."
-            : undefined),
-      );
-    },
+    touchEndTime: () =>
+      replaceError("endTime", validateEndTime(draft.startTime, draft.endTime)),
     touchPlace: () => replaceError("place", validatePlace(draft.place)),
-    touchStartTime: () =>
-      replaceError("startTime", validateTime(draft.startTime, "시작 시간")),
+    touchStartTime: () => {
+      replaceError("startTime", validateTime(draft.startTime, "시작 시간"));
+      replaceError("endTime", validateEndTime(draft.startTime, draft.endTime));
+    },
     touchTitle: () => replaceError("title", validateTitle(draft.title)),
   };
 }

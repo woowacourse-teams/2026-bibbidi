@@ -77,6 +77,36 @@ describe("useChecklistAppointmentCreation", () => {
     });
   });
 
+  it("시작 시간 blur에서 종료 시간 순서를 갱신하고 형식 오류를 보존한다", () => {
+    render(<Harness onSubmit={vi.fn()} />);
+    withController(() => {
+      controller.changeEndTime("10:00");
+      controller.changeStartTime("11:00");
+    });
+    withController(controller.touchStartTime);
+    expect(controller.errors.endTime).toBe(
+      "종료 시간은 시작 시간보다 빠를 수 없어요.",
+    );
+
+    withController(() => controller.changeStartTime("09:00"));
+    expect(controller.errors.endTime).toBeUndefined();
+    withController(() => controller.changeStartTime("11:00"));
+    withController(controller.touchStartTime);
+    expect(controller.errors.endTime).toBe(
+      "종료 시간은 시작 시간보다 빠를 수 없어요.",
+    );
+
+    withController(() => controller.changeEndTime("99:00"));
+    expect(controller.errors.endTime).toBe(
+      "종료 시간을 HH:mm 형식으로 입력해 주세요.",
+    );
+    withController(() => controller.changeStartTime("08:00"));
+    withController(controller.touchStartTime);
+    expect(controller.errors.endTime).toBe(
+      "종료 시간을 HH:mm 형식으로 입력해 주세요.",
+    );
+  });
+
   it("선택 시간은 날짜와 결합한 로컬 문자열로 만들고 공백 선택값은 생략한다", async () => {
     const onSubmit = vi.fn().mockResolvedValue(true);
     render(<Harness onSubmit={onSubmit} />);
