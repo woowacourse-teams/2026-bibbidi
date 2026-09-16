@@ -44,9 +44,7 @@ function validateCategory(categoryId: string | null) {
 }
 
 interface UseChecklistTaskCreationOptions {
-  isAuthenticated: boolean;
   isOpen?: boolean;
-  onLogin: () => void;
   onOpenChange?: (isOpen: boolean) => void;
   onSubmit?: (input: ChecklistTaskCreationInput) => Promise<void> | void;
   submissionState?: ChecklistTaskCreationSubmissionState;
@@ -55,14 +53,12 @@ interface UseChecklistTaskCreationOptions {
 export interface ChecklistTaskCreationController {
   canSubmit: boolean;
   cancelDiscard: () => void;
-  cancelLoginRequired: () => void;
   changeCategory: (categoryId: string) => void;
   changeTitle: (title: string) => void;
   confirmDiscard: () => void;
   draft: ChecklistTaskCreationDraft;
   errors: ChecklistTaskCreationErrors;
   isDiscardDialogOpen: boolean;
-  isLoginRequiredOpen: boolean;
   isOpen: boolean;
   open: () => void;
   requestClose: () => void;
@@ -70,13 +66,10 @@ export interface ChecklistTaskCreationController {
   submissionState: ChecklistTaskCreationSubmissionState;
   touchCategory: () => void;
   touchTitle: () => void;
-  visitLogin: () => void;
 }
 
 export function useChecklistTaskCreation({
-  isAuthenticated,
   isOpen: controlledIsOpen,
-  onLogin,
   onOpenChange,
   onSubmit,
   submissionState = { status: "idle" },
@@ -84,7 +77,6 @@ export function useChecklistTaskCreation({
   const [draft, setDraft] = useState<ChecklistTaskCreationDraft>(emptyDraft);
   const [errors, setErrors] = useState<ChecklistTaskCreationErrors>({});
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
-  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
   const isOpen = controlledIsOpen ?? uncontrolledIsOpen;
   const isSubmitting = submissionState.status === "submitting";
@@ -123,7 +115,6 @@ export function useChecklistTaskCreation({
   return {
     canSubmit: onSubmit !== undefined,
     cancelDiscard: () => setIsDiscardDialogOpen(false),
-    cancelLoginRequired: () => setIsLoginRequiredOpen(false),
     changeCategory: (categoryId) => {
       setDraft((current) => ({ ...current, categoryId }));
 
@@ -146,15 +137,8 @@ export function useChecklistTaskCreation({
     draft,
     errors,
     isDiscardDialogOpen,
-    isLoginRequiredOpen,
     isOpen,
-    open: () => {
-      if (isAuthenticated) {
-        setIsOpen(true);
-      } else {
-        setIsLoginRequiredOpen(true);
-      }
-    },
+    open: () => setIsOpen(true),
     requestClose: () => {
       if (isSubmitting) {
         return;
@@ -199,9 +183,5 @@ export function useChecklistTaskCreation({
     touchCategory: () =>
       replaceError("categoryId", validateCategory(draft.categoryId)),
     touchTitle: () => replaceError("title", validateTitle(draft.title)),
-    visitLogin: () => {
-      setIsLoginRequiredOpen(false);
-      onLogin();
-    },
   };
 }

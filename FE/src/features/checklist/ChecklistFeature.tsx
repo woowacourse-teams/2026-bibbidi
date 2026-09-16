@@ -99,6 +99,7 @@ export function ChecklistFeature({
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
+  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const latestRequestIdRef = useRef(0);
   const [requestRevision, setRequestRevision] = useState(0);
   const isMobileLayout = useIsMobileLayout();
@@ -123,9 +124,7 @@ export function ChecklistFeature({
     [setSearchParams],
   );
   const taskCreation = useChecklistTaskCreation({
-    isAuthenticated: audience === "authenticated",
     isOpen: audience === "authenticated" && isTaskCreationOpen,
-    onLogin: () => navigate("/login"),
     onOpenChange: updateTaskCreation,
     onSubmit: onSubmitCustomTask,
     submissionState: customTaskSubmissionState,
@@ -354,10 +353,23 @@ export function ChecklistFeature({
     <Checklist
       categories={createChecklistViewModel(requestState.checklist)}
       isAuthenticated={audience === "authenticated"}
+      isLoginRequiredOpen={isLoginRequiredOpen}
       itemEditing={audience === "authenticated" ? itemEditing : undefined}
       onBackTaskDetail={backFromTaskDetail}
+      onCancelLoginRequired={() => setIsLoginRequiredOpen(false)}
       onCloseTaskDetail={closeTaskDetail}
+      onOpenTaskCreation={() => {
+        if (audience === "authenticated") {
+          taskCreation.open();
+        } else {
+          setIsLoginRequiredOpen(true);
+        }
+      }}
       onSelectTask={selectTask}
+      onVisitLogin={() => {
+        setIsLoginRequiredOpen(false);
+        navigate("/login");
+      }}
       selectedTaskId={selectedTaskId}
       taskCreation={taskCreation}
     />

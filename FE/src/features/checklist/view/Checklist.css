@@ -3,6 +3,10 @@
   margin: 0 auto;
 }
 
+.checklist-workspace__foreground {
+  display: contents;
+}
+
 .checklist-workspace--detail-open {
   display: grid;
   width: 100%;

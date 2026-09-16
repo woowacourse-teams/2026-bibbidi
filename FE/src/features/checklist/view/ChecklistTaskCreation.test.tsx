@@ -40,8 +40,6 @@ interface CreationHarnessProps {
 
 function CreationHarness({ onSubmit, submissionState }: CreationHarnessProps) {
   const controller = useChecklistTaskCreation({
-    isAuthenticated: true,
-    onLogin: vi.fn(),
     onSubmit,
     submissionState,
   });
@@ -152,6 +150,16 @@ describe("할 일 추가 폼", () => {
       ).value,
     ).toBe("20");
 
+    const backButton = within(page).getByRole("button", {
+      name: "체크리스트로 돌아가기",
+    });
+    const submitButton = within(page).getByRole("button", { name: "추가" });
+    submitButton.focus();
+    fireEvent.keyDown(submitButton, { key: "Tab" });
+    expect(document.activeElement).toBe(backButton);
+    fireEvent.keyDown(backButton, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(submitButton);
+
     act(() => media.setMatches(false));
     expect(
       screen.getByRole("complementary", { name: "할 일 추가" }),
@@ -227,7 +235,9 @@ describe("할 일 추가 폼", () => {
     );
 
     fireEvent.compositionStart(title);
-    fireEvent.keyDown(title, { isComposing: true, key: "Enter" });
+    expect(fireEvent.keyDown(title, { isComposing: true, key: "Enter" })).toBe(
+      false,
+    );
     expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.compositionEnd(title);
 

@@ -13,10 +13,14 @@ import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 interface ChecklistProps {
   categories: ChecklistCategoryViewModel[];
   isAuthenticated?: boolean;
+  isLoginRequiredOpen?: boolean;
   itemEditing?: ChecklistItemEditingController;
   onBackTaskDetail: () => void;
+  onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
+  onOpenTaskCreation?: () => void;
   onSelectTask: (taskId: string) => void;
+  onVisitLogin?: () => void;
   selectedTaskId: string | null;
   taskCreation?: ChecklistTaskCreationController;
 }
@@ -35,10 +39,14 @@ function canRestoreFocus(
 export function Checklist({
   categories,
   isAuthenticated = false,
+  isLoginRequiredOpen = false,
   itemEditing,
   onBackTaskDetail,
+  onCancelLoginRequired,
   onCloseTaskDetail,
+  onOpenTaskCreation,
   onSelectTask,
+  onVisitLogin,
   selectedTaskId,
   taskCreation,
 }: ChecklistProps) {
@@ -145,17 +153,8 @@ export function Checklist({
     onSelectTask(taskId);
   };
 
-  const openTaskCreation = () => {
-    if (!taskCreation) {
-      return;
-    }
-
-    taskCreation.open();
-  };
-
   const isMobileForegroundOpen =
     isMobileLayout && (selectedTaskContext !== undefined || isTaskCreationOpen);
-  const isLoginRequiredOpen = taskCreation?.isLoginRequiredOpen ?? false;
 
   return (
     <div
@@ -192,7 +191,7 @@ export function Checklist({
               className="checklist__add-task"
               onClick={() => {
                 addTaskButtonRef.current?.focus();
-                openTaskCreation();
+                onOpenTaskCreation?.();
               }}
               ref={addTaskButtonRef}
               type="button"
@@ -322,47 +321,53 @@ export function Checklist({
         </div>
       </div>
 
-      {selectedTaskContext && !isMobileLayout && !isTaskCreationOpen ? (
-        <ChecklistTaskDetailPanel
-          categories={categories}
-          categoryTitle={selectedTaskContext.categoryTitle}
-          editing={itemEditing}
-          onClose={onCloseTaskDetail}
-          task={selectedTaskContext.task}
-        />
-      ) : null}
+      <div
+        aria-hidden={isLoginRequiredOpen ? true : undefined}
+        className="checklist-workspace__foreground"
+        inert={isLoginRequiredOpen ? true : undefined}
+      >
+        {selectedTaskContext && !isMobileLayout && !isTaskCreationOpen ? (
+          <ChecklistTaskDetailPanel
+            categories={categories}
+            categoryTitle={selectedTaskContext.categoryTitle}
+            editing={itemEditing}
+            onClose={onCloseTaskDetail}
+            task={selectedTaskContext.task}
+          />
+        ) : null}
 
-      {selectedTaskContext && isMobileLayout && !isTaskCreationOpen ? (
-        <ChecklistTaskDetailPage
-          categories={categories}
-          categoryTitle={selectedTaskContext.categoryTitle}
-          editing={itemEditing}
-          onBack={onBackTaskDetail}
-          task={selectedTaskContext.task}
-        />
-      ) : null}
+        {selectedTaskContext && isMobileLayout && !isTaskCreationOpen ? (
+          <ChecklistTaskDetailPage
+            categories={categories}
+            categoryTitle={selectedTaskContext.categoryTitle}
+            editing={itemEditing}
+            onBack={onBackTaskDetail}
+            task={selectedTaskContext.task}
+          />
+        ) : null}
 
-      {taskCreation && isTaskCreationOpen ? (
-        <ChecklistTaskCreation
-          categories={categories}
-          controller={taskCreation}
-        />
-      ) : null}
+        {taskCreation && isTaskCreationOpen ? (
+          <ChecklistTaskCreation
+            categories={categories}
+            controller={taskCreation}
+          />
+        ) : null}
+      </div>
 
-      {taskCreation?.isLoginRequiredOpen ? (
+      {isLoginRequiredOpen ? (
         <ChecklistModalDialog
           actions={
             <>
               <button
                 className="checklist-dialog__button checklist-dialog__button--secondary"
-                onClick={taskCreation.cancelLoginRequired}
+                onClick={onCancelLoginRequired}
                 type="button"
               >
                 취소
               </button>
               <button
                 className="checklist-dialog__button checklist-dialog__button--primary"
-                onClick={taskCreation.visitLogin}
+                onClick={onVisitLogin}
                 type="button"
               >
                 로그인
@@ -372,7 +377,7 @@ export function Checklist({
           description={
             "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
           }
-          onEscape={taskCreation.cancelLoginRequired}
+          onEscape={onCancelLoginRequired}
           title="로그인이 필요해요"
         />
       ) : null}

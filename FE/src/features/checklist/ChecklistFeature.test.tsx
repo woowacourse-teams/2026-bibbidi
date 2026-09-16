@@ -319,6 +319,31 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(getCurrentUrl()).toBe("/login");
   });
 
+  it("로그인 안내가 열리면 상세 패널을 포함한 배경 전체를 비활성화한다", async () => {
+    renderChecklistFeature();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
+    );
+    const detailPanel = screen.getByRole("complementary", {
+      name: "로컬 체크리스트 항목",
+    });
+    const foreground = detailPanel.closest(".checklist-workspace__foreground");
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeTruthy();
+    expect(foreground?.hasAttribute("inert")).toBe(true);
+    expect(foreground?.getAttribute("aria-hidden")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(foreground?.hasAttribute("inert")).toBe(false);
+    expect(
+      screen.getByRole("complementary", { name: "로컬 체크리스트 항목" }),
+    ).toBe(detailPanel);
+  });
+
   it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {
     authMocks.authState = {
       status: "authenticated",

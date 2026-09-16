@@ -1,6 +1,6 @@
 .feedback-feature {
   position: fixed;
-  right: 28px;
+  right: calc(var(--service-side-panel-width, 0px) + 28px);
   bottom: 28px;
   z-index: 20;
   display: flex;
@@ -260,13 +260,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-@media (min-width: 761px) {
-  .service-layout:has(.checklist-workspace--detail-open) .feedback-feature,
-  .service-layout:has(.checklist-workspace--add-open) .feedback-feature {
-    right: calc(480px + 28px);
-  }
 }
 
 @media (max-width: 760px) {

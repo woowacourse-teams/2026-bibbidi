@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useId, useRef } from "react";
 
 import "./ChecklistModalDialog.css";
+import { containTabFocus, focusFirstElement } from "./containTabFocus";
 
 interface ChecklistModalDialogProps {
   actions: ReactNode;
@@ -9,15 +10,6 @@ interface ChecklistModalDialogProps {
   title: string;
   variant?: "default" | "critical";
 }
-
-const focusableSelector = [
-  "button:not(:disabled)",
-  "[href]",
-  "input:not(:disabled)",
-  "select:not(:disabled)",
-  "textarea:not(:disabled)",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
 
 export function ChecklistModalDialog({
   actions,
@@ -36,9 +28,9 @@ export function ChecklistModalDialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const firstFocusable =
-      dialogRef.current?.querySelector<HTMLElement>(focusableSelector);
-    firstFocusable?.focus();
+    if (dialogRef.current) {
+      focusFirstElement(dialogRef.current);
+    }
 
     return () => {
       if (previouslyFocused?.isConnected) {
@@ -66,28 +58,7 @@ export function ChecklistModalDialog({
         return;
       }
 
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const focusableElements = Array.from(
-        dialog.querySelectorAll<HTMLElement>(focusableSelector),
-      );
-      const first = focusableElements[0];
-      const last = focusableElements.at(-1);
-
-      if (!first || !last) {
-        event.preventDefault();
-        return;
-      }
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      containTabFocus(event, dialog);
     };
 
     dialog.addEventListener("keydown", handleKeyDown);

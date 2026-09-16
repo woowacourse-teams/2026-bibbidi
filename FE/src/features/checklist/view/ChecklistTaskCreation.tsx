@@ -7,6 +7,7 @@ import {
 } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistModalDialog } from "./ChecklistModalDialog";
+import { containTabFocus } from "./containTabFocus";
 import "./ChecklistTaskCreation.css";
 
 interface ChecklistTaskCreationProps {
@@ -46,7 +47,11 @@ export function ChecklistTaskCreation({
       return;
     }
 
-    const handleEscape = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (isMobileLayout) {
+        containTabFocus(event, form);
+      }
+
       if (
         event.key === "Escape" &&
         !(event.target instanceof HTMLSelectElement) &&
@@ -57,9 +62,9 @@ export function ChecklistTaskCreation({
       }
     };
 
-    form.addEventListener("keydown", handleEscape);
-    return () => form.removeEventListener("keydown", handleEscape);
-  }, [controller]);
+    form.addEventListener("keydown", handleKeyDown);
+    return () => form.removeEventListener("keydown", handleKeyDown);
+  }, [controller, isMobileLayout]);
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -1,6 +1,7 @@
 .service-layout {
   --mobile-dock-size: 72px;
   --mobile-dock-offset: max(12px, env(safe-area-inset-bottom));
+  --service-side-panel-width: 0px;
 
   display: flex;
   height: 100dvh;
@@ -8,6 +9,15 @@
   overflow: hidden;
   flex-direction: column;
   background: var(--color-bg-layer-basement);
+}
+
+@media (min-width: 761px) {
+  .service-layout:has(
+    .checklist-detail-panel,
+    .checklist-task-creation--desktop
+  ) {
+    --service-side-panel-width: 480px;
+  }
 }
 
 .service-layout__content {
