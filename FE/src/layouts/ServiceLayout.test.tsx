@@ -104,6 +104,39 @@ describe("ServiceLayout", () => {
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
   });
 
+  it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => undefined)),
+    );
+
+    renderServiceLayout(
+      <>
+        <Route
+          path="/"
+          element={
+            <>
+              <div>홈 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+        <Route path="/planner" element={<div>플래너 화면</div>} />
+      </>,
+    );
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
+        "link",
+        { name: "플래너" },
+      ),
+    );
+
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(screen.queryByText("플래너 화면")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
     vi.stubGlobal(
       "fetch",

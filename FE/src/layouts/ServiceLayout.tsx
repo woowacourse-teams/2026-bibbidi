@@ -31,12 +31,15 @@ export function ServiceLayout() {
   const isPlannerLoginDialogOpen = plannerDialogTrigger !== null;
 
   const handlePlannerNavigation = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (authState.status !== "guest") {
+    if (authState.status === "authenticated") {
       return;
     }
 
     event.preventDefault();
-    setPlannerDialogTrigger(event.currentTarget);
+
+    if (authState.status === "guest") {
+      setPlannerDialogTrigger(event.currentTarget);
+    }
   };
 
   const closePlannerLoginDialog = () => setPlannerDialogTrigger(null);
