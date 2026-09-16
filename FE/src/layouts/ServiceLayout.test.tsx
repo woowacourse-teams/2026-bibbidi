@@ -104,6 +104,39 @@ describe("ServiceLayout", () => {
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
   });
 
+  it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => undefined)),
+    );
+
+    renderServiceLayout(
+      <>
+        <Route
+          path="/"
+          element={
+            <>
+              <div>홈 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+        <Route path="/planner" element={<div>플래너 화면</div>} />
+      </>,
+    );
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
+        "link",
+        { name: "플래너" },
+      ),
+    );
+
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(screen.queryByText("플래너 화면")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
     vi.stubGlobal(
       "fetch",
@@ -196,6 +229,92 @@ describe("ServiceLayout", () => {
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "회원가입" })).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("비로그인 플래너 링크는 이동 없이 로그인 안내를 열고 배경을 비활성화한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+
+    const { container } = renderServiceLayout(
+      <>
+        <Route
+          path="/"
+          element={
+            <>
+              <div>준비 목록 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+        <Route path="/login" element={<LocationDisplay />} />
+      </>,
+    );
+    const desktopNavigation = await screen.findByRole("navigation", {
+      name: "주요 메뉴",
+    });
+    const plannerLink = within(desktopNavigation).getByRole("link", {
+      name: "플래너",
+    });
+
+    fireEvent.click(plannerLink);
+
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(
+      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "취소" }),
+    );
+    expect(
+      container.querySelector(".service-layout__header")?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__header")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector(".service-layout__mobile-dock")
+        ?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__mobile-dock")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(document.activeElement).toBe(plannerLink));
+
+    const mobilePlannerLink = within(
+      screen.getByRole("navigation", { name: "하단 메뉴" }),
+    ).getByRole("link", { name: "플래너" });
+    fireEvent.click(mobilePlannerLink);
+    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/login?returnTo=%2Fplanner",
+    );
   });
 
   it("체크리스트 인증 만료 시 로그인 상태를 다시 확인한다", async () => {

@@ -1,24 +1,34 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, RouteObject } from "react-router";
 
+import { PlannerAccessGuard } from "../features/auth";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
 import { ChecklistPage } from "../pages/ChecklistPage";
-import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
+import { PlannerPage } from "../pages/PlannerPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SignupPage } from "../pages/SignupPage";
 
-export const router = createBrowserRouter([
+export const appRoutes: RouteObject[] = [
   {
     Component: ServiceLayout,
     children: [
       {
         path: "/",
-        Component: HomePage,
+        Component: PreparationCatalogPage,
       },
       {
         path: "/preparation",
-        Component: PreparationCatalogPage,
+        element: <Navigate replace to="/" />,
+      },
+      {
+        Component: PlannerAccessGuard,
+        children: [
+          {
+            path: "/planner",
+            Component: PlannerPage,
+          },
+        ],
       },
       {
         path: "/checklist",
@@ -43,4 +53,6 @@ export const router = createBrowserRouter([
     path: "*",
     element: <Navigate replace to="/" />,
   },
-]);
+];
+
+export const router = createBrowserRouter(appRoutes);

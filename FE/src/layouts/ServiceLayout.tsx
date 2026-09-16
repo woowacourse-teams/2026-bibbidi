@@ -1,18 +1,26 @@
-import { useLayoutEffect, useRef } from "react";
-import { Outlet, useLocation } from "react-router";
+import { MouseEvent, useLayoutEffect, useRef, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
-import { useAuth } from "../features/auth";
+import {
+  createLoginPath,
+  LoginRequiredDialog,
+  PLANNER_RETURN_PATH,
+  useAuth,
+} from "../features/auth";
 import { FeedbackFeature } from "../features/feedback";
+import { useIsMobileLayout } from "../shared/responsive";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
-import { useIsMobileLayout } from "../shared/responsive";
 import "./ServiceLayout.css";
 
 export function ServiceLayout() {
   const { authState, refreshAuth } = useAuth();
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const contentRef = useRef<HTMLDivElement>(null);
+  const [plannerDialogTrigger, setPlannerDialogTrigger] =
+    useState<HTMLAnchorElement | null>(null);
   const isMobileLayout = useIsMobileLayout();
   const selectedTaskId = new URLSearchParams(search).get("taskId");
   const isMobileChecklistDetailOpen =
@@ -20,6 +28,21 @@ export function ServiceLayout() {
     pathname === "/checklist" &&
     selectedTaskId !== null &&
     selectedTaskId.length > 0;
+  const isPlannerLoginDialogOpen = plannerDialogTrigger !== null;
+
+  const handlePlannerNavigation = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (authState.status === "authenticated") {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (authState.status === "guest") {
+      setPlannerDialogTrigger(event.currentTarget);
+    }
+  };
+
+  const closePlannerLoginDialog = () => setPlannerDialogTrigger(null);
 
   useLayoutEffect(() => {
     if (contentRef.current) {
@@ -30,12 +53,21 @@ export function ServiceLayout() {
   return (
     <div className="service-layout">
       <div
-        aria-hidden={isMobileChecklistDetailOpen ? true : undefined}
+        aria-hidden={
+          isMobileChecklistDetailOpen || isPlannerLoginDialogOpen
+            ? true
+            : undefined
+        }
         className="service-layout__header"
         hidden={isMobileChecklistDetailOpen}
-        inert={isMobileChecklistDetailOpen ? true : undefined}
+        inert={
+          isMobileChecklistDetailOpen || isPlannerLoginDialogOpen
+            ? true
+            : undefined
+        }
       >
         <AppHeader
+          onPlannerNavigation={handlePlannerNavigation}
           user={
             authState.status === "authenticated"
               ? {
@@ -55,26 +87,47 @@ export function ServiceLayout() {
       </div>
 
       <div
+        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
         className={`service-layout__content${
           isMobileChecklistDetailOpen
             ? " service-layout__content--mobile-detail"
             : ""
         }`}
         data-page-scroll-container
+        inert={isPlannerLoginDialogOpen ? true : undefined}
         ref={contentRef}
       >
         <Outlet />
       </div>
 
       <div
-        aria-hidden={isMobileChecklistDetailOpen ? true : undefined}
+        aria-hidden={
+          isMobileChecklistDetailOpen || isPlannerLoginDialogOpen
+            ? true
+            : undefined
+        }
         className="service-layout__mobile-dock"
         hidden={isMobileChecklistDetailOpen}
-        inert={isMobileChecklistDetailOpen ? true : undefined}
+        inert={
+          isMobileChecklistDetailOpen || isPlannerLoginDialogOpen
+            ? true
+            : undefined
+        }
       >
-        <AppBottomNavigation />
+        <AppBottomNavigation onPlannerNavigation={handlePlannerNavigation} />
         <FeedbackFeature />
       </div>
+
+      {isPlannerLoginDialogOpen ? (
+        <LoginRequiredDialog
+          onClose={closePlannerLoginDialog}
+          onLogin={() => {
+            closePlannerLoginDialog();
+            navigate(createLoginPath(PLANNER_RETURN_PATH));
+          }}
+          returnFocusTo={plannerDialogTrigger}
+        />
+      ) : null}
     </div>
   );
 }
