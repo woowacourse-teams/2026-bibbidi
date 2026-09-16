@@ -1,4 +1,7 @@
-import { MyChecklistAppointmentModel } from "./myChecklist";
+import {
+  ChecklistItemStatus,
+  MyChecklistAppointmentModel,
+} from "./myChecklist";
 
 export type ChecklistAudience = "authenticated" | "guest";
 
@@ -7,8 +10,8 @@ export interface ChecklistQueryItemModel {
   categoryId: string;
   checklistItemId: number | null;
   id: string;
-  isDone: boolean;
   sourceCatalogItemId: number | null;
+  status: ChecklistItemStatus;
   title: string;
 }
 

@@ -6,11 +6,21 @@ import {
   ChecklistQueryItemModel,
   ChecklistQueryModel,
 } from "../model/checklistQuery";
+import { ChecklistItemStatus } from "../model/myChecklist";
 
 const statusLabels: Record<ChecklistTaskStatus, string> = {
   complete: "완료",
   "in-progress": "진행 중",
   incomplete: "미완료",
+};
+
+const taskStatusByChecklistItemStatus: Record<
+  ChecklistItemStatus,
+  ChecklistTaskStatus
+> = {
+  continue: "in-progress",
+  done: "complete",
+  prev: "incomplete",
 };
 
 export interface ChecklistTaskViewModel {
@@ -49,11 +59,7 @@ export interface ChecklistCategoryViewModel {
 }
 
 function getTaskStatus(item: ChecklistQueryItemModel): ChecklistTaskStatus {
-  if (item.isDone) {
-    return "complete";
-  }
-
-  return item.appointments.length > 0 ? "in-progress" : "incomplete";
+  return taskStatusByChecklistItemStatus[item.status];
 }
 
 function formatScheduleDate(date: string): string {

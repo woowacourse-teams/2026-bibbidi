@@ -10,8 +10,8 @@ function createItem(
     appointments: [],
     categoryId: "10",
     checklistItemId: 1,
-    isDone: false,
     sourceCatalogItemId: 101,
+    status: "prev",
     title: "할 일",
     ...overrides,
     id: overrides.id ?? "checklist-item-1",
@@ -37,19 +37,24 @@ function createAppointment(
 }
 
 describe("createChecklistViewModel", () => {
-  it("완료 여부와 일정 유무로 완료·진행 중·미완료 상태를 만든다", () => {
+  it("명시적인 API 상태를 일정 유무와 관계없이 화면 상태로 변환한다", () => {
     const [category] = createChecklistViewModel({
       categories: [
         {
           id: "10",
           items: [
-            createItem({ checklistItemId: 1, isDone: true, title: "완료" }),
+            createItem({ checklistItemId: 1, status: "done", title: "완료" }),
             createItem({
-              appointments: [createAppointment(1, "2026-09-15")],
               checklistItemId: 2,
+              status: "continue",
               title: "진행 중",
             }),
-            createItem({ checklistItemId: 3, title: "미완료" }),
+            createItem({
+              appointments: [createAppointment(1, "2026-09-15")],
+              checklistItemId: 3,
+              status: "prev",
+              title: "미완료",
+            }),
           ],
           title: "카테고리",
         },
@@ -157,7 +162,11 @@ describe("createChecklistViewModel", () => {
         {
           id: "10",
           items: [
-            createItem({ checklistItemId: 3, isDone: true, title: "세 번째" }),
+            createItem({
+              checklistItemId: 3,
+              status: "done",
+              title: "세 번째",
+            }),
             createItem({ checklistItemId: 1, title: "첫 번째" }),
             createItem({ checklistItemId: 2, title: "두 번째" }),
           ],

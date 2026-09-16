@@ -1,3 +1,11 @@
+export type ChecklistItemStatus = "prev" | "continue" | "done";
+
+export function isChecklistItemStatus(
+  value: unknown,
+): value is ChecklistItemStatus {
+  return value === "prev" || value === "continue" || value === "done";
+}
+
 export interface MyChecklistAppointmentModel {
   date: string;
   endTime: string | null;
@@ -13,8 +21,8 @@ export interface MyChecklistItemModel {
   appointments: MyChecklistAppointmentModel[];
   categoryId: number;
   id: number;
-  isDone: boolean;
   sourceCatalogItemId: number | null;
+  status: ChecklistItemStatus;
   title: string;
 }
 

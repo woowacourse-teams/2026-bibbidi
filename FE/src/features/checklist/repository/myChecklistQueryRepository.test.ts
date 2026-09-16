@@ -21,8 +21,8 @@ const checklist: MyChecklistModel = {
       appointments: [],
       categoryId: 1,
       id: 10,
-      isDone: true,
       sourceCatalogItemId: 101,
+      status: "done",
       title: "웨딩홀 계약",
     },
   ],
@@ -157,16 +157,16 @@ describe("MyChecklistQueryRepository", () => {
         appointments: [],
         categoryId: 2,
         id: 11,
-        isDone: false,
         sourceCatalogItemId: 102,
+        status: "prev",
         title: "드레스 계약",
       },
       {
         appointments: [],
         categoryId: 3,
         id: 12,
-        isDone: false,
         sourceCatalogItemId: 103,
+        status: "continue",
         title: "스냅 계약",
       },
     ]);
@@ -179,21 +179,21 @@ describe("MyChecklistQueryRepository", () => {
           appointments: [],
           categoryId: 2,
           id: 11,
-          isDone: false,
           sourceCatalogItemId: 102,
+          status: "prev",
           title: "드레스 계약",
         },
         {
           appointments: [],
           categoryId: 3,
           id: 12,
-          isDone: false,
           sourceCatalogItemId: 103,
+          status: "continue",
           title: "스냅 계약",
         },
       ],
     });
-    expect(checklist.items[0].isDone).toBe(true);
+    expect(checklist.items[0].status).toBe("done");
     expect(dataSource.getChecklist).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledOnce();
   });
@@ -219,8 +219,8 @@ describe("MyChecklistQueryRepository", () => {
       appointments: [],
       categoryId: 2,
       id: 11,
-      isDone: false,
       sourceCatalogItemId: 102,
+      status: "continue" as const,
       title: "다른 항목",
     };
     const dataSource = createDataSource();
@@ -271,8 +271,8 @@ describe("MyChecklistQueryRepository", () => {
       appointments: [],
       categoryId: 2,
       id: 11,
-      isDone: false,
       sourceCatalogItemId: 102,
+      status: "continue" as const,
       title: "다른 항목",
     };
     const dataSource = createDataSource();
@@ -330,8 +330,8 @@ describe("MyChecklistQueryRepository", () => {
       appointments: [],
       categoryId: 2,
       id: 11,
-      isDone: false,
       sourceCatalogItemId: 102,
+      status: "prev" as const,
       title: "드레스 계약",
     };
 
@@ -358,8 +358,8 @@ describe("MyChecklistQueryRepository", () => {
       appointments: [],
       categoryId: 2,
       id: 11,
-      isDone: false,
       sourceCatalogItemId: 102,
+      status: "prev" as const,
       title: "드레스 계약",
     };
 
@@ -406,8 +406,8 @@ describe("MyChecklistQueryRepository", () => {
         appointments: [],
         categoryId: 2,
         id: 11,
-        isDone: false,
         sourceCatalogItemId: 102,
+        status: "prev",
         title: "드레스 계약",
       },
     ]);

@@ -15,8 +15,8 @@ export function toMyChecklistItemModel(
     appointments: [],
     categoryId: item.categoryId,
     id: item.id,
-    isDone: false,
     sourceCatalogItemId: item.catalogItemId,
+    status: item.status,
     title: item.title,
   };
 }

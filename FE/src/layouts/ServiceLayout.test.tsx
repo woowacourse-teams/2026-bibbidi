@@ -22,14 +22,14 @@ import { ServiceLayout } from "./ServiceLayout";
 function createChecklistItem(
   id: number,
   sourceCatalogItemId: number | null,
-  isDone = false,
+  status: "continue" | "done" | "prev" = "prev",
 ) {
   return {
     appointments: [],
     categoryId: 10,
     id,
-    isDone,
     sourceCatalogItemId,
+    status,
     title: `체크리스트 항목 ${id}`,
   };
 }
@@ -190,9 +190,9 @@ describe("ServiceLayout", () => {
           JSON.stringify({
             id: 1,
             items: [
-              createChecklistItem(10, null, true),
+              createChecklistItem(10, null, "done"),
               createChecklistItem(11, null),
-              createChecklistItem(12, null, true),
+              createChecklistItem(12, null, "done"),
             ],
           }),
           { status: 200 },
@@ -365,7 +365,7 @@ describe("ServiceLayout", () => {
             JSON.stringify({
               id: 1,
               items: [
-                createChecklistItem(10, 101, true),
+                createChecklistItem(10, 101, "done"),
                 createChecklistItem(11, 102),
               ],
             }),
@@ -413,7 +413,7 @@ describe("ServiceLayout", () => {
           new Response(
             JSON.stringify({
               id: 1,
-              items: [createChecklistItem(10, 1001, true)],
+              items: [createChecklistItem(10, 1001, "done")],
             }),
             { status: 200 },
           ),
@@ -480,7 +480,7 @@ describe("ServiceLayout", () => {
           new Response(
             JSON.stringify({
               id: 1,
-              items: [createChecklistItem(10, 1001, true)],
+              items: [createChecklistItem(10, 1001, "done")],
             }),
             { status: 200 },
           ),
@@ -622,7 +622,7 @@ describe("ServiceLayout", () => {
             new Response(
               JSON.stringify({
                 id: 1,
-                items: [createChecklistItem(10, 1001, true)],
+                items: [createChecklistItem(10, 1001, "done")],
               }),
               { status: 200 },
             ),
@@ -733,9 +733,9 @@ describe("ServiceLayout", () => {
                 id: 1,
                 items:
                   checklistRequestCount === 1
-                    ? [createChecklistItem(10, 1001, true)]
+                    ? [createChecklistItem(10, 1001, "done")]
                     : [
-                        createChecklistItem(10, 1001, true),
+                        createChecklistItem(10, 1001, "done"),
                         createChecklistItem(11, 1002),
                       ],
               }),
@@ -839,9 +839,9 @@ describe("ServiceLayout", () => {
                 id: 1,
                 items:
                   checklistRequestCount === 1
-                    ? [createChecklistItem(10, 1001, true)]
+                    ? [createChecklistItem(10, 1001, "done")]
                     : [
-                        createChecklistItem(10, 1001, true),
+                        createChecklistItem(10, 1001, "done"),
                         createChecklistItem(11, 1002),
                       ],
               }),

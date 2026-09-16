@@ -129,8 +129,8 @@ function toCustomChecklistItemModel(
     appointments: [],
     categoryId: item.categoryId,
     id: item.id,
-    isDone: item.status === "done",
     sourceCatalogItemId: null,
+    status: item.status,
     title: item.title,
   };
 }

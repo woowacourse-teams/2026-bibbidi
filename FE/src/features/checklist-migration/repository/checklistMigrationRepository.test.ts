@@ -31,8 +31,8 @@ function createChecklist(
       appointments: [],
       categoryId: 1,
       id: index + 1,
-      isDone: false,
       sourceCatalogItemId,
+      status: "prev",
       title: `체크리스트 항목 ${index + 1}`,
     })),
   };

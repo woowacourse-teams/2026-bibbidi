@@ -10,14 +10,14 @@ const STORAGE_KEY = "bibbidi:preparation-checklist";
 function createChecklistItem(
   id: number,
   sourceCatalogItemId: number | null,
-  isDone = false,
+  status: "continue" | "done" | "prev" = "prev",
 ) {
   return {
     appointments: [],
     categoryId: 10,
     id,
-    isDone,
     sourceCatalogItemId,
+    status,
     title: `체크리스트 항목 ${id}`,
   };
 }

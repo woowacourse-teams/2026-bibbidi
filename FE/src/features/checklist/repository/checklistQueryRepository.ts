@@ -109,8 +109,8 @@ function getCatalogItemsByCategory(
                   categoryId: category.id,
                   checklistItemId: null,
                   id: `catalog-item-${catalogItemId}`,
-                  isDone: false,
                   sourceCatalogItemId: catalogItemId,
+                  status: "prev",
                   title: task.title,
                 },
               ];
@@ -129,8 +129,8 @@ function toAuthenticatedItem(item: MyChecklistItemModel) {
     categoryId: String(item.categoryId),
     checklistItemId: item.id,
     id: `checklist-item-${item.id}`,
-    isDone: item.isDone,
     sourceCatalogItemId: item.sourceCatalogItemId,
+    status: item.status,
     title: item.title,
   } satisfies ChecklistQueryItemModel;
 }

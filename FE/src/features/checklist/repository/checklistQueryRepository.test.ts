@@ -102,8 +102,8 @@ function createMyChecklistItem(
     ],
     categoryId,
     id,
-    isDone: id % 2 === 0,
     sourceCatalogItemId,
+    status: id % 2 === 0 ? "done" : "prev",
     title: `서버 항목 ${id}`,
   };
 }
@@ -144,8 +144,8 @@ describe("ChecklistQueryRepository", () => {
               categoryId: "10",
               checklistItemId: null,
               id: "catalog-item-101",
-              isDone: false,
               sourceCatalogItemId: 101,
+              status: "prev",
               title: "첫 번째 항목",
             },
             {
@@ -153,8 +153,8 @@ describe("ChecklistQueryRepository", () => {
               categoryId: "10",
               checklistItemId: null,
               id: "catalog-item-102",
-              isDone: false,
               sourceCatalogItemId: 102,
+              status: "prev",
               title: "두 번째 항목",
             },
           ],
@@ -206,8 +206,8 @@ describe("ChecklistQueryRepository", () => {
       categoryId: "10",
       checklistItemId: 11,
       id: "checklist-item-11",
-      isDone: false,
       sourceCatalogItemId: null,
+      status: "prev",
       title: "서버 항목 11",
     });
   });
