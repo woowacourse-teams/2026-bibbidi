@@ -7,6 +7,7 @@ import { MyChecklistItemModel, MyChecklistModel } from "../model/myChecklist";
 
 export interface MyChecklistQueryRepository {
   applyAddedItems(items: readonly MyChecklistItemModel[]): void;
+  applyItemCategoryUpdate(itemId: number, categoryId: number): boolean;
   applyItemTitleUpdate(itemId: number, title: string): boolean;
   getChecklist(signal?: AbortSignal): Promise<MyChecklistModel>;
   getRevision(): number;
@@ -227,6 +228,29 @@ export function createMyChecklistQueryRepository(
       );
     });
 
+  const applyItemUpdate = (
+    itemId: number,
+    update: (item: MyChecklistItemModel) => MyChecklistItemModel,
+  ): boolean => {
+    if (!cachedResult) {
+      return false;
+    }
+
+    const itemIndex = cachedResult.items.findIndex(
+      (item) => item.id === itemId,
+    );
+
+    if (itemIndex < 0) {
+      return false;
+    }
+
+    const nextItems = [...cachedResult.items];
+    nextItems[itemIndex] = update(cachedResult.items[itemIndex]);
+    setCachedResult({ ...cachedResult, items: nextItems });
+
+    return true;
+  };
+
   return {
     applyAddedItems(items) {
       if (!cachedResult && inFlightRequest) {
@@ -255,26 +279,11 @@ export function createMyChecklistQueryRepository(
 
       setCachedResult(nextChecklist);
     },
+    applyItemCategoryUpdate(itemId, categoryId) {
+      return applyItemUpdate(itemId, (item) => ({ ...item, categoryId }));
+    },
     applyItemTitleUpdate(itemId, title) {
-      if (!cachedResult) {
-        return false;
-      }
-
-      const itemIndex = cachedResult.items.findIndex(
-        (item) => item.id === itemId,
-      );
-
-      if (itemIndex < 0) {
-        return false;
-      }
-
-      const currentItem = cachedResult.items[itemIndex];
-      const nextItem = { ...currentItem, title };
-      const nextItems = [...cachedResult.items];
-      nextItems[itemIndex] = nextItem;
-      setCachedResult({ ...cachedResult, items: nextItems });
-
-      return true;
+      return applyItemUpdate(itemId, (item) => ({ ...item, title }));
     },
     getChecklist(signal) {
       if (signal?.aborted) {

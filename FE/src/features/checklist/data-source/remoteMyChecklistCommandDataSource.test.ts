@@ -144,6 +144,76 @@ describe("remoteMyChecklistCommandDataSource.createChecklist", () => {
   });
 });
 
+describe("remoteMyChecklistCommandDataSource.changeChecklistItemCategory", () => {
+  it("카테고리 ID를 객체가 아닌 숫자 scalar로 전송한다", async () => {
+    const response = { ...changedItemResponse, categoryId: 3 };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify(response), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemCategory(500, 3),
+    ).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/checklist-items/500/category",
+      {
+        body: "3",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+        signal: expect.any(AbortSignal),
+      },
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.body).not.toContain("{");
+  });
+
+  it("카테고리 수정 성공 응답 계약과 요청 항목 ID를 검증한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ ...changedItemResponse, categoryId: 0, id: 501 }),
+            { status: 200 },
+          ),
+        ),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemCategory(500, 3),
+    ).rejects.toBeInstanceOf(RemoteChecklistItemChangeContractError);
+  });
+
+  it("카테고리 수정 API 오류의 상태·코드·메시지를 보존한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            errorCode: 305,
+            message: "카테고리를 찾을 수 없습니다.",
+          }),
+          { status: 404 },
+        ),
+      ),
+    );
+
+    await expect(
+      remoteMyChecklistCommandDataSource.changeChecklistItemCategory(500, 999),
+    ).rejects.toEqual(
+      new RemoteChecklistItemChangeApiError(
+        305,
+        404,
+        "카테고리를 찾을 수 없습니다.",
+      ),
+    );
+  });
+});
+
 describe("remoteMyChecklistCommandDataSource.changeChecklistItemTitle", () => {
   it("제목을 객체나 quoted string으로 감싸지 않은 raw 문자열로 전송한다", async () => {
     const fetchMock = vi

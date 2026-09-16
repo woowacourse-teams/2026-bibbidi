@@ -40,12 +40,13 @@ export function ChecklistTaskTitleEditor({
   const titleEditSession = editing?.titleEditSession;
   const isEditing = itemId !== null && titleEditSession?.itemId === itemId;
   const draft = isEditing ? titleEditSession.draft : task.title;
-  const feedback = editing?.titleFeedback;
+  const feedback = editing?.changeFeedback;
+  const isSaving = feedback?.status === "pending";
   const isCurrentFeedback =
     itemId !== null &&
     feedback?.status !== "idle" &&
-    feedback?.itemId === itemId;
-  const isSaving = isCurrentFeedback && feedback.status === "pending";
+    feedback?.itemId === itemId &&
+    feedback.kind === "title";
   const errorMessage =
     validationMessage ??
     (isCurrentFeedback && feedback.status === "error"
@@ -205,6 +206,7 @@ export function ChecklistTaskTitleEditor({
       <button
         aria-label="할 일 제목 수정"
         className="checklist-title-editor__edit"
+        disabled={isSaving}
         onClick={startEditing}
         ref={editButtonRef}
         type="button"

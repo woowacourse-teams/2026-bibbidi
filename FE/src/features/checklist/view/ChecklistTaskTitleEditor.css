@@ -84,6 +84,7 @@
 }
 
 .checklist-title-editor__action:disabled,
+.checklist-title-editor__edit:disabled,
 .checklist-title-editor__input:disabled {
   cursor: wait;
   opacity: 0.55;

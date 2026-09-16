@@ -50,6 +50,12 @@
   white-space: nowrap;
 }
 
+.checklist-detail-content__category-value {
+  overflow: visible;
+  flex: 1;
+  text-align: right;
+}
+
 .checklist-detail-content__task-status {
   display: inline-flex;
   min-width: 64px;

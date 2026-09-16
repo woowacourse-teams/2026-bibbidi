@@ -9,6 +9,11 @@ interface ApiErrorResponse {
 }
 
 export interface RemoteMyChecklistCommandDataSource {
+  changeChecklistItemCategory(
+    itemId: number,
+    categoryId: number,
+    signal?: AbortSignal,
+  ): Promise<ChecklistItemChangeResponse>;
   changeChecklistItemTitle(
     itemId: number,
     title: string,
@@ -231,9 +236,10 @@ function toChecklistItemChangeRequestError(
   return new RemoteChecklistItemChangeNetworkError({ cause: error });
 }
 
-async function changeChecklistItemTitle(
+async function changeChecklistItem(
   itemId: number,
-  title: string,
+  property: "category" | "title",
+  requestBody: string,
   signal?: AbortSignal,
 ): Promise<ChecklistItemChangeResponse> {
   const controller = new AbortController();
@@ -254,13 +260,16 @@ async function changeChecklistItemTitle(
     let response: Response;
 
     try {
-      response = await fetch(`${CHECKLIST_ITEM_ENDPOINT}/${itemId}/title`, {
-        body: title,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        method: "PUT",
-        signal: controller.signal,
-      });
+      response = await fetch(
+        `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/${property}`,
+        {
+          body: requestBody,
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          method: "PUT",
+          signal: controller.signal,
+        },
+      );
     } catch (error) {
       throw toChecklistItemChangeRequestError(error, didTimeout, signal);
     }
@@ -304,5 +313,21 @@ async function changeChecklistItemTitle(
   }
 }
 
+function changeChecklistItemCategory(
+  itemId: number,
+  categoryId: number,
+  signal?: AbortSignal,
+) {
+  return changeChecklistItem(itemId, "category", String(categoryId), signal);
+}
+
+function changeChecklistItemTitle(
+  itemId: number,
+  title: string,
+  signal?: AbortSignal,
+) {
+  return changeChecklistItem(itemId, "title", title, signal);
+}
+
 export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSource =
-  { changeChecklistItemTitle, createChecklist };
+  { changeChecklistItemCategory, changeChecklistItemTitle, createChecklist };

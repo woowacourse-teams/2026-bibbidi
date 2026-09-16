@@ -1,12 +1,16 @@
 import { ReactNode, useEffect, useRef } from "react";
 
 import { ChecklistItemEditingController } from "../model/checklistEditing";
-import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
+import {
+  ChecklistCategoryViewModel,
+  ChecklistTaskViewModel,
+} from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
 import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailPage.css";
 
 interface ChecklistTaskDetailPageProps {
+  categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
   editing?: ChecklistItemEditingController;
   onBack: () => void;
@@ -66,6 +70,7 @@ export function ChecklistTaskDetailPageShell({
 }
 
 export function ChecklistTaskDetailPage({
+  categories,
   categoryTitle,
   editing,
   onBack,
@@ -83,7 +88,12 @@ export function ChecklistTaskDetailPage({
       }
       titleId={`${task.id}-detail-title`}
     >
-      <ChecklistTaskDetailContent categoryTitle={categoryTitle} task={task} />
+      <ChecklistTaskDetailContent
+        categories={categories}
+        categoryTitle={categoryTitle}
+        editing={editing}
+        task={task}
+      />
     </ChecklistTaskDetailPageShell>
   );
 }

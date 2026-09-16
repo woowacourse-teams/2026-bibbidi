@@ -1,4 +1,5 @@
 import {
+  ChecklistItemChangeResponse,
   RemoteMyChecklistCommandDataSource,
   RemoteChecklistItemChangeApiError,
   RemoteChecklistItemChangeRequestAbortedError,
@@ -12,6 +13,11 @@ import {
 } from "./myChecklistQueryRepository";
 
 export interface MyChecklistCommandRepository {
+  changeItemCategory(
+    itemId: number,
+    categoryId: number,
+    signal?: AbortSignal,
+  ): Promise<void>;
   changeItemTitle(
     itemId: number,
     title: string,
@@ -24,6 +30,8 @@ export interface MyChecklistCommandRepository {
 export type ChecklistItemChangeFailureReason =
   | "forbidden"
   | "invalid-request"
+  | "category-not-changeable"
+  | "category-not-found"
   | "item-not-found"
   | "title-not-changeable"
   | "unknown";
@@ -52,6 +60,14 @@ function getChecklistItemChangeFailureReason(
 
   if (error.errorCode === 304) {
     return "item-not-found";
+  }
+
+  if (error.errorCode === 305) {
+    return "category-not-found";
+  }
+
+  if (error.errorCode === 404) {
+    return "category-not-changeable";
   }
 
   if (error.errorCode === 405) {
@@ -100,21 +116,13 @@ export function createMyChecklistCommandRepository(
 ): MyChecklistCommandRepository {
   let hasConfirmedChecklist = false;
 
-  const changeChecklistItemTitle = async (
-    itemId: number,
-    title: string,
-    signal?: AbortSignal,
+  const changeChecklistItem = async (
+    request: () => Promise<ChecklistItemChangeResponse>,
+    applyUpdate: (changedItem: ChecklistItemChangeResponse) => boolean,
   ): Promise<void> => {
     try {
-      const changedItem = await dataSource.changeChecklistItemTitle(
-        itemId,
-        title,
-        signal,
-      );
-      const updateApplied = queryRepository.applyItemTitleUpdate(
-        itemId,
-        changedItem.title,
-      );
+      const changedItem = await request();
+      const updateApplied = applyUpdate(changedItem);
 
       if (!updateApplied) {
         throw new ChecklistItemChangeError("unknown");
@@ -194,6 +202,26 @@ export function createMyChecklistCommandRepository(
   };
 
   return {
+    changeItemCategory(itemId, categoryId, signal) {
+      if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+        return Promise.reject(
+          new ChecklistItemChangeError(
+            "invalid-request",
+            "카테고리를 선택해주세요.",
+          ),
+        );
+      }
+
+      return changeChecklistItem(
+        () =>
+          dataSource.changeChecklistItemCategory(itemId, categoryId, signal),
+        (changedItem) =>
+          queryRepository.applyItemCategoryUpdate(
+            itemId,
+            changedItem.categoryId,
+          ),
+      );
+    },
     async changeItemTitle(itemId, title, signal) {
       const normalizedTitle = title.trim();
 
@@ -211,7 +239,12 @@ export function createMyChecklistCommandRepository(
         );
       }
 
-      return changeChecklistItemTitle(itemId, normalizedTitle, signal);
+      return changeChecklistItem(
+        () =>
+          dataSource.changeChecklistItemTitle(itemId, normalizedTitle, signal),
+        (changedItem) =>
+          queryRepository.applyItemTitleUpdate(itemId, changedItem.title),
+      );
     },
     ensureChecklist,
     async reconcileMissingChecklist(signal) {

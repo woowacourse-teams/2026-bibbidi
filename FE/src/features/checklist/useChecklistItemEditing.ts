@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  ChecklistItemCategoryEditSession,
   ChecklistItemChangeFeedback,
+  ChecklistItemChangeKind,
   ChecklistItemEditingController,
   ChecklistItemTitleEditSession,
 } from "./model/checklistEditing";
@@ -22,9 +24,11 @@ export function useChecklistItemEditing(
   refreshAuth: () => void,
   audience: ChecklistAudience | undefined,
 ): ChecklistItemEditingController {
+  const [categoryEditSession, setCategoryEditSession] =
+    useState<ChecklistItemCategoryEditSession | null>(null);
   const [titleEditSession, setTitleEditSession] =
     useState<ChecklistItemTitleEditSession | null>(null);
-  const [titleFeedback, setTitleFeedback] =
+  const [changeFeedback, setChangeFeedback] =
     useState<ChecklistItemChangeFeedback>(idleFeedback);
   const controllerRef = useRef<AbortController | undefined>(undefined);
   const requestGenerationRef = useRef(0);
@@ -49,8 +53,9 @@ export function useChecklistItemEditing(
 
     queueMicrotask(() => {
       if (isActive) {
+        setCategoryEditSession(null);
         setTitleEditSession(null);
-        setTitleFeedback(idleFeedback);
+        setChangeFeedback(idleFeedback);
       }
     });
 
@@ -62,6 +67,7 @@ export function useChecklistItemEditing(
   const runChange = useCallback(
     async (
       itemId: number,
+      kind: ChecklistItemChangeKind,
       request: (signal: AbortSignal) => Promise<void>,
     ): Promise<boolean> => {
       if (controllerRef.current) {
@@ -72,7 +78,7 @@ export function useChecklistItemEditing(
       const requestGeneration = requestGenerationRef.current + 1;
       requestGenerationRef.current = requestGeneration;
       controllerRef.current = controller;
-      setTitleFeedback({ itemId, status: "pending" });
+      setChangeFeedback({ itemId, kind, status: "pending" });
 
       try {
         await request(controller.signal);
@@ -81,7 +87,7 @@ export function useChecklistItemEditing(
           return false;
         }
 
-        setTitleFeedback(idleFeedback);
+        setChangeFeedback(idleFeedback);
         return true;
       } catch (error) {
         if (requestGenerationRef.current !== requestGeneration) {
@@ -92,26 +98,28 @@ export function useChecklistItemEditing(
           controller.signal.aborted ||
           error instanceof MyChecklistRequestAbortedError
         ) {
-          setTitleFeedback(idleFeedback);
+          setChangeFeedback(idleFeedback);
           return false;
         }
 
         if (error instanceof MyChecklistAuthenticationRequiredError) {
           refreshAuth();
-          setTitleFeedback({
+          setChangeFeedback({
             errorMessage: error.message,
             itemId,
+            kind,
             status: "error",
           });
           return false;
         }
 
-        setTitleFeedback({
+        setChangeFeedback({
           errorMessage:
             error instanceof ChecklistItemChangeError
               ? error.message
               : "할 일을 수정하지 못했습니다. 잠시 후 다시 시도해주세요.",
           itemId,
+          kind,
           status: "error",
         });
         return false;
@@ -125,18 +133,36 @@ export function useChecklistItemEditing(
   );
 
   return {
+    categoryEditSession,
+    changeCategory: useCallback(
+      (itemId: number, categoryId: string) =>
+        runChange(itemId, "category", (signal) =>
+          commandRepository.changeItemCategory(
+            itemId,
+            Number(categoryId),
+            signal,
+          ),
+        ),
+      [commandRepository, runChange],
+    ),
+    changeFeedback,
     changeTitle: useCallback(
       (itemId: number, title: string) =>
-        runChange(itemId, (signal) =>
+        runChange(itemId, "title", (signal) =>
           commandRepository.changeItemTitle(itemId, title, signal),
         ),
       [commandRepository, runChange],
     ),
     clearError: useCallback((itemId: number) => {
-      setTitleFeedback((current) =>
+      setChangeFeedback((current) =>
         current.status === "error" && current.itemId === itemId
           ? idleFeedback
           : current,
+      );
+    }, []),
+    finishCategoryEditing: useCallback((itemId: number) => {
+      setCategoryEditSession((current) =>
+        current?.itemId === itemId ? null : current,
       );
     }, []),
     finishTitleEditing: useCallback((itemId: number) => {
@@ -144,11 +170,15 @@ export function useChecklistItemEditing(
         current?.itemId === itemId ? null : current,
       );
     }, []),
+    startCategoryEditing: useCallback((itemId: number) => {
+      setTitleEditSession(null);
+      setCategoryEditSession({ itemId });
+    }, []),
     startTitleEditing: useCallback((itemId: number, title: string) => {
+      setCategoryEditSession(null);
       setTitleEditSession({ draft: title, itemId });
     }, []),
     titleEditSession,
-    titleFeedback,
     updateTitleDraft: useCallback((itemId: number, draft: string) => {
       setTitleEditSession((current) =>
         current?.itemId === itemId ? { draft, itemId } : current,
