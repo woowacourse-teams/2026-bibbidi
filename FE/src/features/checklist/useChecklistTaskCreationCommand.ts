@@ -111,11 +111,15 @@ export function useChecklistTaskCreationCommand(
 
         const currentContext = requestContextRef.current;
 
+        if (requestGenerationRef.current !== requestGeneration) {
+          return false;
+        }
+
         if (
-          requestGenerationRef.current !== requestGeneration ||
           currentContext.audience !== "authenticated" ||
           currentContext.commandRepository !== commandRepository
         ) {
+          setSubmissionState(idleSubmissionState);
           return false;
         }
 

@@ -187,6 +187,42 @@ describe("useChecklistTaskCreationCommand", () => {
     expect(refreshAuth).not.toHaveBeenCalled();
   });
 
+  it("요청 세대는 유효하지만 인증 context가 바뀌면 idle로 되돌린다", async () => {
+    const deferred = createDeferred();
+    const repository = createRepository(
+      vi.fn().mockReturnValue(deferred.promise),
+    );
+    const refreshAuth = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ audience }: { audience: ChecklistAudience | undefined }) =>
+        useChecklistTaskCreationCommand(
+          repository,
+          refreshAuth,
+          audience,
+          "authenticated:1",
+        ),
+      {
+        initialProps: {
+          audience: "authenticated" as ChecklistAudience | undefined,
+        },
+      },
+    );
+    let request!: Promise<boolean>;
+    await act(async () => {
+      request = result.current.submit(input);
+    });
+    expect(result.current.submissionState).toEqual({ status: "submitting" });
+
+    rerender({ audience: undefined });
+    await act(async () => {
+      deferred.resolve();
+      await expect(request).resolves.toBe(false);
+    });
+
+    expect(result.current.submissionState).toEqual({ status: "idle" });
+    expect(refreshAuth).not.toHaveBeenCalled();
+  });
+
   it("세션 Repository가 바뀌면 이전 요청을 취소하고 제출 상태를 초기화한다", async () => {
     let requestSignal: AbortSignal | undefined;
     const firstRepository = createRepository(

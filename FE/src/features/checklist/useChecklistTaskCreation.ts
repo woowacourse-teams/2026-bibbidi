@@ -222,7 +222,7 @@ export function useChecklistTaskCreation({
           title: draft.title.trim(),
         });
 
-        if (didSucceed === true) {
+        if (didSucceed !== false) {
           setIsDiscardDialogOpen(false);
           setIsOpen(false);
           reset();
