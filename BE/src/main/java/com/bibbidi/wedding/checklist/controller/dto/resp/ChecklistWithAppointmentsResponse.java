@@ -24,13 +24,13 @@ public record ChecklistWithAppointmentsResponse(
             Long categoryId,
             Long sourceCatalogItemId,
             String title,
-            boolean isDone,
+            String status,
             List<AppointmentSummaryResponse> appointments
     ) {
         private static ChecklistItemWithAppointmentsResponse from(ChecklistItemWithAppointmentsResult result) {
             return new ChecklistItemWithAppointmentsResponse(
                     result.id(), result.categoryId(), result.sourceCatalogItemId(), result.title(),
-                    result.isDone(), result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
+                    result.status().value(), result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
             );
         }
     }
