@@ -1,8 +1,8 @@
 export const appNavigationItems = [
   {
     icon: "home",
-    label: "홈",
-    showInDesktopHeader: false,
+    label: "로드맵",
+    showInDesktopHeader: true,
     to: "/",
   },
   {

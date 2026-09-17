@@ -45,6 +45,19 @@ beforeEach(() => {
 });
 
 describe("AppHeaderSummaryFeature", () => {
+  it("결혼 일자 미설정 안내를 브랜드 색상 상태로 표시한다", async () => {
+    render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
+
+    const trigger = await screen.findByRole("button", {
+      name: /D-Day, 결혼 일자 미설정\. 결혼 예정일 설정/,
+    });
+
+    expect(trigger.classList).toContain(
+      "app-header-summary__d-day-button--unset",
+    );
+    expect(screen.getByText("D-Day 미설정")).toBeTruthy();
+  });
+
   it("두 조회가 진행 중일 때 결혼 예정일 로딩을 표시하고 완료율을 숨긴다", () => {
     repositoryMocks.getSummary.mockImplementation(
       () => new Promise(() => undefined),
