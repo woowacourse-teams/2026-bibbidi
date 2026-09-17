@@ -1,0 +1,112 @@
+.checklist-category-editor {
+  position: relative;
+  max-width: 100%;
+}
+
+.checklist-category-editor__trigger {
+  display: inline-flex;
+  max-width: 100%;
+  height: 32px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font: inherit;
+}
+
+.checklist-category-editor__trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist-category-editor__trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.checklist-category-editor__trigger:hover:not(:disabled) {
+  background: var(--color-bg-neutral-weak);
+}
+
+.checklist-category-editor__trigger:focus-visible,
+.checklist-category-editor__option:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 1px;
+}
+
+.checklist-category-editor__trigger:disabled,
+.checklist-category-editor__option:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.checklist-category-editor__popover {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 10px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 8px 28px rgb(54 56 61 / 16%);
+}
+
+.checklist-category-editor__options {
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist-category-editor__option {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.checklist-category-editor__option:hover:not(:disabled),
+.checklist-category-editor__option[aria-selected="true"] {
+  background: var(--color-bg-brand-weak);
+}
+
+.checklist-category-editor__check {
+  width: 18px;
+  flex: none;
+  color: var(--color-fg-brand);
+  font-weight: 700;
+  text-align: center;
+}
+
+.checklist-category-editor__error {
+  margin: 6px 4px 2px;
+  color: var(--color-fg-critical);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+}

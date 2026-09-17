@@ -1,0 +1,21 @@
+.auth-layout {
+  display: flex;
+  min-width: 320px;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--color-bg-layer-basement);
+}
+
+.auth-page {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 56px 24px 96px;
+}
+
+@media (max-width: 760px) {
+  .auth-page {
+    align-items: start;
+    padding: 42px 16px 48px;
+  }
+}

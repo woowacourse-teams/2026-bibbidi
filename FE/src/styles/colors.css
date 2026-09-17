@@ -1,0 +1,36 @@
+:root {
+  /* Bibidi core palette */
+  --color-palette-coral: #e88471;
+  --color-palette-ivory: #f0f0e9;
+  --color-palette-yellow: #fdda6e;
+  --color-palette-cream: #f8e8c1;
+  --color-palette-green: #c2d869;
+
+  /* SEED theme-light role tokens used by Bibidi */
+  --color-bg-layer-basement: #fcfaf4;
+  --color-bg-layer-default: #ffffff;
+  --color-bg-brand-solid: var(--color-palette-coral);
+  --color-bg-brand-solid-pressed: #d56f5e;
+  --color-bg-brand-weak: var(--color-palette-cream);
+  --color-bg-critical-weak: #fdf0f0;
+  --color-bg-informative-weak: #eff6ff;
+  --color-bg-neutral-weak: var(--color-palette-ivory);
+  --color-bg-positive-badge: #eef4d6;
+  --color-bg-positive-subtle: #fbfcf7;
+  --color-bg-positive-weak: var(--color-palette-green);
+  --color-fg-neutral: #36383d;
+  --color-fg-neutral-muted: #555d6d;
+  --color-fg-placeholder: #b0b3ba;
+  --color-fg-brand: #8a493f;
+  --color-fg-informative: #217cf9;
+  --color-fg-on-brand: #ffffff;
+  --color-fg-critical: #fa342c;
+  --color-fg-positive: #435016;
+  --color-stroke-neutral: #d5d7db;
+  --color-stroke-neutral-weak: #dcdee3;
+  --color-stroke-brand-solid: var(--color-palette-coral);
+  --color-stroke-brand-weak: #e7d9b7;
+  --color-stroke-neutral-contrast: #1a1c20;
+  --color-stroke-critical-solid: #fa342c;
+  --color-stroke-focus-ring: #5e98fe;
+}

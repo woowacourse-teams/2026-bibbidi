@@ -1,0 +1,23 @@
+.planner-page {
+  display: flex;
+  min-width: 320px;
+  flex-direction: column;
+  background: var(--color-bg-layer-basement);
+  color: var(--color-fg-neutral);
+}
+
+.planner-page__content {
+  display: flex;
+  width: min(calc(100% - 48px), 1440px);
+  flex: 1;
+  margin: 0 auto;
+  padding: 24px 0 52px;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (max-width: 760px) {
+  .planner-page__content {
+    width: min(calc(100% - 32px), 1440px);
+  }
+}
