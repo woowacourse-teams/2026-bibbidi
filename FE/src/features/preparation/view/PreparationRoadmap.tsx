@@ -123,6 +123,16 @@ export function PreparationRoadmap({
 
     if (changesCategory) {
       setMobileOpenStepId(null);
+
+      if (isMobileLayout) {
+        const scrollContainer = document.querySelector<HTMLElement>(
+          "[data-page-scroll-container]",
+        );
+
+        if (scrollContainer) {
+          scrollContainer.scrollTop = 0;
+        }
+      }
     }
 
     onCategorySelect(categoryId);

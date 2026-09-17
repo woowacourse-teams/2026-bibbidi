@@ -1119,6 +1119,46 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeTruthy();
   });
 
+  it("모바일에서 다른 카테고리를 선택하면 페이지 스크롤을 맨 위로 초기화한다", async () => {
+    setViewportMatches();
+    await renderFeature();
+    const scrollContainer = document.querySelector<HTMLElement>(
+      "[data-page-scroll-container]",
+    );
+
+    expect(scrollContainer).not.toBeNull();
+    if (!scrollContainer) {
+      return;
+    }
+
+    scrollContainer.scrollTop = 400;
+    fireEvent.click(screen.getByRole("button", { name: "웨딩홀" }));
+
+    expect(scrollContainer.scrollTop).toBe(400);
+
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+
+    expect(scrollContainer.scrollTop).toBe(0);
+  });
+
+  it("태블릿과 데스크톱에서 카테고리를 변경해도 페이지 스크롤을 유지한다", async () => {
+    setViewportMatches(false);
+    await renderFeature();
+    const scrollContainer = document.querySelector<HTMLElement>(
+      "[data-page-scroll-container]",
+    );
+
+    expect(scrollContainer).not.toBeNull();
+    if (!scrollContainer) {
+      return;
+    }
+
+    scrollContainer.scrollTop = 400;
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+
+    expect(scrollContainer.scrollTop).toBe(400);
+  });
+
   it("viewport 변경 후에도 선택 상태를 유지하고 이벤트를 전송하지 않는다", async () => {
     const viewport = setViewportMatches();
     await renderFeature();
