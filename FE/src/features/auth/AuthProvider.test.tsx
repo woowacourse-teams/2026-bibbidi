@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "./AuthProvider";
@@ -163,12 +163,13 @@ describe("AuthProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "인증 종료" }));
     expect(screen.getByText("guest")).toBeTruthy();
 
-    resolveCurrentUser(
-      new Response(JSON.stringify({ nickname: "이전 사용자" }), {
-        status: 200,
-      }),
-    );
-    await Promise.resolve();
+    await act(async () => {
+      resolveCurrentUser(
+        new Response(JSON.stringify({ nickname: "이전 사용자" }), {
+          status: 200,
+        }),
+      );
+    });
 
     expect(screen.getByText("guest")).toBeTruthy();
     expect(screen.queryByText(/이전 사용자/)).toBeNull();
@@ -200,10 +201,11 @@ describe("AuthProvider", () => {
     expect(screen.getByText("loading")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "인증 종료" }));
 
-    resolveRefreshedUser(
-      new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
-    );
-    await Promise.resolve();
+    await act(async () => {
+      resolveRefreshedUser(
+        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+      );
+    });
 
     expect(screen.getByText("guest")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
