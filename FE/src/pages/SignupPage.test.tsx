@@ -2,9 +2,21 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const analyticsMocks = vi.hoisted(() => ({
+  track: vi.fn(),
+}));
+
+vi.mock("../infrastructure/analytics", () => ({
+  analytics: {
+    initialize: vi.fn(),
+    track: analyticsMocks.track,
+  },
+}));
+
 import { SignupPage } from "./SignupPage";
 
 afterEach(() => {
+  analyticsMocks.track.mockReset();
   vi.unstubAllGlobals();
 });
 
@@ -52,7 +64,9 @@ describe("SignupPage", () => {
         ).disabled,
       ).toBe(false);
     });
-    fireEvent.click(screen.getByRole("button", { name: "회원가입" }));
+    const signupButton = screen.getByRole("button", { name: "회원가입" });
+    fireEvent.click(signupButton);
+    fireEvent.click(signupButton);
 
     await waitFor(() => {
       expect(
@@ -60,6 +74,11 @@ describe("SignupPage", () => {
       ).toBeTruthy();
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "sign_up",
+      parameters: { method: "service" },
+    });
   });
 
   it("중복 확인 후 닉네임이 선점되면 닉네임 오류를 표시한다", async () => {
@@ -112,5 +131,6 @@ describe("SignupPage", () => {
         .disabled,
     ).toBe(true);
     expect(screen.queryByText("사용 가능한 닉네임입니다.")).toBeNull();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 });

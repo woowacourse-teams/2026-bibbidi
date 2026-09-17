@@ -4,6 +4,7 @@ import { analytics } from "../../infrastructure/analytics";
 import {
   createPreparationCatalogViewEvent,
   createPreparationCategorySelectEvent,
+  createPreparationItemAddEvent,
   createPreparationStepSelectEvent,
 } from "./analytics/preparationAnalytics";
 import {
@@ -253,6 +254,17 @@ export function PreparationRoadmapFeature() {
     }
 
     const controller = new AbortController();
+    const additionContext = {
+      categoryId: selection.categoryId,
+      stepId: selection.stepId,
+      stepOrder: viewModel.steps.find((step) => step.id === selection.stepId)
+        ?.order,
+    };
+
+    if (additionContext.stepOrder === undefined) {
+      return;
+    }
+
     additionControllerRef.current = controller;
     setAddingCatalogItemIds(catalogItemIds);
     setAdditionErrorMessage(null);
@@ -284,6 +296,16 @@ export function PreparationRoadmapFeature() {
           ),
         };
       });
+
+      if (addedCatalogItemIds.length > 0) {
+        analytics.track(
+          createPreparationItemAddEvent({
+            ...additionContext,
+            itemCount: addedCatalogItemIds.length,
+            stepOrder: additionContext.stepOrder,
+          }),
+        );
+      }
     } catch (error) {
       if (controller.signal.aborted) {
         return;

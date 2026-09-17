@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createPreparationCatalogViewEvent,
   createPreparationCategorySelectEvent,
+  createPreparationItemAddEvent,
   createPreparationStepSelectEvent,
 } from "./preparationAnalytics";
 
@@ -43,6 +44,26 @@ describe("준비 목록 Analytics 이벤트", () => {
       name: "preparation_step_select",
       parameters: {
         category_id: "invitation",
+        step_id: "step-20",
+        step_order: 2,
+      },
+    });
+  });
+
+  it("추가된 항목의 식별자 없이 실제 성공 개수를 포함한 이벤트를 생성한다", () => {
+    expect(
+      createPreparationItemAddEvent({
+        categoryId: "invitation",
+        itemCount: 2,
+        stepId: "step-20",
+        stepOrder: 2,
+      }),
+    ).toEqual({
+      name: "preparation_item_add",
+      parameters: {
+        category_id: "invitation",
+        item_count: 2,
+        source: "preparation",
         step_id: "step-20",
         step_order: 2,
       },

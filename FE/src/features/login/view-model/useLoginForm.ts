@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 
+import { createLoginEvent } from "../../auth/analytics/authAnalytics";
+import { analytics } from "../../../infrastructure/analytics";
 import {
   login,
   LoginApiError,
@@ -89,6 +91,7 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
     onSuccess?.({
       nickname: result.nickname,
     });
+    analytics.track(createLoginEvent());
   };
 
   const isSubmitting = submissionStatus === "submitting";

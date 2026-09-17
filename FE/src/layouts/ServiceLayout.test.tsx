@@ -16,6 +16,17 @@ import {
 } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const analyticsMocks = vi.hoisted(() => ({
+  track: vi.fn(),
+}));
+
+vi.mock("../infrastructure/analytics", () => ({
+  analytics: {
+    initialize: vi.fn(),
+    track: analyticsMocks.track,
+  },
+}));
+
 import { AuthProvider } from "../features/auth";
 import {
   ChecklistFeature,
@@ -56,6 +67,7 @@ function LocationDisplay() {
 }
 
 beforeEach(() => {
+  analyticsMocks.track.mockReset();
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
     removeItem: vi.fn(),
@@ -197,6 +209,7 @@ describe("ServiceLayout", () => {
       "로그아웃하지 못했습니다.",
     );
     expect(screen.queryByText("서버 내부 정보")).toBeNull();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
@@ -213,6 +226,11 @@ describe("ServiceLayout", () => {
     expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
     expect(screen.queryByText("1/1")).toBeNull();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "logout",
+      parameters: {},
+    });
     const oldRepository = previousRepositoryRef.current;
     expect(oldRepository).toBeDefined();
     if (!oldRepository) {

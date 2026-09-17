@@ -506,6 +506,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
   it("개별 할 일을 서버 체크리스트에 추가하고 즉시 화면에 반영한다", async () => {
     checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce(["102"]);
     await renderFeature();
+    analyticsMocks.track.mockClear();
 
     fireEvent.click(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
@@ -522,6 +523,17 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       ).toBeNull(),
     );
     expect(screen.getByText("2개")).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "preparation_item_add",
+      parameters: {
+        category_id: "wedding-hall",
+        item_count: 1,
+        source: "preparation",
+        step_id: "step-1",
+        step_order: 1,
+      },
+    });
   });
 
   it("현재 단계의 남은 할 일을 서버 체크리스트에 모두 추가한다", async () => {
@@ -554,6 +566,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       }),
     );
     await renderFeature();
+    analyticsMocks.track.mockClear();
     const addButton = screen.getByRole("button", {
       name: "웨딩홀 견적 비교 추가",
     });
@@ -574,17 +587,22 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     ).toBe(true);
 
     await act(async () => resolveAddition?.(["102"]));
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("인증 대상이 바뀌면 진행 중인 추가 작업을 취소한다", async () => {
     let additionSignal: AbortSignal | undefined;
+    let resolveAddition: ((catalogItemIds: string[]) => void) | undefined;
     checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
       (_audience: string, _catalogItemIds: string[], signal?: AbortSignal) => {
         additionSignal = signal;
-        return new Promise(() => {});
+        return new Promise<string[]>((resolve) => {
+          resolveAddition = resolve;
+        });
       },
     );
     const { rerender } = await renderFeature();
+    analyticsMocks.track.mockClear();
 
     fireEvent.click(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
@@ -599,6 +617,8 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     );
 
     expect(additionSignal?.aborted).toBe(true);
+    await act(async () => resolveAddition?.(["102"]));
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("추가 실패 시 화면을 유지하고 같은 동작을 다시 시도한다", async () => {
@@ -608,6 +628,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       )
       .mockResolvedValueOnce(["102"]);
     await renderFeature();
+    analyticsMocks.track.mockClear();
     fireEvent.click(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     );
@@ -615,6 +636,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "이미 추가된 준비 항목입니다.",
     );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     const retryButton = screen.getByRole("button", {
       name: "웨딩홀 견적 비교 추가",
     });
@@ -628,6 +650,22 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       ),
     );
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+  });
+
+  it("서버가 실제로 추가한 항목이 없으면 성공 이벤트를 전송하지 않는다", async () => {
+    checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce([]);
+    await renderFeature();
+    analyticsMocks.track.mockClear();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+
+    await waitFor(() =>
+      expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledOnce(),
+    );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("추가 요청의 인증 만료를 인증 상태 재조회로 연결한다", async () => {
@@ -693,6 +731,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
 
   it("개별 할 일을 로컬 체크리스트에 추가하고 즉시 화면에 반영한다", async () => {
     await renderFeature();
+    analyticsMocks.track.mockClear();
 
     fireEvent.click(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
@@ -709,6 +748,17 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
       ).toBeNull(),
     );
     expect(screen.getByText("2개")).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "preparation_item_add",
+      parameters: {
+        category_id: "wedding-hall",
+        item_count: 1,
+        source: "preparation",
+        step_id: "step-1",
+        step_order: 1,
+      },
+    });
   });
 
   it("현재 단계의 남은 할 일을 모두 로컬 체크리스트에 추가한다", async () => {
@@ -739,6 +789,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
       })
       .mockReturnValueOnce(["102"]);
     await renderFeature();
+    analyticsMocks.track.mockClear();
     fireEvent.click(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     );
@@ -746,6 +797,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
     );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(
       screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     ).toBeTruthy();
@@ -759,6 +811,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     expect(
       screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     ).toBeNull();
+    await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
   });
 
   it("모바일 바텀시트에서도 개별 할 일을 추가한다", async () => {
