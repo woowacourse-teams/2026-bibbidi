@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 
+import { AppPageViewTracker } from "./app/analytics/AppPageViewTracker";
 import { router } from "./app/router";
 import { AuthProvider } from "./features/auth";
 import { ChecklistMigrationProvider } from "./features/checklist-migration";
@@ -22,6 +23,11 @@ createRoot(rootElement).render(
     <AuthProvider>
       <ChecklistMigrationProvider>
         <RouterProvider router={router} />
+        <AppPageViewTracker
+          analytics={analytics}
+          origin={window.location.origin}
+          router={router}
+        />
       </ChecklistMigrationProvider>
     </AuthProvider>
   </StrictMode>,

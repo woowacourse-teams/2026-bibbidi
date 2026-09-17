@@ -5,6 +5,24 @@ const GOOGLE_TAG_SCRIPT_ID = "bibbidi-google-analytics";
 type GoogleTag = (...arguments_: unknown[]) => void;
 type GoogleTagLoader = (measurementId: string) => GoogleTag;
 
+function createPageContext(event: AnalyticsEvent) {
+  if (event.name !== "page_view") {
+    return null;
+  }
+
+  const { page_location, page_referrer, page_title } = event.parameters;
+
+  if (
+    typeof page_location !== "string" ||
+    typeof page_referrer !== "string" ||
+    typeof page_title !== "string"
+  ) {
+    return null;
+  }
+
+  return { page_location, page_referrer, page_title };
+}
+
 interface GoogleAnalyticsWindow extends Window {
   dataLayer?: unknown[];
   gtag?: GoogleTag;
@@ -45,9 +63,15 @@ export function createGoogleAnalyticsProvider(
 
       googleTag = loadTag(measurementId);
       googleTag("js", new Date());
-      googleTag("config", measurementId);
+      googleTag("config", measurementId, { send_page_view: false });
     },
     track(event: AnalyticsEvent) {
+      const pageContext = createPageContext(event);
+
+      if (pageContext) {
+        googleTag?.("set", pageContext);
+      }
+
       googleTag?.("event", event.name, event.parameters);
     },
   };

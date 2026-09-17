@@ -21,7 +21,9 @@ describe("createGoogleAnalyticsProvider", () => {
     expect(loadTag).toHaveBeenCalledOnce();
     expect(loadTag).toHaveBeenCalledWith("G-TEST");
     expect(googleTag.mock.calls[0]?.[0]).toBe("js");
-    expect(googleTag).toHaveBeenNthCalledWith(2, "config", "G-TEST");
+    expect(googleTag).toHaveBeenNthCalledWith(2, "config", "G-TEST", {
+      send_page_view: false,
+    });
     expect(googleTag).toHaveBeenNthCalledWith(
       3,
       "event",
@@ -37,6 +39,37 @@ describe("createGoogleAnalyticsProvider", () => {
     provider.initialize();
 
     expect(loadTag).not.toHaveBeenCalled();
+  });
+
+  it("페이지뷰의 정규화된 페이지 컨텍스트를 이후 이벤트의 기본값으로 설정한다", () => {
+    const googleTag = vi.fn();
+    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
+    const pageView = {
+      name: "page_view",
+      parameters: {
+        page_location: "https://bibbidi.example/checklist",
+        page_path: "/checklist",
+        page_referrer: "https://bibbidi.example/planner",
+        page_title: "체크리스트",
+        screen_name: "checklist",
+      },
+    };
+
+    provider.initialize();
+    provider.track(pageView);
+
+    expect(googleTag).toHaveBeenNthCalledWith(3, "set", {
+      page_location: "https://bibbidi.example/checklist",
+      page_referrer: "https://bibbidi.example/planner",
+      page_title: "체크리스트",
+    });
+    expect(googleTag).toHaveBeenNthCalledWith(4, "event", "page_view", {
+      page_location: "https://bibbidi.example/checklist",
+      page_path: "/checklist",
+      page_referrer: "https://bibbidi.example/planner",
+      page_title: "체크리스트",
+      screen_name: "checklist",
+    });
   });
 
   it("초기화 전에 발생한 이벤트는 제품 오류 없이 무시한다", () => {
@@ -73,6 +106,7 @@ describe("createGoogleAnalyticsProvider", () => {
     expect(Array.from(commands[1] as ArrayLike<unknown>)).toEqual([
       "config",
       "G-TEST",
+      { send_page_view: false },
     ]);
     expect(Array.from(commands[2] as ArrayLike<unknown>)).toEqual([
       "event",
