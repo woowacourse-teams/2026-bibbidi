@@ -1,0 +1,443 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
+index 1d5f61641d8bb28e84cddf71dcc7fa378d2b0d62..a9113cafd0171c766819980a5a7050327fd5cb4e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Appointment.java
+@@ -141,6 +141,10 @@ public final class Appointment {
+         return endTime;
+     }
+ 
++    public boolean belongsTo(ChecklistItem checklistItem) {
++        return checklistItemId.equals(checklistItem.id());
++    }
++
+     public boolean conflictsWith(Appointment other) {
+         if (!hasConfirmedSchedule() || !other.hasConfirmedSchedule()) {
+             return false;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
+index ec1e80163fd071762a0480062b70488ffa2d1370..f164f3361292c9ec65355381d4ac6019ab11f2d7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/Checklist.java
+@@ -4,7 +4,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
+ import java.util.Objects;
+-import java.util.Set;
+ import org.jspecify.annotations.Nullable;
+ 
+ public final class Checklist {
+@@ -76,9 +75,9 @@ public final class Checklist {
+                 .toList();
+     }
+ 
+-    public List<ChecklistItem> unscheduledItems(Set<Long> scheduledItemIds) {
++    public List<ChecklistItem> unscheduledItems(List<Appointment> appointments) {
+         return items.stream()
+-                .filter(item -> item.needsSchedule(scheduledItemIds))
++                .filter(item -> item.needsSchedule(appointments))
+                 .toList();
+     }
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+index 136decb62cd26a622739a1ebf5dd74e46cb12016..28e142babfb4bd5e0f38a40edd851bad3beef95a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+@@ -2,7 +2,7 @@ package com.bibbidi.wedding.checklist.domain;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+-import java.util.Set;
++import java.util.List;
+ import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+ 
+@@ -113,7 +113,7 @@ public final class ChecklistItem {
+         return status == ChecklistItemStatus.DONE;
+     }
+ 
+-    public boolean needsSchedule(Set<Long> scheduledItemIds) {
+-        return !isDone() && !scheduledItemIds.contains(id);
++    public boolean needsSchedule(List<Appointment> appointments) {
++        return !isDone() && appointments.stream().noneMatch(appointment -> appointment.belongsTo(this));
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+index 4c9737d4a95e7cc11845b7d5fc528cd1247c091c..553df53ce6bba3b5fff890da12acda325895f6d7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaAppointmentRepository.java
+@@ -3,7 +3,6 @@ package com.bibbidi.wedding.checklist.persistence;
+ import java.time.LocalDateTime;
+ import java.util.List;
+ import java.util.Optional;
+-import java.util.Set;
+ import org.springframework.data.jpa.repository.JpaRepository;
+ import org.springframework.data.jpa.repository.Modifying;
+ import org.springframework.data.jpa.repository.Query;
+@@ -43,13 +42,6 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
+             """)
+     boolean existsRemainingByChecklistItemId(Long checklistItemId);
+ 
+-    @Query("""
+-            SELECT DISTINCT appointment.checklistItemId
+-            FROM JpaAppointmentEntity appointment
+-            WHERE appointment.checklistItemId IN :checklistItemIds
+-            """)
+-    Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds);
+-
+     @Query("""
+             SELECT appointment
+             FROM JpaAppointmentEntity appointment
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+index d91dd3a53e18b885ff94f6b7bccf1b3d0a3170ec..f738d2fec0fe51aef2ddf6fcf7182bdc9ae3d91e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/AppointmentRepository.java
+@@ -6,7 +6,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.util.List;
+-import java.util.Set;
+ import org.jspecify.annotations.NonNull;
+ import org.springframework.stereotype.Repository;
+ 
+@@ -39,10 +38,6 @@ public class AppointmentRepository {
+         return jpaAppointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+     }
+ 
+-    public Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds) {
+-        return jpaAppointmentRepository.findScheduledChecklistItemIds(checklistItemIds);
+-    }
+-
+     public List<Appointment> findAllRemainingByChecklistItemId(Long checklistItemId) {
+         return findAllByChecklistItemIdAndIsDone(checklistItemId, false);
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+index bbaa5f33991d4274c471b525da27a3136f0aa6fd..7fb9b593cf8a8e1229be73c30850a65a246f6979 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentService.java
+@@ -4,7 +4,6 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import java.util.List;
+-import java.util.Set;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -22,11 +21,6 @@ public class ChecklistAppointmentService {
+         return appointmentRepository.existsRemainingByChecklistItemId(checklistItemId);
+     }
+ 
+-    @Transactional(readOnly = true)
+-    public Set<Long> findScheduledChecklistItemIds(List<Long> checklistItemIds) {
+-        return appointmentRepository.findScheduledChecklistItemIds(checklistItemIds);
+-    }
+-
+     @Transactional(readOnly = true)
+     public List<Appointment> findAllByChecklistItemIds(List<Long> checklistItemIds) {
+         return appointmentRepository.findAllByChecklistItemIdIn(checklistItemIds);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 657938a07e1c0edac89e4c56d0f383de9f288af3..d81a7ce02ea81426719ae70364da4823b43b4f18 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -4,6 +4,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
++import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.domain.Checklist;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+@@ -84,9 +85,9 @@ public class ChecklistService {
+     }
+ 
+     private List<ChecklistItem> excludeScheduledItems(Checklist checklist) {
+-        Set<Long> scheduledItemIds = checklistAppointmentService
+-                .findScheduledChecklistItemIds(checklist.undoneItemIds());
+-        return checklist.unscheduledItems(scheduledItemIds);
++        List<Appointment> appointments = checklistAppointmentService
++                .findAllByChecklistItemIds(checklist.undoneItemIds());
++        return checklist.unscheduledItems(appointments);
+     }
+ 
+     private CategoryNames findCategoryNames(List<ChecklistItem> items) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
+index de2c74269a6d191102c15312a6b0faa5a3e3ac4f..0db97756aa7aa1f8b7d18f9ba9dbf8a93299c081 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/AppointmentTest.java
+@@ -253,6 +253,38 @@ class AppointmentTest {
+         assertThat(crossingMidnight.conflictsWith(nextDay)).isTrue();
+     }
+ 
++    @Test
++    @DisplayName("일정이 달린 할 일에는 속한다")
++    void shouldBelongToChecklistItemOfAppointment() {
++        // given
++        Appointment appointment = constructTestAppointment(false);
++        ChecklistItem checklistItem = checklistItem(CHECKLIST_ITEM_ID);
++
++        // when
++        boolean belongsTo = appointment.belongsTo(checklistItem);
++
++        // then
++        assertThat(belongsTo).isTrue();
++    }
++
++    @Test
++    @DisplayName("다른 할 일에는 속하지 않는다")
++    void shouldNotBelongToOtherChecklistItem() {
++        // given
++        Appointment appointment = constructTestAppointment(false);
++        ChecklistItem otherChecklistItem = checklistItem(2L);
++
++        // when
++        boolean belongsTo = appointment.belongsTo(otherChecklistItem);
++
++        // then
++        assertThat(belongsTo).isFalse();
++    }
++
++    private static ChecklistItem checklistItem(Long id) {
++        return new ChecklistItem(id, 10L, "Wedding hall consultation", null, ChecklistItemStatus.PREV);
++    }
++
+     private static Appointment at(int startHour, int startMinute, int endHour, int endMinute) {
+         return appointmentWithTime(
+                 LocalDateTime.of(2026, 9, 1, startHour, startMinute),
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+index 4a50c90050569273b517379ff00d2cedcbd7f7e6..57e08fb168494456fcd989299a1dc3f5b6a008bf 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+@@ -6,7 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+-import java.util.Set;
++import java.time.LocalDate;
++import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ 
+@@ -269,15 +270,16 @@ class ChecklistItemTest {
+     }
+ 
+     @Test
+-    @DisplayName("완료되지 않았고 일정이 없는 할 일은 일정이 필요하다")
++    @DisplayName("완료되지 않았고 다른 할 일의 일정만 있는 할 일은 일정이 필요하다")
+     void shouldNeedScheduleWhenItemIsIncompleteAndUnscheduled() {
+         // given
+         ChecklistItem item = constructTestItem();
+         ChecklistItem progressed = item.changeStatus(ChecklistItemStatus.CONTINUE);
++        List<Appointment> otherItemAppointments = List.of(appointmentOf(2L));
+ 
+         // when, then
+-        assertThat(item.needsSchedule(Set.of())).isTrue();
+-        assertThat(progressed.needsSchedule(Set.of())).isTrue();
++        assertThat(item.needsSchedule(otherItemAppointments)).isTrue();
++        assertThat(progressed.needsSchedule(otherItemAppointments)).isTrue();
+     }
+ 
+     @Test
+@@ -287,7 +289,7 @@ class ChecklistItemTest {
+         ChecklistItem item = constructTestItem();
+ 
+         // when
+-        boolean needsSchedule = item.needsSchedule(Set.of(item.id()));
++        boolean needsSchedule = item.needsSchedule(List.of(appointmentOf(item.id())));
+ 
+         // then
+         assertThat(needsSchedule).isFalse();
+@@ -300,7 +302,7 @@ class ChecklistItemTest {
+         ChecklistItem item = constructTestItem().changeStatus(ChecklistItemStatus.DONE);
+ 
+         // when
+-        boolean needsSchedule = item.needsSchedule(Set.of());
++        boolean needsSchedule = item.needsSchedule(List.of());
+ 
+         // then
+         assertThat(needsSchedule).isFalse();
+@@ -315,4 +317,19 @@ class ChecklistItemTest {
+                 ChecklistItemStatus.PREV
+         );
+     }
++
++    private static Appointment appointmentOf(Long checklistItemId) {
++        return new Appointment(
++                null,
++                checklistItemId,
++                "Consultation",
++                LocalDate.of(2026, 9, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+index 879fff94bf930a741467dbd05d92eba79be5ba60..5bfb50ad435ee87d1abd70da66f89c815b9f0eb3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.time.LocalDate;
+ import java.util.List;
+-import java.util.Set;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ 
+@@ -106,7 +106,7 @@ class ChecklistTest {
+         );
+ 
+         // when
+-        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(Set.of(2L));
++        List<ChecklistItem> unscheduledItems = checklist.unscheduledItems(List.of(appointmentOf(2L)));
+ 
+         // then
+         assertThat(unscheduledItems)
+@@ -272,4 +272,19 @@ class ChecklistTest {
+                 status
+         );
+     }
++
++    private static Appointment appointmentOf(Long checklistItemId) {
++        return new Appointment(
++                null,
++                checklistItemId,
++                "웨딩홀 투어",
++                LocalDate.of(2026, 9, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+index 351cc00bd8997eb802613b7384236e5252c88f83..afbb30c1ed6b02f643a0701ac88467e42646af11 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+@@ -13,7 +13,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+ import java.util.List;
+-import java.util.Set;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+@@ -140,39 +139,6 @@ class AppointmentRepositoryTest {
+         assertThat(hasRemaining).isFalse();
+     }
+ 
+-    @Test
+-    @DisplayName("지정한 할 일 중 일정이 하나라도 있는 할 일 ID만 조회한다")
+-    void shouldFindOnlyScheduledChecklistItemIds() {
+-        saveAppointment(10L, "아직 안 끝낸 일정");
+-        saveAppointment(10L, "같은 할 일의 다른 일정");
+-        saveDoneAppointment(11L, "이미 끝낸 일정");
+-        saveAppointment(20L, "지정하지 않은 할 일의 일정");
+-
+-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L, 12L));
+-
+-        assertThat(found).containsExactlyInAnyOrder(10L, 11L);
+-    }
+-
+-    @Test
+-    @DisplayName("지정한 할 일에 일정이 하나도 없으면 빈 ID 목록을 조회한다")
+-    void shouldFindNoScheduledChecklistItemIdWhenNoAppointmentExists() {
+-        saveAppointment(20L, "지정하지 않은 할 일의 일정");
+-
+-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L));
+-
+-        assertThat(found).isEmpty();
+-    }
+-
+-    @Test
+-    @DisplayName("지정한 할 일 ID가 없으면 빈 ID 목록을 조회한다")
+-    void shouldFindNoScheduledChecklistItemIdWhenChecklistItemIdsAreEmpty() {
+-        saveAppointment(10L, "지정하지 않은 할 일의 일정");
+-
+-        Set<Long> found = appointmentRepository.findScheduledChecklistItemIds(List.of());
+-
+-        assertThat(found).isEmpty();
+-    }
+-
+     @Test
+     @DisplayName("지정한 할 일들의 일정을 완료 여부와 관계없이 모두 조회한다")
+     void shouldFindAllAppointmentsOfGivenChecklistItems() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+index 26b37a02d55ce6c93385033a7712deadf706f132..2b9f75e5ae60493a623ffd8a73918c28118892c6 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistAppointmentServiceTest.java
+@@ -8,7 +8,6 @@ import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
+ import java.time.LocalDate;
+ import java.util.List;
+-import java.util.Set;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -143,17 +142,6 @@ class ChecklistAppointmentServiceTest {
+         then(appointmentRepository).shouldHaveNoInteractions();
+     }
+ 
+-    @Test
+-    @DisplayName("지정한 할 일 중 일정이 있는 할 일 ID를 한 번에 조회한다")
+-    void shouldFindScheduledChecklistItemIds() {
+-        given(appointmentRepository.findScheduledChecklistItemIds(List.of(10L, 11L)))
+-                .willReturn(Set.of(10L));
+-
+-        Set<Long> found = checklistAppointmentService.findScheduledChecklistItemIds(List.of(10L, 11L));
+-
+-        assertThat(found).containsExactly(10L);
+-    }
+-
+     @Test
+     @DisplayName("지정한 할 일들의 일정을 한 번에 조회한다")
+     void shouldFindAllAppointmentsByChecklistItemIds() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+index 32ba74aa930c4397795b77fda87912f5d8ab93a1..b6401ed1573c92bd40007b64dc410015ad2c015f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+@@ -17,6 +17,7 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentSummaryResult;
+ import com.bibbidi.wedding.catalog.service.CatalogService;
+ import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+ import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
++import com.bibbidi.wedding.checklist.domain.Appointment;
+ import com.bibbidi.wedding.checklist.domain.Checklist;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
+@@ -172,8 +173,8 @@ class ChecklistServiceTest {
+                 OWNER_ID,
+                 List.of(customItem, doneItem, catalogItem, scheduledItem)
+         ));
+-        given(checklistAppointmentService.findScheduledChecklistItemIds(List.of(200L, 202L, 203L)))
+-                .willReturn(Set.of(203L));
++        given(checklistAppointmentService.findAllByChecklistItemIds(List.of(200L, 202L, 203L)))
++                .willReturn(List.of(appointmentOf(scheduledItem)));
+         given(catalogService.findCategoryNames(Set.of(CATEGORY_ID)))
+                 .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀")));
+         given(shuffler.shuffle(List.of(customItem, catalogItem)))
+@@ -712,4 +713,19 @@ class ChecklistServiceTest {
+                 status
+         );
+     }
++
++    private static Appointment appointmentOf(ChecklistItem item) {
++        return new Appointment(
++                null,
++                item.id(),
++                "웨딩홀 투어",
++                java.time.LocalDate.of(2026, 10, 1),
++                null,
++                null,
++                null,
++                null,
++                false,
++                false
++        );
++    }
+ }

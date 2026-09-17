@@ -1,0 +1,14 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+index 2b64e58e3f4094e11a97659b82ce68fd2c85abfc..1ab97f97f082b449c89c002373bb85a088f6181f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+@@ -55,7 +55,8 @@ public class AppointmentController {
+             @Auth Long userId,
+             @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
+     ) {
+-        return appointmentService.findNearby(userId, limit, LocalDateTime.now()).stream()
++        LocalDateTime requestedAt = LocalDateTime.now();
++        return appointmentService.findNearby(userId, limit, requestedAt).stream()
+                 .map(NearbyAppointmentResponse::from)
+                 .toList();
+     }

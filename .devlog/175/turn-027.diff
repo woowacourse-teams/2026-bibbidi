@@ -1,0 +1,247 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
+index ac9382cf06efb183c367471d67a03bff21dfa934..d0b61d0c81c7cbbb68336b0d81577e61305879bf 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/AppointmentControllerIntegrationTest.java
+@@ -197,10 +197,10 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+         CreateAppointmentRequest request = new CreateAppointmentRequest(
+                 "웨딩홀 상담",
+                 LocalDate.of(2026, 9, 1),
+-                null,
+-                null,
+-                null,
+-                null
++                LocalDateTime.of(2026, 9, 1, 10, 0),
++                LocalDateTime.of(2026, 9, 1, 11, 0),
++                "웨딩홀",
++                "상담 준비"
+         );
+ 
+         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 999L)
+@@ -208,7 +208,22 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(convertToStringValue(request)))
+                 .andExpect(status().isNotFound())
+-                .andExpect(jsonPath("$.errorCode").value(304));
++                .andExpect(jsonPath("$.errorCode").value(304))
++                .andDo(document(
++                                "appointments-create-checklist-item-not-found",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("존재하지 않는 할 일에 일정 생성")
++                                        .description("존재하지 않는 할 일에 일정을 생성하려는 요청은 거절됩니다.")
++                                        .requestSchema(schema("CreateAppointmentRequest"))
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .pathParameters(parameterWithName("checklistItemId").description("체크리스트 할 일 ID"))
++                                        .requestFields(requestFields())
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -413,10 +428,10 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+         UpdateAppointmentRequest request = new UpdateAppointmentRequest(
+                 "updated title",
+                 LocalDate.of(2026, 10, 1),
+-                null,
+-                null,
+-                null,
+-                null
++                LocalDateTime.of(2026, 10, 1, 10, 0),
++                LocalDateTime.of(2026, 10, 1, 11, 0),
++                "updated place",
++                "updated memo"
+         );
+ 
+         mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
+@@ -424,7 +439,22 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(convertToStringValue(request)))
+                 .andExpect(status().isForbidden())
+-                .andExpect(jsonPath("$.errorCode").value(203));
++                .andExpect(jsonPath("$.errorCode").value(203))
++                .andDo(document(
++                                "appointments-update-forbidden",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("다른 사용자의 일정 수정")
++                                        .description("다른 사용자가 소유한 일정의 수정 요청은 거절됩니다.")
++                                        .requestSchema(schema("UpdateAppointmentRequest"))
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .requestFields(requestFields())
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -541,7 +571,20 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(jsonPath("$.id").value(appointmentId))
+                 .andExpect(jsonPath("$.isDone").value(true))
+                 .andExpect(jsonPath("$.checklistItemId").value(1L))
+-                .andExpect(jsonPath("$.checklistItemDone").value(false));
++                .andExpect(jsonPath("$.checklistItemDone").value(false))
++                .andDo(document(
++                                "appointments-completion-complete",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("일정 완료")
++                                        .description("일정을 완료 상태로 변경합니다.")
++                                        .responseSchema(schema("AppointmentCompletionResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .responseFields(completionResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -557,7 +600,20 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                                 false)))
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.isDone").value(false))
+-                .andExpect(jsonPath("$.checklistItemDone").value(false));
++                .andExpect(jsonPath("$.checklistItemDone").value(false))
++                .andDo(document(
++                                "appointments-completion-reopen",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("일정 완료 취소")
++                                        .description("완료된 일정을 미완료 상태로 변경하고 완료된 할 일을 다시 엽니다.")
++                                        .responseSchema(schema("AppointmentCompletionResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .responseFields(completionResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -571,6 +627,32 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(status().isUnauthorized());
+     }
+ 
++    @Test
++    @DisplayName("다른 사용자의 일정 완료 상태 변경 요청은 거절한다")
++    void shouldRejectChangingCompletionWhenUserDoesNotOwnChecklistItem() throws Exception {
++        Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
++
++        mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
++                        .session(sessionOf(2L))
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(true)))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.errorCode").value(203))
++                .andDo(document(
++                                "appointments-completion-forbidden",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("다른 사용자의 일정 완료 상태 변경")
++                                        .description("다른 사용자가 소유한 일정의 완료 상태 변경 요청은 거절됩니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
++    }
++
+     @Test
+     @DisplayName("존재하지 않는 일정의 완료 변경 요청을 거절한다")
+     void shouldRejectWhenAppointmentDoesNotExist() throws Exception {
+@@ -578,7 +660,21 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .session(authenticatedSession())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(true)))
+-                .andExpect(status().isNotFound());
++                .andExpect(status().isNotFound())
++                .andExpect(jsonPath("$.errorCode").value(302))
++                .andDo(document(
++                                "appointments-completion-not-found",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("존재하지 않는 일정 완료 상태 변경")
++                                        .description("존재하지 않는 일정의 완료 상태 변경 요청은 거절됩니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -590,7 +686,21 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .session(authenticatedSession())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content("{}"))
+-                .andExpect(status().isBadRequest());
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101))
++                .andDo(document(
++                                "appointments-completion-invalid-request",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("잘못된 일정 완료 상태 변경 요청")
++                                        .description("완료 여부가 Boolean 값이 아니면 요청은 거절됩니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .pathParameters(parameterWithName("appointmentId").description("일정 ID"))
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -644,7 +754,24 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+         mockMvc.perform(get("/api/appointments/me/nearby")
+                         .session(authenticatedSession())
+                         .param("limit", "21"))
+-                .andExpect(status().isBadRequest());
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errorCode").value(101))
++                .andDo(document(
++                                "appointments-nearby-invalid-limit",
++                                resource(ResourceSnippetParameters.builder()
++                                        .tag("Appointment")
++                                        .summary("잘못된 가까운 일정 조회 개수")
++                                        .description("limit이 허용 범위를 벗어나면 요청은 거절됩니다.")
++                                        .responseSchema(schema("ErrorResponse"))
++                                        .queryParameters(
++                                                parameterWithName("limit")
++                                                        .description("조회할 최대 개수 (1 이상 20 이하)")
++                                        )
++                                        .responseFields(errorResponseFields())
++                                        .build()
++                                )
++                        )
++                );
+     }
+ 
+     @Test
+@@ -793,6 +920,15 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+         };
+     }
+ 
++    private static FieldDescriptor[] completionResponseFields() {
++        return new FieldDescriptor[]{
++                fieldWithPath("id").description("일정 ID"),
++                fieldWithPath("isDone").description("일정 완료 여부"),
++                fieldWithPath("checklistItemId").description("체크리스트 할 일 ID"),
++                fieldWithPath("checklistItemDone").description("체크리스트 할 일 완료 여부")
++        };
++    }
++
+     private static FieldDescriptor[] errorResponseFields() {
+         return new FieldDescriptor[]{
+                 fieldWithPath("errorCode").description("오류 코드"),

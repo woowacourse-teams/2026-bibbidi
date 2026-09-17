@@ -1,0 +1,40 @@
+package com.bibbidi.wedding.checklist.repository;
+
+import com.bibbidi.wedding.checklist.domain.Appointment;
+import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
+import java.time.LocalDateTime;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AppointmentMapper {
+
+    public JpaAppointmentEntity toEntity(Appointment appointment) {
+        return new JpaAppointmentEntity(
+                appointment.id(),
+                appointment.checklistItemId(),
+                appointment.title(),
+                appointment.date(),
+                appointment.startTime(),
+                appointment.endTime(),
+                appointment.place(),
+                appointment.memo(),
+                appointment.isDone(),
+                appointment.doneByChecklistItem()
+        );
+    }
+
+    public Appointment toDomain(JpaAppointmentEntity entity) {
+        return new Appointment(
+                entity.id(),
+                entity.checklistItemId(),
+                entity.title(),
+                entity.date(),
+                entity.startTime(),
+                entity.endTime(),
+                entity.place(),
+                entity.memo(),
+                entity.isDone(),
+                entity.doneByChecklistItem()
+        );
+    }
+}

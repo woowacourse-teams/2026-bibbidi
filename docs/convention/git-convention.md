@@ -46,34 +46,48 @@ release-app ──┘
 - `docs`: 문서 변경
 - `chore`: 인프라 및 유지보수 작업
 
-브랜치 식별자는 Notion 액션 아이템에서 발급한 Task ID를 사용한다.
+브랜치 식별자는 GitHub Issue ID를 사용한다.
 
 ```text
-{prefix}/{task-id}
+{prefix}/{issue-id}
 
-예시: feature/TSK-001
+예시: feature/201
 ```
 
-## 작은 TSK와 짧은 브랜치
+## Issue와 PR Type Label
 
-- TSK 하나당 PR 하나를 만든다.
-- 예상 리뷰 시간은 30분 이하로 유지한다.
-- TSK 구현 시간은 1일 이내를 목표로 한다.
+- 모든 Issue와 PR은 다음 `type:*` Label 중 정확히 하나를 사용한다.
+  - `feature` Branch → `type: feature`
+  - `fix` Branch → `type: fix`
+  - `hotfix` Branch → `type: hotfix`
+  - `chore` Branch → `type: chore`
+  - `docs` Branch → `type: docs`
+- Coding Agent가 Issue를 생성할 때 Type Label이 없거나 둘 이상이면 생성을 차단한다.
+- Coding Agent가 PR을 생성할 때 Head Branch Prefix와 Issue의 Type Label이 다르면 생성을 차단한다.
+- Coding Agent가 만드는 PR에는 Head Branch Prefix에 해당하는 Type Label을 자동으로 추가한다.
+- GitHub UI에서 사람이 Issue나 PR을 만들 때는 Template 안내에 따라 Type Label을 직접 선택한다.
+- Label 강제 Gate는 Coding Agent에만 적용하며 사람의 GitHub UI 작업을 GitHub Action으로 차단하지 않는다.
+
+## 작은 Issue와 짧은 브랜치
+
+- Issue 하나당 PR 하나를 만든다.
+- 예상 리뷰 시간은 20분 이하로 유지한다.
+- Issue 구현은 당일 구현을 목표로 한다.
 - 핵심 변경 코드는 200줄 이하를 권장한다.
 - 핵심 변경 파일은 5개 이하를 권장한다.
 - 핵심 변경 코드 350줄 초과, 변경 파일 10개 초과, 리뷰 60분 초과, 구현 2일 이상은 작업 분할을 검토한다.
 - 테스트 코드와 단순 변수명 변경은 변경량 판단에서 제외한다.
 
-TSK는 기술 계층이 아니라 사용자 스토리를 기준으로 분리한다. 하나의 사용자 스토리가 BE·FE·APP 모두에 영향을 주면 분야별 TSK로 나눈다.
+Issue는 기술 계층이 아니라 사용자 스토리를 기준으로 분리한다. 하나의 사용자 스토리가 BE·FE·APP 모두에 영향을 주면 분야별 Issue로 나눈다.
 
 ```text
 User Story
-├── TSK-201 · BE
-├── TSK-202 · FE
-└── TSK-203 · APP
+├── #201 · BE
+├── #202 · FE
+└── #203 · APP
 ```
 
-Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기준으로 TSK를 나누지 않는다.
+Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기준으로 Issue를 나누지 않는다.
 
 ## PR 및 병합
 
@@ -82,11 +96,11 @@ Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기�
 ```text
 release-be
     │
-    ├── feature/TSK-201
+    ├── feature/201
     │        │
     │        └── PR → Squash Merge
     │
-    └── feature/TSK-202
+    └── feature/202
              │
              └── PR → Squash Merge
                          │
@@ -99,10 +113,10 @@ release-be
 
 ### PR 제목
 
-- 작업 브랜치에서 `release-*`로 제출하는 PR 제목에는 Task ID를 포함한다.
+- 작업 브랜치에서 `release-*`로 제출하는 PR 제목에는 GitHub Issue ID를 포함한다.
 
 ```text
-[TSK-201] 할 일 완료 API 구현
+[#201] 할 일 완료 API 구현
 ```
 
 - `release-*`에서 `main`으로 병합할 때는 BE·APP·FE 버전을 제목에 명시한다.
@@ -118,14 +132,14 @@ BE v1.3.0 / APP v1.2.0 / FE v1.4.0
 - Squash Merge가 완료된 작업 브랜치는 삭제한다.
 
 ```text
-feature/TSK-201
+feature/201
   ├── commit A
   ├── commit B
   └── commit C
          │ Squash Merge
          ▼
 release-be
-  └── [TSK-201] 하나의 커밋
+  └── [#201] 하나의 커밋
          │ Merge Commit
          ▼
 main
@@ -149,7 +163,7 @@ main
 - APP은 Store 배포를 수동으로 진행한다.
 
 ```text
-feature/TSK-201
+feature/201
     │
     └── PR → release-be
                    │
@@ -164,12 +178,12 @@ feature/TSK-201
 - 운영 장애 대응도 PR과 Squash Merge를 거친다.
 
 ```text
-release-be → hotfix/TSK-301 → PR → Squash Merge → release-be
+release-be → hotfix/301 → PR → Squash Merge → release-be
 ```
 
 ### 롤백
 
 - 이전 정상 Artifact 또는 배포 버전으로 되돌릴 수 있으면 해당 버전으로 Rollback한다.
 - 코드 자체를 되돌려야 하면 문제가 된 Squash Commit을 Revert한다.
-- 추가 수정이 필요하면 새 Task ID를 발급받아 별도 작업으로 진행한다.
+- 추가 수정이 필요하면 새 GitHub Issue를 발급받아 별도 작업으로 진행한다.
 - Rollback과 Fix를 하나의 변경으로 섞지 않는다.

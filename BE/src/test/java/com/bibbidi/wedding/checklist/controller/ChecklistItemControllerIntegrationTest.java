@@ -1,0 +1,754 @@
+package com.bibbidi.wedding.checklist.controller;
+
+import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+import static com.epages.restdocs.apispec.Schema.schema;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlMergeMode;
+import tools.jackson.databind.ObjectMapper;
+
+@Sql("/checklist-item-fixture.sql")
+@SqlMergeMode(SqlMergeMode.MergeMode.MERGE)
+class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
+
+    private static final String CHANGE_CATEGORY_URL = "/api/checklist-items/{itemId}/category";
+    private static final String CHANGE_TITLE_URL = "/api/checklist-items/{itemId}/title";
+    private static final String DELETE_ITEM_URL = "/api/checklist-items/{itemId}";
+    private static final String REMAINING_APPOINTMENTS_URL = "/api/checklist-items/{itemId}/remaining-appointments";
+    private static final String CHANGE_STATUS_URL = "/api/checklist-items/{itemId}/status";
+    private static final Long USER_ID = 7L;
+    private static final Long CUSTOM_ITEM_ID = 500L;
+    private static final Long CATALOG_SOURCED_ITEM_ID = 501L;
+    private static final Long DONE_CUSTOM_ITEM_ID = 502L;
+    private static final Long OTHER_USERS_ITEM_ID = 503L;
+    private static final Long CONTINUE_CUSTOM_ITEM_ID = 504L;
+    private static final Long ALL_APPOINTMENTS_DONE_ITEM_ID = 505L;
+    private static final Long DONE_BY_CHECKLIST_ITEM_ID = 506L;
+    private static final Long CURRENT_CATEGORY_ID = 2L;
+    private static final Long NEW_CATEGORY_ID = 3L;
+    private static final String NEW_TITLE = "청첩장 문구 최종 확정";
+
+    private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
+    private static final String SESSION_COOKIE_DESCRIPTION =
+            "로그인 시 발급된 JSESSIONID Session Cookie";
+    private static final String CHANGE_CATEGORY_SUMMARY = "직접 만든 할 일의 카테고리 변경";
+    private static final String CHANGE_CATEGORY_DESCRIPTION =
+            "직접 만든 할 일의 카테고리만 바꿉니다. 제목과 완료 상태, 연결된 일정은 그대로 유지합니다. "
+                    + "준비 목록에서 추가한 할 일은 원본과 카테고리가 어긋나므로 변경할 수 없습니다.";
+    private static final String CHANGE_TITLE_SUMMARY = "직접 만든 할 일의 제목 변경";
+    private static final String CHANGE_TITLE_DESCRIPTION =
+            "직접 만든 할 일의 제목만 바꿉니다. 카테고리와 완료 상태, 연결된 일정은 그대로 유지합니다. "
+                    + "준비 목록에서 추가한 할 일은 원본 제목을 따라야 하므로 변경할 수 없습니다.";
+    private static final String CHANGE_STATUS_SUMMARY = "할 일 상태 변경";
+    private static final String CHANGE_STATUS_DESCRIPTION =
+            "할 일의 상태를 prev(시작 전), continue(진행 중), done(완료) 중 하나로 바꿉니다. "
+                    + "done 으로 바꾸면 그 할 일에 남아 있던 미완료 일정도 함께 완료하고, "
+                    + "이미 따로 완료한 일정은 그대로 둡니다. "
+                    + "done 이 아닌 상태로 바꾸면 할 일 완료 때문에 함께 완료됐던 일정만 되돌립니다.";
+    private static final String REMAINING_APPOINTMENTS_SUMMARY = "할 일에 남은 일정 확인";
+    private static final String REMAINING_APPOINTMENTS_DESCRIPTION =
+            "할 일에 아직 완료하지 않은 일정이 남아 있는지 알려줍니다. "
+                    + "이미 완료한 일정은 세지 않으므로, 일정이 있어도 모두 완료했다면 false 입니다.";
+    private static final String DELETE_ITEM_SUMMARY = "미완료 할 일 삭제";
+    private static final String DELETE_ITEM_DESCRIPTION =
+            "자신이 소유한 미완료 할 일과 연결된 일정을 함께 삭제합니다. "
+                    + "완료된 할 일은 삭제할 수 없고, 이미 없는 할 일은 삭제된 것으로 처리합니다.";
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private static MockHttpSession authenticatedSession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, USER_ID);
+        return session;
+    }
+
+    private String requestBody(Long categoryId) {
+        return objectMapper.writeValueAsString(categoryId);
+    }
+
+    private String statusRequestBody(String status) {
+        return status == null ? "" : status;
+    }
+
+    private String titleRequestBody(String title) {
+        return title == null ? "" : title;
+    }
+
+    @Test
+    @DisplayName("할 일을 완료하면 남아 있던 일정도 함께 완료된다")
+    void shouldCompleteItemAndRemainingAppointments() throws Exception {
+        // when
+        mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("done")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CUSTOM_ITEM_ID))
+                .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
+                .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
+                .andExpect(jsonPath("$.status").value("done"))
+                .andDo(document(
+                                "checklist-items-change-status",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CHANGE_STATUS_SUMMARY)
+                                        .description(CHANGE_STATUS_DESCRIPTION
+                                                + " 요청 본문은 바꿀 상태(prev, continue, done 중 하나, 대소문자 구분 없음)를 나타내는 문자열 하나입니다.")
+                                        .responseSchema(schema("ChecklistItemResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .pathParameters(
+                                                parameterWithName("itemId").description("상태를 바꿀 할 일 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("id").description("할 일 ID"),
+                                                fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
+                                                fieldWithPath("categoryId").description("할 일 카테고리 ID"),
+                                                fieldWithPath("title").description("할 일 제목"),
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                        )
+                                        .build())
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("할 일을 시작 전으로 되돌리면 할 일 때문에 완료됐던 일정도 함께 되돌린다")
+    void shouldReopenAppointmentsCompletedByChecklistItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("prev")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("prev"));
+    }
+
+    @Test
+    @DisplayName("할 일을 진행 중으로 바꿔도 할 일 때문에 완료됐던 일정은 되돌린다")
+    void shouldReopenAppointmentsWhenItemBecomesInProgress() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("continue")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("continue"));
+    }
+
+    @Test
+    @DisplayName("status 를 보내지 않으면 할 일의 상태를 바꿀 수 없다")
+    void shouldRejectStatusChangeWhenStatusIsMissing() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody(null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("없는 상태 값을 보내면 할 일의 상태를 바꿀 수 없다")
+    void shouldRejectStatusChangeWhenStatusIsUnknown() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"FINISHED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 상태를 바꿀 수 없다")
+    void shouldRejectStatusChangeForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("done")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 상태를 바꿀 수 없다")
+    void shouldRejectStatusChangeWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, 9999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("done")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 할 일의 상태를 바꿀 수 없다")
+    void shouldRequireAuthenticationToChangeStatus() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("done")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("완료하지 않은 일정이 남아 있으면 남은 일정이 있다고 응답한다")
+    void shouldReportRemainingAppointmentsWhenAppointmentIsNotDone() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(true))
+                .andDo(document(
+                        "checklist-items-remaining-appointments",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(REMAINING_APPOINTMENTS_SUMMARY)
+                                .description(REMAINING_APPOINTMENTS_DESCRIPTION
+                                        + " 응답 본문은 완료하지 않은 일정이 남아 있는지 여부를 나타내는 boolean 값 하나입니다.")
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("남은 일정을 확인할 할 일 ID")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("일정을 모두 완료한 할 일은 남은 일정이 없다고 응답한다")
+    void shouldReportNoRemainingAppointmentsWhenEveryAppointmentIsDone() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(false));
+    }
+
+    @Test
+    @Sql(statements = "DELETE FROM appointments WHERE checklist_item_id = 500")
+    @DisplayName("Reports no remaining appointments when item has no appointments")
+    void shouldReportNoRemainingAppointmentsWhenItemHasNoAppointment() throws Exception {
+
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(false));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 남은 일정을 확인할 수 없다")
+    void shouldRejectRemainingAppointmentsLookupForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 남은 일정을 확인할 수 없다")
+    void shouldRejectRemainingAppointmentsLookupWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 남은 일정을 확인할 수 없다")
+    void shouldRequireAuthenticationToLookUpRemainingAppointments() throws Exception {
+        // when, then
+        mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("직접 만든 할 일의 카테고리를 변경한다")
+    void shouldChangeCategoryOfCustomItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CUSTOM_ITEM_ID))
+                .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
+                .andExpect(jsonPath("$.categoryId").value(NEW_CATEGORY_ID))
+                .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
+                .andExpect(jsonPath("$.status").value("prev"))
+                .andDo(document(
+                        "checklist-items-change-category",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(CHANGE_CATEGORY_SUMMARY)
+                                .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
+                                .responseSchema(schema("ChecklistItemResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("카테고리를 바꿀 할 일 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("id").description("할 일 ID"),
+                                        fieldWithPath("catalogItemId")
+                                                .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
+                                        fieldWithPath("categoryId").description("변경된 카테고리 ID"),
+                                        fieldWithPath("title").description("할 일 제목"),
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("완료한 할 일도 카테고리를 변경할 수 있고 제목과 완료 상태는 그대로다")
+    void shouldChangeCategoryOfDoneItemAndKeepOtherInformation() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, DONE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryId").value(NEW_CATEGORY_ID))
+                .andExpect(jsonPath("$.title").value("식순 정하기"))
+                .andExpect(jsonPath("$.status").value("done"));
+    }
+
+    @Test
+    @DisplayName("이미 그 카테고리인 할 일도 그대로 변경에 성공한다")
+    void shouldAcceptChangeToSameCategory() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(CURRENT_CATEGORY_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID));
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없다")
+    void shouldRejectChangeForItemAddedFromCatalog() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CATALOG_SOURCED_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value(404))
+                .andExpect(jsonPath("$.message").value("준비 목록에서 추가한 할 일은 카테고리를 변경할 수 없습니다."))
+                .andDo(document(
+                        "checklist-items-change-category-not-changeable",
+                        resource(ResourceSnippetParameters.builder()
+                                .tag("Checklist")
+                                .summary(CHANGE_CATEGORY_SUMMARY)
+                                .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
+                                .responseSchema(schema("ErrorResponse"))
+                                .requestHeaders(
+                                        headerWithName(HttpHeaders.COOKIE)
+                                                .description(SESSION_COOKIE_DESCRIPTION)
+                                )
+                                .pathParameters(
+                                        parameterWithName("itemId").description("카테고리를 바꿀 할 일 ID")
+                                )
+                                .responseFields(
+                                        fieldWithPath("errorCode").description("오류 코드"),
+                                        fieldWithPath("message").description("오류 메시지")
+                                )
+                                .build())
+                ));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 카테고리를 변경할 수 없다")
+    void shouldRejectChangeForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 카테고리를 변경할 수 없다")
+    void shouldRejectChangeWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, 9999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("준비 목록에 없는 카테고리로는 변경할 수 없다")
+    void shouldRejectChangeWhenCategoryDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(999L)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(305))
+                .andExpect(jsonPath("$.message").value("카테고리를 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("카테고리를 지정하지 않으면 변경할 수 없다")
+    void shouldRejectChangeWhenCategoryIsMissing() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 카테고리를 변경할 수 없다")
+    void shouldRequireAuthenticationToChangeCategory() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("직접 만든 할 일의 제목을 변경한다")
+    void shouldChangeTitleOfCustomItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CUSTOM_ITEM_ID))
+                .andExpect(jsonPath("$.catalogItemId").value(nullValue()))
+                .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
+                .andExpect(jsonPath("$.title").value(NEW_TITLE))
+                .andExpect(jsonPath("$.status").value("prev"))
+                .andDo(document(
+                                "checklist-items-change-title",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CHANGE_TITLE_SUMMARY)
+                                        .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다. 공백만 보낼 수 없고 50자를 넘을 수 없습니다.")
+                                        .responseSchema(schema("ChecklistItemResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .pathParameters(
+                                                parameterWithName("itemId").description("제목을 바꿀 할 일 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("id").description("할 일 ID"),
+                                                fieldWithPath("catalogItemId")
+                                                        .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
+                                                fieldWithPath("categoryId").description("할 일 카테고리 ID"),
+                                                fieldWithPath("title").description("변경된 할 일 제목"),
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                        )
+                                        .build())
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("완료한 할 일도 제목을 변경할 수 있고 카테고리와 완료 상태는 그대로다")
+    void shouldChangeTitleOfDoneItemAndKeepOtherInformation() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, DONE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(NEW_TITLE))
+                .andExpect(jsonPath("$.categoryId").value(CURRENT_CATEGORY_ID))
+                .andExpect(jsonPath("$.status").value("done"));
+    }
+
+    @Test
+    @DisplayName("이미 그 제목인 할 일도 그대로 변경에 성공한다")
+    void shouldAcceptChangeToSameTitle() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody("청첩장 문구 정하기")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"));
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 추가한 할 일은 제목을 변경할 수 없다")
+    void shouldRejectTitleChangeForItemAddedFromCatalog() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CATALOG_SOURCED_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value(405))
+                .andExpect(jsonPath("$.message").value("준비 목록에서 추가한 할 일은 제목을 변경할 수 없습니다."))
+                .andDo(document(
+                                "checklist-items-change-title-not-changeable",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(CHANGE_TITLE_SUMMARY)
+                                        .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다.")
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .pathParameters(
+                                                parameterWithName("itemId").description("제목을 바꿀 할 일 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build())
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("제목 변경이 거절되어도 원본 준비 항목의 제목은 그대로다")
+    void shouldKeepSourceCatalogItemTitleWhenTitleChangeIsRejected() throws Exception {
+        // when
+        mockMvc.perform(put(CHANGE_TITLE_URL, CATALOG_SOURCED_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 제목을 변경할 수 없다")
+    void shouldRejectTitleChangeForOtherUsersItem() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 제목을 변경할 수 없다")
+    void shouldRejectTitleChangeWhenItemDoesNotExist() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, 9999L)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(304))
+                .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("공백만 있는 제목으로는 변경할 수 없다")
+    void shouldRejectTitleChangeWhenTitleIsBlank() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody("   ")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("50자를 넘는 제목으로는 변경할 수 없다")
+    void shouldRejectTitleChangeWhenTitleIsTooLong() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody("가".repeat(51))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(101));
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 제목을 변경할 수 없다")
+    void shouldRequireAuthenticationToChangeTitle() throws Exception {
+        // when, then
+        mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("미완료 할 일과 연결된 일정을 함께 삭제한다")
+    void shouldDeleteIncompleteItemAndAppointments() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isNoContent())
+                .andDo(document(
+                                "checklist-items-delete",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(DELETE_ITEM_SUMMARY)
+                                        .description(DELETE_ITEM_DESCRIPTION)
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .pathParameters(
+                                                parameterWithName("itemId").description("삭제할 미완료 할 일 ID")
+                                        )
+                                        .build())
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("진행 중인 할 일과 연결된 일정도 함께 삭제한다")
+    void shouldDeleteContinueItemAndAppointments() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CONTINUE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("준비 목록에서 가져온 미완료 할 일은 삭제하지만 원본 준비 항목은 유지한다")
+    void shouldDeleteCatalogSourcedItemAndKeepCatalogItem() throws Exception {
+        // when
+        mockMvc.perform(delete(DELETE_ITEM_URL, CATALOG_SOURCED_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("완료된 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemIsDone() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, DONE_CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value(406))
+                .andExpect(jsonPath("$.message").value("완료된 할 일은 삭제할 수 없습니다."))
+                .andDo(document(
+                                "checklist-items-delete-completed",
+                                resource(ResourceSnippetParameters.builder()
+                                        .tag("Checklist")
+                                        .summary(DELETE_ITEM_SUMMARY)
+                                        .description(DELETE_ITEM_DESCRIPTION)
+                                        .responseSchema(schema("ErrorResponse"))
+                                        .requestHeaders(
+                                                headerWithName(HttpHeaders.COOKIE)
+                                                        .description(SESSION_COOKIE_DESCRIPTION)
+                                        )
+                                        .pathParameters(
+                                                parameterWithName("itemId").description("삭제할 할 일 ID")
+                                        )
+                                        .responseFields(
+                                                fieldWithPath("errorCode").description("오류 코드"),
+                                                fieldWithPath("message").description("오류 메시지")
+                                        )
+                                        .build())
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 할 일은 삭제할 수 없다")
+    void shouldRejectDeletionWhenItemBelongsToAnotherUser() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, OTHER_USERS_ITEM_ID)
+                        .session(authenticatedSession()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(203))
+                .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
+    }
+
+    @Test
+    @DisplayName("없는 할 일은 이미 삭제된 것으로 처리한다")
+    void shouldTreatMissingItemAsAlreadyDeleted() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
+                        .session(authenticatedSession()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("인증 Session이 없으면 할 일을 삭제할 수 없다")
+    void shouldRequireAuthenticationToDeleteItem() throws Exception {
+        // when, then
+        mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+    }
+}
