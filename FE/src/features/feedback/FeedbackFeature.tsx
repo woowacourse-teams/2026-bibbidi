@@ -69,7 +69,7 @@ export function FeedbackFeature() {
     setSentiment,
     submit,
     triggerButtonRef,
-  } = useFeedbackForm();
+  } = useFeedbackForm({ isMobile });
 
   return (
     <>

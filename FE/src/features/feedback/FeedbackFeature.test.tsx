@@ -25,9 +25,9 @@ beforeEach(() => {
 function setMobileViewport(matches: boolean) {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
-    value: () => ({
+    value: (query: string) => ({
       addEventListener: () => undefined,
-      matches,
+      matches: query === "(max-width: 760px)" ? matches : false,
       removeEventListener: () => undefined,
     }),
   });
@@ -179,22 +179,107 @@ describe("FeedbackFeature", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("모바일에서는 Bottom Sheet를 열고 배경 스크롤을 잠근다", () => {
+  it("모바일에서는 Bottom Sheet를 열고 닫기 애니메이션 뒤 포커스를 돌려준다", () => {
     setMobileViewport(true);
     render(<FeedbackFeature />);
     openFeedback();
 
-    expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
+    const dialog = screen.getByRole("dialog");
+    const dragHandle = within(dialog).getByRole("button", {
+      name: "아래로 밀어 피드백 창 닫기",
+    });
+
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement).toBe(dragHandle);
+    expect(
+      within(dialog).queryByRole("button", { name: "피드백 창 닫기" }),
+    ).toBeNull();
     expect(document.body.style.overflow).toBe("hidden");
 
     fireEvent.click(
       screen.getAllByRole("button", { name: "피드백 창 닫기" })[0],
     );
 
+    expect(dialog.parentElement?.className).toContain(
+      "bottom-sheet-dismiss--closing",
+    );
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.body.style.overflow).toBe("");
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "의견 보내기" }),
     );
+  });
+
+  it("모바일 Bottom Sheet의 핸들을 충분히 아래로 드래그하면 닫는다", () => {
+    setMobileViewport(true);
+    render(<FeedbackFeature />);
+    openFeedback();
+
+    const dialog = screen.getByRole("dialog");
+    const dragHandle = within(dialog).getByRole("button", {
+      name: "아래로 밀어 피드백 창 닫기",
+    });
+
+    fireEvent.pointerDown(dragHandle, {
+      button: 0,
+      clientY: 20,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(dragHandle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(dragHandle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    expect(dialog.parentElement?.className).toContain(
+      "bottom-sheet-dismiss--closing",
+    );
+    fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("모바일에서 전송 중에는 바텀시트를 닫거나 드래그할 수 없다", async () => {
+    let resolveRequest: (() => void) | undefined;
+    createFeedbackMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    setMobileViewport(true);
+    render(<FeedbackFeature />);
+    openFeedback();
+
+    fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+    fireEvent.click(getSubmitButton());
+
+    const dialog = screen.getByRole("dialog");
+    const dragHandle = await within(dialog).findByRole("button", {
+      name: "아래로 밀어 피드백 창 닫기",
+    });
+    expect((dragHandle as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "피드백 창 닫기" })[0],
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(dialog.parentElement?.className).not.toContain(
+      "bottom-sheet-dismiss--closing",
+    );
+
+    resolveRequest?.();
+    await screen.findByText("소중한 의견을 보내주셔서 감사해요.");
   });
 });

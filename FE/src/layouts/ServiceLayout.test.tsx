@@ -739,8 +739,11 @@ describe("ServiceLayout", () => {
       name: "체크리스트 항목 10",
     });
     fireEvent.click(
-      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
+      document.querySelector(
+        ".checklist-detail-bottom-sheet__scrim",
+      ) as HTMLButtonElement,
     );
+    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
 
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist",

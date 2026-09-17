@@ -1,0 +1,77 @@
+.bottom-sheet-dismiss {
+  --bottom-sheet-drag-offset: 0px;
+  --bottom-sheet-scrim-opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .bottom-sheet-dismiss__scrim {
+    opacity: var(--bottom-sheet-scrim-opacity);
+    transition: opacity 220ms ease-out;
+  }
+
+  .bottom-sheet-dismiss__dialog {
+    transform: translateY(var(--bottom-sheet-drag-offset));
+    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+  }
+
+  .bottom-sheet-dismiss__handle-area {
+    display: flex;
+    width: 100%;
+    height: 16px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .bottom-sheet-dismiss__handle-area:active {
+    cursor: grabbing;
+  }
+
+  .bottom-sheet-dismiss__handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-stroke-neutral-weak);
+  }
+
+  .bottom-sheet-dismiss__handle-area:focus-visible {
+    outline: none;
+  }
+
+  .bottom-sheet-dismiss__handle-area:focus-visible
+    .bottom-sheet-dismiss__handle,
+  .bottom-sheet-dismiss__scrim:focus-visible {
+    outline: 3px solid var(--color-stroke-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .bottom-sheet-dismiss--dragging .bottom-sheet-dismiss__dialog,
+  .bottom-sheet-dismiss--dragging .bottom-sheet-dismiss__scrim {
+    transition: none;
+  }
+
+  .bottom-sheet-dismiss--closing {
+    pointer-events: none;
+  }
+
+  .bottom-sheet-dismiss--closing .bottom-sheet-dismiss__dialog {
+    transform: translateY(100%);
+  }
+
+  .bottom-sheet-dismiss--closing .bottom-sheet-dismiss__scrim {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .bottom-sheet-dismiss__dialog,
+  .bottom-sheet-dismiss__scrim {
+    transition-duration: 0.01ms;
+  }
+}

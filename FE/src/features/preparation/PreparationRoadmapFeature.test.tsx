@@ -1035,20 +1035,32 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     const firstDetail = screen.getByRole("dialog", {
       name: "웨딩홀 투어와 계약",
     });
-    const closeButton = within(firstDetail).getByRole("button", {
-      name: "단계 상세 닫기",
+    const dragHandle = within(firstDetail).getByRole("button", {
+      name: "아래로 밀어 단계 상세 닫기",
     });
     const scrollContainer = document.querySelector<HTMLElement>(
       "[data-page-scroll-container]",
     );
 
     expect(firstDetail).toBeTruthy();
-    expect(document.activeElement).toBe(closeButton);
+    expect(document.activeElement).toBe(dragHandle);
+    expect(
+      within(firstDetail).queryByRole("button", {
+        name: "단계 상세 닫기",
+      }),
+    ).toBeNull();
     expect(document.body.style.overflow).toBe("hidden");
     expect(scrollContainer?.style.overflow).toBe("hidden");
     expect(firstStepButton).toBeTruthy();
 
     fireEvent.keyDown(firstDetail, { key: "Escape" });
+
+    expect(firstDetail.parentElement?.className).toContain(
+      "bottom-sheet-dismiss--closing",
+    );
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.transitionEnd(firstDetail, { propertyName: "transform" });
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(firstStepButton);
@@ -1056,7 +1068,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(scrollContainer?.style.overflow).toBe("");
   });
 
-  it("모바일 바텀시트를 스크림과 닫기 버튼으로 닫는다", async () => {
+  it("모바일 바텀시트를 스크림과 드래그 핸들로 닫는다", async () => {
     setViewportMatches();
     await renderFeature();
     const stepButton = screen.getByRole("button", {
@@ -1067,14 +1079,38 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     fireEvent.click(
       screen.getAllByRole("button", { name: "단계 상세 닫기" })[0],
     );
+    const firstDetail = screen.getByRole("dialog");
+    expect(firstDetail.parentElement?.className).toContain(
+      "bottom-sheet-dismiss--closing",
+    );
+    fireEvent.transitionEnd(firstDetail, { propertyName: "transform" });
     expect(screen.queryByRole("dialog")).toBeNull();
 
     fireEvent.click(stepButton);
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "단계 상세 닫기",
-      }),
+    const secondDetail = screen.getByRole("dialog");
+    const dragHandle = within(secondDetail).getByRole("button", {
+      name: "아래로 밀어 단계 상세 닫기",
+    });
+    fireEvent.pointerDown(dragHandle, {
+      button: 0,
+      clientY: 20,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(dragHandle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(dragHandle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    expect(secondDetail.parentElement?.className).toContain(
+      "bottom-sheet-dismiss--closing",
     );
+    fireEvent.transitionEnd(secondDetail, { propertyName: "transform" });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

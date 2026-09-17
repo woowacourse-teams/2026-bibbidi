@@ -479,11 +479,16 @@ describe("Checklist 웹 상세 패널", () => {
     expect(bottomSheet.getAttribute("aria-modal")).toBe("true");
     expect(within(bottomSheet).getByText("예식장")).toBeTruthy();
     expect(within(bottomSheet).getByText("계약 조건 확인")).toBeTruthy();
-    expect(
+    expect(document.activeElement).toBe(
       within(bottomSheet).getByRole("button", {
+        name: "아래로 밀어 할 일 상세 닫기",
+      }),
+    );
+    expect(
+      within(bottomSheet).queryByRole("button", {
         name: "할 일 상세 닫기",
       }),
-    ).toBe(document.activeElement);
+    ).toBeNull();
 
     const background = document.querySelector(".checklist-workspace__main");
     const scrollContainer = container.querySelector<HTMLElement>(
@@ -494,31 +499,132 @@ describe("Checklist 웹 상세 패널", () => {
     expect(document.body.style.overflow).toBe("hidden");
     expect(scrollContainer?.style.overflow).toBe("hidden");
 
-    fireEvent.click(
-      within(bottomSheet).getByRole("button", {
-        name: "할 일 상세 닫기",
-      }),
+    fireEvent.keyDown(bottomSheet, { key: "Escape" });
+
+    expect(
+      bottomSheet.closest(".checklist-detail-bottom-sheet")?.className,
+    ).toContain("bottom-sheet-dismiss--closing");
+    expect(screen.getByRole("dialog", { name: "웨딩홀 계약" })).toBe(
+      bottomSheet,
     );
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
 
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
     expect(document.body.style.overflow).toBe("");
     expect(scrollContainer?.style.overflow).toBe("");
+  });
 
+  it("모바일 바텀시트는 스크림과 드래그 핸들로 닫고 짧은 드래그는 복원한다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(<ChecklistHarness />);
+
+    const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
     fireEvent.click(task);
-    const escapeSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
-    fireEvent.keyDown(escapeSheet, { key: "Escape" });
+    let bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    let sheetRoot = bottomSheet.closest(
+      ".checklist-detail-bottom-sheet",
+    ) as HTMLElement;
+    const handle = within(bottomSheet).getByRole("button", {
+      name: "아래로 밀어 할 일 상세 닫기",
+    });
+    vi.spyOn(bottomSheet, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ height: 600 }),
+    );
+
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      clientY: 100,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(handle, {
+      clientY: 160,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    expect(sheetRoot.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
+      "60px",
+    );
+    fireEvent.pointerUp(handle, {
+      clientY: 160,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    expect(sheetRoot.className).not.toContain("bottom-sheet-dismiss--closing");
+    expect(sheetRoot.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
+      "0px",
+    );
+
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      clientY: 100,
+      pointerId: 2,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(handle, {
+      clientY: 210,
+      pointerId: 2,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(handle, {
+      clientY: 210,
+      pointerId: 2,
+      pointerType: "touch",
+    });
+
+    expect(sheetRoot.className).toContain("bottom-sheet-dismiss--closing");
+    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
 
     fireEvent.click(task);
+    bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    sheetRoot = bottomSheet.closest(
+      ".checklist-detail-bottom-sheet",
+    ) as HTMLElement;
     fireEvent.click(
       document.querySelector(
         ".checklist-detail-bottom-sheet__scrim",
       ) as HTMLButtonElement,
     );
+    expect(sheetRoot.className).toContain("bottom-sheet-dismiss--closing");
+    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
+  });
+
+  it("모션 감소 설정에서는 모바일 바텀시트를 즉시 닫는다", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(
+        (query: string) =>
+          ({
+            addEventListener: vi.fn(),
+            addListener: vi.fn(),
+            matches:
+              query === MOBILE_LAYOUT_MEDIA_QUERY ||
+              query === "(prefers-reduced-motion: reduce)",
+            media: query,
+            onchange: null,
+            removeEventListener: vi.fn(),
+            removeListener: vi.fn(),
+          }) as unknown as MediaQueryList,
+      ),
+    );
+    render(<ChecklistHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
+    fireEvent.click(
+      document.querySelector(
+        ".checklist-detail-bottom-sheet__scrim",
+      ) as HTMLButtonElement,
+    );
+
+    expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
   });
 
   it("모바일 바텀시트에서도 일정이 없으면 공통 빈 상태를 표시한다", () => {

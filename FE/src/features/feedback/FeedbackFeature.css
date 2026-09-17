@@ -339,20 +339,6 @@
     box-shadow: 0 -8px 32px -8px rgb(0 0 0 / 18%);
   }
 
-  .feedback-bottom-sheet__handle-area {
-    display: flex;
-    height: 16px;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .feedback-bottom-sheet__handle {
-    width: 38px;
-    height: 4px;
-    border-radius: 2px;
-    background: #dcdee3;
-  }
-
   .feedback-bottom-sheet__header {
     display: flex;
     align-items: flex-start;
@@ -364,22 +350,6 @@
     color: var(--color-fg-neutral);
     font-size: 22px;
     line-height: 1.4;
-  }
-
-  .feedback-bottom-sheet__close {
-    display: grid;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    flex: 0 0 auto;
-    place-items: center;
-    background: var(--color-bg-neutral-weak);
-    color: var(--color-fg-neutral-muted);
-    cursor: pointer;
-    font-size: 22px;
-    line-height: 1;
   }
 
   .feedback-bottom-sheet form {
