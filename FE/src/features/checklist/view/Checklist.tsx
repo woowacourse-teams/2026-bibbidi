@@ -293,6 +293,7 @@ export function Checklist({
       !selectedTaskContext ||
       isAppointmentCreationOpen ||
       isAppointmentEditingOpen ||
+      isAppointmentDeletionOpen ||
       isMobileLayout
     ) {
       return;
@@ -309,6 +310,7 @@ export function Checklist({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     isAppointmentCreationOpen,
+    isAppointmentDeletionOpen,
     isAppointmentEditingOpen,
     isMobileLayout,
     onCloseTaskDetail,

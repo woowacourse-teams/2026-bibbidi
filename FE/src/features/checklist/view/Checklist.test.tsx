@@ -115,8 +115,10 @@ function createAppointmentCommandRepository(): MyChecklistCommandRepository {
 }
 
 function AppointmentManagementHarness({
+  onClose = vi.fn(),
   repository,
 }: {
+  onClose?: () => void;
   repository: MyChecklistCommandRepository;
 }) {
   const management = useChecklistAppointmentManagement({
@@ -133,7 +135,7 @@ function AppointmentManagementHarness({
       categories={createChecklistViewModel(createChecklistQuery())}
       isAuthenticated
       onBackTaskDetail={vi.fn()}
-      onCloseTaskDetail={vi.fn()}
+      onCloseTaskDetail={onClose}
       onSelectTask={vi.fn()}
       selectedTaskId="checklist-item-10"
     />
@@ -397,7 +399,7 @@ afterEach(() => {
 
 describe("Checklist 웹 상세 패널", () => {
   it("일정 메뉴는 하나만 열리고 키보드·바깥 클릭·Escape와 포커스 복귀를 지원한다", async () => {
-    render(
+    const view = render(
       <AppointmentManagementHarness
         repository={createAppointmentCommandRepository()}
       />,
@@ -415,6 +417,12 @@ describe("Checklist 웹 상세 패널", () => {
     const remove = within(menu).getByRole("menuitem", { name: "삭제" });
     expect(document.activeElement).toBe(edit);
     fireEvent.keyDown(edit, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(remove);
+    view.rerender(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
     expect(document.activeElement).toBe(remove);
     fireEvent.keyDown(remove, { key: "Home" });
     expect(document.activeElement).toBe(edit);
@@ -516,6 +524,33 @@ describe("Checklist 웹 상세 패널", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(repository.deleteAppointment).toHaveBeenCalledTimes(2);
+  });
+
+  it("삭제 요청 중 Escape가 할 일 상세 닫기로 전파되지 않는다", () => {
+    const onClose = vi.fn();
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.deleteAppointment).mockReturnValue(
+      new Promise<void>(() => undefined),
+    );
+    render(
+      <AppointmentManagementHarness
+        onClose={onClose}
+        repository={repository}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "계약서 검토 일정 더보기" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "이 일정을 삭제할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBe(dialog);
   });
 
   it("완료 요청 중 체크 버튼을 비활성화해 중복 변경을 막는다", async () => {

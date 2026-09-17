@@ -33,6 +33,7 @@ function ChecklistAppointment({
   const editItemRef = useRef<HTMLButtonElement>(null);
   const deleteItemRef = useRef<HTMLButtonElement>(null);
   const shouldRestoreFocusRef = useRef(false);
+  const managementRef = useRef(management);
   const feedback = management?.operationFeedback;
   const isOperationPending = feedback?.status === "pending";
   const isPending =
@@ -43,6 +44,10 @@ function ChecklistAppointment({
     feedback.operation === "completion"
       ? feedback.errorMessage
       : undefined;
+
+  useEffect(() => {
+    managementRef.current = management;
+  }, [management]);
 
   useEffect(() => {
     if (!menuIsOpen) {
@@ -61,13 +66,13 @@ function ChecklistAppointment({
         event.target !== triggerRef.current
       ) {
         shouldRestoreFocusRef.current = true;
-        management?.closeMenu();
+        managementRef.current?.closeMenu();
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
 
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [management, menuIsOpen]);
+  }, [menuIsOpen]);
 
   const closeMenu = () => {
     shouldRestoreFocusRef.current = true;

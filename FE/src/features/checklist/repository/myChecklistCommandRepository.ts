@@ -426,6 +426,21 @@ export function createMyChecklistCommandRepository(
     await ensureChecklist(signal);
   };
 
+  const synchronizeAppointmentCache = async (
+    updateApplied: boolean,
+    signal?: AbortSignal,
+  ) => {
+    if (updateApplied) {
+      return;
+    }
+
+    try {
+      await queryRepository.refresh(signal);
+    } catch {
+      queryRepository.invalidate();
+    }
+  };
+
   return {
     async changeAppointmentCompletion(appointmentId, isDone, signal) {
       try {
@@ -434,16 +449,15 @@ export function createMyChecklistCommandRepository(
           isDone,
           signal,
         );
-        if (
-          !queryRepository.applyAppointmentCompletionUpdate(
+        await synchronizeAppointmentCache(
+          queryRepository.applyAppointmentCompletionUpdate(
             changed.checklistItemId,
             changed.id,
             changed.isDone,
             changed.checklistItemDone,
-          )
-        ) {
-          throw new AppointmentManagementError("unknown");
-        }
+          ),
+          signal,
+        );
       } catch (error) {
         throwAppointmentManagementError(error);
       }
@@ -500,9 +514,10 @@ export function createMyChecklistCommandRepository(
 
         await dataSource.deleteAppointment(appointmentId, signal);
 
-        if (!queryRepository.applyAppointmentRemoval(itemId, appointmentId)) {
-          throw new AppointmentManagementError("unknown");
-        }
+        await synchronizeAppointmentCache(
+          queryRepository.applyAppointmentRemoval(itemId, appointmentId),
+          signal,
+        );
       } catch (error) {
         throwAppointmentManagementError(error);
       }
@@ -707,14 +722,13 @@ export function createMyChecklistCommandRepository(
           request,
           signal,
         );
-        if (
-          !queryRepository.applyAppointmentUpdate(
+        await synchronizeAppointmentCache(
+          queryRepository.applyAppointmentUpdate(
             checklistItemId,
             toAppointmentModel(updated),
-          )
-        ) {
-          throw new AppointmentManagementError("unknown");
-        }
+          ),
+          signal,
+        );
       } catch (error) {
         throwAppointmentManagementError(error);
       }

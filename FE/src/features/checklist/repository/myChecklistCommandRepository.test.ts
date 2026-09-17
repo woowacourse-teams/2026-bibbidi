@@ -169,6 +169,29 @@ describe("MyChecklistCommandRepository 일정 관리", () => {
     ).toHaveBeenCalledWith(500, 11, true, false);
   });
 
+  it("완료 성공 뒤 캐시 적용이 빗나가면 작업을 실패시키지 않고 다시 동기화한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeAppointmentCompletion).mockResolvedValue({
+      checklistItemDone: false,
+      checklistItemId: 500,
+      id: 11,
+      isDone: true,
+    });
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.applyAppointmentCompletionUpdate).mockReturnValue(
+      false,
+    );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.changeAppointmentCompletion(11, true),
+    ).resolves.toBeUndefined();
+    expect(queryRepository.refresh).toHaveBeenCalledWith(undefined);
+  });
+
   it("수정 성공 응답의 일정 필드만 공통 캐시에 반영한다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.updateAppointment).mockResolvedValue({
@@ -191,6 +214,31 @@ describe("MyChecklistCommandRepository 일정 관리", () => {
       id: 11,
       isDone: true,
     });
+  });
+
+  it("수정 성공 뒤 캐시 재동기화까지 실패해도 원격 작업은 성공으로 유지한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.updateAppointment).mockResolvedValue({
+      ...appointmentRequest,
+      checklistItemId: 500,
+      conflicts: [],
+      id: 11,
+      isDone: true,
+    });
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.applyAppointmentUpdate).mockReturnValue(false);
+    vi.mocked(queryRepository.refresh).mockRejectedValue(
+      new MyChecklistLoadError(),
+    );
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(
+      repository.updateAppointment(11, 500, appointmentRequest),
+    ).resolves.toBeUndefined();
+    expect(queryRepository.invalidate).toHaveBeenCalledOnce();
   });
 
   it("삭제 성공 후 캐시에서 해당 일정만 제거한다", async () => {
@@ -227,6 +275,33 @@ describe("MyChecklistCommandRepository 일정 관리", () => {
       500,
       11,
     );
+  });
+
+  it("삭제 성공 뒤 캐시 적용이 빗나가면 삭제를 재시도시키지 않고 다시 동기화한다", async () => {
+    const dataSource = createDataSource();
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [
+        {
+          appointments: [{ ...appointmentRequest, id: 11, isDone: false }],
+          categoryId: 1,
+          id: 500,
+          sourceCatalogItemId: null,
+          status: "continue",
+          title: "웨딩홀 계약",
+        },
+      ],
+    });
+    vi.mocked(queryRepository.applyAppointmentRemoval).mockReturnValue(false);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await expect(repository.deleteAppointment(11)).resolves.toBeUndefined();
+    expect(dataSource.deleteAppointment).toHaveBeenCalledOnce();
+    expect(queryRepository.refresh).toHaveBeenCalledWith(undefined);
   });
 
   it.each([
