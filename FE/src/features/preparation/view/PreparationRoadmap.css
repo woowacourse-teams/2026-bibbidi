@@ -510,6 +510,9 @@
 
 @media (max-width: 760px) {
   .preparation-roadmap__categories {
+    position: sticky;
+    z-index: 10;
+    top: 0;
     padding: 12px 16px 0;
   }
 
