@@ -60,6 +60,7 @@ type LoginRequiredReason = "schedule-creation" | "task-creation";
 interface ChecklistFeatureProps {
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void;
 }
 

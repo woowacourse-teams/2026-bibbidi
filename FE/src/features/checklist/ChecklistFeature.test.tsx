@@ -169,6 +169,7 @@ function ChecklistFeatureTestApp({
   initialEntries?: string[];
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void;
 }) {
   return (
@@ -183,6 +184,7 @@ function renderChecklistFeature(
   initialEntries?: string[],
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void,
 ) {
   return render(
