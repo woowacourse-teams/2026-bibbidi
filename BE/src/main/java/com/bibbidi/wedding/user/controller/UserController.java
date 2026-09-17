@@ -67,3 +67,4 @@ public class UserController {
         return WeddingDateResponse.from(result);
     }
 }
+
