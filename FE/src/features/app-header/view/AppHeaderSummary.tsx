@@ -28,6 +28,8 @@ export function AppHeaderSummary({
   weddingDate,
 }: AppHeaderSummaryProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const isWeddingDateUnset =
+    viewModel.weddingDateStatus === "loaded" && weddingDate === null;
   const dateDisplay = (
     <>
       <span aria-hidden="true" className="app-header-summary__d-day-desktop">
@@ -48,7 +50,11 @@ export function AppHeaderSummary({
             aria-expanded={isPopoverOpen}
             aria-haspopup="dialog"
             aria-label={`${viewModel.dDayLabel}, ${viewModel.weddingDateLabel}. 결혼 예정일 설정`}
-            className="app-header-summary__d-day app-header-summary__d-day-button"
+            className={`app-header-summary__d-day app-header-summary__d-day-button${
+              isWeddingDateUnset
+                ? " app-header-summary__d-day-button--unset"
+                : ""
+            }`}
             onClick={onOpenPopover}
             ref={triggerRef}
             type="button"

@@ -40,6 +40,7 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
               .map((item) => (
                 <NavLink
                   className="app-header__navigation-item"
+                  end={item.to === "/"}
                   key={item.to}
                   onClick={
                     item.to === "/planner" ? onPlannerNavigation : undefined

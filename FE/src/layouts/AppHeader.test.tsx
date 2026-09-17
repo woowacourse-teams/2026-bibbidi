@@ -137,7 +137,7 @@ describe("AppHeader", () => {
     expect(onLogout).toHaveBeenCalledOnce();
   });
 
-  it("하단 메뉴를 홈, 체크리스트, 플래너 순서로 표시한다", () => {
+  it("하단 메뉴를 로드맵, 체크리스트, 플래너 순서로 표시한다", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppBottomNavigation />
@@ -147,12 +147,12 @@ describe("AppHeader", () => {
     const links = screen.getByRole("navigation", { name: "하단 메뉴" });
     expect(
       Array.from(links.querySelectorAll("a"), (link) => link.textContent),
-    ).toEqual(["홈", "체크리스트", "플래너"]);
-    expect(screen.getByRole("link", { name: "홈" }).getAttribute("href")).toBe(
-      "/",
-    );
+    ).toEqual(["로드맵", "체크리스트", "플래너"]);
     expect(
-      screen.getByRole("link", { name: "홈" }).getAttribute("aria-current"),
+      screen.getByRole("link", { name: "로드맵" }).getAttribute("href"),
+    ).toBe("/");
+    expect(
+      screen.getByRole("link", { name: "로드맵" }).getAttribute("aria-current"),
     ).toBe("page");
   });
 
@@ -169,13 +169,14 @@ describe("AppHeader", () => {
       (link) => [link.textContent, link.getAttribute("href")],
     );
     expect(desktopLinks).toEqual([
+      ["로드맵", "/"],
       ["체크리스트", "/checklist"],
       ["플래너", "/planner"],
     ]);
     expect(screen.queryByRole("link", { name: "준비 목록" })).toBeNull();
   });
 
-  it("모바일 홈은 하위가 아닌 루트에서만 활성화된다", () => {
+  it("모바일 로드맵은 하위가 아닌 루트에서만 활성화된다", () => {
     render(
       <MemoryRouter initialEntries={["/checklist"]}>
         <AppBottomNavigation />
@@ -183,7 +184,7 @@ describe("AppHeader", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "홈" }).hasAttribute("aria-current"),
+      screen.getByRole("link", { name: "로드맵" }).hasAttribute("aria-current"),
     ).toBe(false);
     expect(
       screen

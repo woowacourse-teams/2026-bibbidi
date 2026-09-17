@@ -75,6 +75,11 @@
   font-weight: 400;
 }
 
+.app-header-summary__d-day-button--unset strong,
+.app-header-summary__d-day-button--unset span {
+  color: var(--color-fg-brand);
+}
+
 .app-header-summary__separator {
   width: 1px;
   height: 24px;

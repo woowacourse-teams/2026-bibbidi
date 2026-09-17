@@ -321,7 +321,7 @@ describe("ServiceLayout", () => {
     fireEvent.click(
       within(screen.getByRole("navigation", { name: "하단 메뉴" })).getByRole(
         "link",
-        { name: "홈" },
+        { name: "로드맵" },
       ),
     );
 
