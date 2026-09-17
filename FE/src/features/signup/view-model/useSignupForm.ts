@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 
+import { createSignUpEvent } from "../../auth/analytics/authAnalytics";
+import { analytics } from "../../../infrastructure/analytics";
 import {
   checkNicknameAvailability,
   NicknameAvailabilityApiError,
@@ -224,6 +226,7 @@ export function useSignupForm({ onSuccess }: UseSignupFormOptions) {
       id: user.id,
       nickname: user.nickname,
     });
+    analytics.track(createSignUpEvent());
   };
 
   const isSubmitting = submissionStatus === "submitting";

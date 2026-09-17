@@ -51,3 +51,28 @@ export function createPreparationStepSelectEvent({
     },
   };
 }
+
+interface CreatePreparationItemAddEventParameters {
+  categoryId: string;
+  itemCount: number;
+  stepId: string;
+  stepOrder: number;
+}
+
+export function createPreparationItemAddEvent({
+  categoryId,
+  itemCount,
+  stepId,
+  stepOrder,
+}: CreatePreparationItemAddEventParameters): AnalyticsEvent {
+  return {
+    name: "preparation_item_add",
+    parameters: {
+      category_id: categoryId,
+      item_count: itemCount,
+      source: "preparation",
+      step_id: stepId,
+      step_order: stepOrder,
+    },
+  };
+}

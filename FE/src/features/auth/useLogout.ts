@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
+import { createLogoutEvent } from "./analytics/authAnalytics";
 import {
   logout,
   LogoutNetworkError,
@@ -41,6 +43,7 @@ export function useLogout({ onSuccess }: UseLogoutOptions) {
 
       if (isMountedRef.current && !controller.signal.aborted) {
         onSuccess();
+        analytics.track(createLogoutEvent());
       }
     } catch (error) {
       if (

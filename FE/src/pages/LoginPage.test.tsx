@@ -2,6 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const analyticsMocks = vi.hoisted(() => ({
+  track: vi.fn(),
+}));
+
+vi.mock("../infrastructure/analytics", () => ({
+  analytics: {
+    initialize: vi.fn(),
+    track: analyticsMocks.track,
+  },
+}));
+
 import { AuthProvider, useAuth } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { LoginPage } from "./LoginPage";
@@ -18,6 +29,7 @@ function createChecklistItem(id: number, sourceCatalogItemId: number | null) {
 }
 
 beforeEach(() => {
+  analyticsMocks.track.mockReset();
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
     removeItem: vi.fn(),
@@ -78,7 +90,9 @@ describe("LoginPage", () => {
     fireEvent.change(screen.getByLabelText("비밀번호"), {
       target: { value: "wish" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+    const loginButton = screen.getByRole("button", { name: "로그인" });
+    fireEvent.click(loginButton);
+    fireEvent.click(loginButton);
 
     await waitFor(() => {
       expect(
@@ -86,6 +100,51 @@ describe("LoginPage", () => {
       ).toBeTruthy();
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "login",
+      parameters: { method: "service" },
+    });
+  });
+
+  it("로그인 실패에는 성공 이벤트를 전송하지 않는다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+          { status: 401 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ errorCode: 202, message: "인증 실패" }), {
+          status: 401,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/login"]}>
+          <ChecklistMigrationProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+          </ChecklistMigrationProvider>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("닉네임"), {
+      target: { value: "bibbidi" },
+    });
+    fireEvent.change(screen.getByLabelText("비밀번호"), {
+      target: { value: "wrong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+    await screen.findByText("닉네임 또는 비밀번호를 확인해 주세요.");
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("로그인 성공 후 로컬 준비 항목을 병합하고 홈으로 이동한다", async () => {
