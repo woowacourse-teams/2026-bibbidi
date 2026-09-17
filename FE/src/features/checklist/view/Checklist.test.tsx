@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistQueryModel } from "../model/checklistQuery";
+import { AppointmentManagementError } from "../model/appointmentManagement";
 import {
   ChecklistItemCategoryEditSession,
   ChecklistItemChangeFeedback,
@@ -19,6 +20,8 @@ import {
   ChecklistItemTitleEditSession,
 } from "../model/checklistEditing";
 import { createChecklistViewModel } from "../view-model/createChecklistViewModel";
+import { MyChecklistCommandRepository } from "../repository/myChecklistCommandRepository";
+import { useChecklistAppointmentManagement } from "../useChecklistAppointmentManagement";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
 import { Checklist } from "./Checklist";
@@ -91,6 +94,50 @@ function ChecklistHarness({
       onCloseTaskDetail={() => setSelectedTaskId(null)}
       onSelectTask={setSelectedTaskId}
       selectedTaskId={selectedTaskId}
+    />
+  );
+}
+
+function createAppointmentCommandRepository(): MyChecklistCommandRepository {
+  return {
+    changeAppointmentCompletion: vi.fn().mockResolvedValue(undefined),
+    changeItemCategory: vi.fn(),
+    changeItemStatus: vi.fn(),
+    changeItemTitle: vi.fn(),
+    createAppointment: vi.fn(),
+    createCustomItem: vi.fn(),
+    deleteAppointment: vi.fn().mockResolvedValue(undefined),
+    ensureChecklist: vi.fn(),
+    hasRemainingAppointments: vi.fn(),
+    reconcileMissingChecklist: vi.fn(),
+    updateAppointment: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function AppointmentManagementHarness({
+  onClose = vi.fn(),
+  repository,
+}: {
+  onClose?: () => void;
+  repository: MyChecklistCommandRepository;
+}) {
+  const management = useChecklistAppointmentManagement({
+    audience: "authenticated",
+    checklistItemId: 10,
+    commandRepository: repository,
+    refreshAuth: vi.fn(),
+    sessionIdentity: "user-a",
+  });
+
+  return (
+    <Checklist
+      appointmentManagement={management}
+      categories={createChecklistViewModel(createChecklistQuery())}
+      isAuthenticated
+      onBackTaskDetail={vi.fn()}
+      onCloseTaskDetail={onClose}
+      onSelectTask={vi.fn()}
+      selectedTaskId="checklist-item-10"
     />
   );
 }
@@ -351,6 +398,208 @@ afterEach(() => {
 });
 
 describe("Checklist 웹 상세 패널", () => {
+  it("일정 메뉴는 하나만 열리고 키보드·바깥 클릭·Escape와 포커스 복귀를 지원한다", async () => {
+    const view = render(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+    const firstTrigger = screen.getByRole("button", {
+      name: "계약서 검토 일정 더보기",
+    });
+    const secondTrigger = screen.getByRole("button", {
+      name: "계약금 입금 일정 더보기",
+    });
+
+    fireEvent.click(firstTrigger);
+    const menu = screen.getByRole("menu");
+    const edit = within(menu).getByRole("menuitem", { name: "수정" });
+    const remove = within(menu).getByRole("menuitem", { name: "삭제" });
+    expect(document.activeElement).toBe(edit);
+    fireEvent.keyDown(edit, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(remove);
+    view.rerender(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+    expect(document.activeElement).toBe(remove);
+    fireEvent.keyDown(remove, { key: "Home" });
+    expect(document.activeElement).toBe(edit);
+
+    fireEvent.click(secondTrigger);
+    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    fireEvent.keyDown(
+      within(screen.getByRole("menu")).getByRole("menuitem", {
+        name: "수정",
+      }),
+      { key: "Escape" },
+    );
+    expect(
+      screen.getByRole("complementary", { name: "웨딩홀 계약" }),
+    ).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(secondTrigger));
+
+    fireEvent.click(firstTrigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(firstTrigger));
+  });
+
+  it("수정 화면에 기존 값을 채우고 취소하면 일정 메뉴 버튼으로 초점을 복원한다", async () => {
+    render(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: "계약서 검토 일정 더보기",
+    });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
+
+    const form = screen.getByRole("complementary", { name: "일정 수정" });
+    expect(
+      (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
+    ).toBe("계약서 검토");
+    expect(
+      (within(form).getByLabelText(/날짜/) as HTMLInputElement).value,
+    ).toBe("2026-09-12");
+    expect(
+      (within(form).getByLabelText("시작 시간") as HTMLInputElement).value,
+    ).toBe("19:00");
+    expect(
+      (within(form).getByLabelText("종료 시간") as HTMLInputElement).value,
+    ).toBe("20:30");
+    expect(
+      (within(form).getByLabelText("장소") as HTMLInputElement).value,
+    ).toBe("온라인");
+    expect(
+      (within(form).getByLabelText("메모") as HTMLTextAreaElement).value,
+    ).toBe("계약 조건 확인");
+
+    fireEvent.click(within(form).getByRole("button", { name: "취소" }));
+    expect(
+      screen.queryByRole("complementary", { name: "일정 수정" }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", {
+          name: "계약서 검토 일정 더보기",
+        }),
+      ),
+    );
+  });
+
+  it("삭제는 확인 버튼 뒤에만 실행하고 실패 시 다이얼로그에서 재시도한다", async () => {
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.deleteAppointment)
+      .mockRejectedValueOnce(
+        new AppointmentManagementError(
+          "unknown",
+          "일정을 삭제하지 못했어요. 다시 시도해 주세요.",
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+    render(<AppointmentManagementHarness repository={repository} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "계약서 검토 일정 더보기" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "이 일정을 삭제할까요?",
+    });
+    expect(
+      within(dialog).getByText("삭제한 일정은 다시 복구할 수 없어요."),
+    ).toBeTruthy();
+    expect(repository.deleteAppointment).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "일정을 삭제하지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(repository.deleteAppointment).toHaveBeenCalledTimes(2);
+  });
+
+  it("삭제 요청 중 Escape가 할 일 상세 닫기로 전파되지 않는다", () => {
+    const onClose = vi.fn();
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.deleteAppointment).mockReturnValue(
+      new Promise<void>(() => undefined),
+    );
+    render(
+      <AppointmentManagementHarness
+        onClose={onClose}
+        repository={repository}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "계약서 검토 일정 더보기" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "이 일정을 삭제할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBe(dialog);
+  });
+
+  it("완료 요청 중 체크 버튼을 비활성화해 중복 변경을 막는다", async () => {
+    let resolveCompletion: () => void = () => undefined;
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.changeAppointmentCompletion).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveCompletion = resolve;
+      }),
+    );
+    render(<AppointmentManagementHarness repository={repository} />);
+    const completionButton = screen.getByRole("button", {
+      name: "계약서 검토 일정 완료",
+    });
+
+    fireEvent.click(completionButton);
+    fireEvent.click(completionButton);
+    expect((completionButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "계약금 입금 일정 더보기",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(repository.changeAppointmentCompletion).toHaveBeenCalledOnce();
+
+    await act(async () => resolveCompletion());
+    expect((completionButton as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("완료된 일정은 체크 상태와 완료 스타일을 명확히 표시한다", () => {
+    render(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+
+    const completionButton = screen.getByRole("button", {
+      name: "계약금 입금 일정 미완료로 변경",
+    });
+    const appointment = completionButton.closest("li");
+
+    expect(completionButton.getAttribute("aria-pressed")).toBe("true");
+    expect(appointment?.classList).toContain(
+      "checklist-detail-content__appointment--complete",
+    );
+  });
+
   it("선택한 할 일의 API 기반 상세 정보와 전체 일정을 서버 순서로 표시한다", () => {
     render(<ChecklistHarness />);
 
@@ -774,6 +1023,42 @@ describe("Checklist 할 일 편집", () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("모바일 바텀시트에서 상태 팝오버를 트리거 바로 아래에 배치한다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal("innerWidth", 390);
+    vi.stubGlobal("innerHeight", 844);
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.classList.contains("checklist-status-editor__trigger")) {
+          return DOMRect.fromRect({ height: 24, width: 64, x: 294, y: 320 });
+        }
+        if (this.classList.contains("bottom-sheet-dismiss__dialog")) {
+          return DOMRect.fromRect({ height: 732, width: 390, x: 0, y: 112 });
+        }
+        return DOMRect.fromRect();
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockReturnValue(134);
+    render(<EditableChecklistHarness />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+    );
+
+    const popover = document.querySelector(
+      ".checklist-status-editor__popover",
+    ) as HTMLDivElement;
+    expect(popover.style.left).toBe("178px");
+    expect(popover.style.maxHeight).toBe("482px");
+    expect(popover.style.top).toBe("238px");
+    expect(popover.style.width).toBe("180px");
+
+    rectSpy.mockRestore();
+    scrollHeightSpy.mockRestore();
   });
 
   it("남은 일정 조회 실패는 완료 PUT 없이 팝오버에 접근 가능한 오류를 표시한다", async () => {

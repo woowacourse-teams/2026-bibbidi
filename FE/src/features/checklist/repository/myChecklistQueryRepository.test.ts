@@ -368,6 +368,94 @@ describe("MyChecklistQueryRepository", () => {
     expect(repository.getRevision()).toBe(2);
   });
 
+  it("일정 완료·수정·삭제를 추가 GET 없이 같은 항목에 즉시 반영한다", async () => {
+    const appointment = {
+      date: "2026-09-20",
+      endTime: "2026-09-20T11:00:00",
+      id: 91,
+      isDone: true,
+      memo: "기존 메모",
+      place: "서울",
+      startTime: "2026-09-20T10:00:00",
+      title: "기존 일정",
+    };
+    const item = {
+      ...checklist.items[0],
+      appointments: [appointment],
+      status: "done" as const,
+    };
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [item],
+    });
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+
+    expect(
+      repository.applyAppointmentCompletionUpdate(10, 91, false, false),
+    ).toBe(true);
+    const updatedAppointment = {
+      ...appointment,
+      date: "2026-10-01",
+      isDone: false,
+      title: "수정 일정",
+    };
+    expect(repository.applyAppointmentUpdate(10, updatedAppointment)).toBe(
+      true,
+    );
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [
+        {
+          ...item,
+          appointments: [updatedAppointment],
+          status: "continue",
+        },
+      ],
+    });
+
+    expect(repository.applyAppointmentRemoval(10, 91)).toBe(true);
+    await expect(repository.getChecklist()).resolves.toEqual({
+      exists: true,
+      items: [{ ...item, appointments: [], status: "continue" }],
+    });
+    expect(dataSource.getChecklist).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  it("캐시에 없는 일정 변경은 캐시와 revision을 변경하지 않는다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);
+    const repository = createMyChecklistQueryRepository(dataSource);
+    await repository.getChecklist();
+    const listener = vi.fn();
+    repository.subscribe(listener);
+    const revision = repository.getRevision();
+
+    expect(
+      repository.applyAppointmentCompletionUpdate(10, 999, true, false),
+    ).toBe(false);
+    expect(repository.applyAppointmentRemoval(10, 999)).toBe(false);
+    expect(
+      repository.applyAppointmentUpdate(10, {
+        date: "2026-09-20",
+        endTime: null,
+        id: 999,
+        isDone: false,
+        memo: null,
+        place: null,
+        startTime: null,
+        title: "없는 일정",
+      }),
+    ).toBe(false);
+
+    expect(repository.getRevision()).toBe(revision);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("캐시에 없는 항목 수정은 캐시와 revision을 변경하지 않는다", async () => {
     const dataSource = createDataSource();
     vi.mocked(dataSource.getChecklist).mockResolvedValue(checklist);

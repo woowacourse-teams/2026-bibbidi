@@ -1,4 +1,5 @@
 import { ChecklistItemEditingController } from "../model/checklistEditing";
+import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
   ChecklistCategoryViewModel,
   ChecklistTaskViewModel,
@@ -10,6 +11,7 @@ import "./ChecklistTaskDetailPanel.css";
 interface ChecklistTaskDetailPanelProps {
   categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
+  appointmentManagement?: ChecklistAppointmentManagementController;
   editing?: ChecklistItemEditingController;
   onClose: () => void;
   onRequestScheduleCreation?: () => void;
@@ -17,6 +19,7 @@ interface ChecklistTaskDetailPanelProps {
 }
 
 export function ChecklistTaskDetailPanel({
+  appointmentManagement,
   categories,
   categoryTitle,
   editing,
@@ -49,6 +52,7 @@ export function ChecklistTaskDetailPanel({
       </header>
 
       <ChecklistTaskDetailContent
+        appointmentManagement={appointmentManagement}
         categories={categories}
         categoryTitle={categoryTitle}
         editing={editing}

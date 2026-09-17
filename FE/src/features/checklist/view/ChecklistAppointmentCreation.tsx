@@ -5,11 +5,15 @@ import {
   CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH,
   ChecklistAppointmentCreationController,
 } from "../useChecklistAppointmentCreation";
+import { ChecklistAppointmentEditingController } from "../useChecklistAppointmentManagement";
 import { containTabFocus } from "./containTabFocus";
 import "./ChecklistAppointmentCreation.css";
 
 interface ChecklistAppointmentCreationProps {
-  controller: ChecklistAppointmentCreationController;
+  controller:
+    | ChecklistAppointmentCreationController
+    | ChecklistAppointmentEditingController;
+  heading?: "일정 수정" | "일정 추가";
   taskTitle: string;
 }
 
@@ -23,6 +27,7 @@ function BackIcon() {
 
 export function ChecklistAppointmentCreation({
   controller,
+  heading = "일정 추가",
   taskTitle,
 }: ChecklistAppointmentCreationProps) {
   const isMobileLayout = useIsMobileLayout();
@@ -126,12 +131,12 @@ export function ChecklistAppointmentCreation({
             </button>
           ) : null}
           <span>
-            <h2 id="checklist-appointment-creation-title">일정 추가</h2>
+            <h2 id="checklist-appointment-creation-title">{heading}</h2>
             <small>{taskTitle}</small>
           </span>
           {!isMobileLayout ? (
             <button
-              aria-label="일정 추가 닫기"
+              aria-label={`${heading} 닫기`}
               disabled={isSubmitting}
               onClick={controller.cancel}
               type="button"

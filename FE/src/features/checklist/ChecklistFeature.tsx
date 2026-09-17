@@ -29,6 +29,7 @@ import {
 import { useChecklistTaskCreation } from "./useChecklistTaskCreation";
 import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationCommand";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
+import { useChecklistAppointmentManagement } from "./useChecklistAppointmentManagement";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
 import { ChecklistTaskDetailBottomSheetShell } from "./view/ChecklistTaskDetailBottomSheet";
@@ -240,19 +241,25 @@ export function ChecklistFeature({
     sessionIdentity,
     submissionState: taskCreationCommand.submissionState,
   });
-  const appointmentCreationChecklistItemId =
+  const selectedChecklistItemIsCurrent =
     requestState.status === "success" &&
     requestState.audience === audience &&
     requestState.sessionIdentity === sessionIdentity &&
-    requestState.checklistRevision === checklistRevision &&
-    requestState.requestRevision === requestRevision &&
     requestState.checklist.categories.some((category) =>
       category.items.some(
         (item) =>
           item.id === selectedTaskId &&
           item.checklistItemId === selectedChecklistItemId,
       ),
-    )
+    );
+  const appointmentManagementChecklistItemId = selectedChecklistItemIsCurrent
+    ? selectedChecklistItemId
+    : null;
+  const appointmentCreationChecklistItemId =
+    selectedChecklistItemIsCurrent &&
+    requestState.status === "success" &&
+    requestState.checklistRevision === checklistRevision &&
+    requestState.requestRevision === requestRevision
       ? selectedChecklistItemId
       : null;
   const appointmentCreation = useChecklistAppointmentCreation({
@@ -260,6 +267,13 @@ export function ChecklistFeature({
     isAuthenticated: audience === "authenticated",
     onSubmit: onSubmitAppointment ?? submitAppointment,
     onRetryRefresh: onSubmitAppointment ? undefined : refreshAppointments,
+    sessionIdentity,
+  });
+  const appointmentManagement = useChecklistAppointmentManagement({
+    audience,
+    checklistItemId: appointmentManagementChecklistItemId,
+    commandRepository: checklistCommandRepository,
+    refreshAuth,
     sessionIdentity,
   });
   const requestScheduleCreation = useCallback(() => {
@@ -571,6 +585,9 @@ export function ChecklistFeature({
     <Checklist
       appointmentCreation={
         audience === "authenticated" ? appointmentCreation : undefined
+      }
+      appointmentManagement={
+        audience === "authenticated" ? appointmentManagement : undefined
       }
       categories={createChecklistViewModel(requestState.checklist)}
       isAuthenticated={audience === "authenticated"}

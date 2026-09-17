@@ -3,10 +3,25 @@ import {
   RemoteMyChecklistDataSource,
   RemoteMyChecklistRequestAbortedError,
 } from "../data-source/remoteMyChecklistDataSource";
-import { MyChecklistItemModel, MyChecklistModel } from "../model/myChecklist";
+import {
+  MyChecklistAppointmentModel,
+  MyChecklistItemModel,
+  MyChecklistModel,
+} from "../model/myChecklist";
 
 export interface MyChecklistQueryRepository {
   applyAddedItems(items: readonly MyChecklistItemModel[]): void;
+  applyAppointmentCompletionUpdate(
+    itemId: number,
+    appointmentId: number,
+    isDone: boolean,
+    checklistItemDone: boolean,
+  ): boolean;
+  applyAppointmentRemoval(itemId: number, appointmentId: number): boolean;
+  applyAppointmentUpdate(
+    itemId: number,
+    appointment: MyChecklistAppointmentModel,
+  ): boolean;
   applyItemCategoryUpdate(itemId: number, categoryId: number): boolean;
   applyItemTitleUpdate(itemId: number, title: string): boolean;
   getChecklist(signal?: AbortSignal): Promise<MyChecklistModel>;
@@ -231,7 +246,7 @@ export function createMyChecklistQueryRepository(
 
   const applyItemUpdate = (
     itemId: number,
-    update: (item: MyChecklistItemModel) => MyChecklistItemModel,
+    update: (item: MyChecklistItemModel) => MyChecklistItemModel | null,
   ): boolean => {
     if (!cachedResult) {
       return false;
@@ -245,8 +260,14 @@ export function createMyChecklistQueryRepository(
       return false;
     }
 
+    const updatedItem = update(cachedResult.items[itemIndex]);
+
+    if (updatedItem === null) {
+      return false;
+    }
+
     const nextItems = [...cachedResult.items];
-    nextItems[itemIndex] = update(cachedResult.items[itemIndex]);
+    nextItems[itemIndex] = updatedItem;
     setCachedResult({ ...cachedResult, items: nextItems });
 
     return true;
@@ -293,6 +314,74 @@ export function createMyChecklistQueryRepository(
       }
 
       setCachedResult(nextChecklist);
+    },
+    applyAppointmentCompletionUpdate(
+      itemId,
+      appointmentId,
+      isDone,
+      checklistItemDone,
+    ) {
+      return applyItemUpdate(itemId, (item) => {
+        if (
+          !item.appointments.some(
+            (appointment) => appointment.id === appointmentId,
+          )
+        ) {
+          return null;
+        }
+
+        return {
+          ...item,
+          appointments: item.appointments.map((appointment) =>
+            appointment.id === appointmentId
+              ? { ...appointment, isDone }
+              : appointment,
+          ),
+          status: checklistItemDone
+            ? "done"
+            : item.status === "done"
+              ? "continue"
+              : item.status,
+        };
+      });
+    },
+    applyAppointmentRemoval(itemId, appointmentId) {
+      return applyItemUpdate(itemId, (item) => {
+        if (
+          !item.appointments.some(
+            (appointment) => appointment.id === appointmentId,
+          )
+        ) {
+          return null;
+        }
+
+        return {
+          ...item,
+          appointments: item.appointments.filter(
+            (appointment) => appointment.id !== appointmentId,
+          ),
+        };
+      });
+    },
+    applyAppointmentUpdate(itemId, appointment) {
+      return applyItemUpdate(itemId, (item) => {
+        if (
+          !item.appointments.some(
+            (currentAppointment) => currentAppointment.id === appointment.id,
+          )
+        ) {
+          return null;
+        }
+
+        return {
+          ...item,
+          appointments: item.appointments.map((currentAppointment) =>
+            currentAppointment.id === appointment.id
+              ? appointment
+              : currentAppointment,
+          ),
+        };
+      });
     },
     applyItemCategoryUpdate(itemId, categoryId) {
       return applyItemUpdate(itemId, (item) => ({ ...item, categoryId }));

@@ -9,6 +9,7 @@ import {
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentCreationController } from "../useChecklistAppointmentCreation";
+import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
@@ -20,6 +21,7 @@ import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
   appointmentCreation?: ChecklistAppointmentCreationController;
+  appointmentManagement?: ChecklistAppointmentManagementController;
   categories: ChecklistCategoryViewModel[];
   isAuthenticated?: boolean;
   itemEditing?: ChecklistItemEditingController;
@@ -48,6 +50,7 @@ function canRestoreFocus(
 
 export function Checklist({
   appointmentCreation,
+  appointmentManagement,
   categories,
   isAuthenticated = false,
   itemEditing,
@@ -82,6 +85,14 @@ export function Checklist({
   const appointmentCreationTaskIdRef = useRef(
     appointmentCreation?.isOpen ? selectedTaskId : null,
   );
+  const wasAppointmentEditingOpenRef = useRef(
+    appointmentManagement?.editing.isOpen ?? false,
+  );
+  const appointmentEditingIdRef = useRef<number | null>(null);
+  const wasDeletionOpenRef = useRef(
+    appointmentManagement?.deletionConfirmation !== null,
+  );
+  const deletionAppointmentIdRef = useRef<number | null>(null);
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
   const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -96,6 +107,26 @@ export function Checklist({
   ).length;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
   const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
+  const isAppointmentEditingOpen =
+    appointmentManagement?.editing.isOpen ?? false;
+  const deletionConfirmation =
+    appointmentManagement?.deletionConfirmation ?? null;
+  const isAppointmentDeletionOpen = deletionConfirmation !== null;
+  const appointmentOperationFeedback = appointmentManagement?.operationFeedback;
+  const isAppointmentDeletionPending =
+    deletionConfirmation !== null &&
+    appointmentOperationFeedback?.status === "pending" &&
+    appointmentOperationFeedback.operation === "delete" &&
+    appointmentOperationFeedback.appointmentId ===
+      deletionConfirmation.appointmentId;
+  const appointmentDeletionError =
+    deletionConfirmation !== null &&
+    appointmentOperationFeedback?.status === "error" &&
+    appointmentOperationFeedback.operation === "delete" &&
+    appointmentOperationFeedback.appointmentId ===
+      deletionConfirmation.appointmentId
+      ? appointmentOperationFeedback.errorMessage
+      : undefined;
   const pendingStatusConfirmation = itemEditing?.statusConfirmation ?? null;
   const statusConfirmation =
     pendingStatusConfirmation?.itemId ===
@@ -209,7 +240,62 @@ export function Checklist({
   }, [isAppointmentCreationOpen, selectedTaskContext]);
 
   useEffect(() => {
-    if (!selectedTaskContext || isAppointmentCreationOpen || isMobileLayout) {
+    if (
+      !wasAppointmentEditingOpenRef.current &&
+      isAppointmentEditingOpen &&
+      selectedTaskContext
+    ) {
+      appointmentEditingIdRef.current =
+        appointmentManagement?.editingAppointmentId ?? null;
+    }
+
+    if (wasAppointmentEditingOpenRef.current && !isAppointmentEditingOpen) {
+      const appointmentId = appointmentEditingIdRef.current;
+      if (appointmentId !== null) {
+        document
+          .getElementById(`${appointmentId}-appointment-menu-button`)
+          ?.focus();
+      }
+    }
+
+    if (!isAppointmentEditingOpen) {
+      appointmentEditingIdRef.current = null;
+    }
+    wasAppointmentEditingOpenRef.current = isAppointmentEditingOpen;
+  }, [appointmentManagement, isAppointmentEditingOpen, selectedTaskContext]);
+
+  useEffect(() => {
+    if (!wasDeletionOpenRef.current && deletionConfirmation) {
+      deletionAppointmentIdRef.current = deletionConfirmation.appointmentId;
+    }
+
+    if (wasDeletionOpenRef.current && !deletionConfirmation) {
+      const trigger =
+        deletionAppointmentIdRef.current === null
+          ? null
+          : document.getElementById(
+              `${deletionAppointmentIdRef.current}-appointment-menu-button`,
+            );
+      (
+        trigger ??
+        document.getElementById(
+          `${selectedTaskContext?.task.id}-add-appointment`,
+        )
+      )?.focus();
+      deletionAppointmentIdRef.current = null;
+    }
+
+    wasDeletionOpenRef.current = deletionConfirmation !== null;
+  }, [deletionConfirmation, selectedTaskContext]);
+
+  useEffect(() => {
+    if (
+      !selectedTaskContext ||
+      isAppointmentCreationOpen ||
+      isAppointmentEditingOpen ||
+      isAppointmentDeletionOpen ||
+      isMobileLayout
+    ) {
       return;
     }
 
@@ -224,6 +310,8 @@ export function Checklist({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     isAppointmentCreationOpen,
+    isAppointmentDeletionOpen,
+    isAppointmentEditingOpen,
     isMobileLayout,
     onCloseTaskDetail,
     selectedTaskContext,
@@ -265,7 +353,8 @@ export function Checklist({
         aria-hidden={
           isMobileForegroundOpen ||
           isLoginRequiredOpen ||
-          isStatusConfirmationOpen
+          isStatusConfirmationOpen ||
+          isAppointmentDeletionOpen
             ? true
             : undefined
         }
@@ -273,7 +362,8 @@ export function Checklist({
         inert={
           isMobileForegroundOpen ||
           isLoginRequiredOpen ||
-          isStatusConfirmationOpen
+          isStatusConfirmationOpen ||
+          isAppointmentDeletionOpen
             ? true
             : undefined
         }
@@ -426,18 +516,28 @@ export function Checklist({
 
       <div
         aria-hidden={
-          isLoginRequiredOpen || isStatusConfirmationOpen ? true : undefined
+          isLoginRequiredOpen ||
+          isStatusConfirmationOpen ||
+          isAppointmentDeletionOpen
+            ? true
+            : undefined
         }
         className="checklist-workspace__foreground"
         inert={
-          isLoginRequiredOpen || isStatusConfirmationOpen ? true : undefined
+          isLoginRequiredOpen ||
+          isStatusConfirmationOpen ||
+          isAppointmentDeletionOpen
+            ? true
+            : undefined
         }
       >
         {selectedTaskContext &&
         !isMobileLayout &&
         !isTaskCreationOpen &&
-        !isAppointmentCreationOpen ? (
+        !isAppointmentCreationOpen &&
+        !isAppointmentEditingOpen ? (
           <ChecklistTaskDetailPanel
+            appointmentManagement={appointmentManagement}
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
@@ -450,8 +550,10 @@ export function Checklist({
         {selectedTaskContext &&
         isMobileLayout &&
         !isTaskCreationOpen &&
-        !isAppointmentCreationOpen ? (
+        !isAppointmentCreationOpen &&
+        !isAppointmentEditingOpen ? (
           <ChecklistTaskDetailBottomSheet
+            appointmentManagement={appointmentManagement}
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
@@ -473,6 +575,16 @@ export function Checklist({
         isAppointmentCreationOpen ? (
           <ChecklistAppointmentCreation
             controller={appointmentCreation}
+            taskTitle={selectedTaskContext.task.title}
+          />
+        ) : null}
+
+        {selectedTaskContext &&
+        appointmentManagement &&
+        isAppointmentEditingOpen ? (
+          <ChecklistAppointmentCreation
+            controller={appointmentManagement.editing}
+            heading="일정 수정"
             taskTitle={selectedTaskContext.task.title}
           />
         ) : null}
@@ -549,6 +661,50 @@ export function Checklist({
             }
           }}
           title="남은 일정도 완료할까요?"
+        />
+      ) : null}
+
+      {deletionConfirmation && appointmentManagement ? (
+        <ChecklistModalDialog
+          actions={
+            <>
+              <button
+                disabled={isAppointmentDeletionPending}
+                onClick={appointmentManagement.cancelDelete}
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                aria-busy={isAppointmentDeletionPending}
+                disabled={isAppointmentDeletionPending}
+                onClick={() => void appointmentManagement.confirmDelete()}
+                type="button"
+              >
+                {isAppointmentDeletionPending ? "삭제 중" : "삭제"}
+              </button>
+            </>
+          }
+          description={
+            <>
+              삭제한 일정은 다시 복구할 수 없어요.
+              {appointmentDeletionError ? (
+                <p role="alert">{appointmentDeletionError}</p>
+              ) : null}
+            </>
+          }
+          onBackdropPress={
+            isAppointmentDeletionPending
+              ? undefined
+              : appointmentManagement.cancelDelete
+          }
+          onEscape={
+            isAppointmentDeletionPending
+              ? undefined
+              : appointmentManagement.cancelDelete
+          }
+          title="이 일정을 삭제할까요?"
+          variant="critical"
         />
       ) : null}
     </div>

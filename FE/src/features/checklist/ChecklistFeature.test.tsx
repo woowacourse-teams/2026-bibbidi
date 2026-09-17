@@ -1800,6 +1800,49 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
     expect(screen.queryByRole("complementary")).toBeNull();
   });
+
+  it("일정 수정 중 캐시 revision이 바뀌어도 새 조회 전까지 입력을 유지한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    const checklist = createAuthenticatedChecklist();
+    checklist.categories[0].items[0].appointments = [
+      {
+        date: "2026-09-20",
+        endTime: "2026-09-20T11:00:00",
+        id: 11,
+        isDone: false,
+        memo: "견적 확인",
+        place: "웨딩홀",
+        startTime: "2026-09-20T10:00:00",
+        title: "웨딩홀 상담",
+      },
+    ];
+    repositoryMocks.getChecklist
+      .mockResolvedValueOnce(checklist)
+      .mockImplementationOnce(() => new Promise(() => undefined));
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "웨딩홀 상담 일정 더보기",
+      }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
+    const titleInput = screen.getByLabelText(/제목/) as HTMLInputElement;
+    fireEvent.change(titleInput, { target: { value: "수정 중인 상담" } });
+
+    act(() => repositoryMocks.publishRevision());
+    await waitFor(() =>
+      expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2),
+    );
+
+    expect(
+      screen.getByRole("complementary", { name: "일정 수정" }),
+    ).toBeTruthy();
+    expect(titleInput.value).toBe("수정 중인 상담");
+  });
 });
 
 describe("ChecklistFeature 조회 상태와 요청 수명", () => {

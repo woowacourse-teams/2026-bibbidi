@@ -11,6 +11,7 @@ import {
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistItemStatus } from "../model/myChecklist";
 import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
+import { getChecklistPopoverStyle } from "./getChecklistPopoverStyle";
 import "./ChecklistTaskStatusEditor.css";
 
 interface ChecklistTaskStatusEditorProps {
@@ -96,33 +97,13 @@ export function ChecklistTaskStatusEditor({
       return;
     }
 
-    const triggerRect = trigger.getBoundingClientRect();
-    const width = Math.min(
-      POPOVER_WIDTH,
-      window.innerWidth - POPOVER_MARGIN * 2,
+    setPopoverStyle(
+      getChecklistPopoverStyle(trigger, popover, {
+        gap: POPOVER_GAP,
+        margin: POPOVER_MARGIN,
+        maxWidth: POPOVER_WIDTH,
+      }),
     );
-    const left = Math.min(
-      Math.max(POPOVER_MARGIN, triggerRect.right - width),
-      window.innerWidth - POPOVER_MARGIN - width,
-    );
-    const availableBelow = Math.max(
-      0,
-      window.innerHeight - triggerRect.bottom - POPOVER_GAP - POPOVER_MARGIN,
-    );
-    const availableAbove = Math.max(
-      0,
-      triggerRect.top - POPOVER_GAP - POPOVER_MARGIN,
-    );
-    const naturalHeight = popover.scrollHeight;
-    const placeAbove =
-      naturalHeight > availableBelow && availableAbove > availableBelow;
-    const maxHeight = placeAbove ? availableAbove : availableBelow;
-    const renderedHeight = Math.min(naturalHeight, maxHeight);
-    const top = placeAbove
-      ? triggerRect.top - POPOVER_GAP - renderedHeight
-      : triggerRect.bottom + POPOVER_GAP;
-
-    setPopoverStyle({ left, maxHeight, top, width });
   }, []);
 
   useLayoutEffect(() => {

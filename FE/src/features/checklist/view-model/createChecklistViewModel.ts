@@ -41,11 +41,15 @@ export interface ChecklistAppointmentViewModel {
   date: string;
   dateLabel: string;
   dayLabel: string;
+  endTime: string | null;
   id: number;
   isDone: boolean;
+  memo: string | null;
   memoLabel: string;
   monthLabel: string;
+  place: string | null;
   placeLabel: string;
+  startTime: string | null;
   timeLabel: string;
   title: string;
 }
@@ -121,11 +125,15 @@ function createAppointmentViewModel(
     date: appointment.date,
     dateLabel: formatScheduleDate(appointment.date),
     dayLabel: day === undefined ? appointment.date : `${day}일`,
+    endTime: appointment.endTime,
     id: appointment.id,
     isDone: appointment.isDone,
+    memo: appointment.memo,
     memoLabel: appointment.memo?.trim() || "메모 없음",
     monthLabel: month === undefined ? "날짜" : `${month}월`,
+    place: appointment.place,
     placeLabel: appointment.place?.trim() || "장소 없음",
+    startTime: appointment.startTime,
     timeLabel: getAppointmentTimeLabel(
       appointment.startTime,
       appointment.endTime,
