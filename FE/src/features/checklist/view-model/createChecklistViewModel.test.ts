@@ -101,7 +101,7 @@ describe("createChecklistViewModel", () => {
     ).toEqual([
       { status: "complete", statusLabel: "완료" },
       { status: "in-progress", statusLabel: "진행 중" },
-      { status: "incomplete", statusLabel: "미완료" },
+      { status: "incomplete", statusLabel: "예정" },
     ]);
   });
 

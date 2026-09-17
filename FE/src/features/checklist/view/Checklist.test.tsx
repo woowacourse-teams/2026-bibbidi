@@ -459,48 +459,75 @@ describe("Checklist 웹 상세 패널", () => {
 
     expect(removedTaskButton.isConnected).toBe(false);
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "예식장" }),
+      screen.getByRole("button", { name: "할 일 추가" }),
     );
   });
 
-  it("모바일에서는 공통 상세 콘텐츠를 전체 화면으로 표시하고 배경 목록을 비활성화한다", () => {
+  it("모바일에서는 공통 상세 콘텐츠를 바텀시트로 표시하고 배경 목록과 스크롤을 비활성화한다", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
-    render(<ChecklistHarness />);
+    const { container } = render(
+      <div data-page-scroll-container>
+        <ChecklistHarness />
+      </div>,
+    );
 
     const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
     fireEvent.click(task);
 
     expect(screen.queryByRole("complementary")).toBeNull();
-    const detailPage = screen.getByRole("region", { name: "웨딩홀 계약" });
-    expect(within(detailPage).getByText("예식장")).toBeTruthy();
-    expect(within(detailPage).getByText("계약 조건 확인")).toBeTruthy();
+    const bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    expect(bottomSheet.getAttribute("aria-modal")).toBe("true");
+    expect(within(bottomSheet).getByText("예식장")).toBeTruthy();
+    expect(within(bottomSheet).getByText("계약 조건 확인")).toBeTruthy();
     expect(
-      within(detailPage).getByRole("button", {
-        name: "체크리스트로 돌아가기",
+      within(bottomSheet).getByRole("button", {
+        name: "할 일 상세 닫기",
       }),
     ).toBe(document.activeElement);
 
     const background = document.querySelector(".checklist-workspace__main");
+    const scrollContainer = container.querySelector<HTMLElement>(
+      "[data-page-scroll-container]",
+    );
     expect(background?.getAttribute("aria-hidden")).toBe("true");
     expect(background?.hasAttribute("inert")).toBe(true);
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(scrollContainer?.style.overflow).toBe("hidden");
 
     fireEvent.click(
-      within(detailPage).getByRole("button", {
-        name: "체크리스트로 돌아가기",
+      within(bottomSheet).getByRole("button", {
+        name: "할 일 상세 닫기",
       }),
     );
 
-    expect(screen.queryByRole("region", { name: "웨딩홀 계약" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
+    expect(document.activeElement).toBe(task);
+    expect(document.body.style.overflow).toBe("");
+    expect(scrollContainer?.style.overflow).toBe("");
+
+    fireEvent.click(task);
+    const escapeSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    fireEvent.keyDown(escapeSheet, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
+    expect(document.activeElement).toBe(task);
+
+    fireEvent.click(task);
+    fireEvent.click(
+      document.querySelector(
+        ".checklist-detail-bottom-sheet__scrim",
+      ) as HTMLButtonElement,
+    );
+    expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
   });
 
-  it("모바일 전체 화면에서도 일정이 없으면 공통 빈 상태를 표시한다", () => {
+  it("모바일 바텀시트에서도 일정이 없으면 공통 빈 상태를 표시한다", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(<ChecklistHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: /웨딩홀 투어/ }));
 
-    const detailPage = screen.getByRole("region", { name: "웨딩홀 투어" });
+    const detailPage = screen.getByRole("dialog", { name: "웨딩홀 투어" });
     expect(
       within(detailPage).getByRole("heading", { name: "일정 0개" }),
     ).toBeTruthy();
@@ -518,14 +545,50 @@ describe("Checklist 웹 상세 패널", () => {
     act(() => media.setMatches(true));
 
     expect(screen.queryByRole("complementary")).toBeNull();
-    expect(screen.getByRole("region", { name: "웨딩홀 계약" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "웨딩홀 계약" })).toBeTruthy();
 
     act(() => media.setMatches(false));
 
-    expect(screen.queryByRole("region", { name: "웨딩홀 계약" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(
       screen.getByRole("complementary", { name: "웨딩홀 계약" }),
     ).toBeTruthy();
+  });
+});
+
+describe("Checklist 목록 표현", () => {
+  it("비로그인 사용자에게 로그인 시 현재 체크리스트를 저장할 수 있다고 안내한다", () => {
+    render(<ChecklistHarness />);
+
+    expect(
+      screen.getByText("로그인하면 체크리스트가 그대로 저장돼요."),
+    ).toBeTruthy();
+  });
+
+  it("전체 할 일이 0개면 하나의 빈 상태 문구를 표시한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel({
+          categories: [
+            { id: "10", items: [], title: "예식장" },
+            { id: "20", items: [], title: "스드메" },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("등록된 할 일이 없어요.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "예식장" })).toBeNull();
+    expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
+  });
+
+  it("목록 왼쪽 체크 표시 없이 완료 배경과 상태 문구를 유지한다", () => {
+    const { container } = render(<ChecklistHarness />);
+    const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
+
+    expect(container.querySelector(".checklist__completion-mark")).toBeNull();
+    expect(completedTask.closest(".checklist__task--complete")).not.toBeNull();
+    expect(within(completedTask).getByText("완료")).toBeTruthy();
   });
 });
 
@@ -542,7 +605,7 @@ describe("Checklist 할 일 편집", () => {
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
@@ -551,7 +614,7 @@ describe("Checklist 할 일 편집", () => {
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /카테고리 변경/ })).toBeNull();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     expect(
       within(screen.getByRole("complementary")).getByText("예식 준비"),
@@ -564,11 +627,11 @@ describe("Checklist 할 일 편집", () => {
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
     const trigger = screen.getByRole("button", {
-      name: "상태 변경, 현재 미완료",
+      name: "상태 변경, 현재 예정",
     });
 
     fireEvent.click(trigger);
-    const incomplete = screen.getByRole("option", { name: "미완료" });
+    const incomplete = screen.getByRole("option", { name: "예정" });
     const inProgress = screen.getByRole("option", { name: "진행 중" });
     const complete = screen.getByRole("option", { name: "완료" });
     expect(incomplete.getAttribute("aria-selected")).toBe("true");
@@ -592,11 +655,11 @@ describe("Checklist 할 일 편집", () => {
   it("상태 팝오버는 Escape와 바깥 클릭으로 닫고 트리거로 포커스를 복원한다", async () => {
     render(<EditableChecklistHarness />);
     const trigger = screen.getByRole("button", {
-      name: "상태 변경, 현재 미완료",
+      name: "상태 변경, 현재 예정",
     });
 
     fireEvent.click(trigger);
-    fireEvent.keyDown(screen.getByRole("option", { name: "미완료" }), {
+    fireEvent.keyDown(screen.getByRole("option", { name: "예정" }), {
       key: "Escape",
     });
     await waitFor(() => expect(document.activeElement).toBe(trigger));
@@ -614,7 +677,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
 
@@ -633,7 +696,7 @@ describe("Checklist 할 일 편집", () => {
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
     const trigger = screen.getByRole("button", {
-      name: "상태 변경, 현재 미완료",
+      name: "상태 변경, 현재 예정",
     });
 
     fireEvent.click(trigger);
@@ -661,7 +724,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -696,7 +759,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -730,7 +793,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
@@ -754,7 +817,7 @@ describe("Checklist 할 일 편집", () => {
     expect(screen.getByRole("listbox", { name: "카테고리 선택" })).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 미완료" }),
+      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
     );
     expect(screen.queryByRole("listbox", { name: "카테고리 선택" })).toBeNull();
     expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
@@ -931,7 +994,7 @@ describe("Checklist 할 일 편집", () => {
 
     act(() => media.setMatches(true));
     expect(
-      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+      screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
     expect(screen.getByRole("listbox")).toBeTruthy();
 
@@ -1040,11 +1103,11 @@ describe("Checklist 할 일 편집", () => {
     );
   });
 
-  it("모바일에서도 같은 공통 편집 컴포넌트를 사용하고 편집 Escape가 전체 화면을 닫지 않는다", () => {
+  it("모바일에서도 같은 공통 편집 컴포넌트를 사용하고 편집 Escape가 바텀시트를 닫지 않는다", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(<EditableChecklistHarness />);
 
-    const detailPage = screen.getByRole("region", {
+    const detailPage = screen.getByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
     fireEvent.click(
@@ -1056,7 +1119,7 @@ describe("Checklist 할 일 편집", () => {
     fireEvent.keyDown(input, { key: "Escape" });
 
     expect(
-      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+      screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
 
     fireEvent.click(
@@ -1071,22 +1134,22 @@ describe("Checklist 할 일 편집", () => {
 
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(
-      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+      screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
 
     fireEvent.click(
       within(detailPage).getByRole("button", {
-        name: "상태 변경, 현재 미완료",
+        name: "상태 변경, 현재 예정",
       }),
     );
     fireEvent.keyDown(
-      within(detailPage).getByRole("option", { name: "미완료" }),
+      within(detailPage).getByRole("option", { name: "예정" }),
       { key: "Escape" },
     );
 
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(
-      screen.getByRole("region", { name: "청첩장 문구 정하기" }),
+      screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
 });

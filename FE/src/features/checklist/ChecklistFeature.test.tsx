@@ -493,7 +493,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
     );
-    const detailPage = screen.getByRole("region", {
+    const detailPage = screen.getByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
     const addScheduleButton = within(detailPage).getByRole("button", {
@@ -513,8 +513,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
 
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("region", { name: "로컬 체크리스트 항목" })).toBe(
+    expect(
+      screen.queryByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeNull();
+    expect(screen.getByRole("dialog", { name: "로컬 체크리스트 항목" })).toBe(
       detailPage,
     );
     await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
@@ -1065,7 +1067,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     );
     renderChecklistFeature(["/checklist?taskId=checklist-item-500"], vi.fn());
 
-    const detailPage = await screen.findByRole("region", {
+    const detailPage = await screen.findByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
     fireEvent.click(
@@ -1093,7 +1095,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     });
 
     expect(screen.queryByRole("dialog", { name: "일정 추가" })).toBeNull();
-    const restoredPage = screen.getByRole("region", {
+    const restoredPage = screen.getByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
     await waitFor(() =>
@@ -1436,14 +1438,14 @@ describe("ChecklistFeature 상세 URL 선택", () => {
 
     expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
     expect(
-      screen.getByRole("region", { name: "로컬 체크리스트 항목" }),
+      screen.getByRole("dialog", { name: "로컬 체크리스트 항목" }),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
 
     expect(getCurrentUrl()).toBe("/checklist");
     expect(
-      screen.queryByRole("region", { name: "로컬 체크리스트 항목" }),
+      screen.queryByRole("dialog", { name: "로컬 체크리스트 항목" }),
     ).toBeNull();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
@@ -1455,8 +1457,11 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /로컬 체크리스트 항목/ }),
     );
+    const detailSheet = screen.getByRole("dialog", {
+      name: "로컬 체크리스트 항목",
+    });
     fireEvent.click(
-      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
     );
 
     expect(getCurrentUrl()).toBe("/checklist");
@@ -1473,18 +1478,18 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       "/checklist?filter=remaining&taskId=catalog-item-101",
     ]);
 
-    const detailPage = await screen.findByRole("region", {
+    const detailPage = await screen.findByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
     fireEvent.click(
       within(detailPage).getByRole("button", {
-        name: "체크리스트로 돌아가기",
+        name: "할 일 상세 닫기",
       }),
     );
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(
-      screen.queryByRole("region", { name: "로컬 체크리스트 항목" }),
+      screen.queryByRole("dialog", { name: "로컬 체크리스트 항목" }),
     ).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
@@ -1506,7 +1511,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       "/checklist?filter=remaining&taskId=catalog-item-101",
     ]);
 
-    const loadingDetailPage = screen.getByRole("region", {
+    const loadingDetailPage = screen.getByRole("dialog", {
       name: "할 일 상세",
     });
     expect(within(loadingDetailPage).getByRole("status")).toBeTruthy();
@@ -1515,18 +1520,18 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       rejectChecklist(new ChecklistQueryLoadError());
     });
 
-    const errorDetailPage = await screen.findByRole("region", {
+    const errorDetailPage = await screen.findByRole("dialog", {
       name: "할 일 상세",
     });
     expect(within(errorDetailPage).getByRole("alert")).toBeTruthy();
     fireEvent.click(
       within(errorDetailPage).getByRole("button", {
-        name: "체크리스트로 돌아가기",
+        name: "할 일 상세 닫기",
       }),
     );
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
-    expect(screen.queryByRole("region", { name: "할 일 상세" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "할 일 상세" })).toBeNull();
   });
 
   it("breakpoint 전환은 URL과 history를 변경하지 않고 같은 항목을 유지한다", async () => {
@@ -1545,7 +1550,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     act(() => media.setMatches(true));
     expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
     expect(
-      screen.getByRole("region", { name: "로컬 체크리스트 항목" }),
+      screen.getByRole("dialog", { name: "로컬 체크리스트 항목" }),
     ).toBeTruthy();
 
     act(() => media.setMatches(false));
@@ -1676,8 +1681,11 @@ describe("ChecklistFeature 상세 URL 선택", () => {
         name: "할 일 상세로 돌아가기",
       }),
     );
+    const detailSheet = screen.getByRole("dialog", {
+      name: "청첩장 문구 정하기",
+    });
     fireEvent.click(
-      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
     );
 
     expect(getCurrentUrl()).toBe("/planner");
@@ -1783,19 +1791,16 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
     expect(await screen.findByText("표시할 체크리스트가 없어요.")).toBeTruthy();
   });
 
-  it("항목이 없는 카테고리는 전체 빈 화면 대신 0개와 0%로 표시한다", async () => {
+  it("전체 할 일이 없으면 체크리스트 안에서 빈 상태를 안내한다", async () => {
     repositoryMocks.getChecklist.mockResolvedValue({
       categories: [{ id: "10", items: [], title: "빈 카테고리" }],
     });
 
     renderChecklistFeature();
 
-    const category = (
-      await screen.findByRole("heading", { name: "빈 카테고리" })
-    ).closest("section");
-    expect(category).not.toBeNull();
-    expect(within(category!).getByText("0개")).toBeTruthy();
-    expect(within(category!).getByText("0%")).toBeTruthy();
+    expect(await screen.findByText("등록된 할 일이 없어요.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "빈 카테고리" })).toBeNull();
     expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
   });
 
@@ -2076,7 +2081,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
 
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "상태 변경, 현재 미완료",
+        name: "상태 변경, 현재 예정",
       }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));

@@ -22,7 +22,7 @@ const statusOptions: readonly {
   label: string;
   status: ChecklistItemStatus;
 }[] = [
-  { label: "미완료", status: "prev" },
+  { label: "예정", status: "prev" },
   { label: "진행 중", status: "continue" },
   { label: "완료", status: "done" },
 ];

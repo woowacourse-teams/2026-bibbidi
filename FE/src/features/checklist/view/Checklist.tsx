@@ -1,4 +1,10 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import {
+  MouseEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
@@ -9,7 +15,7 @@ import "./Checklist.css";
 import { ChecklistAppointmentCreation } from "./ChecklistAppointmentCreation";
 import { ChecklistModalDialog } from "./ChecklistModalDialog";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
-import { ChecklistTaskDetailPage } from "./ChecklistTaskDetailPage";
+import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
@@ -65,8 +71,10 @@ export function Checklist({
       ),
   );
   const isMobileLayout = useIsMobileLayout();
+  const checklistRef = useRef<HTMLDivElement>(null);
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const addTaskButtonRef = useRef<HTMLButtonElement>(null);
+  const toolbarRef = useRef<HTMLElement>(null);
   const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
   const wasAppointmentCreationOpenRef = useRef(
     appointmentCreation?.isOpen ?? false,
@@ -110,6 +118,37 @@ export function Checklist({
       ? statusFeedback.errorMessage
       : undefined;
 
+  useLayoutEffect(() => {
+    const checklist = checklistRef.current;
+    const toolbar = toolbarRef.current;
+
+    if (!checklist || !toolbar) {
+      return;
+    }
+
+    const updateToolbarHeight = () => {
+      const toolbarHeight = toolbar.getBoundingClientRect().height;
+
+      if (toolbarHeight > 0) {
+        checklist.style.setProperty(
+          "--checklist-toolbar-height",
+          `${toolbarHeight}px`,
+        );
+      }
+    };
+
+    updateToolbarHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(updateToolbarHeight);
+    resizeObserver.observe(toolbar);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
 
@@ -121,7 +160,7 @@ export function Checklist({
       if (canRestoreFocus(previousTaskButton)) {
         previousTaskButton.focus();
       } else {
-        fallbackFocusRef.current?.focus();
+        (fallbackFocusRef.current ?? addTaskButtonRef.current)?.focus();
       }
     }
 
@@ -170,17 +209,13 @@ export function Checklist({
   }, [isAppointmentCreationOpen, selectedTaskContext]);
 
   useEffect(() => {
-    if (!selectedTaskContext || isAppointmentCreationOpen) {
+    if (!selectedTaskContext || isAppointmentCreationOpen || isMobileLayout) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (isMobileLayout) {
-          onBackTaskDetail();
-        } else {
-          onCloseTaskDetail();
-        }
+        onCloseTaskDetail();
       }
     };
 
@@ -188,9 +223,8 @@ export function Checklist({
 
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    isMobileLayout,
     isAppointmentCreationOpen,
-    onBackTaskDetail,
+    isMobileLayout,
     onCloseTaskDetail,
     selectedTaskContext,
   ]);
@@ -225,10 +259,6 @@ export function Checklist({
           : selectedTaskContext && !isMobileLayout
             ? " checklist-workspace--detail-open"
             : ""
-      }${
-        selectedTaskContext && isMobileLayout
-          ? " checklist-workspace--mobile-detail-open"
-          : ""
       }`}
     >
       <div
@@ -248,14 +278,18 @@ export function Checklist({
             : undefined
         }
       >
-        <div aria-label="결혼 준비 체크리스트" className="checklist">
-          <header className="checklist__toolbar">
+        <div
+          aria-label="결혼 준비 체크리스트"
+          className="checklist"
+          ref={checklistRef}
+        >
+          <header className="checklist__toolbar" ref={toolbarRef}>
             <div className="checklist__summary">
               <h1>체크리스트</h1>
               <p>
                 {isAuthenticated
                   ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
-                  : "기기에서 저장 중"}
+                  : "로그인하면 체크리스트가 그대로 저장돼요."}
               </p>
             </div>
             <button
@@ -271,124 +305,122 @@ export function Checklist({
             </button>
           </header>
 
-          {categories.map((category, categoryIndex) => {
-            const isExpanded = expandedCategoryIds.has(category.id);
-            const taskListId = `${category.id}-tasks`;
+          {tasks.length === 0 ? (
+            <p className="checklist__empty">등록된 할 일이 없어요.</p>
+          ) : (
+            categories.map((category, categoryIndex) => {
+              const isExpanded = expandedCategoryIds.has(category.id);
+              const taskListId = `${category.id}-tasks`;
 
-            return (
-              <section
-                aria-labelledby={`${category.id}-title`}
-                className="checklist__category"
-                key={category.id}
-              >
-                <h2 className="checklist__category-heading">
-                  <button
-                    aria-controls={taskListId}
-                    aria-expanded={isExpanded}
-                    aria-labelledby={`${category.id}-title`}
-                    className="checklist__category-header"
-                    onClick={() => toggleCategory(category.id)}
-                    ref={categoryIndex === 0 ? fallbackFocusRef : undefined}
-                    type="button"
-                  >
-                    <span className="checklist__category-title-area">
-                      <span
-                        aria-hidden="true"
-                        className={`checklist__disclosure${
-                          isExpanded ? " checklist__disclosure--expanded" : ""
-                        }`}
-                      >
-                        ›
-                      </span>
-                      <span
-                        className="checklist__category-title"
-                        id={`${category.id}-title`}
-                      >
-                        {category.title}
-                      </span>
-                      <span className="checklist__category-count">
-                        {category.countLabel}
-                      </span>
-                    </span>
-
-                    <span className="checklist__progress-area">
-                      <span
-                        aria-label={`${category.title} 진행률`}
-                        aria-valuemax={100}
-                        aria-valuemin={0}
-                        aria-valuenow={category.progress}
-                        className="checklist__progress"
-                        role="progressbar"
-                      >
-                        <span
-                          className="checklist__progress-fill"
-                          style={{ width: `${category.progress}%` }}
-                        />
-                      </span>
-                      <span className="checklist__progress-label">
-                        {category.progressLabel}
-                      </span>
-                    </span>
-                  </button>
-                </h2>
-
-                <ul
-                  aria-label={`${category.title} 할 일`}
-                  className="checklist__tasks"
-                  hidden={!isExpanded}
-                  id={taskListId}
+              return (
+                <section
+                  aria-labelledby={`${category.id}-title`}
+                  className="checklist__category"
+                  key={category.id}
                 >
-                  {category.tasks.map((task) => {
-                    const isSelected = selectedTaskId === task.id;
+                  <h2 className="checklist__category-heading">
+                    <button
+                      aria-controls={taskListId}
+                      aria-expanded={isExpanded}
+                      aria-labelledby={`${category.id}-title`}
+                      className="checklist__category-header"
+                      onClick={() => toggleCategory(category.id)}
+                      ref={categoryIndex === 0 ? fallbackFocusRef : undefined}
+                      type="button"
+                    >
+                      <span className="checklist__category-title-area">
+                        <span
+                          aria-hidden="true"
+                          className={`checklist__disclosure${
+                            isExpanded ? " checklist__disclosure--expanded" : ""
+                          }`}
+                        >
+                          ›
+                        </span>
+                        <span
+                          className="checklist__category-title"
+                          id={`${category.id}-title`}
+                        >
+                          {category.title}
+                        </span>
+                        <span className="checklist__category-count">
+                          {category.countLabel}
+                        </span>
+                      </span>
 
-                    return (
-                      <li
-                        className={`checklist__task checklist__task--${task.status}${
-                          isSelected ? " checklist__task--selected" : ""
-                        }`}
-                        key={task.id}
-                      >
-                        <button
-                          aria-controls={
-                            isMobileLayout
-                              ? "checklist-task-detail-page"
-                              : "checklist-task-detail-panel"
-                          }
-                          aria-expanded={isSelected}
-                          className="checklist__task-button"
-                          onClick={(event) => selectTask(task.id, event)}
-                          ref={(button) => {
-                            if (button) {
-                              taskButtonRefs.current.set(task.id, button);
-                            } else {
-                              taskButtonRefs.current.delete(task.id);
-                            }
-                          }}
-                          type="button"
+                      <span className="checklist__progress-area">
+                        <span
+                          aria-label={`${category.title} 진행률`}
+                          aria-valuemax={100}
+                          aria-valuemin={0}
+                          aria-valuenow={category.progress}
+                          className="checklist__progress"
+                          role="progressbar"
                         >
                           <span
-                            aria-hidden="true"
-                            className="checklist__completion-mark"
+                            className="checklist__progress-fill"
+                            style={{ width: `${category.progress}%` }}
+                          />
+                        </span>
+                        <span className="checklist__progress-label">
+                          {category.progressLabel}
+                        </span>
+                      </span>
+                    </button>
+                  </h2>
+
+                  <ul
+                    aria-label={`${category.title} 할 일`}
+                    className="checklist__tasks"
+                    hidden={!isExpanded}
+                    id={taskListId}
+                  >
+                    {category.tasks.map((task) => {
+                      const isSelected = selectedTaskId === task.id;
+
+                      return (
+                        <li
+                          className={`checklist__task checklist__task--${task.status}${
+                            isSelected ? " checklist__task--selected" : ""
+                          }`}
+                          key={task.id}
+                        >
+                          <button
+                            aria-controls={
+                              isMobileLayout
+                                ? "checklist-task-detail-bottom-sheet"
+                                : "checklist-task-detail-panel"
+                            }
+                            aria-expanded={isSelected}
+                            className="checklist__task-button"
+                            onClick={(event) => selectTask(task.id, event)}
+                            ref={(button) => {
+                              if (button) {
+                                taskButtonRefs.current.set(task.id, button);
+                              } else {
+                                taskButtonRefs.current.delete(task.id);
+                              }
+                            }}
+                            type="button"
                           >
-                            {task.status === "complete" ? "✓" : ""}
-                          </span>
-                          <span className="checklist__task-title">
-                            {task.title}
-                          </span>
-                          <span className="checklist__task-schedule">
-                            {task.schedule}
-                          </span>
-                          <span className="checklist__task-status">
-                            {task.statusLabel}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+                            <span className="checklist__task-title">
+                              {task.title}
+                            </span>
+                            <span className="checklist__task-schedule">
+                              {task.schedule}
+                            </span>
+                            <span className="checklist__task-status">
+                              {task.statusLabel}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -419,11 +451,11 @@ export function Checklist({
         isMobileLayout &&
         !isTaskCreationOpen &&
         !isAppointmentCreationOpen ? (
-          <ChecklistTaskDetailPage
+          <ChecklistTaskDetailBottomSheet
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
-            onBack={onBackTaskDetail}
+            onClose={onBackTaskDetail}
             onRequestScheduleCreation={onRequestScheduleCreation}
             task={selectedTaskContext.task}
           />

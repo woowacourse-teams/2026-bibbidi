@@ -40,13 +40,18 @@
 }
 
 .checklist {
-  overflow: hidden;
+  --checklist-toolbar-height: 88px;
+
+  overflow: clip;
   border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: 12px;
   background: var(--color-bg-layer-default);
 }
 
 .checklist__toolbar {
+  position: sticky;
+  z-index: 3;
+  top: 0;
   display: flex;
   min-height: 88px;
   align-items: center;
@@ -54,6 +59,7 @@
   gap: 16px;
   padding: 16px;
   border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  background: var(--color-bg-layer-default);
 }
 
 .checklist__summary {
@@ -115,6 +121,9 @@
 }
 
 .checklist__category-heading {
+  position: sticky;
+  z-index: 2;
+  top: var(--checklist-toolbar-height);
   margin: 0;
 }
 
@@ -219,6 +228,18 @@
   list-style: none;
 }
 
+.checklist__empty {
+  display: grid;
+  min-height: 160px;
+  margin: 0;
+  padding: 32px 16px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  place-items: center;
+  text-align: center;
+}
+
 .checklist__task {
   min-height: 56px;
   border-bottom: 1px solid var(--color-stroke-neutral-weak);
@@ -229,7 +250,7 @@
   display: grid;
   width: 100%;
   min-height: 56px;
-  grid-template-columns: 20px minmax(0, 1fr) clamp(72px, 8%, 120px) 64px;
+  grid-template-columns: minmax(0, 1fr) clamp(72px, 8%, 120px) 64px;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
@@ -254,24 +275,6 @@
 
 .checklist__task--complete {
   background: var(--color-bg-positive-subtle);
-}
-
-.checklist__completion-mark {
-  display: grid;
-  width: 18px;
-  height: 18px;
-  place-items: center;
-  border: 1.5px solid var(--color-stroke-neutral);
-  border-radius: 50%;
-  color: var(--color-fg-positive);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.checklist__task--complete .checklist__completion-mark {
-  border-color: var(--color-stroke-brand-solid);
-  background: var(--color-bg-brand-solid);
-  color: var(--color-fg-on-brand);
 }
 
 .checklist__task-title {
@@ -331,10 +334,6 @@
 
   .checklist-workspace--add-open .checklist-workspace__main {
     padding: 0;
-  }
-
-  .checklist-workspace--mobile-detail-open .checklist-workspace__main {
-    visibility: hidden;
   }
 
   .checklist__toolbar {

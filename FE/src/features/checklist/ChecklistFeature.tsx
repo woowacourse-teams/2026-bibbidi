@@ -29,7 +29,7 @@ import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationComma
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
-import { ChecklistTaskDetailPageShell } from "./view/ChecklistTaskDetailPage";
+import { ChecklistTaskDetailBottomSheetShell } from "./view/ChecklistTaskDetailBottomSheet";
 
 type ChecklistRequestState =
   | { audience?: ChecklistAudience; status: "loading" }
@@ -503,12 +503,12 @@ export function ChecklistFeature({
 
   const renderChecklistState = (state: ReactNode) =>
     isMobileLayout && selectedTaskId !== null ? (
-      <ChecklistTaskDetailPageShell
-        onBack={backFromTaskDetail}
+      <ChecklistTaskDetailBottomSheetShell
+        onClose={backFromTaskDetail}
         title="할 일 상세"
       >
         {state}
-      </ChecklistTaskDetailPageShell>
+      </ChecklistTaskDetailBottomSheetShell>
     ) : (
       state
     );
