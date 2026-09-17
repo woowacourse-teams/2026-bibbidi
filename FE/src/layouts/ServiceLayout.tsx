@@ -1,4 +1,10 @@
-import { MouseEvent, useLayoutEffect, useRef, useState } from "react";
+import {
+  MouseEvent,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
@@ -7,6 +13,7 @@ import {
   LoginRequiredDialog,
   PLANNER_RETURN_PATH,
   useAuth,
+  useLogout,
 } from "../features/auth";
 import { FeedbackFeature } from "../features/feedback";
 import { useIsMobileLayout } from "../shared/responsive";
@@ -15,9 +22,14 @@ import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
 
 export function ServiceLayout() {
-  const { authState, refreshAuth } = useAuth();
+  const { authState, endAuthentication, refreshAuth } = useAuth();
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
+  const handleLogoutSuccess = useCallback(() => {
+    endAuthentication();
+    navigate("/", { replace: true });
+  }, [endAuthentication, navigate]);
+  const logout = useLogout({ onSuccess: handleLogoutSuccess });
   const contentRef = useRef<HTMLDivElement>(null);
   const [plannerDialogTrigger, setPlannerDialogTrigger] =
     useState<HTMLAnchorElement | null>(null);
@@ -77,6 +89,9 @@ export function ServiceLayout() {
                       onAuthenticationRequired={refreshAuth}
                     />
                   ),
+                  isLoggingOut: logout.isLoggingOut,
+                  logoutErrorMessage: logout.errorMessage,
+                  onLogout: logout.submit,
                   userInitial: authState.user.nickname.charAt(0),
                 }
               : authState.status === "guest"

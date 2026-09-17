@@ -62,6 +62,7 @@
 }
 
 .app-header__right {
+  position: relative;
   flex: none;
   gap: 10px;
 }
@@ -77,6 +78,80 @@
   color: var(--color-fg-neutral);
   font-size: 13px;
   font-weight: 700;
+}
+
+.app-header__logout {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+  cursor: pointer;
+}
+
+.app-header__logout:hover:not(:disabled) {
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral);
+}
+
+.app-header__logout:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+
+.app-header__logout svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-header__logout-error {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 8px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  color: var(--color-fg-neutral);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-header__logout-error button {
+  flex: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.app-header__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .app-header__guest-actions {
@@ -136,7 +211,8 @@
   transform: translateY(-50%);
 }
 
-.app-header a:focus-visible {
+.app-header a:focus-visible,
+.app-header button:focus-visible {
   outline: 3px solid var(--color-stroke-focus-ring);
   outline-offset: 2px;
 }
@@ -173,6 +249,11 @@
     height: 36px;
   }
 
+  .app-header__logout {
+    width: 36px;
+    height: 36px;
+  }
+
   .app-header__auth-pending {
     width: 108px;
   }
@@ -181,6 +262,17 @@
 @media (max-width: 390px) {
   .app-header__inner {
     width: calc(100% - 24px);
+    gap: 8px;
+  }
+
+  .app-header__right {
+    gap: 4px;
+  }
+
+  .app-header__user,
+  .app-header__logout {
+    width: 32px;
+    height: 32px;
   }
 
   .app-header__login,

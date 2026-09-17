@@ -1,4 +1,5 @@
 export { AuthProvider, useAuth } from "./AuthProvider";
+export { useLogout } from "./useLogout";
 export { LoginRequiredDialog } from "./LoginRequiredDialog";
 export { PlannerAccessGuard } from "./PlannerAccessGuard";
 export {

@@ -2,6 +2,7 @@ import {
   createContext,
   ReactNode,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
 } from "react";
@@ -35,6 +36,13 @@ export function MyChecklistProvider({
 
     return createMyChecklistRepositoriesDependency();
   }, [sessionKey]);
+
+  useEffect(
+    () => () => {
+      scope.queryRepository.invalidate();
+    },
+    [scope],
+  );
 
   return (
     <MyChecklistContext.Provider value={scope}>

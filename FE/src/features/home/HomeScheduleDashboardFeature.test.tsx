@@ -56,6 +56,7 @@ beforeEach(() => {
     authState: { status: "authenticated", user: { nickname: "비비디" } },
     beginAuthentication: vi.fn(),
     completeAuthentication: vi.fn(),
+    endAuthentication: vi.fn(),
     refreshAuth,
   });
 });

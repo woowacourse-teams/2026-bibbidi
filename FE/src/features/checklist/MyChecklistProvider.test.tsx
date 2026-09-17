@@ -12,7 +12,10 @@ import {
   useMyChecklistQueryRepository,
 } from "./MyChecklistProvider";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
-import { MyChecklistQueryRepository } from "./repository/myChecklistQueryRepository";
+import {
+  MyChecklistQueryRepository,
+  MyChecklistRequestAbortedError,
+} from "./repository/myChecklistQueryRepository";
 
 interface RepositoryObserverProps {
   onRepositories: (
@@ -106,6 +109,38 @@ describe("MyChecklistProvider", () => {
     expect(observeRepositories.mock.calls[2][1]).not.toBe(
       observeRepositories.mock.calls[1][1],
     );
+  });
+
+  it("세션 전환 시 이전 체크리스트 조회를 취소한다", async () => {
+    const requestSignal: { current?: AbortSignal } = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        requestSignal.current = init.signal ?? undefined;
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        });
+      }),
+    );
+    const observeRepositories = vi.fn();
+    const observer = (
+      <RepositoryObserver onRepositories={observeRepositories} />
+    );
+    const { rerender } = render(
+      renderProvider(observer, "authenticated:first-user"),
+    );
+    const firstQueryRepository = observeRepositories.mock
+      .calls[0][1] as MyChecklistQueryRepository;
+    const rejectedRequest = expect(
+      firstQueryRepository.getChecklist(),
+    ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
+
+    rerender(renderProvider(observer, "guest"));
+
+    await rejectedRequest;
+    expect(requestSignal.current?.aborted).toBe(true);
   });
 
   it("Provider 밖에서 공통 저장소를 요청하면 사용 오류를 알린다", () => {
