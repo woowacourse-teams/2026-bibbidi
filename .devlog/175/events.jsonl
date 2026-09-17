@@ -111,3 +111,4 @@
 {"type":"USER_PROMPTED","issue":175,"turnId":"01a0adb1-f5f4-7f02-965f-de8c06949363","prompt":"PR 생성 다시 ㄱㄱ","redacted":false,"timestamp":"2026-09-17T04:48:37.142Z"}
 {"type":"USER_PROMPTED","issue":175,"turnId":"01a0adb2-0bf2-7be0-ad0c-2596d35376ad","prompt":"PR 생성 다시 ㄱㄱ","redacted":false,"timestamp":"2026-09-17T04:48:42.961Z"}
 {"type":"PR_PLANNED","issue":175,"summary":["누락된 일정 완료·수정 API와 현재 코드 기준 예외 응답을 REST Docs 및 Swagger 문서에 추가","일정 소유권 검증 통합 테스트를 보강","Codex에서는 permissionDecision allow를 생략하고 Claude에서는 유지하도록 Hook 응답 호환성을 보완"],"review":["[REQUIRED] 완료 상태 변경의 true/false 및 400/403/404 문서가 실제 API 계약과 맞는지 확인","[REQUIRED] Agent별 Hook adapter가 deny, updatedInput, additionalContext를 보존하는지 확인","[CAUTION] Boolean 원시 요청 본문은 restdocs-api-spec 0.20.0 제약으로 범용 스키마가 생성되며 true/false 예시는 유지됨"],"timestamp":"2026-09-17T04:48:57.835Z"}
+{"type":"PR_REQUESTED","issue":175,"timestamp":"2026-09-17T04:49:58.933Z"}
