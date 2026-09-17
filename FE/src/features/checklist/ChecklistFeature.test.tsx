@@ -200,6 +200,15 @@ function getCurrentUrl() {
   return screen.getByTestId("current-url").textContent;
 }
 
+function closeMobileTaskDetail(dialog: HTMLElement) {
+  fireEvent.click(
+    document.querySelector(
+      ".checklist-detail-bottom-sheet__scrim",
+    ) as HTMLButtonElement,
+  );
+  fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+}
+
 beforeEach(() => {
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
@@ -1450,7 +1459,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
-  it("모바일 목록에서 연 상세의 상단 뒤로가기는 중복 목록 entry를 남기지 않는다", async () => {
+  it("모바일 목록에서 연 상세의 스크림 닫기는 중복 목록 entry를 남기지 않는다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     renderChecklistFeature(["/outside", "/checklist"]);
 
@@ -1461,8 +1470,17 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       name: "로컬 체크리스트 항목",
     });
     fireEvent.click(
-      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
+      document.querySelector(
+        ".checklist-detail-bottom-sheet__scrim",
+      ) as HTMLButtonElement,
     );
+
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
+    expect(
+      detailSheet.closest(".checklist-detail-bottom-sheet")?.className,
+    ).toContain("bottom-sheet-dismiss--closing");
+
+    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
 
     expect(getCurrentUrl()).toBe("/checklist");
 
@@ -1471,7 +1489,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
-  it("모바일 상세 직접 접근의 상단 뒤로가기는 현재 entry를 목록으로 교체한다", async () => {
+  it("모바일 상세 직접 접근의 스크림 닫기는 현재 entry를 목록으로 교체한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     renderChecklistFeature([
       "/outside",
@@ -1481,11 +1499,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailPage = await screen.findByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
-    fireEvent.click(
-      within(detailPage).getByRole("button", {
-        name: "할 일 상세 닫기",
-      }),
-    );
+    closeMobileTaskDetail(detailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(
@@ -1524,11 +1538,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       name: "할 일 상세",
     });
     expect(within(errorDetailPage).getByRole("alert")).toBeTruthy();
-    fireEvent.click(
-      within(errorDetailPage).getByRole("button", {
-        name: "할 일 상세 닫기",
-      }),
-    );
+    closeMobileTaskDetail(errorDetailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(screen.queryByRole("dialog", { name: "할 일 상세" })).toBeNull();
@@ -1684,9 +1694,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
-    fireEvent.click(
-      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
-    );
+    closeMobileTaskDetail(detailSheet);
 
     expect(getCurrentUrl()).toBe("/planner");
   });

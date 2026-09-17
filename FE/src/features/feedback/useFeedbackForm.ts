@@ -6,7 +6,11 @@ import type { FeedbackSentiment } from "./model/feedback";
 
 const SNACKBAR_DURATION_MS = 2_000;
 
-export function useFeedbackForm() {
+interface UseFeedbackFormOptions {
+  isMobile: boolean;
+}
+
+export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
   const [isOpen, setIsOpen] = useState(false);
   const [sentiment, setSentiment] = useState<FeedbackSentiment | null>(null);
   const [content, setContent] = useState("");
@@ -18,7 +22,7 @@ export function useFeedbackForm() {
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || isMobile) {
       return;
     }
 
@@ -50,7 +54,7 @@ export function useFeedbackForm() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isSubmitting]);
+  }, [isMobile, isOpen, isSubmitting]);
 
   useEffect(() => {
     if (!isSnackbarVisible) {

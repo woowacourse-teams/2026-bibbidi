@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-
+import { useBottomSheetDismiss } from "../../../shared/bottom-sheet/useBottomSheetDismiss";
 import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
 import type { FeedbackFormViewProps } from "./feedbackFormView";
 import { FeedbackRatingField } from "./FeedbackRatingField";
@@ -25,7 +24,6 @@ function MessageIcon() {
 
 export function FeedbackBottomSheet({
   canSubmit,
-  closeButtonRef,
   content,
   errorMessage,
   isSubmitting,
@@ -35,47 +33,67 @@ export function FeedbackBottomSheet({
   onSubmit,
   sentiment,
 }: FeedbackFormViewProps) {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
+  const {
+    dialogRef,
+    finishDrag,
+    handleDragKeyDown,
+    handleDragMove,
+    handleDragStart,
+    handleRef,
+    handleTransitionEnd,
+    isClosing,
+    isDragging,
+    requestDismiss,
+    rootStyle,
+  } = useBottomSheetDismiss({
+    canDismiss: !isSubmitting,
+    onDismiss: onClose,
+  });
 
   return (
-    <div className="feedback-bottom-sheet">
+    <div
+      className={`feedback-bottom-sheet bottom-sheet-dismiss${
+        isDragging ? " bottom-sheet-dismiss--dragging" : ""
+      }${isClosing ? " bottom-sheet-dismiss--closing" : ""}`}
+      style={rootStyle}
+    >
       <button
         aria-label="피드백 창 닫기"
-        className="feedback-bottom-sheet__scrim"
+        className="feedback-bottom-sheet__scrim bottom-sheet-dismiss__scrim"
         disabled={isSubmitting}
-        onClick={onClose}
+        onClick={requestDismiss}
         tabIndex={-1}
         type="button"
       />
       <section
         aria-labelledby="feedback-bottom-sheet-title"
         aria-modal="true"
-        className="feedback-bottom-sheet__content"
+        className="feedback-bottom-sheet__content bottom-sheet-dismiss__dialog"
+        onTransitionEnd={handleTransitionEnd}
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
-        <div aria-hidden="true" className="feedback-bottom-sheet__handle-area">
-          <span className="feedback-bottom-sheet__handle" />
-        </div>
+        <button
+          aria-label="아래로 밀어 피드백 창 닫기"
+          className="feedback-bottom-sheet__handle-area bottom-sheet-dismiss__handle-area"
+          disabled={isSubmitting}
+          onKeyDown={handleDragKeyDown}
+          onPointerCancel={finishDrag}
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={finishDrag}
+          ref={handleRef}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="feedback-bottom-sheet__handle bottom-sheet-dismiss__handle"
+          />
+        </button>
 
         <header className="feedback-bottom-sheet__header">
           <h2 id="feedback-bottom-sheet-title">비비디, 어떠셨나요?</h2>
-          <button
-            aria-label="피드백 창 닫기"
-            className="feedback-bottom-sheet__close"
-            disabled={isSubmitting}
-            onClick={onClose}
-            ref={closeButtonRef}
-            type="button"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
         </header>
 
         <form aria-busy={isSubmitting} onSubmit={onSubmit}>

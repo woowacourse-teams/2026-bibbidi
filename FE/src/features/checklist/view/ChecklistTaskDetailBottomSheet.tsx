@@ -1,11 +1,11 @@
-import { ReactNode, useEffect, useEffectEvent, useRef } from "react";
+import { ReactNode } from "react";
 
+import { useBottomSheetDismiss } from "../../../shared/bottom-sheet/useBottomSheetDismiss";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import {
   ChecklistCategoryViewModel,
   ChecklistTaskViewModel,
 } from "../view-model/createChecklistViewModel";
-import { containTabFocus } from "./containTabFocus";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
 import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailBottomSheet.css";
@@ -26,99 +26,68 @@ interface ChecklistTaskDetailBottomSheetShellProps {
   titleId?: string;
 }
 
-function CloseIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <path d="m6 6 12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
 export function ChecklistTaskDetailBottomSheetShell({
   children,
   onClose,
   title,
   titleId = "checklist-task-detail-bottom-sheet-title",
 }: ChecklistTaskDetailBottomSheetShellProps) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const handleClose = useEffectEvent(onClose);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const scrollContainer = document.querySelector<HTMLElement>(
-      "[data-page-scroll-container]",
-    );
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousContainerOverflow = scrollContainer?.style.overflow;
-
-    document.body.style.overflow = "hidden";
-    if (scrollContainer) {
-      scrollContainer.style.overflow = "hidden";
-    }
-    closeButtonRef.current?.focus({ preventScroll: true });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!dialog?.contains(event.target as Node)) {
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        handleClose();
-        return;
-      }
-
-      containTabFocus(event, dialog);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousBodyOverflow;
-      if (scrollContainer) {
-        scrollContainer.style.overflow = previousContainerOverflow ?? "";
-      }
-    };
-  }, []);
+  const {
+    dialogRef,
+    finishDrag,
+    handleDragKeyDown,
+    handleDragMove,
+    handleDragStart,
+    handleRef,
+    handleTransitionEnd,
+    isClosing,
+    isDragging,
+    requestDismiss,
+    rootStyle,
+  } = useBottomSheetDismiss({ onDismiss: onClose });
 
   return (
-    <div className="checklist-detail-bottom-sheet">
+    <div
+      className={`checklist-detail-bottom-sheet bottom-sheet-dismiss${
+        isDragging ? " bottom-sheet-dismiss--dragging" : ""
+      }${isClosing ? " bottom-sheet-dismiss--closing" : ""}`}
+      style={rootStyle}
+    >
       <button
         aria-label="할 일 상세 닫기"
-        className="checklist-detail-bottom-sheet__scrim"
-        onClick={onClose}
+        className="checklist-detail-bottom-sheet__scrim bottom-sheet-dismiss__scrim"
+        onClick={requestDismiss}
         tabIndex={-1}
         type="button"
       />
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className="checklist-detail-bottom-sheet__dialog"
+        className="checklist-detail-bottom-sheet__dialog bottom-sheet-dismiss__dialog"
         id="checklist-task-detail-bottom-sheet"
+        onTransitionEnd={handleTransitionEnd}
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
       >
-        <div
-          aria-hidden="true"
-          className="checklist-detail-bottom-sheet__handle-area"
+        <button
+          aria-label="아래로 밀어 할 일 상세 닫기"
+          className="checklist-detail-bottom-sheet__handle-area bottom-sheet-dismiss__handle-area"
+          onKeyDown={handleDragKeyDown}
+          onPointerCancel={finishDrag}
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={finishDrag}
+          ref={handleRef}
+          type="button"
         >
-          <span className="checklist-detail-bottom-sheet__handle" />
-        </div>
+          <span
+            aria-hidden="true"
+            className="checklist-detail-bottom-sheet__handle bottom-sheet-dismiss__handle"
+          />
+        </button>
         <header className="checklist-detail-bottom-sheet__header">
           {typeof title === "string" ? <h2 id={titleId}>{title}</h2> : title}
-          <button
-            aria-label="할 일 상세 닫기"
-            className="checklist-detail-bottom-sheet__close"
-            onClick={onClose}
-            ref={closeButtonRef}
-            type="button"
-          >
-            <CloseIcon />
-          </button>
         </header>
         {children}
       </section>
