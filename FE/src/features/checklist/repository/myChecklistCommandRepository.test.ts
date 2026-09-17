@@ -23,6 +23,11 @@ import {
   RemoteAppointmentCreationTimeoutError,
 } from "../data-source/remoteAppointmentCreationDataSource";
 import {
+  RemoteAppointmentManagementApiError,
+  RemoteAppointmentManagementRequestAbortedError,
+} from "../data-source/remoteAppointmentManagementDataSource";
+import { AppointmentManagementError } from "../model/appointmentManagement";
+import {
   ChecklistItemChangeError,
   createMyChecklistCommandRepository,
   CustomChecklistItemCreationError,
@@ -37,6 +42,7 @@ import {
 
 function createDataSource(): RemoteMyChecklistCommandDataSource {
   return {
+    changeAppointmentCompletion: vi.fn(),
     changeChecklistItemCategory: vi.fn(),
     changeChecklistItemStatus: vi.fn(),
     changeChecklistItemTitle: vi.fn(),
@@ -44,12 +50,17 @@ function createDataSource(): RemoteMyChecklistCommandDataSource {
     createAppointment: vi.fn(),
     createCustomChecklistItem: vi.fn(),
     hasRemainingAppointments: vi.fn(),
+    deleteAppointment: vi.fn(),
+    updateAppointment: vi.fn(),
   };
 }
 
 function createQueryRepository(exists = true): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyAppointmentCompletionUpdate: vi.fn().mockReturnValue(true),
+    applyAppointmentRemoval: vi.fn().mockReturnValue(true),
+    applyAppointmentUpdate: vi.fn().mockReturnValue(true),
     applyItemCategoryUpdate: vi.fn().mockReturnValue(true),
     applyItemTitleUpdate: vi.fn().mockReturnValue(true),
     getChecklist: vi.fn().mockResolvedValue({ exists, items: [] }),
@@ -133,6 +144,115 @@ describe("MyChecklistCommandRepository.createAppointment", () => {
     await expect(
       repository.createAppointment(500, appointmentRequest),
     ).rejects.toBeInstanceOf(MyChecklistRequestAbortedError);
+  });
+});
+
+describe("MyChecklistCommandRepository 일정 관리", () => {
+  it("완료 응답을 공통 캐시에 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.changeAppointmentCompletion).mockResolvedValue({
+      checklistItemDone: false,
+      checklistItemId: 500,
+      id: 11,
+      isDone: true,
+    });
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await repository.changeAppointmentCompletion(11, true);
+
+    expect(
+      queryRepository.applyAppointmentCompletionUpdate,
+    ).toHaveBeenCalledWith(500, 11, true, false);
+  });
+
+  it("수정 성공 응답의 일정 필드만 공통 캐시에 반영한다", async () => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.updateAppointment).mockResolvedValue({
+      ...appointmentRequest,
+      checklistItemId: 500,
+      conflicts: [],
+      id: 11,
+      isDone: true,
+    });
+    const queryRepository = createQueryRepository();
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await repository.updateAppointment(11, 500, appointmentRequest);
+
+    expect(queryRepository.applyAppointmentUpdate).toHaveBeenCalledWith(500, {
+      ...appointmentRequest,
+      id: 11,
+      isDone: true,
+    });
+  });
+
+  it("삭제 성공 후 캐시에서 해당 일정만 제거한다", async () => {
+    const dataSource = createDataSource();
+    const queryRepository = createQueryRepository();
+    vi.mocked(queryRepository.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [
+        {
+          appointments: [
+            {
+              ...appointmentRequest,
+              id: 11,
+              isDone: false,
+            },
+          ],
+          categoryId: 1,
+          id: 500,
+          sourceCatalogItemId: null,
+          status: "continue",
+          title: "웨딩홀 계약",
+        },
+      ],
+    });
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+
+    await repository.deleteAppointment(11);
+
+    expect(dataSource.deleteAppointment).toHaveBeenCalledWith(11, undefined);
+    expect(queryRepository.applyAppointmentRemoval).toHaveBeenCalledWith(
+      500,
+      11,
+    );
+  });
+
+  it.each([
+    [
+      new RemoteAppointmentManagementApiError("update", 401, 201),
+      MyChecklistAuthenticationRequiredError,
+    ],
+    [
+      new RemoteAppointmentManagementApiError("delete", 403, 203),
+      AppointmentManagementError,
+    ],
+    [
+      new RemoteAppointmentManagementRequestAbortedError(),
+      MyChecklistRequestAbortedError,
+    ],
+  ])("일정 관리 원격 오류를 기능 오류로 변환한다", async (error, expected) => {
+    const dataSource = createDataSource();
+    vi.mocked(dataSource.updateAppointment).mockRejectedValue(error);
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      createQueryRepository(),
+    );
+
+    await expect(
+      repository.updateAppointment(11, 500, appointmentRequest),
+    ).rejects.toBeInstanceOf(expected);
   });
 });
 

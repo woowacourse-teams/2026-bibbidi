@@ -13,12 +13,20 @@ import {
 } from "../data-source/remoteMyChecklistCommandDataSource";
 import {
   AppointmentCreationRequest,
+  AppointmentCreationResponse,
   RemoteAppointmentCreationApiError,
   RemoteAppointmentCreationContractError,
   RemoteAppointmentCreationNetworkError,
   RemoteAppointmentCreationRequestAbortedError,
   RemoteAppointmentCreationTimeoutError,
 } from "../data-source/remoteAppointmentCreationDataSource";
+import {
+  RemoteAppointmentManagementApiError,
+  RemoteAppointmentManagementContractError,
+  RemoteAppointmentManagementNetworkError,
+  RemoteAppointmentManagementRequestAbortedError,
+  RemoteAppointmentManagementTimeoutError,
+} from "../data-source/remoteAppointmentManagementDataSource";
 import {
   ChecklistItemStatus,
   MyChecklistItemModel,
@@ -28,17 +36,27 @@ import {
   AppointmentCreationFailureReason,
 } from "../model/appointmentCreation";
 import {
+  AppointmentManagementError,
+  AppointmentManagementFailureReason,
+} from "../model/appointmentManagement";
+import {
   MyChecklistAuthenticationRequiredError,
   MyChecklistQueryRepository,
   MyChecklistRequestAbortedError,
 } from "./myChecklistQueryRepository";
 
 export interface MyChecklistCommandRepository {
+  changeAppointmentCompletion(
+    appointmentId: number,
+    isDone: boolean,
+    signal?: AbortSignal,
+  ): Promise<void>;
   createAppointment(
     itemId: number,
     request: AppointmentCreationRequest,
     signal?: AbortSignal,
   ): Promise<void>;
+  deleteAppointment(appointmentId: number, signal?: AbortSignal): Promise<void>;
   changeItemCategory(
     itemId: number,
     categoryId: number,
@@ -65,6 +83,12 @@ export interface MyChecklistCommandRepository {
     signal?: AbortSignal,
   ): Promise<boolean>;
   reconcileMissingChecklist(signal?: AbortSignal): Promise<void>;
+  updateAppointment(
+    appointmentId: number,
+    checklistItemId: number,
+    request: AppointmentCreationRequest,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 
 export type ChecklistItemChangeFailureReason =
@@ -141,6 +165,37 @@ function getSafeMutationMessage(error: {
   return message.length > 0 && message.length <= 200 ? message : undefined;
 }
 
+function getAppointmentManagementFailureReason(error: {
+  errorCode: number;
+  status: number;
+}): AppointmentManagementFailureReason {
+  if (error.status === 400 || error.errorCode === 101) {
+    return "invalid-request";
+  }
+  if (error.status === 403 || error.errorCode === 203) {
+    return "forbidden";
+  }
+  if (error.status === 404 || error.errorCode === 302) {
+    return "not-found";
+  }
+  return "unknown";
+}
+
+function toAppointmentModel(
+  appointment: AppointmentCreationResponse,
+): MyChecklistItemModel["appointments"][number] {
+  return {
+    date: appointment.date,
+    endTime: appointment.endTime,
+    id: appointment.id,
+    isDone: appointment.isDone,
+    memo: appointment.memo,
+    place: appointment.place,
+    startTime: appointment.startTime,
+    title: appointment.title,
+  };
+}
+
 function getCustomChecklistItemCreationFailureReason(
   error: RemoteCustomChecklistItemCreationApiError,
 ): CustomChecklistItemCreationFailureReason {
@@ -198,6 +253,47 @@ export function createMyChecklistCommandRepository(
   queryRepository: MyChecklistQueryRepository,
 ): MyChecklistCommandRepository {
   let hasConfirmedChecklist = false;
+
+  const throwAppointmentManagementError = (error: unknown): never => {
+    if (error instanceof MyChecklistAuthenticationRequiredError) {
+      throw error;
+    }
+    if (error instanceof MyChecklistRequestAbortedError) {
+      throw error;
+    }
+    if (error instanceof RemoteAppointmentManagementRequestAbortedError) {
+      throw new MyChecklistRequestAbortedError({ cause: error });
+    }
+    if (
+      error instanceof RemoteAppointmentManagementApiError &&
+      (error.status === 401 || error.errorCode === 201)
+    ) {
+      throw new MyChecklistAuthenticationRequiredError({ cause: error });
+    }
+    if (error instanceof AppointmentManagementError) {
+      throw error;
+    }
+    if (error instanceof RemoteAppointmentManagementApiError) {
+      const reason = getAppointmentManagementFailureReason(error);
+      const safeMessage =
+        reason === "unknown" ? undefined : getSafeMutationMessage(error);
+      throw new AppointmentManagementError(reason, safeMessage, {
+        cause: error,
+      });
+    }
+    if (
+      error instanceof RemoteAppointmentManagementContractError ||
+      error instanceof RemoteAppointmentManagementNetworkError ||
+      error instanceof RemoteAppointmentManagementTimeoutError
+    ) {
+      throw new AppointmentManagementError("unknown", undefined, {
+        cause: error,
+      });
+    }
+    throw new AppointmentManagementError("unknown", undefined, {
+      cause: error,
+    });
+  };
 
   const throwCustomChecklistItemCreationError = (error: unknown): never => {
     if (error instanceof MyChecklistAuthenticationRequiredError) {
@@ -331,6 +427,27 @@ export function createMyChecklistCommandRepository(
   };
 
   return {
+    async changeAppointmentCompletion(appointmentId, isDone, signal) {
+      try {
+        const changed = await dataSource.changeAppointmentCompletion(
+          appointmentId,
+          isDone,
+          signal,
+        );
+        if (
+          !queryRepository.applyAppointmentCompletionUpdate(
+            changed.checklistItemId,
+            changed.id,
+            changed.isDone,
+            changed.checklistItemDone,
+          )
+        ) {
+          throw new AppointmentManagementError("unknown");
+        }
+      } catch (error) {
+        throwAppointmentManagementError(error);
+      }
+    },
     async createAppointment(itemId, request, signal) {
       try {
         await dataSource.createAppointment(itemId, request, signal);
@@ -365,6 +482,29 @@ export function createMyChecklistCommandRepository(
           );
         }
         throw new AppointmentCreationError("api", { cause: error });
+      }
+    },
+    async deleteAppointment(appointmentId, signal) {
+      try {
+        const checklist = await queryRepository.getChecklist(signal);
+        const itemId =
+          checklist.items.find((item) =>
+            item.appointments.some(
+              (appointment) => appointment.id === appointmentId,
+            ),
+          )?.id ?? null;
+
+        if (itemId === null) {
+          throw new AppointmentManagementError("not-found");
+        }
+
+        await dataSource.deleteAppointment(appointmentId, signal);
+
+        if (!queryRepository.applyAppointmentRemoval(itemId, appointmentId)) {
+          throw new AppointmentManagementError("unknown");
+        }
+      } catch (error) {
+        throwAppointmentManagementError(error);
       }
     },
     changeItemCategory(itemId, categoryId, signal) {
@@ -559,5 +699,25 @@ export function createMyChecklistCommandRepository(
       }
     },
     reconcileMissingChecklist,
+    async updateAppointment(appointmentId, checklistItemId, request, signal) {
+      try {
+        const updated = await dataSource.updateAppointment(
+          appointmentId,
+          checklistItemId,
+          request,
+          signal,
+        );
+        if (
+          !queryRepository.applyAppointmentUpdate(
+            checklistItemId,
+            toAppointmentModel(updated),
+          )
+        ) {
+          throw new AppointmentManagementError("unknown");
+        }
+      } catch (error) {
+        throwAppointmentManagementError(error);
+      }
+    },
   };
 }

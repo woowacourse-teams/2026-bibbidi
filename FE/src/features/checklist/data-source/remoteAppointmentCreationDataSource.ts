@@ -128,7 +128,9 @@ function isTimeRangeValid(start: string | null, end: string | null): boolean {
   return start === null || end === null || start <= end;
 }
 
-function isRequest(value: unknown): value is AppointmentCreationRequest {
+export function isAppointmentRequest(
+  value: unknown,
+): value is AppointmentCreationRequest {
   return (
     isRecord(value) &&
     isTitle(value.title) &&
@@ -155,7 +157,7 @@ function isConflict(value: unknown): value is AppointmentConflictResponse {
   );
 }
 
-function isResponse(
+export function isAppointmentResponse(
   value: unknown,
   checklistItemId: number,
 ): value is AppointmentCreationResponse {
@@ -163,7 +165,7 @@ function isResponse(
     isRecord(value) &&
     isId(value.id) &&
     value.checklistItemId === checklistItemId &&
-    isRequest(value) &&
+    isAppointmentRequest(value) &&
     typeof value.isDone === "boolean" &&
     Array.isArray(value.conflicts) &&
     value.conflicts.every(isConflict)
@@ -187,7 +189,7 @@ export async function createRemoteAppointment(
   request: unknown,
   signal?: AbortSignal,
 ): Promise<AppointmentCreationResponse> {
-  if (!isId(checklistItemId) || !isRequest(request)) {
+  if (!isId(checklistItemId) || !isAppointmentRequest(request)) {
     throw new RemoteAppointmentCreationContractError("request");
   }
 
@@ -252,7 +254,10 @@ export async function createRemoteAppointment(
           : 0;
       throw new RemoteAppointmentCreationApiError(response.status, errorCode);
     }
-    if (response.status !== 201 || !isResponse(body, checklistItemId)) {
+    if (
+      response.status !== 201 ||
+      !isAppointmentResponse(body, checklistItemId)
+    ) {
       throw new RemoteAppointmentCreationContractError("response");
     }
     return body;

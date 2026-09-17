@@ -20,6 +20,7 @@ import {
 
 function createLocalDataSource(catalogItemIds: number[] = []) {
   return {
+    changeAppointmentCompletion: vi.fn(),
     getCatalogItemIds: vi.fn().mockReturnValue(catalogItemIds),
     removeCatalogItemIds: vi.fn(),
     setCatalogItemIds: vi.fn(),
@@ -42,6 +43,7 @@ function createRemoteDataSource(catalogItemIds: number[] = []) {
 
 function createCommandRepository(): MyChecklistCommandRepository {
   return {
+    changeAppointmentCompletion: vi.fn(),
     changeItemCategory: vi.fn().mockResolvedValue(undefined),
     changeItemStatus: vi.fn().mockResolvedValue(undefined),
     changeItemTitle: vi.fn().mockResolvedValue(undefined),
@@ -49,7 +51,9 @@ function createCommandRepository(): MyChecklistCommandRepository {
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
     hasRemainingAppointments: vi.fn().mockResolvedValue(false),
     createAppointment: vi.fn(),
+    deleteAppointment: vi.fn(),
     reconcileMissingChecklist: vi.fn().mockResolvedValue(undefined),
+    updateAppointment: vi.fn(),
   };
 }
 
@@ -59,6 +63,9 @@ function createQueryRepository(
 ): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyAppointmentCompletionUpdate: vi.fn(),
+    applyAppointmentRemoval: vi.fn(),
+    applyAppointmentUpdate: vi.fn(),
     applyItemCategoryUpdate: vi.fn(),
     applyItemTitleUpdate: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue({

@@ -114,6 +114,9 @@ function createMyChecklistRepository(
 ): MyChecklistQueryRepository {
   return {
     applyAddedItems: vi.fn(),
+    applyAppointmentCompletionUpdate: vi.fn(),
+    applyAppointmentRemoval: vi.fn(),
+    applyAppointmentUpdate: vi.fn(),
     applyItemCategoryUpdate: vi.fn(),
     applyItemTitleUpdate: vi.fn(),
     getChecklist: vi.fn().mockResolvedValue({ exists, items }),

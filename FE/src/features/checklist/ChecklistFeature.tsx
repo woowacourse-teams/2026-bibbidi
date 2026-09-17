@@ -29,6 +29,7 @@ import {
 import { useChecklistTaskCreation } from "./useChecklistTaskCreation";
 import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationCommand";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
+import { useChecklistAppointmentManagement } from "./useChecklistAppointmentManagement";
 import { Checklist } from "./view/Checklist";
 import { ChecklistState } from "./view/ChecklistState";
 import { ChecklistTaskDetailBottomSheetShell } from "./view/ChecklistTaskDetailBottomSheet";
@@ -260,6 +261,13 @@ export function ChecklistFeature({
     isAuthenticated: audience === "authenticated",
     onSubmit: onSubmitAppointment ?? submitAppointment,
     onRetryRefresh: onSubmitAppointment ? undefined : refreshAppointments,
+    sessionIdentity,
+  });
+  const appointmentManagement = useChecklistAppointmentManagement({
+    audience,
+    checklistItemId: appointmentCreationChecklistItemId,
+    commandRepository: checklistCommandRepository,
+    refreshAuth,
     sessionIdentity,
   });
   const requestScheduleCreation = useCallback(() => {
@@ -571,6 +579,9 @@ export function ChecklistFeature({
     <Checklist
       appointmentCreation={
         audience === "authenticated" ? appointmentCreation : undefined
+      }
+      appointmentManagement={
+        audience === "authenticated" ? appointmentManagement : undefined
       }
       categories={createChecklistViewModel(requestState.checklist)}
       isAuthenticated={audience === "authenticated"}

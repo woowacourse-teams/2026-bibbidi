@@ -7,6 +7,10 @@ import {
   AppointmentCreationResponse,
   createRemoteAppointment,
 } from "./remoteAppointmentCreationDataSource";
+import {
+  AppointmentCompletionResponse,
+  remoteAppointmentManagementDataSource,
+} from "./remoteAppointmentManagementDataSource";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
@@ -20,11 +24,17 @@ interface ApiErrorResponse {
 }
 
 export interface RemoteMyChecklistCommandDataSource {
+  changeAppointmentCompletion(
+    appointmentId: number,
+    isDone: boolean,
+    signal?: AbortSignal,
+  ): Promise<AppointmentCompletionResponse>;
   createAppointment(
     itemId: number,
     request: AppointmentCreationRequest,
     signal?: AbortSignal,
   ): Promise<AppointmentCreationResponse>;
+  deleteAppointment(appointmentId: number, signal?: AbortSignal): Promise<void>;
   changeChecklistItemCategory(
     itemId: number,
     categoryId: number,
@@ -50,6 +60,12 @@ export interface RemoteMyChecklistCommandDataSource {
     itemId: number,
     signal?: AbortSignal,
   ): Promise<boolean>;
+  updateAppointment(
+    appointmentId: number,
+    checklistItemId: number,
+    request: AppointmentCreationRequest,
+    signal?: AbortSignal,
+  ): Promise<AppointmentCreationResponse>;
 }
 
 export interface ChecklistItemChangeResponse {
@@ -670,6 +686,8 @@ async function hasRemainingAppointments(
 
 export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSource =
   {
+    changeAppointmentCompletion:
+      remoteAppointmentManagementDataSource.changeAppointmentCompletion,
     changeChecklistItemCategory,
     changeChecklistItemStatus,
     changeChecklistItemTitle,
@@ -677,4 +695,6 @@ export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSou
     createAppointment: createRemoteAppointment,
     createCustomChecklistItem,
     hasRemainingAppointments,
+    deleteAppointment: remoteAppointmentManagementDataSource.deleteAppointment,
+    updateAppointment: remoteAppointmentManagementDataSource.updateAppointment,
   };

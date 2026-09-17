@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import { useBottomSheetDismiss } from "../../../shared/bottom-sheet/useBottomSheetDismiss";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
+import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
   ChecklistCategoryViewModel,
   ChecklistTaskViewModel,
@@ -13,6 +14,7 @@ import "./ChecklistTaskDetailBottomSheet.css";
 interface ChecklistTaskDetailBottomSheetProps {
   categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
+  appointmentManagement?: ChecklistAppointmentManagementController;
   editing?: ChecklistItemEditingController;
   onClose: () => void;
   onRequestScheduleCreation?: () => void;
@@ -96,6 +98,7 @@ export function ChecklistTaskDetailBottomSheetShell({
 }
 
 export function ChecklistTaskDetailBottomSheet({
+  appointmentManagement,
   categories,
   categoryTitle,
   editing,
@@ -118,6 +121,7 @@ export function ChecklistTaskDetailBottomSheet({
       titleId={titleId}
     >
       <ChecklistTaskDetailContent
+        appointmentManagement={appointmentManagement}
         categories={categories}
         categoryTitle={categoryTitle}
         editing={editing}

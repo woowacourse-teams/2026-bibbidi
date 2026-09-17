@@ -28,6 +28,7 @@ function createRepository(
     .mockResolvedValue(undefined),
 ): MyChecklistCommandRepository {
   return {
+    changeAppointmentCompletion: vi.fn(),
     changeItemCategory: vi.fn(),
     changeItemStatus: vi.fn(),
     changeItemTitle: vi.fn(),
@@ -35,7 +36,9 @@ function createRepository(
     ensureChecklist: vi.fn(),
     hasRemainingAppointments: vi.fn(),
     createAppointment: vi.fn(),
+    deleteAppointment: vi.fn(),
     reconcileMissingChecklist: vi.fn(),
+    updateAppointment: vi.fn(),
   };
 }
 
