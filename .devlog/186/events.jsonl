@@ -26,3 +26,10 @@
 {"type":"TURN_FINISHED","turnId":"12","diff":"turn-007.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-17T07:20:54.483Z"}
 {"type":"USER_PROMPTED","issue":186,"turnId":"13","prompt":"ㅇ","redacted":false,"timestamp":"2026-09-17T07:21:30.622Z"}
 {"type":"COMMIT_CONFIRMED","issue":186,"tree":"5b2fe42b17482e5aac89234c6b10503044046a40","timestamp":"2026-09-17T07:21:40.328Z"}
+{"type":"TURN_FINISHED","turnId":"13","diff":"turn-008.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-17T07:22:20.317Z"}
+{"type":"USER_PROMPTED","issue":186,"turnId":"14","prompt":"그대로 가자","redacted":false,"timestamp":"2026-09-17T07:22:26.752Z"}
+{"type":"GRILL_ME_QUESTION","issue":186,"question":"PR에 넣을 리뷰 요청 항목과 중요도를 정하기. 후보: push 트리거 전환 후 배포 시점이 기존과 동일한지 확인, Probe registry credentials 임시 스텝 유지 여부, paths 필터에 워크플로 파일 자체를 넣을지.","timestamp":"2026-09-17T07:22:36.540Z"}
+{"type":"TURN_FINISHED","turnId":"14","diff":"turn-009.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-17T07:22:55.962Z"}
+{"type":"USER_PROMPTED","issue":186,"turnId":"15","prompt":"ㄱㄱㄱㄱㄱ","redacted":false,"timestamp":"2026-09-17T07:24:04.717Z"}
+{"type":"PR_PLANNED","issue":186,"summary":["배포 트리거를 pull_request types closed 에서 push branches release-be 로 변경. fork에서 온 PR 런에는 GitHub이 시크릿을 주입하지 않아 Docker Hub 로그인이 실패했다.","build-and-push 의 if github.event.pull_request.merged == true 제거. push와 workflow_dispatch 에는 pull_request 정보가 없어 job이 항상 스킵됐다. 수동 배포가 함께 복구된다.","원인 확인용 Probe registry credentials 스텝은 이번에는 유지. 검증 후 별도로 제거 예정.","UserController.java 개행 한 줄은 paths 필터의 BE/** 를 만족시켜 이번 변경을 실제 CD 실행으로 검증하기 위한 것. 동작 변화 없음."],"review":["[REQUIRED] push 트리거 전환으로 배포 시점이 기존과 같은지 확인. Squash Merge 기준으로는 동일하지만, release-be 에 직접 push하면 PR 없이도 배포가 나간다. 이 동작을 팀이 받아들일지 확인 필요.","[CAUTION] Probe registry credentials 스텝을 이번 PR에 남겨두는 것. 시크릿 길이만 출력하고 값은 찍지 않지만 임시 진단용 코드가 운영 워크플로에 들어간다. 검증 후 제거 예정.","[ADVICE] paths 필터에 .github/workflows/backend-prod-cd.yml 을 넣을지. 넣으면 워크플로만 고친 커밋도 prod 배포를 일으켜 과하다고 판단해 제외했다. 대신 workflow_dispatch 수동 실행으로 검증 가능하다."],"timestamp":"2026-09-17T07:24:26.535Z"}
+{"type":"PR_REQUESTED","issue":186,"timestamp":"2026-09-17T07:24:30.467Z"}
