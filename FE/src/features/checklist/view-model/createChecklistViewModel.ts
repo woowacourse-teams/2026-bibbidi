@@ -11,7 +11,7 @@ import { ChecklistItemStatus } from "../model/myChecklist";
 const statusLabels: Record<ChecklistTaskStatus, string> = {
   complete: "완료",
   "in-progress": "진행 중",
-  incomplete: "미완료",
+  incomplete: "예정",
 };
 
 const taskStatusByChecklistItemStatus: Record<

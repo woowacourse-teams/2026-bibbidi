@@ -637,7 +637,7 @@ describe("ServiceLayout", () => {
     ).toHaveLength(1);
   });
 
-  it("모바일 상세에서 앱 chrome과 배경을 비활성화하고 목록 스크롤과 공통 GET을 유지한다", async () => {
+  it("모바일 바텀시트에서 앱 chrome과 목록 스크롤 위치 및 공통 GET을 유지한다", async () => {
     const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
@@ -697,21 +697,21 @@ describe("ServiceLayout", () => {
     fireEvent.click(taskButton);
 
     expect(
-      screen.getByRole("region", { name: "체크리스트 항목 10" }),
+      screen.getByRole("dialog", {
+        name: "체크리스트 항목 10",
+      }),
     ).toBeTruthy();
     const appHeader = container.querySelector(".service-layout__header");
-    expect(appHeader?.hasAttribute("hidden")).toBe(true);
-    expect(appHeader?.hasAttribute("inert")).toBe(true);
-    expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
+    expect(appHeader?.hasAttribute("hidden")).toBe(false);
+    expect(appHeader?.hasAttribute("inert")).toBe(false);
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: /체크리스트 항목 10/ }),
     ).toBeNull();
     expect(taskButton.isConnected).toBe(true);
     expect(taskButton.closest("[inert]")).not.toBeNull();
-    expect(
-      content.classList.contains("service-layout__content--mobile-detail"),
-    ).toBe(true);
+    expect(content.style.overflow).toBe("hidden");
     expect(content.scrollTop).toBe(320);
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
@@ -726,6 +726,7 @@ describe("ServiceLayout", () => {
     expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(content.style.overflow).toBe("");
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist?taskId=checklist-item-10",
     );
@@ -734,8 +735,11 @@ describe("ServiceLayout", () => {
     ).toHaveLength(1);
 
     act(() => media.setMatches(true));
+    const detailSheet = screen.getByRole("dialog", {
+      name: "체크리스트 항목 10",
+    });
     fireEvent.click(
-      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+      within(detailSheet).getByRole("button", { name: "할 일 상세 닫기" }),
     );
 
     expect(screen.getByTestId("service-location").textContent).toBe(
