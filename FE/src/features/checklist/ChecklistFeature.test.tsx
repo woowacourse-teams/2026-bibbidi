@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { useSyncExternalStore } from "react";
+import type { ComponentProps } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -166,7 +167,7 @@ function ChecklistFeatureTestApp({
   initialEntries = ["/checklist"],
   onSubmitAppointment,
 }: {
-  initialEntries?: string[];
+  initialEntries?: ComponentProps<typeof MemoryRouter>["initialEntries"];
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
     signal: AbortSignal,
@@ -181,7 +182,7 @@ function ChecklistFeatureTestApp({
 }
 
 function renderChecklistFeature(
-  initialEntries?: string[],
+  initialEntries?: ComponentProps<typeof MemoryRouter>["initialEntries"],
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
     signal: AbortSignal,
@@ -1590,6 +1591,114 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(getCurrentUrl()).toBe(
       "/checklist?filter=remaining&taskId=catalog-item-101",
     );
+  });
+
+  it("플래너 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    const url = "/checklist?taskId=checklist-item-500&addAppointment=true";
+
+    const first = renderChecklistFeature([url]);
+    expect(
+      await screen.findByRole("complementary", { name: "일정 추가" }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(
+      screen.queryByRole("complementary", { name: "일정 추가" }),
+    ).toBeNull();
+    expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
+
+    first.unmount();
+    renderChecklistFeature([url]);
+    expect(
+      await screen.findByRole("complementary", { name: "일정 추가" }),
+    ).toBeTruthy();
+  });
+
+  it("플래너에서 연 일정 입력을 취소한 뒤 뒤로 가면 플래너로 돌아간다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature([
+      "/planner",
+      "/checklist?taskId=checklist-item-500&addAppointment=true",
+    ]);
+
+    expect(
+      await screen.findByRole("complementary", { name: "일정 추가" }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
+    expect(getCurrentUrl()).toBe("/planner");
+  });
+
+  it("모바일에서 자동 일정 입력을 닫고 상세 뒤로 가기를 누르면 플래너로 돌아간다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature([
+      "/planner",
+      {
+        pathname: "/checklist",
+        search: "?taskId=checklist-item-500&addAppointment=true",
+        state: { checklistDetailDepth: 1 },
+      },
+    ]);
+
+    const creationDialog = await screen.findByRole("dialog", {
+      name: "일정 추가",
+    });
+    await waitFor(() =>
+      expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
+    );
+    fireEvent.click(
+      within(creationDialog).getByRole("button", {
+        name: "할 일 상세로 돌아가기",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "체크리스트로 돌아가기" }),
+    );
+
+    expect(getCurrentUrl()).toBe("/planner");
+  });
+
+  it("존재하지 않는 플래너 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { nickname: "bibbidi" },
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(
+      createAuthenticatedChecklist(),
+    );
+    renderChecklistFeature([
+      "/checklist?taskId=checklist-item-999&addAppointment=true",
+    ]);
+
+    await waitFor(() => expect(getCurrentUrl()).toBe("/checklist"));
+    expect(
+      screen.queryByRole("complementary", { name: "일정 추가" }),
+    ).toBeNull();
   });
 
   it("잘못된 taskId를 로딩 완료 후 replace로 제거한다", async () => {

@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import {
   HomeScheduleDashboardLoadingSectionViewModel,
   HomeScheduleDashboardRecommendedViewModel,
@@ -14,6 +16,7 @@ import { UnscheduledTask } from "./UnscheduledTask";
 import { UpcomingSchedule } from "./UpcomingSchedule";
 
 interface HomeScheduleDashboardProps {
+  onAddRecommendedTask: (catalogItemId: number) => void;
   onRetryRecommended: () => void;
   onRetryUnscheduled: () => void;
   onRetryUpcoming: () => void;
@@ -103,16 +106,26 @@ function DashboardResult({
       </span>
       <h3>{viewModel.title}</h3>
       <p>{viewModel.description}</p>
-      <button
-        className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
-        disabled={viewModel.isActionDisabled}
-        onClick={onAction}
-        type="button"
-      >
-        {viewModel.actionVariant === "button" && <RefreshIcon />}
-        {viewModel.actionLabel}
-        {viewModel.actionVariant === "link" && <ChevronRightIcon />}
-      </button>
+      {viewModel.actionTo ? (
+        <Link
+          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+          to={viewModel.actionTo}
+        >
+          {viewModel.actionLabel}
+          <ChevronRightIcon />
+        </Link>
+      ) : (
+        <button
+          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+          disabled={viewModel.isActionDisabled}
+          onClick={onAction}
+          type="button"
+        >
+          {viewModel.actionVariant === "button" && <RefreshIcon />}
+          {viewModel.actionLabel}
+          {viewModel.actionVariant === "link" && <ChevronRightIcon />}
+        </button>
+      )}
     </div>
   );
 }
@@ -334,9 +347,11 @@ function UnscheduledTaskSection({
 }
 
 function RecommendedScheduleSection({
+  onAddTask,
   onRetry,
   viewModel,
 }: {
+  onAddTask: (catalogItemId: number) => void;
   onRetry: () => void;
   viewModel: HomeScheduleDashboardRecommendedViewModel;
 }) {
@@ -361,13 +376,19 @@ function RecommendedScheduleSection({
         />
       );
     case "complete":
-      return <RecommendedSchedule viewModel={viewModel.content} />;
+      return (
+        <RecommendedSchedule
+          onAddTask={onAddTask}
+          viewModel={viewModel.content}
+        />
+      );
     default:
       return assertNever(viewModel);
   }
 }
 
 export function HomeScheduleDashboard({
+  onAddRecommendedTask,
   onRetryRecommended,
   onRetryUnscheduled,
   onRetryUpcoming,
@@ -386,6 +407,7 @@ export function HomeScheduleDashboard({
         />
       </div>
       <RecommendedScheduleSection
+        onAddTask={onAddRecommendedTask}
         onRetry={onRetryRecommended}
         viewModel={viewModel.recommended}
       />

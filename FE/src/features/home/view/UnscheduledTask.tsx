@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import { UnscheduledTaskViewModel } from "../view-model/createUnscheduledTaskViewModel";
 import "./UnscheduledTask.css";
 
@@ -46,14 +48,14 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
               </span>
             </div>
             <h3 className="unscheduled-task-card__title">{item.title}</h3>
-            <button
+            <Link
               className="unscheduled-task-card__add-schedule"
-              disabled
-              type="button"
+              state={{ checklistDetailDepth: 1 }}
+              to={`/checklist?taskId=checklist-item-${item.id}&addAppointment=true`}
             >
               <CalendarPlusIcon />
               {viewModel.addScheduleLabel}
-            </button>
+            </Link>
           </li>
         ))}
       </ul>

@@ -1,9 +1,10 @@
-import {
+import type {
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
   HomeScheduleDashboardUpcomingModel,
 } from "../model/homeScheduleDashboard";
+import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
 import {
   createRecommendedScheduleViewModel,
   RecommendedScheduleViewModel,
@@ -24,6 +25,7 @@ export type HomeScheduleDashboardResultTone = "critical" | "neutral";
 
 export interface HomeScheduleDashboardResultViewModel {
   actionLabel: string;
+  actionTo?: string;
   actionVariant: "button" | "link";
   description: string;
   icon: HomeScheduleDashboardResultIcon;
@@ -175,6 +177,7 @@ function createUnscheduledViewModel(
 
 function createRecommendedViewModel(
   model: HomeScheduleDashboardRecommendedModel,
+  addition: RecommendedTaskAdditionState,
 ): HomeScheduleDashboardRecommendedViewModel {
   switch (model.status) {
     case "loading":
@@ -187,10 +190,11 @@ function createRecommendedViewModel(
         countLabel: "0개",
         result: {
           actionLabel: "준비 목록 보기",
+          actionTo: "/",
           actionVariant: "link",
           description: "새로 추가할 준비 목록의 할 일이 없어요",
           icon: "calendar-heart",
-          isActionDisabled: true,
+          isActionDisabled: false,
           title: "추천할 일이 없어요",
           tone: "neutral",
         },
@@ -205,7 +209,10 @@ function createRecommendedViewModel(
       };
     case "complete":
       return {
-        content: createRecommendedScheduleViewModel(model.recommendedItems),
+        content: createRecommendedScheduleViewModel(
+          model.recommendedItems,
+          addition,
+        ),
         status: model.status,
       };
     default:
@@ -219,9 +226,21 @@ function assertNever(value: never): never {
 
 export function createHomeScheduleDashboardViewModel(
   model: HomeScheduleDashboardModel,
+  options: {
+    recommendedTaskAddition?: RecommendedTaskAdditionState;
+  } = {},
 ): HomeScheduleDashboardViewModel {
+  const recommendedTaskAddition = options.recommendedTaskAddition ?? {
+    addedCatalogItemIds: [],
+    addingCatalogItemIds: [],
+    additionErrors: {},
+  };
+
   return {
-    recommended: createRecommendedViewModel(model.recommended),
+    recommended: createRecommendedViewModel(
+      model.recommended,
+      recommendedTaskAddition,
+    ),
     unscheduled: createUnscheduledViewModel(model.unscheduled),
     upcoming: createUpcomingViewModel(model.upcoming),
   };

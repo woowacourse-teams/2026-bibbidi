@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AppointmentCreationError } from "./model/appointmentCreation";
 import { MyChecklistRequestAbortedError } from "./repository/myChecklistQueryRepository";
@@ -52,6 +52,7 @@ interface UseChecklistAppointmentCreationOptions {
 }
 
 export interface ChecklistAppointmentCreationController {
+  canOpen: boolean;
   canSubmit: boolean;
   cancel: () => void;
   changeDate: (date: string) => void;
@@ -246,7 +247,7 @@ export function useChecklistAppointmentCreation({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeContextKey === contextKey) {
       return;
     }
@@ -336,6 +337,7 @@ export function useChecklistAppointmentCreation({
   };
 
   return {
+    canOpen: isCurrentContext && isAuthenticated && checklistItemId !== null,
     canSubmit:
       isAuthenticated && checklistItemId !== null && onSubmit !== undefined,
     cancel: () => {

@@ -1,7 +1,10 @@
+import { Link } from "react-router";
+
 import { RecommendedScheduleViewModel } from "../view-model/createRecommendedScheduleViewModel";
 import "./RecommendedSchedule.css";
 
 interface RecommendedScheduleProps {
+  onAddTask: (catalogItemId: number) => void;
   viewModel: RecommendedScheduleViewModel;
 }
 
@@ -31,7 +34,10 @@ function PlusIcon() {
   );
 }
 
-export function RecommendedSchedule({ viewModel }: RecommendedScheduleProps) {
+export function RecommendedSchedule({
+  onAddTask,
+  viewModel,
+}: RecommendedScheduleProps) {
   return (
     <section
       aria-labelledby="recommended-schedule-title"
@@ -39,14 +45,10 @@ export function RecommendedSchedule({ viewModel }: RecommendedScheduleProps) {
     >
       <header className="recommended-schedule__header">
         <h2 id="recommended-schedule-title">{viewModel.title}</h2>
-        <button
-          className="recommended-schedule__catalog-action"
-          disabled={viewModel.isCatalogActionDisabled}
-          type="button"
-        >
+        <Link className="recommended-schedule__catalog-action" to="/">
           {viewModel.catalogActionLabel}
           <ChevronRightIcon />
-        </button>
+        </Link>
       </header>
 
       <ul className="recommended-schedule__list">
@@ -63,12 +65,18 @@ export function RecommendedSchedule({ viewModel }: RecommendedScheduleProps) {
 
             <button
               className="recommended-schedule-card__add-task"
-              disabled={viewModel.isAddTaskActionDisabled}
+              disabled={item.isAddActionDisabled}
+              onClick={() => onAddTask(item.catalogItemId)}
               type="button"
             >
               <PlusIcon />
-              {viewModel.addTaskLabel}
+              {item.addActionLabel}
             </button>
+            {item.additionErrorMessage && (
+              <p className="recommended-schedule-card__error" role="alert">
+                {item.additionErrorMessage}
+              </p>
+            )}
           </li>
         ))}
       </ul>

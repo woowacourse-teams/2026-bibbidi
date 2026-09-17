@@ -1,7 +1,20 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "../auth";
+import {
+  PreparationAuthenticationRequiredError,
+  usePreparationChecklistRepository,
+} from "../preparation";
+import type { ChecklistRepository } from "../preparation";
 import { HomeScheduleDashboardFeature } from "./HomeScheduleDashboardFeature";
 import {
   NearbyAppointmentsAuthenticationRequiredError,
@@ -22,6 +35,43 @@ import {
 vi.mock("../auth", () => ({
   useAuth: vi.fn(),
 }));
+vi.mock("../preparation", () => ({
+  PreparationAuthenticationRequiredError: class extends Error {},
+  usePreparationChecklistRepository: vi.fn(),
+}));
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <output data-testid="dashboard-location">{`${location.pathname}${location.search}`}</output>
+  );
+}
+
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const result = rtlRender(
+    <MemoryRouter initialEntries={["/planner"]}>
+      {ui}
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+
+  return {
+    ...result,
+    rerender(nextUi: Parameters<typeof rtlRender>[0]) {
+      result.rerender(
+        <MemoryRouter initialEntries={["/planner"]}>
+          {nextUi}
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+    },
+  };
+}
+
+const checklistRepository: ChecklistRepository = {
+  addCatalogItemIds: vi.fn().mockResolvedValue([]),
+  getCatalogItemIds: vi.fn().mockResolvedValue([]),
+};
 
 const refreshAuth = vi.fn();
 
@@ -52,6 +102,12 @@ function createDeferred<T>() {
 
 beforeEach(() => {
   refreshAuth.mockReset();
+  vi.mocked(usePreparationChecklistRepository).mockReturnValue(
+    checklistRepository,
+  );
+  vi.mocked(checklistRepository.addCatalogItemIds)
+    .mockReset()
+    .mockResolvedValue([]);
   vi.mocked(useAuth).mockReturnValue({
     authState: { status: "authenticated", user: { nickname: "비비디" } },
     beginAuthentication: vi.fn(),
@@ -280,12 +336,17 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(within(section).getAllByText("미완료")).toHaveLength(2);
     expect(within(section).getByText("가족")).toBeTruthy();
     expect(within(section).getByText("웨딩홀")).toBeTruthy();
-    const addButtons = within(section).getAllByRole("button", {
+    const addLinks = within(section).getAllByRole("link", {
       name: "일정 추가",
     });
-    expect(addButtons).toHaveLength(3);
-    expect(addButtons.every((button) => button.hasAttribute("disabled"))).toBe(
-      true,
+    expect(addLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/checklist?taskId=checklist-item-44&addAppointment=true",
+      "/checklist?taskId=checklist-item-31&addAppointment=true",
+      "/checklist?taskId=checklist-item-52&addAppointment=true",
+    ]);
+    fireEvent.click(addLinks[0]);
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/checklist?taskId=checklist-item-44&addAppointment=true",
     );
   });
 
@@ -504,15 +565,17 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(within(section).getByText("웨딩홀 정하기")).toBeTruthy();
     expect(within(section).queryByText(/개월 전/)).toBeNull();
     expect(
-      within(section)
-        .getAllByRole("button", { name: "내 할 일에 추가" })
-        .every((button) => button.hasAttribute("disabled")),
-    ).toBe(true);
+      within(section).getAllByRole("button", { name: "내 할 일에 추가" }),
+    ).toHaveLength(2);
     expect(
       within(section)
-        .getByRole("button", { name: "준비 목록 보기" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+        .getByRole("link", { name: "준비 목록 보기" })
+        .getAttribute("href"),
+    ).toBe("/");
+    fireEvent.click(
+      within(section).getByRole("link", { name: "준비 목록 보기" }),
+    );
+    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
   });
 
   it("추천 할 일 빈 응답을 Empty UI로 전환한다", async () => {
@@ -526,6 +589,214 @@ describe("HomeScheduleDashboardFeature", () => {
 
     expect(await screen.findByText("추천할 일이 없어요")).toBeTruthy();
     expect(screen.getByRole("region", { name: "추천 할 일" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "준비 목록 보기" }).getAttribute("href"),
+    ).toBe("/");
+    fireEvent.click(screen.getByRole("link", { name: "준비 목록 보기" }));
+    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+  });
+
+  it("추천 항목을 저장소로 추가하고 체크리스트 캐시 흐름을 거쳐 추천 목록만 갱신한다", async () => {
+    const recommendedRepository = createRecommendedRepository();
+    const item = {
+      category: "웨딩홀",
+      catalogItemId: 201,
+      stepName: "웨딩홀 정하기",
+      title: "웨딩홀 투어",
+    };
+    vi.mocked(recommendedRepository.getRecommendedCatalogItems)
+      .mockResolvedValueOnce([item])
+      .mockResolvedValueOnce([]);
+    vi.mocked(checklistRepository.addCatalogItemIds).mockResolvedValueOnce([
+      "201",
+    ]);
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    await waitFor(() =>
+      expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledWith(
+        "authenticated",
+        ["201"],
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(await screen.findByText("추천할 일이 없어요")).toBeTruthy();
+    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
+    expect(screen.getByText("일정이 필요한 할 일이 없어요")).toBeTruthy();
+  });
+
+  it("추천 항목별 추가 중 중복 클릭을 막고 오류 후 같은 항목을 재시도한다", async () => {
+    const recommendedRepository = createRecommendedRepository();
+    const item = {
+      category: "웨딩홀",
+      catalogItemId: 201,
+      stepName: "웨딩홀 정하기",
+      title: "웨딩홀 투어",
+    };
+    vi.mocked(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).mockResolvedValue([item]);
+    let rejectAddition: (error: Error) => void = () => undefined;
+    vi.mocked(checklistRepository.addCatalogItemIds)
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectAddition = reject;
+        }),
+      )
+      .mockResolvedValueOnce(["201"]);
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    const pending = screen.getByRole("button", { name: "추가 중..." });
+    expect(pending.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(pending);
+    expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(1);
+
+    await act(async () => rejectAddition(new Error("서버 내부 메시지")));
+    expect(screen.getByRole("alert").textContent).toBe(
+      "할 일을 추가하지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(screen.queryByText("서버 내부 메시지")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() =>
+      expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(2),
+    );
+    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
+  });
+
+  it("추천 추가 인증 만료는 세션을 갱신하고 요청 취소 뒤에는 오류를 표시하지 않는다", async () => {
+    const recommendedRepository = createRecommendedRepository();
+    vi.mocked(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).mockResolvedValue([
+      {
+        category: "웨딩홀",
+        catalogItemId: 201,
+        stepName: "웨딩홀 정하기",
+        title: "웨딩홀 투어",
+      },
+    ]);
+    vi.mocked(checklistRepository.addCatalogItemIds).mockRejectedValueOnce(
+      new PreparationAuthenticationRequiredError(),
+    );
+    const { unmount } = render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    await waitFor(() => expect(refreshAuth).toHaveBeenCalledOnce());
+    expect(screen.getByRole("alert").textContent).toContain(
+      "로그인이 만료됐어요",
+    );
+    unmount();
+
+    let resolveAddition: (ids: string[]) => void = () => undefined;
+    vi.mocked(checklistRepository.addCatalogItemIds).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAddition = resolve;
+      }),
+    );
+    const second = render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    const signal = vi.mocked(checklistRepository.addCatalogItemIds).mock
+      .calls[1][2];
+    second.unmount();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => resolveAddition(["201"]));
+    expect(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).toHaveBeenCalledTimes(2);
+  });
+
+  it("인증 대상이 바뀌면 이전 추가 요청과 항목 상태를 버리고 새 세션에서 다시 추가한다", async () => {
+    const recommendedRepository = createRecommendedRepository();
+    const item = {
+      category: "웨딩홀",
+      catalogItemId: 201,
+      stepName: "웨딩홀 정하기",
+      title: "웨딩홀 투어",
+    };
+    vi.mocked(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).mockResolvedValue([item]);
+    let resolvePreviousAddition: (ids: string[]) => void = () => undefined;
+    vi.mocked(checklistRepository.addCatalogItemIds)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePreviousAddition = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(["201"]);
+
+    const result = render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    const previousSignal = vi.mocked(checklistRepository.addCatalogItemIds).mock
+      .calls[0][2];
+
+    vi.mocked(useAuth).mockReturnValue({
+      authState: { status: "authenticated", user: { nickname: "새 사용자" } },
+      beginAuthentication: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      refreshAuth,
+    });
+    result.rerender(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    await waitFor(() => expect(previousSignal?.aborted).toBe(true));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+    await waitFor(() =>
+      expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(2),
+    );
+    await act(async () => resolvePreviousAddition(["201"]));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "추가됨" })).toBeTruthy();
   });
 
   it("추천 영역 오류만 재시도하고 다른 두 영역 결과를 유지한다", async () => {

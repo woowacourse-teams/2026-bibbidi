@@ -104,6 +104,7 @@
   font-weight: 600;
   gap: 6px;
   opacity: 1;
+  text-decoration: none;
 }
 
 .unscheduled-task-card__calendar-icon {

@@ -344,6 +344,7 @@
   font-weight: 700;
   gap: 4px;
   opacity: 1;
+  text-decoration: none;
 }
 
 .home-dashboard-state__result-action svg {
