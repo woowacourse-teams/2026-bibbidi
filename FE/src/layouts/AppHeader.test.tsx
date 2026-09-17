@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
@@ -10,7 +10,14 @@ function renderHeader(
   user:
     | { kind: "guest" }
     | { kind: "pending" }
-    | { kind: "authenticated"; summary: ReactNode; userInitial: string },
+    | {
+        kind: "authenticated";
+        isLoggingOut: boolean;
+        logoutErrorMessage: string | null;
+        onLogout: () => void;
+        summary: ReactNode;
+        userInitial: string;
+      },
   path = "/",
 ) {
   return render(
@@ -47,6 +54,9 @@ describe("AppHeader", () => {
     renderHeader(
       {
         kind: "authenticated",
+        isLoggingOut: false,
+        logoutErrorMessage: null,
+        onLogout: vi.fn(),
         summary: <span>결혼 준비 현황</span>,
         userInitial: "비",
       },
@@ -55,12 +65,76 @@ describe("AppHeader", () => {
 
     expect(screen.getByText("결혼 준비 현황")).toBeTruthy();
     expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "로그아웃" })).toBeTruthy();
 
     const activeLinks = screen.getAllByRole("link", { name: "체크리스트" });
     expect(activeLinks).toHaveLength(1);
     activeLinks.forEach((link) =>
       expect(link.getAttribute("aria-current")).toBe("page"),
     );
+  });
+
+  it("로그아웃 버튼을 이니셜 오른쪽에 두고 키보드로 사용할 수 있다", () => {
+    const onLogout = vi.fn();
+    const { container } = renderHeader({
+      kind: "authenticated",
+      isLoggingOut: false,
+      logoutErrorMessage: null,
+      onLogout,
+      summary: null,
+      userInitial: "비",
+    });
+    const initial = screen.getByLabelText("현재 사용자 비");
+    const button = screen.getByRole("button", { name: "로그아웃" });
+
+    expect(initial.nextElementSibling).toBe(button);
+    expect(button.getAttribute("type")).toBe("button");
+    expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.click(button);
+    expect(onLogout).toHaveBeenCalledOnce();
+    expect(container.querySelector(".app-header__logout")).toBe(button);
+  });
+
+  it("처리 중 버튼을 비활성화하고 실패 안내에서 재시도할 수 있다", () => {
+    const onLogout = vi.fn();
+    const { rerender } = renderHeader({
+      kind: "authenticated",
+      isLoggingOut: true,
+      logoutErrorMessage: null,
+      onLogout,
+      summary: null,
+      userInitial: "비",
+    });
+    const button = screen.getByRole("button", { name: "로그아웃" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("status").textContent).toBe("로그아웃 처리 중");
+
+    rerender(
+      <MemoryRouter>
+        <AppHeader
+          user={{
+            kind: "authenticated",
+            isLoggingOut: false,
+            logoutErrorMessage: "잠시 후 다시 시도해 주세요.",
+            onLogout,
+            summary: null,
+            userInitial: "비",
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "잠시 후 다시 시도해 주세요.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onLogout).toHaveBeenCalledOnce();
   });
 
   it("하단 메뉴를 홈, 체크리스트, 플래너 순서로 표시한다", () => {

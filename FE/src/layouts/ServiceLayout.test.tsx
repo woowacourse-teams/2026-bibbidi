@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import {
   act,
   fireEvent,
@@ -7,11 +7,22 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
-import { ChecklistFeature } from "../features/checklist";
+import {
+  ChecklistFeature,
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistQueryRepository,
+  useMyChecklistQueryRepository,
+} from "../features/checklist";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { PreparationRoadmapFeature } from "../features/preparation/PreparationRoadmapFeature";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
@@ -74,6 +85,147 @@ function renderServiceLayout(
 }
 
 describe("ServiceLayout", () => {
+  it("모바일에서 중복 로그아웃을 막고 실패 후 재시도해 홈과 guest 상태로 전환한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    const logoutResolvers: Array<(response: Response) => void> = [];
+    const previousRepositoryRef: { current?: MyChecklistQueryRepository } = {};
+    let isLoggedOut = false;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          isLoggedOut
+            ? new Response(
+                JSON.stringify({ errorCode: 201, message: "인증 없음" }),
+                { status: 401 },
+              )
+            : new Response(
+                JSON.stringify({
+                  id: 1,
+                  items: [createChecklistItem(10, null, "done")],
+                }),
+                { status: 200 },
+              ),
+        );
+      }
+
+      if (url === "/api/logout") {
+        return new Promise<Response>((resolve) => {
+          logoutResolvers.push(resolve);
+        });
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function CacheCapture() {
+      const repository = useMyChecklistQueryRepository();
+      useEffect(() => {
+        previousRepositoryRef.current = repository;
+      }, [repository]);
+      return null;
+    }
+
+    function HomeView() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <p>홈 화면</p>
+          <LocationDisplay />
+          <button onClick={() => navigate(-1)} type="button">
+            뒤로
+          </button>
+        </>
+      );
+    }
+
+    renderServiceLayout(
+      <>
+        <Route path="/" element={<HomeView />} />
+        <Route
+          path="/checklist"
+          element={
+            <>
+              <CacheCapture />
+              <p>개인 체크리스트</p>
+              <LocationDisplay />
+            </>
+          }
+        />
+      </>,
+      ["/", "/checklist"],
+    );
+
+    expect(await screen.findByText("1/1")).toBeTruthy();
+    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    expect(screen.getByLabelText("현재 사용자 비").nextElementSibling).toBe(
+      logoutButton,
+    );
+    fireEvent.click(logoutButton);
+    fireEvent.click(logoutButton);
+
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+    ).toHaveLength(1);
+    expect(logoutButton.hasAttribute("disabled")).toBe(true);
+    expect(logoutButton.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("status").textContent).toBe("로그아웃 처리 중");
+
+    await act(async () => {
+      logoutResolvers[0](
+        new Response(JSON.stringify({ message: "서버 내부 정보" }), {
+          status: 500,
+        }),
+      );
+    });
+
+    expect(screen.getByText("개인 체크리스트")).toBeTruthy();
+    expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "로그아웃하지 못했습니다.",
+    );
+    expect(screen.queryByText("서버 내부 정보")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+    ).toHaveLength(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    isLoggedOut = true;
+    await act(async () => {
+      logoutResolvers[1](new Response(null, { status: 204 }));
+    });
+
+    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+    expect(screen.queryByText("1/1")).toBeNull();
+    const oldRepository = previousRepositoryRef.current;
+    expect(oldRepository).toBeDefined();
+    if (!oldRepository) {
+      return;
+    }
+    await expect(oldRepository.getChecklist()).rejects.toBeInstanceOf(
+      MyChecklistAuthenticationRequiredError,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+  });
+
   it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
     let resolveCurrentUser: (response: Response) => void = () => undefined;
     vi.stubGlobal(

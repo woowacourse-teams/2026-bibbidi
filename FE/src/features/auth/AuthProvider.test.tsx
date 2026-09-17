@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "./AuthProvider";
@@ -22,6 +22,22 @@ function AuthStateView() {
   }
 
   return <p>{authState.status}</p>;
+}
+
+function AuthActionView() {
+  const { endAuthentication, refreshAuth } = useAuth();
+
+  return (
+    <>
+      <AuthStateView />
+      <button onClick={refreshAuth} type="button">
+        인증 다시 확인
+      </button>
+      <button onClick={endAuthentication} type="button">
+        인증 종료
+      </button>
+    </>
+  );
 }
 
 describe("AuthProvider", () => {
@@ -123,6 +139,75 @@ describe("AuthProvider", () => {
     expect(
       await screen.findByText("synchronizing 사용자 bibbidi"),
     ).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("인증 조회가 늦게 완료돼도 로그아웃 후 인증을 되살리지 않는다", async () => {
+    let resolveCurrentUser: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveCurrentUser = resolve;
+          }),
+      ),
+    );
+
+    render(
+      <AuthProvider>
+        <AuthActionView />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "인증 종료" }));
+    expect(screen.getByText("guest")).toBeTruthy();
+
+    await act(async () => {
+      resolveCurrentUser(
+        new Response(JSON.stringify({ nickname: "이전 사용자" }), {
+          status: 200,
+        }),
+      );
+    });
+
+    expect(screen.getByText("guest")).toBeTruthy();
+    expect(screen.queryByText(/이전 사용자/)).toBeNull();
+  });
+
+  it("갱신 중인 이전 인증 조회도 로그아웃 후 무시한다", async () => {
+    let resolveRefreshedUser: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRefreshedUser = resolve;
+          }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthActionView />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText("synchronizing 사용자 비비디")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "인증 다시 확인" }));
+    expect(screen.getByText("loading")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "인증 종료" }));
+
+    await act(async () => {
+      resolveRefreshedUser(
+        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+      );
+    });
+
+    expect(screen.getByText("guest")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
