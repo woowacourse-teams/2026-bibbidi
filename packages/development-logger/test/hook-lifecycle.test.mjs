@@ -84,7 +84,7 @@ test('Issue binding부터 grill-me, ADR Gate, Turn Diff까지 연결한다', () 
     runLifecycle(['grill', 'decision', '--session', session, '--text', '공통 core를 사용한다.'], root);
     runLifecycle(['grill', 'finish', '--session', session], root);
 
-    assert.equal(preToolUse(options, session, 'apply_patch', {}).permissionDecision, 'allow');
+    assert.equal(preToolUse(options, session, 'apply_patch', {}).permissionDecision, undefined);
 
     writeFileSync(join(root, 'tracked.txt'), 'after\n');
     handleHook({
@@ -246,7 +246,24 @@ test('Agent의 Issue 생성은 Type Label을 정확히 하나 요구한다', () 
   const options = { agent: 'codex', cwd: root };
   try {
     assert.equal(preToolUse(options, 'issue-create-session', 'Bash', { command: 'gh issue create --title "새 기능"' }).permissionDecision, 'deny');
-    assert.equal(preToolUse(options, 'issue-create-session', 'Bash', { command: 'gh issue create --title "새 기능" --label "type: feature"' }).permissionDecision, 'allow');
+    assert.equal(preToolUse(options, 'issue-create-session', 'Bash', { command: 'gh issue create --title "새 기능" --label "type: feature"' }).permissionDecision, undefined);
+  } finally {
+    removeDirectory(root);
+  }
+});
+
+test('허용 응답은 Agent별 PreToolUse 프로토콜을 따른다', () => {
+  const root = setupRepository();
+  try {
+    const codexOutput = preToolUse({ agent: 'codex', cwd: root }, 'codex-session', 'Bash', {
+      command: 'git status --short',
+    });
+    const claudeOutput = preToolUse({ agent: 'claude', cwd: root }, 'claude-session', 'Bash', {
+      command: 'git status --short',
+    });
+
+    assert.equal(Object.hasOwn(codexOutput, 'permissionDecision'), false);
+    assert.equal(claudeOutput.permissionDecision, 'allow');
   } finally {
     removeDirectory(root);
   }

@@ -240,6 +240,21 @@ function onPreToolUse(root, config, payload, agent, services) {
   return allow();
 }
 
+function adaptPreToolUseOutput(agent, output) {
+  const hookOutput = output?.hookSpecificOutput;
+  if (agent !== 'codex'
+    || hookOutput?.hookEventName !== 'PreToolUse'
+    || hookOutput.permissionDecision !== 'allow') {
+    return output;
+  }
+
+  const { permissionDecision: ignored, ...codexHookOutput } = hookOutput;
+  return {
+    ...output,
+    hookSpecificOutput: codexHookOutput,
+  };
+}
+
 export function handleHook({ agent, payload, cwd = payload.cwd ?? process.cwd(), services = { getIssue } }) {
   const root = findRepositoryRoot(cwd);
   const config = loadConfig(root);
@@ -248,6 +263,8 @@ export function handleHook({ agent, payload, cwd = payload.cwd ?? process.cwd(),
   if (event === 'UserPromptSubmit') return onUserPrompt(root, config, payload, agent, services);
   if (event === 'PostToolUse') return onPostToolUse(root, config, payload, agent);
   if (event === 'Stop') return onStop(root, payload, agent);
-  if (event === 'PreToolUse') return onPreToolUse(root, config, payload, agent, services);
+  if (event === 'PreToolUse') {
+    return adaptPreToolUseOutput(agent, onPreToolUse(root, config, payload, agent, services));
+  }
   return {};
 }
