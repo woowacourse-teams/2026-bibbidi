@@ -1,7 +1,6 @@
 name: Bibbidi Backend PROD CD
 
 on:
-  workflow_dispatch:
   push:
     branches: [release-be]
     paths:
