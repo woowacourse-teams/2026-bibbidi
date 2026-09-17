@@ -127,3 +127,4 @@
 {"type":"TURN_FINISHED","turnId":"01a0add9-615c-7f41-afbd-522ea6183ac1","diff":"turn-042.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-17T05:32:46.352Z"}
 {"type":"USER_PROMPTED","issue":175,"turnId":"01a0adda-71ee-70f0-8b4d-f1eaa356e5c8","prompt":"네","redacted":false,"timestamp":"2026-09-17T05:32:50.317Z"}
 {"type":"COMMIT_CONFIRMED","issue":175,"tree":"fdf377008c734cf09ac728f0c4f379c3aa421b2b","timestamp":"2026-09-17T05:32:57.517Z"}
+{"type":"PR_PLANNED","issue":175,"summary":["AppointmentController의 5개 operation 문서 summary를 엔드포인트별 범용 기능명으로 통일","각 REST Docs Example의 description을 성공, 충돌, 검증 실패, 권한 부족 등 구체적인 상황 설명으로 개선","완료 취소 테스트 fixture를 완료 상태에서 미완료 상태로 전환하도록 수정하고 체크리스트 항목 용어를 통일"],"review":["[REQUIRED] 동일 엔드포인트의 Example들이 같은 summary를 사용하고 description이 각 상황을 정확히 설명하는지 확인","[REQUIRED] 완료 취소 테스트가 실제 true에서 false로 상태를 변경하는지 확인","[CAUTION] 수정과 삭제는 같은 URI를 공유하므로 OpenAPI path는 4개지만 HTTP operation은 총 5개"],"timestamp":"2026-09-17T05:33:51.257Z"}
