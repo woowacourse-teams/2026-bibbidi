@@ -30,19 +30,35 @@ export class CreateFeedbackTimeoutError extends Error {
   }
 }
 
+export class CreateFeedbackRequestAbortedError extends Error {
+  constructor() {
+    super("피드백 요청이 취소됐습니다.");
+    this.name = "CreateFeedbackRequestAbortedError";
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 export async function createFeedback(
   values: CreateFeedbackValues,
+  signal?: AbortSignal,
 ): Promise<void> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(
-    () => controller.abort(),
-    CREATE_FEEDBACK_TIMEOUT_MS,
-  );
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, CREATE_FEEDBACK_TIMEOUT_MS);
   let response: Response;
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
 
   try {
     response = await fetch(CREATE_FEEDBACK_ENDPOINT, {
@@ -55,12 +71,21 @@ export async function createFeedback(
     });
   } catch (error) {
     if (isRecord(error) && error.name === "AbortError") {
+      if (signal?.aborted) {
+        throw new CreateFeedbackRequestAbortedError();
+      }
+
+      if (!didTimeout) {
+        throw new CreateFeedbackNetworkError();
+      }
+
       throw new CreateFeedbackTimeoutError();
     }
 
     throw new CreateFeedbackNetworkError();
   } finally {
     window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
   }
 
   if (response.status !== 201) {

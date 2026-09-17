@@ -1,5 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
+import {
+  AppointmentCreationSource,
+  createAppointmentCreateEvent,
+} from "./analytics/checklistAnalytics";
 import { AppointmentCreationError } from "./model/appointmentCreation";
 import { MyChecklistRequestAbortedError } from "./repository/myChecklistQueryRepository";
 
@@ -64,7 +69,7 @@ export interface ChecklistAppointmentCreationController {
   draft: ChecklistAppointmentCreationDraft;
   errors: ChecklistAppointmentCreationErrors;
   isOpen: boolean;
-  open: () => void;
+  open: (source?: AppointmentCreationSource) => void;
   submissionState: ChecklistAppointmentCreationSubmissionState;
   submit: () => Promise<ChecklistAppointmentCreationField | null>;
   touchDate: () => void;
@@ -232,6 +237,7 @@ export function useChecklistAppointmentCreation({
   const submissionInFlightRef = useRef(false);
   const requestControllerRef = useRef<AbortController | null>(null);
   const needsRefreshRef = useRef(false);
+  const sourceRef = useRef<AppointmentCreationSource>("checklist");
   const commandRef = useRef({ onSubmit, onRetryRefresh });
   const isMountedRef = useRef(true);
   const isCurrentContext = activeContextKey === contextKey;
@@ -256,6 +262,7 @@ export function useChecklistAppointmentCreation({
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
     needsRefreshRef.current = false;
+    sourceRef.current = "checklist";
     submissionInFlightRef.current = false;
     let isActive = true;
 
@@ -292,6 +299,7 @@ export function useChecklistAppointmentCreation({
     requestControllerRef.current = null;
     submissionInFlightRef.current = false;
     needsRefreshRef.current = false;
+    sourceRef.current = "checklist";
     let isActive = true;
 
     queueMicrotask(() => {
@@ -376,8 +384,9 @@ export function useChecklistAppointmentCreation({
     draft,
     errors,
     isOpen: isCurrentContext && isOpen,
-    open: () => {
+    open: (source = "checklist") => {
       if (isAuthenticated && checklistItemId !== null) {
+        sourceRef.current = source;
         setIsOpen(true);
       }
     },
@@ -430,6 +439,7 @@ export function useChecklistAppointmentCreation({
         }
 
         if (didSucceed !== false) {
+          analytics.track(createAppointmentCreateEvent(sourceRef.current));
           requestControllerRef.current = null;
           resetAndClose();
         } else {

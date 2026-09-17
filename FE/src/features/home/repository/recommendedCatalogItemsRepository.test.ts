@@ -59,12 +59,14 @@ describe("createRecommendedCatalogItemsRepository", () => {
       {
         category: "스드메",
         catalogItemId: 201,
+        phase: 2,
         stepName: "스드메 업체 확정",
         title: "드레스샵 확정",
       },
       {
         category: "웨딩홀",
         catalogItemId: 100,
+        phase: 1,
         stepName: "웨딩홀 정하기",
         title: "웨딩홀 투어",
       },

@@ -32,6 +32,12 @@ import {
   UnscheduledTasksRequestAbortedError,
 } from "./repository/unscheduledTasksRepository";
 
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
+}));
+
 vi.mock("../auth", () => ({
   useAuth: vi.fn(),
 }));
@@ -101,6 +107,7 @@ function createDeferred<T>() {
 }
 
 beforeEach(() => {
+  analyticsMocks.track.mockReset();
   refreshAuth.mockReset();
   vi.mocked(usePreparationChecklistRepository).mockReturnValue(
     checklistRepository,
@@ -542,12 +549,14 @@ describe("HomeScheduleDashboardFeature", () => {
         {
           category: "스드메",
           catalogItemId: 201,
+          phase: 2,
           stepName: "스드메 업체 확정",
           title: "드레스샵 확정",
         },
         {
           category: "웨딩홀",
           catalogItemId: 100,
+          phase: 1,
           stepName: "웨딩홀 정하기",
           title: "웨딩홀 투어",
         },
@@ -601,6 +610,7 @@ describe("HomeScheduleDashboardFeature", () => {
     const item = {
       category: "웨딩홀",
       catalogItemId: 201,
+      phase: 1,
       stepName: "웨딩홀 정하기",
       title: "웨딩홀 투어",
     };
@@ -622,6 +632,7 @@ describe("HomeScheduleDashboardFeature", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "내 할 일에 추가" }),
     );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledWith(
         "authenticated",
@@ -630,6 +641,16 @@ describe("HomeScheduleDashboardFeature", () => {
       ),
     );
     expect(await screen.findByText("추천할 일이 없어요")).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "preparation_item_add",
+      parameters: {
+        category_name: "웨딩홀",
+        item_count: 1,
+        phase: 1,
+        source: "planner_recommendation",
+      },
+    });
     expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
     expect(screen.getByText("일정이 필요한 할 일이 없어요")).toBeTruthy();
   });
@@ -639,6 +660,7 @@ describe("HomeScheduleDashboardFeature", () => {
     const item = {
       category: "웨딩홀",
       catalogItemId: 201,
+      phase: 1,
       stepName: "웨딩홀 정하기",
       title: "웨딩홀 투어",
     };
@@ -671,6 +693,7 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(1);
 
     await act(async () => rejectAddition(new Error("서버 내부 메시지")));
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
       "할 일을 추가하지 못했어요. 다시 시도해 주세요.",
     );
@@ -679,7 +702,41 @@ describe("HomeScheduleDashboardFeature", () => {
     await waitFor(() =>
       expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(2),
     );
+    await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
     expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
+  });
+
+  it("이미 추가된 추천 항목 응답은 공통 준비 항목 성공 이벤트를 중복 전송하지 않는다", async () => {
+    const recommendedRepository = createRecommendedRepository();
+    vi.mocked(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).mockResolvedValue([
+      {
+        category: "웨딩홀",
+        catalogItemId: 201,
+        phase: 1,
+        stepName: "웨딩홀 정하기",
+        title: "웨딩홀 투어",
+      },
+    ]);
+    vi.mocked(checklistRepository.addCatalogItemIds).mockResolvedValueOnce([]);
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={createRepository()}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "내 할 일에 추가" }),
+    );
+
+    await waitFor(() =>
+      expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledOnce(),
+    );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("추천 추가 인증 만료는 세션을 갱신하고 요청 취소 뒤에는 오류를 표시하지 않는다", async () => {
@@ -690,6 +747,7 @@ describe("HomeScheduleDashboardFeature", () => {
       {
         category: "웨딩홀",
         catalogItemId: 201,
+        phase: 1,
         stepName: "웨딩홀 정하기",
         title: "웨딩홀 투어",
       },
@@ -744,6 +802,7 @@ describe("HomeScheduleDashboardFeature", () => {
     const item = {
       category: "웨딩홀",
       catalogItemId: 201,
+      phase: 1,
       stepName: "웨딩홀 정하기",
       title: "웨딩홀 투어",
     };
@@ -797,6 +856,7 @@ describe("HomeScheduleDashboardFeature", () => {
     await act(async () => resolvePreviousAddition(["201"]));
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: "추가됨" })).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("추천 영역 오류만 재시도하고 다른 두 영역 결과를 유지한다", async () => {
@@ -854,6 +914,7 @@ describe("HomeScheduleDashboardFeature", () => {
       {
         category: "스드메",
         catalogItemId: 201,
+        phase: 2,
         stepName: "스드메 업체 확정",
         title: "드레스샵 확정",
       },
@@ -923,6 +984,7 @@ describe("HomeScheduleDashboardFeature", () => {
       {
         category: "스드메",
         catalogItemId: 201,
+        phase: 2,
         stepName: "스드메 업체 확정",
         title: "새 응답",
       },
@@ -955,6 +1017,7 @@ describe("HomeScheduleDashboardFeature", () => {
         {
           category: "웨딩홀",
           catalogItemId: 100,
+          phase: 1,
           stepName: "웨딩홀 정하기",
           title: "늦은 응답",
         },

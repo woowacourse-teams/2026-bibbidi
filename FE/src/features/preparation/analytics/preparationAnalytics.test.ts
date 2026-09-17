@@ -69,4 +69,23 @@ describe("준비 목록 Analytics 이벤트", () => {
       },
     });
   });
+
+  it("플래너 추천 추가도 같은 이벤트 계약에서 공개 분류와 유입만 구분한다", () => {
+    expect(
+      createPreparationItemAddEvent({
+        categoryName: "웨딩홀",
+        itemCount: 1,
+        phase: 3,
+        source: "planner_recommendation",
+      }),
+    ).toEqual({
+      name: "preparation_item_add",
+      parameters: {
+        category_name: "웨딩홀",
+        item_count: 1,
+        phase: 3,
+        source: "planner_recommendation",
+      },
+    });
+  });
 });

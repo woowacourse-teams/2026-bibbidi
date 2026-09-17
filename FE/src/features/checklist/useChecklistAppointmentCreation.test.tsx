@@ -1,12 +1,22 @@
 import { useEffect } from "react";
 import { act, render, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ChecklistAppointmentCreationController,
   ChecklistAppointmentCreationInput,
   useChecklistAppointmentCreation,
 } from "./useChecklistAppointmentCreation";
+
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
+}));
+
+beforeEach(() => {
+  analyticsMocks.track.mockReset();
+});
 
 let controller: ChecklistAppointmentCreationController;
 
@@ -135,6 +145,11 @@ describe("useChecklistAppointmentCreation", () => {
     );
     expect(controller.isOpen).toBe(false);
     expect(controller.draft.title).toBe("");
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "appointment_create",
+      parameters: { creation_type: "checklist_item", source: "checklist" },
+    });
   });
 
   it("제출 중에는 취소와 중복 제출을 막고 View에 제출 상태를 제공한다", async () => {
@@ -166,12 +181,32 @@ describe("useChecklistAppointmentCreation", () => {
     withController(controller.cancel);
     expect(onSubmit).toHaveBeenCalledOnce();
     expect(controller.isOpen).toBe(true);
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveSubmission?.(true);
       await firstSubmission;
     });
     expect(controller.isOpen).toBe(false);
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+  });
+
+  it("플래너에서 연 일정 생성의 고정 유입 위치를 보존한다", async () => {
+    render(<Harness onSubmit={vi.fn().mockResolvedValue(true)} />);
+    withController(() => {
+      controller.open("planner");
+      controller.changeTitle("전송하면 안 되는 일정 제목");
+      controller.changeDate("2026-09-01");
+      controller.changePlace("전송하면 안 되는 장소");
+      controller.changeMemo("전송하면 안 되는 메모");
+    });
+
+    await submit();
+
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "appointment_create",
+      parameters: { creation_type: "checklist_item", source: "planner" },
+    });
   });
 
   it("저장 실패 후 입력을 유지하고 같은 값으로 다시 제출한다", async () => {
@@ -186,6 +221,7 @@ describe("useChecklistAppointmentCreation", () => {
       controller.changeDate("2026-09-20");
     });
     await submit();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(controller.isOpen).toBe(true);
     expect(controller.draft.title).toBe("상담");
     expect(controller.submissionState).toEqual({
@@ -197,6 +233,7 @@ describe("useChecklistAppointmentCreation", () => {
     expect(onSubmit).toHaveBeenCalledTimes(2);
     expect(onSubmit.mock.calls[0][0]).toEqual(onSubmit.mock.calls[1][0]);
     expect(controller.isOpen).toBe(false);
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("취소 후 재열기와 인증 대상·체크리스트 항목 변경 시 draft를 정리한다", async () => {
@@ -287,6 +324,7 @@ describe("useChecklistAppointmentCreation", () => {
       await submission;
     });
     expect(onSubmit).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it.each([

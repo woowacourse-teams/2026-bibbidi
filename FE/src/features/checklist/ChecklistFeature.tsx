@@ -1,8 +1,10 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
+import { analytics } from "../../infrastructure/analytics";
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
+import { createPlannerAppointmentStartEvent } from "./analytics/checklistAnalytics";
 import {
   useChecklistCommandRepository,
   useChecklistCacheRepository,
@@ -187,12 +189,19 @@ export function ChecklistFeature({
     },
     [audience, setRequestState],
   );
+  const selectedCategoryId =
+    requestState.status === "success"
+      ? requestState.checklist.categories
+          .flatMap((category) => category.items)
+          .find((item) => item.id === selectedTaskId)?.categoryId
+      : null;
   const itemEditing = useChecklistItemEditing(
     checklistCommandRepository,
     refreshAuth,
     audience,
     selectedChecklistItemId,
     handleRefreshFailed,
+    selectedCategoryId,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,
@@ -470,7 +479,8 @@ export function ChecklistFeature({
     }
 
     openedAppointmentRequestRef.current = location.key;
-    appointmentCreation.open();
+    appointmentCreation.open("planner");
+    analytics.track(createPlannerAppointmentStartEvent());
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);

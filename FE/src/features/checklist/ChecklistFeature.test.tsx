@@ -23,6 +23,7 @@ const authMocks = vi.hoisted(() => ({
     | { status: "synchronizing"; user: { nickname: string } },
   refreshAuth: vi.fn(),
 }));
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
 const repositoryMocks = vi.hoisted(() => {
   const changeItemCategory = vi.fn();
   const changeItemStatus = vi.fn();
@@ -69,6 +70,9 @@ vi.mock("../auth", () => ({
     authState: authMocks.authState,
     refreshAuth: authMocks.refreshAuth,
   }),
+}));
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
 }));
 vi.mock("./checklistQueryDependencies", () => ({
   useChecklistCommandRepository: () => repositoryMocks.command,
@@ -210,6 +214,7 @@ function closeMobileTaskDetail(dialog: HTMLElement) {
 }
 
 beforeEach(() => {
+  analyticsMocks.track.mockReset();
   authMocks.authState = { status: "guest" };
   authMocks.refreshAuth.mockReset();
   repositoryMocks.changeItemCategory.mockReset();
@@ -1625,6 +1630,11 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     await waitFor(() =>
       expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
     );
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "planner_appointment_start",
+      parameters: { entry_type: "unscheduled_task", source: "planner" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(
       screen.queryByRole("complementary", { name: "일정 추가" }),
@@ -1636,6 +1646,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(
       await screen.findByRole("complementary", { name: "일정 추가" }),
     ).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
   });
 
   it("플래너에서 연 일정 입력을 취소한 뒤 뒤로 가면 플래너로 돌아간다", async () => {
@@ -1715,6 +1726,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(
       screen.queryByRole("complementary", { name: "일정 추가" }),
     ).toBeNull();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("잘못된 taskId를 로딩 완료 후 replace로 제거한다", async () => {

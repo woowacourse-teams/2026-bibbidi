@@ -4,6 +4,7 @@ import {
   createFeedback,
   CreateFeedbackApiError,
   CreateFeedbackNetworkError,
+  CreateFeedbackRequestAbortedError,
   CreateFeedbackTimeoutError,
 } from "./createFeedback";
 
@@ -69,5 +70,30 @@ describe("createFeedback", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     await requestExpectation;
+  });
+
+  it("호출자가 중단하면 timeout 성공으로 오인하지 않고 취소 오류를 반환한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("aborted", "AbortError"));
+            });
+          }),
+      ),
+    );
+    const controller = new AbortController();
+    const request = createFeedback(
+      { content: null, sentiment: "good" },
+      controller.signal,
+    );
+
+    controller.abort();
+
+    await expect(request).rejects.toBeInstanceOf(
+      CreateFeedbackRequestAbortedError,
+    );
   });
 });

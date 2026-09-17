@@ -7,18 +7,21 @@ const model = {
     {
       category: "웨딩홀",
       catalogItemId: 101,
+      phase: 1,
       stepName: "웨딩홀 정하기",
       title: "웨딩홀 투어",
     },
     {
       category: "스드메",
       catalogItemId: 102,
+      phase: 2,
       stepName: "스드메 업체 확정",
       title: "드레스샵 확정",
     },
     {
       category: "예식",
       catalogItemId: 103,
+      phase: 3,
       stepName: "예식 준비",
       title: "식순 정하기",
     },

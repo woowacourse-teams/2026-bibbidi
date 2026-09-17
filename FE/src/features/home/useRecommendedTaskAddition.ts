@@ -14,7 +14,7 @@ interface UseRecommendedTaskAdditionOptions {
   authScope: string;
   isAuthenticated: boolean;
   onAuthenticationRequired: () => void;
-  onSuccess: () => void;
+  onSuccess: (catalogItemId: number, itemCount: number) => void;
   repository: ChecklistRepository;
 }
 
@@ -123,7 +123,7 @@ export function useRecommendedTaskAddition({
           [String(catalogItemId)],
           controller.signal,
         )
-        .then(() => {
+        .then((addedCatalogItemIds) => {
           if (
             controller.signal.aborted ||
             currentAuthScopeRef.current !== authScope ||
@@ -146,7 +146,7 @@ export function useRecommendedTaskAddition({
               ],
             };
           });
-          onSuccess();
+          onSuccess(catalogItemId, addedCatalogItemIds.length);
         })
         .catch((error: unknown) => {
           if (
