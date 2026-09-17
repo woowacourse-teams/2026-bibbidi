@@ -12,9 +12,21 @@ import {
   RemoteMyChecklistCreationRequestAbortedError,
 } from "../data-source/remoteMyChecklistCommandDataSource";
 import {
+  AppointmentCreationRequest,
+  RemoteAppointmentCreationApiError,
+  RemoteAppointmentCreationContractError,
+  RemoteAppointmentCreationNetworkError,
+  RemoteAppointmentCreationRequestAbortedError,
+  RemoteAppointmentCreationTimeoutError,
+} from "../data-source/remoteAppointmentCreationDataSource";
+import {
   ChecklistItemStatus,
   MyChecklistItemModel,
 } from "../model/myChecklist";
+import {
+  AppointmentCreationError,
+  AppointmentCreationFailureReason,
+} from "../model/appointmentCreation";
 import {
   MyChecklistAuthenticationRequiredError,
   MyChecklistQueryRepository,
@@ -22,6 +34,11 @@ import {
 } from "./myChecklistQueryRepository";
 
 export interface MyChecklistCommandRepository {
+  createAppointment(
+    itemId: number,
+    request: AppointmentCreationRequest,
+    signal?: AbortSignal,
+  ): Promise<void>;
   changeItemCategory(
     itemId: number,
     categoryId: number,
@@ -314,6 +331,42 @@ export function createMyChecklistCommandRepository(
   };
 
   return {
+    async createAppointment(itemId, request, signal) {
+      try {
+        await dataSource.createAppointment(itemId, request, signal);
+      } catch (error) {
+        if (error instanceof RemoteAppointmentCreationApiError) {
+          if (error.status === 401 || error.errorCode === 201) {
+            throw new MyChecklistAuthenticationRequiredError({ cause: error });
+          }
+          const reason: AppointmentCreationFailureReason =
+            error.status === 400 || error.errorCode === 101
+              ? "invalid-request"
+              : error.status === 404 || error.errorCode === 304
+                ? "item-not-found"
+                : error.status === 403
+                  ? "forbidden"
+                  : "api";
+          throw new AppointmentCreationError(reason, { cause: error });
+        }
+        if (error instanceof RemoteAppointmentCreationRequestAbortedError) {
+          throw new MyChecklistRequestAbortedError({ cause: error });
+        }
+        if (error instanceof RemoteAppointmentCreationTimeoutError) {
+          throw new AppointmentCreationError("timeout", { cause: error });
+        }
+        if (error instanceof RemoteAppointmentCreationNetworkError) {
+          throw new AppointmentCreationError("network", { cause: error });
+        }
+        if (error instanceof RemoteAppointmentCreationContractError) {
+          throw new AppointmentCreationError(
+            error.stage === "request" ? "invalid-request" : "contract",
+            { cause: error },
+          );
+        }
+        throw new AppointmentCreationError("api", { cause: error });
+      }
+    },
     changeItemCategory(itemId, categoryId, signal) {
       if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
         return Promise.reject(

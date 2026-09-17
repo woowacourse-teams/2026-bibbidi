@@ -30,3 +30,7 @@ export function useChecklistRevision() {
 export function useChecklistCommandRepository() {
   return useMyChecklistCommandRepository();
 }
+
+export function useChecklistCacheRepository() {
+  return useMyChecklistQueryRepository();
+}

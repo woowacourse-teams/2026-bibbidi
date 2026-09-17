@@ -85,6 +85,7 @@ function createCommandRepository(): MyChecklistCommandRepository {
     createCustomItem: vi.fn().mockResolvedValue(undefined),
     ensureChecklist: vi.fn().mockResolvedValue(undefined),
     hasRemainingAppointments: vi.fn().mockResolvedValue(false),
+    createAppointment: vi.fn(),
     reconcileMissingChecklist: vi.fn().mockResolvedValue(undefined),
   };
 }

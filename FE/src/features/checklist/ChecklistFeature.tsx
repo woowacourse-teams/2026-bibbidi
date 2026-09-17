@@ -5,6 +5,7 @@ import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
 import {
   useChecklistCommandRepository,
+  useChecklistCacheRepository,
   useChecklistQueryRepository,
   useChecklistRevision,
 } from "./checklistQueryDependencies";
@@ -13,6 +14,11 @@ import {
   ChecklistQueryAuthenticationRequiredError,
   ChecklistQueryRequestAbortedError,
 } from "./repository/checklistQueryRepository";
+import { AppointmentCreationError } from "./model/appointmentCreation";
+import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistRequestAbortedError,
+} from "./repository/myChecklistQueryRepository";
 import { createChecklistViewModel } from "./view-model/createChecklistViewModel";
 import {
   ChecklistAppointmentCreationInput,
@@ -54,6 +60,7 @@ type LoginRequiredReason = "schedule-creation" | "task-creation";
 interface ChecklistFeatureProps {
   onSubmitAppointment?: (
     input: ChecklistAppointmentCreationInput,
+    signal: AbortSignal,
   ) => Promise<boolean | void> | boolean | void;
 }
 
@@ -104,7 +111,54 @@ export function ChecklistFeature({
         ? "guest"
         : undefined;
   const checklistRepository = useChecklistQueryRepository();
+  const checklistCacheRepository = useChecklistCacheRepository();
   const checklistCommandRepository = useChecklistCommandRepository();
+  const refreshAppointments = useCallback(
+    async (signal: AbortSignal) => {
+      try {
+        checklistCacheRepository.invalidate();
+        await checklistCacheRepository.getChecklist(signal);
+      } catch (error) {
+        if (signal.aborted || error instanceof MyChecklistRequestAbortedError) {
+          throw new MyChecklistRequestAbortedError({ cause: error });
+        }
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
+          refreshAuth();
+        }
+        throw new AppointmentCreationError("refresh-failed", { cause: error });
+      }
+    },
+    [checklistCacheRepository, refreshAuth],
+  );
+  const submitAppointment = useCallback(
+    async (input: ChecklistAppointmentCreationInput, signal: AbortSignal) => {
+      try {
+        await checklistCommandRepository.createAppointment(
+          input.checklistItemId,
+          {
+            title: input.title,
+            date: input.date,
+            startTime: input.startTime ?? null,
+            endTime: input.endTime ?? null,
+            place: input.place ?? null,
+            memo: input.memo ?? null,
+          },
+          signal,
+        );
+      } catch (error) {
+        if (
+          error instanceof MyChecklistAuthenticationRequiredError ||
+          (error instanceof AppointmentCreationError &&
+            error.cause instanceof MyChecklistAuthenticationRequiredError)
+        ) {
+          refreshAuth();
+        }
+        throw error;
+      }
+      await refreshAppointments(signal);
+    },
+    [checklistCommandRepository, refreshAppointments, refreshAuth],
+  );
   const checklistRevision = useChecklistRevision();
   const location = useLocation();
   const navigate = useNavigate();
@@ -188,7 +242,8 @@ export function ChecklistFeature({
   const appointmentCreation = useChecklistAppointmentCreation({
     checklistItemId: appointmentCreationChecklistItemId,
     isAuthenticated: audience === "authenticated",
-    onSubmit: onSubmitAppointment,
+    onSubmit: onSubmitAppointment ?? submitAppointment,
+    onRetryRefresh: onSubmitAppointment ? undefined : refreshAppointments,
     sessionIdentity,
   });
   const requestScheduleCreation = useCallback(() => {
