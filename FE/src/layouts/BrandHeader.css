@@ -1,0 +1,25 @@
+.brand-header {
+  min-width: 320px;
+  height: 96px;
+  flex: none;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  background: var(--color-bg-layer-default);
+}
+
+.brand-header__inner {
+  display: flex;
+  width: min(calc(100% - 48px), 1440px);
+  height: 100%;
+  align-items: center;
+  margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .brand-header {
+    height: 64px;
+  }
+
+  .brand-header__inner {
+    width: min(calc(100% - 32px), 1440px);
+  }
+}

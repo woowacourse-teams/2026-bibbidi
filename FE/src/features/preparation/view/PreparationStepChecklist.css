@@ -1,0 +1,46 @@
+.preparation-step-checklist {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 18px 0 12px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+}
+
+.preparation-step-checklist h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.preparation-step-checklist__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 18px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.preparation-step-checklist__count {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preparation-step-checklist--empty {
+  display: flex;
+  flex-direction: column;
+}
+
+.preparation-step-checklist--empty .preparation-step-checklist__header {
+  border-bottom: 0;
+}

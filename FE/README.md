@@ -38,11 +38,31 @@ pnpm dev
 
 기본 주소는 `http://localhost:3000`입니다.
 
+## API 연결
+
+로컬 API 주소는 `FE/.env`에서 관리합니다. `.env`는 Git에 포함하지 않습니다.
+
+```dotenv
+BIBBIDI_API_BASE_URL=
+BIBBIDI_API_PROXY_TARGET=http://localhost:8080
+```
+
+개발 서버는 `/api` 요청을 `BIBBIDI_API_PROXY_TARGET`으로 전달합니다.
+해당 값이 없으면 설정 누락 오류와 함께 개발 서버 실행을 중단합니다.
+production에서 FE와 BE의 도메인이 다르면 `BIBBIDI_API_BASE_URL`에 API 기준 주소를 지정합니다.
+값을 지정하지 않으면 현재 웹과 같은 도메인으로 `/api` 요청을 전송합니다.
+
+CI와 배포 환경에서 직접 전달한 환경변수는 `.env`보다 우선합니다.
+
 ## 명령어
 
 | 명령어 | 설명 |
 |---|---|
 | `pnpm dev` | Webpack development 모드로 개발 서버를 실행합니다. |
+| `pnpm lint` | ESLint로 코드를 검사하고 warning도 오류로 처리합니다. |
+| `pnpm lint:fix` | ESLint로 검사하면서 자동 수정 가능한 문제를 수정합니다. |
+| `pnpm format` | Prettier로 파일 형식을 자동 정리합니다. |
+| `pnpm format:check` | 파일을 수정하지 않고 Prettier 형식 준수 여부를 검사합니다. |
 | `pnpm typecheck` | 출력 파일 없이 TypeScript 타입만 검사합니다. |
 | `pnpm build` | 타입 검사 후 production 번들을 `dist/`에 생성합니다. |
 

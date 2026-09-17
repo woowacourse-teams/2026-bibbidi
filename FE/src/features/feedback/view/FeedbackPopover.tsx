@@ -1,0 +1,80 @@
+import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
+import type { FeedbackFormViewProps } from "./feedbackFormView";
+import { FeedbackRatingField } from "./FeedbackRatingField";
+
+export function FeedbackPopover({
+  canSubmit,
+  closeButtonRef,
+  content,
+  errorMessage,
+  isSubmitting,
+  onClose,
+  onContentChange,
+  onSentimentChange,
+  onSubmit,
+  sentiment,
+}: FeedbackFormViewProps) {
+  return (
+    <section
+      aria-label="서비스 피드백"
+      aria-modal="false"
+      className="feedback-popover"
+      role="dialog"
+    >
+      <header className="feedback-popover__header">
+        <h2>비비디, 어떠셨나요?</h2>
+        <button
+          aria-label="피드백 창 닫기"
+          className="feedback-popover__close"
+          disabled={isSubmitting}
+          onClick={onClose}
+          ref={closeButtonRef}
+          type="button"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </header>
+
+      <form aria-busy={isSubmitting} onSubmit={onSubmit}>
+        <FeedbackRatingField
+          disabled={isSubmitting}
+          onChange={onSentimentChange}
+          value={sentiment}
+        />
+
+        <div className="feedback-popover__field">
+          <div className="feedback-popover__label-row">
+            <label htmlFor="feedback-content">의견을 들려주세요</label>
+            <span>선택</span>
+          </div>
+          <textarea
+            id="feedback-content"
+            disabled={isSubmitting}
+            maxLength={MAX_FEEDBACK_LENGTH}
+            onChange={(event) => onContentChange(event.target.value)}
+            placeholder={
+              "어떤 점이 좋았거나 불편했나요?\n자유롭게 작성해 주세요."
+            }
+            value={content}
+          />
+          <span className="feedback-popover__count">
+            {content.length} / {MAX_FEEDBACK_LENGTH}
+          </span>
+        </div>
+
+        <button
+          className="feedback-popover__submit"
+          disabled={!canSubmit}
+          type="submit"
+        >
+          {isSubmitting ? "보내는 중..." : "의견 보내기"}
+        </button>
+        {errorMessage ? (
+          <p className="feedback-form__error" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+      </form>
+    </section>
+  );
+}

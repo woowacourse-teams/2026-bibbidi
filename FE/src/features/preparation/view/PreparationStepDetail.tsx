@@ -1,0 +1,73 @@
+import { PreparationStepDetailViewModel } from "../view-model/createPreparationRoadmapViewModel";
+import {
+  PreparationAddAllTasksButton,
+  PreparationTaskList,
+} from "./PreparationTaskList";
+
+type PreparationStepDetailContentViewModel = Pick<
+  PreparationStepDetailViewModel,
+  "description" | "detailTasks" | "title"
+>;
+
+interface PreparationStepDetailProps {
+  additionErrorMessage: string | null;
+  addingCatalogItemIds: readonly string[];
+  canAddTasks: boolean;
+  detail: PreparationStepDetailContentViewModel;
+  onAddAllTasks: () => void;
+  onTaskAdd: (catalogItemId: string) => void;
+}
+
+export function PreparationStepDetail({
+  additionErrorMessage,
+  addingCatalogItemIds,
+  canAddTasks,
+  detail,
+  onAddAllTasks,
+  onTaskAdd,
+}: PreparationStepDetailProps) {
+  return (
+    <aside
+      aria-live="polite"
+      aria-label="이 단계에서 준비할 일"
+      className="preparation-step-detail"
+      id="preparation-step-detail"
+    >
+      <div className="preparation-step-detail__panel">
+        <header className="preparation-step-detail__header">
+          <h2>{detail.title}</h2>
+          <p>{detail.description}</p>
+        </header>
+
+        <div className="preparation-step-detail__content">
+          <section
+            aria-label="세부 할 일"
+            className={`preparation-step-detail__section${detail.detailTasks.length === 0 ? " preparation-step-detail__section--empty" : ""}`}
+          >
+            <PreparationTaskList
+              addingCatalogItemIds={addingCatalogItemIds}
+              canAddTasks={canAddTasks}
+              onTaskAdd={onTaskAdd}
+              tasks={detail.detailTasks}
+              variant="available"
+            />
+          </section>
+        </div>
+        {detail.detailTasks.length > 0 ? (
+          <footer className="preparation-step-detail__footer">
+            {additionErrorMessage ? (
+              <p className="preparation-task-list__error" role="alert">
+                {additionErrorMessage}
+              </p>
+            ) : null}
+            <PreparationAddAllTasksButton
+              isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
+              isLoading={addingCatalogItemIds.length > 0}
+              onClick={onAddAllTasks}
+            />
+          </footer>
+        ) : null}
+      </div>
+    </aside>
+  );
+}

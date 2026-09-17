@@ -1,0 +1,1207 @@
+import { ReactNode, useEffect } from "react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const analyticsMocks = vi.hoisted(() => ({
+  track: vi.fn(),
+}));
+
+vi.mock("../infrastructure/analytics", () => ({
+  analytics: {
+    initialize: vi.fn(),
+    track: analyticsMocks.track,
+  },
+}));
+
+import { AuthProvider } from "../features/auth";
+import {
+  ChecklistFeature,
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistQueryRepository,
+  useMyChecklistQueryRepository,
+} from "../features/checklist";
+import { ChecklistMigrationProvider } from "../features/checklist-migration";
+import { PreparationRoadmapFeature } from "../features/preparation/PreparationRoadmapFeature";
+import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../shared/responsive";
+import { installMatchMedia } from "../test/matchMedia";
+import { ServiceLayout } from "./ServiceLayout";
+
+function createChecklistItem(
+  id: number,
+  sourceCatalogItemId: number | null,
+  status: "continue" | "done" | "prev" = "prev",
+) {
+  return {
+    appointments: [],
+    categoryId: 10,
+    id,
+    sourceCatalogItemId,
+    status,
+    title: `체크리스트 항목 ${id}`,
+  };
+}
+
+function LocationDisplay() {
+  const location = useLocation();
+
+  return (
+    <div data-testid="service-location">
+      {`${location.pathname}${location.search}`}
+    </div>
+  );
+}
+
+beforeEach(() => {
+  analyticsMocks.track.mockReset();
+  vi.stubGlobal("localStorage", {
+    getItem: vi.fn().mockReturnValue(null),
+    removeItem: vi.fn(),
+    setItem: vi.fn(),
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function renderServiceLayout(
+  routes: ReactNode,
+  initialEntries: string[] = ["/"],
+) {
+  return render(
+    <AuthProvider>
+      <ChecklistMigrationProvider>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route element={<ServiceLayout />}>{routes}</Route>
+          </Routes>
+        </MemoryRouter>
+      </ChecklistMigrationProvider>
+    </AuthProvider>,
+  );
+}
+
+describe("ServiceLayout", () => {
+  it("모바일에서 중복 로그아웃을 막고 실패 후 재시도해 홈과 guest 상태로 전환한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    const logoutResolvers: Array<(response: Response) => void> = [];
+    const previousRepositoryRef: { current?: MyChecklistQueryRepository } = {};
+    let isLoggedOut = false;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          isLoggedOut
+            ? new Response(
+                JSON.stringify({ errorCode: 201, message: "인증 없음" }),
+                { status: 401 },
+              )
+            : new Response(
+                JSON.stringify({
+                  id: 1,
+                  items: [createChecklistItem(10, null, "done")],
+                }),
+                { status: 200 },
+              ),
+        );
+      }
+
+      if (url === "/api/logout") {
+        return new Promise<Response>((resolve) => {
+          logoutResolvers.push(resolve);
+        });
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function CacheCapture() {
+      const repository = useMyChecklistQueryRepository();
+      useEffect(() => {
+        previousRepositoryRef.current = repository;
+      }, [repository]);
+      return null;
+    }
+
+    function HomeView() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <p>홈 화면</p>
+          <LocationDisplay />
+          <button onClick={() => navigate(-1)} type="button">
+            뒤로
+          </button>
+        </>
+      );
+    }
+
+    renderServiceLayout(
+      <>
+        <Route path="/" element={<HomeView />} />
+        <Route
+          path="/checklist"
+          element={
+            <>
+              <CacheCapture />
+              <p>개인 체크리스트</p>
+              <LocationDisplay />
+            </>
+          }
+        />
+      </>,
+      ["/", "/checklist"],
+    );
+
+    expect(await screen.findByText("1/1")).toBeTruthy();
+    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    expect(screen.getByLabelText("현재 사용자 비").nextElementSibling).toBe(
+      logoutButton,
+    );
+    fireEvent.click(logoutButton);
+    fireEvent.click(logoutButton);
+
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+    ).toHaveLength(1);
+    expect(logoutButton.hasAttribute("disabled")).toBe(true);
+    expect(logoutButton.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("status").textContent).toBe("로그아웃 처리 중");
+
+    await act(async () => {
+      logoutResolvers[0](
+        new Response(JSON.stringify({ message: "서버 내부 정보" }), {
+          status: 500,
+        }),
+      );
+    });
+
+    expect(screen.getByText("개인 체크리스트")).toBeTruthy();
+    expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "로그아웃하지 못했습니다.",
+    );
+    expect(screen.queryByText("서버 내부 정보")).toBeNull();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+    ).toHaveLength(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    isLoggedOut = true;
+    await act(async () => {
+      logoutResolvers[1](new Response(null, { status: 204 }));
+    });
+
+    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+    expect(screen.queryByText("1/1")).toBeNull();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "logout",
+      parameters: {},
+    });
+    const oldRepository = previousRepositoryRef.current;
+    expect(oldRepository).toBeDefined();
+    if (!oldRepository) {
+      return;
+    }
+    await expect(oldRepository.getChecklist()).rejects.toBeInstanceOf(
+      MyChecklistAuthenticationRequiredError,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+  });
+
+  it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
+    let resolveCurrentUser: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveCurrentUser = resolve;
+          }),
+      ),
+    );
+
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
+
+    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "로그인 상태 확인 중" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "계정 메뉴" })).toBeNull();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCurrentUser(
+        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+      );
+    });
+
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+  });
+
+  it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => undefined)),
+    );
+
+    renderServiceLayout(
+      <>
+        <Route
+          path="/"
+          element={
+            <>
+              <div>홈 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+        <Route path="/planner" element={<div>플래너 화면</div>} />
+      </>,
+    );
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
+        "link",
+        { name: "플래너" },
+      ),
+    );
+
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(screen.queryByText("플래너 화면")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          status: 200,
+        }),
+      ),
+    );
+
+    const { container } = renderServiceLayout(
+      <>
+        <Route path="/" element={<div>홈 화면</div>} />
+        <Route path="/preparation" element={<div>준비 목록 화면</div>} />
+      </>,
+      ["/preparation"],
+    );
+    await screen.findByText("준비 목록 화면");
+    const content = container.querySelector<HTMLElement>(
+      ".service-layout__content",
+    );
+
+    expect(content).not.toBeNull();
+    if (!content) {
+      return;
+    }
+
+    content.scrollTop = 700;
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "하단 메뉴" })).getByRole(
+        "link",
+        { name: "로드맵" },
+      ),
+    );
+
+    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(content.scrollTop).toBe(0);
+  });
+
+  it("현재 사용자 닉네임으로 로그인 헤더를 표시한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [
+                createChecklistItem(10, null, "done"),
+                createChecklistItem(11, null),
+                createChecklistItem(12, null, "done"),
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
+
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(await screen.findByText("67%")).toBeTruthy();
+    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "로그인" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/checklists/me",
+      expect.objectContaining({ credentials: "include", method: "GET" }),
+    );
+  });
+
+  it("비로그인 사용자에게 계정 메뉴를 표시한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+          { status: 401 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
+
+    expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "회원가입" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("비로그인 플래너 링크는 이동 없이 로그인 안내를 열고 배경을 비활성화한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+
+    const { container } = renderServiceLayout(
+      <>
+        <Route
+          path="/"
+          element={
+            <>
+              <div>준비 목록 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
+        <Route path="/login" element={<LocationDisplay />} />
+      </>,
+    );
+    const desktopNavigation = await screen.findByRole("navigation", {
+      name: "주요 메뉴",
+    });
+    const plannerLink = within(desktopNavigation).getByRole("link", {
+      name: "플래너",
+    });
+
+    fireEvent.click(plannerLink);
+
+    expect(screen.getByTestId("service-location").textContent).toBe("/");
+    expect(
+      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "취소" }),
+    );
+    expect(
+      container.querySelector(".service-layout__header")?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__header")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector(".service-layout__mobile-dock")
+        ?.hasAttribute("inert"),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector(".service-layout__mobile-dock")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(document.activeElement).toBe(plannerLink));
+
+    const mobilePlannerLink = within(
+      screen.getByRole("navigation", { name: "하단 메뉴" }),
+    ).getByRole("link", { name: "플래너" });
+    fireEvent.click(mobilePlannerLink);
+    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/login?returnTo=%2Fplanner",
+    );
+  });
+
+  it("체크리스트 인증 만료 시 로그인 상태를 다시 확인한다", async () => {
+    let currentUserRequests = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        currentUserRequests += 1;
+        return Promise.resolve(
+          currentUserRequests === 1
+            ? new Response(JSON.stringify({ nickname: "비비디" }), {
+                status: 200,
+              })
+            : new Response(
+                JSON.stringify({
+                  errorCode: 201,
+                  message: "로그인이 필요합니다.",
+                }),
+                { status: 401 },
+              ),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+          { status: 401 },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
+
+    expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("준비 목록과 헤더가 내 체크리스트 조회를 공유한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [
+                createChecklistItem(10, 101, "done"),
+                createChecklistItem(11, 102),
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "준비 로드맵" }),
+    ).toBeTruthy();
+    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("체크리스트 화면·헤더·상세 패널이 내 체크리스트 GET 요청을 공유한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [createChecklistItem(10, 1001, "done")],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route
+        path="/checklist"
+        element={
+          <>
+            <ChecklistFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
+      ["/checklist"],
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /체크리스트 항목 10/ }),
+    );
+
+    expect(
+      screen.getByRole("complementary", { name: "체크리스트 항목 10" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist?taskId=checklist-item-10",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 상세 닫기" }));
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist",
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("모바일 바텀시트에서 앱 chrome과 목록 스크롤 위치 및 공통 GET을 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              items: [createChecklistItem(10, 1001, "done")],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderServiceLayout(
+      <Route
+        path="/checklist"
+        element={
+          <>
+            <ChecklistFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
+      ["/checklist"],
+    );
+    const taskButton = await screen.findByRole("button", {
+      name: /체크리스트 항목 10/,
+    });
+    const content = container.querySelector<HTMLElement>(
+      ".service-layout__content",
+    );
+    expect(content).not.toBeNull();
+    if (!content) {
+      return;
+    }
+    content.scrollTop = 320;
+
+    fireEvent.click(taskButton);
+
+    expect(
+      screen.getByRole("dialog", {
+        name: "체크리스트 항목 10",
+      }),
+    ).toBeTruthy();
+    const appHeader = container.querySelector(".service-layout__header");
+    expect(appHeader?.hasAttribute("hidden")).toBe(false);
+    expect(appHeader?.hasAttribute("inert")).toBe(false);
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /체크리스트 항목 10/ }),
+    ).toBeNull();
+    expect(taskButton.isConnected).toBe(true);
+    expect(taskButton.closest("[inert]")).not.toBeNull();
+    expect(content.style.overflow).toBe("hidden");
+    expect(content.scrollTop).toBe(320);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+
+    act(() => media.setMatches(false));
+
+    expect(
+      screen.getByRole("complementary", { name: "체크리스트 항목 10" }),
+    ).toBeTruthy();
+    expect(appHeader?.hasAttribute("hidden")).toBe(false);
+    expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(content.style.overflow).toBe("");
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist?taskId=checklist-item-10",
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+
+    act(() => media.setMatches(true));
+    const detailSheet = screen.getByRole("dialog", {
+      name: "체크리스트 항목 10",
+    });
+    fireEvent.click(
+      document.querySelector(
+        ".checklist-detail-bottom-sheet__scrim",
+      ) as HTMLButtonElement,
+    );
+    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
+
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/checklist",
+    );
+    expect(content.scrollTop).toBe(320);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("모바일 체크리스트의 taskId가 비어 있으면 앱 chrome을 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+
+    const { container } = renderServiceLayout(
+      <Route path="/checklist" element={<div>체크리스트 화면</div>} />,
+      ["/checklist?taskId="],
+    );
+
+    expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(
+      container
+        .querySelector(".service-layout__content")
+        ?.classList.contains("service-layout__content--mobile-detail"),
+    ).toBe(false);
+  });
+
+  it("준비 항목 추가 직후 헤더와 체크리스트 화면을 공통 캐시에서 함께 갱신한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items: [createChecklistItem(10, 1001, "done")],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (
+          url === "/api/checklists/me/catalog-items" &&
+          init?.method === "POST"
+        ) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 1002,
+                    categoryId: 10,
+                    id: 11,
+                    status: "prev",
+                    title: "서버가 추가한 두 번째 할 일",
+                  },
+                ],
+              }),
+              { status: 201 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route
+        path="/preparation"
+        element={
+          <>
+            <PreparationRoadmapFeature />
+            <ChecklistFeature />
+          </>
+        }
+      />,
+      ["/preparation"],
+    );
+
+    expect(await screen.findByText("1/1")).toBeTruthy();
+    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
+    );
+
+    expect(await screen.findByText("1/2")).toBeTruthy();
+    expect(
+      within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
+        "50%",
+      ),
+    ).toBeTruthy();
+    expect(await screen.findByText("서버가 추가한 두 번째 할 일")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => url === "/api/checklists/me" && init?.method === "GET",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("Migration 중 체크리스트를 숨기고 완료 후 최신 서버 결과를 표시한다", async () => {
+    let serializedValue: string | null = JSON.stringify({
+      version: 1,
+      catalogItemIds: [1002],
+    });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => serializedValue),
+      removeItem: vi.fn(() => {
+        serializedValue = null;
+      }),
+      setItem: vi.fn((_key: string, value: string) => {
+        serializedValue = value;
+      }),
+    });
+    let resolveAddition: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          const checklistRequestCount = fetchMock.mock.calls.filter(
+            ([requestedUrl]) => requestedUrl === "/api/checklists/me",
+          ).length;
+
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items:
+                  checklistRequestCount === 1
+                    ? [createChecklistItem(10, 1001, "done")]
+                    : [
+                        createChecklistItem(10, 1001, "done"),
+                        createChecklistItem(11, 1002),
+                      ],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists/me/catalog-items") {
+          return new Promise<Response>((resolve) => {
+            resolveAddition = resolve;
+          });
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/checklist" element={<ChecklistFeature />} />,
+      ["/checklist"],
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/checklists/me/catalog-items",
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByText("체크리스트를 불러오고 있어요.")).toBeTruthy();
+    expect(screen.queryByText("체크리스트 항목 10")).toBeNull();
+
+    await act(async () => {
+      resolveAddition(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                catalogItemId: 1002,
+                categoryId: 10,
+                id: 11,
+                status: "prev",
+                title: "체크리스트 항목 11",
+              },
+            ],
+          }),
+          { status: 201 },
+        ),
+      );
+    });
+
+    expect(await screen.findByText("체크리스트 항목 11")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+
+  it("병합 완료 전 서버 상태를 숨기고 완료 후 최신 조회를 공유한다", async () => {
+    let serializedValue: string | null = JSON.stringify({
+      version: 1,
+      catalogItemIds: [1002],
+    });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => serializedValue),
+      removeItem: vi.fn(() => {
+        serializedValue = null;
+      }),
+      setItem: vi.fn((_key: string, value: string) => {
+        serializedValue = value;
+      }),
+    });
+    let resolveAddition: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          const checklistRequestCount = fetchMock.mock.calls.filter(
+            ([requestedUrl]) => requestedUrl === "/api/checklists/me",
+          ).length;
+
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: 1,
+                items:
+                  checklistRequestCount === 1
+                    ? [createChecklistItem(10, 1001, "done")]
+                    : [
+                        createChecklistItem(10, 1001, "done"),
+                        createChecklistItem(11, 1002),
+                      ],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists/me/catalog-items") {
+          return new Promise<Response>((resolve) => {
+            resolveAddition = resolve;
+          });
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/checklists/me/catalog-items",
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByLabelText("현재 사용자 비")).toBeNull();
+    expect(
+      screen.getByRole("status", { name: "로그인 상태 확인 중" }),
+    ).toBeTruthy();
+
+    await act(async () => {
+      resolveAddition(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                catalogItemId: 1002,
+                categoryId: 10,
+                id: 11,
+                status: "prev",
+                title: "체크리스트 항목 11",
+              },
+            ],
+          }),
+          { status: 201 },
+        ),
+      );
+    });
+
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "두 번째 할 일 추가" }),
+    ).toBeNull();
+  });
+
+  it("체크리스트가 없으면 생성한 뒤 준비 항목을 추가한다", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ nickname: "비비디" }), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/catalog") {
+          return Promise.resolve(
+            new Response(JSON.stringify(preparationCatalogResponseFixture), {
+              status: 200,
+            }),
+          );
+        }
+
+        if (url === "/api/checklists/me" && init?.method === "GET") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                errorCode: 303,
+                message: "체크리스트를 찾을 수 없습니다.",
+              }),
+              { status: 404 },
+            ),
+          );
+        }
+
+        if (url === "/api/checklists" && init?.method === "POST") {
+          return Promise.resolve(
+            new Response(JSON.stringify(1), { status: 201 }),
+          );
+        }
+
+        if (
+          url === "/api/checklists/me/catalog-items" &&
+          init?.method === "POST"
+        ) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 1001,
+                    categoryId: 10,
+                    id: 10,
+                    status: "prev",
+                    title: "체크리스트 항목 10",
+                  },
+                ],
+              }),
+              { status: 201 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderServiceLayout(
+      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      ["/preparation"],
+    );
+
+    const addButton = await screen.findByRole("button", {
+      name: "첫 번째 할 일 추가",
+    });
+    fireEvent.click(addButton);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
+      ).toBeNull(),
+    );
+    const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
+    const createRequestIndex = requestedUrls.indexOf("/api/checklists");
+    const addRequestIndex = requestedUrls.indexOf(
+      "/api/checklists/me/catalog-items",
+    );
+
+    expect(createRequestIndex).toBeGreaterThanOrEqual(0);
+    expect(addRequestIndex).toBeGreaterThan(createRequestIndex);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+    ).toHaveLength(1);
+  });
+});

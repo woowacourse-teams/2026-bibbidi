@@ -2,9 +2,23 @@ const path = require("path");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const webpack = require("webpack");
+
+require("dotenv").config({
+  path: path.resolve(__dirname, ".env"),
+  quiet: true,
+});
 
 module.exports = (_environment, arguments_) => {
   const isProduction = arguments_.mode === "production";
+  const apiBaseUrl = process.env.BIBBIDI_API_BASE_URL ?? "";
+  const apiProxyTarget = process.env.BIBBIDI_API_PROXY_TARGET;
+  const googleAnalyticsMeasurementId =
+    process.env.BIBBIDI_GA_MEASUREMENT_ID ?? "";
+
+  if (!isProduction && !apiProxyTarget) {
+    throw new Error("BIBBIDI_API_PROXY_TARGET 환경변수가 필요합니다.");
+  }
 
   return {
     mode: isProduction ? "production" : "development",
@@ -52,6 +66,12 @@ module.exports = (_environment, arguments_) => {
         template: "./public/index.html",
         minify: isProduction,
       }),
+      new webpack.DefinePlugin({
+        __BIBBIDI_API_BASE_URL__: JSON.stringify(apiBaseUrl),
+        __BIBBIDI_GA_MEASUREMENT_ID__: JSON.stringify(
+          googleAnalyticsMeasurementId,
+        ),
+      }),
       ...(isProduction
         ? [
             new MiniCssExtractPlugin({
@@ -74,6 +94,17 @@ module.exports = (_environment, arguments_) => {
       hot: true,
       open: true,
       historyApiFallback: true,
+      ...(apiProxyTarget
+        ? {
+            proxy: [
+              {
+                changeOrigin: true,
+                context: "/api",
+                target: apiProxyTarget,
+              },
+            ],
+          }
+        : {}),
       client: {
         overlay: {
           errors: true,

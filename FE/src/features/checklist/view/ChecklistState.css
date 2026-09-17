@@ -1,0 +1,30 @@
+.checklist-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  color: var(--color-fg-neutral);
+  text-align: center;
+}
+
+.checklist-state p {
+  margin: 0;
+}
+
+.checklist-state button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.checklist-state button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
