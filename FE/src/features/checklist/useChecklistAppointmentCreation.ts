@@ -236,7 +236,7 @@ export function useChecklistAppointmentCreation({
   const isMountedRef = useRef(true);
   const isCurrentContext = activeContextKey === contextKey;
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     isMountedRef.current = true;
 
     return () => {
@@ -247,7 +247,7 @@ export function useChecklistAppointmentCreation({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeContextKey === contextKey) {
       return;
     }
