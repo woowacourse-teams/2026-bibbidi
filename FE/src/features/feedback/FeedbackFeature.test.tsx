@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -10,6 +11,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFeedback } from "./api/createFeedback";
 import { FeedbackFeature } from "./FeedbackFeature";
 
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
+}));
 vi.mock("./api/createFeedback", () => ({
   createFeedback: vi.fn(),
 }));
@@ -17,6 +23,7 @@ vi.mock("./api/createFeedback", () => ({
 const createFeedbackMock = vi.mocked(createFeedback);
 
 beforeEach(() => {
+  analyticsMocks.track.mockReset();
   createFeedbackMock.mockReset();
   createFeedbackMock.mockResolvedValue();
   setMobileViewport(false);
@@ -79,13 +86,22 @@ describe("FeedbackFeature", () => {
     });
     fireEvent.click(getSubmitButton());
 
-    expect(createFeedbackMock).toHaveBeenCalledWith({
-      content: "조금 아쉬웠어요",
-      sentiment: "bad",
-    });
+    expect(createFeedbackMock).toHaveBeenCalledWith(
+      {
+        content: "조금 아쉬웠어요",
+        sentiment: "bad",
+      },
+      expect.any(AbortSignal),
+    );
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(
       await screen.findByText("소중한 의견을 보내주셔서 감사해요."),
     ).toBeTruthy();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "feedback_submit",
+      parameters: { source: "service_layout" },
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -100,10 +116,13 @@ describe("FeedbackFeature", () => {
     fireEvent.click(getSubmitButton());
 
     await waitFor(() =>
-      expect(createFeedbackMock).toHaveBeenCalledWith({
-        content: null,
-        sentiment: "good",
-      }),
+      expect(createFeedbackMock).toHaveBeenCalledWith(
+        {
+          content: null,
+          sentiment: "good",
+        },
+        expect.any(AbortSignal),
+      ),
     );
   });
 
@@ -143,9 +162,32 @@ describe("FeedbackFeature", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.click(submitButton);
     expect(createFeedbackMock).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
 
     resolveRequest?.();
     await screen.findByText("소중한 의견을 보내주셔서 감사해요.");
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+  });
+
+  it("unmount 시 전송을 중단하고 늦은 성공 이벤트를 보내지 않는다", async () => {
+    let resolveRequest: (() => void) | undefined;
+    let requestSignal: AbortSignal | undefined;
+    createFeedbackMock.mockImplementation((_values, signal) => {
+      requestSignal = signal;
+      return new Promise<void>((resolve) => {
+        resolveRequest = resolve;
+      });
+    });
+    const view = render(<FeedbackFeature />);
+    openFeedback();
+    fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+    fireEvent.click(getSubmitButton());
+
+    view.unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+    await act(async () => resolveRequest?.());
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("전송에 실패하면 입력값을 유지하고 재시도 오류를 표시한다", async () => {
@@ -166,6 +208,7 @@ describe("FeedbackFeature", () => {
       (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement).value,
     ).toBe("좋았어요");
     expect(getSubmitButton().disabled).toBe(false);
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
   it("Escape 키로 닫고 플로팅 버튼에 포커스를 돌려준다", () => {

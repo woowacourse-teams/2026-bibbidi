@@ -63,6 +63,7 @@ function toRecommendedCatalogItem(
   return {
     category: task.categoryName,
     catalogItemId: task.catalogItemId,
+    phase: task.phase,
     stepName: task.stepName,
     title: task.title,
   };

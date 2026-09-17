@@ -52,25 +52,50 @@ export function createPreparationStepSelectEvent({
   };
 }
 
-interface CreatePreparationItemAddEventParameters {
-  categoryId: string;
-  itemCount: number;
-  stepId: string;
-  stepOrder: number;
-}
+type CreatePreparationItemAddEventParameters =
+  | {
+      categoryId: string;
+      itemCount: number;
+      source?: "preparation";
+      stepId: string;
+      stepOrder: number;
+    }
+  | {
+      categoryName: string;
+      itemCount: number;
+      phase: number;
+      source: "planner_recommendation";
+    };
 
-export function createPreparationItemAddEvent({
-  categoryId,
-  itemCount,
-  stepId,
-  stepOrder,
-}: CreatePreparationItemAddEventParameters): AnalyticsEvent {
+export function createPreparationItemAddEvent(
+  parameters: CreatePreparationItemAddEventParameters,
+): AnalyticsEvent {
+  if (parameters.source === "planner_recommendation") {
+    return {
+      name: "preparation_item_add",
+      parameters: {
+        category_name: parameters.categoryName,
+        item_count: parameters.itemCount,
+        phase: parameters.phase,
+        source: parameters.source,
+      },
+    };
+  }
+
+  const {
+    categoryId,
+    itemCount,
+    source = "preparation",
+    stepId,
+    stepOrder,
+  } = parameters;
+
   return {
     name: "preparation_item_add",
     parameters: {
       category_id: categoryId,
       item_count: itemCount,
-      source: "preparation",
+      source,
       step_id: stepId,
       step_order: stepOrder,
     },

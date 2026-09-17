@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { SubmitEvent } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
+import { createFeedbackSubmitEvent } from "./analytics/feedbackAnalytics";
 import { createFeedback } from "./api/createFeedback";
 import type { FeedbackSentiment } from "./model/feedback";
 
@@ -20,6 +22,22 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const requestGenerationRef = useRef(0);
+  const submissionInFlightRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      requestGenerationRef.current += 1;
+      requestControllerRef.current?.abort();
+      requestControllerRef.current = null;
+      submissionInFlightRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen || isMobile) {
@@ -87,27 +105,58 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!sentiment || isSubmitting) {
+    if (!sentiment || submissionInFlightRef.current) {
       return;
     }
 
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    submissionInFlightRef.current = true;
     setErrorMessage(null);
     setIsSubmitting(true);
 
     try {
-      await createFeedback({
-        content: content.trim() === "" ? null : content,
-        sentiment,
-      });
+      await createFeedback(
+        {
+          content: content.trim() === "" ? null : content,
+          sentiment,
+        },
+        controller.signal,
+      );
+
+      if (
+        !isMountedRef.current ||
+        controller.signal.aborted ||
+        requestGenerationRef.current !== requestGeneration
+      ) {
+        return;
+      }
+
       setIsOpen(false);
       setSentiment(null);
       setContent("");
       setIsSnackbarVisible(true);
       triggerButtonRef.current?.focus();
+      analytics.track(createFeedbackSubmitEvent());
     } catch {
-      setErrorMessage("의견을 보내지 못했어요. 다시 시도해 주세요.");
+      if (
+        isMountedRef.current &&
+        !controller.signal.aborted &&
+        requestGenerationRef.current === requestGeneration
+      ) {
+        setErrorMessage("의견을 보내지 못했어요. 다시 시도해 주세요.");
+      }
     } finally {
-      setIsSubmitting(false);
+      if (requestGenerationRef.current === requestGeneration) {
+        requestControllerRef.current = null;
+        submissionInFlightRef.current = false;
+
+        if (isMountedRef.current) {
+          setIsSubmitting(false);
+        }
+      }
     }
   };
 

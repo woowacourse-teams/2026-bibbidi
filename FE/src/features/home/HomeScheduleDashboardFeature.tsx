@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
 import { usePreparationChecklistRepository } from "../preparation";
+import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import {
   nearbyAppointmentsRepository,
   recommendedCatalogItemsRepository,
@@ -240,11 +242,36 @@ export function HomeScheduleDashboardFeature({
     setRecommendedRequestRevision((revision) => revision + 1);
   }, []);
 
+  const handleRecommendedTaskAdditionSuccess = useCallback(
+    (catalogItemId: number, itemCount: number) => {
+      const item =
+        recommended.status === "complete"
+          ? recommended.recommendedItems.items.find(
+              (candidate) => candidate.catalogItemId === catalogItemId,
+            )
+          : undefined;
+
+      if (item && itemCount > 0) {
+        analytics.track(
+          createPreparationItemAddEvent({
+            categoryName: item.category,
+            itemCount,
+            phase: item.phase,
+            source: "planner_recommendation",
+          }),
+        );
+      }
+
+      retryRecommended();
+    },
+    [recommended, retryRecommended],
+  );
+
   const recommendedTaskAddition = useRecommendedTaskAddition({
     authScope,
     isAuthenticated: authState.status === "authenticated",
     onAuthenticationRequired: refreshAuth,
-    onSuccess: retryRecommended,
+    onSuccess: handleRecommendedTaskAdditionSuccess,
     repository: checklistRepository,
   });
 

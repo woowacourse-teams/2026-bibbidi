@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
@@ -11,6 +11,16 @@ import {
   MyChecklistRequestAbortedError,
 } from "./repository/myChecklistQueryRepository";
 import { useChecklistTaskCreationCommand } from "./useChecklistTaskCreationCommand";
+
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
+}));
+
+beforeEach(() => {
+  analyticsMocks.track.mockReset();
+});
 
 function createRepository(
   createCustomItem: MyChecklistCommandRepository["createCustomItem"] = vi
@@ -64,12 +74,18 @@ describe("useChecklistTaskCreationCommand", () => {
     );
     await expect(result.current.submit(input)).resolves.toBe(false);
     expect(createCustomItem).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
 
     await act(async () => {
       deferred.resolve();
       await expect(firstRequest).resolves.toBe(true);
     });
     expect(result.current.submissionState).toEqual({ status: "idle" });
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "checklist_task_create",
+      parameters: { category_id: "2", source: "checklist" },
+    });
   });
 
   it("실패 메시지를 표시하고 재시도 시작 시 이전 오류를 지운다", async () => {
@@ -95,6 +111,7 @@ describe("useChecklistTaskCreationCommand", () => {
       message: "카테고리를 찾을 수 없습니다.",
       status: "error",
     });
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
 
     let retryRequest!: Promise<boolean>;
     await act(async () => {
@@ -106,6 +123,7 @@ describe("useChecklistTaskCreationCommand", () => {
       retry.resolve();
       await retryRequest;
     });
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("인증 오류를 기존 refreshAuth 흐름에 연결한다", async () => {

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
+import { createChecklistTaskCreateEvent } from "./analytics/checklistAnalytics";
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
   CustomChecklistItemCreationError,
@@ -124,6 +126,7 @@ export function useChecklistTaskCreationCommand(
         }
 
         setSubmissionState(idleSubmissionState);
+        analytics.track(createChecklistTaskCreateEvent(input.categoryId));
         return true;
       } catch (error) {
         if (requestGenerationRef.current !== requestGeneration) {

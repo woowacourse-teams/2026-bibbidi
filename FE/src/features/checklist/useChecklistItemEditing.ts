@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { analytics } from "../../infrastructure/analytics";
+import {
+  createChecklistTaskCategoryUpdateEvent,
+  createChecklistTaskCompleteEvent,
+  createChecklistTaskTitleUpdateEvent,
+} from "./analytics/checklistAnalytics";
 import {
   ChecklistItemCategoryEditSession,
   ChecklistItemChangeFeedback,
@@ -27,6 +33,7 @@ export function useChecklistItemEditing(
   audience: ChecklistAudience | undefined,
   activeItemId?: number | null,
   onRefreshFailed?: (message: string) => void,
+  activeCategoryId?: string | null,
 ): ChecklistItemEditingController {
   const [categoryEditSession, setCategoryEditSession] =
     useState<ChecklistItemCategoryEditSession | null>(null);
@@ -212,26 +219,36 @@ export function useChecklistItemEditing(
       );
     }, []),
     changeCategory: useCallback(
-      async (itemId: number, categoryId: string) =>
-        (
-          await runRequest(itemId, "category", (signal) =>
-            commandRepository.changeItemCategory(
-              itemId,
-              Number(categoryId),
-              signal,
-            ),
-          )
-        ).ok,
+      async (itemId: number, categoryId: string) => {
+        const result = await runRequest(itemId, "category", (signal) =>
+          commandRepository.changeItemCategory(
+            itemId,
+            Number(categoryId),
+            signal,
+          ),
+        );
+
+        if (result.ok) {
+          analytics.track(createChecklistTaskCategoryUpdateEvent(categoryId));
+        }
+
+        return result.ok;
+      },
       [commandRepository, runRequest],
     ),
     changeFeedback,
     changeTitle: useCallback(
-      async (itemId: number, title: string) =>
-        (
-          await runRequest(itemId, "title", (signal) =>
-            commandRepository.changeItemTitle(itemId, title, signal),
-          )
-        ).ok,
+      async (itemId: number, title: string) => {
+        const result = await runRequest(itemId, "title", (signal) =>
+          commandRepository.changeItemTitle(itemId, title, signal),
+        );
+
+        if (result.ok) {
+          analytics.track(createChecklistTaskTitleUpdateEvent());
+        }
+
+        return result.ok;
+      },
       [commandRepository, runRequest],
     ),
     confirmStatusChange: useCallback(
@@ -257,9 +274,13 @@ export function useChecklistItemEditing(
           setStatusConfirmation(null);
         }
 
+        if (result.ok && activeCategoryId) {
+          analytics.track(createChecklistTaskCompleteEvent(activeCategoryId));
+        }
+
         return result.ok;
       },
-      [commandRepository, runRequest, statusConfirmation],
+      [activeCategoryId, commandRepository, runRequest, statusConfirmation],
     ),
     requestStatusChange: useCallback(
       async (itemId, status) => {
@@ -282,9 +303,13 @@ export function useChecklistItemEditing(
           commandRepository.changeItemStatus(itemId, status, signal),
         );
 
+        if (changeResult.ok && status === "done" && activeCategoryId) {
+          analytics.track(createChecklistTaskCompleteEvent(activeCategoryId));
+        }
+
         return changeResult.ok ? "changed" : "failed";
       },
-      [commandRepository, runRequest],
+      [activeCategoryId, commandRepository, runRequest],
     ),
     clearError: useCallback((itemId: number) => {
       setChangeFeedback((current) =>

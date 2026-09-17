@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
@@ -8,6 +8,16 @@ import {
 } from "./repository/myChecklistCommandRepository";
 import { MyChecklistAuthenticationRequiredError } from "./repository/myChecklistQueryRepository";
 import { useChecklistItemEditing } from "./useChecklistItemEditing";
+
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("../../infrastructure/analytics", () => ({
+  analytics: { initialize: vi.fn(), track: analyticsMocks.track },
+}));
+
+beforeEach(() => {
+  analyticsMocks.track.mockReset();
+});
 
 function createDeferred() {
   let reject: (reason?: unknown) => void = () => undefined;
@@ -67,6 +77,7 @@ describe("useChecklistItemEditing 요청 세대", () => {
     await act(async () => firstRequest.resolve());
 
     await expect(firstResult).resolves.toBe(false);
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
     expect(result.current.changeFeedback).toEqual({
       itemId: 501,
       kind: "title",
@@ -76,6 +87,7 @@ describe("useChecklistItemEditing 요청 세대", () => {
     await act(async () => secondRequest.resolve());
     await expect(secondResult).resolves.toBe(true);
     expect(result.current.changeFeedback).toEqual({ status: "idle" });
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("이전 요청의 늦은 인증 오류가 새 요청 상태나 인증 갱신에 영향을 주지 않는다", async () => {
@@ -121,6 +133,38 @@ describe("useChecklistItemEditing 요청 세대", () => {
   });
 });
 
+describe("useChecklistItemEditing 성공 이벤트", () => {
+  it("제목과 카테고리의 로컬 반영 성공 뒤에만 각각 한 번 전송한다", async () => {
+    const repository = createRepository(vi.fn().mockResolvedValue(undefined));
+    vi.mocked(repository.changeItemCategory).mockResolvedValue();
+    const { result } = renderHook(() =>
+      useChecklistItemEditing(repository, vi.fn(), "authenticated"),
+    );
+
+    let titleRequest!: Promise<boolean>;
+    act(() => {
+      titleRequest = result.current.changeTitle(500, "전송하면 안 되는 제목");
+    });
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    await act(async () => expect(titleRequest).resolves.toBe(true));
+    expect(analyticsMocks.track).toHaveBeenLastCalledWith({
+      name: "checklist_task_title_update",
+      parameters: { source: "checklist" },
+    });
+
+    await act(async () => {
+      await expect(result.current.changeCategory(500, "20")).resolves.toBe(
+        true,
+      );
+    });
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
+    expect(analyticsMocks.track).toHaveBeenLastCalledWith({
+      name: "checklist_task_category_update",
+      parameters: { category_id: "20" },
+    });
+  });
+});
+
 describe("useChecklistItemEditing 상태 변경", () => {
   it.each(["prev", "continue"] as const)(
     "%s 선택은 남은 일정 조회 없이 바로 상태를 변경한다",
@@ -128,7 +172,14 @@ describe("useChecklistItemEditing 상태 변경", () => {
       const repository = createRepository(vi.fn());
       vi.mocked(repository.changeItemStatus).mockResolvedValue();
       const { result } = renderHook(() =>
-        useChecklistItemEditing(repository, vi.fn(), "authenticated"),
+        useChecklistItemEditing(
+          repository,
+          vi.fn(),
+          "authenticated",
+          undefined,
+          undefined,
+          "10",
+        ),
       );
 
       await act(async () => {
@@ -151,7 +202,14 @@ describe("useChecklistItemEditing 상태 변경", () => {
     vi.mocked(repository.hasRemainingAppointments).mockResolvedValue(false);
     vi.mocked(repository.changeItemStatus).mockResolvedValue();
     const { result } = renderHook(() =>
-      useChecklistItemEditing(repository, vi.fn(), "authenticated"),
+      useChecklistItemEditing(
+        repository,
+        vi.fn(),
+        "authenticated",
+        undefined,
+        undefined,
+        "10",
+      ),
     );
 
     await act(async () => {
@@ -166,6 +224,10 @@ describe("useChecklistItemEditing 상태 변경", () => {
       "done",
       expect.any(AbortSignal),
     );
+    expect(analyticsMocks.track).toHaveBeenCalledWith({
+      name: "checklist_task_complete",
+      parameters: { action: "complete", category_id: "10" },
+    });
   });
 
   it("done에 남은 일정이 있으면 확인 뒤에만 완료한다", async () => {
@@ -173,7 +235,14 @@ describe("useChecklistItemEditing 상태 변경", () => {
     vi.mocked(repository.hasRemainingAppointments).mockResolvedValue(true);
     vi.mocked(repository.changeItemStatus).mockResolvedValue();
     const { result } = renderHook(() =>
-      useChecklistItemEditing(repository, vi.fn(), "authenticated"),
+      useChecklistItemEditing(
+        repository,
+        vi.fn(),
+        "authenticated",
+        undefined,
+        undefined,
+        "10",
+      ),
     );
 
     await act(async () => {
@@ -196,6 +265,7 @@ describe("useChecklistItemEditing 상태 변경", () => {
       expect.any(AbortSignal),
     );
     expect(result.current.statusConfirmation).toBeNull();
+    expect(analyticsMocks.track).toHaveBeenCalledOnce();
   });
 
   it("남은 일정 완료 확인을 취소하면 상태 PUT을 호출하지 않는다", async () => {
