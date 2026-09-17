@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "../auth";
+import { usePreparationChecklistRepository } from "../preparation";
 import {
   nearbyAppointmentsRepository,
   recommendedCatalogItemsRepository,
@@ -29,6 +30,7 @@ import {
 } from "./repository/unscheduledTasksRepository";
 import { createHomeScheduleDashboardViewModel } from "./view-model/createHomeScheduleDashboardViewModel";
 import { HomeScheduleDashboard } from "./view/HomeScheduleDashboard";
+import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
 
 const initialModel: HomeScheduleDashboardModel = {
   recommended: {
@@ -63,7 +65,12 @@ export function HomeScheduleDashboardFeature({
   recommendedRepository = recommendedCatalogItemsRepository,
   unscheduledRepository = unscheduledTasksRepository,
 }: HomeScheduleDashboardFeatureProps) {
-  const { refreshAuth } = useAuth();
+  const { authState, refreshAuth } = useAuth();
+  const authScope =
+    authState.status === "authenticated"
+      ? `authenticated:${authState.user.nickname}`
+      : authState.status;
+  const checklistRepository = usePreparationChecklistRepository();
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
@@ -121,6 +128,7 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authScope,
     getReferenceDate,
     nearbyRepository,
     refreshAuth,
@@ -164,7 +172,12 @@ export function HomeScheduleDashboardFeature({
       isActive = false;
       controller.abort();
     };
-  }, [refreshAuth, unscheduledRepository, unscheduledRequestRevision]);
+  }, [
+    authScope,
+    refreshAuth,
+    unscheduledRepository,
+    unscheduledRequestRevision,
+  ]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -205,7 +218,12 @@ export function HomeScheduleDashboardFeature({
       isActive = false;
       controller.abort();
     };
-  }, [recommendedRepository, recommendedRequestRevision, refreshAuth]);
+  }, [
+    authScope,
+    recommendedRepository,
+    recommendedRequestRevision,
+    refreshAuth,
+  ]);
 
   const retryUpcoming = useCallback(() => {
     setUpcoming({ status: "loading" });
@@ -222,15 +240,27 @@ export function HomeScheduleDashboardFeature({
     setRecommendedRequestRevision((revision) => revision + 1);
   }, []);
 
-  const viewModel = createHomeScheduleDashboardViewModel({
-    ...initialModel,
-    recommended,
-    unscheduled,
-    upcoming,
+  const recommendedTaskAddition = useRecommendedTaskAddition({
+    authScope,
+    isAuthenticated: authState.status === "authenticated",
+    onAuthenticationRequired: refreshAuth,
+    onSuccess: retryRecommended,
+    repository: checklistRepository,
   });
+
+  const viewModel = createHomeScheduleDashboardViewModel(
+    {
+      ...initialModel,
+      recommended,
+      unscheduled,
+      upcoming,
+    },
+    { recommendedTaskAddition },
+  );
 
   return (
     <HomeScheduleDashboard
+      onAddRecommendedTask={recommendedTaskAddition.add}
       onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
       onRetryUpcoming={retryUpcoming}

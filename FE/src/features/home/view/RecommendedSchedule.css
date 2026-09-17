@@ -39,6 +39,7 @@
   font-size: 14px;
   font-weight: 600;
   gap: 5px;
+  text-decoration: none;
 }
 
 .recommended-schedule__chevron {
@@ -122,6 +123,13 @@
   font-size: 12px;
   font-weight: 700;
   gap: 5px;
+}
+
+.recommended-schedule-card__error {
+  margin: 0;
+  color: var(--color-fg-critical);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .recommended-schedule-card__plus {

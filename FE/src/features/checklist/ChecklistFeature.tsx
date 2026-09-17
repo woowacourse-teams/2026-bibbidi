@@ -38,6 +38,7 @@ type ChecklistRequestState =
       checklistRevision: number;
       requestId: number;
       requestRevision: number;
+      sessionIdentity?: string;
       status: "empty";
     }
   | { audience: ChecklistAudience; status: "authentication-required" }
@@ -52,6 +53,7 @@ type ChecklistRequestState =
       checklistRevision: number;
       requestId: number;
       requestRevision: number;
+      sessionIdentity?: string;
       status: "success";
     };
 
@@ -164,7 +166,9 @@ export function ChecklistFeature({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get("taskId");
+  const shouldOpenAppointment = searchParams.get("addAppointment") === "true";
   const selectedChecklistItemId = getSelectedChecklistItemId(selectedTaskId);
+  const openedAppointmentRequestRef = useRef<string | null>(null);
   const [requestState, setRequestState] = useState<ChecklistRequestState>({
     status: "loading",
   });
@@ -230,6 +234,9 @@ export function ChecklistFeature({
   const appointmentCreationChecklistItemId =
     requestState.status === "success" &&
     requestState.audience === audience &&
+    requestState.sessionIdentity === sessionIdentity &&
+    requestState.checklistRevision === checklistRevision &&
+    requestState.requestRevision === requestRevision &&
     requestState.checklist.categories.some((category) =>
       category.items.some(
         (item) =>
@@ -282,6 +289,7 @@ export function ChecklistFeature({
             checklistRevision,
             requestId,
             requestRevision,
+            sessionIdentity,
             status: "empty",
           });
           return;
@@ -293,6 +301,7 @@ export function ChecklistFeature({
           checklistRevision,
           requestId,
           requestRevision,
+          sessionIdentity,
           status: "success",
         });
       })
@@ -338,6 +347,7 @@ export function ChecklistFeature({
     checklistRevision,
     refreshAuth,
     requestRevision,
+    sessionIdentity,
   ]);
 
   const updateTaskSelection = useCallback(
@@ -350,6 +360,7 @@ export function ChecklistFeature({
 
         if (taskId === null) {
           nextSearchParams.delete("taskId");
+          nextSearchParams.delete("addAppointment");
         } else {
           nextSearchParams.set("taskId", taskId);
           nextSearchParams.delete("addTask");
@@ -406,6 +417,7 @@ export function ChecklistFeature({
       requestState.audience !== audience ||
       (requestState.status !== "empty" && requestState.status !== "success") ||
       requestState.checklistRevision !== checklistRevision ||
+      requestState.sessionIdentity !== sessionIdentity ||
       requestState.requestId !== latestRequestIdRef.current ||
       requestState.requestRevision !== requestRevision
     ) {
@@ -427,7 +439,55 @@ export function ChecklistFeature({
     requestRevision,
     requestState,
     selectedTaskId,
+    sessionIdentity,
     updateTaskSelection,
+  ]);
+
+  useEffect(() => {
+    if (!shouldOpenAppointment) {
+      openedAppointmentRequestRef.current = null;
+      return;
+    }
+
+    if (selectedTaskId === null || audience === "guest") {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("addAppointment");
+          return next;
+        },
+        { replace: true, state: location.state },
+      );
+      return;
+    }
+
+    if (
+      appointmentCreationChecklistItemId === null ||
+      !appointmentCreation.canOpen ||
+      openedAppointmentRequestRef.current === location.key
+    ) {
+      return;
+    }
+
+    openedAppointmentRequestRef.current = location.key;
+    appointmentCreation.open();
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("addAppointment");
+        return next;
+      },
+      { replace: true, state: location.state },
+    );
+  }, [
+    appointmentCreation,
+    appointmentCreationChecklistItemId,
+    audience,
+    location.key,
+    location.state,
+    selectedTaskId,
+    setSearchParams,
+    shouldOpenAppointment,
   ]);
 
   const handleRetry = () => {
