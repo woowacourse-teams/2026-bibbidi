@@ -9,6 +9,16 @@ require("dotenv").config({
   quiet: true,
 });
 
+function getSiteOrigin(value = process.env.FE_SERVICE_URL) {
+  const siteUrl = new URL(value?.trim() || "http://localhost:3000");
+
+  if (siteUrl.protocol !== "http:" && siteUrl.protocol !== "https:") {
+    throw new Error("FE_SERVICE_URL은 HTTP 또는 HTTPS URL이어야 합니다.");
+  }
+
+  return siteUrl.origin;
+}
+
 module.exports = (_environment, arguments_) => {
   const isProduction = arguments_.mode === "production";
   const apiBaseUrl = process.env.BIBBIDI_API_BASE_URL ?? "";
@@ -63,6 +73,8 @@ module.exports = (_environment, arguments_) => {
 
     plugins: [
       new HtmlWebpackPlugin({
+        favicon: "./src/assets/bibbidi-favicon.png",
+        siteOrigin: getSiteOrigin(),
         template: "./public/index.html",
         minify: isProduction,
       }),
