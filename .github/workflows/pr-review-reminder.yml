@@ -1,0 +1,27 @@
+name: PR 코드리뷰 리마인더
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  pull-requests: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+          DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+        run: node --experimental-strip-types .github/pr-notification/review-reminder.ts
