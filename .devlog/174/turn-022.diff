@@ -1,0 +1,269 @@
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index 3216862970ca6a2c3448a9460a1556abe0909f46..0208c3fa616d59568d56e3fbc8c5594256061688 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -1,4 +1,26 @@
+-type Label = { name?: string };
++type Label = {
++  name?: string;
++};
++
++type EventDescription = {
++  icon: string;
++  text: string;
++};
++
++type DiscordField = {
++  name: string;
++  value: string;
++  inline: boolean;
++};
++
++type DiscordPayload = {
++  embeds: Array<{
++    title: string;
++    url: string;
++    description: string;
++    fields: DiscordField[];
++  }>;
++};
+ 
+ export type Member = {
+   github: string;
+@@ -7,94 +29,194 @@ export type Member = {
+ };
+ 
+ export type NotificationInput = {
+-  action: string; merged: boolean; number: string; title: string; url: string;
+-  head: string; base: string; actor: string; author: string; commits: string;
+-  files: string; additions: string; deletions: string; labels: Label[];
++  action: string;
++  merged: boolean;
++  number: string;
++  title: string;
++  url: string;
++  head: string;
++  base: string;
++  actor: string;
++  author: string;
++  commits: string;
++  files: string;
++  additions: string;
++  deletions: string;
++  labels: Label[];
++};
++
++const WEBHOOK_CHANNELS: Record<string, string> = {
++  "release-be": "BE",
++  "release-fe": "FE",
++  "release-app": "APP",
+ };
+ 
+-type DiscordPayload = { embeds: Array<{ title: string; url: string; description: string; fields: Array<{ name: string; value: string; inline: boolean }> }> };
++const RETRY_COUNT = 3;
++const RETRY_DELAY_MS = 2_000;
++
++export function channelForBaseBranch(baseBranch: string): string | undefined {
++  return WEBHOOK_CHANNELS[baseBranch];
++}
+ 
+-export function channelForBaseBranch(base: string): string | undefined {
+-  return { "release-be": "BE", "release-fe": "FE", "release-app": "APP" }[base];
++function eventFor(action: string, merged: boolean): EventDescription {
++  switch (action) {
++    case "opened":
++      return { icon: "🆕", text: "PR을 생성했습니다" };
++    case "synchronize":
++      return { icon: "🔄", text: "PR에 새로운 커밋을 추가했습니다" };
++    case "reopened":
++      return { icon: "🔁", text: "PR을 다시 열었습니다" };
++    case "ready_for_review":
++      return { icon: "📢", text: "PR을 리뷰 요청 상태로 전환했습니다" };
++    case "closed":
++      return merged
++        ? { icon: "✅", text: "PR을 머지했습니다" }
++        : { icon: "❌", text: "PR을 닫았습니다" };
++    default:
++      return { icon: "ℹ️", text: "PR 상태를 변경했습니다" };
++  }
+ }
+ 
+-function eventFor(action: string, merged: boolean): { icon: string; text: string } {
+-  if (action === "opened") return { icon: "🆕", text: "PR을 생성했습니다" };
+-  if (action === "synchronize") return { icon: "🔄", text: "PR에 새로운 커밋을 추가했습니다" };
+-  if (action === "reopened") return { icon: "🔁", text: "PR을 다시 열었습니다" };
+-  if (action === "ready_for_review") return { icon: "📢", text: "PR을 리뷰 요청 상태로 전환했습니다" };
+-  if (action === "closed") return merged ? { icon: "✅", text: "PR을 머지했습니다" } : { icon: "❌", text: "PR을 닫았습니다" };
+-  return { icon: "ℹ️", text: "PR 상태를 변경했습니다" };
++function isMember(value: unknown): value is Member {
++  if (!value || typeof value !== "object") return false;
++  if (!("github" in value) || !("nickname" in value)) return false;
++  if (typeof value.github !== "string" || typeof value.nickname !== "string") return false;
++  return !("discordUserId" in value) || typeof value.discordUserId === "string";
+ }
+ 
+ export function loadMembers(value: string | undefined): Member[] {
+   if (!value) throw new Error("PR_NOTIFICATION_MEMBERS_JSON is required");
++
+   const parsed: unknown = JSON.parse(value);
+   if (!parsed || typeof parsed !== "object" || !("members" in parsed) || !Array.isArray(parsed.members)) {
+-    throw new Error("members.json must contain a members array");
++    throw new Error("PR_NOTIFICATION_MEMBERS_JSON must contain a members array");
+   }
+-  return parsed.members.map((member): Member => {
+-    if (!member || typeof member !== "object" || !("github" in member) || !("nickname" in member)
+-      || typeof member.github !== "string" || typeof member.nickname !== "string") {
+-      throw new Error("every member must have string github and nickname properties");
+-    }
+-    if ("discordUserId" in member && typeof member.discordUserId !== "string") {
+-      throw new Error("discordUserId must be a string when provided");
+-    }
+-    return member;
+-  });
++
++  if (!parsed.members.every(isMember)) {
++    throw new Error("every member must have string github and nickname properties");
++  }
++
++  return parsed.members;
+ }
+ 
+-function nickname(login: string, members: Member[]): string {
++function nicknameFor(login: string, members: Member[]): string {
+   return members.find((member) => member.github === login)?.nickname ?? login;
+ }
+ 
++function labelNames(labels: Label[]): string {
++  return labels
++    .map((label) => label.name)
++    .filter((name): name is string => Boolean(name))
++    .join(", ")
++    .slice(0, 1000);
++}
++
++function baseFields(input: NotificationInput, members: Member[]): DiscordField[] {
++  const author = `${nicknameFor(input.author, members)} (@${input.author})`;
++  const branch = `${input.head} → ${input.base}`;
++  const changes = `commits: ${input.commits} | files: ${input.files} | +${input.additions} / -${input.deletions}`;
++
++  return [
++    { name: "작성자", value: `\`${author}\``, inline: true },
++    { name: "브랜치", value: `\`${branch}\``, inline: true },
++    { name: "변경 내역", value: `\`${changes}\``, inline: false },
++  ];
++}
++
+ export function buildPayload(input: NotificationInput, members: Member[]): DiscordPayload {
+   const event = eventFor(input.action, input.merged);
+-  const labels = input.labels.map((label) => label.name).filter((name): name is string => Boolean(name)).join(", ").slice(0, 1000);
+-  const fields = [
+-    { name: "작성자", value: `\`${nickname(input.author, members)} (@${input.author})\``, inline: true },
+-    { name: "브랜치", value: `\`${input.head} → ${input.base}\``, inline: true },
+-    { name: "변경 내역", value: `\`commits: ${input.commits} | files: ${input.files} | +${input.additions} / -${input.deletions}\``, inline: false },
+-  ];
++  const fields = baseFields(input, members);
++  const labels = labelNames(input.labels);
++
+   if (labels) fields.push({ name: "라벨", value: labels, inline: false });
+-  return { embeds: [{ title: `${event.icon} ${nickname(input.actor, members)}님이 ${event.text}`, url: input.url, description: `#${input.number} ${input.title}`, fields }] };
++
++  return {
++    embeds: [
++      {
++        title: `${event.icon} ${nicknameFor(input.actor, members)}님이 ${event.text}`,
++        url: input.url,
++        description: `#${input.number} ${input.title}`,
++        fields,
++      },
++    ],
++  };
+ }
+ 
+ function labelsFromEnvironment(value: string | undefined): Label[] {
+   if (!value) return [];
+-  try { const labels: unknown = JSON.parse(value); return Array.isArray(labels) ? labels : []; }
+-  catch { console.warn("::warning::failed to parse PR labels"); return []; }
++
++  try {
++    const labels: unknown = JSON.parse(value);
++    return Array.isArray(labels) ? labels : [];
++  } catch {
++    console.warn("::warning::failed to parse PR labels");
++    return [];
++  }
+ }
+ 
+ function inputFromEnvironment(environment: NodeJS.ProcessEnv): NotificationInput {
+   return {
+-    action: environment.ACTION ?? "", merged: environment.MERGED === "true", number: environment.NUMBER ?? "", title: environment.TITLE ?? "", url: environment.URL ?? "", head: environment.HEAD ?? "", base: environment.BASE ?? "", actor: environment.ACTOR ?? "", author: environment.AUTHOR ?? "", commits: environment.COMMITS ?? "0", files: environment.FILES ?? "0", additions: environment.ADDITIONS ?? "0", deletions: environment.DELETIONS ?? "0", labels: labelsFromEnvironment(environment.LABELS_JSON),
++    action: environment.ACTION ?? "",
++    merged: environment.MERGED === "true",
++    number: environment.NUMBER ?? "",
++    title: environment.TITLE ?? "",
++    url: environment.URL ?? "",
++    head: environment.HEAD ?? "",
++    base: environment.BASE ?? "",
++    actor: environment.ACTOR ?? "",
++    author: environment.AUTHOR ?? "",
++    commits: environment.COMMITS ?? "0",
++    files: environment.FILES ?? "0",
++    additions: environment.ADDITIONS ?? "0",
++    deletions: environment.DELETIONS ?? "0",
++    labels: labelsFromEnvironment(environment.LABELS_JSON),
+   };
+ }
+ 
+ export async function sendPayload(webhook: string, payload: DiscordPayload): Promise<void> {
+   let lastError: Error | undefined;
+-  for (let attempt = 0; attempt < 4; attempt += 1) {
++
++  for (let attempt = 0; attempt <= RETRY_COUNT; attempt += 1) {
+     try {
+-      const response = await fetch(webhook, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
++      const response = await fetch(webhook, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify(payload),
++      });
++
+       if (response.ok) return;
+       lastError = new Error(`Discord webhook request failed with status ${response.status}`);
+-    } catch (error) { lastError = error instanceof Error ? error : new Error(String(error)); }
+-    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 2_000));
++    } catch (error) {
++      lastError = error instanceof Error ? error : new Error(String(error));
++    }
++
++    if (attempt < RETRY_COUNT) {
++      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
++    }
+   }
++
+   throw lastError;
+ }
+ 
+ export async function main(environment = process.env): Promise<void> {
+   const input = inputFromEnvironment(environment);
+   const channel = channelForBaseBranch(input.base);
++
+   if (!channel) return;
++
+   const webhook = environment[`DISCORD_WEBHOOK_${channel}`];
+-  if (!webhook) { console.warn(`::warning::no webhook secret configured for channel ${channel}`); return; }
+-  await sendPayload(webhook, buildPayload(input, loadMembers(environment.PR_NOTIFICATION_MEMBERS_JSON)));
++  if (!webhook) {
++    console.warn(`::warning::no webhook secret configured for channel ${channel}`);
++    return;
++  }
++
++  const members = loadMembers(environment.PR_NOTIFICATION_MEMBERS_JSON);
++  await sendPayload(webhook, buildPayload(input, members));
+ }
+ 
+ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+-  main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });
++  main().catch((error: unknown) => {
++    console.error(error);
++    process.exitCode = 1;
++  });
+ }

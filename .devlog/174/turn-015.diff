@@ -1,0 +1,22 @@
+diff --git a/.github/scripts/discord-pr-notification.test.ts b/.github/pr-notification/discord-pr-notification.test.ts
+similarity index 100%
+rename from .github/scripts/discord-pr-notification.test.ts
+rename to .github/pr-notification/discord-pr-notification.test.ts
+diff --git a/.github/scripts/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+similarity index 100%
+rename from .github/scripts/discord-pr-notification.ts
+rename to .github/pr-notification/discord-pr-notification.ts
+diff --git a/.github/scripts/package.json b/.github/pr-notification/package.json
+similarity index 100%
+rename from .github/scripts/package.json
+rename to .github/pr-notification/package.json
+diff --git a/.github/workflows/discord-pr-notification.yml b/.github/workflows/discord-pr-notification.yml
+index 565592974a33a4dc565f42d4abed5971dcc77734..78bcfdd201b06d98884bb6a9caaad4dbac60faa9 100644
+--- a/.github/workflows/discord-pr-notification.yml
++++ b/.github/workflows/discord-pr-notification.yml
+@@ -50,4 +50,4 @@ jobs:
+           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+           DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+           DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+-        run: node --experimental-strip-types .github/scripts/discord-pr-notification.ts
++        run: node --experimental-strip-types .github/pr-notification/discord-pr-notification.ts

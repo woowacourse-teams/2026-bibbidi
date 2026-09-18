@@ -1,0 +1,122 @@
+diff --git a/.github/pr-notification/discord-pr-notification.test.ts b/.github/pr-notification/discord-pr-notification.test.ts
+index 3324757f83f59e6ce74e45090e02b00dc9a84c85..157b1e70c792644c79f93026d99597ee9012e18d 100644
+--- a/.github/pr-notification/discord-pr-notification.test.ts
++++ b/.github/pr-notification/discord-pr-notification.test.ts
+@@ -4,6 +4,12 @@ import test from "node:test";
+ import { buildPayload, channelForBaseBranch, loadMembers } from "./discord-pr-notification.ts";
+ 
+ const input = { action: "opened", merged: false, number: "174", title: "코드 리뷰를 빠르게 하기", url: "https://github.com/woowacourse-teams/2026-bibbidi/pull/174", head: "feature/174", base: "release-fe", actor: "kdongsu5509", author: "boyekim", commits: "2", files: "3", additions: "10", deletions: "4", labels: [{ name: "type: feature" }, { name: "area: fe" }] };
++const membersJson = JSON.stringify({ members: [
++  { github: "kdongsu5509", nickname: "라티", discordUserId: "" },
++  { github: "byunghyunkim0", nickname: "바드", discordUserId: "" },
++  { github: "boyekim", nickname: "보예", discordUserId: "" },
++  { github: "JohnPrk", nickname: "티뉴", discordUserId: "" },
++] });
+ 
+ test("routes supported release branches to their existing webhook channels", () => {
+   assert.equal(channelForBaseBranch("release-be"), "BE");
+@@ -13,7 +19,7 @@ test("routes supported release branches to their existing webhook channels", ()
+ });
+ 
+ test("loads GitHub login and nickname mappings from the JSON configuration", () => {
+-  const members = loadMembers();
++  const members = loadMembers(membersJson);
+   assert.deepEqual(members.map(({ github, nickname }) => ({ github, nickname })), [
+     { github: "kdongsu5509", nickname: "라티" },
+     { github: "byunghyunkim0", nickname: "바드" },
+@@ -24,10 +30,11 @@ test("loads GitHub login and nickname mappings from the JSON configuration", ()
+ });
+ 
+ test("builds the existing opened PR notification payload", () => {
+-  assert.deepEqual(buildPayload(input), { embeds: [{ title: "🆕 라티님이 PR을 생성했습니다", url: input.url, description: "#174 코드 리뷰를 빠르게 하기", fields: [{ name: "작성자", value: "`보예 (@boyekim)`", inline: true }, { name: "브랜치", value: "`feature/174 → release-fe`", inline: true }, { name: "변경 내역", value: "`commits: 2 | files: 3 | +10 / -4`", inline: false }, { name: "라벨", value: "type: feature, area: fe", inline: false }] }] });
++  assert.deepEqual(buildPayload(input, loadMembers(membersJson)), { embeds: [{ title: "🆕 라티님이 PR을 생성했습니다", url: input.url, description: "#174 코드 리뷰를 빠르게 하기", fields: [{ name: "작성자", value: "`보예 (@boyekim)`", inline: true }, { name: "브랜치", value: "`feature/174 → release-fe`", inline: true }, { name: "변경 내역", value: "`commits: 2 | files: 3 | +10 / -4`", inline: false }, { name: "라벨", value: "type: feature, area: fe", inline: false }] }] });
+ });
+ 
+ test("uses merge and close messages according to the merged flag", () => {
+-  assert.match(buildPayload({ ...input, action: "closed", merged: true }).embeds[0].title, /머지했습니다/);
+-  assert.match(buildPayload({ ...input, action: "closed", merged: false }).embeds[0].title, /닫았습니다/);
++  const members = loadMembers(membersJson);
++  assert.match(buildPayload({ ...input, action: "closed", merged: true }, members).embeds[0].title, /머지했습니다/);
++  assert.match(buildPayload({ ...input, action: "closed", merged: false }, members).embeds[0].title, /닫았습니다/);
+ });
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index e71798ecf798973b58a6bdbb696eeab72a0b3b57..3216862970ca6a2c3448a9460a1556abe0909f46 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -1,5 +1,3 @@
+-import { readFileSync } from "node:fs";
+-
+ type Label = { name?: string };
+ 
+ export type Member = {
+@@ -29,8 +27,9 @@ function eventFor(action: string, merged: boolean): { icon: string; text: string
+   return { icon: "ℹ️", text: "PR 상태를 변경했습니다" };
+ }
+ 
+-export function loadMembers(configPath = new URL("./members.json", import.meta.url)): Member[] {
+-  const parsed: unknown = JSON.parse(readFileSync(configPath, "utf8"));
++export function loadMembers(value: string | undefined): Member[] {
++  if (!value) throw new Error("PR_NOTIFICATION_MEMBERS_JSON is required");
++  const parsed: unknown = JSON.parse(value);
+   if (!parsed || typeof parsed !== "object" || !("members" in parsed) || !Array.isArray(parsed.members)) {
+     throw new Error("members.json must contain a members array");
+   }
+@@ -50,7 +49,7 @@ function nickname(login: string, members: Member[]): string {
+   return members.find((member) => member.github === login)?.nickname ?? login;
+ }
+ 
+-export function buildPayload(input: NotificationInput, members = loadMembers()): DiscordPayload {
++export function buildPayload(input: NotificationInput, members: Member[]): DiscordPayload {
+   const event = eventFor(input.action, input.merged);
+   const labels = input.labels.map((label) => label.name).filter((name): name is string => Boolean(name)).join(", ").slice(0, 1000);
+   const fields = [
+@@ -93,7 +92,7 @@ export async function main(environment = process.env): Promise<void> {
+   if (!channel) return;
+   const webhook = environment[`DISCORD_WEBHOOK_${channel}`];
+   if (!webhook) { console.warn(`::warning::no webhook secret configured for channel ${channel}`); return; }
+-  await sendPayload(webhook, buildPayload(input, loadMembers()));
++  await sendPayload(webhook, buildPayload(input, loadMembers(environment.PR_NOTIFICATION_MEMBERS_JSON)));
+ }
+ 
+ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+diff --git a/.github/pr-notification/members.json b/.github/pr-notification/members.json
+deleted file mode 100644
+index 312a5279dae13b2065c7e5aaf107f7e5698207fa..0000000000000000000000000000000000000000
+--- a/.github/pr-notification/members.json
++++ /dev/null
+@@ -1,24 +0,0 @@
+-{
+-  "members": [
+-    {
+-      "github": "kdongsu5509",
+-      "nickname": "라티",
+-      "discordUserId": "967578301889654834"
+-    },
+-    {
+-      "github": "byunghyunkim0",
+-      "nickname": "바드",
+-      "discordUserId": ""
+-    },
+-    {
+-      "github": "boyekim",
+-      "nickname": "보예",
+-      "discordUserId": ""
+-    },
+-    {
+-      "github": "JohnPrk",
+-      "nickname": "티뉴",
+-      "discordUserId": ""
+-    }
+-  ]
+-}
+\ No newline at end of file
+diff --git a/.github/workflows/discord-pr-notification.yml b/.github/workflows/discord-pr-notification.yml
+index 78bcfdd201b06d98884bb6a9caaad4dbac60faa9..ce11d94ce094f27e0196f5006df091eb8230ca69 100644
+--- a/.github/workflows/discord-pr-notification.yml
++++ b/.github/workflows/discord-pr-notification.yml
+@@ -50,4 +50,5 @@ jobs:
+           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+           DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+           DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
++          PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
+         run: node --experimental-strip-types .github/pr-notification/discord-pr-notification.ts

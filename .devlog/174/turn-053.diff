@@ -1,0 +1,110 @@
+diff --git a/.github/pr-notification/discord-pr-notification.test.ts b/.github/pr-notification/discord-pr-notification.test.ts
+deleted file mode 100644
+index 17fcb87537766f54318a75015fc49f525645a22f..0000000000000000000000000000000000000000
+--- a/.github/pr-notification/discord-pr-notification.test.ts
++++ /dev/null
+@@ -1,46 +0,0 @@
+-import assert from "node:assert/strict";
+-import test from "node:test";
+-
+-import { loadMembers } from "./member-configuration-parser.ts";
+-import { buildPayload, channelForBaseBranch } from "./discord-pr-notification.ts";
+-
+-const input = { eventName: "pull_request", action: "opened", merged: false, number: "174", title: "코드 리뷰를 빠르게 하기", url: "https://github.com/woowacourse-teams/2026-bibbidi/pull/174", head: "feature/174", base: "release-fe", actor: "kdongsu5509", author: "boyekim", labels: [{ name: "type: feature" }, { name: "area: fe" }] };
+-const membersJson = JSON.stringify({ members: [
+-  { github: "kdongsu5509", nickname: "라티", discordUserId: "" },
+-  { github: "byunghyunkim0", nickname: "바드", discordUserId: "" },
+-  { github: "boyekim", nickname: "보예", discordUserId: "" },
+-  { github: "JohnPrk", nickname: "티뉴", discordUserId: "" },
+-] });
+-
+-test("릴리스 브랜치를 기존 Discord 웹훅 채널로 연결한다", () => {
+-  assert.equal(channelForBaseBranch("release-be"), "BE", "BE 릴리스 브랜치는 BE 채널을 사용해야 합니다.");
+-  assert.equal(channelForBaseBranch("release-fe"), "FE", "FE 릴리스 브랜치는 FE 채널을 사용해야 합니다.");
+-  assert.equal(channelForBaseBranch("release-app"), "APP", "APP 릴리스 브랜치는 APP 채널을 사용해야 합니다.");
+-  assert.equal(channelForBaseBranch("main"), undefined, "main 브랜치에는 알림 채널이 없어야 합니다.");
+-});
+-
+-test("JSON 설정에서 GitHub 로그인과 닉네임을 읽는다", () => {
+-  const members = loadMembers(membersJson);
+-  assert.deepEqual(members.map(({ github, nickname }) => ({ github, nickname })), [
+-    { github: "kdongsu5509", nickname: "라티" },
+-    { github: "byunghyunkim0", nickname: "바드" },
+-    { github: "boyekim", nickname: "보예" },
+-    { github: "JohnPrk", nickname: "티뉴" },
+-  ], "구성원 설정의 GitHub 로그인과 닉네임이 일치해야 합니다.");
+-  assert(members.every((member) => typeof member.discordUserId === "string"), "Discord 사용자 ID는 문자열이어야 합니다.");
+-});
+-
+-test("PR 생성 알림 페이로드를 만든다", () => {
+-  assert.deepEqual(buildPayload(input, loadMembers(membersJson)), { content: "라티님이 [#174 : 코드 리뷰를 빠르게 하기](https://github.com/woowacourse-teams/2026-bibbidi/pull/174)을 생성했습니다.\ntype: feature" }, "PR 생성 알림 페이로드가 예상 형식과 일치해야 합니다.");
+-});
+-
+-test("병합 여부에 따라 병합 또는 종료 메시지를 사용한다", () => {
+-  const members = loadMembers(membersJson);
+-  assert.match(buildPayload({ ...input, action: "closed", merged: true }, members)?.content ?? "", /머지했습니다/, "병합된 PR에는 병합 메시지를 표시해야 합니다.");
+-  assert.equal(buildPayload({ ...input, action: "closed", merged: false }, members), undefined, "병합되지 않은 종료 PR은 알림을 보내지 않아야 합니다.");
+-});
+-
+-test("리뷰 제출 알림을 만든다", () => {
+-  const payload = buildPayload({ ...input, eventName: "pull_request_review", action: "submitted", actor: "JohnPrk" }, loadMembers(membersJson));
+-  assert.match(payload?.content ?? "", /티뉴님이 .*에 리뷰를 남겼습니다/, "리뷰 제출 알림에는 리뷰 작성자와 이벤트를 표시해야 합니다.");
+-});
+diff --git a/.github/pr-notification/members.json b/.github/pr-notification/members.json
+deleted file mode 100644
+index 8212789167b71b8bc989d30cc21300804540770c..0000000000000000000000000000000000000000
+--- a/.github/pr-notification/members.json
++++ /dev/null
+@@ -1,25 +0,0 @@
+-{
+-  "members": [
+-    {
+-      "github": "kdongsu5509",
+-      "nickname": "라티",
+-      "discordUserId": "967578301889654834"
+-    },
+-    {
+-      "github": "byunghyunkim0",
+-      "nickname": "바드",
+-      "reviewer": false,
+-      "discordUserId": "1136442169415184455"
+-    },
+-    {
+-      "github": "boyekim",
+-      "nickname": "보예",
+-      "discordUserId": "790864352055656489"
+-    },
+-    {
+-      "github": "JohnPrk",
+-      "nickname": "티뉴",
+-      "discordUserId": "407641076556627972"
+-    }
+-  ]
+-}
+diff --git a/.github/pr-notification/reviewer-assignment.test.ts b/.github/pr-notification/reviewer-assignment.test.ts
+deleted file mode 100644
+index c702356b9ab2ec4c6e9d2193bf67745d91290c13..0000000000000000000000000000000000000000
+--- a/.github/pr-notification/reviewer-assignment.test.ts
++++ /dev/null
+@@ -1,21 +0,0 @@
+-import assert from "node:assert/strict";
+-import test from "node:test";
+-
+-import { selectReviewer } from "./reviewer-assignment.ts";
+-
+-const candidates = [
+-  { github: "kdongsu5509" },
+-  { github: "byunghyunkim0", reviewer: false },
+-  { github: "boyekim" },
+-  { github: "JohnPrk" },
+-];
+-
+-test("PR 번호 순환으로 작성자와 제외 구성원을 건너뛰어 리뷰어를 배정한다", () => {
+-  assert.equal(selectReviewer({ candidates, author: "kdongsu5509", pullNumber: 1, existingReviewers: [] }), "boyekim", "작성자는 건너뛰고 다음 후보를 배정해야 합니다.");
+-  assert.equal(selectReviewer({ candidates, author: "boyekim", pullNumber: 3, existingReviewers: [] }), "JohnPrk", "제외된 후보는 배정하지 않아야 합니다.");
+-  assert.equal(selectReviewer({ candidates, author: "JohnPrk", pullNumber: 4, existingReviewers: [] }), "kdongsu5509", "후보 목록 끝에서는 처음 후보로 순환해야 합니다.");
+-});
+-
+-test("이미 지정된 리뷰어를 바꾸지 않는다", () => {
+-  assert.equal(selectReviewer({ candidates, author: "kdongsu5509", pullNumber: 1, existingReviewers: ["boyekim"] }), undefined, "기존 리뷰어가 있으면 자동 배정하지 않아야 합니다.");
+-});

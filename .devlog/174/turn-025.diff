@@ -1,0 +1,55 @@
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index ec6cc49f70883640dc4c220cd6dd578068ff1232..5afa5e76b82d3d5f995d2e1a29407d575cc2469d 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -36,14 +36,20 @@ function isMember(value: unknown): value is Member {
+ }
+ 
+ export function loadMembers(value: string | undefined): Member[] {
+-  if (!value) throw new Error("PR_NOTIFICATION_MEMBERS_JSON is required");
++  if (!value) throw new Error("PR_NOTIFICATION_MEMBERS_JSON 시크릿이 필요합니다.");
++
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(value);
++  } catch {
++    throw new Error("PR_NOTIFICATION_MEMBERS_JSON은 올바른 JSON 형식이어야 합니다.");
++  }
+ 
+-  const parsed: unknown = JSON.parse(value);
+   if (!parsed || typeof parsed !== "object" || !("members" in parsed) || !Array.isArray(parsed.members)) {
+-    throw new Error("PR_NOTIFICATION_MEMBERS_JSON must contain a members array");
++    throw new Error("PR_NOTIFICATION_MEMBERS_JSON은 members 배열을 포함해야 합니다.");
+   }
+   if (!parsed.members.every(isMember)) {
+-    throw new Error("every member must have string github and nickname properties");
++    throw new Error("각 구성원은 문자열 형식의 github과 nickname을 포함해야 합니다.");
+   }
+ 
+   return parsed.members;
+@@ -97,7 +103,7 @@ function labelsFromEnvironment(value: string | undefined): Label[] {
+     const labels: unknown = JSON.parse(value);
+     return Array.isArray(labels) ? labels : [];
+   } catch {
+-    console.warn("::warning::failed to parse PR labels");
++    console.warn("::warning::PR 라벨 정보를 해석하지 못했습니다.");
+     return [];
+   }
+ }
+@@ -129,7 +135,7 @@ export async function sendPayload(webhook: string, payload: DiscordPayload): Pro
+       });
+ 
+       if (response.ok) return;
+-      lastError = new Error(`Discord webhook request failed with status ${response.status}`);
++      lastError = new Error(`Discord 웹훅 요청에 실패했습니다. (상태 코드: ${response.status})`);
+     } catch (error) {
+       lastError = error instanceof Error ? error : new Error(String(error));
+     }
+@@ -150,7 +156,7 @@ export async function main(environment = process.env): Promise<void> {
+ 
+   const webhook = environment[`DISCORD_WEBHOOK_${channel}`];
+   if (!webhook) {
+-    console.warn(`::warning::no webhook secret configured for channel ${channel}`);
++    console.warn(`::warning::${channel} 채널의 Discord 웹훅 시크릿이 설정되지 않았습니다.`);
+     return;
+   }

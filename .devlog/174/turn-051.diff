@@ -1,0 +1,10 @@
+diff --git a/.github/workflows/pr-notification.yml b/.github/workflows/pr-notification.yml
+index 30a57012b0c46a38c8d4eab7d615c5e242fd1156..461e153b55a84cdd6bb332a01fa2815af8531c36 100644
+--- a/.github/workflows/pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -1,4 +1,4 @@
+-name: PR Notification
++name: PR 알림
+ 
+ on:
+   pull_request:
