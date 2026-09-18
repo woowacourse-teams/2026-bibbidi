@@ -12,3 +12,4 @@
 {"type":"USER_PROMPTED","issue":173,"prompt":"변경 설명을 확인했으며 이대로 커밋·푸시하고 release-fe 대상 PR을 작성한다.","redacted":false,"bootstrap":true,"timestamp":"2026-09-18T12:40:00.324Z"}
 {"type":"COMMIT_CONFIRMED","issue":173,"tree":"4712fa44085b7516200a88637181bb49e1a89c23","bootstrap":true,"timestamp":"2026-09-18T12:40:00.635Z"}
 {"type":"PR_PLANNED","issue":173,"summary":["원본 비비디 로고를 브라우저 파비콘으로 적용했습니다.","Open Graph와 Twitter Card 메타데이터 및 FE_SERVICE_URL 기반 절대 URL을 추가해 외부 공유 미리보기를 제공합니다."],"review":["[REQUIRED] 공유 제목·설명·대표 이미지가 제품 의도와 맞는지 확인해 주세요.","[CAUTION] FE_SERVICE_URL에서 생성한 og:url과 og:image가 운영 주소와 일치하는지 확인해 주세요."],"bootstrap":true,"timestamp":"2026-09-18T12:40:23.709Z"}
+{"type":"PR_REQUESTED","issue":173,"bootstrap":true,"timestamp":"2026-09-18T12:40:42.011Z"}
