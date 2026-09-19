@@ -1,5 +1,5 @@
-import { createGitHubClient, createOpenAIClient } from "./clients.mjs";
-import { runReview } from "./review.mjs";
+import { createGitHubClient, createOpenAIClient, loadReviewPrompts } from "./ai-review-client.ts";
+import { runReview } from "./ai-review-service.ts";
 
 const requiredEnvironment = [
   "GITHUB_TOKEN",
@@ -9,22 +9,16 @@ const requiredEnvironment = [
   "REVIEW_HEAD_SHA",
 ];
 
-for (const name of requiredEnvironment) {
-  if (!process.env[name]) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-}
-
 const pullNumber = Number(process.env.REVIEW_PULL_NUMBER);
-if (!Number.isSafeInteger(pullNumber) || pullNumber <= 0) {
-  throw new Error("REVIEW_PULL_NUMBER must be a positive integer");
-}
 
 const github = createGitHubClient({
   token: process.env.GITHUB_TOKEN,
   repository: process.env.REVIEW_REPOSITORY,
 });
 const openai = createOpenAIClient({ apiKey: process.env.OPENAI_API_KEY });
+const prompts = await loadReviewPrompts(
+  new URL("./ai-review-prompt.yml", import.meta.url),
+);
 
 try {
   await runReview({
@@ -32,6 +26,7 @@ try {
     openai,
     pullNumber,
     expectedHeadSha: process.env.REVIEW_HEAD_SHA,
+    prompts,
   });
   console.log(`AI review submitted for PR #${pullNumber}`);
 } catch (error) {

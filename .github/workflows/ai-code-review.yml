@@ -41,6 +41,14 @@ jobs:
         with:
           node-version: 24.19.0
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+
+      - name: Install AI review dependencies
+        run: pnpm --dir .github/ai-review install --frozen-lockfile
+
       - name: Run AI review
         continue-on-error: true
         env:
@@ -50,4 +58,4 @@ jobs:
           REVIEW_PULL_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REVIEW_EVENT: ${{ github.event.action }}
-        run: node .github/scripts/ai-review/cli.mjs
+        run: node --experimental-strip-types .github/ai-review/cli.ts

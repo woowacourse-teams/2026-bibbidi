@@ -1,0 +1,24 @@
+diff --git a/.github/ai-review/ai-review-service.ts b/.github/ai-review/ai-review-service.ts
+index f80e8e350710ecc843c2c7d6fe8b96d447f1cad4..b44d0fdc3c98c490316c87d69e8857401c7373e1 100644
+--- a/.github/ai-review/ai-review-service.ts
++++ b/.github/ai-review/ai-review-service.ts
+@@ -225,7 +225,7 @@ function formatReviewBody(
+     ? `\n\n> diff 크기 제한으로 ${totalFiles}개 파일 중 ${omittedFiles}개 파일의 patch가 제외되었습니다.`
+     : "";
+ 
+-  return `## 🤖 Bibbidi AI 코드 리뷰 Harness
++  return `## 코드 리뷰
+ 
+ ${summary.trim() || "인라인으로 남길 높은 확신의 지적을 찾지 못했습니다."}
+ 
+@@ -235,9 +235,7 @@ ${summary.trim() || "인라인으로 남길 높은 확신의 지적을 찾지 
+ | CAUTION | ${count("CAUTION")} |
+ | ADVICE | ${count("ADVICE")} |
+ 
+-모델: \`gpt-5.6-luna\` · 인라인 코멘트: ${findings.length}/${MAX_INLINE_COMMENTS}${coverage}
+-
+-> AI 리뷰는 참고용입니다. 최종 판단과 승인은 사람 리뷰어가 담당합니다.`;
++인라인 코멘트: ${findings.length}/${MAX_INLINE_COMMENTS}${coverage}`;
+ }
+ 
+ export async function runReview({
