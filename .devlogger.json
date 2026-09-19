@@ -2,7 +2,7 @@
   "version": 1,
   "repository": "woowacourse-teams/2026-bibbidi",
   "defaultBaseBranch": "release-be",
-  "issueTemplate": ".github/ISSUE_TEMPLATE/development.md",
+  "issueTemplate": ".github/ISSUE_TEMPLATE.md",
   "pullRequestTemplate": ".github/pull_request_template.md",
   "typeLabels": {
     "feature": "type: feature",
@@ -19,11 +19,11 @@
         ".claude/",
         ".codex/",
         ".devlogger.json",
-        ".github/ISSUE_TEMPLATE/",
+        ".github/ISSUE_TEMPLATE.md",
         ".github/pull_request_template.md",
         "packages/development-logger/"
       ],
-      "commands": ["node --test packages/development-logger/test/index.test.mjs"]
+      "commands": ["node --experimental-strip-types --test packages/development-logger/test/index.test.ts"]
     },
     {
       "key": "be-test",
