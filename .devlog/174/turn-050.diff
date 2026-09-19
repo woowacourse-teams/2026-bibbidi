@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/discord-pr-notification.yml b/.github/workflows/pr-notification.yml
+similarity index 98%
+rename from .github/workflows/discord-pr-notification.yml
+rename to .github/workflows/pr-notification.yml
+index fbb08cfee106ea49c84f152c2accc21f7b025c77..30a57012b0c46a38c8d4eab7d615c5e242fd1156 100644
+--- a/.github/workflows/discord-pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -1,4 +1,4 @@
+-name: Discord PR Notification
++name: PR Notification
+ 
+ on:
+   pull_request:

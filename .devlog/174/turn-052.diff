@@ -1,0 +1,25 @@
+diff --git a/.github/workflows/pr-notification.yml b/.github/workflows/pr-notification.yml
+index 461e153b55a84cdd6bb332a01fa2815af8531c36..5f957083b0d2463f52c700fa243318d0e428f588 100644
+--- a/.github/workflows/pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -1,4 +1,4 @@
+-name: PR 알림
++name: PR 알리미
+ 
+ on:
+   pull_request:
+diff --git a/.github/workflows/pr-review-reminder.yml b/.github/workflows/pr-review-reminder.yml
+index a0761c5802e9445a62a155bd5ef3e42e4e9adf7e..e8d3fc4e8957dcadc75800ce6c2d1b946bd463e8 100644
+--- a/.github/workflows/pr-review-reminder.yml
++++ b/.github/workflows/pr-review-reminder.yml
+@@ -1,8 +1,8 @@
+-name: PR Review Reminder
++name: PR 코드리뷰 리마인더
+ 
+ on:
+   schedule:
+-    - cron: '7 * * * *'
++    - cron: "7 * * * *"
+   workflow_dispatch:
+ 
+ permissions:

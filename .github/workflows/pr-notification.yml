@@ -1,0 +1,68 @@
+name: PR 알리미
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+  pull_request_review:
+    types:
+      - submitted
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: discord-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    name: Notify Discord
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+
+      - name: Assign reviewer
+        if: github.event.action == 'opened'
+        shell: bash
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          REQUESTED_REVIEWERS_JSON: ${{ toJson(github.event.pull_request.requested_reviewers) }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
+        run: node --experimental-strip-types .github/pr-notification/reviewer-assignment.ts
+
+      - name: Send Discord notification
+        shell: bash
+        env:
+          ACTION: ${{ github.event.action }}
+          EVENT_NAME: ${{ github.event_name }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          ACTOR: ${{ github.actor }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+          REQUESTED_REVIEWERS_JSON: ${{ toJson(github.event.pull_request.requested_reviewers) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+          DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+          PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
+        run: node --experimental-strip-types .github/pr-notification/discord-pr-notification.ts

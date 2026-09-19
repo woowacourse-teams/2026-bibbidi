@@ -1,0 +1,259 @@
+diff --git a/.github/scripts/discord-pr-notification.test.ts b/.github/scripts/discord-pr-notification.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f75c1ffc89c1c03cc06289780cbcd1895be36f4
+--- /dev/null
++++ b/.github/scripts/discord-pr-notification.test.ts
+@@ -0,0 +1,22 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++
++import { buildPayload, channelForBaseBranch } from "./discord-pr-notification.ts";
++
++const input = { action: "opened", merged: false, number: "174", title: "코드 리뷰를 빠르게 하기", url: "https://github.com/woowacourse-teams/2026-bibbidi/pull/174", head: "feature/174", base: "release-fe", actor: "kdongsu5509", author: "boyekim", commits: "2", files: "3", additions: "10", deletions: "4", labels: [{ name: "type: feature" }, { name: "area: fe" }] };
++
++test("routes supported release branches to their existing webhook channels", () => {
++  assert.equal(channelForBaseBranch("release-be"), "BE");
++  assert.equal(channelForBaseBranch("release-fe"), "FE");
++  assert.equal(channelForBaseBranch("release-app"), "APP");
++  assert.equal(channelForBaseBranch("main"), undefined);
++});
++
++test("builds the existing opened PR notification payload", () => {
++  assert.deepEqual(buildPayload(input), { embeds: [{ title: "🆕 라티님이 PR을 생성했습니다", url: input.url, description: "#174 코드 리뷰를 빠르게 하기", fields: [{ name: "작성자", value: "`보예 (@boyekim)`", inline: true }, { name: "브랜치", value: "`feature/174 → release-fe`", inline: true }, { name: "변경 내역", value: "`commits: 2 | files: 3 | +10 / -4`", inline: false }, { name: "라벨", value: "type: feature, area: fe", inline: false }] }] });
++});
++
++test("uses merge and close messages according to the merged flag", () => {
++  assert.match(buildPayload({ ...input, action: "closed", merged: true }).embeds[0].title, /머지했습니다/);
++  assert.match(buildPayload({ ...input, action: "closed", merged: false }).embeds[0].title, /닫았습니다/);
++});
+diff --git a/.github/scripts/discord-pr-notification.ts b/.github/scripts/discord-pr-notification.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e4ebcf5abd0c4050cb48fc5a72feeeb06b704f0
+--- /dev/null
++++ b/.github/scripts/discord-pr-notification.ts
+@@ -0,0 +1,78 @@
++type Label = { name?: string };
++
++export type NotificationInput = {
++  action: string; merged: boolean; number: string; title: string; url: string;
++  head: string; base: string; actor: string; author: string; commits: string;
++  files: string; additions: string; deletions: string; labels: Label[];
++};
++
++type DiscordPayload = { embeds: Array<{ title: string; url: string; description: string; fields: Array<{ name: string; value: string; inline: boolean }> }> };
++
++const NICKNAMES: Record<string, string> = {
++  kdongsu5509: "라티", byunghyunkim0: "바드", boyekim: "보예", JohnPrk: "티뉴",
++};
++
++export function channelForBaseBranch(base: string): string | undefined {
++  return { "release-be": "BE", "release-fe": "FE", "release-app": "APP" }[base];
++}
++
++function eventFor(action: string, merged: boolean): { icon: string; text: string } {
++  if (action === "opened") return { icon: "🆕", text: "PR을 생성했습니다" };
++  if (action === "synchronize") return { icon: "🔄", text: "PR에 새로운 커밋을 추가했습니다" };
++  if (action === "reopened") return { icon: "🔁", text: "PR을 다시 열었습니다" };
++  if (action === "ready_for_review") return { icon: "📢", text: "PR을 리뷰 요청 상태로 전환했습니다" };
++  if (action === "closed") return merged ? { icon: "✅", text: "PR을 머지했습니다" } : { icon: "❌", text: "PR을 닫았습니다" };
++  return { icon: "ℹ️", text: "PR 상태를 변경했습니다" };
++}
++
++function nickname(login: string): string { return NICKNAMES[login] ?? login; }
++
++export function buildPayload(input: NotificationInput): DiscordPayload {
++  const event = eventFor(input.action, input.merged);
++  const labels = input.labels.map((label) => label.name).filter((name): name is string => Boolean(name)).join(", ").slice(0, 1000);
++  const fields = [
++    { name: "작성자", value: `\`${nickname(input.author)} (@${input.author})\``, inline: true },
++    { name: "브랜치", value: `\`${input.head} → ${input.base}\``, inline: true },
++    { name: "변경 내역", value: `\`commits: ${input.commits} | files: ${input.files} | +${input.additions} / -${input.deletions}\``, inline: false },
++  ];
++  if (labels) fields.push({ name: "라벨", value: labels, inline: false });
++  return { embeds: [{ title: `${event.icon} ${nickname(input.actor)}님이 ${event.text}`, url: input.url, description: `#${input.number} ${input.title}`, fields }] };
++}
++
++function labelsFromEnvironment(value: string | undefined): Label[] {
++  if (!value) return [];
++  try { const labels: unknown = JSON.parse(value); return Array.isArray(labels) ? labels : []; }
++  catch { console.warn("::warning::failed to parse PR labels"); return []; }
++}
++
++function inputFromEnvironment(environment: NodeJS.ProcessEnv): NotificationInput {
++  return {
++    action: environment.ACTION ?? "", merged: environment.MERGED === "true", number: environment.NUMBER ?? "", title: environment.TITLE ?? "", url: environment.URL ?? "", head: environment.HEAD ?? "", base: environment.BASE ?? "", actor: environment.ACTOR ?? "", author: environment.AUTHOR ?? "", commits: environment.COMMITS ?? "0", files: environment.FILES ?? "0", additions: environment.ADDITIONS ?? "0", deletions: environment.DELETIONS ?? "0", labels: labelsFromEnvironment(environment.LABELS_JSON),
++  };
++}
++
++export async function sendPayload(webhook: string, payload: DiscordPayload): Promise<void> {
++  let lastError: Error | undefined;
++  for (let attempt = 0; attempt < 4; attempt += 1) {
++    try {
++      const response = await fetch(webhook, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
++      if (response.ok) return;
++      lastError = new Error(`Discord webhook request failed with status ${response.status}`);
++    } catch (error) { lastError = error instanceof Error ? error : new Error(String(error)); }
++    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 2_000));
++  }
++  throw lastError;
++}
++
++export async function main(environment = process.env): Promise<void> {
++  const input = inputFromEnvironment(environment);
++  const channel = channelForBaseBranch(input.base);
++  if (!channel) return;
++  const webhook = environment[`DISCORD_WEBHOOK_${channel}`];
++  if (!webhook) { console.warn(`::warning::no webhook secret configured for channel ${channel}`); return; }
++  await sendPayload(webhook, buildPayload(input));
++}
++
++if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
++  main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });
++}
+diff --git a/.github/scripts/package.json b/.github/scripts/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e986b24bbae58b2e6d308a8186e3347e92314fe4
+--- /dev/null
++++ b/.github/scripts/package.json
+@@ -0,0 +1,4 @@
++{
++  "private": true,
++  "type": "module"
++}
+diff --git a/.github/workflows/discord-pr-notification.yml b/.github/workflows/discord-pr-notification.yml
+index f61cb22906e58ce682356be859fb6454d7e318cd..565592974a33a4dc565f42d4abed5971dcc77734 100644
+--- a/.github/workflows/discord-pr-notification.yml
++++ b/.github/workflows/discord-pr-notification.yml
+@@ -24,25 +24,13 @@ jobs:
+     timeout-minutes: 5
+ 
+     steps:
+-      - name: Select webhook channel by release branch
+-        id: route
+-        shell: bash
+-        env:
+-          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+-        run: |
+-          case "$BASE_BRANCH" in
+-            release-be)  CHANNEL="BE" ;;
+-            release-fe)  CHANNEL="FE" ;;
+-            release-app) CHANNEL="APP" ;;
+-            *)           CHANNEL="" ;;
+-          esac
++      - uses: actions/checkout@v4
+ 
+-          echo "base=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
++      - uses: actions/setup-node@v4
++        with:
++          node-version: 22.18.0
+ 
+-      - name: Build Discord payload
+-        if: steps.route.outputs.channel != ''
+-        id: payload
++      - name: Send Discord notification
+         shell: bash
+         env:
+           ACTION: ${{ github.event.action }}
+@@ -59,100 +47,7 @@ jobs:
+           ADDITIONS: ${{ github.event.pull_request.additions }}
+           DELETIONS: ${{ github.event.pull_request.deletions }}
+           LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+-        run: |
+-          case "$ACTION" in
+-            opened)
+-              ICON="🆕"
+-              EVENT="PR을 생성했습니다"
+-              ;;
+-            synchronize)
+-              ICON="🔄"
+-              EVENT="PR에 새로운 커밋을 추가했습니다"
+-              ;;
+-            reopened)
+-              ICON="🔁"
+-              EVENT="PR을 다시 열었습니다"
+-              ;;
+-            ready_for_review)
+-              ICON="📢"
+-              EVENT="PR을 리뷰 요청 상태로 전환했습니다"
+-              ;;
+-            closed)
+-              if [ "$MERGED" = "true" ]; then
+-                ICON="✅"
+-                EVENT="PR을 머지했습니다"
+-              else
+-                ICON="❌"
+-                EVENT="PR을 닫았습니다"
+-              fi
+-              ;;
+-            *)
+-              ICON="ℹ️"
+-              EVENT="PR 상태를 변경했습니다"
+-              ;;
+-          esac
+-
+-          nickname() {
+-            case "$1" in
+-              kdongsu5509)   echo "라티" ;;
+-              byunghyunkim0) echo "바드" ;;
+-              boyekim)       echo "보예" ;;
+-              JohnPrk)       echo "티뉴" ;;
+-              *)             echo "$1" ;;
+-            esac
+-          }
+-
+-          ACTOR_NAME=$(nickname "$ACTOR")
+-          AUTHOR_NAME=$(nickname "$AUTHOR")
+-
+-          LABELS=$(jq -r 'map(.name) | join(", ") | .[0:1000]' <<< "${LABELS_JSON:-[]}")
+-          jq -n \
+-            --arg event "$EVENT" \
+-            --arg icon "$ICON" \
+-            --arg number "#$NUMBER" \
+-            --arg title "$TITLE" \
+-            --arg actor_name "$ACTOR_NAME" \
+-            --arg author "$AUTHOR_NAME (@$AUTHOR)" \
+-            --arg branch "$HEAD → $BASE" \
+-            --arg stats "commits: $COMMITS | files: $FILES | +$ADDITIONS / -$DELETIONS" \
+-            --arg labels "$LABELS" \
+-            --arg url "$URL" \
+-            '{
+-              embeds: [{
+-                title: ($icon + " " + $actor_name + "님이 " + $event),
+-                url: $url,
+-                description: ($number + " " + $title),
+-                fields: (
+-                  [
+-                    {name: "작성자", value: ("`" + $author + "`"), inline: true},
+-                    {name: "브랜치", value: ("`" + $branch + "`"), inline: true},
+-                    {name: "변경 내역", value: ("`" + $stats + "`"), inline: false}
+-                  ]
+-                  + (if $labels != "" then [{name: "라벨", value: $labels, inline: false}] else [] end)
+-                )
+-              }]
+-            }' > payload.json
+-
+-      - name: Send notification to Discord
+-        if: steps.route.outputs.channel != ''
+-        shell: bash
+-        env:
+-          CHANNEL: ${{ steps.route.outputs.channel }}
+           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+           DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+           DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+-        run: |
+-          WEBHOOK_VAR="DISCORD_WEBHOOK_${CHANNEL}"
+-          WEBHOOK="${!WEBHOOK_VAR}"
+-
+-          if [ -z "$WEBHOOK" ]; then
+-            echo "::warning::no webhook secret configured for channel $CHANNEL"
+-            exit 0
+-          fi
+-
+-          curl --fail-with-body --silent --show-error \
+-            --retry 3 --retry-delay 2 \
+-            -X POST \
+-            -H "Content-Type: application/json" \
+-            --data-binary @payload.json \
+-            "$WEBHOOK"
++        run: node --experimental-strip-types .github/scripts/discord-pr-notification.ts

@@ -1,0 +1,123 @@
+diff --git a/.github/pr-notification/discord-pr-notification.test.ts b/.github/pr-notification/discord-pr-notification.test.ts
+index 157b1e70c792644c79f93026d99597ee9012e18d..93900f1e5bc041ba0c8712b3a604792c74a13c42 100644
+--- a/.github/pr-notification/discord-pr-notification.test.ts
++++ b/.github/pr-notification/discord-pr-notification.test.ts
+@@ -3,7 +3,7 @@ import test from "node:test";
+ 
+ import { buildPayload, channelForBaseBranch, loadMembers } from "./discord-pr-notification.ts";
+ 
+-const input = { action: "opened", merged: false, number: "174", title: "코드 리뷰를 빠르게 하기", url: "https://github.com/woowacourse-teams/2026-bibbidi/pull/174", head: "feature/174", base: "release-fe", actor: "kdongsu5509", author: "boyekim", commits: "2", files: "3", additions: "10", deletions: "4", labels: [{ name: "type: feature" }, { name: "area: fe" }] };
++const input = { action: "opened", merged: false, number: "174", title: "코드 리뷰를 빠르게 하기", url: "https://github.com/woowacourse-teams/2026-bibbidi/pull/174", head: "feature/174", base: "release-fe", actor: "kdongsu5509", author: "boyekim", labels: [{ name: "type: feature" }, { name: "area: fe" }] };
+ const membersJson = JSON.stringify({ members: [
+   { github: "kdongsu5509", nickname: "라티", discordUserId: "" },
+   { github: "byunghyunkim0", nickname: "바드", discordUserId: "" },
+@@ -30,7 +30,7 @@ test("loads GitHub login and nickname mappings from the JSON configuration", ()
+ });
+ 
+ test("builds the existing opened PR notification payload", () => {
+-  assert.deepEqual(buildPayload(input, loadMembers(membersJson)), { embeds: [{ title: "🆕 라티님이 PR을 생성했습니다", url: input.url, description: "#174 코드 리뷰를 빠르게 하기", fields: [{ name: "작성자", value: "`보예 (@boyekim)`", inline: true }, { name: "브랜치", value: "`feature/174 → release-fe`", inline: true }, { name: "변경 내역", value: "`commits: 2 | files: 3 | +10 / -4`", inline: false }, { name: "라벨", value: "type: feature, area: fe", inline: false }] }] });
++  assert.deepEqual(buildPayload(input, loadMembers(membersJson)), { embeds: [{ title: "🆕 라티님이 PR을 생성했습니다", url: input.url, description: "#174 코드 리뷰를 빠르게 하기", fields: [{ name: "작성자", value: "`보예 (@boyekim)`", inline: true }, { name: "브랜치", value: "`feature/174 → release-fe`", inline: true }, { name: "라벨", value: "type: feature, area: fe", inline: false }] }] });
+ });
+ 
+ test("uses merge and close messages according to the merged flag", () => {
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index 4e76bf2be169e12408f7ab25378f9b2742baf096..ec6cc49f70883640dc4c220cd6dd578068ff1232 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -19,8 +19,6 @@ function eventFor(action: string, merged: boolean): EventDescription {
+       return { icon: "🔄", text: "PR에 새로운 커밋을 추가했습니다" };
+     case "reopened":
+       return { icon: "🔁", text: "PR을 다시 열었습니다" };
+-    case "ready_for_review":
+-      return { icon: "📢", text: "PR을 리뷰 요청 상태로 전환했습니다" };
+     case "closed":
+       return merged
+         ? { icon: "✅", text: "PR을 머지했습니다" }
+@@ -66,12 +64,10 @@ function labelNames(labels: Label[]): string {
+ function baseFields(input: NotificationInput, members: Member[]): DiscordField[] {
+   const author = `${nicknameFor(input.author, members)} (@${input.author})`;
+   const branch = `${input.head} → ${input.base}`;
+-  const changes = `commits: ${input.commits} | files: ${input.files} | +${input.additions} / -${input.deletions}`;
+ 
+   return [
+     { name: "작성자", value: `\`${author}\``, inline: true },
+     { name: "브랜치", value: `\`${branch}\``, inline: true },
+-    { name: "변경 내역", value: `\`${changes}\``, inline: false },
+   ];
+ }
+ 
+@@ -117,10 +113,6 @@ function inputFromEnvironment(environment: NodeJS.ProcessEnv): NotificationInput
+     base: environment.BASE ?? "",
+     actor: environment.ACTOR ?? "",
+     author: environment.AUTHOR ?? "",
+-    commits: environment.COMMITS ?? "0",
+-    files: environment.FILES ?? "0",
+-    additions: environment.ADDITIONS ?? "0",
+-    deletions: environment.DELETIONS ?? "0",
+     labels: labelsFromEnvironment(environment.LABELS_JSON),
+   };
+ }
+@@ -213,9 +205,5 @@ export type NotificationInput = {
+   base: string;
+   actor: string;
+   author: string;
+-  commits: string;
+-  files: string;
+-  additions: string;
+-  deletions: string;
+   labels: Label[];
+ };
+diff --git a/.github/pr-notification/members.json b/.github/pr-notification/members.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad7192960da7795c888002fc6a87aab7a4f09a40
+--- /dev/null
++++ b/.github/pr-notification/members.json
+@@ -0,0 +1,24 @@
++{
++  "members": [
++    {
++      "github": "kdongsu5509",
++      "nickname": "라티",
++      "discordUserId": "967578301889654834"
++    },
++    {
++      "github": "byunghyunkim0",
++      "nickname": "바드",
++      "discordUserId": "1136442169415184455"
++    },
++    {
++      "github": "boyekim",
++      "nickname": "보예",
++      "discordUserId": "790864352055656489"
++    },
++    {
++      "github": "JohnPrk",
++      "nickname": "티뉴",
++      "discordUserId": "407641076556627972"
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/.github/workflows/discord-pr-notification.yml b/.github/workflows/discord-pr-notification.yml
+index ce11d94ce094f27e0196f5006df091eb8230ca69..b9d3aad6c26c02124434a61a7e351afddf479596 100644
+--- a/.github/workflows/discord-pr-notification.yml
++++ b/.github/workflows/discord-pr-notification.yml
+@@ -7,7 +7,6 @@ on:
+       - synchronize
+       - reopened
+       - closed
+-      - ready_for_review
+ 
+ permissions:
+   contents: read
+@@ -42,10 +41,6 @@ jobs:
+           BASE: ${{ github.event.pull_request.base.ref }}
+           ACTOR: ${{ github.actor }}
+           AUTHOR: ${{ github.event.pull_request.user.login }}
+-          COMMITS: ${{ github.event.pull_request.commits }}
+-          FILES: ${{ github.event.pull_request.changed_files }}
+-          ADDITIONS: ${{ github.event.pull_request.additions }}
+-          DELETIONS: ${{ github.event.pull_request.deletions }}
+           LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+           DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
