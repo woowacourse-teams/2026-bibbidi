@@ -150,7 +150,8 @@ export function assertTemplateStructure(template: string, body: string): void {
   if (missing.length) throw new Error(`PR 본문에 템플릿 제목이 빠졌습니다: ${missing.join(', ')}`);
 }
 
-export function assertPullRequestEvents(events: LogEvent[]): { adrSkipped: boolean } {
+/** grill-me를 건너뛰었거나 ADR 생략을 기록했으면 ADR을 요구하지 않는다. 구현 게이트와 같은 기준이다. */
+export function assertPullRequestEvents(events: LogEvent[]): { adrRequired: boolean } {
   const adrSkipped = hasEvent(events, 'ADR_SKIPPED');
   const grillSkipped = hasEvent(events, 'GRILL_ME_SKIPPED') && !hasEvent(events, 'GRILL_ME_FINISHED');
   const design = grillSkipped
@@ -168,7 +169,7 @@ export function assertPullRequestEvents(events: LogEvent[]): { adrSkipped: boole
   const lastConfirmed = events.findLastIndex((event) => event.type === 'COMMIT_CONFIRMED');
   if (lastPlanned < 0) throw new Error('PR에 올릴 내용을 아직 개발자와 정하지 않았습니다. 변경 요약과 리뷰받고 싶은 부분을 하나씩 물어 정한 뒤 `pr plan`으로 기록해 주세요.');
   if (lastPlanned < lastConfirmed) throw new Error('PR 내용을 정한 뒤에 새로 커밋한 코드가 있습니다. PR에 올릴 내용을 다시 정해 `pr plan`으로 기록해 주세요.');
-  return { adrSkipped };
+  return { adrRequired: !grillSkipped && !adrSkipped };
 }
 
 function assertDevlogCommitted(root: string, issue: number): void {
@@ -190,10 +191,10 @@ export function preparePullRequest({ root, config, state, requireTracked = true 
 }): PreparedPullRequest {
   const issue = state.issue as number;
   const events = readEvents(root, issue);
-  const { adrSkipped } = assertPullRequestEvents(events);
+  const { adrRequired } = assertPullRequestEvents(events);
 
   const issueData = getIssue(root, config.repository, issue);
-  if (!adrSkipped && !hasInitialAdr(issueData.body)) {
+  if (adrRequired && !hasInitialAdr(issueData.body)) {
     throw new Error('Issue 본문에 ADR(결정, 이유, 근거, 검증)이 없습니다. ADR이 필요 없다고 정했다면 `adr skip`으로 기록해 주세요.');
   }
   const adrChanged = events.some((event) => event.type === 'ADR_CHANGED');

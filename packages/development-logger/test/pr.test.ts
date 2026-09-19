@@ -78,11 +78,18 @@ test('PR 전에 개발자와 정한 요약과 리뷰 요청으로 본문을 만�
   assert.doesNotMatch(body, /작업을 막거나 허용하는 규칙/);
 });
 
+test('grill-me를 건너뛴 작업은 PR에서도 ADR을 요구하지 않는다', () => {
+  const events: LogEvent[] = (['SESSION_STARTED', 'ISSUE_BOUND', 'GRILL_ME_SKIPPED', 'TURN_FINISHED', 'PR_PLANNED'] as EventType[])
+    .map((type) => ({ type }));
+  assert.deepEqual(assertPullRequestEvents(events), { adrRequired: false });
+});
+
 test('PR 전 작업 기록은 ADR 생략과 PR 내용 합의 여부를 확인한다', () => {
   const base: LogEvent[] = (['SESSION_STARTED', 'ISSUE_BOUND', 'GRILL_ME_STARTED', 'GRILL_ME_QUESTION', 'GRILL_ME_ANSWER', 'GRILL_ME_DECISION', 'GRILL_ME_FINISHED', 'TURN_FINISHED'] as EventType[])
     .map((type) => ({ type }));
   assert.throws(() => assertPullRequestEvents([...base, { type: 'PR_PLANNED' }]), /ADR_CREATED/);
-  assert.deepEqual(assertPullRequestEvents([...base, { type: 'ADR_SKIPPED' }, { type: 'PR_PLANNED' }]), { adrSkipped: true });
+  assert.deepEqual(assertPullRequestEvents([...base, { type: 'ADR_SKIPPED' }, { type: 'PR_PLANNED' }]), { adrRequired: false });
+  assert.deepEqual(assertPullRequestEvents([...base, { type: 'ADR_CREATED' }, { type: 'PR_PLANNED' }]), { adrRequired: true });
   assert.throws(() => assertPullRequestEvents([...base, { type: 'ADR_CREATED' }]), /PR에 올릴 내용/);
   assert.throws(() => assertPullRequestEvents([...base, { type: 'ADR_CREATED' }, { type: 'PR_PLANNED' }, { type: 'COMMIT_CONFIRMED' }]), /다시 정해/);
 });

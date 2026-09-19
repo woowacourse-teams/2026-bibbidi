@@ -22,3 +22,14 @@
 {"type":"USER_PROMPTED","issue":205,"turnId":"3","prompt":"네","redacted":false,"timestamp":"2026-09-19T08:26:46.508Z"}
 {"type":"TOOL_DENIED","issue":205,"tool":"Bash","phase":"READY_TO_IMPLEMENT","turnId":"3","reason":"커밋하기 전에 바꾼 내용을 개발자에게 설명하고 확인을 받아 주세요.","timestamp":"2026-09-19T08:26:51.705Z"}
 {"type":"COMMIT_CONFIRMED","issue":205,"tree":"63747ea38a501d47a0263bf8a13c8e6cbfab7af1","timestamp":"2026-09-19T08:26:55.685Z"}
+{"type":"TURN_FINISHED","turnId":"3","timestamp":"2026-09-19T08:27:13.653Z"}
+{"type":"USER_PROMPTED","issue":205,"turnId":"4","prompt":"ㄱㄱ","redacted":false,"timestamp":"2026-09-19T08:27:25.387Z"}
+{"type":"TURN_FINISHED","turnId":"4","timestamp":"2026-09-19T08:27:32.078Z"}
+{"type":"USER_PROMPTED","issue":205,"turnId":"5","prompt":"비워 둬","redacted":false,"timestamp":"2026-09-19T08:27:35.790Z"}
+{"type":"PR_PLANNED","issue":205,"summary":["작업 기록을 .git 안에 쌓고 커밋 확인 시점에 .devlog로 내보낸다. devlog 전용 커밋과 커밋 루프가 사라진다","세션 시작 시 진입(Issue 작성 / 바로 구현 / 조사만)을 묻고 자동 Issue 연결을 없앤다","grill-me를 선택으로 바꾼다. Issue 본문에 내용이 있으면 구현·PR 생성을 허용하고 GRILL_ME_SKIPPED를 남긴다","TOOL_DENIED 이벤트와 issue rebind 명령을 추가하고, 읽기 전용 명령 오차단과 Issue·PR 생성 오탐을 고친다","Issue 템플릿을 단일 파일 .github/ISSUE_TEMPLATE.md로 합친다","development-logger를 TypeScript로 전환하고 Node 24.19.0으로 통일한다"],"review":[],"timestamp":"2026-09-19T08:27:42.059Z"}
+{"type":"PR_REQUESTED","issue":205,"timestamp":"2026-09-19T08:27:53.194Z"}
+{"type":"TOOL_DENIED","issue":205,"tool":"Bash","phase":"READY_TO_IMPLEMENT","turnId":"5","reason":"Issue 본문에 ADR(결정, 이유, 근거, 검증)이 없습니다. ADR이 필요 없다고 정했다면 `adr skip`으로 기록해 주세요.","timestamp":"2026-09-19T08:27:54.384Z"}
+{"type":"COMMIT_EXPLAINED","issue":205,"explanation":"PR 게이트 두 번째 구멍 수정. pr.ts: assertPullRequestEvents가 adrSkipped 대신 adrRequired를 돌려주고, grill-me를 건너뛴 작업이면 ADR을 요구하지 않는다. 구현 게이트는 grill-me를 건너뛰면 ADR을 요구하지 않는데 PR 게이트만 요구해서, grill-me 없이 진행한 작업은 PR을 만들 수 없었다(adr skip도 grill-me 답이 필요해 쓸 수 없음). pr.test.ts: grill-me 건너뜀이면 adrRequired false, ADR 생성이면 true인지 확인하는 테스트 추가.","diffStat":" packages/development-logger/src/pr.ts       | 9 +++++----\n packages/development-logger/test/pr.test.ts | 9 ++++++++-\n 2 files changed, 13 insertions(+), 5 deletions(-)","tree":"91e9364f94b98d6edc705854b291beb94db48330","timestamp":"2026-09-19T08:28:46.518Z"}
+{"type":"TURN_FINISHED","turnId":"5","diff":"turn-009.diff","diffStat":" packages/development-logger/src/pr.ts       | 9 +++++----\n packages/development-logger/test/pr.test.ts | 9 ++++++++-\n 2 files changed, 13 insertions(+), 5 deletions(-)","testResult":"NOT_RUN","timestamp":"2026-09-19T08:28:52.914Z"}
+{"type":"USER_PROMPTED","issue":205,"turnId":"6","prompt":"ㄱㄱ","redacted":false,"timestamp":"2026-09-19T08:28:57.916Z"}
+{"type":"COMMIT_CONFIRMED","issue":205,"tree":"91e9364f94b98d6edc705854b291beb94db48330","timestamp":"2026-09-19T08:29:02.238Z"}
