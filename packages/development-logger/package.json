@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24 <25"
   },
   "scripts": {
-    "test": "node --test test/index.test.mjs"
+    "test": "node --experimental-strip-types --test test/index.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.2",
+    "typescript": "6.0.3"
   }
 }

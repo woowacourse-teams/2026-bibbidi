@@ -9,6 +9,27 @@ description: GitHub Issue를 구현하기 전에 요구사항과 설계를 사�
   - 애매한 요구사항, 말하지 않은 전제, 어느 코드가 무엇을 맡을지, 다른 방법과 장단점, 확인 방법을 드러낸다.
   - 이미 만든 코드를 정당화하려는 질문은 하지 않는다.
 
+## 시작하기 전: 무엇을 할지 먼저 묻는다
+
+- 세션을 시작하면 사용자에게 무엇을 하고 싶은지 묻는다. 답을 받기 전에는 다음으로 넘어가지 않는다.
+  - **Issue 작성**: 새 Issue를 만든다. 만들기 전에 (가) 이번 작업에 기술 선택이 있을 것 같은지, (나) grill-me로 설계 질문을 시작할지 함께 묻는다.
+  - **바로 구현**: 이미 있는 Issue로 작업한다. 번호, URL, 제목 중 하나로 확인한다.
+  - **조사만**: Issue 없이 코드를 읽기만 한다.
+- Issue를 못 찾으면 `gh issue list --state open`으로 열린 Issue를 보여 주고 고르게 한다. 짐작해서 고르지 않는다.
+- 사용자가 번호나 URL을 이미 말했더라도 한 줄로 확인받은 뒤에 연결한다.
+- 정해진 Issue를 기록한다.
+  - `node --experimental-strip-types packages/development-logger/src/cli.ts issue bind --session <session-id> --issue <번호>`
+- 잘못 연결했으면 바꾼다. 이유를 함께 남긴다. 두 Issue의 기록에 모두 남는다.
+  - `node --experimental-strip-types packages/development-logger/src/cli.ts issue rebind --session <session-id> --issue <번호> --text "<바꾸는 이유>"`
+
+## grill-me를 할지 정한다
+
+- grill-me는 선택이다. 다음 기준으로 정한다.
+  - Issue 본문에 해결하려는 문제와 완료 조건이 적혀 있으면, 그것을 설계 합의로 보고 바로 구현해도 된다.
+  - **Issue 본문이 비어 있거나 템플릿 제목만 있으면 grill-me를 해야 한다.** 이때는 구현이 막힌다.
+  - 본문이 있어도 설계에서 정할 것이 남았다고 판단되면 사용자에게 grill-me를 제안한다.
+- 건너뛴 경우 그 사실이 작업 기록에 남는다. 따로 기록할 명령은 없다.
+
 ## 준비
 
 - 질문하기 전에 직접 확인할 수 있는 것은 먼저 조사한다.
@@ -33,6 +54,7 @@ description: GitHub Issue를 구현하기 전에 요구사항과 설계를 사�
   - 영어 용어나 어려운 말(trade-off, 불변식 등)은 쉬운 우리말로 바꾼다.
 - 사용자가 모르겠다고 답하면 추측하지 않고, 조사나 작은 실험 중 무엇으로 확인할지 제안한다.
 - 개수를 채우려는 질문이나 이미 정해진 것을 다시 묻는 질문은 하지 않는다.
+- 조사해서 알 수 있는 것을 짐작해서 쓰지 않는다. Issue 본문, ADR, PR 본문은 사용자와 정한 내용만 적는다.
 
 질문은 다음 형식을 따른다.
 
@@ -59,8 +81,9 @@ description: GitHub Issue를 구현하기 전에 요구사항과 설계를 사�
 
 - ADR은 A와 B 중 기술을 골라야 하는 결정이 있을 때만 쓴다.
   - ADR: 어떤 기술을 왜 골랐는지 Issue 본문에 남기는 기록
-- 설계 질문이 끝나갈 때 "이번 작업에 ADR이 필요한가요?"를 따로 하나의 질문으로 묻는다.
-  - 이번 작업에 기술 선택이 있었는지 정리해 보여 주고, 추천과 이유를 붙인다.
+- Issue를 만들 때 "이번 작업에 기술 선택이 있을 것 같은가요?"를 예고로 묻는다.
+- grill-me를 하는 경우, 설계 질문이 끝나갈 때 "이번 작업에 ADR이 필요한가요?"를 따로 하나의 질문으로 묻어 확정한다.
+  - 예고 때의 답과 조사 결과를 함께 정리해 보여 주고, 추천과 이유를 붙인다.
 - 사용자 답에 따라 기록한다.
   - 필요하다: 정리한 내용을 사용자가 확인한 뒤 Issue 본문 맨 아래에 `## ADR`을 추가하고, 그 아래에 `### 결정`, `### 이유`, `### 근거`, `### 검증`을 쓴다.
   - 필요 없다: 아래 `adr skip` 명령으로 필요 없는 이유를 기록한다. Issue 본문은 고치지 않는다.
@@ -69,12 +92,12 @@ description: GitHub Issue를 구현하기 전에 요구사항과 설계를 사�
 
 - Development Logger가 있는 저장소에서는 아래 명령으로 기록한다.
   - Hook 안내에 나온 session ID를 `<session-id>` 자리에 넣는다.
-  - 질문을 시작하기 전: `node packages/development-logger/src/cli.mjs grill start --session <session-id>`
-  - 질문을 보여 주기 전, 질문마다: `node packages/development-logger/src/cli.mjs grill question --session <session-id> --text "<질문>"`
+  - 질문을 시작하기 전: `node --experimental-strip-types packages/development-logger/src/cli.ts grill start --session <session-id>`
+  - 질문을 보여 주기 전, 질문마다: `node --experimental-strip-types packages/development-logger/src/cli.ts grill question --session <session-id> --text "<질문>"`
   - 사용자 답은 Hook이 자동으로 기록한다.
-  - 답을 받아 정한 결정마다: `node packages/development-logger/src/cli.mjs grill decision --session <session-id> --text "<결정>"`
-  - ADR이 필요 없다고 답했을 때: `node packages/development-logger/src/cli.mjs adr skip --session <session-id> --text "<ADR이 필요 없는 이유>"`
-  - 질문을 끝내기 전: `node packages/development-logger/src/cli.mjs grill finish --session <session-id>`
+  - 답을 받아 정한 결정마다: `node --experimental-strip-types packages/development-logger/src/cli.ts grill decision --session <session-id> --text "<결정>"`
+  - ADR이 필요 없다고 답했을 때: `node --experimental-strip-types packages/development-logger/src/cli.ts adr skip --session <session-id> --text "<ADR이 필요 없는 이유>"`
+  - 질문을 끝내기 전: `node --experimental-strip-types packages/development-logger/src/cli.ts grill finish --session <session-id>`
 - `.devlog` 파일을 직접 고치지 않는다.
 - 명령이 실패하면 구현으로 넘어가지 않고, 실패 이유와 해결 방법을 사용자에게 알린다.
 
