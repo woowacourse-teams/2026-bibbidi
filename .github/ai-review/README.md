@@ -2,6 +2,13 @@
 
 GitHub Actions를 실행 환경으로 사용하는 AI 코드 리뷰 Harness다. PR 컨텍스트 수집, 4단계 모델 호출, 결과 검증, GitHub Review 등록을 하나의 안전장치로 관리한다.
 
+## 구조
+
+- `cli.ts`: GitHub Actions가 실행하는 진입점
+- `ai-review-service.ts`: 리뷰 흐름과 diff 검증
+- `ai-review-client.ts`: GitHub API, OpenAI API, 프롬프트 파일 요청
+- `ai-review-prompt.yml`: AI 리뷰 프롬프트
+
 `release-be`, `release-fe`, `release-app`을 대상으로 생성되거나 Draft에서 전환된 PR을 `gpt-5.6-luna`로 검토한다.
 
 ## 저장소 설정
@@ -24,5 +31,6 @@ Repository secret에 `OPENAI_API_KEY`를 등록한다. 별도의 GitHub 토큰�
 ## 로컬 검증
 
 ```shell
-node --test .github/scripts/ai-review/*.test.mjs
+corepack pnpm --dir .github/ai-review install --frozen-lockfile
+node --experimental-strip-types --test .github/ai-review/*.test.ts
 ```

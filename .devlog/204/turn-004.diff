@@ -1,0 +1,21 @@
+diff --git a/.github/ai-review/README.md b/.github/ai-review/README.md
+index 70b580c8a36989fe6a2088ccd007272188475e7f..3edd2f2afdc649794c06aa35cd1825eb7747fc9c 100644
+--- a/.github/ai-review/README.md
++++ b/.github/ai-review/README.md
+@@ -24,5 +24,5 @@ Repository secret에 `OPENAI_API_KEY`를 등록한다. 별도의 GitHub 토큰
+ ## 로컬 검증
+ 
+ ```shell
+-node --test .github/ai-review/*.test.ts
++node --experimental-strip-types --test .github/ai-review/*.test.ts
+ ```
+diff --git a/.github/workflows/ai-code-review.yml b/.github/workflows/ai-code-review.yml
+index 6359a80d0048b409663af92e9f75f082ce14cb37..00022954bdfa20b1d7308e97db0bdb394752ca6f 100644
+--- a/.github/workflows/ai-code-review.yml
++++ b/.github/workflows/ai-code-review.yml
+@@ -50,4 +50,4 @@ jobs:
+           REVIEW_PULL_NUMBER: ${{ github.event.pull_request.number }}
+           REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+           REVIEW_EVENT: ${{ github.event.action }}
+-        run: node .github/ai-review/cli.ts
++        run: node --experimental-strip-types .github/ai-review/cli.ts
