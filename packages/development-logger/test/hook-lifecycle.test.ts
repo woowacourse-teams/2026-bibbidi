@@ -225,6 +225,38 @@ test('Issue 본문에 내용이 있으면 grill-me 없이 구현을 허용하고
   }
 });
 
+test('코드를 고치지 않고 PR만 만드는 세션도 Issue 본문이 있으면 grill-me 건너뜀을 남긴다', () => {
+  const root = setupRepository();
+  const session = 'pr-only-session';
+  const options = { agent: 'claude', cwd: root, services: { getIssue: () => issueWithoutAdr() } };
+  try {
+    startSession(options, session);
+    prompt(options, session, '1', 'PR 만들자');
+    stop(options, session, '1');
+    const denied = preToolUse(options, session, 'Bash', { command: 'gh pr create --base release-be' });
+
+    assert.equal(readEvents(root, 106).some((event) => event.type === 'GRILL_ME_SKIPPED'), true);
+    assert.doesNotMatch(String(denied.permissionDecisionReason), /빠진 단계/);
+  } finally {
+    removeDirectory(root);
+  }
+});
+
+test('Issue 본문이 비어 있으면 PR 게이트도 grill-me 건너뜀을 남기지 않는다', () => {
+  const root = setupRepository();
+  const session = 'pr-only-empty-session';
+  const options = { agent: 'claude', cwd: root, services: { getIssue: () => issueWithoutAdr('') } };
+  try {
+    startSession(options, session);
+    const denied = preToolUse(options, session, 'Bash', { command: 'gh pr create --base release-be' });
+
+    assert.equal(readEvents(root, 106).some((event) => event.type === 'GRILL_ME_SKIPPED'), false);
+    assert.match(String(denied.permissionDecisionReason), /빠진 단계/);
+  } finally {
+    removeDirectory(root);
+  }
+});
+
 test('Issue 본문이 비어 있으면 구현을 막는다', () => {
   const root = setupRepository();
   const session = 'empty-issue-session';

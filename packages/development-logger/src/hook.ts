@@ -98,6 +98,22 @@ function implementationBlocker(root: string, config: LoggerConfig, state: Sessio
   return null;
 }
 
+/**
+ * 코드를 고치지 않고 PR만 만드는 세션은 구현 게이트를 거치지 않아 설계 기록이 남지 않는다.
+ * 그때도 Issue 본문에 내용이 있으면 구현 게이트와 똑같이 grill-me를 건너뛴 것으로 기록한다.
+ */
+function recordDesignSkip(root: string, state: SessionState, issueBody: string): void {
+  const issue = state.issue as number;
+  const events = readEvents(root, issue);
+  if (state.phase === 'GRILLING'
+    || hasEvent(events, 'GRILL_ME_FINISHED')
+    || hasEvent(events, 'GRILL_ME_SKIPPED')
+    || !hasIssueContent(issueBody)) {
+    return;
+  }
+  appendEvent(root, issue, { type: 'GRILL_ME_SKIPPED', issue, ...(state.bootstrap ? { bootstrap: true as const } : {}) });
+}
+
 function issueBodyFrom(root: string, toolInput: ToolInput): string | null {
   const command = commandFromToolInput(toolInput);
   const inline = argumentValues(command, 'body', 'b')[0];
@@ -274,13 +290,15 @@ function onPreToolUse(root: string, config: LoggerConfig, payload: HookPayload, 
   if (isPullRequestCreate(toolName, toolInput)) {
     if (!state.issue) return denyWith('연결된 Issue가 없어 PR을 만들 수 없습니다.');
     try {
+      const issueData = services.getIssue(root, config.repository, state.issue);
+      recordDesignSkip(root, state, issueData.body);
       const events = readEvents(root, state.issue);
       assertPullRequestEvents(events);
       if (!hasEvent(events, 'PR_REQUESTED')) {
         appendEvent(root, state.issue, { type: 'PR_REQUESTED', issue: state.issue });
       }
       const typeLabel = expectedTypeLabel(gitMetadata(root).branch, config);
-      issueTypeLabel(services.getIssue(root, config.repository, state.issue), config, typeLabel);
+      issueTypeLabel(issueData, config, typeLabel);
       const prepared = preparePullRequest({ root, config, state });
       const dirty = gitMetadata(root).status;
       if (dirty) return denyWith(`커밋하지 않은 변경이 있어 PR을 만들 수 없습니다:\n${dirty}`);
