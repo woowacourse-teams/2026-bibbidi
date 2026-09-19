@@ -34,7 +34,7 @@ jobs:
           node-version: 24.19.0
 
       - name: Assign reviewer
-        if: github.event.action == 'opened'
+        if: github.event.action == 'opened' && github.event.pull_request.base.ref == 'release-be'
         shell: bash
         env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -46,6 +46,7 @@ jobs:
         run: node --experimental-strip-types .github/pr-notification/reviewer-assignment.ts
 
       - name: Send Discord notification
+        if: github.event.pull_request.base.ref != 'main'
         shell: bash
         env:
           ACTION: ${{ github.event.action }}
