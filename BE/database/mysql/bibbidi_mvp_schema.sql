@@ -9,13 +9,14 @@ SET time_zone = '+09:00';
 
 CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    nickname VARCHAR(10) NOT NULL,
+    nickname VARCHAR(255) NOT NULL,
+    password_login_id VARCHAR(255) NULL,
     password_hash VARCHAR(255) NOT NULL,
     wedding_date DATE NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE (nickname)
+    UNIQUE KEY uk_users_password_login_id (password_login_id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;
