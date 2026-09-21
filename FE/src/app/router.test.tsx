@@ -81,7 +81,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "필요한 일만 골라 나만의 체크리스트로",
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
       }),
     ).toBeTruthy();
     expect(screen.getByRole("main", { name: "준비 목록" })).toBeTruthy();
@@ -98,7 +98,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "필요한 일만 골라 나만의 체크리스트로",
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -119,7 +119,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "필요한 일만 골라 나만의 체크리스트로",
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");

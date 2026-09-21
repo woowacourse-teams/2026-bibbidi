@@ -186,7 +186,7 @@ export function PreparationRoadmap({
             <h1 id="preparation-roadmap-title">
               {isMobileLayout
                 ? viewModel.title
-                : "필요한 일만 골라 나만의 체크리스트로"}
+                : "로드맵에서 필요한 일만, 내 체크리스트에"}
             </h1>
           </div>
           <ol

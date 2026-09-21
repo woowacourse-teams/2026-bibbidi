@@ -60,9 +60,9 @@ import {
 } from "./repository/preparationErrors";
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
-const DESKTOP_ROADMAP_TITLE = "필요한 일만 골라 나만의 체크리스트로";
+const DESKTOP_ROADMAP_TITLE = "로드맵에서 필요한 일만, 내 체크리스트에";
 const ROADMAP_TITLE_PATTERN =
-  /^(준비 로드맵|필요한 일만 골라 나만의 체크리스트로)$/;
+  /^(준비 로드맵|로드맵에서 필요한 일만, 내 체크리스트에)$/;
 
 async function renderFeature({ strictMode = false } = {}) {
   const feature = <PreparationRoadmapFeature />;
