@@ -60,12 +60,16 @@ import {
 } from "./repository/preparationErrors";
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
+const DESKTOP_ROADMAP_TITLE = "필요한 일만 골라 나만의 체크리스트로";
+const ROADMAP_TITLE_PATTERN =
+  /^(준비 로드맵|필요한 일만 골라 나만의 체크리스트로)$/;
+
 async function renderFeature({ strictMode = false } = {}) {
   const feature = <PreparationRoadmapFeature />;
   const page = <div data-page-scroll-container>{feature}</div>;
 
   const result = render(strictMode ? <StrictMode>{page}</StrictMode> : page);
-  await screen.findByRole("heading", { name: "준비 로드맵" });
+  await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
   await waitFor(() =>
     expect(analyticsMocks.track).toHaveBeenCalledWith(
       expect.objectContaining({ name: "preparation_catalog_view" }),
@@ -76,7 +80,7 @@ async function renderFeature({ strictMode = false } = {}) {
 }
 
 function getRoadmapTitle() {
-  return screen.getByRole("heading", { name: "준비 로드맵" });
+  return screen.getByRole("heading", { name: ROADMAP_TITLE_PATTERN });
 }
 
 const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1439px)";
@@ -441,7 +445,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     expect(
-      await screen.findByRole("heading", { name: "준비 로드맵" }),
+      await screen.findByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
     ).toBeTruthy();
     expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
   });
@@ -723,7 +727,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     expect(
-      await screen.findByRole("heading", { name: "준비 로드맵" }),
+      await screen.findByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
     ).toBeTruthy();
     expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
     expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
@@ -911,6 +915,16 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     await renderFeature();
 
     expect(
+      screen.getByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
+    ).toBeTruthy();
+    const guide = screen.getByRole("list", {
+      name: "체크리스트 만드는 순서",
+    });
+    expect(within(guide).getByText("단계 선택")).toBeTruthy();
+    expect(within(guide).getByText("할 일 추가")).toBeTruthy();
+    expect(within(guide).getByText("체크리스트에서 관리")).toBeTruthy();
+
+    expect(
       screen.getByRole("complementary", {
         name: "이 단계에서 준비할 일",
       }),
@@ -999,6 +1013,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     setViewportMatches();
     await renderFeature();
 
+    expect(screen.getByRole("heading", { name: "준비 로드맵" })).toBeTruthy();
     expect(
       screen.queryByRole("complementary", {
         name: "이 단계에서 준비할 일",

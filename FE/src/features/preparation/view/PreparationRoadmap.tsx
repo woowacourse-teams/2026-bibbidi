@@ -183,7 +183,29 @@ export function PreparationRoadmap({
       >
         <div className="preparation-roadmap__main">
           <header className="preparation-roadmap__header">
-            <h1 id="preparation-roadmap-title">{viewModel.title}</h1>
+            <div className="preparation-roadmap__header-copy">
+              <h1 id="preparation-roadmap-title">
+                {isMobileLayout
+                  ? viewModel.title
+                  : "필요한 일만 골라 나만의 체크리스트로"}
+              </h1>
+            </div>
+            <ol
+              aria-label="체크리스트 만드는 순서"
+              className="preparation-roadmap__guide"
+            >
+              <li>
+                <span aria-hidden="true">1</span>
+                단계 선택
+              </li>
+              <li>
+                <span aria-hidden="true">2</span>할 일 추가
+              </li>
+              <li>
+                <span aria-hidden="true">3</span>
+                체크리스트에서 관리
+              </li>
+            </ol>
           </header>
 
           <div className="preparation-roadmap__grid-wrap">
