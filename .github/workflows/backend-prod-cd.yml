@@ -102,10 +102,12 @@ jobs:
       - name: Install deployment configuration
         env:
           SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          JWT_ENV_CONTENT: ${{ secrets.BIBBIDI_JWT_ENV }}
           NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
           ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
         run: |
           test -n "$SPRING_ENV_CONTENT"
+          test -n "$JWT_ENV_CONTENT"
           test -n "$NGINX_ENV_CONTENT"
           test -n "$ALLOY_ENV_CONTENT"
           install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
@@ -115,7 +117,7 @@ jobs:
           install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
           umask 077
-          printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
+          printf '%s\n%s\n' "$SPRING_ENV_CONTENT" "$JWT_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
           printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
           printf '%s\n' "$ALLOY_ENV_CONTENT" > /opt/bibbidi/app/infra/monitoring/.env.alloy
           chmod 600 /opt/bibbidi/app/.env.spring /opt/bibbidi/app/.env.nginx /opt/bibbidi/app/infra/monitoring/.env.alloy
