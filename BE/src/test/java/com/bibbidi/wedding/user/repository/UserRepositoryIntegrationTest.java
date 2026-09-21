@@ -1,7 +1,10 @@
 package com.bibbidi.wedding.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import jakarta.persistence.EntityManager;
@@ -30,13 +33,35 @@ class UserRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("닉네임 중복 검사에서 현재 사용자는 제외하고 다른 사용자는 대소문자 없이 찾는다")
-    void shouldIgnoreCaseAndExcludeCurrentUserWhenCheckingNickname() {
+    @DisplayName("비밀번호 로그인 회원 중복 검사는 영문 대소문자를 구분하지 않는다")
+    void shouldIgnoreCaseWhenCheckingPasswordLoginUser() {
+        userRepository.create(new User(null, "Bibbidi", "hash-one"));
+
+        assertThat(userRepository.existsPasswordLoginUserByNickname("bibbidi")).isTrue();
+        assertThat(userRepository.existsPasswordLoginUserByNickname("Magic")).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 비밀번호 로그인 회원이 쓰는 닉네임으로는 저장할 수 없다")
+    void shouldRejectNicknameUsedByAnotherPasswordLoginUser() {
+        userRepository.create(new User(null, "Bibbidi", "hash-one"));
+
+        assertThatThrownBy(() -> userRepository.create(new User(null, "bibbidi", "hash-two")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+    }
+
+    @Test
+    @DisplayName("다른 비밀번호 로그인 회원이 쓰는 닉네임으로는 변경할 수 없다")
+    void shouldRejectNicknameChangeToOneUsedByAnotherPasswordLoginUser() {
         User currentUser = userRepository.create(new User(null, "Bibbidi", "hash-one"));
         userRepository.create(new User(null, "Magic", "hash-two"));
 
-        assertThat(userRepository.existsByNicknameExcludingUser("bibbidi", currentUser.id())).isFalse();
-        assertThat(userRepository.existsByNicknameExcludingUser("MAGIC", currentUser.id())).isTrue();
+        assertThatThrownBy(() -> userRepository.update(currentUser.changeNickname("magic")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
     }
 
     @Test
@@ -53,7 +78,7 @@ class UserRepositoryIntegrationTest {
         assertThat(updated.nickname()).isEqualTo("bibbidi");
         assertThat(updated.passwordHash()).isEqualTo("password-hash");
         assertThat(userRepository.findWeddingDateByUserId(user.id()).date()).isEqualTo(weddingDate);
-        assertThat(userRepository.findByNickname("BIBBIDI").nickname()).isEqualTo("bibbidi");
+        assertThat(userRepository.findPasswordLoginUserByNickname("BIBBIDI").nickname()).isEqualTo("bibbidi");
     }
 
     @Test
