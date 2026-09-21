@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.auth.password.PasswordHasher;
+import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
@@ -31,11 +32,14 @@ class AuthServiceTest {
     @Mock
     private PasswordHasher passwordHasher;
 
+    @Mock
+    private RefreshSessionRepository refreshSessionRepository;
+
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userService, passwordHasher);
+        authService = new AuthService(userService, passwordHasher, refreshSessionRepository);
     }
 
     @Test
@@ -158,6 +162,7 @@ class AuthServiceTest {
 
         authService.deleteUser(1L, "password");
 
+        then(refreshSessionRepository).should().deleteByUserId(1L);
         then(userService).should().delete(1L);
     }
 
@@ -174,6 +179,7 @@ class AuthServiceTest {
                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
 
         then(userService).should(never()).delete(anyLong());
+        then(refreshSessionRepository).should(never()).deleteByUserId(anyLong());
     }
 
     @Test
@@ -190,5 +196,6 @@ class AuthServiceTest {
 
         then(passwordHasher).shouldHaveNoInteractions();
         then(userService).should(never()).delete(anyLong());
+        then(refreshSessionRepository).should(never()).deleteByUserId(anyLong());
     }
 }

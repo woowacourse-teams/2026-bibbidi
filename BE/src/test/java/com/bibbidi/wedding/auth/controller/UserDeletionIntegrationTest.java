@@ -13,13 +13,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
+import com.bibbidi.wedding.auth.controller.dto.IssueTokenRequest;
 import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
-import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
+import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
+import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import jakarta.servlet.http.Cookie;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,8 @@ import tools.jackson.databind.ObjectMapper;
 class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String PASSWORD = "wish";
+    private static final String ALLOWED_ORIGIN = "https://test.bibbidi.kr";
+    private static final String REFRESH_COOKIE_NAME = "BIBBIDI_REFRESH";
     private static final Long CATEGORY_ID = 1000L;
     private static final Long OTHER_CHECKLIST_ID = 1001L;
     private static final String DOCUMENTED_SESSION_COOKIE =
@@ -67,7 +71,8 @@ class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
                                         .tag("User")
                                         .summary("회원 탈퇴")
                                         .description(
-                                                "인증된 사용자를 탈퇴 처리하고 사용자의 결혼식 데이터를 삭제한 뒤 세션 쿠키를 만료합니다.")
+                                                "인증된 사용자를 탈퇴 처리하고 결혼식 데이터와 Refresh 세션을 삭제한 뒤 "
+                                                        + "세션 쿠키를 만료합니다.")
                                         .requestSchema(schema("DeleteUserRequest"))
                                         .requestHeaders(
                                                 headerWithName(HttpHeaders.COOKIE)
@@ -99,6 +104,48 @@ class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(OTHER_CHECKLIST_ID))
                 .andExpect(jsonPath("$.items[0].appointments[0].id").isNumber());
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 그 사용자의 모든 Refresh 세션이 폐기되고 다른 사용자의 세션은 유지된다")
+    void shouldDeleteAllRefreshSessionsForCurrentUser() throws Exception {
+        Cookie firstRefreshCookie = issueRefreshCookie("current");
+        Cookie secondRefreshCookie = issueRefreshCookie("current");
+        Cookie otherRefreshCookie = issueRefreshCookie("other");
+
+        mockMvc.perform(delete("/api/users/me")
+                        .session(login("current"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new DeleteUserRequest(PASSWORD))))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/tokens/reissue")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .cookie(firstRefreshCookie))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(202));
+        mockMvc.perform(post("/api/auth/tokens/reissue")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .cookie(secondRefreshCookie))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(202));
+        mockMvc.perform(post("/api/auth/tokens/reissue")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .cookie(otherRefreshCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
+    private Cookie issueRefreshCookie(String nickname) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/tokens")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new IssueTokenRequest(nickname, PASSWORD))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        String value = setCookie.substring(setCookie.indexOf('=') + 1, setCookie.indexOf(';'));
+        return new Cookie(REFRESH_COOKIE_NAME, value);
     }
 
     private MockHttpSession login(String nickname) throws Exception {

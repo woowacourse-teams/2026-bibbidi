@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.auth.service;
 
 import com.bibbidi.wedding.auth.password.PasswordHasher;
+import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
@@ -15,10 +16,12 @@ public class AuthService {
 
     private final UserService userService;
     private final PasswordHasher passwordHasher;
+    private final RefreshSessionRepository refreshSessionRepository;
 
-    public AuthService(UserService userService, PasswordHasher passwordHasher) {
+    public AuthService(UserService userService, PasswordHasher passwordHasher, RefreshSessionRepository refreshSessionRepository) {
         this.userService = userService;
         this.passwordHasher = passwordHasher;
+        this.refreshSessionRepository = refreshSessionRepository;
     }
 
     public UserResult register(String nickname, String rawPassword) {
@@ -68,6 +71,7 @@ public class AuthService {
                     "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
             );
         }
+        refreshSessionRepository.deleteByUserId(currentUserId);
         userService.delete(currentUserId);
     }
 }
