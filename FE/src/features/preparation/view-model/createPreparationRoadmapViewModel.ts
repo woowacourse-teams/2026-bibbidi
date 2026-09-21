@@ -34,6 +34,7 @@ export interface PreparationStepDetailViewModel {
   checklistTasks: PreparationStepTaskViewModel[];
   description: string;
   detailTasks: PreparationStepTaskViewModel[];
+  numberLabel: string;
   title: string;
 }
 
@@ -204,6 +205,7 @@ function createSelectedStepDetailViewModel(
     checklistTasks: tasks.checklistTasks,
     description: selectedDetail.description,
     detailTasks: tasks.detailTasks,
+    numberLabel: String(selectedStep.order).padStart(2, "0"),
     title: selectedStep.title,
   } satisfies PreparationStepDetailViewModel;
 }

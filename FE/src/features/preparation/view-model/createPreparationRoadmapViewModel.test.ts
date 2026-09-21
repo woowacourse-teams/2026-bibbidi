@@ -206,6 +206,7 @@ describe("createPreparationRoadmapViewModel", () => {
           title: "step-1 할 일",
         },
       ],
+      numberLabel: "01",
       title: "step-1 제목",
     });
     expect(viewModel.title).toBe("준비 로드맵");
