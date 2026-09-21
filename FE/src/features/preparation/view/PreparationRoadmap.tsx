@@ -84,6 +84,14 @@ function PreparationRoadmapSteps({
               <span className="preparation-roadmap__step-title">
                 {step.title}
               </span>
+              {!isMobileLayout ? (
+                <span
+                  aria-hidden="true"
+                  className="preparation-roadmap__step-action"
+                >
+                  할 일 보기 →
+                </span>
+              ) : null}
               {step.iconUrl ? (
                 <img
                   alt=""

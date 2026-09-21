@@ -1036,6 +1036,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       firstStepButton.querySelector(".preparation-roadmap__step-title")
         ?.textContent,
     ).toBe("웨딩홀 투어와 계약");
+    expect(within(firstStepButton).getByText("할 일 보기 →")).toBeTruthy();
     const icon = firstStepButton.querySelector<HTMLImageElement>(
       ".preparation-roadmap__step-icon",
     );
@@ -1144,6 +1145,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     const firstStepButton = screen.getByRole("button", {
       name: /01.*웨딩홀 투어와 계약/,
     });
+    expect(screen.queryByText("할 일 보기 →")).toBeNull();
     firstStepButton.focus();
     fireEvent.click(firstStepButton);
 
