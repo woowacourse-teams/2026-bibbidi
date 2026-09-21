@@ -1,0 +1,21 @@
+{"type":"SESSION_STARTED","sessionId":"341a5fcc-52ff-4631-b2f1-4e5cf15dd657","agent":"CLAUDE","cwd":"/Users/john_park/Desktop/2026-bibbidi","branch":"main","head":"6cd8ab2614d0753856270c8d8444b1d10f9b8b94","gitStatus":"","timestamp":"2026-09-21T08:47:27.580Z"}
+{"type":"ISSUE_BOUND","issue":208,"source":"USER_PROMPT","timestamp":"2026-09-21T08:47:27.581Z"}
+{"type":"USER_PROMPTED","issue":208,"turnId":"1","prompt":"BIBBIDI_SOCIAL_LOGIN_DESIGN.md\n\n\n이거 참고해서\n\n개발해줘\n\nPR 단위로 나한테 묻지말고\n\n너가 알아서 판단해\n\n그 인터뷰 하는 것도 자료 바탕으로 너가 알아서 판단해줘\n\n깃허브 이슈 208번과 다운로드에 최근 txt에 있는 내용도 참고해서 \n\nADR 쓸꺼 없으니깐 PR까지 알아서 진행해줘","redacted":false,"timestamp":"2026-09-21T08:47:27.582Z"}
+{"type":"GRILL_ME_STARTED","issue":208,"timestamp":"2026-09-21T08:54:18.770Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"설계 문서의 구현 단위 5개 중 이번 PR은 어디까지 하나","timestamp":"2026-09-21T08:54:30.584Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"닉네임 유일 제약을 풀면 기존 비밀번호 로그인은 무엇으로 사용자를 찾나","timestamp":"2026-09-21T08:54:30.670Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"닉네임 중복 확인 API와 닉네임 변경 API는 이제 무엇을 검사하나","timestamp":"2026-09-21T08:54:30.765Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"소셜용 컬럼과 테이블을 이번 PR에서 미리 만들어 둘까","timestamp":"2026-09-21T08:54:30.851Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"닉네임 길이 제한을 어디까지 손대나","timestamp":"2026-09-21T08:54:36.971Z"}
+{"type":"GRILL_ME_QUESTION","issue":208,"question":"운영 DB는 어떻게 바꾸나","timestamp":"2026-09-21T08:54:37.058Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"이번 PR은 설계 문서 7절의 1단계만 한다. users 테이블에서 닉네임 유일 제약을 떼고 기존 비밀번호 로그인의 식별자를 분리하는 변경 하나로 닫는다. 카카오 OIDC와 JWT는 다음 PR로 나눈다","timestamp":"2026-09-21T08:54:44.883Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"users.password_login_id 컬럼을 UNIQUE NULL 허용으로 새로 두고 기존 회원의 닉네임을 그 값으로 옮긴다. 로그인 요청 본문의 nickname 필드는 그대로 두고 서버가 내부에서 password_login_id와 대조한다. 회의에서 나온 닉네임과 비밀번호 해시 복합 유니크 안은 쓰지 않는다. 비밀번호를 바꾸면 로그인 키가 같이 바뀌기 때문이다","timestamp":"2026-09-21T08:54:44.969Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"GET /api/users/nickname/availability는 password_login_id 중복을 검사한다. 경로와 쿼리와 응답 필드는 그대로 둔다. 이 API를 쓰는 곳은 FE 회원가입 화면뿐이다. 표시 닉네임은 중복을 허용하므로 닉네임 변경 API는 더 이상 DUPLICATE_NICKNAME을 던지지 않는다","timestamp":"2026-09-21T08:54:51.180Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"social_identities와 refresh_sessions 테이블, password_hash NULL 허용, 약관 컬럼은 이번 PR에서 만들지 않는다. 읽는 코드가 없는 스키마는 테스트로 지킬 수 없고 되돌릴 근거도 남지 않는다. 각각 그 기능을 구현하는 PR에서 마이그레이션과 함께 추가한다","timestamp":"2026-09-21T08:54:51.266Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"users.nickname은 VARCHAR(10)에서 VARCHAR(255)로 넓힌다. 카카오가 준 닉네임을 가공 없이 담기 위해서다. 요청 DTO의 10자 검증은 그대로 둔다. 일반 회원가입과 닉네임 변경의 제품 규칙은 이번 변경 대상이 아니다","timestamp":"2026-09-21T08:54:58.780Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"마이그레이션 파일 002를 새로 추가하고 초기화 스크립트 bibbidi_mvp_schema.sql도 같은 모양으로 맞춘다. 컬럼 추가 다음에 기존 닉네임 복사 다음에 유니크 인덱스 교체 순서로 적는다. 운영 DB에 초기화 스크립트는 실행하지 않는다","timestamp":"2026-09-21T08:54:58.869Z"}
+{"type":"GRILL_ME_DECISION","issue":208,"decision":"브랜치는 feature/208, base는 release-be로 한다. 실제 BE 구현 이슈는 210번이라 PR 본문의 Closes 208은 상위 설계 이슈 링크로만 남는다. release-be는 기본 브랜치가 아니라 병합해도 이슈가 닫히지 않는다","timestamp":"2026-09-21T08:54:58.955Z"}
+{"type":"TURN_FINISHED","turnId":"1","diff":"turn-001.diff","diffStat":"","testResult":"NOT_RUN","timestamp":"2026-09-21T08:55:20.964Z"}
+{"type":"GRILL_ME_ANSWER","issue":208,"turnId":"2","answer":"ㅇㅇ 그렇게 진행해","redacted":false,"timestamp":"2026-09-21T08:58:36.234Z"}
+{"type":"GRILL_ME_FINISHED","issue":208,"timestamp":"2026-09-21T08:58:41.416Z"}
+{"type":"ADR_SKIPPED","issue":208,"reason":"새 기술이나 라이브러리를 고르는 결정이 없다. 이미 쓰는 Spring Data JPA와 MySQL 안에서 유니크 제약을 닉네임에서 로그인 식별자로 옮기는 변경뿐이라 사용자가 ADR을 쓰지 않기로 정했다","timestamp":"2026-09-21T08:58:41.501Z"}
