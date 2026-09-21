@@ -544,7 +544,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce(["102"]);
     await renderFeature();
 
-    fireEvent.click(screen.getByRole("button", { name: "모든 할 일 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "모두 추가" }));
 
     expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
       "authenticated",
@@ -558,7 +558,9 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
       screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
     ).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: /모든 할 일 추가/ }),
+      screen.queryByRole("button", {
+        name: /모두 추가/,
+      }),
     ).toBeNull();
   });
 
@@ -586,7 +588,7 @@ describe("PreparationRoadmapFeature 로그인 체크리스트 추가", () => {
     ).toBe(true);
     expect(
       screen
-        .getByRole("button", { name: "모든 할 일 추가 중" })
+        .getByRole("button", { name: "모두 추가 중" })
         .hasAttribute("disabled"),
     ).toBe(true);
 
@@ -768,7 +770,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
   it("현재 단계의 남은 할 일을 모두 로컬 체크리스트에 추가한다", async () => {
     await renderFeature();
 
-    fireEvent.click(screen.getByRole("button", { name: "모든 할 일 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "모두 추가" }));
 
     expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
       "guest",
@@ -782,7 +784,9 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
       screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
     ).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: /모든 할 일 추가/ }),
+      screen.queryByRole("button", {
+        name: /모두 추가/,
+      }),
     ).toBeNull();
   });
 
@@ -938,8 +942,21 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       "preparation-step-detail",
     );
     expect(selectedStep.hasAttribute("aria-haspopup")).toBe(false);
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
+    });
+    expect(within(detail).getByText("01")).toBeTruthy();
+    expect(within(detail).queryByText("선택한 로드맵 단계")).toBeNull();
     expect(
-      screen.getByRole("heading", { name: "이 단계의 체크리스트" }),
+      within(detail).getByRole("heading", { name: "웨딩홀 투어와 계약" }),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByRole("heading", {
+        name: "아직 안 담은 일",
+      }),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByRole("heading", { name: "내가 담은 일" }),
     ).toBeTruthy();
     expect(screen.getByText("웨딩홀 투어")).toBeTruthy();
     expect(
@@ -950,12 +967,44 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
         .hasAttribute("disabled"),
     ).toBe(false);
     expect(screen.getByText("필수")).toBeTruthy();
+    const addAllButton = screen.getByRole("button", {
+      name: "모두 추가",
+    });
+    expect(addAllButton.hasAttribute("disabled")).toBe(false);
+    const checklist = screen.getByRole("region", {
+      name: "이 단계의 체크리스트",
+    });
+    expect(within(checklist).getByText("1개")).toBeTruthy();
     expect(
-      screen
-        .getByRole("button", { name: "모든 할 일 추가" })
-        .hasAttribute("disabled"),
-    ).toBe(false);
-    expect(screen.getByText("1개")).toBeTruthy();
+      within(checklist)
+        .getByRole("link", { name: "내 체크리스트 보기" })
+        .getAttribute("href"),
+    ).toBe("/checklist");
+    expect(
+      checklist.parentElement?.classList.contains(
+        "preparation-step-detail__columns",
+      ),
+    ).toBe(true);
+    expect(
+      detail.parentElement?.classList.contains("preparation-roadmap__content"),
+    ).toBe(true);
+  });
+
+  it("데스크톱에서 추가 전과 추가한 일을 나란히 표시한다", async () => {
+    setViewportMatches(false);
+    await renderFeature();
+
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
+    });
+    expect(
+      within(detail).getByRole("heading", { name: "아직 안 담은 일" }),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByRole("heading", { name: "내가 담은 일" }),
+    ).toBeTruthy();
+    expect(within(detail).getByText("웨딩홀 투어")).toBeTruthy();
+    expect(within(detail).getByText("웨딩홀 견적 비교")).toBeTruthy();
   });
 
   it("데스크톱에서 선택한 단계의 체크리스트가 비어 있으면 안내한다", async () => {
@@ -968,9 +1017,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       }),
     );
 
-    expect(
-      screen.getByRole("heading", { name: "이 단계의 체크리스트" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "내가 담은 일" })).toBeTruthy();
     expect(screen.getByText("이 단계에 추가한 할 일이 없어요.")).toBeTruthy();
   });
 

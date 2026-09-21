@@ -25,7 +25,7 @@ function PreparationTaskEmptyState({
           title: "추가할 수 있는 할 일이 없어요.",
         }
       : {
-          description: "아래 준비할 일에서 필요한 항목을 확인해 보세요.",
+          description: "왼쪽에서 필요한 항목을 골라보세요.",
           title: "이 단계에 추가한 할 일이 없어요.",
         };
 
@@ -113,7 +113,7 @@ interface PreparationAddAllTasksButtonProps {
   isLoading?: boolean;
   label?: string;
   onClick?: () => void;
-  size?: "large" | "regular";
+  size?: "compact" | "large" | "regular";
 }
 
 export function PreparationAddAllTasksButton({
