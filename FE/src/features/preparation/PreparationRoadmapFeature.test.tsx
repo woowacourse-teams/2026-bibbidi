@@ -83,7 +83,7 @@ function getRoadmapTitle() {
   return screen.getByRole("heading", { name: ROADMAP_TITLE_PATTERN });
 }
 
-const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1439px)";
+const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1199px)";
 const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
 
 beforeEach(() => {
