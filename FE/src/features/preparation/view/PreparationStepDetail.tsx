@@ -3,10 +3,11 @@ import {
   PreparationAddAllTasksButton,
   PreparationTaskList,
 } from "./PreparationTaskList";
+import { PreparationStepChecklist } from "./PreparationStepChecklist";
 
 type PreparationStepDetailContentViewModel = Pick<
   PreparationStepDetailViewModel,
-  "description" | "detailTasks" | "title"
+  "checklistTasks" | "description" | "detailTasks" | "numberLabel" | "title"
 >;
 
 interface PreparationStepDetailProps {
@@ -35,38 +36,57 @@ export function PreparationStepDetail({
     >
       <div className="preparation-step-detail__panel">
         <header className="preparation-step-detail__header">
-          <h2>{detail.title}</h2>
+          <div className="preparation-step-detail__context">
+            <span className="preparation-step-detail__number">
+              {detail.numberLabel}
+            </span>
+            <h2>{detail.title}</h2>
+          </div>
           <p>{detail.description}</p>
         </header>
 
         <div className="preparation-step-detail__content">
-          <section
-            aria-label="세부 할 일"
-            className={`preparation-step-detail__section${detail.detailTasks.length === 0 ? " preparation-step-detail__section--empty" : ""}`}
-          >
-            <PreparationTaskList
-              addingCatalogItemIds={addingCatalogItemIds}
-              canAddTasks={canAddTasks}
-              onTaskAdd={onTaskAdd}
-              tasks={detail.detailTasks}
-              variant="available"
-            />
-          </section>
+          <div className="preparation-step-detail__columns">
+            <section
+              aria-labelledby="preparation-step-available-tasks-title"
+              className={`preparation-step-detail__section${detail.detailTasks.length === 0 ? " preparation-step-detail__section--empty" : ""}`}
+            >
+              <header className="preparation-step-detail__section-header">
+                <h3 id="preparation-step-available-tasks-title">
+                  아직 안 담은 일
+                </h3>
+                <span className="preparation-step-detail__section-count">
+                  {detail.detailTasks.length}개
+                </span>
+              </header>
+              {additionErrorMessage ? (
+                <p className="preparation-task-list__error" role="alert">
+                  {additionErrorMessage}
+                </p>
+              ) : null}
+              <PreparationTaskList
+                addingCatalogItemIds={addingCatalogItemIds}
+                canAddTasks={canAddTasks}
+                isScrollable
+                onTaskAdd={onTaskAdd}
+                tasks={detail.detailTasks}
+                variant="available"
+              />
+              {detail.detailTasks.length > 0 ? (
+                <footer className="preparation-step-detail__section-footer">
+                  <PreparationAddAllTasksButton
+                    isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
+                    isLoading={addingCatalogItemIds.length > 0}
+                    label="모두 추가"
+                    onClick={onAddAllTasks}
+                    size="compact"
+                  />
+                </footer>
+              ) : null}
+            </section>
+            <PreparationStepChecklist tasks={detail.checklistTasks} />
+          </div>
         </div>
-        {detail.detailTasks.length > 0 ? (
-          <footer className="preparation-step-detail__footer">
-            {additionErrorMessage ? (
-              <p className="preparation-task-list__error" role="alert">
-                {additionErrorMessage}
-              </p>
-            ) : null}
-            <PreparationAddAllTasksButton
-              isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
-              isLoading={addingCatalogItemIds.length > 0}
-              onClick={onAddAllTasks}
-            />
-          </footer>
-        ) : null}
       </div>
     </aside>
   );

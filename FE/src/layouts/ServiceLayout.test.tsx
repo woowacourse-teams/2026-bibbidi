@@ -581,7 +581,9 @@ describe("ServiceLayout", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "준비 로드맵" }),
+      await screen.findByRole("heading", {
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+      }),
     ).toBeTruthy();
     expect(await screen.findByText("50%")).toBeTruthy();
     expect(
