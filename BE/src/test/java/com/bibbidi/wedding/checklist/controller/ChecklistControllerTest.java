@@ -7,9 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.config.AuthWebConfig;
+import com.bibbidi.wedding.auth.session.AccessTokenUserIdProvider;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
+import com.bibbidi.wedding.auth.token.AccessTokenProvider;
+import com.bibbidi.wedding.auth.token.JwtKeySource;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -31,7 +34,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(ChecklistController.class)
-@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
+@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class,
+        AccessTokenUserIdProvider.class, AccessTokenProvider.class, JwtKeySource.class})
 class ChecklistControllerTest {
 
     private static final Long USER_ID = 7L;

@@ -6,8 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.config.AuthWebConfig;
+import com.bibbidi.wedding.auth.session.AccessTokenUserIdProvider;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
+import com.bibbidi.wedding.auth.token.AccessTokenProvider;
+import com.bibbidi.wedding.auth.token.JwtKeySource;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
@@ -23,7 +26,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CatalogController.class)
-@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
+@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class,
+        AccessTokenUserIdProvider.class, AccessTokenProvider.class, JwtKeySource.class})
 class CatalogControllerTest {
 
     @Autowired

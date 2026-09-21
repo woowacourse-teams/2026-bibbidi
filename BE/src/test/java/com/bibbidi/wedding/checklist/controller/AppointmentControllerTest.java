@@ -20,9 +20,12 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
 import com.bibbidi.wedding.auth.config.AuthWebConfig;
+import com.bibbidi.wedding.auth.session.AccessTokenUserIdProvider;
 import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
 import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
+import com.bibbidi.wedding.auth.token.AccessTokenProvider;
+import com.bibbidi.wedding.auth.token.JwtKeySource;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,7 +42,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(AppointmentController.class)
-@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
+@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class,
+        AccessTokenUserIdProvider.class, AccessTokenProvider.class, JwtKeySource.class})
 class AppointmentControllerTest {
 
     @Autowired
