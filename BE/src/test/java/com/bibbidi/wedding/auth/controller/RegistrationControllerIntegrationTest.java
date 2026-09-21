@@ -1,13 +1,9 @@
 package com.bibbidi.wedding.auth.controller;
 
-import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
-import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
-import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -16,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
-import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +19,6 @@ import org.springframework.http.MediaType;
 import tools.jackson.databind.ObjectMapper;
 
 class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
-
-    private static final String CREATE_USER_DESCRIPTION = "닉네임과 비밀번호로 사용자를 생성합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -43,25 +36,7 @@ class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.nickname").value("bibbidi"))
                 .andExpect(jsonPath("$.checklistId").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
-                .andDo(document(
-                        "users-create",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("회원가입")
-                                .description(CREATE_USER_DESCRIPTION)
-                                .requestSchema(schema("CreateUserRequest"))
-                                .responseSchema(schema("CreateUserResponse"))
-                                .requestFields(
-                                        fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                        fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
-                                )
-                                .responseFields(
-                                        fieldWithPath("id").description("생성된 사용자 ID"),
-                                        fieldWithPath("nickname").description("사용자 닉네임")
-                                )
-                                .build())
-                ));
+                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
     }
 
     @Test
@@ -89,29 +64,7 @@ class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.type").doesNotExist())
                 .andExpect(jsonPath("$.title").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
-                .andExpect(jsonPath("$.instance").doesNotExist())
-                .andDo(document(
-                                "users-create-invalid-request",
-                                resource(ResourceSnippetParameters.builder()
-                                        .tag("User")
-                                        .summary("회원가입")
-                                        .description(CREATE_USER_DESCRIPTION)
-                                        .requestSchema(schema("CreateUserRequest"))
-                                        .responseSchema(schema("ValidationErrorResponse"))
-                                        .requestFields(
-                                                fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                                fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
-                                        )
-                                        .responseFields(
-                                                fieldWithPath("errorCode").description("오류 코드"),
-                                                fieldWithPath("message").description("오류 메시지"),
-                                                fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
-                                                fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
-                                                fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
-                                        )
-                                        .build())
-                        )
-                );
+                .andExpect(jsonPath("$.instance").doesNotExist());
     }
 
     @Test
@@ -128,29 +81,6 @@ class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
                                         "닉네임은 비어 있을 수 없습니다.",
                                         "비밀번호는 4자 이상 20자 이하여야 합니다."
-                                )
-                        )
-                )
-                .andDo(document(
-                                "users-create-empty-nickname-and-too-long-password",
-                                resource(ResourceSnippetParameters.builder()
-                                        .tag("User")
-                                        .summary("회원가입")
-                                        .description(CREATE_USER_DESCRIPTION)
-                                        .requestSchema(schema("CreateUserRequest"))
-                                        .responseSchema(schema("ValidationErrorResponse"))
-                                        .requestFields(
-                                                fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                                fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
-                                        )
-                                        .responseFields(
-                                                fieldWithPath("errorCode").description("오류 코드"),
-                                                fieldWithPath("message").description("오류 메시지"),
-                                                fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
-                                                fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
-                                                fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
-                                        )
-                                        .build()
                                 )
                         )
                 );
@@ -179,27 +109,7 @@ class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.title").doesNotExist())
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(jsonPath("$.instance").doesNotExist())
-                .andExpect(content().string(not(containsString("닉네임 중복으로 회원가입에 실패했습니다."))))
-                .andDo(document(
-                                "users-create-nickname-conflict",
-                                resource(ResourceSnippetParameters.builder()
-                                        .tag("User")
-                                        .summary("회원가입")
-                                        .description(CREATE_USER_DESCRIPTION)
-                                        .requestSchema(schema("CreateUserRequest"))
-                                        .responseSchema(schema("ErrorResponse"))
-                                        .requestFields(
-                                                fieldWithPath("nickname").description("로그인에 사용할 닉네임"),
-                                                fieldWithPath("password").description("가입할 비밀번호(4자 이상 20자 이하)")
-                                        )
-                                        .responseFields(
-                                                fieldWithPath("errorCode").description("오류 코드"),
-                                                fieldWithPath("message").description("오류 메시지")
-                                        )
-                                        .build()
-                                )
-                        )
-                );
+                .andExpect(content().string(not(containsString("닉네임 중복으로 회원가입에 실패했습니다."))));
     }
 
     @Test
