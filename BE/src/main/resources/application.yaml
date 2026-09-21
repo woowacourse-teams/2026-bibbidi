@@ -14,6 +14,23 @@ discord:
   url:
     feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
 
+bibbidi:
+  jwt:
+    issuer: https://api.bibbidi.kr
+    audience: bibbidi-api
+    access-token-ttl: 30m
+    refresh-token-ttl: 30d
+    active-key-id: ${BIBBIDI_JWT_ACTIVE_KEY_ID:}
+    active-private-key: ${BIBBIDI_JWT_ACTIVE_PRIVATE_KEY:}
+    retired-public-keys: ${BIBBIDI_JWT_RETIRED_PUBLIC_KEYS:}
+  auth:
+    web:
+      refresh-cookie-name: BIBBIDI_REFRESH
+      refresh-cookie-path: /api/auth/tokens
+      refresh-cookie-secure: true
+      allowed-origins: ${BIBBIDI_ALLOWED_ORIGINS:}
+
+
 server:
   servlet:
     session:

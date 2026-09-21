@@ -19,3 +19,8 @@ spring:
 discord:
   url:
     feedback: https://discord.test/webhook
+
+bibbidi:
+  auth:
+    web:
+      allowed-origins: https://test.bibbidi.kr,https://www.test.bibbidi.kr
