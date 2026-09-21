@@ -38,8 +38,8 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     private static final String CURRENT_USER_DESCRIPTION =
             "현재 인증 Session의 사용자 ID로 계정 정보를 조회합니다. "
                     + "Session이 없으면 인증 필요 오류를, DB에 사용자가 없으면 사용자 없음 오류를 반환합니다.";
-    private static final String CHANGE_NICKNAME_DESCRIPTION = "현재 인증 Session의 사용자 ID를 유지하면서 로그인에 사용할 닉네임을 변경합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다.";
-    private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 닉네임 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 닉네임을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
+    private static final String CHANGE_NICKNAME_DESCRIPTION = "현재 인증 Session의 사용자 ID를 유지하면서 화면에 보이는 닉네임을 변경합니다. 닉네임은 다른 사용자와 같아도 됩니다. 로그인에 쓰는 아이디는 회원가입할 때 정한 값으로 유지되며 이 API로 바뀌지 않습니다.";
+    private static final String NICKNAME_AVAILABILITY_DESCRIPTION = "회원가입 화면에서 닉네임을 확정하기 전에 사용할 수 있는 닉네임인지 미리 확인합니다. 회원가입할 때 정한 닉네임이 그대로 로그인 아이디가 되므로 이 API는 로그인 아이디 중복을 확인합니다. 중복은 영문 대소문자를 구분하지 않습니다. 확인 이후 다른 요청이 같은 값을 선점할 수 있으므로 최종 판단은 회원가입 응답이 합니다.";
     private static final String WEDDING_DATE_DESCRIPTION =
             "현재 인증 Session 사용자의 결혼 예정일을 저장하거나 변경합니다. 과거 날짜와 동일한 날짜도 허용합니다.";
 
@@ -351,11 +351,11 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("현재 사용자의 닉네임을 변경하고 사용자와 Session을 유지한다")
+    @DisplayName("현재 사용자의 닉네임을 변경하고 사용자와 Session과 로그인 아이디를 유지한다")
     void shouldChangeCurrentUserNicknameAndKeepIdentityAndSession() throws Exception {
         ChangeNicknameRequest changeNicknameRequest = new ChangeNicknameRequest("new-name");
         LoginRequest changedNicknameLoginRequest = new LoginRequest("new-name", PASSWORD);
-        LoginRequest previousNicknameLoginRequest = new LoginRequest("current", PASSWORD);
+        LoginRequest signedUpNicknameLoginRequest = new LoginRequest("current", PASSWORD);
         MockHttpSession session = authenticatedSession(currentUserId);
 
         mockMvc.perform(put("/api/users/me/nickname")
@@ -381,7 +381,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 .description("로그인 시 발급된 JSESSIONID Session Cookie")
                                 )
                                 .requestFields(
-                                        fieldWithPath("nickname").description("새 로그인 닉네임")
+                                        fieldWithPath("nickname").description("새 표시 닉네임")
                                 )
                                 .responseFields(
                                         fieldWithPath("id").description("변경되지 않은 사용자 ID"),
@@ -391,20 +391,20 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                 ));
         mockMvc.perform(post("/api/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(changedNicknameLoginRequest)))
+                        .content(objectMapper.writeValueAsString(signedUpNicknameLoginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(currentUserId))
                 .andExpect(jsonPath("$.nickname").value("new-name"));
 
         mockMvc.perform(post("/api/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(previousNicknameLoginRequest)))
+                        .content(objectMapper.writeValueAsString(changedNicknameLoginRequest)))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("다른 사용자의 닉네임과 대소문자만 달라도 변경을 거절한다")
-    void shouldRejectNicknameUsedByAnotherUserIgnoringCase() throws Exception {
+    @DisplayName("다른 사용자와 닉네임이 같아도 변경한다")
+    void shouldChangeNicknameEvenWhenAnotherUserAlreadyHasIt() throws Exception {
         createUser("Taken");
         ChangeNicknameRequest request = new ChangeNicknameRequest("taken");
 
@@ -413,30 +413,9 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                         .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value(401))
-                .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."))
-                .andDo(document(
-                        "users-change-nickname-conflict",
-                        resource(ResourceSnippetParameters.builder()
-                                .tag("User")
-                                .summary("닉네임 변경")
-                                .description(CHANGE_NICKNAME_DESCRIPTION)
-                                .requestSchema(schema("ChangeNicknameRequest"))
-                                .responseSchema(schema("ErrorResponse"))
-                                .requestHeaders(
-                                        headerWithName(HttpHeaders.COOKIE)
-                                                .description("로그인 시 발급된 JSESSIONID Session Cookie")
-                                )
-                                .requestFields(
-                                        fieldWithPath("nickname").description("새 로그인 닉네임")
-                                )
-                                .responseFields(
-                                        fieldWithPath("errorCode").description("오류 코드"),
-                                        fieldWithPath("message").description("오류 메시지")
-                                )
-                                .build())
-                ));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(currentUserId))
+                .andExpect(jsonPath("$.nickname").value("taken"));
     }
 
     @Test
@@ -467,7 +446,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 .description("로그인 시 발급된 JSESSIONID Session Cookie")
                                 )
                                 .requestFields(
-                                        fieldWithPath("nickname").description("새 로그인 닉네임")
+                                        fieldWithPath("nickname").description("새 표시 닉네임")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -500,7 +479,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .requestSchema(schema("ChangeNicknameRequest"))
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestFields(
-                                        fieldWithPath("nickname").description("새 로그인 닉네임")
+                                        fieldWithPath("nickname").description("새 표시 닉네임")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),
@@ -526,7 +505,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(NICKNAME_AVAILABILITY_DESCRIPTION)
                                 .responseSchema(schema("NicknameAvailabilityResponse"))
                                 .queryParameters(
-                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임")
+                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임이자 로그인 아이디")
                                 )
                                 .responseFields(
                                         fieldWithPath("nickname").description("확인을 요청한 닉네임"),
@@ -554,7 +533,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(NICKNAME_AVAILABILITY_DESCRIPTION)
                                 .responseSchema(schema("NicknameAvailabilityResponse"))
                                 .queryParameters(
-                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임")
+                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임이자 로그인 아이디")
                                 )
                                 .responseFields(
                                         fieldWithPath("nickname").description("확인을 요청한 닉네임"),
@@ -582,7 +561,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(NICKNAME_AVAILABILITY_DESCRIPTION)
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .queryParameters(
-                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임")
+                                        parameterWithName("nickname").description("사용 가능 여부를 확인할 닉네임이자 로그인 아이디")
                                 )
                                 .responseFields(
                                         fieldWithPath("errorCode").description("오류 코드"),

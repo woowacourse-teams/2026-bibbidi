@@ -25,8 +25,9 @@ public class UserService {
 
     @Transactional
     public UserResult createUser(String nickname, String passwordHash) {
+        String passwordLoginId = nickname;
         try {
-            User user = new User(null, nickname, passwordHash);
+            User user = new User(null, nickname, passwordLoginId, passwordHash);
             User savedUser = userRepository.create(user);
 
             return UserResult.from(savedUser);
@@ -38,13 +39,13 @@ public class UserService {
         }
     }
 
-    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
-        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
-        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+    public PasswordLoginIdAvailabilityResult checkPasswordLoginIdAvailability(String passwordLoginId) {
+        boolean isAvailablePasswordLoginId = !userRepository.existsByPasswordLoginId(passwordLoginId);
+        return new PasswordLoginIdAvailabilityResult(passwordLoginId, isAvailablePasswordLoginId);
     }
 
-    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
-        User user = userRepository.findByNickname(nickname);
+    public UserAuthenticationInfo findAuthenticationInfoByPasswordLoginId(String passwordLoginId) {
+        User user = userRepository.findByPasswordLoginId(passwordLoginId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
@@ -97,15 +98,8 @@ public class UserService {
             return UserResult.from(user);
         }
 
-        try {
-            User changedUser = user.changeNickname(nickname);
-            User savedUser = userRepository.update(changedUser);
-            return UserResult.from(savedUser);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
-            );
-        }
+        User changedUser = user.changeNickname(nickname);
+        User savedUser = userRepository.update(changedUser);
+        return UserResult.from(savedUser);
     }
 }

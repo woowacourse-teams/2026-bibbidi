@@ -18,8 +18,11 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "nickname", nullable = false, unique = true, length = 10)
+    @Column(name = "nickname", nullable = false)
     private String nickname;
+
+    @Column(name = "password_login_id", unique = true)
+    private String passwordLoginId;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
@@ -30,9 +33,16 @@ public class JpaUserEntity extends BaseTimeEntity {
     protected JpaUserEntity() {
     }
 
-    public JpaUserEntity(Long id, String nickname, String passwordHash, LocalDate weddingDate) {
+    public JpaUserEntity(
+            Long id,
+            String nickname,
+            String passwordLoginId,
+            String passwordHash,
+            LocalDate weddingDate
+    ) {
         this.id = id;
         this.nickname = nickname;
+        this.passwordLoginId = passwordLoginId;
         this.passwordHash = passwordHash;
         this.weddingDate = weddingDate;
     }
@@ -43,6 +53,10 @@ public class JpaUserEntity extends BaseTimeEntity {
 
     public String nickname() {
         return nickname;
+    }
+
+    public String passwordLoginId() {
+        return passwordLoginId;
     }
 
     public String passwordHash() {

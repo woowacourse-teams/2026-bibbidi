@@ -1,6 +1,6 @@
-INSERT INTO users (id, nickname, password_hash, created_at, updated_at) VALUES
-(1, 'current', '$argon2id$v=19$m=19456,t=2,p=1$mPT6Y0wsuHrmDa2H/HbqZQ$mA8UYY3PjaR5MI3uemA0KoJTHRYEDHG2ef6PafohlZg', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 'other', '$argon2id$v=19$m=19456,t=2,p=1$mPT6Y0wsuHrmDa2H/HbqZQ$mA8UYY3PjaR5MI3uemA0KoJTHRYEDHG2ef6PafohlZg', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO users (id, nickname, password_login_id, password_hash, created_at, updated_at) VALUES
+(1, 'current', 'current', '$argon2id$v=19$m=19456,t=2,p=1$mPT6Y0wsuHrmDa2H/HbqZQ$mA8UYY3PjaR5MI3uemA0KoJTHRYEDHG2ef6PafohlZg', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'other', 'other', '$argon2id$v=19$m=19456,t=2,p=1$mPT6Y0wsuHrmDa2H/HbqZQ$mA8UYY3PjaR5MI3uemA0KoJTHRYEDHG2ef6PafohlZg', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO categories (id, name, display_order, created_at, updated_at) VALUES
 (1000, '웨딩홀', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

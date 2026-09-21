@@ -55,7 +55,7 @@ class AuthServiceTest {
     @DisplayName("닉네임과 비밀번호가 일치하면 인증 결과를 반환한다")
     void shouldReturnAuthResultWhenCredentialsAreValid() {
         UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
-        given(userService.findAuthenticationInfo("비비디")).willReturn(user);
+        given(userService.findAuthenticationInfoByPasswordLoginId("비비디")).willReturn(user);
         given(passwordHasher.matches("password", "password-hash")).willReturn(true);
 
         AuthResult result = authService.login("비비디", "password");
@@ -66,7 +66,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("존재하지 않는 닉네임은 인증 실패로 처리한다")
     void shouldFailAuthenticationWhenNicknameDoesNotExist() {
-        given(userService.findAuthenticationInfo("없는 사용자")).willThrow(new NoSuchElementException());
+        given(userService.findAuthenticationInfoByPasswordLoginId("없는 사용자")).willThrow(new NoSuchElementException());
 
         assertThatThrownBy(() -> authService.login("없는 사용자", "password"))
                 .isInstanceOf(BusinessException.class)
@@ -79,7 +79,7 @@ class AuthServiceTest {
     @DisplayName("잘못된 비밀번호는 사용자 부재와 동일한 인증 실패로 처리한다")
     void shouldFailAuthenticationWhenPasswordDoesNotMatch() {
         UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
-        given(userService.findAuthenticationInfo("비비디")).willReturn(user);
+        given(userService.findAuthenticationInfoByPasswordLoginId("비비디")).willReturn(user);
         given(passwordHasher.matches("wrong-password", "password-hash")).willReturn(false);
 
         assertThatThrownBy(() -> authService.login("비비디", "wrong-password"))

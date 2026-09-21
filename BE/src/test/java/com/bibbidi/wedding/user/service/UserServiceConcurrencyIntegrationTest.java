@@ -64,34 +64,35 @@ class UserServiceConcurrencyIntegrationTest {
         }
 
         assertThat(jpaUserRepository.count()).isOne();
-        assertThat(userRepository.findByNickname(NICKNAME).nickname()).isEqualTo(NICKNAME);
+        assertThat(userRepository.findByPasswordLoginId(NICKNAME).nickname()).isEqualTo(NICKNAME);
     }
 
     @Test
-    @DisplayName("서로 다른 사용자가 같은 닉네임으로 동시에 변경해도 한 명만 변경시킨다")
-    void shouldChangeNicknameForOnlyOneUserOnConcurrentRequests() throws Exception {
-        User first = userRepository.create(new User(null, "first", PASSWORD_HASH));
-        User second = userRepository.create(new User(null, "second", PASSWORD_HASH));
+    @DisplayName("서로 다른 사용자가 같은 닉네임으로 동시에 변경해도 모두 변경한다")
+    void shouldChangeNicknameForEveryUserOnConcurrentRequests() throws Exception {
+        User first = userRepository.create(new User(null, "first", "first", PASSWORD_HASH));
+        User second = userRepository.create(new User(null, "second", "second", PASSWORD_HASH));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<Boolean> firstChange = executor.submit(() -> tryChangeNickname(first.id(), ready, start));
-            Future<Boolean> secondChange = executor.submit(() -> tryChangeNickname(second.id(), ready, start));
+            Future<String> firstChange = executor.submit(() -> changeNicknameOnSignal(first.id(), ready, start));
+            Future<String> secondChange = executor.submit(() -> changeNicknameOnSignal(second.id(), ready, start));
 
             boolean allRequestsAreReady = ready.await(5, TimeUnit.SECONDS);
             start.countDown();
             assertThat(allRequestsAreReady).isTrue();
 
-            List<Boolean> results = List.of(
+            List<String> results = List.of(
                     firstChange.get(5, TimeUnit.SECONDS),
                     secondChange.get(5, TimeUnit.SECONDS)
             );
 
-            assertThat(results).containsExactlyInAnyOrder(true, false);
+            assertThat(results).containsExactly(NICKNAME, NICKNAME);
         }
 
-        assertThat(userRepository.findByNickname(NICKNAME).id()).isIn(first.id(), second.id());
+        assertThat(userRepository.findByPasswordLoginId("first").nickname()).isEqualTo(NICKNAME);
+        assertThat(userRepository.findByPasswordLoginId("second").nickname()).isEqualTo(NICKNAME);
         assertThat(jpaUserRepository.count()).isEqualTo(2);
     }
 
@@ -108,17 +109,11 @@ class UserServiceConcurrencyIntegrationTest {
         }
     }
 
-    private boolean tryChangeNickname(Long userId, CountDownLatch ready, CountDownLatch start)
+    private String changeNicknameOnSignal(Long userId, CountDownLatch ready, CountDownLatch start)
             throws InterruptedException {
         ready.countDown();
         start.await();
 
-        try {
-            userService.changeNickname(userId, NICKNAME);
-            return true;
-        } catch (BusinessException exception) {
-            assertThat(exception.clientError()).isEqualTo(ClientError.DUPLICATE_NICKNAME);
-            return false;
-        }
+        return userService.changeNickname(userId, NICKNAME).nickname();
     }
 }

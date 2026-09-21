@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
@@ -45,7 +44,7 @@ class UserServiceTest {
     @Test
     @DisplayName("사용자 ID로 비밀번호 해시가 없는 현재 사용자 정보를 조회한다")
     void shouldFindCurrentUserWithoutPasswordHash() {
-        User user = new User(1L, "current", "password-hash");
+        User user = new User(1L, "current", "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
 
         UserResult result = userService.findCurrentUserInfo(1L);
@@ -70,10 +69,10 @@ class UserServiceTest {
     @Test
     @DisplayName("대소문자만 다른 닉네임도 요청한 표기로 변경한다")
     void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
-        User user = new User(1L, "Bibbidi", "password-hash");
+        User user = new User(1L, "Bibbidi", "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
         given(userRepository.update(any(User.class)))
-                .willReturn(new User(1L, "bibbidi", "password-hash"));
+                .willReturn(new User(1L, "bibbidi", "Bibbidi", "password-hash"));
 
         UserResult result = userService.changeNickname(1L, "bibbidi");
 
@@ -81,6 +80,7 @@ class UserServiceTest {
         then(userRepository).should().update(argThat(changedUser ->
                 changedUser.id().equals(1L)
                         && changedUser.nickname().equals("bibbidi")
+                        && changedUser.passwordLoginId().equals("Bibbidi")
                         && changedUser.passwordHash().equals("password-hash")
         ));
     }
@@ -88,7 +88,7 @@ class UserServiceTest {
     @Test
     @DisplayName("현재 닉네임과 정확히 같으면 저장하지 않고 현재 정보를 반환한다")
     void shouldReturnCurrentUserWithoutSavingWhenNicknameIsExactlySame() {
-        User user = new User(1L, "Bibbidi", "password-hash");
+        User user = new User(1L, "Bibbidi", "Bibbidi", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
 
         UserResult result = userService.changeNickname(1L, "Bibbidi");
@@ -98,17 +98,16 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("다른 사용자가 이미 사용하는 닉네임이면 변경을 거절한다")
-    void shouldRejectWhenAnotherUserAlreadyHasNickname() {
-        User user = new User(1L, "current", "password-hash");
+    @DisplayName("다른 사용자가 이미 쓰는 닉네임으로도 변경한다")
+    void shouldChangeNicknameEvenWhenAnotherUserAlreadyHasIt() {
+        User user = new User(1L, "current", "current", "password-hash");
         given(userRepository.findById(1L)).willReturn(user);
-        willThrow(new DataIntegrityViolationException("uk_users_nickname"))
-                .given(userRepository).update(any(User.class));
+        given(userRepository.update(any(User.class)))
+                .willReturn(new User(1L, "TAKEN", "current", "password-hash"));
 
-        assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+        UserResult result = userService.changeNickname(1L, "TAKEN");
+
+        assertThat(result).isEqualTo(new UserResult(1L, "TAKEN"));
     }
 
     @Test
@@ -138,30 +137,30 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
+    @DisplayName("사용 중이지 않은 로그인 아이디는 사용할 수 있다고 응답한다")
     void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
-        given(userRepository.existsByNickname("bibbidi")).willReturn(false);
+        given(userRepository.existsByPasswordLoginId("bibbidi")).willReturn(false);
 
-        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+        PasswordLoginIdAvailabilityResult result = userService.checkPasswordLoginIdAvailability("bibbidi");
 
-        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", true));
+        assertThat(result).isEqualTo(new PasswordLoginIdAvailabilityResult("bibbidi", true));
     }
 
     @Test
-    @DisplayName("이미 사용 중인 닉네임은 사용할 수 없다고 응답한다")
+    @DisplayName("이미 사용 중인 로그인 아이디는 사용할 수 없다고 응답한다")
     void shouldReportNicknameAsUnavailableWhenSomebodyUsesIt() {
-        given(userRepository.existsByNickname("bibbidi")).willReturn(true);
+        given(userRepository.existsByPasswordLoginId("bibbidi")).willReturn(true);
 
-        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+        PasswordLoginIdAvailabilityResult result = userService.checkPasswordLoginIdAvailability("bibbidi");
 
-        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
+        assertThat(result).isEqualTo(new PasswordLoginIdAvailabilityResult("bibbidi", false));
     }
 
     @Test
-    @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
+    @DisplayName("이미 사용 중인 로그인 아이디로는 회원가입을 거절한다")
     void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
         given(userRepository.create(any(User.class)))
-                .willThrow(new DataIntegrityViolationException("uk_users_nickname"));
+                .willThrow(new DataIntegrityViolationException("uk_users_password_login_id"));
 
         assertThatThrownBy(() -> userService.createUser("bibbidi", "password-hash"))
                 .isInstanceOf(BusinessException.class)
@@ -172,16 +171,17 @@ class UserServiceTest {
     @Test
     @DisplayName("현재 사용자의 비밀번호 해시를 도메인에서 변경하고 저장한다")
     void shouldChangeAndSaveCurrentUserPasswordHash() {
-        User user = new User(1L, "current", "current-hash");
+        User user = new User(1L, "current", "current", "current-hash");
         given(userRepository.findById(1L)).willReturn(user);
         given(userRepository.update(any(User.class)))
-                .willReturn(new User(1L, "current", "new-password-hash"));
+                .willReturn(new User(1L, "current", "current", "new-password-hash"));
 
         userService.changePasswordHash(1L, "new-password-hash");
 
         then(userRepository).should().update(argThat(changedUser ->
                 changedUser.id().equals(1L)
                         && changedUser.nickname().equals("current")
+                        && changedUser.passwordLoginId().equals("current")
                         && changedUser.passwordHash().equals("new-password-hash")
         ));
     }

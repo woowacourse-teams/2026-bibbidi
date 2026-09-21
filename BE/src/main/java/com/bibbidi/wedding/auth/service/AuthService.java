@@ -26,10 +26,10 @@ public class AuthService {
         return userService.createUser(nickname, passwordHash);
     }
 
-    public AuthResult login(String nickname, String rawPassword) {
+    public AuthResult login(String passwordLoginId, String rawPassword) {
         UserAuthenticationInfo user;
         try {
-            user = userService.findAuthenticationInfo(nickname);
+            user = userService.findAuthenticationInfoByPasswordLoginId(passwordLoginId);
         } catch (NoSuchElementException ignored) {
             throw new BusinessException(ClientError.AUTHENTICATION_FAILED, "로그인 인증에 실패했습니다.");
         }

@@ -22,12 +22,8 @@ public class UserRepository {
         this.userMapper = userMapper;
     }
 
-    public boolean existsByNickname(String nickname) {
-        return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
-    }
-
-    public boolean existsByNicknameExcludingUser(String nickname, Long userId) {
-        return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
+    public boolean existsByPasswordLoginId(String passwordLoginId) {
+        return jpaUserRepository.existsByPasswordLoginIdIgnoreCase(passwordLoginId);
     }
 
     public User create(User user) {
@@ -40,6 +36,7 @@ public class UserRepository {
         JpaUserEntity updatedEntity = new JpaUserEntity(
                 user.id(),
                 user.nickname(),
+                user.passwordLoginId(),
                 user.passwordHash(),
                 currentEntity.weddingDate()
         );
@@ -47,8 +44,8 @@ public class UserRepository {
         return userMapper.toDomain(saved);
     }
 
-    public User findByNickname(String nickname) {
-        return jpaUserRepository.findByNicknameIgnoreCase(nickname)
+    public User findByPasswordLoginId(String passwordLoginId) {
+        return jpaUserRepository.findByPasswordLoginIdIgnoreCase(passwordLoginId)
                 .map(userMapper::toDomain)
                 .orElseThrow(NoSuchElementException::new);
     }
@@ -69,6 +66,7 @@ public class UserRepository {
         JpaUserEntity updatedEntity = new JpaUserEntity(
                 weddingDate.userId(),
                 currentEntity.nickname(),
+                currentEntity.passwordLoginId(),
                 currentEntity.passwordHash(),
                 weddingDate.date()
         );

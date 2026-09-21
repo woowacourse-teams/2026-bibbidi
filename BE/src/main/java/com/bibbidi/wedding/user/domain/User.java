@@ -7,24 +7,27 @@ public final class User {
 
     private final Long id;
     private final String nickname;
+    private final String passwordLoginId;
     private final String passwordHash;
 
     public User(
             @Nullable Long id,
             @NonNull String nickname,
+            @Nullable String passwordLoginId,
             @NonNull String passwordHash
     ) {
         this.id = id;
         this.nickname = nickname;
+        this.passwordLoginId = passwordLoginId;
         this.passwordHash = passwordHash;
     }
 
     public User changeNickname(String nickname) {
-        return new User(id, nickname, passwordHash);
+        return new User(id, nickname, passwordLoginId, passwordHash);
     }
 
     public User changePasswordHash(String passwordHash) {
-        return new User(id, nickname, passwordHash);
+        return new User(id, nickname, passwordLoginId, passwordHash);
     }
 
     public Long id() {
@@ -33,6 +36,10 @@ public final class User {
 
     public String nickname() {
         return nickname;
+    }
+
+    public String passwordLoginId() {
+        return passwordLoginId;
     }
 
     public String passwordHash() {

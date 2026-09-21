@@ -7,7 +7,7 @@ import com.bibbidi.wedding.user.controller.dto.CurrentUserResponse;
 import com.bibbidi.wedding.user.controller.dto.NicknameAvailabilityResponse;
 import com.bibbidi.wedding.user.controller.dto.WeddingDateRequest;
 import com.bibbidi.wedding.user.controller.dto.WeddingDateResponse;
-import com.bibbidi.wedding.user.service.NicknameAvailabilityResult;
+import com.bibbidi.wedding.user.service.PasswordLoginIdAvailabilityResult;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.bibbidi.wedding.user.service.WeddingDateResult;
@@ -45,7 +45,8 @@ public class UserController {
     public NicknameAvailabilityResponse checkNicknameAvailability(
             @Valid @ModelAttribute ChangeNicknameRequest request
     ) {
-        NicknameAvailabilityResult result = userService.checkNicknameAvailability(request.nickname());
+        PasswordLoginIdAvailabilityResult result =
+                userService.checkPasswordLoginIdAvailability(request.nickname());
         return NicknameAvailabilityResponse.from(result);
     }
 
