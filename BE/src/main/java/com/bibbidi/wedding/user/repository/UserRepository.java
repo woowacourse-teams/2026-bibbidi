@@ -26,6 +26,10 @@ public class UserRepository {
         return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
     }
 
+    public boolean existsById(Long userId) {
+        return jpaUserRepository.existsById(userId);
+    }
+
     public boolean existsByNicknameExcludingUser(String nickname, Long userId) {
         return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
     }

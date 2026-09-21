@@ -53,6 +53,10 @@ public class UserService {
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
+    public boolean existsById(Long userId) {
+        return userRepository.existsById(userId);
+    }
+
     public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
