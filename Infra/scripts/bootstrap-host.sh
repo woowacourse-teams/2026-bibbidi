@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# One-time host bootstrap for the APP EC2. Run it manually, as an administrator:
+# One-time host bootstrap for a backend deployment EC2. Run it manually, as an administrator:
 #
 #     sudo bash Infra/scripts/bootstrap-host.sh <runner-user>
 #
@@ -10,7 +10,7 @@
 # SECURITY: this grants the GitHub Actions runner account passwordless root on
 # this host. The deploy scripts need it (certbot, /etc/letsencrypt, systemd
 # units), but it means anyone able to merge into release-be can run arbitrary
-# root commands here. Protect that branch accordingly.
+# root commands here. Protect the branch allowed to deploy to this environment.
 
 set -euo pipefail
 

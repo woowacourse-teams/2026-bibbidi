@@ -1,0 +1,24 @@
+diff --git a/.github/workflows/backend-dev-cd.yml b/.github/workflows/backend-dev-cd.yml
+index e730780007b1db5f0e6a9d3646afea65f85fecc8..957f8f58db71c9913ec9c25d8f9de1561bcafcfb 100644
+--- a/.github/workflows/backend-dev-cd.yml
++++ b/.github/workflows/backend-dev-cd.yml
+@@ -20,6 +20,7 @@ concurrency:
+ jobs:
+   deploy:
+     uses: ./.github/workflows/backend-common-cd.yml
++    secrets: inherit
+     with:
+       deployment-environment: backend-dev
+       runner-labels: '["self-hosted", "linux", "ARM64", "dev"]'
+diff --git a/.github/workflows/backend-prod-cd.yml b/.github/workflows/backend-prod-cd.yml
+index 6dc48c660746a7734153afccfab402cfbb49baf9..bcf4598b990ece152b71a3539a810ad892e248ce 100644
+--- a/.github/workflows/backend-prod-cd.yml
++++ b/.github/workflows/backend-prod-cd.yml
+@@ -66,6 +66,7 @@ jobs:
+   deploy:
+     needs: resolve-image
+     uses: ./.github/workflows/backend-common-cd.yml
++    secrets: inherit
+     with:
+       deployment-environment: backend-prod
+       runner-labels: '["self-hosted", "linux", "ARM64", "prod"]'

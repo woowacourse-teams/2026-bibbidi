@@ -1,0 +1,76 @@
+diff --git a/.github/ai-review/README.md b/.github/ai-review/README.md
+index 1ad7f9ad7a9f7420e24d7e0c66c351b688d7c5f5..eecedc4bc741a2f49d2a175a0f8c30a9652462b2 100644
+--- a/.github/ai-review/README.md
++++ b/.github/ai-review/README.md
+@@ -1,6 +1,6 @@
+ # Bibbidi AI Code Review Harness
+ 
+-GitHub Actions에서 PR의 요구사항, 변경 diff, 주변 코드와 관련 테스트를 수집해 자동 코드 리뷰를 등록한다. 후보 탐색, 원본 근거 재검증, diff 줄 검증과 GitHub Review 등록을 하나의 안전장치로 관리한다.
++GitHub Actions에서 PR의 요구사항, 변경 diff, 주변 코드와 관련 테스트를 수집해 자동 코드 리뷰를 등록한다. 청크별 통합 후보 탐색 1회, 원본 근거 최종 검증 1회, diff 줄 검증과 GitHub Review 등록을 하나의 안전장치로 관리한다.
+ 
+ ## 구성
+ 
+diff --git a/.github/ai-review/ai-review-service.test.ts b/.github/ai-review/ai-review-service.test.ts
+index cfbb76469c9c83d427efda3b0f18b56bb7c463b4..4a44d0001bdd8b7f1468069c2eeb0df8d9a20428 100644
+--- a/.github/ai-review/ai-review-service.test.ts
++++ b/.github/ai-review/ai-review-service.test.ts
+@@ -190,7 +190,7 @@ test("새 HEAD 리뷰가 끝나면 기존 AI 요약 코멘트를 갱신한다",
+   });
+ 
+   assert.equal(result.skipped, false);
+-  assert.equal(modelCalls, 4);
++  assert.equal(modelCalls, 2);
+   assert.equal(updates.length, 1);
+   assert.equal(updates[0].id, 10);
+   assert.match(updates[0].body, /AI 판정: 통과/);
+diff --git a/.github/ai-review/ai-review-service.ts b/.github/ai-review/ai-review-service.ts
+index 4677c16132a2145c47beabf0126bef2b5f4f59b9..0574b917a5fbfa1609717c61884bbd7b3e8235f6 100644
+--- a/.github/ai-review/ai-review-service.ts
++++ b/.github/ai-review/ai-review-service.ts
+@@ -45,20 +45,15 @@ const BE_CONVENTION_FILES = [
+   "docs/convention/test-strategy.md",
+ ];
+ 
+-const REVIEW_STAGES: ReviewStage[] = [
+-  {
+-    effort: "none",
+-    focus: "언어 문법, null 처리, 자원 정리, 오류 처리 누락과 저장소 규칙 위반을 검토한다.",
+-  },
+-  {
+-    effort: "low",
+-    focus: "프레임워크·인프라 통합, 의존성, HTTP 계약, 상태 흐름, 빌드와 배포 설정 문제를 검토한다.",
+-  },
+-  {
+-    effort: "medium",
+-    focus: "도메인 규칙, 동시성, 인증과 인가, 민감정보, 데이터 무결성, 장애 복구와 경계 조건을 검토한다.",
+-  },
+-];
++const CANDIDATE_STAGE: ReviewStage = {
++  effort: "medium",
++  focus: [
++    "1. 언어 관점에서 null-safety, Optional 오용, 불변성, equals/hashCode, 예외 삼킴을 검토한다.",
++    "2. 프레임워크·인프라 관점에서 트랜잭션, 영속성, 모듈 경계, 이벤트, HTTP 계약, 빌드와 배포를 검토한다.",
++    "3. 도메인·보안 관점에서 상태 규칙, 동시성, 인증·인가, 민감정보, 데이터 무결성과 장애 복구를 검토한다.",
++    "각 관점의 후보를 한 번의 구조화된 결과로 반환한다.",
++  ].join("\n"),
++};
+ 
+ const FINAL_STAGE: ReviewStage = {
+   effort: "medium",
+@@ -583,14 +578,12 @@ export async function runReview({
+       `${index + 1}/${chunks.length}`,
+     );
+     const cacheKey = `bibbidi-pr-${pullNumber}-${expectedHeadSha}-chunk-${index + 1}`;
+-    const stageResults = await Promise.all(
+-      REVIEW_STAGES.map((stage) => reviewStage(openai, prompts, values, stage, cacheKey)),
+-    );
++    const candidateResult = await reviewStage(openai, prompts, values, CANDIDATE_STAGE, cacheKey);
+     const finalResult = await reviewFinalStage(
+       openai,
+       prompts,
+       values,
+-      stageResults.flatMap((result) => result.findings),
++      candidateResult.findings,
+       cacheKey,
+     );
+     candidateFindings.push(...finalResult.findings);

@@ -9,30 +9,31 @@
 ## Trunk 구조
 
 ```text
-BE  Trunk = release-be
-FE  Trunk = release-fe
-APP Trunk = release-app
+BE  Dev = dev-be       / Release = release-be
+FE  Dev = dev-fe       / Release = release-fe
+APP Dev = dev-app      / Release = release-app
 ```
 
 ```text
-release-be  ──┐
-release-fe  ──┼──→ main
-release-app ──┘
+dev-be  ──→ release-be  ──┐
+dev-fe  ──→ release-fe  ──┼──→ main
+dev-app ──→ release-app ──┘
 ```
 
-| 분야 | Trunk | 배포 기준 |
-| --- | --- | --- |
-| BE | `release-be` | BE AWS 운영 환경 |
-| FE | `release-fe` | FE AWS 운영 환경 |
-| APP | `release-app` | App Store 배포 기준선 |
+| 분야 | 개발 브랜치 | 개발 배포 환경 | Release | 운영 배포 기준 |
+| --- | --- | --- | --- | --- |
+| BE | `dev-be` | BE 테스트 환경 | `release-be` | BE AWS 운영 환경 |
+| FE | `dev-fe` | FE 테스트 환경 | `release-fe` | FE AWS 운영 환경 |
+| APP | `dev-app` | - | `release-app` | App Store 배포 기준선 |
 
-### `main`과 `release-*`
+### `main`, `release-*`, `dev-*`
 
 - `main`은 배포 브랜치로 사용하지 않는다.
-- CI/CD는 각 분야의 `release-*` Trunk를 기준으로 수행한다.
-- `release-*`는 각 분야의 사실상 main 브랜치다.
-- 작업 브랜치의 기준점이자 PR 병합 대상이다.
-- 항상 배포 가능한 상태를 유지한다.
+- 테스트 환경 CD는 `dev-be`와 `dev-fe`, 운영 환경 CD는 각 분야의 `release-*`를 기준으로 수행한다.
+- `release-*`는 각 분야의 배포 기준 브랜치이며 항상 배포 가능한 상태를 유지한다.
+- `dev-*`는 작업 브랜치의 기준점이자 PR 병합 대상인 개발 통합 브랜치다.
+- `dev-be`와 `dev-fe`는 각각 BE·FE 테스트 환경에 CD로 연결한다.
+- 검증을 마친 `dev-*`를 같은 분야의 `release-*`에 반영한다.
 - `hotfix`와 `docs` 작업은 `release-*`에 바로 반영할 수 있다.
 - `chore` 작업은 팀 합의 후에만 `release-*`에 바로 반영한다.
 
@@ -94,7 +95,7 @@ Controller 구현, Service 구현, Repository 구현처럼 기술 계층만 기�
 ### 작업 흐름
 
 ```text
-release-be
+dev-be
     │
     ├── feature/201
     │        │
@@ -105,6 +106,10 @@ release-be
              └── PR → Squash Merge
                          │
                          ▼
+                       dev-be
+                         │
+                         └── PR → Merge Commit
+                         ▼
                     release-be
                          │
                          ▼
@@ -113,7 +118,7 @@ release-be
 
 ### PR 제목
 
-- 작업 브랜치에서 `release-*`로 제출하는 PR 제목에는 GitHub Issue ID를 포함한다.
+- 작업 브랜치에서 `dev-*`로 제출하는 PR 제목에는 GitHub Issue ID를 포함한다.
 
 ```text
 [#201] 할 일 완료 API 구현
@@ -127,7 +132,8 @@ BE v1.3.0 / APP v1.2.0 / FE v1.4.0
 
 ### 병합 방식
 
-- 작업 브랜치 → `release-*`: Squash Merge
+- 작업 브랜치 → `dev-*`: Squash Merge
+- `dev-*` → `release-*`: Merge Commit
 - `release-*` → `main`: Merge Commit
 - Squash Merge가 완료된 작업 브랜치는 삭제한다.
 
@@ -138,8 +144,11 @@ feature/201
   └── commit C
          │ Squash Merge
          ▼
-release-be
+dev-be
   └── [#201] 하나의 커밋
+         │ Merge Commit
+         ▼
+release-be
          │ Merge Commit
          ▼
 main
@@ -147,7 +156,7 @@ main
 
 ### 충돌 해결
 
-- PR 병합 전 최신 Trunk와의 충돌 여부를 확인한다.
+- PR 병합 전 최신 대상 브랜치와의 충돌 여부를 확인한다.
 - 충돌은 작업 브랜치에서 해결한다.
 - 충돌 해결 후 CI를 다시 실행한다.
 
@@ -158,23 +167,29 @@ main
 
 ## 배포 및 운영
 
-- 각 분야의 Trunk는 해당 운영 배포 환경과 연결한다.
+- `dev-be`와 `dev-fe`는 각각의 테스트 환경에 연결한다.
+- 각 분야의 `release-*`는 해당 운영 배포 환경과 연결한다.
 - 하나의 저장소를 사용하되 대상 브랜치와 변경 경로를 기준으로 분야별 CI/CD를 분리한다.
 - APP은 Store 배포를 수동으로 진행한다.
 
 ```text
 feature/201
     │
-    └── PR → release-be
-                   │
-                   ├── CI: 빌드·테스트·검증
-                   ├── Squash Merge
-                   └── CD → BE AWS 운영 환경
+    └── PR → dev-be
+                │
+                ├── CI: 빌드·테스트·검증
+                ├── Squash Merge
+                └── CD → BE 테스트 환경
+                         │
+                         ▼
+                    release-be
+                         │
+                         └── CD → BE AWS 운영 환경
 ```
 
 ### 운영 장애 대응
 
-- 배포 후 장애는 해당 분야 Trunk에 `hotfix` 브랜치로 대응한다.
+- 배포 후 장애는 해당 분야의 `release-*`에서 `hotfix` 브랜치를 생성해 대응한다.
 - 운영 장애 대응도 PR과 Squash Merge를 거친다.
 
 ```text

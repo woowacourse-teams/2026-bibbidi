@@ -7,9 +7,13 @@ on:
       - synchronize
       - reopened
       - closed
+      - review_requested
   pull_request_review:
     types:
       - submitted
+  pull_request_review_comment:
+    types:
+      - created
 
 permissions:
   contents: read
@@ -17,24 +21,30 @@ permissions:
 
 concurrency:
   group: discord-pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   notify:
-    name: Notify Discord
+    name: PR 상태와 리뷰어를 Discord에 알림
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: PR 알림 코드 체크아웃
+        uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
         with:
           node-version: 24.19.0
 
-      - name: Assign reviewer
-        if: github.event.action == 'opened' && github.event.pull_request.base.ref == 'release-be'
+      - name: dev-be 또는 release-be 신규 PR에 팀 리뷰어 할당
+        id: assign-reviewer
+        if: >-
+          github.event.action == 'opened' &&
+          (github.event.pull_request.base.ref == 'dev-be' ||
+           github.event.pull_request.base.ref == 'release-be')
         shell: bash
         env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -45,7 +55,7 @@ jobs:
           PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
         run: node --experimental-strip-types .github/pr-notification/reviewer-assignment.ts
 
-      - name: Send Discord notification
+      - name: main 외 PR 상태를 분야별 Discord 채널로 전송
         if: github.event.pull_request.base.ref != 'main'
         shell: bash
         env:
@@ -59,11 +69,17 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
           ACTOR: ${{ github.actor }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
+          ASSIGNED_REVIEWER: ${{ steps.assign-reviewer.outputs.reviewer }}
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          COMMENT_BODY: ${{ github.event.review.body || github.event.comment.body || '' }}
+          COMMENT_URL: ${{ github.event.review.html_url || github.event.comment.html_url || github.event.pull_request.html_url }}
           LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
           REQUESTED_REVIEWERS_JSON: ${{ toJson(github.event.pull_request.requested_reviewers) }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
           DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
           DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}
         run: node --experimental-strip-types .github/pr-notification/discord-pr-notification.ts

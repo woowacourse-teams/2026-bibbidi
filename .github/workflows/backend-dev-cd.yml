@@ -1,0 +1,31 @@
+name: 비비디 백엔드 개발 CD
+
+on:
+  push:
+    branches: [dev-be]
+    paths:
+      - "BE/**"
+      - "Infra/monitoring/**"
+      - "Infra/nginx/**"
+      - "Infra/scripts/**"
+      - ".github/workflows/backend-*-cd.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-dev-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/backend-common-cd.yml
+    secrets: inherit
+    with:
+      deployment-environment: backend-dev
+      runner-labels: '["self-hosted", "linux", "ARM64", "dev"]'
+      image-tag: ${{ github.sha }}
+      build-image: true
+      spring-profile: dev
+      deployment-name: development
+      service-instance-id: bibbidi-backend-dev

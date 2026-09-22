@@ -1,0 +1,46 @@
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index 0d7c44a18597f5f5843adbe0821542350bb534ed..3ff770221b66442de3edd57ec34db691c1c05e8f 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -4,6 +4,9 @@ const WEBHOOK_CHANNELS: Record<string, string> = {
+   "dev-be": "BE",
+   "dev-fe": "FE",
+   "dev-app": "APP",
++  "release-be": "BE",
++  "release-fe": "FE",
++  "release-app": "APP",
+ };
+ 
+ const RETRY_COUNT = 3;
+diff --git a/.github/pr-notification/review-reminder.ts b/.github/pr-notification/review-reminder.ts
+index 2037892e94d88de2064b0bb491853655f13c8698..4d8352398da36e9c05eb58eaf2c14eb2e7a87cbd 100644
+--- a/.github/pr-notification/review-reminder.ts
++++ b/.github/pr-notification/review-reminder.ts
+@@ -112,6 +112,9 @@ async function main() {
+         "dev-be": "BE",
+         "dev-fe": "FE",
+         "dev-app": "APP",
++        "release-be": "BE",
++        "release-fe": "FE",
++        "release-app": "APP",
+       }[pr.base.ref];
+       const webhook = env[`DISCORD_WEBHOOK_${channel}`];
+       await sendChannel(webhook, message);
+diff --git a/.github/workflows/pr-notification.yml b/.github/workflows/pr-notification.yml
+index c029ebdf662bf67dfa360dc32034ce41fe13e5db..3eabe33531b4c86abdf13300f46109bedc7dfa51 100644
+--- a/.github/workflows/pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -35,8 +35,11 @@ jobs:
+         with:
+           node-version: 24.19.0
+ 
+-      - name: dev-be 신규 PR에 팀 리뷰어 할당
+-        if: github.event.action == 'opened' && github.event.pull_request.base.ref == 'dev-be'
++      - name: dev-be 또는 release-be 신규 PR에 팀 리뷰어 할당
++        if: >-
++          github.event.action == 'opened' &&
++          (github.event.pull_request.base.ref == 'dev-be' ||
++           github.event.pull_request.base.ref == 'release-be')
+         shell: bash
+         env:
+           AUTHOR: ${{ github.event.pull_request.user.login }}
