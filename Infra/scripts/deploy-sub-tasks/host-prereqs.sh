@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Preflight for the APP EC2, run by the CD workflow on every deploy.
+# Preflight for a backend deployment EC2, run by the CD workflow on every deploy.
 #
 # Everything here is idempotent: it verifies what the deploy needs and installs
 # what it can. It deliberately cannot grant its own sudo rights - see
@@ -31,7 +31,7 @@ require_passwordless_sudo() {
 
   cat >&2 <<'GUIDE'
 [host-prereqs] The deploy needs passwordless sudo, and it cannot grant that to
-[host-prereqs] itself. Log in to the APP EC2 as an administrator once and run:
+[host-prereqs] itself. Log in to the deployment EC2 as an administrator once and run:
 [host-prereqs]
 [host-prereqs]     sudo bash Infra/scripts/bootstrap-host.sh <runner-user>
 [host-prereqs]
