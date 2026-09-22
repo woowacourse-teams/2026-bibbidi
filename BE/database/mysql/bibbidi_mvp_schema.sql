@@ -156,6 +156,7 @@ CREATE TABLE oidc_auth_requests (
     provider VARCHAR(20) NOT NULL,
     nonce VARCHAR(255) NOT NULL,
     code_verifier VARCHAR(255) NOT NULL,
+    browser_binder_hash VARCHAR(64) NULL,
     client_type VARCHAR(10) NOT NULL,
     purpose VARCHAR(20) NOT NULL,
     expires_at DATETIME NOT NULL,

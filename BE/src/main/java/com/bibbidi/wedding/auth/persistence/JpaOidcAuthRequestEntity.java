@@ -40,6 +40,9 @@ public class JpaOidcAuthRequestEntity extends BaseTimeEntity {
     @Column(name = "code_verifier", nullable = false)
     private String codeVerifier;
 
+    @Column(name = "browser_binder_hash", length = 64)
+    private String browserBinderHash;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "client_type", nullable = false, length = 10)
     private ClientType clientType;
@@ -63,6 +66,7 @@ public class JpaOidcAuthRequestEntity extends BaseTimeEntity {
             SocialProvider provider,
             String nonce,
             String codeVerifier,
+            String browserBinderHash,
             ClientType clientType,
             SocialAuthPurpose purpose,
             LocalDateTime expiresAt,
@@ -73,6 +77,7 @@ public class JpaOidcAuthRequestEntity extends BaseTimeEntity {
         this.provider = provider;
         this.nonce = nonce;
         this.codeVerifier = codeVerifier;
+        this.browserBinderHash = browserBinderHash;
         this.clientType = clientType;
         this.purpose = purpose;
         this.expiresAt = expiresAt;
@@ -97,6 +102,10 @@ public class JpaOidcAuthRequestEntity extends BaseTimeEntity {
 
     public String codeVerifier() {
         return codeVerifier;
+    }
+
+    public String browserBinderHash() {
+        return browserBinderHash;
     }
 
     public ClientType clientType() {
