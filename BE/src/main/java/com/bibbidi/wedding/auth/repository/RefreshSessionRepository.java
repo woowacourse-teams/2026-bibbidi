@@ -2,6 +2,7 @@ package com.bibbidi.wedding.auth.repository;
 
 import com.bibbidi.wedding.auth.domain.RefreshSession;
 import com.bibbidi.wedding.auth.persistence.JpaRefreshSessionRepository;
+import com.bibbidi.wedding.auth.domain.ClientType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,16 @@ public class RefreshSessionRepository {
         return jpaRefreshSessionRepository
                 .findByTokenHash(tokenHash)
                 .map(authMapper::toDomain);
+    }
+
+    public Optional<RefreshSession> findLatestUsableNativeSession(Long userId, LocalDateTime now) {
+        return jpaRefreshSessionRepository
+                .findLatestUsableSession(userId, ClientType.NATIVE, now)
+                .map(authMapper::toDomain);
+    }
+
+    public boolean hasUsableFamily(String familyId, LocalDateTime now) {
+        return jpaRefreshSessionRepository.existsUsableFamily(familyId, now);
     }
 
     public int revokeFamily(String familyId, LocalDateTime revokedAt) {

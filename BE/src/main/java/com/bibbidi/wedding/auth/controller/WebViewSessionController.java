@@ -2,7 +2,6 @@ package com.bibbidi.wedding.auth.controller;
 
 import com.bibbidi.wedding.auth.controller.dto.request.HandoffCodeExchangeRequest;
 import com.bibbidi.wedding.auth.controller.dto.response.HandoffCodeResponse;
-import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
 import com.bibbidi.wedding.auth.controller.dto.response.WebSessionResponse;
 import com.bibbidi.wedding.auth.service.HandoffService;
 import com.bibbidi.wedding.auth.service.dto.IssuedSession;
@@ -16,9 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 네이티브에서 한 로그인을 앱 안 WebView로 넘긴다. 앱이 코드를 받아 WebView 주소에 실어 열면, WebView가 그 코드를 내고 웹 세션 쿠키를 받는다.
- */
 @RestController
 public class WebViewSessionController {
 
@@ -33,10 +29,9 @@ public class WebViewSessionController {
     @PostMapping("/api/auth/native/handoff-codes")
     @ResponseStatus(HttpStatus.CREATED)
     public HandoffCodeResponse issueCode(
-            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
-            @Valid @RequestBody NativeSessionRefreshRequest request
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId
     ) {
-        return new HandoffCodeResponse(handoffService.issueCode(currentUserId, request.refreshToken()));
+        return new HandoffCodeResponse(handoffService.issueCode(currentUserId));
     }
 
     @PostMapping("/api/auth/web/handoff-codes/exchange")

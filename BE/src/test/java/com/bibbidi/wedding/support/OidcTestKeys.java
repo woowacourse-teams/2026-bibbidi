@@ -48,12 +48,12 @@ public final class OidcTestKeys {
     ) {
         return Jwts.builder()
                 .header().keyId(KEY_ID).and()
+                .claims(claims)
                 .issuer(issuer)
                 .audience().add(audience).and()
                 .subject(subject)
                 .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(expiration))
-                .claims(claims)
                 .signWith((RSAPrivateKey) KEY_PAIR.getPrivate(), Jwts.SIG.RS256)
                 .compact();
     }

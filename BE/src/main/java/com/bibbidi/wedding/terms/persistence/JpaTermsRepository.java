@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface JpaTermsRepository extends JpaRepository<JpaTermsEntity, Long> {
 
     List<JpaTermsEntity> findAllByRequiredTrue();
+
+    List<JpaTermsEntity> findAllByRequiredTrueAndVersion(String version);
 }

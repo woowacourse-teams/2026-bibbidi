@@ -2,6 +2,7 @@ package com.bibbidi.wedding.auth.token;
 
 import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.MacAlgorithm;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -53,7 +54,7 @@ public class BibbidiTokenIssuer {
                 .claim(BibbidiTokenClaimNames.ROLE, claims.role().name())
                 .claim(BibbidiTokenClaimNames.NICKNAME, claims.nickname())
                 .claim(BibbidiTokenClaimNames.EMAIL, claims.email())
-                .signWith(signingKey.signingKey())
+                .signWith(signingKey.signingKey(), signatureAlgorithm())
                 .compact();
     }
 
@@ -67,11 +68,21 @@ public class BibbidiTokenIssuer {
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(issuedAt.plus(properties.deleteGrantLifetime())))
                 .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.DELETE_GRANT.name())
-                .signWith(signingKey.signingKey())
+                .signWith(signingKey.signingKey(), signatureAlgorithm())
                 .compact();
     }
 
     public Duration accessTokenLifetime() {
         return properties.accessTokenLifetime();
+    }
+
+    private MacAlgorithm signatureAlgorithm() {
+        return switch (properties.signatureAlgorithm()) {
+            case "HS256" -> Jwts.SIG.HS256;
+            case "HS384" -> Jwts.SIG.HS384;
+            case "HS512" -> Jwts.SIG.HS512;
+            default -> throw new IllegalStateException(
+                    "지원하지 않는 JWT 서명 알고리즘입니다. alg=" + properties.signatureAlgorithm());
+        };
     }
 }

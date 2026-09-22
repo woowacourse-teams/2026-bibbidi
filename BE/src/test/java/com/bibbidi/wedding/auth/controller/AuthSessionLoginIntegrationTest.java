@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -31,10 +32,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * 카카오와 구글을 실제로 부르지 않는다.
- * 어댑터 경계에서 대역을 세우고, 서버가 웹과 네이티브에 어떤 형태로 내려 주는지를 확인한다.
- */
 class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
@@ -55,9 +52,10 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
     void stubProvider() {
         given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
                 .willReturn("id-token");
-        given(idTokenVerifier.verify(any(SocialProvider.class), anyString(), anyString()))
-                .willReturn(new VerifiedOidcUser(
-                        SocialProvider.KAKAO, "social-user-1", "비비디", "user@bibbidi.kr"));
+        willAnswer(invocation -> new VerifiedOidcUser(
+                invocation.getArgument(0), "social-user-1", "비비디", "user@bibbidi.kr"))
+                .given(idTokenVerifier)
+                .verify(any(SocialProvider.class), anyString(), anyString());
     }
 
     @Test
@@ -138,6 +136,20 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
                 .andReturn();
 
         assertThat(result.getResponse().getHeader("Set-Cookie")).isNull();
+    }
+
+    @Test
+    @DisplayName("구글도 카카오와 같은 OIDC 로그인 흐름을 사용한다")
+    void shouldLoginWithGoogle() throws Exception {
+        SocialLoginRequest request = loginRequest("google", "WEB");
+
+        mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "google")
+                        .cookie(binderCookies())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.termsAgreementRequired").value(true));
     }
 
     @Test
@@ -272,12 +284,22 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private SocialLoginRequest loginRequest(String clientType) throws Exception {
-        return new SocialLoginRequest("authorization-code", startAuthorization(clientType));
+        return loginRequest("kakao", clientType);
     }
 
-    /** 인가를 시작하고 state를 돌려준다. 웹이면 브라우저 바인딩 쿠키도 받아 둔다. */
+    private SocialLoginRequest loginRequest(String provider, String clientType) throws Exception {
+        return new SocialLoginRequest("authorization-code", startAuthorization(provider, clientType));
+    }
+
+    /**
+     * 인가를 시작하고 state를 돌려준다. 웹이면 브라우저 바인딩 쿠키도 받아 둔다.
+     */
     private String startAuthorization(String clientType) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/oidc/{provider}/authorization", "kakao")
+        return startAuthorization("kakao", clientType);
+    }
+
+    private String startAuthorization(String provider, String clientType) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/auth/oidc/{provider}/authorization", provider)
                         .param("clientType", clientType))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -286,7 +308,7 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private Cookie[] binderCookies() {
-        return binderCookie == null ? new Cookie[0] : new Cookie[] {binderCookie};
+        return binderCookie == null ? new Cookie[0] : new Cookie[]{binderCookie};
     }
 
     private String login(String clientType) throws Exception {

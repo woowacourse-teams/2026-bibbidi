@@ -28,6 +28,7 @@ auth:
     audience: bibbidi-test-client
     access-token-lifetime: 30m
     delete-grant-lifetime: 5m
+    signature-algorithm: HS256
     header-name: Authorization
   session:
     refresh-token-lifetime: 30d

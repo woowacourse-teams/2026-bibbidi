@@ -1,8 +1,15 @@
 package com.bibbidi.wedding.auth.controller.dto.request;
 
-import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
 
-/** @param agreedTermsIds 동의한 약관들의 식별자. 필수 약관이 하나라도 빠지면 가입이 끝나지 않는다 */
-public record TermsAgreementRequest(@NotEmpty List<Long> agreedTermsIds) {
+public record TermsAgreementRequest(
+        @NotBlank String termsVersion,
+        boolean agreed
+) {
+
+    @AssertTrue(message = "약관 동의 값은 true여야 합니다.")
+    public boolean isAgreed() {
+        return agreed;
+    }
 }

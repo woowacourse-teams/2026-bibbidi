@@ -5,6 +5,7 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,14 +21,12 @@ public class UserService {
         this.checklistService = checklistService;
     }
 
-    /** 소셜 인증만 끝난 회원을 만든다. 약관에 동의해야 서비스를 쓸 수 있다. */
     @Transactional
     public UserResult createPendingUser(String nickname, String email) {
         User savedUser = userRepository.create(User.pending(nickname, email));
         return UserResult.from(savedUser);
     }
 
-    /** 필수 약관 동의가 끝난 회원을 서비스를 쓸 수 있는 상태로 바꾼다. */
     @Transactional
     public UserResult activate(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
@@ -35,6 +34,13 @@ public class UserService {
             return UserResult.from(user);
         }
         return UserResult.from(userRepository.update(user.activate()));
+    }
+
+    @Transactional
+    public UserResult agreeToTerms(Long currentUserId, String termsVersion) {
+        User user = userRepository.findById(currentUserId);
+        return UserResult.from(userRepository.update(
+                user.agreeToTerms(termsVersion, LocalDateTime.now())));
     }
 
     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {

@@ -9,9 +9,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 가입을 끝내는 자리다. 동의하기 전에는 이 API 말고는 부를 수 없다.
- */
 @RestController
 public class TermsAgreementController {
 
@@ -27,6 +24,6 @@ public class TermsAgreementController {
             @Valid @RequestBody TermsAgreementRequest request
     ) {
         return new TermsAgreementResponse(
-                termsAgreementService.agree(currentUserId, request.agreedTermsIds()));
+                termsAgreementService.agree(currentUserId, request.termsVersion(), request.agreed()));
     }
 }

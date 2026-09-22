@@ -193,6 +193,16 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
+    @DisplayName("잘못된 결혼 예정일 형식은 요청을 거절한다")
+    void shouldRejectInvalidWeddingDateFormat() throws Exception {
+        mockMvc.perform(put("/api/users/me/wedding-date")
+                        .header(AUTHORIZATION, bearerTokenOf(currentUserId, "current"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"weddingDate\":\"2027-13-40\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("access token이 없으면 결혼 예정일을 저장하거나 조회할 수 없다")
     void shouldRequireAuthenticationForWeddingDate() throws Exception {
         mockMvc.perform(put("/api/users/me/wedding-date")

@@ -153,7 +153,7 @@ class BibbidiTokenTest {
     private static BibbidiTokenProperties properties(
             Duration accessTokenLifetime, String secret, String issuer, String audience) {
         return new BibbidiTokenProperties(
-                secret, issuer, audience, accessTokenLifetime, Duration.ofMinutes(5), "Authorization");
+                secret, issuer, audience, accessTokenLifetime, Duration.ofMinutes(5), "HS256", "Authorization");
     }
 
     private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {

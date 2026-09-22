@@ -7,7 +7,6 @@ import com.bibbidi.wedding.auth.domain.HandoffCode;
 import com.bibbidi.wedding.auth.domain.RefreshSession;
 import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
-import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.auth.token.SecretValueGenerator;
 import com.bibbidi.wedding.auth.config.SessionProperties;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -25,7 +24,6 @@ public class HandoffService {
     private final HandoffCodeRepository handoffCodeRepository;
     private final RefreshSessionRepository refreshSessionRepository;
     private final SecretValueGenerator secretValueGenerator;
-    private final BibbidiTokenParser bibbidiTokenParser;
     private final SessionIssueService sessionIssueService;
     private final UserService userService;
     private final SessionProperties sessionProperties;
@@ -34,7 +32,6 @@ public class HandoffService {
             HandoffCodeRepository handoffCodeRepository,
             RefreshSessionRepository refreshSessionRepository,
             SecretValueGenerator secretValueGenerator,
-            BibbidiTokenParser bibbidiTokenParser,
             SessionIssueService sessionIssueService,
             UserService userService,
             SessionProperties sessionProperties
@@ -42,23 +39,17 @@ public class HandoffService {
         this.handoffCodeRepository = handoffCodeRepository;
         this.refreshSessionRepository = refreshSessionRepository;
         this.secretValueGenerator = secretValueGenerator;
-        this.bibbidiTokenParser = bibbidiTokenParser;
         this.sessionIssueService = sessionIssueService;
         this.userService = userService;
         this.sessionProperties = sessionProperties;
     }
 
-    public String issueCode(Long currentUserId, String refreshToken) {
+    public String issueCode(Long currentUserId) {
         LocalDateTime now = LocalDateTime.now();
         RefreshSession session = refreshSessionRepository
-                .findByTokenHash(bibbidiTokenParser.hashRefreshToken(refreshToken))
+                .findLatestUsableNativeSession(currentUserId, now)
                 .orElseThrow(() -> new BusinessException(ClientError.REFRESH_SESSION_INVALID,
                         "저장된 refresh 세션을 찾지 못했습니다."));
-
-        if (!session.isUsable(now) || !session.userId().equals(currentUserId)) {
-            throw new BusinessException(ClientError.REFRESH_SESSION_INVALID,
-                    "쓸 수 없거나 다른 회원의 refresh 세션입니다. sessionId=" + session.id());
-        }
 
         String code = secretValueGenerator.generate();
         handoffCodeRepository.save(
@@ -82,6 +73,13 @@ public class HandoffService {
         if (!handoffCode.isUsable(now)) {
             throw new BusinessException(ClientError.HANDOFF_CODE_INVALID,
                     "이미 썼거나 만료된 handoff code입니다. codeId=" + handoffCode.id());
+        }
+
+        if (!refreshSessionRepository.hasUsableFamily(handoffCode.familyId(), now)) {
+            throw new BusinessException(
+                    ClientError.HANDOFF_CODE_INVALID,
+                    "handoff code를 발급한 세션 계열이 폐기되었습니다. familyId="
+                            + handoffCode.familyId());
         }
 
         handoffCodeRepository.save(handoffCode.use(now));

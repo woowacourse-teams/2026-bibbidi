@@ -14,9 +14,6 @@ import java.security.PublicKey;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/**
- * 제공자가 준 id_token을 검증한다. 서명을 먼저 확인하고, 그 다음 발급자·대상·nonce를 확인한다. 만료는 서명 검증 단계에서 함께 걸러진다.
- */
 @Component
 public class IdTokenVerifier {
 
@@ -56,8 +53,8 @@ public class IdTokenVerifier {
         return new VerifiedOidcUser(
                 provider,
                 parseSubject(claims),
-                claims.get(configuration.nicknameClaim(), String.class),
-                claims.get(configuration.emailClaim(), String.class)
+                stringClaim(claims, configuration.nicknameClaim(), "nickname"),
+                stringClaim(claims, configuration.emailClaim(), "email")
         );
     }
 
@@ -111,12 +108,22 @@ public class IdTokenVerifier {
     }
 
     private void validateNonce(Claims claims, String expectedNonce) {
-        String nonce = claims.get(NONCE, String.class);
+        String nonce = stringClaim(claims, NONCE, "nonce");
         if (nonce == null || !nonce.equals(expectedNonce)) {
             throw new BusinessException(
                     ClientError.SOCIAL_AUTHENTICATION_FAILED,
                     "id_token의 nonce가 현재 서비스에서 만든 값과 다릅니다."
             );
+        }
+    }
+
+    private String stringClaim(Claims claims, String claimName, String claimLabel) {
+        try {
+            return claims.get(claimName, String.class);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(
+                    ClientError.SOCIAL_AUTHENTICATION_FAILED,
+                    "id_token의 " + claimLabel + " claim 형식이 올바르지 않습니다.", exception);
         }
     }
 

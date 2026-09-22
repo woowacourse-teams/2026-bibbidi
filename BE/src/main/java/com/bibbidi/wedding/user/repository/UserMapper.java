@@ -19,6 +19,8 @@ public class UserMapper {
                 user.status(),
                 user.role(),
                 user.email(),
+                user.termsVersion(),
+                user.termsAgreedAt(),
                 weddingDate);
     }
 
@@ -28,6 +30,8 @@ public class UserMapper {
                 entity.nickname(),
                 entity.status(),
                 entity.role(),
-                entity.email());
+                entity.email(),
+                entity.termsVersion(),
+                entity.termsAgreedAt());
     }
 }

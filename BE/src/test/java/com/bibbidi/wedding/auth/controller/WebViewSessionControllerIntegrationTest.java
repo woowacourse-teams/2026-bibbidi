@@ -11,10 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.controller.dto.request.HandoffCodeExchangeRequest;
-import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
 import com.bibbidi.wedding.auth.domain.ClientType;
-import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.SessionIssueService;
+import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.service.UserResult;
@@ -28,9 +27,6 @@ import org.springframework.http.MediaType;
 import org.springframework.restdocs.payload.PayloadDocumentation;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * 네이티브 로그인을 앱 안 WebView로 넘기는 흐름을 확인하고 문서로 남긴다.
- */
 class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
@@ -87,7 +83,12 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
                 .getResponse()
                 .getHeader("Set-Cookie");
 
-        assertThat(setCookie).contains(REFRESH_COOKIE).contains("HttpOnly");
+        assertThat(setCookie)
+                .contains(REFRESH_COOKIE)
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/api/auth");
     }
 
     @Test
@@ -105,19 +106,14 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("로그인하지 않으면 코드를 받을 수 없다")
     void shouldRequireAuthenticationToIssueCode() throws Exception {
         mockMvc.perform(post("/api/auth/native/handoff-codes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new NativeSessionRefreshRequest(nativeSession.refreshToken()))))
+                )
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201));
     }
 
     private String issueCode() throws Exception {
         String response = mockMvc.perform(post("/api/auth/native/handoff-codes")
-                        .header(AUTHORIZATION, "Bearer " + nativeSession.accessToken())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new NativeSessionRefreshRequest(nativeSession.refreshToken()))))
+                        .header(AUTHORIZATION, "Bearer " + nativeSession.accessToken()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").isNotEmpty())
                 .andDo(document(
@@ -125,14 +121,10 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Auth")
                                 .summary("handoff code 발급")
-                                .description("앱이 자기 refresh token을 내면 WebView에 넘길 1회용 코드를 받습니다. "
-                                        + "refresh token 원문은 앱 밖으로 나가지 않습니다.")
-                                .requestSchema(schema("NativeSessionRefreshRequest"))
+                                .description("앱의 access token으로 WebView에 넘길 1회용 코드를 받습니다.")
                                 .responseSchema(schema("HandoffCodeResponse"))
                                 .requestHeaders(headerWithName(AUTHORIZATION)
                                         .description("앱이 가진 access token"))
-                                .requestFields(PayloadDocumentation.fieldWithPath("refreshToken")
-                                        .description("앱이 가진 refresh token"))
                                 .responseFields(PayloadDocumentation.fieldWithPath("code")
                                         .description("WebView 주소에 실어 넘기는 1회용 코드"))
                                 .build())))

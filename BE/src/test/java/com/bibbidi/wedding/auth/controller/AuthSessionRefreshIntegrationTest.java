@@ -2,7 +2,6 @@ package com.bibbidi.wedding.auth.controller;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
-import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,15 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
 import com.bibbidi.wedding.auth.controller.dto.request.TermsAgreementRequest;
 import com.bibbidi.wedding.auth.domain.ClientType;
-import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.SessionIssueService;
+import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.http.Cookie;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,9 +31,6 @@ import org.springframework.restdocs.payload.PayloadDocumentation;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * 로그인 상태를 이어 가거나 끊는 API를 확인하고 문서로 남긴다.
- */
 @Sql("/terms-fixture.sql")
 class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
 
@@ -202,7 +197,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                         .header(AUTHORIZATION, "Bearer " + issued.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new TermsAgreementRequest(
-                                List.of(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID)))))
+                                "v1", true))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andDo(document(
@@ -216,8 +211,11 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                                 .responseSchema(schema("TermsAgreementResponse"))
                                 .requestHeaders(headerWithName(AUTHORIZATION)
                                         .description("가입이 끝나지 않은 회원의 access token"))
-                                .requestFields(PayloadDocumentation.fieldWithPath("agreedTermsIds")
-                                        .description("동의한 약관 식별자 목록"))
+                                .requestFields(
+                                        PayloadDocumentation.fieldWithPath("termsVersion")
+                                                .description("동의하는 약관 버전"),
+                                        PayloadDocumentation.fieldWithPath("agreed")
+                                                .description("약관 동의 여부"))
                                 .responseFields(PayloadDocumentation.fieldWithPath("accessToken")
                                         .description("가입이 끝난 상태가 담긴 새 access token"))
                                 .build())))

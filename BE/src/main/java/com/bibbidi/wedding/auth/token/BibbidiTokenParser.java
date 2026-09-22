@@ -9,6 +9,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.Jws;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -73,16 +74,24 @@ public class BibbidiTokenParser {
 
     private Claims parseSigned(String token, ClientError invalidError) {
         try {
-            return Jwts.parser()
+            Jws<Claims> signed = Jwts.parser()
                     .verifyWith(signingKey.signingKey())
                     .requireIssuer(properties.issuer())
                     .requireAudience(properties.audience())
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload();
+                    ;
+            if (!properties.signatureAlgorithm().equals(signed.getHeader().getAlgorithm())) {
+                throw new BusinessException(
+                        invalidError,
+                        "허용하지 않는 JWT 서명 알고리즘입니다. alg=" + signed.getHeader().getAlgorithm());
+            }
+            return signed.getPayload();
         } catch (ExpiredJwtException exception) {
             throw new BusinessException(
-                    ClientError.ACCESS_TOKEN_EXPIRED,
+                    invalidError == ClientError.ACCESS_TOKEN_INVALID
+                            ? ClientError.ACCESS_TOKEN_EXPIRED
+                            : invalidError,
                     "만료된 토큰입니다.",
                     exception
             );

@@ -13,6 +13,8 @@ CREATE TABLE users (
     status VARCHAR(20) NOT NULL,
     role VARCHAR(20) NOT NULL,
     email VARCHAR(255) NULL,
+    terms_version VARCHAR(20) NULL,
+    terms_agreed_at DATETIME NULL,
     wedding_date DATE NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,

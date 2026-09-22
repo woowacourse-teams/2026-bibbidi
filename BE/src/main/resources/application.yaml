@@ -22,6 +22,7 @@ auth:
     audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
     access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:30m}
     delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:5m}
+    signature-algorithm: ${AUTH_JWT_SIGNATURE_ALGORITHM:HS256}
     header-name: Authorization
   session:
     refresh-token-lifetime: ${AUTH_REFRESH_TOKEN_LIFETIME:30d}

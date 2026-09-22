@@ -20,6 +20,7 @@ public record BibbidiTokenProperties(
         String audience,
         Duration accessTokenLifetime,
         Duration deleteGrantLifetime,
+        String signatureAlgorithm,
         String headerName
 ) {
 }

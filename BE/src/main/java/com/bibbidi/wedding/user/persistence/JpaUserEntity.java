@@ -12,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -36,6 +37,12 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "email")
     private String email;
 
+    @Column(name = "terms_version", length = 20)
+    private String termsVersion;
+
+    @Column(name = "terms_agreed_at")
+    private LocalDateTime termsAgreedAt;
+
     @Column(name = "wedding_date")
     private LocalDate weddingDate;
 
@@ -48,6 +55,8 @@ public class JpaUserEntity extends BaseTimeEntity {
             UserStatus status,
             UserRole role,
             String email,
+            String termsVersion,
+            LocalDateTime termsAgreedAt,
             LocalDate weddingDate
     ) {
         this.id = id;
@@ -55,7 +64,20 @@ public class JpaUserEntity extends BaseTimeEntity {
         this.status = status;
         this.role = role;
         this.email = email;
+        this.termsVersion = termsVersion;
+        this.termsAgreedAt = termsAgreedAt;
         this.weddingDate = weddingDate;
+    }
+
+    public JpaUserEntity(
+            Long id,
+            String nickname,
+            UserStatus status,
+            UserRole role,
+            String email,
+            LocalDate weddingDate
+    ) {
+        this(id, nickname, status, role, email, null, null, weddingDate);
     }
 
     public Long id() {
@@ -76,6 +98,14 @@ public class JpaUserEntity extends BaseTimeEntity {
 
     public String email() {
         return email;
+    }
+
+    public String termsVersion() {
+        return termsVersion;
+    }
+
+    public LocalDateTime termsAgreedAt() {
+        return termsAgreedAt;
     }
 
     public LocalDate weddingDate() {

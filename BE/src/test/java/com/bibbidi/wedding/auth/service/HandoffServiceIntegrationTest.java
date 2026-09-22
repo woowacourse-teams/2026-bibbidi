@@ -50,7 +50,7 @@ class HandoffServiceIntegrationTest {
     @Test
     @DisplayName("넘겨받은 웹 세션은 앱 세션과 같은 기기 계열에 들어간다")
     void shouldPutHandedOffWebSessionInSameFamily() {
-        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
+        String code = handoffService.issueCode(owner.userId());
 
         IssuedSession webSession = handoffService.exchange(code);
 
@@ -61,7 +61,7 @@ class HandoffServiceIntegrationTest {
     @Test
     @DisplayName("handoff code는 한 번만 통한다")
     void shouldAllowHandoffCodeOnlyOnce() {
-        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
+        String code = handoffService.issueCode(owner.userId());
         handoffService.exchange(code);
 
         assertThatThrownBy(() -> handoffService.exchange(code))
@@ -80,23 +80,22 @@ class HandoffServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("다른 회원의 refresh token으로는 code를 받을 수 없다")
+    @DisplayName("native 세션이 없는 회원은 code를 받을 수 없다")
     void shouldRejectIssuingCodeForOtherUsersSession() {
         UserResult other = userService.createPendingUser("other", null);
 
-        assertThatThrownBy(() -> handoffService.issueCode(other.id(), nativeSession.refreshToken()))
+        assertThatThrownBy(() -> handoffService.issueCode(other.id()))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
     }
 
     @Test
-    @DisplayName("이미 갱신에 쓴 refresh token으로는 code를 받을 수 없다")
-    void shouldRejectIssuingCodeWithRotatedRefreshToken() {
-        sessionRefreshService.refresh(nativeSession.refreshToken(), ClientType.NATIVE);
+    @DisplayName("native 세션이 폐기되면 code를 받을 수 없다")
+    void shouldRejectIssuingCodeWithoutUsableSession() {
+        sessionRefreshService.revokeSession(nativeSession.refreshToken());
 
-        assertThatThrownBy(
-                () -> handoffService.issueCode(owner.userId(), nativeSession.refreshToken()))
+        assertThatThrownBy(() -> handoffService.issueCode(owner.userId()))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
@@ -105,7 +104,7 @@ class HandoffServiceIntegrationTest {
     @Test
     @DisplayName("앱 쪽에서 토큰 재사용이 감지되면 넘겨준 웹 세션도 함께 끊긴다")
     void shouldRevokeHandedOffWebSessionWhenNativeTokenIsReused() {
-        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
+        String code = handoffService.issueCode(owner.userId());
         IssuedSession webSession = handoffService.exchange(code);
         sessionRefreshService.refresh(nativeSession.refreshToken(), ClientType.NATIVE);
 
@@ -118,5 +117,17 @@ class HandoffServiceIntegrationTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
+    }
+
+    @Test
+    @DisplayName("native 세션 계열이 폐기되면 handoff code를 교환할 수 없다")
+    void shouldRejectHandoffCodeFromRevokedFamily() {
+        String code = handoffService.issueCode(owner.userId());
+        sessionRefreshService.revokeSession(nativeSession.refreshToken());
+
+        assertThatThrownBy(() -> handoffService.exchange(code))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.HANDOFF_CODE_INVALID);
     }
 }

@@ -32,6 +32,11 @@ public class TermsRepository {
         return jpaTermsRepository.findAllByRequiredTrue().stream().map(termsMapper::toDomain).toList();
     }
 
+    public List<Terms> findAllRequiredByVersion(String version) {
+        return jpaTermsRepository.findAllByRequiredTrueAndVersion(version)
+                .stream().map(termsMapper::toDomain).toList();
+    }
+
     public List<Terms> findAllByIds(List<Long> termsIds) {
         return jpaTermsRepository.findAllById(termsIds).stream().map(termsMapper::toDomain).toList();
     }

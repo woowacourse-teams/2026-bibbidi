@@ -14,7 +14,3 @@ spring:
     init:
       mode: always
       data-locations: classpath:load_catalog.sql
-
-auth:
-  jwt:
-    secret: ${AUTH_JWT_SECRET:local-development-only-jwt-secret-value}
