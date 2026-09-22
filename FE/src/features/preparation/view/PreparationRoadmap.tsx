@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepDetail } from "./PreparationStepDetail";
-import { PreparationStepInlineAccordions } from "./PreparationStepInlineAccordions";
+import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
 import "./PreparationRoadmap.css";
 
 interface PreparationRoadmapProps {
@@ -98,7 +98,7 @@ function PreparationRoadmapSteps({
               ) : null}
             </button>
             {isExpanded ? (
-              <PreparationStepInlineAccordions
+              <PreparationStepInlineDetail
                 additionErrorMessage={additionErrorMessage}
                 addingCatalogItemIds={addingCatalogItemIds}
                 canAddTasks={canAddTasks}

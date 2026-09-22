@@ -4,9 +4,9 @@ import {
   PreparationTaskList,
 } from "./PreparationTaskList";
 import { PreparationStepChecklist } from "./PreparationStepChecklist";
-import "./PreparationStepInlineAccordions.css";
+import "./PreparationStepInlineDetail.css";
 
-interface PreparationStepInlineAccordionsProps {
+interface PreparationStepInlineDetailProps {
   additionErrorMessage: string | null;
   addingCatalogItemIds: readonly string[];
   canAddTasks: boolean;
@@ -17,7 +17,7 @@ interface PreparationStepInlineAccordionsProps {
   onTaskAdd: (catalogItemId: string) => void;
 }
 
-export function PreparationStepInlineAccordions({
+export function PreparationStepInlineDetail({
   additionErrorMessage,
   addingCatalogItemIds,
   canAddTasks,
@@ -26,7 +26,7 @@ export function PreparationStepInlineAccordions({
   onAddAllTasks,
   onCollapse,
   onTaskAdd,
-}: PreparationStepInlineAccordionsProps) {
+}: PreparationStepInlineDetailProps) {
   return (
     <aside
       aria-label="이 단계에서 준비할 일"
