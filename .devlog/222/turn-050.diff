@@ -1,0 +1,171 @@
+diff --git a/.github/ai-review/README.md b/.github/ai-review/README.md
+index d0d810fd6f8ff204b047407d86d2b71f03b1abce..c353982f937bddf552f97a8d8e3fed165f4b3509 100644
+--- a/.github/ai-review/README.md
++++ b/.github/ai-review/README.md
+@@ -28,17 +28,14 @@ GitHub Actions에서 PR의 요구사항, 변경 diff, 주변 코드와 관련 
+ 
+ ### 🤖 AI만으로 충분한 것
+ 
+-- 정답이 이미 정해져 있는 변경
+-- 기존 동작을 유지하는 변경
+-- 테스트·컴파일·정적 분석 등으로 결과를 검증할 수 있는 변경
++- `ReviewerAssignment`의 리뷰어 선택 순서를 유지한 채 Discord 전송 코드를 공통 함수로 추출했습니다.
++- DM 중복 방지와 204 응답 처리를 단위 테스트와 TypeScript 검사로 검증할 수 있습니다.
+ 
+ ### 👀 사람이 확인해야 하는 것
+ 
+-- 무엇이 올바른 동작인지 정해야 하는 변경
+-- 여러 선택지 중 방향을 결정해야 하는 변경
+-- 비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경
++- 리뷰 지연 알림을 4시간과 12시간에 보내는 빈도가 팀의 리뷰 방식에 적절한지 확인해야 합니다.
+ 
+-#### 이번 PR에서 확인할 것
++#### 리뷰 질문
+ 
+ - **[comment] #질문-토론** (`ExpenseListener.java:31`): 실패 시 재시도하지 않는 정책을 수용할지 확인해 주세요
+   이벤트 처리 실패를 복구하는 경로가 없습니다. **영향:** 비용 반영이 누락된 상태로 남을 수 있습니다.
+diff --git a/.github/ai-review/ai-review-client.ts b/.github/ai-review/ai-review-client.ts
+index 8aee00ba0cee5ea103bdb03ed648955a71bd1c98..41988ca70c3a0f14f752b7026c622e09051b7d3e 100644
+--- a/.github/ai-review/ai-review-client.ts
++++ b/.github/ai-review/ai-review-client.ts
+@@ -54,6 +54,8 @@ export type Finding = {
+ 
+ export type ReviewResult = {
+   summary: string;
++  aiSufficientChanges: string[];
++  humanReviewChanges: string[];
+   findings: Finding[];
+ };
+ 
+@@ -89,6 +91,8 @@ const schema = {
+   type: "object",
+   properties: {
+     summary: { type: "string" },
++    aiSufficientChanges: { type: "array", maxItems: 10, items: { type: "string" } },
++    humanReviewChanges: { type: "array", maxItems: 10, items: { type: "string" } },
+     findings: {
+       type: "array",
+       maxItems: 30,
+@@ -100,7 +104,7 @@ const schema = {
+       },
+     },
+   },
+-  required: ["summary", "findings"],
++  required: ["summary", "aiSufficientChanges", "humanReviewChanges", "findings"],
+   additionalProperties: false,
+ };
+ 
+diff --git a/.github/ai-review/ai-review-prompt.yml b/.github/ai-review/ai-review-prompt.yml
+index c7b8e5a879d105e025e3da2f81e2cb8085cc5c7a..ad4f09de31510d548873d9dfdbe8cda3ed6f4159 100644
+--- a/.github/ai-review/ai-review-prompt.yml
++++ b/.github/ai-review/ai-review-prompt.yml
+@@ -35,6 +35,11 @@ commonInstructions: |-
+ 
+   같은 원인의 문제는 한 항목으로 합친다. 변경되지 않은 기존 문제, 빌드·테스트가 자동으로 찾는 단순 문법 문제, 근거 없는 방어적 코딩 제안은 제외한다.
+ 
++  이번 PR의 실제 변경을 다음 두 배열로 분류한다. 기준 문구를 그대로 반복하지 말고, 파일·기능·동작을 포함한 이번 변경의 구체적인 내용만 한 줄씩 작성한다.
++  - aiSufficientChanges: 정답이 이미 정해져 있거나, 기존 동작을 유지하거나, 테스트·컴파일·정적 분석으로 결과를 검증할 수 있는 변경
++  - humanReviewChanges: 무엇이 올바른 동작인지 정해야 하거나, 여러 선택지 중 방향을 골라야 하거나, 비용과 이득 사이에서 무엇을 포기할지 판단해야 하는 변경
++  해당되는 변경이 없으면 빈 배열을 반환한다. 같은 변경을 두 배열에 중복해서 넣지 않는다.
++
+ stageInputTemplate: |-
+   <repository_conventions>
+   {{conventions}}
+diff --git a/.github/ai-review/ai-review-service.test.ts b/.github/ai-review/ai-review-service.test.ts
+index ef92226c93a2331dc53212b26510e8ccaa65c924..e3727e8ffab7e940ebc8704d6f0bb4383e87af2d 100644
+--- a/.github/ai-review/ai-review-service.test.ts
++++ b/.github/ai-review/ai-review-service.test.ts
+@@ -132,6 +132,8 @@ test("요약 코멘트를 한국어 카테고리와 Markdown 판정 형식으로
+     2,
+     1,
+     false,
++    ["리네임 결과는 컴파일로 검증할 수 있습니다."],
++    ["재시도 정책을 도입할지 사람이 결정해야 합니다."],
+   );
+ 
+   assert.match(body, /## 🤖 AI Code Review/);
+@@ -139,9 +141,9 @@ test("요약 코멘트를 한국어 카테고리와 Markdown 판정 형식으로
+   assert.match(body, /#트랜잭션/);
+   assert.match(body, /### ⚠️ 반영 필요/);
+   assert.match(body, /### 🤖 AI만으로 충분한 것/);
+-  assert.match(body, /정답이 이미 정해져 있는 변경/);
++  assert.match(body, /리네임 결과는 컴파일로 검증할 수 있습니다/);
+   assert.match(body, /### 👀 사람이 확인해야 하는 것/);
+-  assert.match(body, /비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경/);
++  assert.match(body, /재시도 정책을 도입할지 사람이 결정해야 합니다/);
+   assert.doesNotMatch(body, /분석 완료|지적 사항/);
+   assert.match(body, /검증이 필요합니다\. \*\*영향:\*\* 잘못된 데이터가 저장됩니다/);
+   assert.match(body, /AI 판정: 반영 필요/);
+diff --git a/.github/ai-review/ai-review-service.ts b/.github/ai-review/ai-review-service.ts
+index 40f5676319c232b9378ce59e7216d71c62e74180..95b671cb6d9ed72146e0650e1bc20ba0c2032353 100644
+--- a/.github/ai-review/ai-review-service.ts
++++ b/.github/ai-review/ai-review-service.ts
+@@ -473,6 +473,8 @@ export function formatReviewBody(
+   chunks: number,
+   unavailablePatches: number,
+   treeTruncated: boolean,
++  aiSufficientChanges: string[] = [],
++  humanReviewChanges: string[] = [],
+ ) {
+   const count = (severity: Finding["severity"]) => findings.filter((finding) => (
+     finding.kind === "DEFECT" && finding.severity === severity
+@@ -498,6 +500,9 @@ export function formatReviewBody(
+     `patch 미제공 파일: ${unavailablePatches}`,
+     treeTruncated ? "저장소 트리: GitHub API 제한으로 일부만 조회" : "저장소 트리: 전체 조회",
+   ].join(" · ");
++  const changeList = (values: string[], emptyMessage: string) => values.length > 0
++    ? values.map((value) => `- ${briefExplanation(value)}`).join("\n")
++    : `- ${emptyMessage}`;
+ 
+   return `${SUMMARY_MARKER}
+ ${reviewMarker(headSha)}
+@@ -508,19 +513,13 @@ ${requests.length > 0 ? `### ⚠️ 반영 필요\n\n${findingList(requests)}` :
+ ${suggestions.length > 0 ? `### 💬 개선 의견\n\n${findingList(suggestions)}\n` : ""}
+ ### 🤖 AI만으로 충분한 것
+ 
+-- 정답이 이미 정해져 있는 변경
+-- 기존 동작을 유지하는 변경
+-- 테스트·컴파일·정적 분석 등으로 결과를 검증할 수 있는 변경
++${changeList(aiSufficientChanges, "이번 변경에서 AI와 자동 검증만으로 충분한 항목을 찾지 못했습니다.")}
+ 
+ ### 👀 사람이 확인해야 하는 것
+ 
+-- 무엇이 올바른 동작인지 정해야 하는 변경
+-- 여러 선택지 중 방향을 결정해야 하는 변경
+-- 비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경
++${changeList(humanReviewChanges, "이번 변경에서 별도의 사람 판단이 필요한 항목을 찾지 못했습니다.")}
+ 
+-#### 이번 PR에서 확인할 것
+-
+-${humanReview.length > 0 ? findingList(humanReview) : "- 판단이 필요한 트레이드오프를 추가로 발견하지 못했습니다."}
++${humanReview.length > 0 ? `#### 리뷰 질문\n\n${findingList(humanReview)}` : ""}
+ 
+ ### 🔎 검토 범위
+ 
+@@ -579,6 +578,8 @@ export async function runReview({
+   ]);
+ 
+   const candidateFindings: Finding[] = [];
++  const aiSufficientChanges: string[] = [];
++  const humanReviewChanges: string[] = [];
+   for (const [index, chunk] of chunks.entries()) {
+     const [conventions, repositoryContext] = await Promise.all([
+       loadConventions(chunk.files),
+@@ -602,6 +603,8 @@ export async function runReview({
+       cacheKey,
+     );
+     candidateFindings.push(...finalResult.findings);
++    aiSufficientChanges.push(...(finalResult.aiSufficientChanges ?? []));
++    humanReviewChanges.push(...(finalResult.humanReviewChanges ?? []));
+   }
+ 
+   const latestPullRequest = await github.getPullRequest(pullNumber);
+@@ -616,6 +619,8 @@ export async function runReview({
+     chunks.length,
+     unavailablePatches,
+     tree.truncated,
++    [...new Set(aiSufficientChanges)],
++    [...new Set(humanReviewChanges)],
+   );
+ 
+   let review;

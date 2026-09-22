@@ -1,0 +1,242 @@
+name: 비비디 백엔드 공통 CD
+
+on:
+  workflow_call:
+    inputs:
+      deployment-environment:
+        required: true
+        type: string
+      runner-labels:
+        required: true
+        type: string
+      image-tag:
+        required: true
+        type: string
+      build-image:
+        required: true
+        type: boolean
+      spring-profile:
+        required: true
+        type: string
+      deployment-name:
+        required: true
+        type: string
+      service-instance-id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    if: inputs.build-image
+    runs-on: ubuntu-24.04-arm
+    environment: ${{ inputs.deployment-environment }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: BE
+    steps:
+      - name: 배포 백엔드 소스 코드 체크아웃
+        uses: actions/checkout@v7
+
+      - name: Corretto JDK 버전 25 설정
+        uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Gradle 실행 환경과 의존성 캐시 설정
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Gradle clean build로 테스트와 빌드 실행
+        run: ./gradlew clean build
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: ARM64 이미지 빌드용 Docker Buildx 설정
+        uses: docker/setup-buildx-action@v4
+
+      - name: 커밋 SHA 태그의 ARM64 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v7
+        with:
+          context: ./BE
+          file: ./BE/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}
+
+  deploy:
+    needs: build-and-push
+    if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
+    environment: ${{ inputs.deployment-environment }}
+    timeout-minutes: 20
+    env:
+      EC2_DEPLOY_PATH: /opt/bibbidi/app
+      NGINX_CONFIG_PATH: /opt/bibbidi/app/infra/nginx/nginx.conf
+      ALLOY_CONFIG_PATH: /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+      SPRING_ENV_FILE: /opt/bibbidi/app/.env.spring
+      ALLOY_ENV_FILE: /opt/bibbidi/app/infra/monitoring/.env.alloy
+      NGINX_ENV_FILE: /opt/bibbidi/app/.env.nginx
+      CERTBOT_WEBROOT: /opt/bibbidi/app/infra/nginx/certbot
+      TLS_SCRIPT: Infra/scripts/deploy-sub-tasks/tls-sub-tasks/do-tls.sh
+      HOST_PREREQS_SCRIPT: Infra/scripts/deploy-sub-tasks/host-prereqs.sh
+    steps:
+      - name: 서버에 배포 설정 체크아웃
+        uses: actions/checkout@v7
+
+      - name: Docker와 certbot 등 호스트 사전 조건 확인
+        run: bash "$HOST_PREREQS_SCRIPT"
+
+      - name: 서버에서 Docker Hub 로그인
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 커밋 SHA 태그의 배포 이미지 존재 확인
+        run: docker manifest inspect "${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}" >/dev/null
+
+      - name: Compose와 nginx·Alloy·환경 파일 설치
+        env:
+          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+        run: |
+          set -euo pipefail
+          test -n "$SPRING_ENV_CONTENT"
+          test -n "$NGINX_ENV_CONTENT"
+          test -n "$ALLOY_ENV_CONTENT"
+          install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
+          install -d -m 0755 /opt/bibbidi/app/infra/nginx
+          install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
+          install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
+          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
+          umask 077
+          printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
+          printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
+          printf '%s\n' "$ALLOY_ENV_CONTENT" > /opt/bibbidi/app/infra/monitoring/.env.alloy
+          chmod 600 /opt/bibbidi/app/.env.spring /opt/bibbidi/app/.env.nginx /opt/bibbidi/app/infra/monitoring/.env.alloy
+
+      - name: bibbidi-observability Docker 네트워크 준비
+        run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
+
+      - name: 환경별 도메인으로 nginx 설정 생성
+        run: |
+          set -a
+          . /opt/bibbidi/app/.env.nginx
+          set +a
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT}' \
+            < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
+            > /opt/bibbidi/app/infra/nginx/nginx.conf
+          test -s /opt/bibbidi/app/infra/nginx/nginx.conf
+          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT)\}' \
+            /opt/bibbidi/app/infra/nginx/nginx.conf
+
+      - name: nginx 기동을 위한 TLS 인증서 초기화
+        run: bash "$TLS_SCRIPT" bootstrap
+
+      - name: 배포 후 비즈니스 서버와 nginx 상태 확인
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ inputs.image-tag }}
+          SPRING_PROFILES_ACTIVE: ${{ inputs.spring-profile }}
+          DEPLOYMENT_ENVIRONMENT_NAME: ${{ inputs.deployment-name }}
+          OTEL_SERVICE_INSTANCE_ID: ${{ inputs.service-instance-id }}
+        run: |
+          set -euo pipefail
+          cd /opt/bibbidi/app
+
+          PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
+
+          rollback() {
+            if [ -z "$PREVIOUS_IMAGE" ]; then
+              echo "::error::deploy failed and no previous image is available to roll back to"
+              return
+            fi
+            echo "::error::deploy failed - rolling back backend to $PREVIOUS_IMAGE"
+            IMAGE_TAG="${PREVIOUS_IMAGE##*:}" docker compose up -d --force-recreate backend || true
+          }
+
+          docker compose config >/dev/null
+          docker compose pull backend nginx alloy dockerproxy
+          docker compose up -d backend nginx alloy dockerproxy
+          docker exec nginx nginx -t
+          docker exec nginx nginx -s reload
+
+          if ! curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 60 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --retry-all-errors \
+            http://127.0.0.1:8080/actuator/health \
+            | grep --quiet '"status":"UP"'; then
+            docker compose logs --tail=200 backend nginx alloy
+            rollback
+            exit 1
+          fi
+
+          if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
+            docker compose logs --tail=200 nginx alloy
+            rollback
+            exit 1
+          fi
+
+      - name: Let's Encrypt TLS 인증서 발급 또는 갱신
+        id: tls_issue
+        continue-on-error: true
+        run: bash "$TLS_SCRIPT" issue
+
+      - name: TLS 인증서 발급 실패를 Discord로 알림
+        if: steps.tls_issue.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+        run: |
+          echo "::warning::TLS issue/renew failed for ${{ inputs.deployment-name }}"
+          if [ -n "${DISCORD_WEBHOOK_BE:-}" ]; then
+            curl -fsS -H 'Content-Type: application/json' \
+              -d '{"content":"Bibbidi ${{ inputs.deployment-name }}: TLS certificate issue/renew FAILED. Check the deploy workflow logs."}' \
+              "$DISCORD_WEBHOOK_BE" >/dev/null || true
+          fi
+
+      - name: certbot 갱신 타이머 설치(1일 2회)
+        run: |
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.service >/dev/null <<'UNIT'
+          [Unit]
+          Description=Renew the Bibbidi TLS certificate
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+          ExecStart=/bin/sh -c 'certbot renew --quiet --webroot -w /opt/bibbidi/app/infra/nginx/certbot --deploy-hook "docker exec nginx nginx -s reload"'
+          UNIT
+
+          sudo tee /etc/systemd/system/bibbidi-certbot-renew.timer >/dev/null <<'UNIT'
+          [Unit]
+          Description=Run the Bibbidi TLS renewal twice a day
+
+          [Timer]
+          OnCalendar=*-*-* 03,15:00:00
+          RandomizedDelaySec=1h
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now bibbidi-certbot-renew.timer
+
+      - name: 72시간이 지난 미사용 Docker 이미지 정리
+        run: docker image prune --all --force --filter "until=72h"

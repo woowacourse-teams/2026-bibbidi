@@ -1,0 +1,621 @@
+diff --git a/.github/ai-review/README.md b/.github/ai-review/README.md
+index b3b70e840429bc4619dac9bd4e9a9dce272d4005..1ad7f9ad7a9f7420e24d7e0c66c351b688d7c5f5 100644
+--- a/.github/ai-review/README.md
++++ b/.github/ai-review/README.md
+@@ -10,7 +10,49 @@ GitHub Actions에서 PR의 요구사항, 변경 diff, 주변 코드와 관련 
+ - `ai-review-prompt.yml`: 후보 탐색과 최종 판정 기준
+ - `*.test.ts`: diff 분석과 결과 검증 회귀 테스트
+ 
+-`release-be`, `release-fe`, `release-app` 대상 PR을 현재 설정된 모델로 검토한다. PR 생성, Draft 해제, 다시 열기와 새 커밋 추가 시 실행하며, 같은 HEAD SHA에 이미 AI 리뷰가 있으면 중복 실행하지 않는다.
++`dev-be`, `dev-fe`, `dev-app` 대상 PR을 현재 설정된 모델로 검토한다. PR 생성, Draft 해제, 다시 열기와 새 커밋 추가 시 실행하며, 같은 HEAD SHA에 이미 AI 리뷰가 있으면 중복 실행하지 않는다.
++
++요약은 숨김 marker가 있는 일반 PR 코멘트 하나를 계속 갱신한다. 인라인 지적은 각 HEAD SHA의 Review로 남겨 대화 이력을 보존한다. 심각도는 `[request]`, `[comment]`, `[참고]`를 사용하고 카테고리는 한국어 고정 목록을 사용한다.
++
++## 출력 형식
++
++요약 코멘트는 판정과 사람이 직접 판단할 부분을 먼저 보여준다.
++
++```markdown
++## 🤖 AI Code Review
++
++**분석 완료**: 언어, 프레임워크·인프라, 도메인·보안 관점에서 검토했습니다.<br>
++**지적 사항**: `[request]` 1건 · `[comment]` 1건 · `[참고]` 0건
++
++### ⚠️ 반영 필요
++
++- **[request] #트랜잭션** (`ScheduleService.java:42`): 트랜잭션 밖에서 상태를 변경합니다.
++
++### 👀 사람 리뷰어가 볼 곳
++
++- **[comment] #질문-토론**: 실패 시 재시도하지 않는 정책을 수용할지 확인해 주세요.
++
++---
++**[request] AI 판정: 반영 필요** — 필수 대응 1개를 남겼습니다.
++```
++
++인라인 코멘트는 문제, 발생 조건, 영향과 근거를 분리한다.
++
++```markdown
++**[request] #트랜잭션** — 상태 변경이 원자적으로 처리되지 않습니다
++
++두 저장 작업 사이에 예외가 발생하면 일부 상태만 반영됩니다.
++
++- **발생 조건**: 두 번째 저장 작업이 실패할 때
++- **영향**: 일정과 비용 상태가 서로 달라집니다
++- **근거**: 트랜잭션 없이 두 Repository를 순서대로 호출합니다
++
++<details><summary>💡 제안</summary>
++
++유스케이스 경계에 트랜잭션을 적용하세요.
++
++</details>
++```
+ 
+ ## 리뷰 컨텍스트
+ 
+@@ -48,5 +90,6 @@ Repository secret에 `OPENAI_API_KEY`를 등록한다. 별도의 GitHub 토큰
+ 
+ ```shell
+ corepack pnpm --dir .github/ai-review install --frozen-lockfile
++corepack pnpm exec tsc -p .github/ai-review/tsconfig.json
+ node --experimental-strip-types --test .github/ai-review/*.test.ts
+ ```
+diff --git a/.github/ai-review/ai-review-client.ts b/.github/ai-review/ai-review-client.ts
+index acf426c354dd43ff560b10c5b31361f3508315e9..8aee00ba0cee5ea103bdb03ed648955a71bd1c98 100644
+--- a/.github/ai-review/ai-review-client.ts
++++ b/.github/ai-review/ai-review-client.ts
+@@ -26,13 +26,9 @@ export type Issue = {
+ };
+ 
+ export type IssueComment = {
++  id?: number;
+   body?: string | null;
+-  user?: { login?: string };
+-};
+-
+-export type PullRequestReview = {
+-  body?: string | null;
+-  commit_id?: string | null;
++  user?: { login?: string; type?: string };
+ };
+ 
+ export type RepositoryTreeItem = {
+@@ -44,7 +40,7 @@ export type Finding = {
+   kind: "DEFECT" | "QUESTION";
+   severity: "REQUIRED" | "CAUTION" | "ADVICE";
+   confidence: "HIGH" | "MEDIUM" | "LOW";
+-  category: "CORRECTNESS" | "SECURITY" | "DATA" | "CONTRACT" | "OPERATION" | "MAINTAINABILITY";
++  category: "#예외처리" | "#null-safety" | "#트랜잭션" | "#모듈경계" | "#동시성" | "#보안" | "#성능" | "#테스트" | "#네이밍" | "#질문-토론";
+   path: string;
+   side: "LEFT" | "RIGHT";
+   line: number;
+@@ -73,7 +69,10 @@ const findingProperties = {
+   confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+   category: {
+     type: "string",
+-    enum: ["CORRECTNESS", "SECURITY", "DATA", "CONTRACT", "OPERATION", "MAINTAINABILITY"],
++    enum: [
++      "#예외처리", "#null-safety", "#트랜잭션", "#모듈경계", "#동시성",
++      "#보안", "#성능", "#테스트", "#네이밍", "#질문-토론",
++    ],
+   },
+   path: { type: "string" },
+   side: { type: "string", enum: ["LEFT", "RIGHT"] },
+@@ -159,15 +158,6 @@ export function createGitHubClient({ token, repository }: { token: string; repos
+       }
+       return files;
+     },
+-    async getPullRequestReviews(number: number) {
+-      const reviews: PullRequestReview[] = [];
+-      for (let page = 1; page <= 10; page += 1) {
+-        const batch = (await getJson(`/pulls/${number}/reviews?per_page=100&page=${page}`)) as PullRequestReview[];
+-        reviews.push(...batch);
+-        if (batch.length < 100) break;
+-      }
+-      return reviews;
+-    },
+     async getIssue(number: number) {
+       try {
+         return (await getJson(`/issues/${number}`)) as Issue;
+@@ -213,6 +203,20 @@ export function createGitHubClient({ token, repository }: { token: string; repos
+         body: JSON.stringify(review),
+       }, "GitHub review")
+     ).json(),
++    createIssueComment: async (number: number, body: string) => (
++      await request(`${baseUrl}/issues/${number}/comments`, {
++        method: "POST",
++        headers: { ...headers, "Content-Type": "application/json" },
++        body: JSON.stringify({ body }),
++      }, "GitHub issue comment")
++    ).json(),
++    updateIssueComment: async (commentId: number, body: string) => (
++      await request(`${baseUrl}/issues/comments/${commentId}`, {
++        method: "PATCH",
++        headers: { ...headers, "Content-Type": "application/json" },
++        body: JSON.stringify({ body }),
++      }, "GitHub issue comment update")
++    ).json(),
+   };
+ }
+ 
+diff --git a/.github/ai-review/ai-review-prompt.yml b/.github/ai-review/ai-review-prompt.yml
+index bc61de68c5f98839f0768381fe81b64adc07db8d..cb41214f3c31b8b4658d5eaab9673220a5e6316a 100644
+--- a/.github/ai-review/ai-review-prompt.yml
++++ b/.github/ai-review/ai-review-prompt.yml
+@@ -9,10 +9,24 @@ commonInstructions: |-
+   - DEFECT: 요구사항과 코드 근거로 실제 잘못된 동작을 확인할 수 있다.
+   - QUESTION: 정책 또는 요구사항이 불명확해 결함으로 단정할 수 없지만 병합 전에 확인할 필요가 있다. 질문 형태로 작성한다.
+ 
+-  severity 기준:
+-  - REQUIRED: 보안 취약점, 데이터 손실·오염, 명확한 오동작, 계약 위반처럼 반드시 수정해야 하는 높은 확신의 결함이다.
+-  - CAUTION: 수정이 강하게 권장되지만 명시적인 트레이드오프에 따라 수용할 수 있다.
+-  - ADVICE: 동작에는 직접 영향이 없고 적용 여부를 작성자가 선택할 수 있다. 매우 제한적으로 사용한다.
++  severity와 Markdown 태그 기준:
++  - REQUIRED → [request]: 보안 취약점, 데이터 손실·오염, 명확한 오동작, 계약 위반처럼 반드시 반영하거나 근거를 남겨야 하는 높은 확신의 결함이다.
++  - CAUTION → [comment]: 수정이 권장되지만 명시적인 트레이드오프에 따라 수용할 수 있다.
++  - ADVICE → [참고]: 동작에는 직접 영향이 없고 적용 여부를 작성자가 선택할 수 있다. 매우 제한적으로 사용한다.
++
++  category는 다음 한국어 고정 목록 중 하나만 사용한다:
++  - #예외처리
++  - #null-safety
++  - #트랜잭션
++  - #모듈경계
++  - #동시성
++  - #보안
++  - #성능
++  - #테스트
++  - #네이밍
++  - #질문-토론
++
++  kind가 QUESTION이면 category는 반드시 #질문-토론을 사용한다.
+ 
+   confidence 기준:
+   - HIGH: 제공된 코드와 요구사항만으로 재현 조건과 잘못된 결과가 확정된다.
+diff --git a/.github/ai-review/ai-review-service.test.ts b/.github/ai-review/ai-review-service.test.ts
+index dafef40bfa3188264dcd79f93abd73383389ae33..cfbb76469c9c83d427efda3b0f18b56bb7c463b4 100644
+--- a/.github/ai-review/ai-review-service.test.ts
++++ b/.github/ai-review/ai-review-service.test.ts
+@@ -7,8 +7,10 @@ import {
+   deterministicSummary,
+   excerptAroundLines,
+   extractLinkedIssueNumber,
++  formatReviewBody,
+   hasReviewForHead,
+   reviewMarker,
++  runReview,
+   selectValidFindings,
+ } from "./ai-review-service.ts";
+ 
+@@ -17,7 +19,7 @@ function finding(overrides: Partial<Finding> = {}): Finding {
+     kind: "DEFECT",
+     severity: "CAUTION",
+     confidence: "HIGH",
+-    category: "CORRECTNESS",
++    category: "#예외처리",
+     path: "BE/src/Foo.java",
+     side: "RIGHT",
+     line: 11,
+@@ -79,9 +81,9 @@ test("LOW 확신도와 근거 없는 항목을 제거하고 같은 위치와 분
+   const selected = selectValidFindings([
+     finding(),
+     finding({ title: "같은 원인의 다른 문장" }),
+-    finding({ confidence: "LOW", category: "SECURITY" }),
+-    finding({ evidence: "", category: "DATA" }),
+-    finding({ line: 999, category: "OPERATION" }),
++    finding({ confidence: "LOW", category: "#보안" }),
++    finding({ evidence: "", category: "#트랜잭션" }),
++    finding({ line: 999, category: "#성능" }),
+   ], lines);
+ 
+   assert.equal(selected.length, 1);
+@@ -96,9 +98,9 @@ test("검증된 finding만으로 결정론적인 요약을 만든다", () => {
+   assert.equal(
+     deterministicSummary([
+       finding({ severity: "REQUIRED" }),
+-      finding({ kind: "QUESTION", category: "CONTRACT", line: 12 }),
++      finding({ kind: "QUESTION", category: "#질문-토론", line: 12 }),
+     ]),
+-    "검증된 결함 1개 중 필수 수정 1개와 정책 확인 질문 1개를 남겼습니다.",
++    "검증된 지적 1개 중 필수 대응 1개와 사람의 판단이 필요한 질문 1개를 남겼습니다.",
+   );
+ });
+ 
+@@ -119,6 +121,109 @@ test("변경 줄 주변 코드만 줄 번호와 함께 발췌한다", () => {
+ 
+ test("같은 HEAD SHA에 marker가 있는 리뷰만 중복 리뷰로 판단한다", () => {
+   const sha = "abc123";
+-  assert.equal(hasReviewForHead([{ commit_id: sha, body: reviewMarker(sha) }], sha), true);
+-  assert.equal(hasReviewForHead([{ commit_id: "old", body: reviewMarker("old") }], sha), false);
++  assert.equal(hasReviewForHead([{ body: `<!-- bibbidi-ai-review:summary -->\n${reviewMarker(sha)}` }], sha), true);
++  assert.equal(hasReviewForHead([{ body: `<!-- bibbidi-ai-review:summary -->\n${reviewMarker("old")}` }], sha), false);
++});
++
++test("요약 코멘트를 한국어 카테고리와 Markdown 판정 형식으로 만든다", () => {
++  const body = formatReviewBody(
++    [finding({ severity: "REQUIRED", category: "#트랜잭션" })],
++    "abc123",
++    2,
++    1,
++    false,
++  );
++
++  assert.match(body, /## 🤖 AI Code Review/);
++  assert.match(body, /\[request]/);
++  assert.match(body, /#트랜잭션/);
++  assert.match(body, /### ⚠️ 반영 필요/);
++  assert.match(body, /AI 판정: 반영 필요/);
++  assert.match(body, /bibbidi-ai-review:meta/);
++});
++
++test("새 HEAD 리뷰가 끝나면 기존 AI 요약 코멘트를 갱신한다", async () => {
++  const updates: Array<{ id: number; body: string }> = [];
++  let modelCalls = 0;
++  const pullRequest = {
++    title: "문서 변경",
++    body: "연결된 이슈 없음",
++    labels: [],
++    base: { ref: "dev-be", sha: "base-sha" },
++    head: { ref: "chore/222", sha: "head-sha" },
++  };
++  const github = {
++    getPullRequest: async () => pullRequest,
++    getPullRequestFiles: async () => files,
++    getIssueComments: async () => [{
++      id: 10,
++      body: "<!-- bibbidi-ai-review:summary -->\nold summary",
++      user: { login: "github-actions[bot]", type: "Bot" },
++    }],
++    getRepositoryTree: async () => ({ items: [], truncated: false }),
++    getRepositoryFile: async () => "class Foo {\n  void save() {}\n}",
++    updateIssueComment: async (id: number, body: string) => {
++      updates.push({ id, body });
++      return {};
++    },
++    createIssueComment: async () => assert.fail("기존 요약이 있으면 새 코멘트를 만들면 안 된다"),
++    createReview: async () => assert.fail("finding이 없으면 빈 Review를 만들면 안 된다"),
++  };
++  const openai = {
++    review: async () => {
++      modelCalls += 1;
++      return { summary: "", findings: [] };
++    },
++  };
++  const prompts = {
++    commonInstructions: "review",
++    stageInputTemplate: "{{diff}} {{repositoryContext}} {{requirements}} {{stageFocus}}",
++    finalInputTemplate: "{{diff}} {{candidates}} {{stageFocus}}",
++  };
++
++  const result = await runReview({
++    github: github as never,
++    openai: openai as never,
++    pullNumber: 222,
++    expectedHeadSha: "head-sha",
++    prompts,
++  });
++
++  assert.equal(result.skipped, false);
++  assert.equal(modelCalls, 4);
++  assert.equal(updates.length, 1);
++  assert.equal(updates[0].id, 10);
++  assert.match(updates[0].body, /AI 판정: 통과/);
++  assert.match(updates[0].body, new RegExp(reviewMarker("head-sha")));
++});
++
++test("현재 HEAD의 요약이 있으면 모델을 호출하지 않고 리뷰를 생략한다", async () => {
++  let modelCalls = 0;
++  const github = {
++    getPullRequest: async () => ({
++      title: "문서 변경",
++      body: "",
++      base: { ref: "dev-be", sha: "base-sha" },
++      head: { ref: "chore/222", sha: "head-sha" },
++    }),
++    getPullRequestFiles: async () => files,
++    getIssueComments: async () => [{ body: `<!-- bibbidi-ai-review:summary -->\n${reviewMarker("head-sha")}` }],
++  };
++  const openai = {
++    review: async () => {
++      modelCalls += 1;
++      return { summary: "", findings: [] };
++    },
++  };
++
++  const result = await runReview({
++    github: github as never,
++    openai: openai as never,
++    pullNumber: 222,
++    expectedHeadSha: "head-sha",
++    prompts: { commonInstructions: "", stageInputTemplate: "", finalInputTemplate: "" },
++  });
++
++  assert.equal(result.skipped, true);
++  assert.equal(modelCalls, 0);
+ });
+diff --git a/.github/ai-review/ai-review-service.ts b/.github/ai-review/ai-review-service.ts
+index 15adfb69f09bba7a262c7100b43af799e84761bd..4677c16132a2145c47beabf0126bef2b5f4f59b9 100644
+--- a/.github/ai-review/ai-review-service.ts
++++ b/.github/ai-review/ai-review-service.ts
+@@ -36,6 +36,7 @@ const MAX_DIFF_CHUNK_CHARACTERS = 45_000;
+ const MAX_CONTEXT_CHARACTERS = 80_000;
+ const MAX_REQUIREMENTS_CHARACTERS = 30_000;
+ const MAX_INLINE_COMMENTS = 20;
++const SUMMARY_MARKER = "<!-- bibbidi-ai-review:summary -->";
+ const REVIEW_MARKER_PREFIX = "<!-- bibbidi-ai-review:sha=";
+ const COMMON_CONVENTION_FILE = "docs/convention/git-convention.md";
+ const BE_CONVENTION_FILES = [
+@@ -69,11 +70,11 @@ export function reviewMarker(headSha: string) {
+ }
+ 
+ export function hasReviewForHead(
+-  reviews: Array<{ body?: string | null; commit_id?: string | null }>,
++  comments: Array<{ body?: string | null }>,
+   headSha: string,
+ ) {
+   const marker = reviewMarker(headSha);
+-  return reviews.some((review) => review.commit_id === headSha && review.body?.includes(marker));
++  return comments.some((comment) => comment.body?.includes(SUMMARY_MARKER) && comment.body.includes(marker));
+ }
+ 
+ export function collectCommentableLines(files: PullRequestFile[]) {
+@@ -122,6 +123,9 @@ export function selectValidFindings(
+ 
+   return [...findings]
+     .filter((finding) => finding.confidence !== "LOW")
++    .filter((finding) => (
++      (finding.kind === "QUESTION") === (finding.category === "#질문-토론")
++    ))
+     .filter((finding) => {
+       const line = `${finding.side}:${finding.line}`;
+       const key = [finding.path, line, finding.kind, finding.category].join(":");
+@@ -420,21 +424,24 @@ async function reviewFinalStage(
+ }
+ 
+ function formatInlineComment(finding: Finding) {
+-  const label = finding.kind === "QUESTION" ? "QUESTION" : finding.severity;
++  const severityLabels = {
++    REQUIRED: "request",
++    CAUTION: "comment",
++    ADVICE: "참고",
++  } as const;
++  const label = finding.kind === "QUESTION" ? "comment" : severityLabels[finding.severity];
+   const suggestion = finding.suggestion.trim()
+-    ? `\n\n**제안**\n${finding.suggestion.trim()}`
++    ? `\n\n<details><summary>💡 제안</summary>\n\n${finding.suggestion.trim()}\n\n</details>`
+     : "";
+-  return `**[${label}] ${finding.title.trim()}**
+-
+-**발생 조건**: ${finding.trigger.trim()}
+-
+-**영향**: ${finding.impact.trim()}
++  return `**[${label}] ${finding.category}** — ${finding.title.trim()}
+ 
+-**근거**: ${finding.evidence.trim()}
++${finding.explanation.trim()}
+ 
+-${finding.explanation.trim()}${suggestion}
++- **발생 조건**: ${finding.trigger.trim()}
++- **영향**: ${finding.impact.trim()}
++- **근거**: ${finding.evidence.trim()}
+ 
+-_확신도: ${finding.confidence} · 분류: ${finding.category}_`;
++${suggestion}\n\n_확신도: ${finding.confidence}_`;
+ }
+ 
+ export function deterministicSummary(findings: Finding[]) {
+@@ -442,10 +449,25 @@ export function deterministicSummary(findings: Finding[]) {
+   const defects = findings.filter((finding) => finding.kind === "DEFECT");
+   const questions = findings.filter((finding) => finding.kind === "QUESTION");
+   const required = defects.filter((finding) => finding.severity === "REQUIRED").length;
+-  return `검증된 결함 ${defects.length}개${required ? ` 중 필수 수정 ${required}개` : ""}와 정책 확인 질문 ${questions.length}개를 남겼습니다.`;
++  return `검증된 지적 ${defects.length}개${required ? ` 중 필수 대응 ${required}개` : ""}와 사람의 판단이 필요한 질문 ${questions.length}개를 남겼습니다.`;
+ }
+ 
+-function formatReviewBody(
++function verdict(findings: Finding[]) {
++  if (findings.some((finding) => finding.kind === "DEFECT" && finding.severity === "REQUIRED")) {
++    return { tag: "request", text: "반영 필요" } as const;
++  }
++  if (findings.some((finding) => finding.kind === "QUESTION" || finding.severity === "CAUTION")) {
++    return { tag: "comment", text: "조건부 통과" } as const;
++  }
++  return { tag: "참고", text: "통과" } as const;
++}
++
++function severityLabel(finding: Finding) {
++  if (finding.kind === "QUESTION") return "comment";
++  return finding.severity === "REQUIRED" ? "request" : finding.severity === "CAUTION" ? "comment" : "참고";
++}
++
++export function formatReviewBody(
+   findings: Finding[],
+   headSha: string,
+   chunks: number,
+@@ -456,27 +478,64 @@ function formatReviewBody(
+     finding.kind === "DEFECT" && finding.severity === severity
+   )).length;
+   const questions = findings.filter((finding) => finding.kind === "QUESTION").length;
++  const decision = verdict(findings);
++  const requests = findings.filter((finding) => finding.kind === "DEFECT" && finding.severity === "REQUIRED");
++  const humanReview = findings.filter((finding) => finding.kind === "QUESTION");
++  const categoryCounts = Object.fromEntries(
++    [...new Set(findings.map((finding) => finding.category))]
++      .sort()
++      .map((category) => [category, findings.filter((finding) => finding.category === category).length]),
++  );
++  const findingList = (values: Finding[]) => values.length > 0
++    ? values.map((finding) => `- **[${severityLabel(finding)}] ${finding.category}** (\`${finding.path}:${finding.line}\`): ${finding.title} — ${finding.impact}`).join("\n")
++    : "- 없음";
+   const coverage = [
+     `diff 청크: ${chunks}`,
+     `patch 미제공 파일: ${unavailablePatches}`,
+     treeTruncated ? "저장소 트리: GitHub API 제한으로 일부만 조회" : "저장소 트리: 전체 조회",
+   ].join(" · ");
+ 
+-  return `${reviewMarker(headSha)}
+-## 코드 리뷰
++  return `${SUMMARY_MARKER}
++${reviewMarker(headSha)}
++## 🤖 AI Code Review
++
++**분석 완료**: 언어, 프레임워크·인프라, 도메인·보안 관점에서 검토했습니다.<br>
++**지적 사항**: \`[request]\` ${count("REQUIRED")}건 · \`[comment]\` ${count("CAUTION") + questions}건 · \`[참고]\` ${count("ADVICE")}건
++
++### 🧾 리뷰 요약
+ 
+ ${deterministicSummary(findings)}
+ 
+-| 구분 | 개수 |
+-| --- | ---: |
+-| REQUIRED | ${count("REQUIRED")} |
+-| CAUTION | ${count("CAUTION")} |
+-| ADVICE | ${count("ADVICE")} |
+-| QUESTION | ${questions} |
++${requests.length > 0 ? `### ⚠️ 반영 필요\n\n${findingList(requests)}` : `### ✅ 통과 사유\n\n- 재현 가능한 \`[request]\` 수준의 결함을 확인하지 못했습니다.`}
++
++### 👀 사람 리뷰어가 볼 곳
++
++${humanReview.length > 0 ? findingList(humanReview) : "- 판단이 필요한 트레이드오프를 추가로 발견하지 못했습니다."}
+ 
+-인라인 코멘트: ${findings.length}/${MAX_INLINE_COMMENTS}
++### 🔎 검토 범위
+ 
+-<sub>${coverage}</sub>`;
++- ${coverage}
++- 인라인 코멘트: ${findings.length}/${MAX_INLINE_COMMENTS}
++
++---
++**[${decision.tag}] AI 판정: ${decision.text}** — ${deterministicSummary(findings)}
++
++<!-- bibbidi-ai-review:meta ${JSON.stringify({ verdict: decision.text, request: count("REQUIRED"), comment: count("CAUTION") + questions, 참고: count("ADVICE"), categories: categoryCounts })} -->`;
++}
++
++async function upsertSummaryComment(
++  github: GitHubClient,
++  pullNumber: number,
++  comments: Array<{ id?: number; body?: string | null; user?: { login?: string; type?: string } }>,
++  body: string,
++) {
++  const existing = comments.find((comment) => (
++    comment.id
++    && comment.body?.includes(SUMMARY_MARKER)
++    && (comment.user?.login === "github-actions[bot]" || comment.user?.type === "Bot")
++  ));
++  if (existing?.id) return github.updateIssueComment(existing.id, body);
++  return github.createIssueComment(pullNumber, body);
+ }
+ 
+ export async function runReview({
+@@ -492,16 +551,16 @@ export async function runReview({
+   expectedHeadSha: string;
+   prompts: ReviewPrompts;
+ }) {
+-  const [pullRequest, files, reviews] = await Promise.all([
++  const [pullRequest, files, pullRequestComments] = await Promise.all([
+     github.getPullRequest(pullNumber),
+     github.getPullRequestFiles(pullNumber),
+-    github.getPullRequestReviews(pullNumber),
++    github.getIssueComments(pullNumber),
+   ]);
+ 
+   if (pullRequest.head.sha !== expectedHeadSha) {
+     throw new Error("리뷰 시작 전에 새 커밋이 올라왔습니다. 최신 커밋에서 다시 실행해 주세요.");
+   }
+-  if (hasReviewForHead(reviews, expectedHeadSha)) return { skipped: true as const };
++  if (hasReviewForHead(pullRequestComments, expectedHeadSha)) return { skipped: true as const };
+ 
+   const [{ chunks, unavailablePatches }, requirements, tree] = await Promise.all([
+     Promise.resolve(buildDiffChunks(files)),
+@@ -551,16 +610,20 @@ export async function runReview({
+     tree.truncated,
+   );
+ 
+-  const review = await github.createReview(pullNumber, {
+-    commit_id: expectedHeadSha,
+-    event: "COMMENT",
+-    body,
+-    comments: findings.map((finding) => ({
+-      path: finding.path,
+-      side: finding.side,
+-      line: finding.line,
+-      body: formatInlineComment(finding),
+-    })),
+-  });
+-  return { skipped: false as const, review };
++  let review;
++  if (findings.length > 0) {
++    review = await github.createReview(pullNumber, {
++      commit_id: expectedHeadSha,
++      event: "COMMENT",
++      body: reviewMarker(expectedHeadSha),
++      comments: findings.map((finding) => ({
++        path: finding.path,
++        side: finding.side,
++        line: finding.line,
++        body: formatInlineComment(finding),
++      })),
++    });
++  }
++  const summaryComment = await upsertSummaryComment(github, pullNumber, pullRequestComments, body);
++  return { skipped: false as const, review, summaryComment };
+ }
+diff --git a/.github/ai-review/tsconfig.json b/.github/ai-review/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba4feeb11d51385099391db36cf05cd66508762b
+--- /dev/null
++++ b/.github/ai-review/tsconfig.json
+@@ -0,0 +1,12 @@
++{
++  "compilerOptions": {
++    "allowImportingTsExtensions": true,
++    "module": "NodeNext",
++    "moduleResolution": "NodeNext",
++    "noEmit": true,
++    "strict": true,
++    "target": "ES2023",
++    "types": ["node"]
++  },
++  "include": ["*.ts"]
++}
+diff --git a/.github/ai-review/types.d.ts b/.github/ai-review/types.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7fe3f491049123c9e99b4108deb9300fb1ca2478
+--- /dev/null
++++ b/.github/ai-review/types.d.ts
+@@ -0,0 +1,3 @@
++declare module "js-yaml" {
++  export function load(value: string): unknown;
++}
+diff --git a/.github/workflows/ai-code-review.yml b/.github/workflows/ai-code-review.yml
+index ef48f3bebec9d0b0133757f3cd3b2413f9e11dcd..6e10cca75909a2d35cf9234683494272d4b26b09 100644
+--- a/.github/workflows/ai-code-review.yml
++++ b/.github/workflows/ai-code-review.yml
+@@ -8,9 +8,9 @@ on:
+       - synchronize
+       - reopened
+     branches:
+-      - release-be
+-      - release-fe
+-      - release-app
++      - dev-be
++      - dev-fe
++      - dev-app
+ 
+ permissions:
+   contents: read
+@@ -54,6 +54,9 @@ jobs:
+       - name: AI 리뷰 diff 분석과 결과 검증 테스트 실행
+         run: node --experimental-strip-types --test .github/ai-review/*.test.ts
+ 
++      - name: AI 리뷰 TypeScript 타입 검사
++        run: pnpm exec tsc -p .github/ai-review/tsconfig.json
++
+       - name: PR 변경사항을 AI로 리뷰하고 댓글 작성
+         env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+@@ -61,5 +64,4 @@ jobs:
+           REVIEW_REPOSITORY: ${{ github.repository }}
+           REVIEW_PULL_NUMBER: ${{ github.event.pull_request.number }}
+           REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+-          REVIEW_EVENT: ${{ github.event.action }}
+         run: node --experimental-strip-types .github/ai-review/cli.ts
