@@ -750,38 +750,77 @@
     flex-direction: column;
   }
 
+  .preparation-roadmap__step--expanded {
+    border: 2px solid var(--color-stroke-brand-solid);
+    border-radius: 16px;
+    background: var(--color-bg-layer-default);
+    box-shadow: 0 8px 18px rgb(193 104 84 / 8%);
+  }
+
   .preparation-roadmap__step-button {
-    min-height: 156px;
+    min-height: 120px;
     height: auto;
-    padding: 20px;
+    padding: 14px;
     border-radius: 16px;
     box-shadow: 0 4px 14px rgb(0 0 0 / 5%);
   }
 
   .preparation-roadmap__step-button[aria-pressed="true"] {
-    padding: 19px;
+    padding: 13px;
     background: var(--color-bg-layer-default);
     box-shadow: 0 4px 14px rgb(0 0 0 / 5%);
   }
 
+  .preparation-roadmap__step--expanded
+    > .preparation-roadmap__step-button[aria-pressed="true"] {
+    min-height: 72px;
+    padding: 10px 14px 4px;
+    border: 0;
+    border-radius: 14px 14px 0 0;
+    box-shadow: none;
+  }
+
   .preparation-roadmap__step-header {
-    margin-bottom: 16px;
+    margin-bottom: 6px;
   }
 
   .preparation-roadmap__step-number {
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .preparation-roadmap__step-title {
-    padding-right: 64px;
-    font-size: 18px;
+    padding-right: 52px;
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  .preparation-roadmap__step-action {
+    position: static;
+    margin-top: auto;
+    padding-top: 6px;
+    opacity: 1;
+    transform: none;
   }
 
   .preparation-roadmap__step-icon {
-    right: 16px;
-    bottom: 16px;
-    width: 68px;
-    height: 68px;
+    right: 14px;
+    bottom: 12px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .preparation-roadmap__step--expanded
+    > .preparation-roadmap__step-button
+    .preparation-roadmap__step-header {
+    margin-bottom: 2px;
+  }
+
+  .preparation-roadmap__step--expanded
+    > .preparation-roadmap__step-button
+    .preparation-roadmap__step-icon {
+    bottom: 6px;
+    width: 44px;
+    height: 44px;
   }
 
   .preparation-roadmap__step--expanded > .preparation-step-inline-detail {
