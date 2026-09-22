@@ -64,4 +64,33 @@ describe("LoginForm", () => {
       "password",
     );
   });
+
+  it("기존 로그인 다음에 세 소셜 로그인 버튼을 순서대로 표시한다", () => {
+    render(<LoginForm signupLink={<a href="/signup">회원가입</a>} />);
+
+    expect(
+      screen.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual([
+      "로그인",
+      "카카오로 계속하기",
+      "구글로 계속하기",
+      "애플로 계속하기",
+    ]);
+    expect(
+      screen.getByRole("separator", { name: "다른 로그인 방법" }),
+    ).toBeTruthy();
+  });
+
+  it("소셜 로그인 버튼을 누르면 인증 요청 없이 준비 중 안내를 표시한다", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LoginForm signupLink={<a href="/signup">회원가입</a>} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "구글로 계속하기" }));
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "구글 로그인은 준비 중이에요.",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

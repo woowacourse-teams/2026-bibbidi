@@ -1,0 +1,27 @@
+{"type":"SESSION_STARTED","sessionId":"01a0c68a-1779-7132-8b1f-db7f4395d307","agent":"CODEX","cwd":"/Users/byunghyun/Projects/2026-bibbidi","branch":"dev-fe","head":"819c5b8b0a7f9c18b006d0752c7ed1e2ac0ce2c0","gitStatus":" M pnpm-lock.yaml","timestamp":"2026-09-22T00:46:16.227Z"}
+{"type":"ISSUE_BOUND","issue":229,"source":"USER_CONFIRMED","timestamp":"2026-09-22T00:46:16.250Z"}
+{"type":"GRILL_ME_STARTED","issue":229,"timestamp":"2026-09-22T00:46:16.423Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"이번 작업은 브라우저 로그인 페이지의 카카오·구글·애플 UI만 구현하며 실제 소셜 인증, JWT 연동, WebView bridge는 제외한다.","timestamp":"2026-09-22T00:46:16.567Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"기존 닉네임·비밀번호 로그인 폼을 어떻게 할까요? A. 소셜 로그인 버튼으로 완전히 교체한다. B. 기존 폼 아래에 소셜 로그인 버튼을 함께 둔다. 추천: A. 상위 설계에서 기존 닉네임·비밀번호 인증을 소셜 로그인으로 전환하기로 확정했고, 이번 UI가 앞으로의 로그인 화면을 명확하게 보여 준다.","timestamp":"2026-09-22T00:46:16.708Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"기존 닉네임·비밀번호 로그인 폼과 회원가입 링크를 유지하고, 그 아래에 소셜 로그인 UI를 함께 배치한다.","timestamp":"2026-09-22T00:48:14.279Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"세 소셜 로그인 버튼을 어떤 형태로 배치할까요? A. 제공자 이름이 적힌 전체 너비 버튼 3개를 세로로 배치한다. B. 아이콘 중심의 버튼 3개를 가로로 배치한다. 추천: A. 320px 모바일에서도 제공자 이름을 분명하게 읽을 수 있고, 키보드와 스크린 리더 사용성도 좋다.","timestamp":"2026-09-22T00:48:14.421Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"카카오·구글·애플 로그인은 로고와 제공자 이름이 포함된 전체 너비 버튼 3개를 세로로 배치한다.","timestamp":"2026-09-22T00:49:31.997Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"소셜 로그인 버튼의 색상과 모양을 어떻게 할까요? A. 각 제공자의 공식 색상과 로고 특성을 살린다. B. 세 버튼 모두 Bibbidi 브랜드 색상으로 통일한다. 추천: A. 사용자가 익숙한 제공자를 즉시 알아볼 수 있고 소셜 로그인 버튼이라는 목적이 분명하다.","timestamp":"2026-09-22T00:49:32.145Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"참고 이미지처럼 카카오 노랑, 구글 흰색 테두리, 애플 검정의 전체 너비 버튼을 카카오·구글·애플 순서로 배치하고, 문구는 각 제공자로 계속하기 형식을 사용한다.","timestamp":"2026-09-22T00:50:51.325Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"참고 이미지의 짙은 초록 배경도 적용할까요? A. 버튼 스타일만 참고하고 기존 Bibbidi 아이보리 배경과 흰색 로그인 카드 안에 둔다. B. 소셜 로그인 영역에 짙은 초록 배경까지 적용한다. 추천: A. 기존 닉네임·비밀번호 폼과 한 화면에서 자연스럽게 이어지고, 현재 Bibbidi 색상 체계와도 맞는다.","timestamp":"2026-09-22T00:50:51.470Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"참고 이미지의 짙은 초록 배경은 사용하지 않고, 기존 Bibbidi 아이보리 배경과 흰색 로그인 카드 안에 소셜 버튼 스타일만 적용한다.","timestamp":"2026-09-22T00:51:22.201Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"실제 인증을 연결하기 전 버튼을 누르면 어떻게 반응할까요? A. 버튼은 활성 상태로 두고 카드 안에 준비 중 안내를 표시한다. B. 세 버튼을 비활성 상태로 표시한다. 추천: A. hover, focus, pressed 상태를 확인할 수 있고 사용자가 눌렀을 때 아무 반응이 없는 혼란도 피할 수 있다.","timestamp":"2026-09-22T00:51:22.345Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"소셜 로그인 버튼은 활성 상태로 제공하고, 클릭 시 인증 요청 없이 해당 제공자 로그인은 준비 중이라는 안내를 카드 안의 접근 가능한 상태 영역에 표시한다.","timestamp":"2026-09-22T00:52:15.134Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"로그인 카드 안의 최종 순서를 어떻게 할까요? A. 기존 로그인 폼 → 또는 구분선 → 소셜 버튼 → 회원가입 안내. B. 기존 로그인 폼 → 회원가입 안내 → 또는 구분선 → 소셜 버튼. 추천: A. 로그인 방법들을 한 덩어리로 묶고 계정 생성 안내를 마지막 보조 행동으로 둘 수 있다.","timestamp":"2026-09-22T00:52:15.274Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"로그인 카드의 순서는 기존 닉네임·비밀번호 로그인 폼, 또는 구분선, 카카오·구글·애플 소셜 버튼, 회원가입 안내 순으로 구성한다.","timestamp":"2026-09-22T00:53:54.220Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"이번 작업에 ADR이 필요한가요? A. 필요 없다. 기존 React와 CSS를 그대로 사용하며 새로운 기술이나 구조를 선택하지 않는다. B. 필요하다. 소셜 로그인 UI 구성과 컴포넌트 책임을 Issue에 별도 기술 결정으로 남긴다. 추천: A. 이번 작업은 인증 연동 없이 기존 화면에 표현 컴포넌트를 추가하는 범위라 장기적인 기술 선택이 없다.","timestamp":"2026-09-22T00:53:54.367Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"새 기술이나 장기적인 구조 선택이 없는 기존 React·CSS 기반 UI 추가이므로 ADR을 작성하지 않는다.","timestamp":"2026-09-22T00:54:26.345Z"}
+{"type":"GRILL_ME_ANSWER","issue":229,"answer":"A. 이번 작업에는 ADR이 필요 없다.","redacted":false,"timestamp":"2026-09-22T00:54:43.861Z"}
+{"type":"ADR_SKIPPED","issue":229,"reason":"인증 연동과 새 의존성 없이 기존 LoginForm과 CSS에 표현 UI만 추가하므로 별도 기술 선택 기록이 필요 없다.","timestamp":"2026-09-22T00:54:44.021Z"}
+{"type":"GRILL_ME_QUESTION","issue":229,"question":"정리한 설계대로 #229의 Issue 본문을 확정하고 구현을 시작해도 될까요?","timestamp":"2026-09-22T00:54:44.160Z"}
+{"type":"GRILL_ME_ANSWER","issue":229,"answer":"정리한 설계대로 구현을 진행한다.","redacted":false,"timestamp":"2026-09-22T00:56:37.302Z"}
+{"type":"GRILL_ME_DECISION","issue":229,"decision":"최종 설계 요약을 사용자에게 확인받았으며 #229 본문을 확정하고 구현을 시작한다.","timestamp":"2026-09-22T00:56:37.447Z"}
+{"type":"GRILL_ME_FINISHED","issue":229,"timestamp":"2026-09-22T00:56:37.606Z"}
+{"type":"COMMIT_EXPLAINED","issue":229,"explanation":"FE/src/features/login/view/LoginForm.tsx에 카카오·구글·애플 소셜 로그인 버튼, 인라인 로고, 또는 구분선, 인증 요청 없는 준비 중 안내를 추가했습니다. FE/src/features/login/view/LoginForm.css에 참고 이미지 기반 제공자별 색상과 모바일 대응, hover·pressed·focus 스타일을 추가했습니다. FE/src/features/login/view/LoginForm.test.tsx에 버튼 순서와 준비 중 안내가 네트워크 요청 없이 동작하는 테스트를 추가했습니다. 설계와 다르게 구현한 부분은 없습니다. 작업 전부터 수정돼 있던 pnpm-lock.yaml은 이번 커밋에서 제외합니다.","diffStat":" FE/src/features/login/view/LoginForm.css      | 119 +++++++++++++++++++++++++-\n FE/src/features/login/view/LoginForm.test.tsx |  29 +++++++\n FE/src/features/login/view/LoginForm.tsx      |  86 ++++++++++++++++++-\n pnpm-lock.yaml                                |  20 +----\n 4 files changed, 235 insertions(+), 19 deletions(-)","tree":"bdd2c7bb76937580270896195627a05def2ce779","timestamp":"2026-09-22T01:06:23.848Z"}
+{"type":"GRILL_ME_ANSWER","issue":229,"answer":"소셜 로그인 UI에 필요한 변경만 포함해 커밋하고 PR을 진행한다. 무관한 pnpm-lock.yaml 변경은 제외한다.","redacted":false,"timestamp":"2026-09-22T01:08:40.923Z"}
+{"type":"COMMIT_CONFIRMED","issue":229,"tree":"bdd2c7bb76937580270896195627a05def2ce779","timestamp":"2026-09-22T01:08:41.238Z"}
