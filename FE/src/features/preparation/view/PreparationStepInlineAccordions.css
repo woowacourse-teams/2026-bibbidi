@@ -119,9 +119,7 @@
   padding-left: 0;
 }
 
-.preparation-step-inline-detail
-  .preparation-step-checklist--empty
-  > .preparation-task-list__empty-state {
+.preparation-step-inline-detail .preparation-task-list__empty-state {
   flex: none;
   align-items: flex-start;
   justify-content: flex-start;
@@ -129,23 +127,15 @@
   text-align: left;
 }
 
-.preparation-step-inline-detail
-  .preparation-step-checklist--empty
-  .preparation-task-list__empty-icon {
+.preparation-step-inline-detail .preparation-task-list__empty-icon {
   display: none;
 }
 
-.preparation-step-inline-detail
-  .preparation-step-checklist--empty
-  .preparation-task-list__empty-state
-  h3 {
+.preparation-step-inline-detail .preparation-task-list__empty-state h3 {
   display: none;
 }
 
-.preparation-step-inline-detail
-  .preparation-step-checklist--empty
-  .preparation-task-list__empty-state
-  p {
+.preparation-step-inline-detail .preparation-task-list__empty-state p {
   margin-top: 2px;
   font-size: 12px;
   line-height: 1.5;
