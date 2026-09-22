@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.user.controller;
 
-import com.bibbidi.wedding.common.auth.Auth;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameResponse;
 import com.bibbidi.wedding.user.controller.dto.CurrentUserResponse;
@@ -12,6 +11,7 @@ import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.bibbidi.wedding.user.service.WeddingDateResult;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -30,13 +30,13 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public CurrentUserResponse findCurrentUser(@Auth Long currentUserId) {
+    public CurrentUserResponse findCurrentUser(@AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         UserResult result = userService.findCurrentUserInfo(currentUserId);
         return CurrentUserResponse.from(result);
     }
 
     @GetMapping("/me/wedding-date")
-    public WeddingDateResponse findWeddingDate(@Auth Long currentUserId) {
+    public WeddingDateResponse findWeddingDate(@AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         WeddingDateResult result = userService.findWeddingDate(currentUserId);
         return WeddingDateResponse.from(result);
     }
@@ -51,7 +51,7 @@ public class UserController {
 
     @PutMapping("/me/nickname")
     public ChangeNicknameResponse changeNickname(
-            @Auth Long currentUserId,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
             @Valid @RequestBody ChangeNicknameRequest request
     ) {
         UserResult result = userService.changeNickname(currentUserId, request.nickname());
@@ -60,7 +60,7 @@ public class UserController {
 
     @PutMapping("/me/wedding-date")
     public WeddingDateResponse updateWeddingDate(
-            @Auth Long currentUserId,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
             @Valid @RequestBody WeddingDateRequest request
     ) {
         WeddingDateResult result = userService.updateWeddingDate(currentUserId, request.weddingDate());

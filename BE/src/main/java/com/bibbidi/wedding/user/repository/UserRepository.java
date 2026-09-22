@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.user.repository;
 
-import static com.bibbidi.wedding.common.exception.ClientError.DUPLICATE_NICKNAME;
 import static com.bibbidi.wedding.common.exception.ClientError.USER_NOT_FOUND;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -8,7 +7,6 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
-import java.util.NoSuchElementException;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Repository;
 public class UserRepository {
 
     private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다. userId=";
-    private static final String DUPLICATE_NICKNAME_MESSAGE = "이미 사용 중인 닉네임입니다. nickname=";
 
     private final JpaUserRepository jpaUserRepository;
     private final UserMapper userMapper;
@@ -26,33 +23,24 @@ public class UserRepository {
         this.userMapper = userMapper;
     }
 
-    public boolean existsPasswordLoginUserByNickname(String nickname) {
-        return jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname);
+    public boolean existsByNickname(String nickname) {
+        return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
     }
 
+    /**
+     * 소셜 가입으로 만들어지는 회원이다.
+     * 소셜에서 받은 닉네임은 서로 겹칠 수 있으므로 닉네임 중복을 막지 않는다.
+     */
     public User create(User user) {
-        validateNicknameNotUsed(user.nickname());
         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
         return userMapper.toDomain(saved);
     }
 
     public User update(User user) {
-        validateNicknameNotUsedByOthers(user.nickname(), user.id());
         JpaUserEntity currentEntity = getJpaUserEntity(user.id());
-        JpaUserEntity updatedEntity = new JpaUserEntity(
-                user.id(),
-                user.nickname(),
-                user.passwordHash(),
-                currentEntity.weddingDate()
-        );
-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
+                userMapper.toEntity(user, currentEntity.weddingDate()));
         return userMapper.toDomain(saved);
-    }
-
-    public User findPasswordLoginUserByNickname(String nickname) {
-        return jpaUserRepository.findByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)
-                .map(userMapper::toDomain)
-                .orElseThrow(NoSuchElementException::new);
     }
 
     public User findById(Long userId) {
@@ -68,36 +56,13 @@ public class UserRepository {
 
     public WeddingDate saveWeddingDate(WeddingDate weddingDate) {
         JpaUserEntity currentEntity = getJpaUserEntity(weddingDate.userId());
-        JpaUserEntity updatedEntity = new JpaUserEntity(
-                weddingDate.userId(),
-                currentEntity.nickname(),
-                currentEntity.passwordHash(),
-                weddingDate.date()
-        );
-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
+                userMapper.toEntity(userMapper.toDomain(currentEntity), weddingDate.date()));
         return new WeddingDate(saved.id(), saved.weddingDate());
     }
 
     public int deleteById(Long userId) {
         return jpaUserRepository.deleteByUserId(userId);
-    }
-
-    private void validateNicknameNotUsed(String nickname) {
-        if (jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)) {
-            throw new BusinessException(
-                    DUPLICATE_NICKNAME,
-                    DUPLICATE_NICKNAME_MESSAGE + nickname
-            );
-        }
-    }
-
-    private void validateNicknameNotUsedByOthers(String nickname, Long userId) {
-        if (jpaUserRepository.existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(nickname, userId)) {
-            throw new BusinessException(
-                    DUPLICATE_NICKNAME,
-                    DUPLICATE_NICKNAME_MESSAGE + nickname
-            );
-        }
     }
 
     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {

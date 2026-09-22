@@ -20,32 +20,26 @@ public class UserService {
         this.checklistService = checklistService;
     }
 
+    /** 소셜 인증만 끝난 회원을 만든다. 약관에 동의해야 서비스를 쓸 수 있다. */
     @Transactional
-    public UserResult createUser(String nickname, String passwordHash) {
-        User user = new User(null, nickname, passwordHash);
-        User savedUser = userRepository.create(user);
-
+    public UserResult createPendingUser(String nickname, String email) {
+        User savedUser = userRepository.create(User.pending(nickname, email));
         return UserResult.from(savedUser);
     }
 
-    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
-        boolean isAvailableNickname = !userRepository.existsPasswordLoginUserByNickname(nickname);
-        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
-    }
-
-    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
-        User user = userRepository.findPasswordLoginUserByNickname(nickname);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findAuthenticationInfo(Long userId) {
-        User user = userRepository.findById(userId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
+    /** 필수 약관 동의가 끝난 회원을 서비스를 쓸 수 있는 상태로 바꾼다. */
+    @Transactional
+    public UserResult activate(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+        if (user.isActive()) {
+            return UserResult.from(user);
+        }
+        return UserResult.from(userRepository.update(user.activate()));
+    }
+
+    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
     }
 
     public UserResult findCurrentUserInfo(Long currentUserId) {
@@ -64,13 +58,6 @@ public class UserService {
         WeddingDate changedWeddingDate = currentWeddingDate.changeDate(weddingDate);
         WeddingDate savedWeddingDate = userRepository.saveWeddingDate(changedWeddingDate);
         return WeddingDateResult.from(savedWeddingDate);
-    }
-
-    @Transactional
-    public void changePasswordHash(Long currentUserId, String passwordHash) {
-        User user = userRepository.findById(currentUserId);
-        User changedUser = user.changePasswordHash(passwordHash);
-        userRepository.update(changedUser);
     }
 
     @Transactional

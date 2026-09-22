@@ -5,25 +5,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.config.AuthWebConfig;
-import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
-import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import java.util.List;
+import com.bibbidi.wedding.support.SecurityTestConfig;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@Import(SecurityTestConfig.class)
 @WebMvcTest(CatalogController.class)
-@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
 class CatalogControllerTest {
 
     @Autowired

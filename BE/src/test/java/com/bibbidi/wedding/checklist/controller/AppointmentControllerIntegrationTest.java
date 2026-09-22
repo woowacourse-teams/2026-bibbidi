@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.controller;
 
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
@@ -14,7 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
 import com.bibbidi.wedding.checklist.controller.dto.req.UpdateAppointmentRequest;
-import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.time.LocalDate;
@@ -24,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
@@ -32,6 +33,15 @@ import tools.jackson.databind.node.ObjectNode;
 
 @Sql("/appointment-fixture.sql")
 class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
+
+    private static final Long USER_ID = 1L;
+
+    @Autowired
+    private AccessTokenIssuer accessTokenIssuer;
+
+    private String bearerToken(Long userId) {
+        return AuthenticationTestSupport.bearerTokenOf(accessTokenIssuer, userId, "테스트회원");
+    }
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -51,7 +61,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when & then
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isCreated())
@@ -91,7 +101,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
 
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isCreated())
@@ -130,7 +140,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when & then
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isBadRequest())
@@ -204,7 +214,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
 
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 999L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isNotFound())
@@ -242,7 +252,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when & then
         mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isOk())
@@ -280,7 +290,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
 
         mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isOk())
@@ -319,7 +329,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when & then
         mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isBadRequest())
@@ -357,7 +367,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when & then
         mockMvc.perform(put("/api/appointments/{appointmentId}", 99999L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isNotFound())
@@ -435,7 +445,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
 
         mockMvc.perform(put("/api/appointments/{appointmentId}", appointmentId)
-                        .session(sessionOf(2L))
+                        .header(AUTHORIZATION, bearerToken(2L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isForbidden())
@@ -463,7 +473,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNoContent())
                 .andDo(document(
                                 "appointments-delete",
@@ -484,7 +494,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", appointmentId)
-                        .session(sessionOf(2L)))
+                        .header(AUTHORIZATION, bearerToken(2L)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203))
                 .andDo(document(
@@ -506,7 +516,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("존재하지 않는 일정 삭제 요청은 404를 반환한다")
     void shouldRejectDeletingNonexistentAppointment() throws Exception {
         mockMvc.perform(delete("/api/appointments/{appointmentId}", 99999L)
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(302))
                 .andDo(document(
@@ -553,7 +563,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long remainingAppointmentId = createAppointment();
 
         mockMvc.perform(delete("/api/appointments/{appointmentId}", deletedAppointmentId)
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNoContent());
     }
 
@@ -563,7 +573,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment(LocalDate.of(2099, 1, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 true)))
@@ -593,7 +603,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), true);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 false)))
@@ -632,7 +642,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
-                        .session(sessionOf(2L))
+                        .header(AUTHORIZATION, bearerToken(2L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(true)))
                 .andExpect(status().isForbidden())
@@ -656,7 +666,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("존재하지 않는 일정의 완료 변경 요청을 거절한다")
     void shouldRejectWhenAppointmentDoesNotExist() throws Exception {
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", 99999L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(true)))
                 .andExpect(status().isNotFound())
@@ -682,7 +692,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long appointmentId = createAppointment(LocalDate.of(2026, 9, 1), false);
 
         mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())
@@ -710,7 +720,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         Long nearbyAppointmentId = createAppointment(LocalDate.now().plusDays(2), false);
 
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(nearbyAppointmentId))
@@ -741,7 +751,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         createAppointment(LocalDate.now().plusDays(3), false);
 
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
@@ -751,7 +761,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("limit이 허용 범위를 벗어나면 가까운 일정 조회를 거부한다")
     void shouldRejectNearbyRequestWhenLimitIsOutOfRange() throws Exception {
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .param("limit", "21"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
@@ -807,7 +817,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         );
 
         String response = mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", 1L)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(convertToStringValue(request)))
                 .andExpect(status().isCreated())
@@ -818,7 +828,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
         if (isDone) {
             mockMvc.perform(put("/api/appointments/{appointmentId}/complete", appointmentId)
-                            .session(authenticatedSession())
+                            .header(AUTHORIZATION, bearerToken(USER_ID))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(true)))
                     .andExpect(status().isOk());
@@ -842,15 +852,7 @@ class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
         }
     }
 
-    private static MockHttpSession authenticatedSession() {
-        return sessionOf(1L);
-    }
 
-    private static MockHttpSession sessionOf(Long userId) {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
-        return session;
-    }
 
     private static FieldDescriptor[] requestFields() {
         return new FieldDescriptor[]{

@@ -1,8 +1,12 @@
 package com.bibbidi.wedding.user.persistence;
 
+import com.bibbidi.wedding.common.domain.UserRole;
+import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -21,8 +25,16 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "nickname", nullable = false)
     private String nickname;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private UserStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role;
+
+    @Column(name = "email")
+    private String email;
 
     @Column(name = "wedding_date")
     private LocalDate weddingDate;
@@ -30,10 +42,19 @@ public class JpaUserEntity extends BaseTimeEntity {
     protected JpaUserEntity() {
     }
 
-    public JpaUserEntity(Long id, String nickname, String passwordHash, LocalDate weddingDate) {
+    public JpaUserEntity(
+            Long id,
+            String nickname,
+            UserStatus status,
+            UserRole role,
+            String email,
+            LocalDate weddingDate
+    ) {
         this.id = id;
         this.nickname = nickname;
-        this.passwordHash = passwordHash;
+        this.status = status;
+        this.role = role;
+        this.email = email;
         this.weddingDate = weddingDate;
     }
 
@@ -45,8 +66,16 @@ public class JpaUserEntity extends BaseTimeEntity {
         return nickname;
     }
 
-    public String passwordHash() {
-        return passwordHash;
+    public UserStatus status() {
+        return status;
+    }
+
+    public UserRole role() {
+        return role;
+    }
+
+    public String email() {
+        return email;
     }
 
     public LocalDate weddingDate() {
