@@ -51,7 +51,7 @@ discovery.relabel "docker_logs" {
 
   rule {
     target_label = "deployment_environment_name"
-    replacement  = "production"
+    replacement  = sys.env("DEPLOYMENT_ENVIRONMENT_NAME")
   }
 }
 

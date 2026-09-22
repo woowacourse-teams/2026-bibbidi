@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepBottomSheet } from "./PreparationStepBottomSheet";
 import { PreparationStepDetail } from "./PreparationStepDetail";
-import { PreparationStepChecklist } from "./PreparationStepChecklist";
 import "./PreparationRoadmap.css";
 
 const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
@@ -85,6 +84,14 @@ function PreparationRoadmapSteps({
               <span className="preparation-roadmap__step-title">
                 {step.title}
               </span>
+              {!isMobileLayout ? (
+                <span
+                  aria-hidden="true"
+                  className="preparation-roadmap__step-action"
+                >
+                  할 일 보기 →
+                </span>
+              ) : null}
               {step.iconUrl ? (
                 <img
                   alt=""
@@ -115,6 +122,7 @@ export function PreparationRoadmap({
 }: PreparationRoadmapProps) {
   const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
   const [mobileOpenStepId, setMobileOpenStepId] = useState<string | null>(null);
+  const selectedStepId = viewModel.steps.find((step) => step.isSelected)?.id;
 
   const handleCategorySelect = (categoryId: string) => {
     const changesCategory = viewModel.categories.some(
@@ -181,35 +189,55 @@ export function PreparationRoadmap({
         className="preparation-roadmap__workspace"
         id="preparation-roadmap-content"
       >
-        <div className="preparation-roadmap__main">
-          <header className="preparation-roadmap__header">
-            <h1 id="preparation-roadmap-title">{viewModel.title}</h1>
-          </header>
-
-          <div className="preparation-roadmap__grid-wrap">
-            <PreparationRoadmapSteps
-              isMobileLayout={isMobileLayout}
-              onStepSelect={handleStepSelect}
-              viewModel={viewModel}
-            />
+        <header className="preparation-roadmap__header">
+          <div className="preparation-roadmap__header-copy">
+            <h1 id="preparation-roadmap-title">
+              {isMobileLayout
+                ? viewModel.title
+                : "로드맵에서 필요한 일만, 내 체크리스트에"}
+            </h1>
           </div>
-        </div>
+          <ol
+            aria-label="체크리스트 만드는 순서"
+            className="preparation-roadmap__guide"
+          >
+            <li>
+              <span aria-hidden="true">1</span>
+              단계 선택
+            </li>
+            <li>
+              <span aria-hidden="true">2</span>할 일 추가
+            </li>
+            <li>
+              <span aria-hidden="true">3</span>
+              체크리스트에서 관리
+            </li>
+          </ol>
+        </header>
 
-        {!isMobileLayout ? (
-          <div className="preparation-roadmap__sidebar">
-            <PreparationStepChecklist
-              tasks={viewModel.selectedStepDetail.checklistTasks}
-            />
+        <div className="preparation-roadmap__content">
+          <div className="preparation-roadmap__main">
+            <div className="preparation-roadmap__grid-wrap">
+              <PreparationRoadmapSteps
+                isMobileLayout={isMobileLayout}
+                onStepSelect={handleStepSelect}
+                viewModel={viewModel}
+              />
+            </div>
+          </div>
+
+          {!isMobileLayout ? (
             <PreparationStepDetail
               additionErrorMessage={additionErrorMessage}
               addingCatalogItemIds={addingCatalogItemIds}
               canAddTasks={canAddTasks}
               detail={viewModel.selectedStepDetail}
+              key={selectedStepId}
               onAddAllTasks={onAddAllTasks}
               onTaskAdd={onTaskAdd}
             />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </section>
       {isMobileLayout && mobileOpenStepId ? (
         <PreparationStepBottomSheet

@@ -62,3 +62,7 @@ apply from: 'gradle/jacoco.gradle'
 tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }
+
+tasks.named('processResources') {
+    from('database/mysql/load_catalog.sql')
+}

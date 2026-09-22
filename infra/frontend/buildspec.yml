@@ -39,10 +39,14 @@ phases:
           exit 1
         fi
 
-        if [ "$S3_PREFIX" != "bibbidi/fe/production" ]; then
-          echo "Unexpected deployment prefix: ${S3_PREFIX}" >&2
-          exit 1
-        fi
+        case "$S3_PREFIX" in
+          bibbidi/fe/production|bibbidi/fe/development)
+            ;;
+          *)
+            echo "Unexpected deployment prefix: ${S3_PREFIX}" >&2
+            exit 1
+            ;;
+        esac
 
         pnpm install --frozen-lockfile
 

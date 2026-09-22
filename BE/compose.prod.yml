@@ -6,12 +6,12 @@ services:
     env_file:
       - ${SPRING_ENV_FILE:-./.env.spring}
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bibbidi-backend}
-      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-0.0.1}
+      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-1.0.0}
       OTEL_SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}
       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
-      OTEL_RESOURCE_ATTRIBUTES: service.name=${OTEL_SERVICE_NAME:-bibbidi-backend},service.version=${OTEL_SERVICE_VERSION:-0.0.1},service.instance.id=${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod},deployment.environment.name=${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+      OTEL_RESOURCE_ATTRIBUTES: service.name=${OTEL_SERVICE_NAME:-bibbidi-backend},service.version=${OTEL_SERVICE_VERSION:-1.0.0},service.instance.id=${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod},deployment.environment.name=${DEPLOYMENT_ENVIRONMENT_NAME:-production}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
     ports:
       - "127.0.0.1:8080:8080"
@@ -69,6 +69,7 @@ services:
       - --stability.level=experimental
     environment:
       DOCKER_HOST_URL: tcp://dockerproxy:2375
+      DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
     depends_on:
       - dockerproxy
     volumes:

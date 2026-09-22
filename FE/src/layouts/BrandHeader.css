@@ -1,6 +1,6 @@
 .brand-header {
   min-width: 320px;
-  height: 96px;
+  height: 72px;
   flex: none;
   border-bottom: 1px solid var(--color-stroke-neutral-weak);
   background: var(--color-bg-layer-default);
