@@ -119,6 +119,44 @@
   padding-left: 0;
 }
 
+.preparation-step-inline-detail
+  .preparation-step-checklist--empty
+  > .preparation-task-list__empty-state {
+  flex: none;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 0 2px;
+  text-align: left;
+}
+
+.preparation-step-inline-detail
+  .preparation-step-checklist--empty
+  .preparation-task-list__empty-icon {
+  display: none;
+}
+
+.preparation-step-inline-detail
+  .preparation-step-checklist--empty
+  .preparation-task-list__empty-state
+  h3 {
+  display: none;
+}
+
+.preparation-step-inline-detail
+  .preparation-step-checklist--empty
+  .preparation-task-list__empty-state
+  p {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.preparation-step-inline-detail
+  .preparation-step-checklist--empty
+  .preparation-step-checklist__footer {
+  padding-top: 6px;
+}
+
 .preparation-step-inline-detail__footer,
 .preparation-step-inline-detail .preparation-step-checklist__footer {
   display: flex;
