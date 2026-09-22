@@ -6,17 +6,21 @@ on:
   workflow_dispatch:
 
 permissions:
+  issues: read
   pull-requests: read
 
 jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - name: PR 알림 코드 체크아웃
+        uses: actions/checkout@v7
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
         with:
           node-version: 24.19.0
-      - env:
+      - name: 리뷰 대기자에게 Discord 리마인더 전송
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NOTIFICATION_MEMBERS_JSON: ${{ secrets.PR_NOTIFICATION_MEMBERS_JSON }}

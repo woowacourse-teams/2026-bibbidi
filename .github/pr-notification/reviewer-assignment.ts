@@ -91,6 +91,10 @@ export async function main(environment = process.env): Promise<void> {
   if (!repository || !token) throw new Error("GitHub 리뷰어 지정을 위한 저장소 정보 또는 토큰이 없습니다.");
 
   await requestReviewer({ repository, pullNumber: environment.NUMBER ?? "", reviewer, token });
+
+  if (environment.GITHUB_OUTPUT) {
+    appendFileSync(environment.GITHUB_OUTPUT, `reviewer=${reviewer}\n`, { encoding: "utf8" });
+  }
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
@@ -99,4 +103,5 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
     process.exitCode = 1;
   });
 }
+import { appendFileSync } from "node:fs";
 import { loadMembers } from "./member-configuration-parser.ts";
