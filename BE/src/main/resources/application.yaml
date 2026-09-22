@@ -14,16 +14,99 @@ discord:
   url:
     feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
 
-server:
-  servlet:
-    session:
-      timeout: 24h
-      cookie:
-        name: JSESSIONID
-        path: /
-        http-only: true
-        secure: true
-        same-site: lax
+auth:
+  jwt:
+    # 비밀말은 기본값을 두지 않는다. 없거나 32바이트 미만이면 애플리케이션이 뜨지 않는다.
+    secret: ${AUTH_JWT_SECRET:}
+    issuer: ${AUTH_JWT_ISSUER:bibbidi}
+    audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
+    delete-grant-ttl: ${AUTH_DELETE_GRANT_TTL:5m}
+    header-name: Authorization
+  session:
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:30d}
+    handoff-code-ttl: ${AUTH_HANDOFF_CODE_TTL:60s}
+    auth-request-ttl: ${AUTH_REQUEST_TTL:10m}
+  refresh-cookie:
+    name: ${AUTH_REFRESH_COOKIE_NAME:BIBBIDI_REFRESH}
+    path: ${AUTH_REFRESH_COOKIE_PATH:/api/auth}
+    same-site: ${AUTH_REFRESH_COOKIE_SAME_SITE:Lax}
+    secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
+  cleanup:
+    batch-size: ${AUTH_CLEANUP_BATCH_SIZE:500}
+    max-rounds-per-run: ${AUTH_CLEANUP_MAX_ROUNDS:20}
+    revoked-session-retention: ${AUTH_CLEANUP_REVOKED_RETENTION:30d}
+    cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
+  oidc-jwks:
+    ttl: ${AUTH_JWKS_TTL:8d}
+    refresh-interval: ${AUTH_JWKS_REFRESH_INTERVAL:7d}
+    forced-refresh-min-interval: ${AUTH_JWKS_FORCED_REFRESH_MIN_INTERVAL:5m}
+    maximum-size: ${AUTH_JWKS_MAX_SIZE:16}
+    warm-up-enabled: ${AUTH_JWKS_WARM_UP_ENABLED:true}
+  oidc:
+    providers:
+      kakao:
+        client-id: ${KAKAO_CLIENT_ID:}
+        client-secret: ${KAKAO_CLIENT_SECRET:}
+        issuers:
+          - https://kauth.kakao.com
+        audiences:
+          - ${KAKAO_CLIENT_ID:}
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://kauth.kakao.com/oauth/authorize
+        token-uri: https://kauth.kakao.com/oauth/token
+        jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
+        scopes:
+          - openid
+          - profile_nickname
+          - account_email
+        nickname-claim: nickname
+        email-claim: email
+        redirect-uris:
+          web: ${KAKAO_WEB_REDIRECT_URI:}
+          native: ${KAKAO_NATIVE_REDIRECT_URI:}
+      google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+        issuers:
+          - https://accounts.google.com
+          - accounts.google.com
+        audiences:
+          - ${GOOGLE_CLIENT_ID:}
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+        token-uri: https://oauth2.googleapis.com/token
+        jwks-uri: https://www.googleapis.com/oauth2/v3/certs
+        scopes:
+          - openid
+          - profile
+          - email
+        nickname-claim: name
+        email-claim: email
+        redirect-uris:
+          web: ${GOOGLE_WEB_REDIRECT_URI:}
+          native: ${GOOGLE_NATIVE_REDIRECT_URI:}
+  security:
+    # permit-all보다 먼저 판단한다. /api/auth 아래지만 로그인해야 부를 수 있는 것들이다.
+    require-authentication:
+      - /api/auth/native/handoff-codes
+      - /api/auth/delete-grants/**
+    permit-all:
+      - /api/auth/**
+      - /api/catalog
+      # 가입하기 전에도 약관을 봐야 한다.
+      - /api/terms
+      - /api/users/nickname/availability
+      - /api/feedbacks
+      # 수집 도구가 컨테이너 망에서 직접 긁는다. 외부 차단은 nginx가 한다.
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /swagger-ui/**
+      - /docs/**
 
 management:
   endpoints:
@@ -112,3 +195,8 @@ spring:
     init:
       mode: always
       data-locations: classpath:load_catalog.sql
+
+auth:
+  jwt:
+    # 로컬 개발 전용 값이다. 운영은 환경 변수로만 받으며, 없으면 서버가 뜨지 않는다.
+    secret: ${AUTH_JWT_SECRET:local-development-only-jwt-secret-value}
