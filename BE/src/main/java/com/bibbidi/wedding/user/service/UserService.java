@@ -1,13 +1,10 @@
 package com.bibbidi.wedding.user.service;
 
 import com.bibbidi.wedding.checklist.service.ChecklistService;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import java.time.LocalDate;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,26 +22,19 @@ public class UserService {
 
     @Transactional
     public UserResult createUser(String nickname, String passwordHash) {
-        try {
-            User user = new User(null, nickname, passwordHash);
-            User savedUser = userRepository.create(user);
+        User user = new User(null, nickname, passwordHash);
+        User savedUser = userRepository.create(user);
 
-            return UserResult.from(savedUser);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
-            );
-        }
+        return UserResult.from(savedUser);
     }
 
     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
-        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+        boolean isAvailableNickname = !userRepository.existsPasswordLoginUserByNickname(nickname);
         return new NicknameAvailabilityResult(nickname, isAvailableNickname);
     }
 
     public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
-        User user = userRepository.findByNickname(nickname);
+        User user = userRepository.findPasswordLoginUserByNickname(nickname);
         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
     }
 
@@ -97,15 +87,8 @@ public class UserService {
             return UserResult.from(user);
         }
 
-        try {
-            User changedUser = user.changeNickname(nickname);
-            User savedUser = userRepository.update(changedUser);
-            return UserResult.from(savedUser);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
-            );
-        }
+        User changedUser = user.changeNickname(nickname);
+        User savedUser = userRepository.update(changedUser);
+        return UserResult.from(savedUser);
     }
 }

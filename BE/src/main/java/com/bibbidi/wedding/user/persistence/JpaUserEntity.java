@@ -18,7 +18,7 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "nickname", nullable = false, unique = true, length = 10)
+    @Column(name = "nickname", nullable = false)
     private String nickname;
 
     @Column(name = "password_hash", nullable = false)

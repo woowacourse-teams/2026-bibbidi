@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -98,20 +96,6 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("다른 사용자가 이미 사용하는 닉네임이면 변경을 거절한다")
-    void shouldRejectWhenAnotherUserAlreadyHasNickname() {
-        User user = new User(1L, "current", "password-hash");
-        given(userRepository.findById(1L)).willReturn(user);
-        willThrow(new DataIntegrityViolationException("uk_users_nickname"))
-                .given(userRepository).update(any(User.class));
-
-        assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
-    }
-
-    @Test
     @DisplayName("Session의 사용자 ID로 DB에서 사용자를 찾을 수 없으면 사용자 없음 오류를 유지한다")
     void shouldKeepUserNotFoundWhenSessionUserDoesNotExist() {
         given(userRepository.findById(1L)).willThrow(
@@ -138,9 +122,9 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
-    void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
-        given(userRepository.existsByNickname("bibbidi")).willReturn(false);
+    @DisplayName("비밀번호 로그인 회원이 쓰지 않는 닉네임은 사용할 수 있다고 응답한다")
+    void shouldReportNicknameAsAvailableWhenNoPasswordLoginUserUsesIt() {
+        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(false);
 
         NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
 
@@ -148,25 +132,13 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("이미 사용 중인 닉네임은 사용할 수 없다고 응답한다")
-    void shouldReportNicknameAsUnavailableWhenSomebodyUsesIt() {
-        given(userRepository.existsByNickname("bibbidi")).willReturn(true);
+    @DisplayName("비밀번호 로그인 회원이 이미 쓰는 닉네임은 사용할 수 없다고 응답한다")
+    void shouldReportNicknameAsUnavailableWhenPasswordLoginUserUsesIt() {
+        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(true);
 
         NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
 
         assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
-    }
-
-    @Test
-    @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
-    void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
-        given(userRepository.create(any(User.class)))
-                .willThrow(new DataIntegrityViolationException("uk_users_nickname"));
-
-        assertThatThrownBy(() -> userService.createUser("bibbidi", "password-hash"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
     }
 
     @Test
