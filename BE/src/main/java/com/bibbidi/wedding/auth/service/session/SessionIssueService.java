@@ -3,8 +3,8 @@ package com.bibbidi.wedding.auth.service.session;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.RefreshSession;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
-import com.bibbidi.wedding.auth.token.AccessTokenClaims;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.auth.token.OpaqueTokenGenerator;
 import com.bibbidi.wedding.auth.token.SessionProperties;
 import com.bibbidi.wedding.common.domain.UserStatus;
@@ -21,18 +21,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class SessionIssueService {
 
-    private final AccessTokenIssuer accessTokenIssuer;
+    private final BibbidiTokenIssuer bibbidiTokenIssuer;
     private final OpaqueTokenGenerator opaqueTokenGenerator;
     private final RefreshSessionRepository refreshSessionRepository;
     private final SessionProperties sessionProperties;
 
     public SessionIssueService(
-            AccessTokenIssuer accessTokenIssuer,
+            BibbidiTokenIssuer bibbidiTokenIssuer,
             OpaqueTokenGenerator opaqueTokenGenerator,
             RefreshSessionRepository refreshSessionRepository,
             SessionProperties sessionProperties
     ) {
-        this.accessTokenIssuer = accessTokenIssuer;
+        this.bibbidiTokenIssuer = bibbidiTokenIssuer;
         this.opaqueTokenGenerator = opaqueTokenGenerator;
         this.refreshSessionRepository = refreshSessionRepository;
         this.sessionProperties = sessionProperties;
@@ -51,7 +51,7 @@ public class SessionIssueService {
                 opaqueTokenGenerator.hash(refreshToken),
                 LocalDateTime.now().plus(sessionProperties.refreshTokenTtl())));
 
-        String accessToken = accessTokenIssuer.issueAccessToken(new AccessTokenClaims(
+        String accessToken = bibbidiTokenIssuer.issueAccessToken(new BibbidiTokenClaims(
                 owner.userId(), owner.status(), owner.role(), owner.nickname(), owner.email()));
 
         return new IssuedSession(

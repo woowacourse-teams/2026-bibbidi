@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
@@ -45,7 +45,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     private UserService userService;
 
     @Autowired
-    private AccessTokenIssuer accessTokenIssuer;
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
 
     private Long currentUserId;
     private Long otherUserId;
@@ -270,6 +270,6 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private String bearerTokenOf(Long userId, String nickname) {
-        return AuthenticationTestSupport.bearerTokenOf(accessTokenIssuer, userId, nickname);
+        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, nickname);
     }
 }

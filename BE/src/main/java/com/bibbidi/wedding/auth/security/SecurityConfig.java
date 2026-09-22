@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.security;
 
-import com.bibbidi.wedding.auth.token.AccessTokenParser;
+import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.auth.token.JwtProperties;
 import com.bibbidi.wedding.common.exception.ClientError;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -13,7 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 /**
  * 인증은 access token 하나로만 한다. 서버 세션을 만들지 않는다. CORS 헤더는 앞단 nginx가 붙이므로 여기서 켜지 않는다. 켜면 헤더가 겹친다.
@@ -23,36 +23,40 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
 
-    private final AccessTokenParser accessTokenParser;
+    /** 약관에 동의하기 전 사용자가 유일하게 부를 수 있는 경로다. */
+    private static final String TERMS_AGREEMENT_PATH = "/api/users/me/terms-agreement";
+
+    private final BibbidiTokenParser bibbidiTokenParser;
     private final AuthenticationFailureResponseWriter failureResponseWriter;
     private final SecurityProperties securityProperties;
     private final JwtProperties jwtProperties;
     private final ActiveUserAuthorizationManager activeUserAuthorizationManager;
 
     public SecurityConfig(
-            AccessTokenParser accessTokenParser,
+            BibbidiTokenParser bibbidiTokenParser,
             AuthenticationFailureResponseWriter failureResponseWriter,
             SecurityProperties securityProperties,
             JwtProperties jwtProperties,
             ActiveUserAuthorizationManager activeUserAuthorizationManager
     ) {
-        this.accessTokenParser = accessTokenParser;
+        this.bibbidiTokenParser = bibbidiTokenParser;
         this.failureResponseWriter = failureResponseWriter;
         this.securityProperties = securityProperties;
         this.jwtProperties = jwtProperties;
         this.activeUserAuthorizationManager = activeUserAuthorizationManager;
     }
 
-    /**
-     * 컴포넌트 스캔으로 등록하지 않는다. 등록하면 컨트롤러만 띄우는 슬라이스 테스트가 이 필터까지 끌어오면서 의존성을 찾지 못한다.
-     */
     @Bean
-    public AccessTokenAuthenticationFilter accessTokenAuthenticationFilter() {
-        return new AccessTokenAuthenticationFilter(accessTokenParser, failureResponseWriter, jwtProperties);
+    public BibbidiTokenAuthenticationFilter bibbidiTokenAuthenticationFilter() {
+        return new BibbidiTokenAuthenticationFilter(
+                bibbidiTokenParser,
+                failureResponseWriter,
+                jwtProperties
+        );
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -66,9 +70,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(securityProperties.requireAuthenticationPatterns()).authenticated()
                         .requestMatchers(securityProperties.permitAllPatterns()).permitAll()
-                        .requestMatchers(TermsAgreementPath.PATH).authenticated()
+                        .requestMatchers(TERMS_AGREEMENT_PATH).authenticated()
                         .anyRequest().access(activeUserAuthorizationManager))
-                .addFilterBefore(accessTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                // 인가를 판단하는 필터가 우리 인증 결과를 보게 그 앞에 둔다.
+                .addFilterBefore(bibbidiTokenAuthenticationFilter(), AuthorizationFilter.class)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(
                                 (

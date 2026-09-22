@@ -20,6 +20,7 @@ import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
 import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ import tools.jackson.databind.ObjectMapper;
 class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
+    private static final String BINDER_COOKIE = "BIBBIDI_OIDC_BINDER";
+
+    private Cookie binderCookie;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -59,9 +63,11 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
     @Test
     @DisplayName("웹은 access token만 본문으로 받고 refresh token은 쿠키로 받는다")
     void shouldGiveRefreshTokenAsCookieOnWeb() throws Exception {
+        SocialLoginRequest request = loginRequest("WEB");
         MvcResult result = mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .cookie(binderCookies())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest("WEB"))))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
@@ -161,10 +167,12 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
         String body = objectMapper.writeValueAsString(new SocialLoginRequest("code", state));
 
         mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .cookie(binderCookies())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .cookie(binderCookies())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(208));
@@ -224,24 +232,69 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .build())));
     }
 
+    @Test
+    @DisplayName("인가를 시작한 브라우저가 아니면 거절한다")
+    void shouldRejectCallbackFromOtherBrowser() throws Exception {
+        SocialLoginRequest request = loginRequest("WEB");
+
+        mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(208));
+    }
+
+    @Test
+    @DisplayName("다른 사람이 받은 인가 결과를 제 브라우저 쿠키와 섞어 내면 거절한다")
+    void shouldRejectMismatchedBrowserBinder() throws Exception {
+        SocialLoginRequest attackerRequest = loginRequest("WEB");
+        Cookie attackerCookie = binderCookie;
+        loginRequest("WEB");
+        Cookie victimCookie = binderCookie;
+
+        assertThat(attackerCookie.getValue()).isNotEqualTo(victimCookie.getValue());
+
+        mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .cookie(victimCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(attackerRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(208));
+    }
+
+    @Test
+    @DisplayName("네이티브는 쿠키를 쓰지 않으므로 브라우저 확인 없이 통과한다")
+    void shouldNotRequireBinderOnNative() throws Exception {
+        mockMvc.perform(post("/api/auth/native/oidc/{provider}/callback", "kakao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest("NATIVE"))))
+                .andExpect(status().isCreated());
+    }
+
     private SocialLoginRequest loginRequest(String clientType) throws Exception {
         return new SocialLoginRequest("authorization-code", startAuthorization(clientType));
     }
 
+    /** 인가를 시작하고 state를 돌려준다. 웹이면 브라우저 바인딩 쿠키도 받아 둔다. */
     private String startAuthorization(String clientType) throws Exception {
-        String response = mockMvc.perform(get("/api/auth/oidc/{provider}/authorization", "kakao")
+        MvcResult result = mockMvc.perform(get("/api/auth/oidc/{provider}/authorization", "kakao")
                         .param("clientType", clientType))
                 .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        return objectMapper.readTree(response).get("state").asString();
+                .andReturn();
+        binderCookie = result.getResponse().getCookie(BINDER_COOKIE);
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("state").asString();
+    }
+
+    private Cookie[] binderCookies() {
+        return binderCookie == null ? new Cookie[0] : new Cookie[] {binderCookie};
     }
 
     private String login(String clientType) throws Exception {
+        SocialLoginRequest request = loginRequest(clientType);
         return mockMvc.perform(post("/api/auth/web/oidc/{provider}/callback", "kakao")
+                        .cookie(binderCookies())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest(clientType))))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()

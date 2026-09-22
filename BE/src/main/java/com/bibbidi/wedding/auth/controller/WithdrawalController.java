@@ -6,6 +6,7 @@ import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.service.withdrawal.WithdrawalService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,13 +29,16 @@ public class WithdrawalController {
 
     private final WithdrawalService withdrawalService;
     private final RefreshCookieFactory refreshCookieFactory;
+    private final OidcBinderCookieFactory binderCookieFactory;
 
     public WithdrawalController(
             WithdrawalService withdrawalService,
-            RefreshCookieFactory refreshCookieFactory
+            RefreshCookieFactory refreshCookieFactory,
+            OidcBinderCookieFactory binderCookieFactory
     ) {
         this.withdrawalService = withdrawalService;
         this.refreshCookieFactory = refreshCookieFactory;
+        this.binderCookieFactory = binderCookieFactory;
     }
 
     @PostMapping("/api/auth/delete-grants/{provider}/callback")
@@ -43,10 +47,16 @@ public class WithdrawalController {
             @AuthenticationPrincipal(expression = "userId") Long currentUserId,
             @PathVariable String provider,
             @RequestParam ClientType clientType,
-            @Valid @RequestBody SocialLoginRequest request
+            @Valid @RequestBody SocialLoginRequest request,
+            HttpServletRequest servletRequest
     ) {
         return new DeleteGrantResponse(withdrawalService.issueDeleteGrant(
-                SocialProvider.from(provider), clientType, request.code(), request.state(), currentUserId));
+                SocialProvider.from(provider),
+                clientType,
+                request.code(),
+                request.state(),
+                binderCookieFactory.read(servletRequest),
+                currentUserId));
     }
 
     @DeleteMapping("/api/users/me")

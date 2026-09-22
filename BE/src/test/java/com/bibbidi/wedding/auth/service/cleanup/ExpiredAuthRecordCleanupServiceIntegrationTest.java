@@ -96,6 +96,7 @@ class ExpiredAuthRecordCleanupServiceIntegrationTest {
                 SocialProvider.KAKAO,
                 "nonce",
                 "code-verifier",
+                null,
                 ClientType.WEB,
                 SocialAuthPurpose.LOGIN,
                 expiresAt,

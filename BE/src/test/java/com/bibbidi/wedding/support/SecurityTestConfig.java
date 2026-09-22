@@ -6,7 +6,7 @@ import com.bibbidi.wedding.auth.security.ActiveUserAuthorizationManager;
 import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
 import com.bibbidi.wedding.auth.security.SecurityConfig;
 import com.bibbidi.wedding.auth.security.SecurityProperties;
-import com.bibbidi.wedding.auth.token.AccessTokenParser;
+import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.auth.token.JwtProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -29,8 +29,8 @@ public class SecurityTestConfig {
     }
 
     @Bean
-    public AccessTokenParser accessTokenParser() {
-        return mock(AccessTokenParser.class);
+    public BibbidiTokenParser bibbidiTokenParser() {
+        return mock(BibbidiTokenParser.class);
     }
 
     @Bean

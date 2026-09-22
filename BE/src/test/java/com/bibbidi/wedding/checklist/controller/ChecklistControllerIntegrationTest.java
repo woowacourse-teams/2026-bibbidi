@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
@@ -36,10 +36,10 @@ import tools.jackson.databind.ObjectMapper;
 class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
-    private AccessTokenIssuer accessTokenIssuer;
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
 
     private String bearerToken(Long userId) {
-        return AuthenticationTestSupport.bearerTokenOf(accessTokenIssuer, userId, "테스트회원");
+        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, "테스트회원");
     }
 
     private static final Long USER_ID = 7L;

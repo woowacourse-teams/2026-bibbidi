@@ -14,7 +14,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
@@ -32,10 +32,10 @@ import tools.jackson.databind.ObjectMapper;
 class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
-    private AccessTokenIssuer accessTokenIssuer;
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
 
     private String bearerToken(Long userId) {
-        return AuthenticationTestSupport.bearerTokenOf(accessTokenIssuer, userId, "테스트회원");
+        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, "테스트회원");
     }
 
     private static final String CHANGE_CATEGORY_URL = "/api/checklist-items/{itemId}/category";

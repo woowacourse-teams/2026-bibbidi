@@ -8,7 +8,7 @@ import com.bibbidi.wedding.auth.service.session.IssuedSession;
 import com.bibbidi.wedding.auth.service.session.SessionIssueService;
 import com.bibbidi.wedding.auth.service.session.SessionOwner;
 import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserResult;
@@ -36,7 +36,7 @@ class WithdrawalServiceIntegrationTest {
     private SessionRefreshService sessionRefreshService;
 
     @Autowired
-    private AccessTokenIssuer accessTokenIssuer;
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
 
     @Autowired
     private UserService userService;
@@ -57,7 +57,7 @@ class WithdrawalServiceIntegrationTest {
         IssuedSession web = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
         IssuedSession mobile = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
 
-        withdrawalService.withdraw(owner.userId(), accessTokenIssuer.issueDeleteGrant(owner.userId()));
+        withdrawalService.withdraw(owner.userId(), bibbidiTokenIssuer.issueDeleteGrant(owner.userId()));
 
         assertThatThrownBy(() -> sessionRefreshService.refresh(web.refreshToken(), ClientType.WEB))
                 .isInstanceOf(BusinessException.class);
@@ -68,7 +68,7 @@ class WithdrawalServiceIntegrationTest {
     @Test
     @DisplayName("탈퇴한 회원은 더 이상 조회되지 않는다")
     void shouldDeleteUserOnWithdrawal() {
-        withdrawalService.withdraw(owner.userId(), accessTokenIssuer.issueDeleteGrant(owner.userId()));
+        withdrawalService.withdraw(owner.userId(), bibbidiTokenIssuer.issueDeleteGrant(owner.userId()));
 
         assertThatThrownBy(() -> userService.findCurrentUserInfo(owner.userId()))
                 .isInstanceOf(BusinessException.class)
@@ -80,7 +80,7 @@ class WithdrawalServiceIntegrationTest {
     @DisplayName("다른 회원의 탈퇴 표로는 탈퇴할 수 없다")
     void shouldRejectDeleteGrantOfOtherUser() {
         UserResult other = userService.createPendingUser("other", null);
-        String otherGrant = accessTokenIssuer.issueDeleteGrant(other.id());
+        String otherGrant = bibbidiTokenIssuer.issueDeleteGrant(other.id());
 
         assertThatThrownBy(() -> withdrawalService.withdraw(owner.userId(), otherGrant))
                 .isInstanceOf(BusinessException.class)

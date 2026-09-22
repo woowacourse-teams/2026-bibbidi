@@ -11,22 +11,22 @@ import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class AccessTokenTest {
+class BibbidiTokenTest {
 
     private static final String SECRET = "test-only-jwt-secret-value-for-bibbidi-auth";
     private static final String ISSUER = "bibbidi-test";
     private static final String AUDIENCE = "bibbidi-test-client";
 
-    private static final AccessTokenClaims CLAIMS =
-            new AccessTokenClaims(1L, UserStatus.ACTIVE, UserRole.NORMAL, "current", "current@bibbidi.kr");
+    private static final BibbidiTokenClaims CLAIMS =
+            new BibbidiTokenClaims(1L, UserStatus.ACTIVE, UserRole.NORMAL, "current", "current@bibbidi.kr");
 
     @Test
     @DisplayName("발급한 access token에서 사용자와 표시용 정보를 그대로 꺼낸다")
     void shouldIssueAndParseAccessToken() {
         JwtProperties properties = properties(Duration.ofMinutes(30));
-        AccessTokenIssuer issuer = issuer(properties);
+        BibbidiTokenIssuer issuer = issuer(properties);
 
-        AccessTokenClaims parsed = parser(properties).parseAccessToken(issuer.issueAccessToken(CLAIMS));
+        BibbidiTokenClaims parsed = parser(properties).parseAccessToken(issuer.issueAccessToken(CLAIMS));
 
         assertThat(parsed).isEqualTo(CLAIMS);
     }
@@ -62,7 +62,7 @@ class AccessTokenTest {
                 .issueAccessToken(CLAIMS);
         String otherAudience = issuer(properties(Duration.ofMinutes(30), SECRET, ISSUER, "other"))
                 .issueAccessToken(CLAIMS);
-        AccessTokenParser parser = parser(properties(Duration.ofMinutes(30)));
+        BibbidiTokenParser parser = parser(properties(Duration.ofMinutes(30)));
 
         assertThatThrownBy(() -> parser.parseAccessToken(otherIssuer))
                 .isInstanceOf(BusinessException.class);
@@ -125,11 +125,11 @@ class AccessTokenTest {
                 secret, issuer, audience, accessTokenTtl, Duration.ofMinutes(5), "Authorization");
     }
 
-    private static AccessTokenIssuer issuer(JwtProperties properties) {
-        return new AccessTokenIssuer(properties, new JwtSigningKeySource(properties));
+    private static BibbidiTokenIssuer issuer(JwtProperties properties) {
+        return new BibbidiTokenIssuer(properties, new JwtSigningKeySource(properties));
     }
 
-    private static AccessTokenParser parser(JwtProperties properties) {
-        return new AccessTokenParser(properties, new JwtSigningKeySource(properties));
+    private static BibbidiTokenParser parser(JwtProperties properties) {
+        return new BibbidiTokenParser(properties, new JwtSigningKeySource(properties));
     }
 }

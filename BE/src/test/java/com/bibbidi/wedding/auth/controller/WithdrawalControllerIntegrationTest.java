@@ -14,7 +14,7 @@ import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.service.session.IssuedSession;
 import com.bibbidi.wedding.auth.service.session.SessionIssueService;
 import com.bibbidi.wedding.auth.service.session.SessionOwner;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
@@ -36,7 +36,7 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
     private SessionIssueService sessionIssueService;
 
     @Autowired
-    private AccessTokenIssuer accessTokenIssuer;
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
 
     @Autowired
     private UserService userService;
@@ -62,7 +62,7 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
                         .header(AUTHORIZATION, "Bearer " + session.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new WithdrawalRequest(accessTokenIssuer.issueDeleteGrant(userId)))))
+                                new WithdrawalRequest(bibbidiTokenIssuer.issueDeleteGrant(userId)))))
                 .andExpect(status().isNoContent())
                 .andDo(document(
                         "users-withdraw",
@@ -96,7 +96,7 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(delete("/api/users/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new WithdrawalRequest(accessTokenIssuer.issueDeleteGrant(userId)))))
+                                new WithdrawalRequest(bibbidiTokenIssuer.issueDeleteGrant(userId)))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201));
     }

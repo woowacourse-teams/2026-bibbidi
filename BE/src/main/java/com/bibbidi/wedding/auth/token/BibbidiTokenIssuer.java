@@ -9,17 +9,17 @@ import org.springframework.stereotype.Component;
 
 /** 서명 토큰을 발급한다. 수명과 식별자는 모두 설정에서 온다. */
 @Component
-public class AccessTokenIssuer {
+public class BibbidiTokenIssuer {
 
     private final JwtProperties properties;
     private final JwtSigningKeySource keySource;
 
-    public AccessTokenIssuer(JwtProperties properties, JwtSigningKeySource keySource) {
+    public BibbidiTokenIssuer(JwtProperties properties, JwtSigningKeySource keySource) {
         this.properties = properties;
         this.keySource = keySource;
     }
 
-    public String issueAccessToken(AccessTokenClaims claims) {
+    public String issueAccessToken(BibbidiTokenClaims claims) {
         Instant issuedAt = Instant.now();
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())

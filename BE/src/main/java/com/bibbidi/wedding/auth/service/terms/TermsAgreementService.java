@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.auth.service.terms;
 
-import com.bibbidi.wedding.auth.token.AccessTokenClaims;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
@@ -21,22 +21,22 @@ public class TermsAgreementService {
 
     private final TermsService termsService;
     private final UserService userService;
-    private final AccessTokenIssuer accessTokenIssuer;
+    private final BibbidiTokenIssuer bibbidiTokenIssuer;
 
     public TermsAgreementService(
             TermsService termsService,
             UserService userService,
-            AccessTokenIssuer accessTokenIssuer
+            BibbidiTokenIssuer bibbidiTokenIssuer
     ) {
         this.termsService = termsService;
         this.userService = userService;
-        this.accessTokenIssuer = accessTokenIssuer;
+        this.bibbidiTokenIssuer = bibbidiTokenIssuer;
     }
 
     public String agree(Long currentUserId, List<Long> agreedTermsIds) {
         termsService.agree(currentUserId, agreedTermsIds);
         UserResult user = userService.activate(currentUserId);
-        return accessTokenIssuer.issueAccessToken(
-                new AccessTokenClaims(user.id(), user.status(), user.role(), user.nickname(), user.email()));
+        return bibbidiTokenIssuer.issueAccessToken(
+                new BibbidiTokenClaims(user.id(), user.status(), user.role(), user.nickname(), user.email()));
     }
 }

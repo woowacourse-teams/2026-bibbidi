@@ -15,19 +15,19 @@ import org.springframework.stereotype.Component;
  * 서명과 만료는 jjwt가, 발급자·대상·용도는 여기서 확인한다.
  */
 @Component
-public class AccessTokenParser {
+public class BibbidiTokenParser {
 
     private final JwtProperties properties;
     private final JwtSigningKeySource keySource;
 
-    public AccessTokenParser(JwtProperties properties, JwtSigningKeySource keySource) {
+    public BibbidiTokenParser(JwtProperties properties, JwtSigningKeySource keySource) {
         this.properties = properties;
         this.keySource = keySource;
     }
 
-    public AccessTokenClaims parseAccessToken(String token) {
+    public BibbidiTokenClaims parseAccessToken(String token) {
         Claims claims = parse(token, TokenCategory.ACCESS, ClientError.ACCESS_TOKEN_INVALID);
-        return new AccessTokenClaims(
+        return new BibbidiTokenClaims(
                 userId(claims, ClientError.ACCESS_TOKEN_INVALID),
                 status(claims),
                 role(claims),
