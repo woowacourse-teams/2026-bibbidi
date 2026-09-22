@@ -1,0 +1,64 @@
+diff --git a/.github/ai-review/README.md b/.github/ai-review/README.md
+index 84d924da67eaf1da8aacc9ae83b41b9fd93231a2..d0d810fd6f8ff204b047407d86d2b71f03b1abce 100644
+--- a/.github/ai-review/README.md
++++ b/.github/ai-review/README.md
+@@ -26,7 +26,19 @@ GitHub Actions에서 PR의 요구사항, 변경 diff, 주변 코드와 관련 
+ - **[request] #트랜잭션** (`ScheduleService.java:42`): 트랜잭션 밖에서 상태를 변경합니다
+   두 저장 작업 사이에서 예외가 발생하면 일부 상태만 반영됩니다. **영향:** 일정과 비용 상태가 서로 달라질 수 있습니다.
+ 
+-### 👀 사람 리뷰어가 볼 곳
++### 🤖 AI만으로 충분한 것
++
++- 정답이 이미 정해져 있는 변경
++- 기존 동작을 유지하는 변경
++- 테스트·컴파일·정적 분석 등으로 결과를 검증할 수 있는 변경
++
++### 👀 사람이 확인해야 하는 것
++
++- 무엇이 올바른 동작인지 정해야 하는 변경
++- 여러 선택지 중 방향을 결정해야 하는 변경
++- 비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경
++
++#### 이번 PR에서 확인할 것
+ 
+ - **[comment] #질문-토론** (`ExpenseListener.java:31`): 실패 시 재시도하지 않는 정책을 수용할지 확인해 주세요
+   이벤트 처리 실패를 복구하는 경로가 없습니다. **영향:** 비용 반영이 누락된 상태로 남을 수 있습니다.
+diff --git a/.github/ai-review/ai-review-service.test.ts b/.github/ai-review/ai-review-service.test.ts
+index 52e8546a9af5872f7ce7638af58f003f41a5a8e4..ef92226c93a2331dc53212b26510e8ccaa65c924 100644
+--- a/.github/ai-review/ai-review-service.test.ts
++++ b/.github/ai-review/ai-review-service.test.ts
+@@ -138,6 +138,10 @@ test("요약 코멘트를 한국어 카테고리와 Markdown 판정 형식으로
+   assert.match(body, /\[request]/);
+   assert.match(body, /#트랜잭션/);
+   assert.match(body, /### ⚠️ 반영 필요/);
++  assert.match(body, /### 🤖 AI만으로 충분한 것/);
++  assert.match(body, /정답이 이미 정해져 있는 변경/);
++  assert.match(body, /### 👀 사람이 확인해야 하는 것/);
++  assert.match(body, /비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경/);
+   assert.doesNotMatch(body, /분석 완료|지적 사항/);
+   assert.match(body, /검증이 필요합니다\. \*\*영향:\*\* 잘못된 데이터가 저장됩니다/);
+   assert.match(body, /AI 판정: 반영 필요/);
+diff --git a/.github/ai-review/ai-review-service.ts b/.github/ai-review/ai-review-service.ts
+index 5ec3f4a80c1a99c8ab5b9fd842c4ac3cfd699619..40f5676319c232b9378ce59e7216d71c62e74180 100644
+--- a/.github/ai-review/ai-review-service.ts
++++ b/.github/ai-review/ai-review-service.ts
+@@ -506,7 +506,19 @@ ${reviewMarker(headSha)}
+ ${requests.length > 0 ? `### ⚠️ 반영 필요\n\n${findingList(requests)}` : `### ✅ 통과 사유\n\n- 재현 가능한 \`[request]\` 수준의 결함을 확인하지 못했습니다.`}
+ 
+ ${suggestions.length > 0 ? `### 💬 개선 의견\n\n${findingList(suggestions)}\n` : ""}
+-### 👀 사람 리뷰어가 볼 곳
++### 🤖 AI만으로 충분한 것
++
++- 정답이 이미 정해져 있는 변경
++- 기존 동작을 유지하는 변경
++- 테스트·컴파일·정적 분석 등으로 결과를 검증할 수 있는 변경
++
++### 👀 사람이 확인해야 하는 것
++
++- 무엇이 올바른 동작인지 정해야 하는 변경
++- 여러 선택지 중 방향을 결정해야 하는 변경
++- 비용과 이득 사이에서 무엇을 포기할지 결정해야 하는 변경
++
++#### 이번 PR에서 확인할 것
+ 
+ ${humanReview.length > 0 ? findingList(humanReview) : "- 판단이 필요한 트레이드오프를 추가로 발견하지 못했습니다."}
