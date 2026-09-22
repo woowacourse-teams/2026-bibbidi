@@ -5,13 +5,14 @@ import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
 import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
 import com.bibbidi.wedding.auth.service.login.SocialLoginService;
-import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
-import com.bibbidi.wedding.auth.token.AccessTokenParser;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.user.service.UserService;
 import java.time.LocalDateTime;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class WithdrawalService {
 
     private final SocialLoginService socialLoginService;
-    private final AccessTokenIssuer accessTokenIssuer;
-    private final AccessTokenParser accessTokenParser;
+    private final BibbidiTokenIssuer bibbidiTokenIssuer;
+    private final BibbidiTokenParser bibbidiTokenParser;
     private final SocialIdentityRepository socialIdentityRepository;
     private final RefreshSessionRepository refreshSessionRepository;
     private final TermsService termsService;
@@ -35,16 +36,16 @@ public class WithdrawalService {
 
     public WithdrawalService(
             SocialLoginService socialLoginService,
-            AccessTokenIssuer accessTokenIssuer,
-            AccessTokenParser accessTokenParser,
+            BibbidiTokenIssuer bibbidiTokenIssuer,
+            BibbidiTokenParser bibbidiTokenParser,
             SocialIdentityRepository socialIdentityRepository,
             RefreshSessionRepository refreshSessionRepository,
             TermsService termsService,
             UserService userService
     ) {
         this.socialLoginService = socialLoginService;
-        this.accessTokenIssuer = accessTokenIssuer;
-        this.accessTokenParser = accessTokenParser;
+        this.bibbidiTokenIssuer = bibbidiTokenIssuer;
+        this.bibbidiTokenParser = bibbidiTokenParser;
         this.socialIdentityRepository = socialIdentityRepository;
         this.refreshSessionRepository = refreshSessionRepository;
         this.termsService = termsService;
@@ -53,14 +54,20 @@ public class WithdrawalService {
 
     /** 소셜 재인증이 끝나면 수명이 짧은 탈퇴용 표를 내준다. */
     public String issueDeleteGrant(
-            SocialProvider provider, ClientType clientType, String code, String state, Long currentUserId) {
-        Long verifiedUserId =
-                socialLoginService.verifyForWithdrawal(provider, clientType, code, state, currentUserId);
-        return accessTokenIssuer.issueDeleteGrant(verifiedUserId);
+            SocialProvider provider,
+            ClientType clientType,
+            String code,
+            String state,
+            @Nullable String browserBinder,
+            Long currentUserId
+    ) {
+        Long verifiedUserId = socialLoginService.verifyForWithdrawal(
+                provider, clientType, code, state, browserBinder, currentUserId);
+        return bibbidiTokenIssuer.issueDeleteGrant(verifiedUserId);
     }
 
     public void withdraw(Long currentUserId, String deleteGrant) {
-        Long grantedUserId = accessTokenParser.parseDeleteGrant(deleteGrant);
+        Long grantedUserId = bibbidiTokenParser.parseDeleteGrant(deleteGrant);
         if (!grantedUserId.equals(currentUserId)) {
             throw new BusinessException(ClientError.DELETE_GRANT_INVALID,
                     "탈퇴 표가 지금 로그인한 회원의 것이 아닙니다.");
