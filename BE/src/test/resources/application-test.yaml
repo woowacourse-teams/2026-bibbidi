@@ -26,15 +26,15 @@ auth:
     secret: test-only-jwt-secret-value-for-bibbidi-auth
     issuer: bibbidi-test
     audience: bibbidi-test-client
-    access-token-ttl: 30m
-    delete-grant-ttl: 5m
+    access-token-lifetime: 30m
+    delete-grant-lifetime: 5m
     header-name: Authorization
   session:
-    refresh-token-ttl: 30d
-    handoff-code-ttl: 60s
-    auth-request-ttl: 10m
+    refresh-token-lifetime: 30d
+    handoff-code-lifetime: 60s
+    auth-request-lifetime: 10m
   security:
-    require-authentication:
+    permit-pending-user:
       - /api/auth/native/handoff-codes
       - /api/auth/delete-grants/**
     permit-all:
@@ -61,13 +61,13 @@ auth:
     revoked-session-retention: 30d
     # 테스트에서는 스케줄러를 기다리지 않고 서비스를 직접 부른다.
     cron: "-"
-  oidc-jwks:
-    ttl: 8d
-    refresh-interval: 7d
-    forced-refresh-min-interval: 5m
-    maximum-size: 16
+  oidc-public-key:
+    cached-key-lifetime: 8d
+    scheduled-refresh-interval: 7d
+    unknown-key-refresh-min-interval: 5m
+    max-cached-provider-count: 16
     # 테스트는 제공자를 실제로 호출하지 않는다.
-    warm-up-enabled: false
+    scheduled-refresh-enabled: false
   oidc:
     providers:
       kakao:

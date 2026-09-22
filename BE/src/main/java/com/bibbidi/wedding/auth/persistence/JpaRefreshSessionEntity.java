@@ -12,10 +12,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/**
- * 살아 있는 refresh token 하나를 나타낸다.
- * 토큰 원문은 저장하지 않고 해시만 남긴다. 같은 기기에서 이어진 토큰은 family_id를 공유한다.
- */
 @Entity
 @Table(name = "refresh_sessions")
 public class JpaRefreshSessionEntity extends BaseTimeEntity {

@@ -11,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** 어떤 소셜 계정이 어떤 회원인지 잇는다. provider_user_id는 받은 문자열을 그대로 저장한다. */
 @Entity
 @Table(name = "social_identities")
 public class JpaSocialIdentityEntity extends BaseTimeEntity {

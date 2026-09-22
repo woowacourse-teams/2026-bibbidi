@@ -9,10 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/**
- * 네이티브 로그인을 WebView로 넘길 때 쓰는 1회용 코드다.
- * 코드 원문은 저장하지 않고, 넘겨받은 웹 세션이 앱 세션과 같은 기기 계열에 들어가도록 family_id를 함께 둔다.
- */
 @Entity
 @Table(name = "handoff_codes")
 public class JpaHandoffCodeEntity extends BaseTimeEntity {

@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.auth.oidc.provider;
 
+import com.bibbidi.wedding.auth.config.OidcProviderProperties;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -7,7 +8,6 @@ import java.util.Locale;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/** 사용자를 보낼 인가 화면 주소를 만든다. 주소의 모양은 제공자 설정에서만 온다. */
 @Component
 public class OidcAuthorizationUriFactory {
 

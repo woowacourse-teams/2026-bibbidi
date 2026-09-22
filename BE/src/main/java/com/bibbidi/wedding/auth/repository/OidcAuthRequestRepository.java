@@ -24,15 +24,21 @@ public class OidcAuthRequestRepository {
 
     public OidcAuthRequest save(OidcAuthRequest request) {
         return authMapper.toDomain(
-                jpaOidcAuthRequestRepository.saveAndFlush(authMapper.toEntity(request)));
+                jpaOidcAuthRequestRepository.saveAndFlush(authMapper.toEntity(request))
+        );
     }
 
     public Optional<OidcAuthRequest> findByStateHash(String stateHash) {
-        return jpaOidcAuthRequestRepository.findByStateHash(stateHash).map(authMapper::toDomain);
+        return jpaOidcAuthRequestRepository
+                .findByStateHash(stateHash)
+                .map(authMapper::toDomain);
     }
 
     public int deleteExpiredOrUsed(LocalDateTime threshold, int batchSize) {
-        List<Long> ids = jpaOidcAuthRequestRepository.findIdsToClean(threshold, PageRequest.of(0, batchSize));
+        List<Long> ids = jpaOidcAuthRequestRepository.findIdsToClean(
+                threshold,
+                PageRequest.of(0, batchSize)
+        );
         jpaOidcAuthRequestRepository.deleteAllByIdInBatch(ids);
         return ids.size();
     }

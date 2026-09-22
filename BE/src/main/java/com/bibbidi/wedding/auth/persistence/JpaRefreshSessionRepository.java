@@ -13,7 +13,6 @@ public interface JpaRefreshSessionRepository extends JpaRepository<JpaRefreshSes
 
     Optional<JpaRefreshSessionEntity> findByTokenHash(String tokenHash);
 
-    /** 재사용이 감지되면 그 기기 계열에 딸린 세션을 한꺼번에 막는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             UPDATE JpaRefreshSessionEntity session
@@ -32,12 +31,6 @@ public interface JpaRefreshSessionRepository extends JpaRepository<JpaRefreshSes
             """)
     int revokeAllOfUser(@Param("userId") Long userId, @Param("revokedAt") LocalDateTime revokedAt);
 
-    /**
-     * 정리 대상 id를 먼저 뽑는다. 한 번에 다 지우면 운영 MySQL에서 락을 오래 잡는다.
-     *
-     * <p>만료된 세션은 더 쓸 수 없으므로 바로 지운다.
-     * 폐기한 세션은 재사용을 감지한 흔적이라 얼마간 남겨 두었다가 지운다.
-     */
     @Query("""
             SELECT session.id
               FROM JpaRefreshSessionEntity session

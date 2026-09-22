@@ -1,11 +1,11 @@
 package com.bibbidi.wedding.auth.controller;
 
-import com.bibbidi.wedding.auth.controller.dto.DeleteGrantResponse;
-import com.bibbidi.wedding.auth.controller.dto.SocialLoginRequest;
-import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
+import com.bibbidi.wedding.auth.controller.dto.response.DeleteGrantResponse;
+import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
+import com.bibbidi.wedding.auth.controller.dto.request.WithdrawalRequest;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
-import com.bibbidi.wedding.auth.service.withdrawal.WithdrawalService;
+import com.bibbidi.wedding.auth.service.WithdrawalService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -21,41 +21,37 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 탈퇴를 맡는다.
- * 토큰만으로는 지우지 않는다. 소셜로 한 번 더 인증해 받은 표를 함께 내야 한다.
+ * 탈퇴를 맡는다. 토큰만으로는 지우지 않는다. 소셜로 한 번 더 인증해 받은 표를 함께 내야 한다.
  */
 @RestController
 public class WithdrawalController {
 
     private final WithdrawalService withdrawalService;
-    private final RefreshCookieFactory refreshCookieFactory;
-    private final OidcBinderCookieFactory binderCookieFactory;
+    private final AuthCookieFactory authCookieFactory;
 
     public WithdrawalController(
             WithdrawalService withdrawalService,
-            RefreshCookieFactory refreshCookieFactory,
-            OidcBinderCookieFactory binderCookieFactory
+            AuthCookieFactory authCookieFactory
     ) {
         this.withdrawalService = withdrawalService;
-        this.refreshCookieFactory = refreshCookieFactory;
-        this.binderCookieFactory = binderCookieFactory;
+        this.authCookieFactory = authCookieFactory;
     }
 
     @PostMapping("/api/auth/delete-grants/{provider}/callback")
     @ResponseStatus(HttpStatus.CREATED)
-    public DeleteGrantResponse issueDeleteGrant(
+    public DeleteGrantResponse issueDeleteGrantToken(
             @AuthenticationPrincipal(expression = "userId") Long currentUserId,
             @PathVariable String provider,
             @RequestParam ClientType clientType,
             @Valid @RequestBody SocialLoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        return new DeleteGrantResponse(withdrawalService.issueDeleteGrant(
+        return new DeleteGrantResponse(withdrawalService.issueDeleteGrantToken(
                 SocialProvider.from(provider),
                 clientType,
                 request.code(),
                 request.state(),
-                binderCookieFactory.read(servletRequest),
+                authCookieFactory.readOidcBinder(servletRequest),
                 currentUserId));
     }
 
@@ -66,7 +62,7 @@ public class WithdrawalController {
     ) {
         withdrawalService.withdraw(currentUserId, request.deleteGrant());
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.expired().toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieFactory.expiredRefreshToken().toString())
                 .build();
     }
 }

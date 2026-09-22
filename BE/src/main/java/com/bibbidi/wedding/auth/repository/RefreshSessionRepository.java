@@ -24,11 +24,14 @@ public class RefreshSessionRepository {
 
     public RefreshSession save(RefreshSession session) {
         return authMapper.toDomain(
-                jpaRefreshSessionRepository.saveAndFlush(authMapper.toEntity(session)));
+                jpaRefreshSessionRepository.saveAndFlush(authMapper.toEntity(session))
+        );
     }
 
     public Optional<RefreshSession> findByTokenHash(String tokenHash) {
-        return jpaRefreshSessionRepository.findByTokenHash(tokenHash).map(authMapper::toDomain);
+        return jpaRefreshSessionRepository
+                .findByTokenHash(tokenHash)
+                .map(authMapper::toDomain);
     }
 
     public int revokeFamily(String familyId, LocalDateTime revokedAt) {
@@ -42,7 +45,10 @@ public class RefreshSessionRepository {
     public int deleteExpiredOrRevoked(
             LocalDateTime now, LocalDateTime revokedThreshold, int batchSize) {
         List<Long> ids = jpaRefreshSessionRepository.findIdsToClean(
-                now, revokedThreshold, PageRequest.of(0, batchSize));
+                now,
+                revokedThreshold,
+                PageRequest.of(0, batchSize)
+        );
         jpaRefreshSessionRepository.deleteAllByIdInBatch(ids);
         return ids.size();
     }

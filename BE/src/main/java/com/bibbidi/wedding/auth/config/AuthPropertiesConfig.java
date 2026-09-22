@@ -1,8 +1,5 @@
 package com.bibbidi.wedding.auth.config;
 
-import com.bibbidi.wedding.auth.controller.RefreshCookieProperties;
-import com.bibbidi.wedding.auth.token.JwtProperties;
-import com.bibbidi.wedding.auth.token.SessionProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties(
         {
-                JwtProperties.class,
+                BibbidiTokenProperties.class,
                 SessionProperties.class,
                 AuthCleanupProperties.class,
                 RefreshCookieProperties.class

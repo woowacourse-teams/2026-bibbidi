@@ -20,13 +20,13 @@ auth:
     secret: ${AUTH_JWT_SECRET:}
     issuer: ${AUTH_JWT_ISSUER:bibbidi}
     audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
-    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
-    delete-grant-ttl: ${AUTH_DELETE_GRANT_TTL:5m}
+    access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:30m}
+    delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:5m}
     header-name: Authorization
   session:
-    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:30d}
-    handoff-code-ttl: ${AUTH_HANDOFF_CODE_TTL:60s}
-    auth-request-ttl: ${AUTH_REQUEST_TTL:10m}
+    refresh-token-lifetime: ${AUTH_REFRESH_TOKEN_LIFETIME:30d}
+    handoff-code-lifetime: ${AUTH_HANDOFF_CODE_LIFETIME:60s}
+    auth-request-lifetime: ${AUTH_REQUEST_LIFETIME:10m}
   refresh-cookie:
     name: ${AUTH_REFRESH_COOKIE_NAME:BIBBIDI_REFRESH}
     path: ${AUTH_REFRESH_COOKIE_PATH:/api/auth}
@@ -37,12 +37,12 @@ auth:
     max-rounds-per-run: ${AUTH_CLEANUP_MAX_ROUNDS:20}
     revoked-session-retention: ${AUTH_CLEANUP_REVOKED_RETENTION:30d}
     cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
-  oidc-jwks:
-    ttl: ${AUTH_JWKS_TTL:8d}
-    refresh-interval: ${AUTH_JWKS_REFRESH_INTERVAL:7d}
-    forced-refresh-min-interval: ${AUTH_JWKS_FORCED_REFRESH_MIN_INTERVAL:5m}
-    maximum-size: ${AUTH_JWKS_MAX_SIZE:16}
-    warm-up-enabled: ${AUTH_JWKS_WARM_UP_ENABLED:true}
+  oidc-public-key:
+    cached-key-lifetime: ${AUTH_OIDC_PUBLIC_KEY_LIFETIME:8d}
+    scheduled-refresh-interval: ${AUTH_OIDC_PUBLIC_KEY_REFRESH_INTERVAL:7d}
+    unknown-key-refresh-min-interval: ${AUTH_OIDC_PUBLIC_KEY_UNKNOWN_KEY_MIN_INTERVAL:5m}
+    max-cached-provider-count: ${AUTH_OIDC_PUBLIC_KEY_MAX_PROVIDERS:16}
+    scheduled-refresh-enabled: ${AUTH_OIDC_PUBLIC_KEY_SCHEDULED_REFRESH_ENABLED:true}
   oidc:
     providers:
       kakao:
@@ -90,7 +90,8 @@ auth:
           native: ${GOOGLE_NATIVE_REDIRECT_URI:}
   security:
     # permit-all보다 먼저 판단한다. /api/auth 아래지만 로그인해야 부를 수 있는 것들이다.
-    require-authentication:
+    # 가입을 끝내지 않은 회원도 부를 수 있다.
+    permit-pending-user:
       - /api/auth/native/handoff-codes
       - /api/auth/delete-grants/**
     permit-all:
@@ -133,70 +134,3 @@ logging:
     format:
       console: ecs
   include-application-name: false
-
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bibbidi}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
-    hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:10}
-      minimum-idle: 1
-      idle-timeout: 600000
-      connection-timeout: 30000
-      max-lifetime: 110000
-      keepalive-time: 30000
-      connection-test-query: "SELECT 1"
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-
----
-spring:
-  config:
-    activate:
-      on-profile: "!prod & !dev"
-
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
-    username: sa
-    password: ""
-
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
-    username: sa
-    password: ""
-
-  jpa:
-    defer-datasource-initialization: true
-    hibernate:
-      ddl-auto: create-drop
-
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:load_catalog.sql
-
-auth:
-  jwt:
-    # 로컬 개발 전용 값이다. 운영은 환경 변수로만 받으며, 없으면 서버가 뜨지 않는다.
-    secret: ${AUTH_JWT_SECRET:local-development-only-jwt-secret-value}

@@ -1,15 +1,17 @@
 package com.bibbidi.wedding.auth.controller;
 
-import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
-import com.bibbidi.wedding.auth.controller.dto.TermsAgreementResponse;
-import com.bibbidi.wedding.auth.service.terms.TermsAgreementService;
+import com.bibbidi.wedding.auth.controller.dto.request.TermsAgreementRequest;
+import com.bibbidi.wedding.auth.controller.dto.response.TermsAgreementResponse;
+import com.bibbidi.wedding.auth.service.TermsAgreementService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 가입을 끝내는 자리다. 동의하기 전에는 이 API 말고는 부를 수 없다. */
+/**
+ * 가입을 끝내는 자리다. 동의하기 전에는 이 API 말고는 부를 수 없다.
+ */
 @RestController
 public class TermsAgreementController {
 

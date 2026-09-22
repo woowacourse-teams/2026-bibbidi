@@ -2,12 +2,11 @@ package com.bibbidi.wedding.support;
 
 import static org.mockito.Mockito.mock;
 
-import com.bibbidi.wedding.auth.security.ActiveUserAuthorizationManager;
 import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
-import com.bibbidi.wedding.auth.security.SecurityConfig;
-import com.bibbidi.wedding.auth.security.SecurityProperties;
+import com.bibbidi.wedding.auth.config.SecurityConfig;
+import com.bibbidi.wedding.auth.config.SecurityProperties;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
-import com.bibbidi.wedding.auth.token.JwtProperties;
+import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -20,13 +19,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @TestConfiguration
 @Import(SecurityConfig.class)
-@EnableConfigurationProperties({SecurityProperties.class, JwtProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, BibbidiTokenProperties.class})
 public class SecurityTestConfig {
-
-    @Bean
-    public ActiveUserAuthorizationManager activeUserAuthorizationManager() {
-        return new ActiveUserAuthorizationManager();
-    }
 
     @Bean
     public BibbidiTokenParser bibbidiTokenParser() {

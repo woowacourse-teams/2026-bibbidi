@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.support;
 
-import com.bibbidi.wedding.auth.oidc.jwks.JsonWebKey;
+import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKey;
 import io.jsonwebtoken.Jwts;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -25,9 +25,9 @@ public final class OidcTestKeys {
     private OidcTestKeys() {
     }
 
-    public static JsonWebKey publicJsonWebKey() {
+    public static OidcPublicKey publicKey() {
         RSAPublicKey publicKey = (RSAPublicKey) KEY_PAIR.getPublic();
-        return new JsonWebKey(
+        return new OidcPublicKey(
                 KEY_ID,
                 "RSA",
                 "RS256",

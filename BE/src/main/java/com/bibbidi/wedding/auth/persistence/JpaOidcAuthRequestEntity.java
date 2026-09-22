@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.auth.persistence;
 
 import com.bibbidi.wedding.auth.domain.ClientType;
-import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,10 +14,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/**
- * 인가 URL을 내줄 때 서버가 만든 값을 담아 둔다.
- * 돌아온 요청이 우리가 시작한 그 요청인지 확인하는 데 쓰고, 한 번 쓰면 다시 쓰지 못한다.
- */
 @Entity
 @Table(name = "oidc_auth_requests")
 public class JpaOidcAuthRequestEntity extends BaseTimeEntity {

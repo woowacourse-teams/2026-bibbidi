@@ -23,14 +23,12 @@ public class SocialIdentityRepository {
         this.authMapper = authMapper;
     }
 
-    /**
-     * 같은 소셜 계정으로 동시에 가입 요청이 와도 DB 제약이 한 건만 통과시킨다.
-     * 진 쪽은 회원을 더 만들지 않고 정해진 오류로 끝난다.
-     */
+
     public SocialIdentity save(SocialIdentity identity) {
         try {
             return authMapper.toDomain(
-                    jpaSocialIdentityRepository.saveAndFlush(authMapper.toEntity(identity)));
+                    jpaSocialIdentityRepository.saveAndFlush(authMapper.toEntity(identity))
+            );
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(ClientError.DUPLICATE_SOCIAL_IDENTITY,
                     "이미 연결된 소셜 계정입니다. provider=" + identity.provider(), exception);
@@ -38,7 +36,9 @@ public class SocialIdentityRepository {
     }
 
     public Optional<SocialIdentity> findByProviderAndProviderUserId(
-            SocialProvider provider, String providerUserId) {
+            SocialProvider provider,
+            String providerUserId
+    ) {
         return jpaSocialIdentityRepository
                 .findByProviderAndProviderUserId(provider, providerUserId)
                 .map(authMapper::toDomain);

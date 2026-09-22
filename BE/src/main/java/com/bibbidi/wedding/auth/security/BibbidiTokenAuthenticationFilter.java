@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.auth.security;
 
+import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
-import com.bibbidi.wedding.auth.token.JwtProperties;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,10 +13,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * 요청 헤더에 실린 비비디 토큰을 검사해 SecurityContext에 사용자를 올린다. 제공자가 준 id_token과는 다른, 우리가 발급한 토큰이다. 토큰이 없으면 그대로 통과시켜 비로그인 허용 경로가
- * 동작하게 하고, 토큰이 있는데 올바르지 않으면 인증 진입점이 401을 내도록 예외를 남긴다.
- */
 public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
@@ -28,11 +24,11 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
     public BibbidiTokenAuthenticationFilter(
             BibbidiTokenParser bibbidiTokenParser,
             AuthenticationFailureResponseWriter failureResponseWriter,
-            JwtProperties jwtProperties
+            BibbidiTokenProperties bibbidiTokenProperties
     ) {
         this.bibbidiTokenParser = bibbidiTokenParser;
         this.failureResponseWriter = failureResponseWriter;
-        this.headerName = jwtProperties.headerName();
+        this.headerName = bibbidiTokenProperties.headerName();
     }
 
     @Override
@@ -63,7 +59,7 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
             );
         } catch (BusinessException exception) {
             SecurityContextHolder.clearContext();
-            failureResponseWriter.respond(request, response, exception);
+            failureResponseWriter.write(request, response, exception);
             return;
         }
 

@@ -12,10 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * 필터 단계에서 끝난 요청도 컨트롤러와 같은 오류 형식을 내도록 직접 응답을 쓴다.
- * 토큰 값은 기록하지 않는다.
- */
 @Slf4j
 @Component
 public class AuthenticationFailureResponseWriter {
@@ -26,16 +22,28 @@ public class AuthenticationFailureResponseWriter {
         this.objectMapper = objectMapper;
     }
 
-    public void respond(HttpServletRequest request, HttpServletResponse response, BusinessException exception)
-            throws IOException {
-        respond(request, response, exception.clientError(), exception.getMessage());
+    public void write(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            BusinessException exception
+    ) throws IOException {
+        write(request, response, exception.clientError(), exception.getMessage());
     }
 
-    public void respond(HttpServletRequest request, HttpServletResponse response, ClientError error, String logMessage)
-            throws IOException {
-        log.warn("errorCode={} method={} uri={} status={} message={}",
-                error.errorCode(), request.getMethod(), request.getRequestURI(),
-                error.httpStatus().value(), logMessage);
+    public void write(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            ClientError error,
+            String logMessage
+    ) throws IOException {
+        log.warn(
+                "errorCode={} method={} uri={} status={} message={}",
+                error.errorCode(),
+                request.getMethod(),
+                request.getRequestURI(),
+                error.httpStatus().value(),
+                logMessage
+        );
 
         response.setStatus(error.httpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
