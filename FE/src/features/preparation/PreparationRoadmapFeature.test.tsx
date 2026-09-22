@@ -61,8 +61,9 @@ import {
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
 const DESKTOP_ROADMAP_TITLE = "로드맵에서 필요한 일만, 내 체크리스트에";
+const MOBILE_ROADMAP_TITLE = "준비할 단계를 선택해 보세요.";
 const ROADMAP_TITLE_PATTERN =
-  /^(준비 로드맵|로드맵에서 필요한 일만, 내 체크리스트에)$/;
+  /^(준비할 단계를 선택해 보세요\.|로드맵에서 필요한 일만, 내 체크리스트에)$/;
 
 async function renderFeature({ strictMode = false } = {}) {
   const feature = <PreparationRoadmapFeature />;

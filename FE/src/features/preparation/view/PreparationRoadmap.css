@@ -118,6 +118,7 @@
 }
 
 .preparation-roadmap__header h1,
+.preparation-roadmap__header p,
 .preparation-roadmap__step-title,
 .preparation-roadmap__guide {
   margin: 0;
@@ -710,12 +711,22 @@
   .preparation-roadmap__header h1 {
     margin: 0;
     color: var(--color-fg-neutral);
-    font-size: 24px;
+    font-size: clamp(20px, 6.1vw, 24px);
     line-height: 1.4;
+    text-align: left;
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
-  .preparation-roadmap__guide {
-    display: none;
+  .preparation-roadmap__header-copy {
+    gap: 6px;
+  }
+
+  .preparation-roadmap__header p {
+    color: var(--color-fg-neutral-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: keep-all;
   }
 
   .preparation-roadmap__content {

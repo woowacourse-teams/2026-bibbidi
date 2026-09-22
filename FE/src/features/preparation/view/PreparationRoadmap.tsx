@@ -193,26 +193,31 @@ export function PreparationRoadmap({
           <div className="preparation-roadmap__header-copy">
             <h1 id="preparation-roadmap-title">
               {isMobileLayout
-                ? viewModel.title
+                ? "준비할 단계를 선택해 보세요."
                 : "로드맵에서 필요한 일만, 내 체크리스트에"}
             </h1>
+            {isMobileLayout ? (
+              <p>필요한 할 일을 골라 내 체크리스트에 담을 수 있어요.</p>
+            ) : null}
           </div>
-          <ol
-            aria-label="체크리스트 만드는 순서"
-            className="preparation-roadmap__guide"
-          >
-            <li>
-              <span aria-hidden="true">1</span>
-              단계 선택
-            </li>
-            <li>
-              <span aria-hidden="true">2</span>할 일 추가
-            </li>
-            <li>
-              <span aria-hidden="true">3</span>
-              체크리스트에서 관리
-            </li>
-          </ol>
+          {!isMobileLayout ? (
+            <ol
+              aria-label="체크리스트 만드는 순서"
+              className="preparation-roadmap__guide"
+            >
+              <li>
+                <span aria-hidden="true">1</span>
+                단계 선택
+              </li>
+              <li>
+                <span aria-hidden="true">2</span>할 일 추가
+              </li>
+              <li>
+                <span aria-hidden="true">3</span>
+                체크리스트에서 관리
+              </li>
+            </ol>
+          ) : null}
         </header>
 
         <div className="preparation-roadmap__content">
