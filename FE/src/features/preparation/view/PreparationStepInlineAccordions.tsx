@@ -1,160 +1,92 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { PreparationStepDetailViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import {
   PreparationAddAllTasksButton,
   PreparationTaskList,
 } from "./PreparationTaskList";
+import { PreparationStepChecklist } from "./PreparationStepChecklist";
 import "./PreparationStepInlineAccordions.css";
 
-type AccordionValue = "available-tasks" | "checklist";
-
-interface PreparationTaskAccordionProps {
-  children: ReactNode;
-  count?: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-  title: string;
-}
-
-function AccordionChevron() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function PreparationTaskAccordion({
-  children,
-  count,
-  isExpanded,
-  onToggle,
-  title,
-}: PreparationTaskAccordionProps) {
-  const id = useId();
-  const contentId = `${id}-content`;
-  const triggerId = `${id}-trigger`;
-
-  return (
-    <section className="preparation-step-accordion">
-      <h3 className="preparation-step-accordion__heading">
-        <button
-          aria-controls={contentId}
-          aria-expanded={isExpanded}
-          className="preparation-step-accordion__trigger"
-          id={triggerId}
-          onClick={onToggle}
-          type="button"
-        >
-          <span className="preparation-step-accordion__title">
-            <span
-              className={`preparation-step-accordion__chevron${isExpanded ? " preparation-step-accordion__chevron--expanded" : ""}`}
-            >
-              <AccordionChevron />
-            </span>
-            <span>{title}</span>
-          </span>
-          {count === undefined ? null : (
-            <span className="preparation-step-accordion__count">{count}개</span>
-          )}
-        </button>
-      </h3>
-
-      <div
-        aria-labelledby={triggerId}
-        className="preparation-step-accordion__content"
-        hidden={!isExpanded}
-        id={contentId}
-        role="region"
-      >
-        {children}
-      </div>
-    </section>
-  );
-}
-
 interface PreparationStepInlineAccordionsProps {
+  additionErrorMessage: string | null;
+  addingCatalogItemIds: readonly string[];
+  canAddTasks: boolean;
   detail: PreparationStepDetailViewModel;
+  id: string;
+  onAddAllTasks: () => void;
+  onCollapse: () => void;
+  onTaskAdd: (catalogItemId: string) => void;
 }
 
 export function PreparationStepInlineAccordions({
+  additionErrorMessage,
+  addingCatalogItemIds,
+  canAddTasks,
   detail,
+  id,
+  onAddAllTasks,
+  onCollapse,
+  onTaskAdd,
 }: PreparationStepInlineAccordionsProps) {
-  const [expandedValues, setExpandedValues] = useState<Set<AccordionValue>>(
-    () => new Set(),
-  );
-  const detailRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const detailElement = detailRef.current;
-
-    detailElement?.focus({ preventScroll: true });
-    detailElement?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-      block: "start",
-    });
-  }, []);
-
-  const handleToggle = (value: AccordionValue) => {
-    setExpandedValues((currentValues) => {
-      const nextValues = new Set(currentValues);
-
-      if (nextValues.has(value)) {
-        nextValues.delete(value);
-      } else {
-        nextValues.add(value);
-      }
-
-      return nextValues;
-    });
-  };
-
   return (
     <aside
       aria-label="이 단계에서 준비할 일"
       aria-live="polite"
       className="preparation-step-inline-detail"
-      id="preparation-step-detail"
-      ref={detailRef}
-      tabIndex={-1}
+      id={id}
     >
-      <header className="preparation-step-inline-detail__header">
-        <h2>{detail.title}</h2>
-        {detail.description ? <p>{detail.description}</p> : null}
+      <header className="preparation-step-inline-detail__summary">
+        {detail.description ? (
+          <p className="preparation-step-inline-detail__description">
+            {detail.description}
+          </p>
+        ) : null}
+        <button
+          className="preparation-step-inline-detail__collapse"
+          onClick={onCollapse}
+          type="button"
+        >
+          할 일 접기 <span aria-hidden="true">↑</span>
+        </button>
       </header>
-      <PreparationTaskAccordion
-        count={detail.checklistTasks.length}
-        isExpanded={expandedValues.has("checklist")}
-        onToggle={() => handleToggle("checklist")}
-        title="내 체크리스트"
-      >
+
+      <section className="preparation-step-inline-detail__section">
+        <header className="preparation-step-inline-detail__section-header">
+          <h3>아직 안 담은 일</h3>
+          <span className="preparation-step-inline-detail__count">
+            {detail.detailTasks.length}개
+          </span>
+        </header>
+        {additionErrorMessage ? (
+          <p className="preparation-task-list__error" role="alert">
+            {additionErrorMessage}
+          </p>
+        ) : null}
         <PreparationTaskList
+          addingCatalogItemIds={addingCatalogItemIds}
+          canAddTasks={canAddTasks}
           density="compact"
-          tasks={detail.checklistTasks}
-          variant="checklist"
+          onTaskAdd={onTaskAdd}
+          tasks={detail.detailTasks}
+          variant="available"
         />
-      </PreparationTaskAccordion>
-      <PreparationTaskAccordion
-        isExpanded={expandedValues.has("available-tasks")}
-        onToggle={() => handleToggle("available-tasks")}
-        title="추가할 수 있는 할 일"
-      >
-        <div className="preparation-step-accordion__tasks">
-          <PreparationTaskList
-            density="compact"
-            tasks={detail.detailTasks}
-            variant="available"
-          />
-          {detail.detailTasks.length > 0 ? (
+        {detail.detailTasks.length > 0 ? (
+          <footer className="preparation-step-inline-detail__footer">
             <PreparationAddAllTasksButton
-              label="남은 할 일 모두 추가"
-              size="large"
+              isDisabled={!canAddTasks || addingCatalogItemIds.length > 0}
+              isLoading={addingCatalogItemIds.length > 0}
+              label="모두 추가"
+              onClick={onAddAllTasks}
+              size="compact"
             />
-          ) : null}
-        </div>
-      </PreparationTaskAccordion>
+          </footer>
+        ) : null}
+      </section>
+
+      <PreparationStepChecklist
+        emptyDescription="위의 아직 안 담은 일에서 필요한 항목을 골라보세요."
+        isScrollable={false}
+        tasks={detail.checklistTasks}
+      />
     </aside>
   );
 }
