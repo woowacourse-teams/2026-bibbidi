@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class UserRepository {
 
-    private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다.";
+    private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다. userId=";
     private static final String DUPLICATE_NICKNAME_MESSAGE = "이미 사용 중인 닉네임입니다. nickname=";
 
     private final JpaUserRepository jpaUserRepository;
