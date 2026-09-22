@@ -1,17 +1,12 @@
--- bibbidi_mvp_schema.sql 실행 후 이 파일을 실행한다.
-
-USE bibbidi;
+-- 빈 스키마에 카탈로그 기준 데이터를 적재한다.
+-- MySQL과 H2에서 함께 실행할 수 있도록 표준 SQL만 사용한다.
 
 INSERT INTO categories (id, name, display_order, created_at, updated_at) VALUES
 (1, '웨딩홀', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, '스드메', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (3, '초대', 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (4, '가족', 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(5, '기타', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-AS new ON DUPLICATE KEY UPDATE
-    name          = new.name,
-    display_order = new.display_order,
-    updated_at    = CURRENT_TIMESTAMP;
+(5, '기타', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO steps (id, category_id, name, description, icon_url, display_order, created_at, updated_at) VALUES
 (1, 1, '웨딩홀 정하기',
@@ -146,14 +141,7 @@ INSERT INTO steps (id, category_id, name, description, icon_url, display_order, 
  'https://www.bibbidi.kr/icon/etc/etc-move-in.png', 8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (43, 5, '혼인신고 접수',
  '구청에 혼인신고를 접수해요.',
- 'https://www.bibbidi.kr/icon/etc/etc-marriage-registration.png', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-AS new ON DUPLICATE KEY UPDATE
-    category_id   = new.category_id,
-    name          = new.name,
-    description   = new.description,
-    icon_url      = new.icon_url,
-    display_order = new.display_order,
-    updated_at    = CURRENT_TIMESTAMP;
+ 'https://www.bibbidi.kr/icon/etc/etc-marriage-registration.png', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO catalog_items (id, step_id, title, display_order, essential, created_at, updated_at) VALUES
 (1, 1, '웨딩홀 투어', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -366,20 +354,4 @@ INSERT INTO catalog_items (id, step_id, title, display_order, essential, created
 (167, 42, '신혼집 입주', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (168, 42, '전입신고·확정일자 처리', 2, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
-(169, 43, '혼인신고 접수', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-AS new ON DUPLICATE KEY UPDATE
-    step_id       = new.step_id,
-    title         = new.title,
-    display_order = new.display_order,
-    essential     = new.essential,
-    updated_at    = CURRENT_TIMESTAMP;
-
-
-ALTER TABLE categories AUTO_INCREMENT = 6;
-ALTER TABLE steps AUTO_INCREMENT = 44;
-ALTER TABLE catalog_items AUTO_INCREMENT = 170;
-
-SELECT (SELECT COUNT(*) FROM categories)    AS categories,
-       (SELECT COUNT(*) FROM steps)         AS steps,
-       (SELECT COUNT(*) FROM catalog_items) AS catalog_items;
-SELECT COUNT(*) AS steps_without_icon FROM steps WHERE icon_url IS NULL;
+(169, 43, '혼인신고 접수', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

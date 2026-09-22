@@ -1,0 +1,277 @@
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index 3ff770221b66442de3edd57ec34db691c1c05e8f..c6cbcd2b034e03e2673d00713914874d8e074f7b 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -16,20 +16,38 @@ export function channelForBaseBranch(baseBranch: string): string | undefined {
+   return WEBHOOK_CHANNELS[baseBranch];
+ }
+ 
+-function eventFor(eventName: string, action: string, merged: boolean): EventDescription | undefined {
++function eventFor(
++  eventName: string,
++  action: string,
++  merged: boolean,
++  reviewState: string | undefined,
++): EventDescription | undefined {
+   if (eventName === "pull_request_review" && action === "submitted") {
+-    return { text: "에 리뷰를 남겼습니다." };
++    switch (reviewState) {
++      case "approved":
++        return { title: "리뷰 승인", text: "PR을 승인했습니다.", color: 0x57f287, kind: "review" };
++      case "changes_requested":
++        return { title: "변경 요청", text: "수정이 필요한 내용을 남겼습니다.", color: 0xed4245, kind: "review" };
++      default:
++        return { title: "리뷰 코멘트", text: "리뷰 의견을 남겼습니다.", color: 0x3498db, kind: "review" };
++    }
++  }
++
++  if (eventName === "pull_request_review_comment" && action === "created") {
++    return { title: "코드 댓글", text: "코드에 댓글을 남겼습니다.", color: 0xfaa61a, kind: "comment" };
+   }
+ 
+   switch (action) {
+     case "opened":
+-      return { text: "을 생성했습니다." };
++      return { title: "PR 생성", text: "새로운 PR을 생성했습니다.", color: 0x5865f2, kind: "pull_request" };
+     case "synchronize":
+-      return { text: "에 새로운 커밋을 남겼습니다." };
++      return { title: "커밋 추가", text: "PR에 새로운 커밋을 추가했습니다.", color: 0xfee75c, kind: "pull_request" };
+     case "reopened":
+-      return { text: "을 다시 열었습니다." };
++      return { title: "PR 다시 열림", text: "닫혀 있던 PR을 다시 열었습니다.", color: 0x57f287, kind: "pull_request" };
+     case "closed":
+-      return merged ? { text: "을 머지했습니다." } : undefined;
++      return merged
++        ? { title: "PR 머지", text: "PR을 머지했습니다.", color: 0xeb459e, kind: "pull_request" }
++        : undefined;
+     default:
+       return undefined;
+   }
+@@ -41,15 +59,87 @@ function nicknameFor(login: string, members: Member[]): string {
+ 
+ function typeLabel(labels: Label[]): string {
+   const label = labels.find((item) => item.name?.startsWith("type:"))?.name;
+-  return label?.slice("type:".length).trim() || "none";
++  return label?.slice("type:".length).trim() || "미지정";
++}
++
++function reviewerLogins(value: string | undefined, assignedReviewer: string | undefined): string[] {
++  const reviewers = labelsFromEnvironment(value)
++    .flatMap((reviewer) => reviewer.login ? [reviewer.login] : []);
++  if (assignedReviewer) reviewers.push(assignedReviewer);
++  return [...new Set(reviewers)];
++}
++
++function reviewerField(reviewers: string[], members: Member[]): string {
++  if (reviewers.length === 0) return "_지정되지 않음_";
++
++  return reviewers
++    .map((login) => {
++      const member = members.find((item) => item.github === login);
++      if (!member) return `- [@${login}](https://github.com/${login})`;
++      if (member.discordUserId) {
++        return `- **${member.nickname}** · <@${member.discordUserId}> (\`@${login}\`)`;
++      }
++      return `- **${member.nickname}** · [\`@${login}\`](https://github.com/${login})`;
++    })
++    .join("\n");
++}
++
++function commentPreview(body: string | undefined): string {
++  const normalized = body?.trim();
++  if (!normalized) return "> _내용 없이 상태만 등록했습니다._";
++  const limit = 900;
++  const preview = normalized.length > limit ? `${normalized.slice(0, limit)}…` : normalized;
++  return preview
++    .split("\n")
++    .map((line) => `> ${line || " "}`)
++    .join("\n");
+ }
+ 
+ export function buildPayload(input: NotificationInput, members: Member[]): DiscordPayload | undefined {
+-  const event = eventFor(input.eventName, input.action, input.merged);
++  const event = eventFor(input.eventName, input.action, input.merged, input.reviewState);
+   if (!event) return undefined;
+   const actor = nicknameFor(input.actor, members);
++  const author = nicknameFor(input.author, members);
++  const reviewers = reviewerLogins(input.requestedReviewersJson, input.assignedReviewer);
++  const reviewerDiscordIds = reviewers.flatMap((login) => {
++    const discordUserId = members.find((member) => member.github === login)?.discordUserId;
++    return discordUserId ? [discordUserId] : [];
++  });
++  const destinationUrl = event.kind === "pull_request" ? input.url : (input.commentUrl || input.url);
++  const authorMarkdown = `**${author}** · [\`@${input.author}\`](https://github.com/${input.author})`;
++  const actorMarkdown = `**${actor}** · [\`@${input.actor}\`](https://github.com/${input.actor})`;
++
++  const fields: DiscordEmbedField[] = event.kind === "pull_request"
++    ? [
++        { name: "👤 작성자", value: authorMarkdown, inline: true },
++        { name: "🏷️ 변경 유형", value: `**\`${typeLabel(input.labels)}\`**`, inline: true },
++        { name: "👀 리뷰어", value: reviewerField(reviewers, members), inline: false },
++        { name: "🌿 변경 흐름", value: `\`${input.head}\` **→** \`${input.base}\``, inline: false },
++      ]
++    : [
++        { name: "💬 리뷰 작성자", value: actorMarkdown, inline: true },
++        { name: "👤 PR 작성자", value: authorMarkdown, inline: true },
++        { name: "📝 내용", value: commentPreview(input.commentBody), inline: false },
++        { name: "🌿 변경 흐름", value: `\`${input.head}\` **→** \`${input.base}\``, inline: false },
++      ];
++
+   return {
+-    content: `${actor}님이 [#${input.number} : ${input.title}](${input.url})${event.text}\ntype: ${typeLabel(input.labels)}`,
++    username: "Bibbidi PR 알리미",
++    allowed_mentions: {
++      parse: [],
++      users: reviewerDiscordIds,
++    },
++    embeds: [{
++      title: event.kind === "pull_request"
++        ? `#${input.number} · ${input.title}`
++        : `[${event.title}] #${input.number} · ${input.title}`,
++      url: destinationUrl,
++      description: `### ${event.title}\n**${actor}**님이 ${event.text}\n[GitHub에서 확인하기 ↗](${destinationUrl})`,
++      color: event.color,
++      fields,
++      footer: { text: `GitHub PR #${input.number}` },
++      timestamp: new Date().toISOString(),
++    }],
+   };
+ }
+ 
+@@ -78,6 +168,11 @@ function inputFromEnvironment(environment: NodeJS.ProcessEnv): NotificationInput
+     actor: environment.ACTOR ?? "",
+     author: environment.AUTHOR ?? "",
+     labels: labelsFromEnvironment(environment.LABELS_JSON),
++    requestedReviewersJson: environment.REQUESTED_REVIEWERS_JSON,
++    assignedReviewer: environment.ASSIGNED_REVIEWER,
++    reviewState: environment.REVIEW_STATE,
++    commentBody: environment.COMMENT_BODY,
++    commentUrl: environment.COMMENT_URL,
+   };
+ }
+ 
+@@ -131,14 +226,33 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
+ 
+ type Label = {
+   name?: string;
++  login?: string;
+ };
+ 
+ type EventDescription = {
++  title: string;
+   text: string;
++  color: number;
++  kind: "pull_request" | "review" | "comment";
+ };
+ 
++type DiscordEmbedField = { name: string; value: string; inline: boolean };
++
+ type DiscordPayload = {
+-  content: string;
++  username: string;
++  allowed_mentions: {
++    parse: string[];
++    users: string[];
++  };
++  embeds: Array<{
++    title: string;
++    url: string;
++    description: string;
++    color: number;
++    fields: DiscordEmbedField[];
++    footer: { text: string };
++    timestamp: string;
++  }>;
+ };
+ 
+ export type NotificationInput = {
+@@ -153,4 +267,9 @@ export type NotificationInput = {
+   actor: string;
+   author: string;
+   labels: Label[];
++  requestedReviewersJson?: string;
++  assignedReviewer?: string;
++  reviewState?: string;
++  commentBody?: string;
++  commentUrl?: string;
+ };
+diff --git a/.github/pr-notification/reviewer-assignment.ts b/.github/pr-notification/reviewer-assignment.ts
+index 0375ac416f072abb1d468578d12e5b9bdbc49e91..174dc5fb44286646260d9f284227d6f268983928 100644
+--- a/.github/pr-notification/reviewer-assignment.ts
++++ b/.github/pr-notification/reviewer-assignment.ts
+@@ -91,6 +91,10 @@ export async function main(environment = process.env): Promise<void> {
+   if (!repository || !token) throw new Error("GitHub 리뷰어 지정을 위한 저장소 정보 또는 토큰이 없습니다.");
+ 
+   await requestReviewer({ repository, pullNumber: environment.NUMBER ?? "", reviewer, token });
++
++  if (environment.GITHUB_OUTPUT) {
++    appendFileSync(environment.GITHUB_OUTPUT, `reviewer=${reviewer}\n`, { encoding: "utf8" });
++  }
+ }
+ 
+ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+@@ -99,4 +103,5 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
+     process.exitCode = 1;
+   });
+ }
++import { appendFileSync } from "node:fs";
+ import { loadMembers } from "./member-configuration-parser.ts";
+diff --git a/.github/workflows/backend-dev-cd.yml b/.github/workflows/backend-dev-cd.yml
+index a9b6cb3f9616d4cc35ec957e12c9088e5a0bdf7c..e730780007b1db5f0e6a9d3646afea65f85fecc8 100644
+--- a/.github/workflows/backend-dev-cd.yml
++++ b/.github/workflows/backend-dev-cd.yml
+@@ -21,7 +21,7 @@ jobs:
+   deploy:
+     uses: ./.github/workflows/backend-common-cd.yml
+     with:
+-      deployment-environment: development
++      deployment-environment: backend-dev
+       runner-labels: '["self-hosted", "linux", "ARM64", "dev"]'
+       image-tag: ${{ github.sha }}
+       build-image: true
+diff --git a/.github/workflows/backend-prod-cd.yml b/.github/workflows/backend-prod-cd.yml
+index fc39733703db6b2b1e2296c316e9bf9487d750a2..6dc48c660746a7734153afccfab402cfbb49baf9 100644
+--- a/.github/workflows/backend-prod-cd.yml
++++ b/.github/workflows/backend-prod-cd.yml
+@@ -67,7 +67,7 @@ jobs:
+     needs: resolve-image
+     uses: ./.github/workflows/backend-common-cd.yml
+     with:
+-      deployment-environment: production
++      deployment-environment: backend-prod
+       runner-labels: '["self-hosted", "linux", "ARM64", "prod"]'
+       image-tag: ${{ needs.resolve-image.outputs.image-tag }}
+       build-image: ${{ needs.resolve-image.outputs.build-image == 'true' }}
+diff --git a/.github/workflows/pr-notification.yml b/.github/workflows/pr-notification.yml
+index 3eabe33531b4c86abdf13300f46109bedc7dfa51..323fed7eb697a3228af501c939acd9ccb7db67c9 100644
+--- a/.github/workflows/pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -10,6 +10,9 @@ on:
+   pull_request_review:
+     types:
+       - submitted
++  pull_request_review_comment:
++    types:
++      - created
+ 
+ permissions:
+   contents: read
+@@ -36,6 +39,7 @@ jobs:
+           node-version: 24.19.0
+ 
+       - name: dev-be 또는 release-be 신규 PR에 팀 리뷰어 할당
++        id: assign-reviewer
+         if: >-
+           github.event.action == 'opened' &&
+           (github.event.pull_request.base.ref == 'dev-be' ||
+@@ -64,6 +68,10 @@ jobs:
+           BASE: ${{ github.event.pull_request.base.ref }}
+           ACTOR: ${{ github.actor }}
+           AUTHOR: ${{ github.event.pull_request.user.login }}
++          ASSIGNED_REVIEWER: ${{ steps.assign-reviewer.outputs.reviewer }}
++          REVIEW_STATE: ${{ github.event.review.state }}
++          COMMENT_BODY: ${{ github.event.review.body || github.event.comment.body || '' }}
++          COMMENT_URL: ${{ github.event.review.html_url || github.event.comment.html_url || github.event.pull_request.html_url }}
+           LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+           REQUESTED_REVIEWERS_JSON: ${{ toJson(github.event.pull_request.requested_reviewers) }}
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

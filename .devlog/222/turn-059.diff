@@ -1,0 +1,24 @@
+diff --git a/BE/compose.prod.yml b/BE/compose.prod.yml
+index bfec6dc957ce01c8bd6826d4fc75bde72d38b2f6..796f0607798bba7b2751c06e27504c55347f25a6 100644
+--- a/BE/compose.prod.yml
++++ b/BE/compose.prod.yml
+@@ -69,6 +69,7 @@ services:
+       - --stability.level=experimental
+     environment:
+       DOCKER_HOST_URL: tcp://dockerproxy:2375
++      DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+     depends_on:
+       - dockerproxy
+     volumes:
+diff --git a/Infra/monitoring/alloy/config.alloy b/Infra/monitoring/alloy/config.alloy
+index aba1ed4a415f150c59927d0f3247b1adb54fb803..65d8bcdf24ff1653c9d02a5f8dc0cf872002b3ae 100644
+--- a/Infra/monitoring/alloy/config.alloy
++++ b/Infra/monitoring/alloy/config.alloy
+@@ -51,7 +51,7 @@ discovery.relabel "docker_logs" {
+ 
+   rule {
+     target_label = "deployment_environment_name"
+-    replacement  = "production"
++    replacement  = sys.env("DEPLOYMENT_ENVIRONMENT_NAME")
+   }
+ }

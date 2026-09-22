@@ -1,0 +1,174 @@
+diff --git a/.github/pr-notification/discord-pr-notification.ts b/.github/pr-notification/discord-pr-notification.ts
+index 7eebd4e8df4cbfa7a33f5d75cd3010ea73c01d0b..0d7c44a18597f5f5843adbe0821542350bb534ed 100644
+--- a/.github/pr-notification/discord-pr-notification.ts
++++ b/.github/pr-notification/discord-pr-notification.ts
+@@ -1,9 +1,9 @@
+ import { loadMembers, type Member } from "./member-configuration-parser.ts";
+ 
+ const WEBHOOK_CHANNELS: Record<string, string> = {
+-  "release-be": "BE",
+-  "release-fe": "FE",
+-  "release-app": "APP",
++  "dev-be": "BE",
++  "dev-fe": "FE",
++  "dev-app": "APP",
+ };
+ 
+ const RETRY_COUNT = 3;
+diff --git a/.github/pr-notification/review-reminder.ts b/.github/pr-notification/review-reminder.ts
+index 61d28e4342cea9acae2bd65c55aef61ae09b60c2..2037892e94d88de2064b0bb491853655f13c8698 100644
+--- a/.github/pr-notification/review-reminder.ts
++++ b/.github/pr-notification/review-reminder.ts
+@@ -109,9 +109,9 @@ async function main() {
+         });
+       }
+       const channel = {
+-        "release-be": "BE",
+-        "release-fe": "FE",
+-        "release-app": "APP",
++        "dev-be": "BE",
++        "dev-fe": "FE",
++        "dev-app": "APP",
+       }[pr.base.ref];
+       const webhook = env[`DISCORD_WEBHOOK_${channel}`];
+       await sendChannel(webhook, message);
+diff --git a/.github/workflows/ai-code-review.yml b/.github/workflows/ai-code-review.yml
+index 69b4fa23e5915664e07681dfbb3b98370cd345bb..60f3cb437067e2eecec133ba196b21f9c10b5290 100644
+--- a/.github/workflows/ai-code-review.yml
++++ b/.github/workflows/ai-code-review.yml
+@@ -46,7 +46,7 @@ jobs:
+         with:
+           version: 11.20.0
+ 
+-      - name: 잠금 파일 기준으로 AI 리뷰 의존성 설치
++      - name: AI 리뷰 의존성 설치
+         run: pnpm --dir .github/ai-review install --frozen-lockfile
+ 
+       - name: PR 변경사항을 AI로 리뷰하고 댓글 작성
+diff --git a/.github/workflows/backend-common-cd.yml b/.github/workflows/backend-common-cd.yml
+index c4727765d4f5bde958d1285bc3812cf8c6fe67b1..d994627dc56748874ee553915fefe465502f52c6 100644
+--- a/.github/workflows/backend-common-cd.yml
++++ b/.github/workflows/backend-common-cd.yml
+@@ -38,10 +38,10 @@ jobs:
+       run:
+         working-directory: BE
+     steps:
+-      - name: 배포할 백엔드 소스 코드 체크아웃
++      - name: 배포 백엔드 소스 코드 체크아웃
+         uses: actions/checkout@v7
+ 
+-      - name: Corretto JDK 버전을 25로 설정
++      - name: Corretto JDK 버전 25 설정
+         uses: actions/setup-java@v6
+         with:
+           distribution: corretto
+@@ -53,13 +53,13 @@ jobs:
+       - name: Gradle clean build로 테스트와 빌드 실행
+         run: ./gradlew clean build
+ 
+-      - name: 이미지 푸시를 위해 Docker Hub 로그인
++      - name: Docker Hub 로그인
+         uses: docker/login-action@v4
+         with:
+           username: ${{ secrets.DOCKERHUB_USERNAME }}
+           password: ${{ secrets.DOCKERHUB_TOKEN }}
+ 
+-      - name: ARM64 이미지 빌드를 위해 Docker Buildx 설정
++      - name: ARM64 이미지 빌드용 Docker Buildx 설정
+         uses: docker/setup-buildx-action@v4
+ 
+       - name: 커밋 SHA 태그의 ARM64 이미지 빌드 및 푸시
+@@ -88,13 +88,13 @@ jobs:
+       TLS_SCRIPT: Infra/scripts/deploy-sub-tasks/tls-sub-tasks/do-tls.sh
+       HOST_PREREQS_SCRIPT: Infra/scripts/deploy-sub-tasks/host-prereqs.sh
+     steps:
+-      - name: 대상 서버에 설치할 배포 설정 체크아웃
++      - name: 서버에 배포 설정 체크아웃
+         uses: actions/checkout@v7
+ 
+       - name: Docker와 certbot 등 호스트 사전 조건 확인
+         run: bash "$HOST_PREREQS_SCRIPT"
+ 
+-      - name: 이미지 풀을 위해 Docker Hub 로그인
++      - name: 서버에서 Docker Hub 로그인
+         uses: docker/login-action@v4
+         with:
+           username: ${{ secrets.DOCKERHUB_USERNAME }}
+@@ -143,7 +143,7 @@ jobs:
+       - name: nginx 기동을 위한 TLS 인증서 초기화
+         run: bash "$TLS_SCRIPT" bootstrap
+ 
+-      - name: 네 컨테이너 배포 후 백엔드와 nginx 상태 확인
++      - name: 배포 후 비즈니스 서버와 nginx 상태 확인
+         env:
+           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+           IMAGE_TAG: ${{ inputs.image-tag }}
+@@ -209,7 +209,7 @@ jobs:
+               "$DISCORD_WEBHOOK_BE" >/dev/null || true
+           fi
+ 
+-      - name: 하루 두 번 실행할 certbot 갱신 타이머 설치
++      - name: certbot 갱신 타이머 설치(1일 2회)
+         run: |
+           sudo tee /etc/systemd/system/bibbidi-certbot-renew.service >/dev/null <<'UNIT'
+           [Unit]
+diff --git a/.github/workflows/backend-prod-cd.yml b/.github/workflows/backend-prod-cd.yml
+index 81282b72ea5fe246ef1ca4420893a362cff5eebc..fc39733703db6b2b1e2296c316e9bf9487d750a2 100644
+--- a/.github/workflows/backend-prod-cd.yml
++++ b/.github/workflows/backend-prod-cd.yml
+@@ -25,12 +25,12 @@ jobs:
+       build-image: ${{ steps.resolve.outputs.build-image }}
+       image-tag: ${{ steps.resolve.outputs.image-tag }}
+     steps:
+-      - name: 승격 커밋 확인을 위해 전체 Git 이력 체크아웃
++      - name: 승격 대상 확인을 위해 전체 Git 이력 체크아웃
+         uses: actions/checkout@v7
+         with:
+           fetch-depth: 0
+ 
+-      - name: dev-be 승격 이미지 또는 release-be hotfix 이미지 결정
++      - name: dev-be 또는 release-be hotfix 에서 배포할 이미지 결정
+         id: resolve
+         env:
+           GH_TOKEN: ${{ github.token }}
+diff --git a/.github/workflows/bibbidi-dev-ci.yml b/.github/workflows/bibbidi-dev-ci.yml
+index 0415203a7e861cce1e511cb6912b410d86869cee..cab862198d59b471f8dfeeed881bd37d02da1255 100644
+--- a/.github/workflows/bibbidi-dev-ci.yml
++++ b/.github/workflows/bibbidi-dev-ci.yml
+@@ -23,10 +23,10 @@ jobs:
+                 working-directory: BE
+ 
+         steps:
+-            - name: 테스트할 백엔드 소스 코드 체크아웃
++            - name: 테스트 소스 코드 체크아웃
+               uses: actions/checkout@v7
+ 
+-            - name: Corretto JDK 버전을 25로 설정
++            - name: Corretto JDK 버전 25 설정
+               uses: actions/setup-java@v6
+               with:
+                   java-version: "25"
+@@ -44,7 +44,7 @@ jobs:
+             - name: Gradle test로 테스트와 JaCoCo 검사 실행
+               run: ./gradlew test
+ 
+-            - name: 테스트 실패 시 테스트와 JaCoCo 보고서 업로드
++            - name: 테스트 실패 시 테스트와 JaCoCo 보고서 기록
+               if: failure()
+               uses: actions/upload-artifact@v7
+               with:
+diff --git a/.github/workflows/pr-notification.yml b/.github/workflows/pr-notification.yml
+index ffaff9cd586fd16de38eda41c14a33769fe4d7e7..c029ebdf662bf67dfa360dc32034ce41fe13e5db 100644
+--- a/.github/workflows/pr-notification.yml
++++ b/.github/workflows/pr-notification.yml
+@@ -35,8 +35,8 @@ jobs:
+         with:
+           node-version: 24.19.0
+ 
+-      - name: release-be 신규 PR에 팀 리뷰어 할당
+-        if: github.event.action == 'opened' && github.event.pull_request.base.ref == 'release-be'
++      - name: dev-be 신규 PR에 팀 리뷰어 할당
++        if: github.event.action == 'opened' && github.event.pull_request.base.ref == 'dev-be'
+         shell: bash
+         env:
+           AUTHOR: ${{ github.event.pull_request.user.login }}

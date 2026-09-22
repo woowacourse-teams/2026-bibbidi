@@ -1,14 +1,16 @@
-name: Bibbidi AI Code Review Harness
+name: 비비디 AI 코드 리뷰
 
 on:
   pull_request_target:
     types:
       - opened
       - ready_for_review
+      - synchronize
+      - reopened
     branches:
-      - release-be
-      - release-fe
-      - release-app
+      - dev-be
+      - dev-fe
+      - dev-app
 
 permissions:
   contents: read
@@ -20,42 +22,46 @@ concurrency:
 
 jobs:
   review:
-    name: Review pull request
+    name: PR 변경사항을 AI로 검토
     if: >-
       github.event.pull_request.draft == false &&
       github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       # pull_request_target has access to secrets. Never check out or execute
       # code from github.event.pull_request.head.sha in this workflow.
-      - name: Checkout trusted reviewer
+      - name: 기본 브랜치의 AI 리뷰 코드 체크아웃
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - name: Set up Node.js
+      - name: Node.js 버전을 24.19.0으로 설정
         uses: actions/setup-node@v6
         with:
           node-version: 24.19.0
 
-      - name: Set up pnpm
+      - name: pnpm 버전을 11.20.0으로 설정
         uses: pnpm/action-setup@v6
         with:
           version: 11.20.0
 
-      - name: Install AI review dependencies
+      - name: AI 리뷰 의존성 설치
         run: pnpm --dir .github/ai-review install --frozen-lockfile
 
-      - name: Run AI review
-        continue-on-error: true
+      - name: AI 리뷰 diff 분석과 결과 검증 테스트 실행
+        run: node --experimental-strip-types --test .github/ai-review/*.test.ts
+
+      - name: AI 리뷰 TypeScript 타입 검사
+        run: pnpm exec tsc -p .github/ai-review/tsconfig.json
+
+      - name: PR 변경사항을 AI로 리뷰하고 댓글 작성
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           REVIEW_REPOSITORY: ${{ github.repository }}
           REVIEW_PULL_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REVIEW_EVENT: ${{ github.event.action }}
         run: node --experimental-strip-types .github/ai-review/cli.ts
