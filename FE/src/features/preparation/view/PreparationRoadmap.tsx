@@ -1,37 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useIsMobileLayout } from "../../../shared/responsive";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
-import { PreparationStepBottomSheet } from "./PreparationStepBottomSheet";
 import { PreparationStepDetail } from "./PreparationStepDetail";
+import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
 import "./PreparationRoadmap.css";
-
-const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window.matchMedia === "function"
-      ? window.matchMedia(query).matches
-      : false,
-  );
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia(query);
-    const handleChange = (event: MediaQueryListEvent) => {
-      setMatches(event.matches);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, [query]);
-
-  return matches;
-}
 
 interface PreparationRoadmapProps {
   additionErrorMessage: string | null;
@@ -45,34 +17,56 @@ interface PreparationRoadmapProps {
 }
 
 interface PreparationRoadmapStepsProps {
+  additionErrorMessage: string | null;
+  addingCatalogItemIds: readonly string[];
+  canAddTasks: boolean;
+  expandedStepId: string | null;
   isMobileLayout: boolean;
+  onAddAllTasks: () => void;
   onStepSelect: (stepId: string) => void;
+  onTaskAdd: (catalogItemId: string) => void;
   viewModel: PreparationRoadmapViewModel;
 }
 
 function PreparationRoadmapSteps({
+  additionErrorMessage,
+  addingCatalogItemIds,
+  canAddTasks,
+  expandedStepId,
   isMobileLayout,
+  onAddAllTasks,
   onStepSelect,
+  onTaskAdd,
   viewModel,
 }: PreparationRoadmapStepsProps) {
   return (
     <ol className="preparation-roadmap__steps">
       {viewModel.steps.map((step) => {
+        const detailId = `preparation-step-detail-${step.id}`;
+        const triggerId = `preparation-step-trigger-${step.id}`;
+        const isExpanded =
+          isMobileLayout && expandedStepId === step.id && step.isSelected;
         const stepClassName = [
           "preparation-roadmap__step",
           `preparation-roadmap__step--${step.numberLabel}`,
+          isExpanded ? "preparation-roadmap__step--expanded" : "",
         ].join(" ");
 
         return (
           <li className={stepClassName} key={step.id}>
             <button
               aria-controls={
-                isMobileLayout ? undefined : "preparation-step-detail"
+                isMobileLayout
+                  ? isExpanded
+                    ? detailId
+                    : undefined
+                  : "preparation-step-detail"
               }
-              aria-haspopup={isMobileLayout ? "dialog" : undefined}
+              aria-expanded={isMobileLayout ? isExpanded : undefined}
               aria-label={`${step.numberLabel} ${step.title}`}
-              aria-pressed={step.isSelected}
+              aria-pressed={isMobileLayout ? isExpanded : step.isSelected}
               className="preparation-roadmap__step-button"
+              id={triggerId}
               onClick={() => onStepSelect(step.id)}
               type="button"
             >
@@ -84,12 +78,12 @@ function PreparationRoadmapSteps({
               <span className="preparation-roadmap__step-title">
                 {step.title}
               </span>
-              {!isMobileLayout ? (
+              {!isMobileLayout || !isExpanded ? (
                 <span
                   aria-hidden="true"
                   className="preparation-roadmap__step-action"
                 >
-                  할 일 보기 →
+                  {isMobileLayout ? "할 일 고르기 ↓" : "할 일 보기 →"}
                 </span>
               ) : null}
               {step.iconUrl ? (
@@ -103,6 +97,21 @@ function PreparationRoadmapSteps({
                 />
               ) : null}
             </button>
+            {isExpanded ? (
+              <PreparationStepInlineDetail
+                additionErrorMessage={additionErrorMessage}
+                addingCatalogItemIds={addingCatalogItemIds}
+                canAddTasks={canAddTasks}
+                detail={viewModel.selectedStepDetail}
+                id={detailId}
+                onAddAllTasks={onAddAllTasks}
+                onCollapse={() => {
+                  document.getElementById(triggerId)?.focus();
+                  onStepSelect(step.id);
+                }}
+                onTaskAdd={onTaskAdd}
+              />
+            ) : null}
           </li>
         );
       })}
@@ -120,9 +129,13 @@ export function PreparationRoadmap({
   onTaskAdd,
   viewModel,
 }: PreparationRoadmapProps) {
-  const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_MEDIA_QUERY);
+  const isMobileLayout = useIsMobileLayout();
   const [mobileOpenStepId, setMobileOpenStepId] = useState<string | null>(null);
   const selectedStepId = viewModel.steps.find((step) => step.isSelected)?.id;
+  const expandedStepId =
+    isMobileLayout && mobileOpenStepId === selectedStepId
+      ? mobileOpenStepId
+      : null;
 
   const handleCategorySelect = (categoryId: string) => {
     const changesCategory = viewModel.categories.some(
@@ -149,11 +162,27 @@ export function PreparationRoadmap({
   const handleStepSelect = (stepId: string) => {
     const selectedStep = viewModel.steps.find((step) => step.id === stepId);
 
-    if (!selectedStep || (!isMobileLayout && selectedStep.isSelected)) {
+    if (!selectedStep) {
       return;
     }
 
-    setMobileOpenStepId(isMobileLayout ? stepId : null);
+    if (isMobileLayout) {
+      if (mobileOpenStepId === stepId) {
+        setMobileOpenStepId(null);
+        return;
+      }
+
+      setMobileOpenStepId(stepId);
+      onStepSelect(stepId);
+      return;
+    }
+
+    setMobileOpenStepId(null);
+
+    if (selectedStep.isSelected) {
+      return;
+    }
+
     onStepSelect(stepId);
   };
 
@@ -193,34 +222,45 @@ export function PreparationRoadmap({
           <div className="preparation-roadmap__header-copy">
             <h1 id="preparation-roadmap-title">
               {isMobileLayout
-                ? viewModel.title
+                ? "준비할 단계를 선택해 보세요."
                 : "로드맵에서 필요한 일만, 내 체크리스트에"}
             </h1>
+            {isMobileLayout ? (
+              <p>필요한 할 일을 골라 내 체크리스트에 담을 수 있어요.</p>
+            ) : null}
           </div>
-          <ol
-            aria-label="체크리스트 만드는 순서"
-            className="preparation-roadmap__guide"
-          >
-            <li>
-              <span aria-hidden="true">1</span>
-              단계 선택
-            </li>
-            <li>
-              <span aria-hidden="true">2</span>할 일 추가
-            </li>
-            <li>
-              <span aria-hidden="true">3</span>
-              체크리스트에서 관리
-            </li>
-          </ol>
+          {!isMobileLayout ? (
+            <ol
+              aria-label="체크리스트 만드는 순서"
+              className="preparation-roadmap__guide"
+            >
+              <li>
+                <span aria-hidden="true">1</span>
+                단계 선택
+              </li>
+              <li>
+                <span aria-hidden="true">2</span>할 일 추가
+              </li>
+              <li>
+                <span aria-hidden="true">3</span>
+                체크리스트에서 관리
+              </li>
+            </ol>
+          ) : null}
         </header>
 
         <div className="preparation-roadmap__content">
           <div className="preparation-roadmap__main">
             <div className="preparation-roadmap__grid-wrap">
               <PreparationRoadmapSteps
+                additionErrorMessage={additionErrorMessage}
+                addingCatalogItemIds={addingCatalogItemIds}
+                canAddTasks={canAddTasks}
+                expandedStepId={expandedStepId}
                 isMobileLayout={isMobileLayout}
+                onAddAllTasks={onAddAllTasks}
                 onStepSelect={handleStepSelect}
+                onTaskAdd={onTaskAdd}
                 viewModel={viewModel}
               />
             </div>
@@ -239,18 +279,6 @@ export function PreparationRoadmap({
           ) : null}
         </div>
       </section>
-      {isMobileLayout && mobileOpenStepId ? (
-        <PreparationStepBottomSheet
-          additionErrorMessage={additionErrorMessage}
-          addingCatalogItemIds={addingCatalogItemIds}
-          canAddTasks={canAddTasks}
-          detail={viewModel.selectedStepDetail}
-          key={mobileOpenStepId}
-          onAddAllTasks={onAddAllTasks}
-          onClose={() => setMobileOpenStepId(null)}
-          onTaskAdd={onTaskAdd}
-        />
-      ) : null}
     </div>
   );
 }

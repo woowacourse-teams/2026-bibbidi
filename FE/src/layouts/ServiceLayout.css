@@ -1,5 +1,5 @@
 .service-layout {
-  --mobile-dock-size: 72px;
+  --mobile-dock-size: 64px;
   --mobile-dock-offset: max(12px, env(safe-area-inset-bottom));
   --service-side-panel-width: 0px;
 

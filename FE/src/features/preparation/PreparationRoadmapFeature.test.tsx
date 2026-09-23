@@ -61,8 +61,9 @@ import {
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 
 const DESKTOP_ROADMAP_TITLE = "로드맵에서 필요한 일만, 내 체크리스트에";
+const MOBILE_ROADMAP_TITLE = "준비할 단계를 선택해 보세요.";
 const ROADMAP_TITLE_PATTERN =
-  /^(준비 로드맵|로드맵에서 필요한 일만, 내 체크리스트에)$/;
+  /^(준비할 단계를 선택해 보세요\.|로드맵에서 필요한 일만, 내 체크리스트에)$/;
 
 async function renderFeature({ strictMode = false } = {}) {
   const feature = <PreparationRoadmapFeature />;
@@ -822,18 +823,18 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
   });
 
-  it("모바일 바텀시트에서도 개별 할 일을 추가한다", async () => {
+  it("모바일 인라인 상세에서도 개별 할 일을 추가하고 펼친 상태를 유지한다", async () => {
     setViewportMatches(true);
     await renderFeature();
     fireEvent.click(
       screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
     );
-    const dialog = screen.getByRole("dialog", {
-      name: "웨딩홀 투어와 계약",
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
     });
 
     fireEvent.click(
-      within(dialog).getByRole("button", {
+      within(detail).getByRole("button", {
         name: "웨딩홀 견적 비교 추가",
       }),
     );
@@ -845,11 +846,22 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     );
     await waitFor(() =>
       expect(
-        within(dialog).queryByRole("button", {
+        within(detail).queryByRole("button", {
           name: "웨딩홀 견적 비교 추가",
         }),
       ).toBeNull(),
     );
+    expect(
+      screen.getByRole("button", {
+        expanded: true,
+        name: /01.*웨딩홀 투어와 계약/,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBe(detail);
   });
 
   it("모바일에서 남은 할 일을 모두 추가하면 빈 상태를 안내하고 전체 추가 버튼을 숨긴다", async () => {
@@ -858,27 +870,27 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
     );
-    const dialog = screen.getByRole("dialog", {
-      name: "웨딩홀 투어와 계약",
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
     });
 
     fireEvent.click(
-      within(dialog).getByRole("button", {
-        name: "남은 할 일 모두 추가",
+      within(detail).getByRole("button", {
+        name: "모두 추가",
       }),
     );
 
     expect(
-      await within(dialog).findByText("추가할 수 있는 할 일이 없어요."),
+      await within(detail).findByText("추가할 수 있는 할 일이 없어요."),
     ).toBeTruthy();
     expect(
-      within(dialog).getByText(
+      within(detail).getByText(
         "이 단계의 모든 할 일을 체크리스트에 추가했어요.",
       ),
     ).toBeTruthy();
     expect(
-      within(dialog).queryByRole("button", {
-        name: /남은 할 일 모두 추가/,
+      within(detail).queryByRole("button", {
+        name: /모두 추가/,
       }),
     ).toBeNull();
   });
@@ -919,14 +931,15 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     await renderFeature();
 
     expect(
-      screen.getByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
+      screen.getByRole("heading", {
+        name: DESKTOP_ROADMAP_TITLE,
+      }),
     ).toBeTruthy();
-    const guide = screen.getByRole("list", {
-      name: "체크리스트 만드는 순서",
-    });
-    expect(within(guide).getByText("단계 선택")).toBeTruthy();
-    expect(within(guide).getByText("할 일 추가")).toBeTruthy();
-    expect(within(guide).getByText("체크리스트에서 관리")).toBeTruthy();
+    expect(
+      screen.getByRole("list", {
+        name: "체크리스트 만드는 순서",
+      }),
+    ).toBeTruthy();
 
     expect(
       screen.getByRole("complementary", {
@@ -1061,7 +1074,18 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     setViewportMatches();
     await renderFeature();
 
-    expect(screen.getByRole("heading", { name: "준비 로드맵" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: MOBILE_ROADMAP_TITLE }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("필요한 할 일을 골라 내 체크리스트에 담을 수 있어요."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("list", {
+        name: "체크리스트 만드는 순서",
+      }),
+    ).toBeNull();
+    expect(screen.getAllByText("할 일 고르기 ↓")).toHaveLength(3);
     expect(
       screen.queryByRole("complementary", {
         name: "이 단계에서 준비할 일",
@@ -1069,14 +1093,14 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     ).toBeNull();
     const selectedStep = screen.getByRole("button", {
       name: /01.*웨딩홀 투어와 계약/,
-      pressed: true,
     });
 
-    expect(selectedStep.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(selectedStep.getAttribute("aria-expanded")).toBe("false");
+    expect(selectedStep.getAttribute("aria-pressed")).toBe("false");
     expect(selectedStep.hasAttribute("aria-controls")).toBe(false);
   });
 
-  it("모바일 바텀시트에서 웹과 같은 상세 목록을 바로 표시한다", async () => {
+  it("모바일 카드 아래에 두 할 일 목록을 펼쳐 표시한다", async () => {
     setViewportMatches();
     await renderFeature();
 
@@ -1086,26 +1110,21 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       }),
     );
 
-    const detail = screen.getByRole("dialog", {
-      name: "웨딩홀 투어와 계약",
+    const detail = screen.getByRole("complementary", {
+      name: "이 단계에서 준비할 일",
     });
-    expect(
-      within(detail).getByRole("heading", { name: "웨딩홀 투어와 계약" }),
-    ).toBeTruthy();
     expect(within(detail).queryByText("웨딩홀")).toBeNull();
     expect(
       within(detail).getByText("웨딩홀을 둘러보고 계약해요."),
     ).toBeTruthy();
     expect(
-      within(detail).getByRole("heading", {
-        name: "이 단계의 체크리스트",
-      }),
+      within(detail).getByRole("button", { name: "할 일 접기" }),
     ).toBeTruthy();
     expect(
-      within(detail).getByRole("heading", {
-        name: "추가할 수 있는 할 일",
-      }),
-    ).toBeTruthy();
+      within(detail)
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["아직 안 담은 일", "내가 담은 일"]);
     expect(within(detail).getByText("웨딩홀 투어")).toBeTruthy();
     expect(
       within(detail)
@@ -1117,16 +1136,21 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(
       within(detail)
         .getByRole("button", {
-          name: "남은 할 일 모두 추가",
+          name: "모두 추가",
         })
         .hasAttribute("disabled"),
     ).toBe(false);
+    const checklist = within(detail).getByRole("region", {
+      name: "이 단계의 체크리스트",
+    });
     expect(
-      within(detail).queryByRole("button", { name: /내 체크리스트/ }),
-    ).toBeNull();
+      within(checklist)
+        .getByRole("link", { name: "내 체크리스트 보기" })
+        .getAttribute("href"),
+    ).toBe("/checklist");
   });
 
-  it("모바일 바텀시트에서도 빈 체크리스트를 안내한다", async () => {
+  it("모바일 인라인 상세에서도 빈 체크리스트를 안내한다", async () => {
     setViewportMatches();
     await renderFeature();
 
@@ -1136,99 +1160,72 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
       }),
     );
     expect(screen.getByText("이 단계에 추가한 할 일이 없어요.")).toBeTruthy();
+    expect(
+      screen.getByText("위의 아직 안 담은 일에서 필요한 항목을 골라보세요."),
+    ).toBeTruthy();
   });
 
-  it("모바일에서는 선택한 단계의 바텀시트를 열고 포커스를 이동한다", async () => {
+  it("모바일에서는 같은 단계 카드를 다시 누르면 인라인 상세를 접는다", async () => {
     setViewportMatches();
     await renderFeature();
 
     const firstStepButton = screen.getByRole("button", {
       name: /01.*웨딩홀 투어와 계약/,
     });
-    expect(screen.queryByText("할 일 보기 →")).toBeNull();
-    firstStepButton.focus();
+    expect(screen.getAllByText("할 일 고르기 ↓")).toHaveLength(3);
     fireEvent.click(firstStepButton);
 
-    const firstDetail = screen.getByRole("dialog", {
-      name: "웨딩홀 투어와 계약",
-    });
-    const dragHandle = within(firstDetail).getByRole("button", {
-      name: "아래로 밀어 단계 상세 닫기",
-    });
-    const scrollContainer = document.querySelector<HTMLElement>(
-      "[data-page-scroll-container]",
-    );
-
-    expect(firstDetail).toBeTruthy();
-    expect(document.activeElement).toBe(dragHandle);
     expect(
-      within(firstDetail).queryByRole("button", {
-        name: "단계 상세 닫기",
+      screen.getByRole("button", {
+        expanded: true,
+        name: /01.*웨딩홀 투어와 계약/,
+      }),
+    ).toBeTruthy();
+    const collapseButton = screen.getByRole("button", {
+      name: "할 일 접기",
+    });
+    expect(
+      screen.getByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(collapseButton);
+
+    expect(firstStepButton.getAttribute("aria-expanded")).toBe("false");
+    expect(firstStepButton.hasAttribute("aria-controls")).toBe(false);
+    expect(document.activeElement).toBe(firstStepButton);
+    expect(screen.queryByRole("button", { name: "할 일 접기" })).toBeNull();
+    expect(
+      screen.queryByRole("complementary", {
+        name: "이 단계에서 준비할 일",
       }),
     ).toBeNull();
-    expect(document.body.style.overflow).toBe("hidden");
-    expect(scrollContainer?.style.overflow).toBe("hidden");
-    expect(firstStepButton).toBeTruthy();
-
-    fireEvent.keyDown(firstDetail, { key: "Escape" });
-
-    expect(firstDetail.parentElement?.className).toContain(
-      "bottom-sheet-dismiss--closing",
-    );
-    expect(screen.getByRole("dialog")).toBeTruthy();
-
-    fireEvent.transitionEnd(firstDetail, { propertyName: "transform" });
-
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(firstStepButton);
-    expect(document.body.style.overflow).toBe("");
-    expect(scrollContainer?.style.overflow).toBe("");
   });
 
-  it("모바일 바텀시트를 스크림과 드래그 핸들로 닫는다", async () => {
+  it("모바일에서 다른 단계를 누르면 기존 상세를 닫고 새 상세를 펼친다", async () => {
     setViewportMatches();
     await renderFeature();
-    const stepButton = screen.getByRole("button", {
+    const firstStepButton = screen.getByRole("button", {
       name: /01.*웨딩홀 투어와 계약/,
     });
+    const secondStepButton = screen.getByRole("button", {
+      name: /02.*예식 형태·식순·입장 방식 결정/,
+    });
 
-    fireEvent.click(stepButton);
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "단계 상세 닫기" })[0],
-    );
-    const firstDetail = screen.getByRole("dialog");
-    expect(firstDetail.parentElement?.className).toContain(
-      "bottom-sheet-dismiss--closing",
-    );
-    fireEvent.transitionEnd(firstDetail, { propertyName: "transform" });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(firstStepButton);
+    expect(firstStepButton.getAttribute("aria-expanded")).toBe("true");
 
-    fireEvent.click(stepButton);
-    const secondDetail = screen.getByRole("dialog");
-    const dragHandle = within(secondDetail).getByRole("button", {
-      name: "아래로 밀어 단계 상세 닫기",
-    });
-    fireEvent.pointerDown(dragHandle, {
-      button: 0,
-      clientY: 20,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-    fireEvent.pointerMove(dragHandle, {
-      clientY: 140,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-    fireEvent.pointerUp(dragHandle, {
-      clientY: 140,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-    expect(secondDetail.parentElement?.className).toContain(
-      "bottom-sheet-dismiss--closing",
-    );
-    fireEvent.transitionEnd(secondDetail, { propertyName: "transform" });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(secondStepButton);
+
+    expect(firstStepButton.getAttribute("aria-expanded")).toBe("false");
+    expect(secondStepButton.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      screen.getAllByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toHaveLength(1);
+    expect(screen.getByText("예식 형태와 식순을 정해요.")).toBeTruthy();
   });
 
   it("모바일에서 현재 초기 단계 카드를 선택해도 선택 이벤트를 전송한다", async () => {
@@ -1264,7 +1261,11 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.queryByRole("complementary", {
+        name: "이 단계에서 준비할 일",
+      }),
+    ).toBeNull();
     expect(
       screen.getByRole("button", {
         name: /01.*스드메 상담·견적과 패키지 계약/,
