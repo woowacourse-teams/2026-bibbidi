@@ -37,8 +37,7 @@ public class ChecklistMapper {
                 checklistItem.categoryId(),
                 checklistItem.sourceCatalogItemId(),
                 checklistItem.title(),
-                checklistItem.status(),
-                checklistItem.createdAt()
+                checklistItem.status()
         );
     }
 

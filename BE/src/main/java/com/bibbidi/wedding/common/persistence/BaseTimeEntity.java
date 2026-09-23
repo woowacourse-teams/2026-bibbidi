@@ -30,8 +30,4 @@ public abstract class BaseTimeEntity {
     public LocalDateTime createdAt() {
         return createdAt;
     }
-
-    protected void restoreCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 }

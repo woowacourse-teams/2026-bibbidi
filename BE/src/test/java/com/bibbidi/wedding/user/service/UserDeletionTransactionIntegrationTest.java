@@ -73,8 +73,7 @@ class UserDeletionTransactionIntegrationTest {
                         1L,
                         100L,
                         "계약서 확인",
-                        ChecklistItemStatus.PREV,
-                        null
+                        ChecklistItemStatus.PREV
                 )
         );
         JpaAppointmentEntity appointment = jpaAppointmentRepository.saveAndFlush(

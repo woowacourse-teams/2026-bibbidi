@@ -14,7 +14,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -54,8 +53,7 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
             Long categoryId,
             Long sourceCatalogItemId,
             String title,
-            ChecklistItemStatus status,
-            LocalDateTime createdAt
+            ChecklistItemStatus status
     ) {
         this.id = id;
         this.checklist = checklist;
@@ -63,7 +61,12 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
         this.sourceCatalogItemId = sourceCatalogItemId;
         this.title = title;
         this.status = status;
-        restoreCreatedAt(createdAt);
+    }
+
+    public void update(Long categoryId, String title, ChecklistItemStatus status) {
+        this.categoryId = categoryId;
+        this.title = title;
+        this.status = status;
     }
 
     public Long id() {

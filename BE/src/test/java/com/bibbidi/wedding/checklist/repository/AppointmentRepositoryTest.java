@@ -407,7 +407,7 @@ class AppointmentRepositoryTest {
 
     private Long saveChecklistItem(JpaChecklistEntity checklist) {
         return jpaChecklistItemRepository.saveAndFlush(new JpaChecklistItemEntity(
-                null, checklist, 1L, null, "item", ChecklistItemStatus.PREV, null)).id();
+                null, checklist, 1L, null, "item", ChecklistItemStatus.PREV)).id();
     }
 
     private Appointment saveAppointment(Long checklistItemId, Integer startHour, Integer startMinute,
