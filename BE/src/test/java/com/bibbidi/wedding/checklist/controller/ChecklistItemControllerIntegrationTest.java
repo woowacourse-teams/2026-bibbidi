@@ -351,7 +351,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
         String originalCreatedAt = createdAtOfCustomItem();
 
         String titleResponse = mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isOk())
@@ -359,7 +359,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
         assertThat(objectMapper.readTree(titleResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
 
         String categoryResponse = mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isOk())
@@ -367,7 +367,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
         assertThat(objectMapper.readTree(categoryResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
 
         String statusResponse = mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("continue")))
                 .andExpect(status().isOk())
@@ -378,7 +378,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private String createdAtOfCustomItem() throws Exception {
         String checklistResponse = mockMvc.perform(get("/api/checklists/me")
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         var items = objectMapper.readTree(checklistResponse).get("items");
