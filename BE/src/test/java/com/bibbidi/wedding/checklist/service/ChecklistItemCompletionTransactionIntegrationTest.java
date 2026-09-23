@@ -61,7 +61,8 @@ class ChecklistItemCompletionTransactionIntegrationTest {
                         1L,
                         null,
                         "청첩장 문구 정하기",
-                        ChecklistItemStatus.PREV
+                        ChecklistItemStatus.PREV,
+                        null
                 )
         );
         JpaAppointmentEntity appointment = jpaAppointmentRepository.saveAndFlush(

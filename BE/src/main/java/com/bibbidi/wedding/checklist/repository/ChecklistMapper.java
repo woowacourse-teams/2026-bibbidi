@@ -37,7 +37,8 @@ public class ChecklistMapper {
                 checklistItem.categoryId(),
                 checklistItem.sourceCatalogItemId(),
                 checklistItem.title(),
-                checklistItem.status()
+                checklistItem.status(),
+                checklistItem.createdAt()
         );
     }
 
@@ -47,7 +48,8 @@ public class ChecklistMapper {
                 entity.categoryId(),
                 entity.title(),
                 entity.sourceCatalogItemId(),
-                entity.status()
+                entity.status(),
+                entity.createdAt()
         );
     }
 }

@@ -1,0 +1,648 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistItemResponse.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistItemResponse.java
+index a2dc720db64a77564706e8ff1cc3f890970a2dff..6fd7582b394431919b38afd804437c2dd71878e4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistItemResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistItemResponse.java
+@@ -1,13 +1,15 @@
+ package com.bibbidi.wedding.checklist.controller.dto.resp;
+ 
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
++import java.time.LocalDateTime;
+ 
+ public record ChecklistItemResponse(
+         Long id,
+         Long catalogItemId,
+         Long categoryId,
+         String title,
+-        String status
++        String status,
++        LocalDateTime createdAt
+ ) {
+ 
+     public static ChecklistItemResponse from(ChecklistItemResult result) {
+@@ -16,7 +18,8 @@ public record ChecklistItemResponse(
+                 result.catalogItemId(),
+                 result.categoryId(),
+                 result.title(),
+-                result.status().value()
++                result.status().value(),
++                result.createdAt()
+         );
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistWithAppointmentsResponse.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistWithAppointmentsResponse.java
+index c2c7a3ffaa664f35875b22a7a47180292bab3d4e..87800acd0f4a0807effe846a21036e544a531ca3 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistWithAppointmentsResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/dto/resp/ChecklistWithAppointmentsResponse.java
+@@ -25,12 +25,14 @@ public record ChecklistWithAppointmentsResponse(
+             Long sourceCatalogItemId,
+             String title,
+             String status,
++            LocalDateTime createdAt,
+             List<AppointmentSummaryResponse> appointments
+     ) {
+         private static ChecklistItemWithAppointmentsResponse from(ChecklistItemWithAppointmentsResult result) {
+             return new ChecklistItemWithAppointmentsResponse(
+                     result.id(), result.categoryId(), result.sourceCatalogItemId(), result.title(),
+-                    result.status().value(), result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
++                    result.status().value(), result.createdAt(),
++                    result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
+             );
+         }
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+index 84f05708f92bebf977b50117fe9d48efe70a2a98..4d58a02e078c74cc4c83d1ed5c072fbf1ba1ca53 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/domain/ChecklistItem.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.domain;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import java.time.LocalDateTime;
+ import java.util.List;
+ import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+@@ -13,19 +14,22 @@ public final class ChecklistItem {
+     private final String title;
+     private final Long sourceCatalogItemId;
+     private final ChecklistItemStatus status;
++    private final LocalDateTime createdAt;
+ 
+     public ChecklistItem(
+             @Nullable Long id,
+             @Nullable Long categoryId,
+             @NonNull String title,
+             @Nullable Long sourceCatalogItemId,
+-            @NonNull ChecklistItemStatus status
++            @NonNull ChecklistItemStatus status,
++            @Nullable LocalDateTime createdAt
+     ) {
+         this.id = id;
+         this.categoryId = categoryId;
+         this.title = title;
+         this.sourceCatalogItemId = sourceCatalogItemId;
+         this.status = status;
++        this.createdAt = createdAt;
+     }
+ 
+     public ChecklistItem changeStatus(ChecklistItemStatus status) {
+@@ -34,7 +38,8 @@ public final class ChecklistItem {
+                 categoryId,
+                 title,
+                 sourceCatalogItemId,
+-                status
++                status,
++                createdAt
+         );
+     }
+ 
+@@ -51,7 +56,8 @@ public final class ChecklistItem {
+                 categoryId,
+                 title,
+                 sourceCatalogItemId,
+-                status
++                status,
++                createdAt
+         );
+     }
+ 
+@@ -68,7 +74,8 @@ public final class ChecklistItem {
+                 categoryId,
+                 title,
+                 sourceCatalogItemId,
+-                status
++                status,
++                createdAt
+         );
+     }
+ 
+@@ -109,6 +116,10 @@ public final class ChecklistItem {
+         return status;
+     }
+ 
++    public LocalDateTime createdAt() {
++        return createdAt;
++    }
++
+     public boolean isDone() {
+         return status == ChecklistItemStatus.DONE;
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaChecklistItemEntity.java b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaChecklistItemEntity.java
+index 94d86fc20402cfc5fcca4b18e2d7f541fab1b282..e6841033c2043cd33c22dafbb63fdff44d322aed 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaChecklistItemEntity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/persistence/JpaChecklistItemEntity.java
+@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
+ import jakarta.persistence.ManyToOne;
+ import jakarta.persistence.Table;
+ import jakarta.persistence.UniqueConstraint;
++import java.time.LocalDateTime;
+ 
+ @Entity
+ @Table(
+@@ -53,7 +54,8 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
+             Long categoryId,
+             Long sourceCatalogItemId,
+             String title,
+-            ChecklistItemStatus status
++            ChecklistItemStatus status,
++            LocalDateTime createdAt
+     ) {
+         this.id = id;
+         this.checklist = checklist;
+@@ -61,6 +63,7 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
+         this.sourceCatalogItemId = sourceCatalogItemId;
+         this.title = title;
+         this.status = status;
++        restoreCreatedAt(createdAt);
+     }
+ 
+     public Long id() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/ChecklistMapper.java b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/ChecklistMapper.java
+index 199ece5ee07fb9ee6f09594c43ed1c7202fe56a2..fc84eeda9a57057a6a428d6841251c38102eaa5f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/repository/ChecklistMapper.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/repository/ChecklistMapper.java
+@@ -37,7 +37,8 @@ public class ChecklistMapper {
+                 checklistItem.categoryId(),
+                 checklistItem.sourceCatalogItemId(),
+                 checklistItem.title(),
+-                checklistItem.status()
++                checklistItem.status(),
++                checklistItem.createdAt()
+         );
+     }
+ 
+@@ -47,7 +48,8 @@ public class ChecklistMapper {
+                 entity.categoryId(),
+                 entity.title(),
+                 entity.sourceCatalogItemId(),
+-                entity.status()
++                entity.status(),
++                entity.createdAt()
+         );
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+index 6427d19217204f3bb0e94fa0cb62c964868cf904..715b52d7b1a2ea5f4bb44c46fe641b5ed5376dbc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/ChecklistService.java
+@@ -189,7 +189,8 @@ public class ChecklistService {
+                 categoryId,
+                 title,
+                 null,
+-                ChecklistItemStatus.PREV
++                ChecklistItemStatus.PREV,
++                null
+         );
+         ChecklistItem saved = checklistRepository.saveItem(checklist, checklistItem);
+ 
+@@ -315,7 +316,8 @@ public class ChecklistService {
+                         catalogItem.categoryId(),
+                         catalogItem.title(),
+                         catalogItem.id(),
+-                        ChecklistItemStatus.PREV
++                        ChecklistItemStatus.PREV,
++                        null
+                 ))
+                 .toList();
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemResult.java
+index 2a540b917bca2d7e6bb60d219a54ada462e78faa..cb3184041b5c9fc3f9e403526b59a7a59ff9776e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemResult.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemResult.java
+@@ -2,13 +2,15 @@ package com.bibbidi.wedding.checklist.service.dto;
+ 
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
++import java.time.LocalDateTime;
+ 
+ public record ChecklistItemResult(
+         Long id,
+         Long catalogItemId,
+         Long categoryId,
+         String title,
+-        ChecklistItemStatus status
++        ChecklistItemStatus status,
++        LocalDateTime createdAt
+ ) {
+ 
+     public static ChecklistItemResult from(ChecklistItem item) {
+@@ -17,7 +19,8 @@ public record ChecklistItemResult(
+                 item.sourceCatalogItemId(),
+                 item.categoryId(),
+                 item.title(),
+-                item.status()
++                item.status(),
++                item.createdAt()
+         );
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemWithAppointmentsResult.java b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemWithAppointmentsResult.java
+index 30908cf82985482633c2e1abf3a049e9c86fcd7f..893072dccd61a4498080ef08029166ac6a1a9226 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemWithAppointmentsResult.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/service/dto/ChecklistItemWithAppointmentsResult.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.service.dto;
+ 
+ import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+ import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
++import java.time.LocalDateTime;
+ import java.util.List;
+ 
+ public record ChecklistItemWithAppointmentsResult(
+@@ -10,6 +11,7 @@ public record ChecklistItemWithAppointmentsResult(
+         Long sourceCatalogItemId,
+         String title,
+         ChecklistItemStatus status,
++        LocalDateTime createdAt,
+         List<ChecklistAppointmentResult> appointments
+ ) {
+ 
+@@ -20,6 +22,7 @@ public record ChecklistItemWithAppointmentsResult(
+                 item.sourceCatalogItemId(),
+                 item.title(),
+                 item.status(),
++                item.createdAt(),
+                 appointments.stream().map(ChecklistAppointmentResult::from).toList()
+         );
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/common/persistence/BaseTimeEntity.java b/BE/src/main/java/com/bibbidi/wedding/common/persistence/BaseTimeEntity.java
+index 51fc14d3d673f60fbe6a637fe11fd3184f927500..e96259756ade56b69903b8c7430b45069843e616 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/common/persistence/BaseTimeEntity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/common/persistence/BaseTimeEntity.java
+@@ -26,4 +26,12 @@ public abstract class BaseTimeEntity {
+     protected void onUpdate() {
+         updatedAt = LocalDateTime.now();
+     }
++
++    public LocalDateTime createdAt() {
++        return createdAt;
++    }
++
++    protected void restoreCreatedAt(LocalDateTime createdAt) {
++        this.createdAt = createdAt;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+index a8a6d4e00beb900fc54777186a719d98e52b80cc..4fc321d80e18e968e6ec42f8568a0c22155c252f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistControllerIntegrationTest.java
+@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+ import static com.epages.restdocs.apispec.Schema.schema;
++import static org.assertj.core.api.Assertions.assertThat;
+ import static org.hamcrest.Matchers.containsInAnyOrder;
+ import static org.hamcrest.Matchers.everyItem;
+ import static org.hamcrest.Matchers.is;
+@@ -21,6 +22,7 @@ import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemReque
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.epages.restdocs.apispec.ResourceSnippetParameters;
+ import java.time.LocalDate;
++import java.time.LocalDateTime;
+ import java.util.List;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -99,7 +101,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+ 
+     @Test
+     @Sql("/appointment-fixture.sql")
+-    @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES (2, 1, 1, NULL, '청첩장 제작', 'CONTINUE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), (3, 1, 1, NULL, '피팅 예약', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
++    @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES (2, 1, 1, NULL, '청첩장 제작', 'CONTINUE', '2026-08-01 09:10:11', CURRENT_TIMESTAMP), (3, 1, 1, NULL, '피팅 예약', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+     @Sql(statements = "INSERT INTO appointments (id, checklist_item_id, title, appointment_date, start_time, end_time, place, memo, is_done, done_by_checklist_item, created_at, updated_at) VALUES (100, 1, 'appointment', '2026-09-10', '2026-09-10 10:00:00', '2026-09-10 11:00:00', 'place', 'memo', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+     @DisplayName("로그인한 사용자의 할 일을 상태와 일정과 함께 조회한다")
+     void shouldReturnChecklistItemsWithAppointments() throws Exception {
+@@ -113,6 +115,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(jsonPath("$.items[0].categoryId").value(1))
+                 .andExpect(jsonPath("$.items[0].sourceCatalogItemId").isEmpty())
+                 .andExpect(jsonPath("$.items[0].status").value("prev"))
++                .andExpect(jsonPath("$.items[0].createdAt").isString())
+                 .andExpect(jsonPath("$.items[0].appointments[0].title").value("appointment"))
+                 .andExpect(jsonPath("$.items[0].appointments[0].date").value("2026-09-10"))
+                 .andExpect(jsonPath("$.items[0].appointments[0].startTime").value("2026-09-10T10:00:00"))
+@@ -122,10 +125,12 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(jsonPath("$.items[1].id").value(2))
+                 .andExpect(jsonPath("$.items[1].title").value("청첩장 제작"))
+                 .andExpect(jsonPath("$.items[1].status").value("continue"))
++                .andExpect(jsonPath("$.items[1].createdAt").value("2026-08-01T09:10:11"))
+                 .andExpect(jsonPath("$.items[1].appointments").isEmpty())
+                 .andExpect(jsonPath("$.items[2].id").value(3))
+                 .andExpect(jsonPath("$.items[2].title").value("피팅 예약"))
+                 .andExpect(jsonPath("$.items[2].status").value("done"))
++                .andExpect(jsonPath("$.items[2].createdAt").isString())
+                 .andDo(document(
+                                 "checklists-find-me",
+                                 resource(ResourceSnippetParameters.builder()
+@@ -145,6 +150,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                         .optional(),
+                                                 fieldWithPath("items[].title").description("할 일 제목"),
+                                                 fieldWithPath("items[].status").description("할 일 상태. prev, continue, done"),
++                                                fieldWithPath("items[].createdAt").description("할 일 생성 시각"),
+                                                 fieldWithPath("items[].appointments").description("할 일에 연결된 일정 목록"),
+                                                 fieldWithPath("items[].appointments[].id").description("일정 ID"),
+                                                 fieldWithPath("items[].appointments[].title").description("일정 제목"),
+@@ -703,6 +709,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(jsonPath("$.categoryId").value(2))
+                 .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
+                 .andExpect(jsonPath("$.status").value("prev"))
++                .andExpect(jsonPath("$.createdAt").isString())
+                 .andDo(document(
+                                 "checklists-write-item",
+                                 resource(ResourceSnippetParameters.builder()
+@@ -724,7 +731,8 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                 fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
+                                                 fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
+                                                 fieldWithPath("title").description("할 일 제목"),
+-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
++                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
++                                                fieldWithPath("createdAt").description("할 일 생성 시각")
+                                         )
+                                         .build()
+                                 )
+@@ -732,6 +740,35 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
+                 );
+     }
+ 
++    @Test
++    @Sql("/checklist-catalog-fixture.sql")
++    @DisplayName("직접 만든 할 일의 생성 응답과 이어지는 조회 응답에 같은 생성 시각이 담긴다")
++    void shouldReturnSameCreatedAtAfterWritingCustomItem() throws Exception {
++        String creationResponse = mockMvc.perform(post("/api/checklists/me/items")
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
++                .andExpect(status().isCreated())
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++        var createdItem = objectMapper.readTree(creationResponse);
++        String createdAt = createdItem.get("createdAt").asText();
++
++        String checklistResponse = mockMvc.perform(get("/api/checklists/me")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++        var queriedItem = objectMapper.readTree(checklistResponse).get("items").get(0);
++
++        assertThat(LocalDateTime.parse(createdAt)).isNotNull();
++        assertThat(queriedItem.get("id").asLong()).isEqualTo(createdItem.get("id").asLong());
++        assertThat(queriedItem.get("createdAt").asText()).isEqualTo(createdAt);
++    }
++
+     @Test
+     @Sql("/checklist-catalog-fixture.sql")
+     @DisplayName("직접 만든 할 일은 제목이 같아도 여러 번 추가할 수 있다")
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistItemControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistItemControllerIntegrationTest.java
+index 382fc62840537aa0e336b9f904d9991c08887083..2708570e5e1ea94a105509b330002be7f940a665 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistItemControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/controller/ChecklistItemControllerIntegrationTest.java
+@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+ import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+ import static com.epages.restdocs.apispec.Schema.schema;
++import static org.assertj.core.api.Assertions.assertThat;
+ import static org.hamcrest.Matchers.nullValue;
+ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
+ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+@@ -128,7 +129,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                 fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
+                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
+                                                 fieldWithPath("title").description("할 일 제목"),
+-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
++                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
++                                                fieldWithPath("createdAt").description("할 일 생성 시각")
+                                         )
+                                         .build())
+                         )
+@@ -337,12 +339,59 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                 .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
+                                         fieldWithPath("categoryId").description("변경된 카테고리 ID"),
+                                         fieldWithPath("title").description("할 일 제목"),
+-                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
++                                        fieldWithPath("status").description("할 일 상태. prev, continue, done"),
++                                        fieldWithPath("createdAt").description("할 일 생성 시각")
+                                 )
+                                 .build())
+                 ));
+     }
+ 
++    @Test
++    @DisplayName("제목, 카테고리, 상태를 변경해도 생성 시각은 유지된다")
++    void shouldKeepCreatedAtAfterChangingItem() throws Exception {
++        String originalCreatedAt = createdAtOfCustomItem();
++
++        String titleResponse = mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(titleRequestBody(NEW_TITLE)))
++                .andExpect(status().isOk())
++                .andReturn().getResponse().getContentAsString();
++        assertThat(objectMapper.readTree(titleResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
++
++        String categoryResponse = mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(requestBody(NEW_CATEGORY_ID)))
++                .andExpect(status().isOk())
++                .andReturn().getResponse().getContentAsString();
++        assertThat(objectMapper.readTree(categoryResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
++
++        String statusResponse = mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
++                        .session(authenticatedSession())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(statusRequestBody("continue")))
++                .andExpect(status().isOk())
++                .andReturn().getResponse().getContentAsString();
++        assertThat(objectMapper.readTree(statusResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
++        assertThat(createdAtOfCustomItem()).isEqualTo(originalCreatedAt);
++    }
++
++    private String createdAtOfCustomItem() throws Exception {
++        String checklistResponse = mockMvc.perform(get("/api/checklists/me")
++                        .session(authenticatedSession()))
++                .andExpect(status().isOk())
++                .andReturn().getResponse().getContentAsString();
++        var items = objectMapper.readTree(checklistResponse).get("items");
++        for (int index = 0; index < items.size(); index++) {
++            var item = items.get(index);
++            if (item.get("id").asLong() == CUSTOM_ITEM_ID) {
++                return item.get("createdAt").asText();
++            }
++        }
++        throw new AssertionError("조회 응답에서 직접 만든 할 일을 찾지 못했습니다.");
++    }
++
+     @Test
+     @DisplayName("완료한 할 일도 카테고리를 변경할 수 있고 제목과 완료 상태는 그대로다")
+     void shouldChangeCategoryOfDoneItemAndKeepOtherInformation() throws Exception {
+@@ -501,7 +550,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
+                                                         .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
+                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
+                                                 fieldWithPath("title").description("변경된 할 일 제목"),
+-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
++                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
++                                                fieldWithPath("createdAt").description("할 일 생성 시각")
+                                         )
+                                         .build())
+                         )
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+index 57e08fb168494456fcd989299a1dc3f5b6a008bf..6f681ebc79edecf5308f79866b42061f2535fa4b 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistItemTest.java
+@@ -19,7 +19,8 @@ class ChecklistItemTest {
+                 10L,
+                 "Wedding hall consultation",
+                 1L,
+-                ChecklistItemStatus.PREV
++                ChecklistItemStatus.PREV,
++                null
+         );
+     }
+ 
+@@ -135,7 +136,8 @@ class ChecklistItemTest {
+                 10L,
+                 "Wedding hall consultation",
+                 null,
+-                ChecklistItemStatus.DONE
++                ChecklistItemStatus.DONE,
++                null
+         );
+ 
+         // when
+@@ -168,7 +170,8 @@ class ChecklistItemTest {
+                 10L,
+                 "Wedding hall consultation",
+                 null,
+-                ChecklistItemStatus.DONE
++                ChecklistItemStatus.DONE,
++                null
+         );
+ 
+         // when
+@@ -314,7 +317,8 @@ class ChecklistItemTest {
+                 10L,
+                 "Wedding hall consultation",
+                 null,
+-                ChecklistItemStatus.PREV
++                ChecklistItemStatus.PREV,
++                null
+         );
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+index ead80c6bedcc1a0f61ffcdd02abd7c50b9cb191f..380e0534be37ca995c7fe518d8fe3ab82d2bd91d 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/domain/ChecklistTest.java
+@@ -304,7 +304,8 @@ class ChecklistTest {
+                 2L,
+                 "계약서 확인",
+                 sourceCatalogItemId,
+-                status
++                status,
++                null
+         );
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+index e954247d73cf4830cd1311a10b1c93280bf2a4c3..072e8f149a7f7bffabddbb8f66364dad52dcb584 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/AppointmentRepositoryTest.java
+@@ -407,7 +407,7 @@ class AppointmentRepositoryTest {
+ 
+     private Long saveChecklistItem(JpaChecklistEntity checklist) {
+         return jpaChecklistItemRepository.saveAndFlush(new JpaChecklistItemEntity(
+-                null, checklist, 1L, null, "item", ChecklistItemStatus.PREV)).id();
++                null, checklist, 1L, null, "item", ChecklistItemStatus.PREV, null)).id();
+     }
+ 
+     private Appointment saveAppointment(Long checklistItemId, Integer startHour, Integer startMinute,
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/ChecklistRepositoryTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/ChecklistRepositoryTest.java
+index a56dac0d0f37b998e148466155a5b237a8ada9de..565bf86763ca8fd3456e278e00b83939262d85eb 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/repository/ChecklistRepositoryTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/repository/ChecklistRepositoryTest.java
+@@ -180,8 +180,8 @@ class ChecklistRepositoryTest {
+         // given
+         Checklist checklist = saveChecklist(OWNER_ID);
+         List<ChecklistItem> items = List.of(
+-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
+-                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
++                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null),
++                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV, null)
+         );
+ 
+         // when
+@@ -215,7 +215,7 @@ class ChecklistRepositoryTest {
+         Checklist checklist = saveChecklist(OWNER_ID);
+         saveItem(checklist, 100L);
+         List<ChecklistItem> items = List.of(
+-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
++                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null)
+         );
+ 
+         // when, then
+@@ -284,7 +284,8 @@ class ChecklistRepositoryTest {
+                 CATEGORY_ID,
+                 "계약서 확인",
+                 sourceCatalogItemId,
+-                ChecklistItemStatus.PREV
++                ChecklistItemStatus.PREV,
++                null
+         ));
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemCompletionTransactionIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemCompletionTransactionIntegrationTest.java
+index 3e8aabb7cafd0ebe9bb6d881eb60582c3768ba9d..4d39fe942f9271e395826ecddc77ce205c25f7bc 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemCompletionTransactionIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemCompletionTransactionIntegrationTest.java
+@@ -61,7 +61,8 @@ class ChecklistItemCompletionTransactionIntegrationTest {
+                         1L,
+                         null,
+                         "청첩장 문구 정하기",
+-                        ChecklistItemStatus.PREV
++                        ChecklistItemStatus.PREV,
++                        null
+                 )
+         );
+         JpaAppointmentEntity appointment = jpaAppointmentRepository.saveAndFlush(
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemDeletionTransactionIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemDeletionTransactionIntegrationTest.java
+index fcdc83c0cad25f10294be0e9298dd6df357c030e..d2a92b59ecaa122d1d9037a83eaa8bb185791c6c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemDeletionTransactionIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistItemDeletionTransactionIntegrationTest.java
+@@ -60,7 +60,8 @@ class ChecklistItemDeletionTransactionIntegrationTest {
+                         1L,
+                         null,
+                         "청첩장 문구 정하기",
+-                        ChecklistItemStatus.PREV
++                        ChecklistItemStatus.PREV,
++                        null
+                 )
+         );
+         JpaAppointmentEntity appointment = jpaAppointmentRepository.saveAndFlush(
+diff --git a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+index edee5d5e6e9b6ae3fc528e359ab331e47d1f6c18..47ce83496a5006a2972fb44c541fc34f78f4a01c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/checklist/service/ChecklistServiceTest.java
+@@ -818,7 +818,8 @@ class ChecklistServiceTest {
+                 CATEGORY_ID,
+                 "계약서 확인",
+                 sourceCatalogItemId,
+-                status
++                status,
++                null
+         );
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/service/UserDeletionTransactionIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/service/UserDeletionTransactionIntegrationTest.java
+index 0cac264edd48e683b8954c4a3996f580f303d16b..e452fa740d94d3f2390f944d49dcdf4caa3d7960 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/service/UserDeletionTransactionIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/service/UserDeletionTransactionIntegrationTest.java
+@@ -73,7 +73,8 @@ class UserDeletionTransactionIntegrationTest {
+                         1L,
+                         100L,
+                         "계약서 확인",
+-                        ChecklistItemStatus.PREV
++                        ChecklistItemStatus.PREV,
++                        null
+                 )
+         );
+         JpaAppointmentEntity appointment = jpaAppointmentRepository.saveAndFlush(

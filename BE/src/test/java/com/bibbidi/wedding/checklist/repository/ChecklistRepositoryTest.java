@@ -180,8 +180,8 @@ class ChecklistRepositoryTest {
         // given
         Checklist checklist = saveChecklist(OWNER_ID);
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
-                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null),
+                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV, null)
         );
 
         // when
@@ -215,7 +215,7 @@ class ChecklistRepositoryTest {
         Checklist checklist = saveChecklist(OWNER_ID);
         saveItem(checklist, 100L);
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null)
         );
 
         // when, then
@@ -284,7 +284,8 @@ class ChecklistRepositoryTest {
                 CATEGORY_ID,
                 "계약서 확인",
                 sourceCatalogItemId,
-                ChecklistItemStatus.PREV
+                ChecklistItemStatus.PREV,
+                null
         ));
     }
 }

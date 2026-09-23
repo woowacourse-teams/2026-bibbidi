@@ -26,4 +26,12 @@ public abstract class BaseTimeEntity {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public LocalDateTime createdAt() {
+        return createdAt;
+    }
+
+    protected void restoreCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }
