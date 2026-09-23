@@ -1,0 +1,1320 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+index 6d7a613987514190281b918a9bd6dff3ec62348f..abc2672c4a60d9d660eaa81ed99ed099f723a2da 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+@@ -6,8 +6,17 @@ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Configuration;
+ 
+-/** 인증 설정값을 빈으로 등록한다. 값은 모두 application.yaml과 환경 변수에서 온다. */
++/**
++ * 인증 설정값을 빈으로 등록한다. 값은 모두 application.yaml과 환경 변수에서 온다.
++ */
+ @Configuration
+-@EnableConfigurationProperties({JwtProperties.class, SessionProperties.class, AuthCleanupProperties.class, RefreshCookieProperties.class})
++@EnableConfigurationProperties(
++        {
++                JwtProperties.class,
++                SessionProperties.class,
++                AuthCleanupProperties.class,
++                RefreshCookieProperties.class
++        }
++)
+ public class AuthPropertiesConfig {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
+index 521161f0a9308095c7f43a1fd0a1ae06b205653b..b73ec248842c41fbb4a2a474ed92ef31d4165100 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
+@@ -7,8 +7,8 @@ import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+ import com.bibbidi.wedding.auth.service.login.SocialLoginService;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+ import org.springframework.http.HttpStatus;
+@@ -22,8 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ /**
+- * 소셜 로그인 입구다.
+- * 웹과 네이티브는 같은 검증을 거치지만 refresh token을 받는 방식이 달라 경로를 나눈다.
++ * 소셜 로그인 입구다. 웹과 네이티브는 같은 검증을 거치지만 refresh token을 받는 방식이 달라 경로를 나눈다.
+  */
+ @RestController
+ public class SocialLoginController {
+@@ -45,8 +44,13 @@ public class SocialLoginController {
+             @RequestParam ClientType clientType,
+             @RequestParam(defaultValue = "LOGIN") SocialAuthPurpose purpose
+     ) {
+-        return SocialAuthorizationResponse.from(socialLoginService.startAuthorization(
+-                SocialProvider.from(provider), clientType, purpose));
++        return SocialAuthorizationResponse.from(
++                socialLoginService.startAuthorization(
++                        SocialProvider.from(provider),
++                        clientType,
++                        purpose
++                )
++        );
+     }
+ 
+     @PostMapping("/api/auth/web/oidc/{provider}/callback")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
+index fb652976d8a89929bb65f2096bbb46d58b2dc001..4a0917ddc58c350cebb6137bfb896e61eb18f21d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
+@@ -32,12 +32,20 @@ public interface JpaRefreshSessionRepository extends JpaRepository<JpaRefreshSes
+             """)
+     int revokeAllOfUser(@Param("userId") Long userId, @Param("revokedAt") LocalDateTime revokedAt);
+ 
+-    /** 정리 대상 id를 먼저 뽑는다. 한 번에 다 지우면 운영 MySQL에서 락을 오래 잡는다. */
++    /**
++     * 정리 대상 id를 먼저 뽑는다. 한 번에 다 지우면 운영 MySQL에서 락을 오래 잡는다.
++     *
++     * <p>만료된 세션은 더 쓸 수 없으므로 바로 지운다.
++     * 폐기한 세션은 재사용을 감지한 흔적이라 얼마간 남겨 두었다가 지운다.
++     */
+     @Query("""
+             SELECT session.id
+               FROM JpaRefreshSessionEntity session
+-             WHERE session.expiresAt < :threshold
+-                OR session.revokedAt < :threshold
++             WHERE session.expiresAt < :now
++                OR session.revokedAt < :revokedThreshold
+             """)
+-    List<Long> findIdsToClean(@Param("threshold") LocalDateTime threshold, Pageable pageable);
++    List<Long> findIdsToClean(
++            @Param("now") LocalDateTime now,
++            @Param("revokedThreshold") LocalDateTime revokedThreshold,
++            Pageable pageable);
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
+index 1d56b6f382b7d6269cbb1b698335b6d4cd8a6e46..a7157732947e092ce8313db393e4e1479d09e270 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
+@@ -39,8 +39,10 @@ public class RefreshSessionRepository {
+         return jpaRefreshSessionRepository.revokeAllOfUser(userId, revokedAt);
+     }
+ 
+-    public int deleteExpiredOrRevoked(LocalDateTime threshold, int batchSize) {
+-        List<Long> ids = jpaRefreshSessionRepository.findIdsToClean(threshold, PageRequest.of(0, batchSize));
++    public int deleteExpiredOrRevoked(
++            LocalDateTime now, LocalDateTime revokedThreshold, int batchSize) {
++        List<Long> ids = jpaRefreshSessionRepository.findIdsToClean(
++                now, revokedThreshold, PageRequest.of(0, batchSize));
+         jpaRefreshSessionRepository.deleteAllByIdInBatch(ids);
+         return ids.size();
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+index c0da7e5e07cf74380ec7b18b06017a8f034872b0..8498f70b2cf5b574f92ce408b2b176f4030e91ff 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+@@ -70,12 +70,23 @@ public class SecurityConfig {
+                         .anyRequest().access(activeUserAuthorizationManager))
+                 .addFilterBefore(accessTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                 .exceptionHandling(handling -> handling
+-                        .authenticationEntryPoint((request, response, exception) -> failureResponseWriter.respond(
+-                                request, response, ClientError.AUTHENTICATION_REQUIRED,
+-                                "인증이 필요한 요청에 유효한 access token이 없습니다."))
+-                        .accessDeniedHandler((request, response, exception) -> failureResponseWriter.respond(
+-                                request, response, ClientError.TERMS_AGREEMENT_REQUIRED,
+-                                "약관에 동의하지 않은 사용자의 요청입니다.")))
+-                .build();
++                        .authenticationEntryPoint(
++                                (
++                                        request, response, exception) -> failureResponseWriter.respond(
++                                        request,
++                                        response,
++                                        ClientError.AUTHENTICATION_REQUIRED,
++                                        "인증이 필요한 요청에 유효한 access token이 없습니다."
++                                )
++                        )
++                        .accessDeniedHandler(
++                                (request, response, exception) -> failureResponseWriter.respond(
++                                        request,
++                                        response,
++                                        ClientError.TERMS_AGREEMENT_REQUIRED,
++                                        "약관에 동의하지 않은 사용자의 요청입니다."
++                                )
++                        )
++                ).build();
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java
+index 8cd75f0c44f69bb539d9ddfa563c861fa0f2d787..8d0411c638bb4ed0315f76aebb3746908c82255e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java
+@@ -42,7 +42,7 @@ public class ExpiredAuthRecordCleanupService {
+ 
+     public CleanupResult cleanUp() {
+         LocalDateTime now = LocalDateTime.now();
+-        LocalDateTime sessionThreshold = now.minus(properties.revokedSessionRetention());
++        LocalDateTime revokedThreshold = now.minus(properties.revokedSessionRetention());
+         int batchSize = properties.batchSize();
+ 
+         int authRequests = deleteInBatches(
+@@ -50,7 +50,8 @@ public class ExpiredAuthRecordCleanupService {
+         int handoffCodes = deleteInBatches(
+                 batch -> handoffCodeRepository.deleteExpiredOrUsed(now, batch), batchSize);
+         int refreshSessions = deleteInBatches(
+-                batch -> refreshSessionRepository.deleteExpiredOrRevoked(sessionThreshold, batch), batchSize);
++                batch -> refreshSessionRepository.deleteExpiredOrRevoked(now, revokedThreshold, batch),
++                batchSize);
+ 
+         CleanupResult result = new CleanupResult(authRequests, handoffCodes, refreshSessions);
+         log.info("만료된 인증 기록을 정리했습니다. {}", result);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java b/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
+index e1601d42ebf3c9639c09ef5a4a6017617e4d95d1..9c658d9f57102f519bb8e19c7b153f02ed1568eb 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
+@@ -50,6 +50,13 @@ public class TermsService {
+                 .toList());
+     }
+ 
++    /** 그 회원이 어떤 약관에 동의했는지다. */
++    public List<Long> findAgreedTermsIds(Long userId) {
++        return termsRepository.findAgreementsByUserId(userId).stream()
++                .map(TermsAgreement::termsId)
++                .toList();
++    }
++
+     @Transactional
+     public void deleteAgreementsOf(Long userId) {
+         termsRepository.deleteAgreementsByUserId(userId);
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index 88817d60d4869a4a7e2fd6e4319929220351b825..6f1961b131f5de81bb92650f3795f7b2db3513ea 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -96,6 +96,8 @@ auth:
+     permit-all:
+       - /api/auth/**
+       - /api/catalog
++      # 가입하기 전에도 약관을 봐야 한다.
++      - /api/terms
+       - /api/users/nickname/availability
+       - /api/feedbacks
+       # 수집 도구가 컨테이너 망에서 직접 긁는다. 외부 차단은 nginx가 한다.
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..896393f0a0a0c6792ea204ad3d85f7774c6b75ba
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
+@@ -0,0 +1,148 @@
++package com.bibbidi.wedding.auth.controller;
++
++import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
++import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
++import static com.epages.restdocs.apispec.Schema.schema;
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.http.HttpHeaders.AUTHORIZATION;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.bibbidi.wedding.auth.controller.dto.HandoffCodeExchangeRequest;
++import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.session.SessionIssueService;
++import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
++import com.epages.restdocs.apispec.ResourceSnippetParameters;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.restdocs.payload.PayloadDocumentation;
++import tools.jackson.databind.ObjectMapper;
++
++/** 네이티브 로그인을 앱 안 WebView로 넘기는 흐름을 확인하고 문서로 남긴다. */
++class HandoffControllerIntegrationTest extends BibbidiIntegrationTest {
++
++    private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
++
++    @Autowired
++    private ObjectMapper objectMapper;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private UserService userService;
++
++    private IssuedSession nativeSession;
++
++    @BeforeEach
++    void setUp() {
++        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
++        UserResult active = userService.activate(created.id());
++        SessionOwner owner = new SessionOwner(
++                active.id(), active.status(), active.role(), active.nickname(), active.email());
++        nativeSession = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
++    }
++
++    @Test
++    @DisplayName("앱이 코드를 받아 WebView가 웹 세션 쿠키로 바꾼다")
++    void shouldHandOffNativeLoginToWebView() throws Exception {
++        String code = issueCode();
++
++        String setCookie = mockMvc.perform(post("/api/auth/web/handoff-codes/exchange")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new HandoffCodeExchangeRequest(code))))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.accessToken").isNotEmpty())
++                .andExpect(jsonPath("$.refreshToken").doesNotExist())
++                .andDo(document(
++                        "auth-handoff-code-exchange",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("handoff code 교환")
++                                .description("앱이 넘겨 준 1회용 코드를 내면 웹 세션 쿠키를 받습니다. "
++                                        + "이 세션은 앱 세션과 같은 기기 계열에 들어갑니다.")
++                                .requestSchema(schema("HandoffCodeExchangeRequest"))
++                                .responseSchema(schema("WebSessionResponse"))
++                                .requestFields(PayloadDocumentation.fieldWithPath("code")
++                                        .description("앱이 발급받아 WebView에 넘긴 1회용 코드"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("accessToken")
++                                                .description("WebView가 쓸 access token"),
++                                        PayloadDocumentation.fieldWithPath("termsAgreementRequired")
++                                                .description("약관 동의가 필요한 상태인지"))
++                                .build())))
++                .andReturn()
++                .getResponse()
++                .getHeader("Set-Cookie");
++
++        assertThat(setCookie).contains(REFRESH_COOKIE).contains("HttpOnly");
++    }
++
++    @Test
++    @DisplayName("한 번 쓴 코드는 다시 통하지 않는다")
++    void shouldRejectReusedHandoffCode() throws Exception {
++        String code = issueCode();
++        exchange(code).andExpect(status().isCreated());
++
++        exchange(code)
++                .andExpect(status().isUnauthorized())
++                .andExpect(jsonPath("$.errorCode").value(209));
++    }
++
++    @Test
++    @DisplayName("로그인하지 않으면 코드를 받을 수 없다")
++    void shouldRequireAuthenticationToIssueCode() throws Exception {
++        mockMvc.perform(post("/api/auth/native/handoff-codes")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new NativeSessionRefreshRequest(nativeSession.refreshToken()))))
++                .andExpect(status().isUnauthorized())
++                .andExpect(jsonPath("$.errorCode").value(201));
++    }
++
++    private String issueCode() throws Exception {
++        String response = mockMvc.perform(post("/api/auth/native/handoff-codes")
++                        .header(AUTHORIZATION, "Bearer " + nativeSession.accessToken())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new NativeSessionRefreshRequest(nativeSession.refreshToken()))))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.code").isNotEmpty())
++                .andDo(document(
++                        "auth-handoff-code-issue",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("handoff code 발급")
++                                .description("앱이 자기 refresh token을 내면 WebView에 넘길 1회용 코드를 받습니다. "
++                                        + "refresh token 원문은 앱 밖으로 나가지 않습니다.")
++                                .requestSchema(schema("NativeSessionRefreshRequest"))
++                                .responseSchema(schema("HandoffCodeResponse"))
++                                .requestHeaders(headerWithName(AUTHORIZATION)
++                                        .description("앱이 가진 access token"))
++                                .requestFields(PayloadDocumentation.fieldWithPath("refreshToken")
++                                        .description("앱이 가진 refresh token"))
++                                .responseFields(PayloadDocumentation.fieldWithPath("code")
++                                        .description("WebView 주소에 실어 넘기는 1회용 코드"))
++                                .build())))
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++        return objectMapper.readTree(response).get("code").asString();
++    }
++
++    private org.springframework.test.web.servlet.ResultActions exchange(String code) throws Exception {
++        return mockMvc.perform(post("/api/auth/web/handoff-codes/exchange")
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(objectMapper.writeValueAsString(new HandoffCodeExchangeRequest(code))));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff50fd5b713bb673f33521f0d343e364d14228ba
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
+@@ -0,0 +1,202 @@
++package com.bibbidi.wedding.auth.controller;
++
++import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
++import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
++import static com.epages.restdocs.apispec.Schema.schema;
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.http.HttpHeaders.AUTHORIZATION;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.session.SessionIssueService;
++import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
++import com.epages.restdocs.apispec.ResourceSnippetParameters;
++import jakarta.servlet.http.Cookie;
++import java.util.List;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.restdocs.payload.PayloadDocumentation;
++import org.springframework.test.context.jdbc.Sql;
++import tools.jackson.databind.ObjectMapper;
++
++/** 로그인 상태를 이어 가거나 끊는 API를 확인하고 문서로 남긴다. */
++@Sql("/terms-fixture.sql")
++class SessionControllerIntegrationTest extends BibbidiIntegrationTest {
++
++    private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
++    private static final Long REQUIRED_SERVICE_TERMS_ID = 1L;
++    private static final Long REQUIRED_PRIVACY_TERMS_ID = 2L;
++
++    @Autowired
++    private ObjectMapper objectMapper;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private UserService userService;
++
++    private SessionOwner owner;
++
++    @BeforeEach
++    void setUp() {
++        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
++        UserResult active = userService.activate(created.id());
++        owner = new SessionOwner(
++                active.id(), active.status(), active.role(), active.nickname(), active.email());
++    }
++
++    @Test
++    @DisplayName("웹은 쿠키로 갱신하고 새 쿠키를 받는다")
++    void shouldRefreshWebSessionWithCookie() throws Exception {
++        IssuedSession issued = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
++
++        String setCookie = mockMvc.perform(post("/api/auth/web/sessions/refresh")
++                        .cookie(new Cookie(REFRESH_COOKIE, issued.refreshToken())))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.accessToken").isNotEmpty())
++                .andExpect(jsonPath("$.refreshToken").doesNotExist())
++                .andDo(document(
++                        "auth-web-session-refresh",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("웹 세션 갱신")
++                                .description("refresh 쿠키로 새 한 쌍을 받습니다. 쓴 refresh token은 다시 쓸 수 없습니다.")
++                                .responseSchema(schema("WebSessionResponse"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("accessToken")
++                                                .description("새 access token"),
++                                        PayloadDocumentation.fieldWithPath("termsAgreementRequired")
++                                                .description("약관 동의가 필요한 상태인지"))
++                                .build())))
++                .andReturn()
++                .getResponse()
++                .getHeader("Set-Cookie");
++
++        assertThat(setCookie).contains(REFRESH_COOKIE).contains("HttpOnly").contains("Secure");
++    }
++
++    @Test
++    @DisplayName("네이티브는 본문으로 갱신하고 본문으로 받는다")
++    void shouldRefreshNativeSessionWithBody() throws Exception {
++        IssuedSession issued = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
++
++        mockMvc.perform(post("/api/auth/native/sessions/refresh")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new NativeSessionRefreshRequest(issued.refreshToken()))))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.accessToken").isNotEmpty())
++                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
++                .andDo(document(
++                        "auth-native-session-refresh",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("네이티브 세션 갱신")
++                                .description("앱은 쿠키를 쓰지 않으므로 refresh token을 본문으로 주고받습니다.")
++                                .requestSchema(schema("NativeSessionRefreshRequest"))
++                                .responseSchema(schema("NativeSessionResponse"))
++                                .requestFields(PayloadDocumentation.fieldWithPath("refreshToken")
++                                        .description("지금 가지고 있는 refresh token"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("accessToken")
++                                                .description("새 access token"),
++                                        PayloadDocumentation.fieldWithPath("refreshToken")
++                                                .description("새 refresh token"),
++                                        PayloadDocumentation.fieldWithPath("termsAgreementRequired")
++                                                .description("약관 동의가 필요한 상태인지"))
++                                .build())));
++    }
++
++    @Test
++    @DisplayName("웹 로그아웃은 쿠키를 만료시킨다")
++    void shouldExpireCookieOnWebLogOut() throws Exception {
++        IssuedSession issued = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
++
++        String setCookie = mockMvc.perform(delete("/api/auth/web/sessions/current")
++                        .cookie(new Cookie(REFRESH_COOKIE, issued.refreshToken())))
++                .andExpect(status().isNoContent())
++                .andDo(document(
++                        "auth-web-session-logout",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("웹 로그아웃")
++                                .description("그 기기 계열의 세션만 끊고 refresh 쿠키를 만료시킵니다.")
++                                .build())))
++                .andReturn()
++                .getResponse()
++                .getHeader("Set-Cookie");
++
++        assertThat(setCookie).contains(REFRESH_COOKIE).contains("Max-Age=0");
++    }
++
++    @Test
++    @DisplayName("refresh 쿠키가 없으면 갱신할 수 없다")
++    void shouldRejectWebRefreshWithoutCookie() throws Exception {
++        mockMvc.perform(post("/api/auth/web/sessions/refresh"))
++                .andExpect(status().isUnauthorized())
++                .andExpect(jsonPath("$.errorCode").value(206));
++    }
++
++    @Test
++    @DisplayName("약관에 동의하기 전에는 다른 API를 부를 수 없고, 동의하면 새 token으로 통과한다")
++    void shouldBlockPendingUserUntilTermsAgreed() throws Exception {
++        UserResult pending = userService.createPendingUser("pending", null);
++        SessionOwner pendingOwner = new SessionOwner(
++                pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
++        IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
++
++        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
++                        .get("/api/users/me")
++                        .header(AUTHORIZATION, "Bearer " + issued.accessToken()))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.errorCode").value(211));
++
++        String reissued = mockMvc.perform(post("/api/users/me/terms-agreement")
++                        .header(AUTHORIZATION, "Bearer " + issued.accessToken())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new TermsAgreementRequest(
++                                List.of(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID)))))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.accessToken").isNotEmpty())
++                .andDo(document(
++                        "auth-terms-agreement",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("약관 동의로 가입 완료")
++                                .description("필수 약관에 모두 동의하면 서비스를 쓸 수 있는 상태가 되고 "
++                                        + "그 자리에서 access token을 새로 내줍니다.")
++                                .requestSchema(schema("TermsAgreementRequest"))
++                                .responseSchema(schema("TermsAgreementResponse"))
++                                .requestHeaders(headerWithName(AUTHORIZATION)
++                                        .description("가입이 끝나지 않은 회원의 access token"))
++                                .requestFields(PayloadDocumentation.fieldWithPath("agreedTermsIds")
++                                        .description("동의한 약관 식별자 목록"))
++                                .responseFields(PayloadDocumentation.fieldWithPath("accessToken")
++                                        .description("가입이 끝난 상태가 담긴 새 access token"))
++                                .build())))
++                .andReturn()
++                .getResponse()
++                .getContentAsString();
++
++        String newAccessToken = objectMapper.readTree(reissued).get("accessToken").asString();
++        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
++                        .get("/api/users/me")
++                        .header(AUTHORIZATION, "Bearer " + newAccessToken))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.nickname").value("pending"));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java
+index b94e3dec322c2d4cd9feab4546b6bfa845ae3f4f..4c47736a9cebb4b291698a4f9f69cfaaf9b52e9c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java
+@@ -1,5 +1,9 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
++import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
++import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
++import static com.epages.restdocs.apispec.Schema.schema;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.ArgumentMatchers.anyString;
+@@ -15,11 +19,13 @@ import com.bibbidi.wedding.auth.oidc.client.OidcTokenExchangeClient;
+ import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+ import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.epages.restdocs.apispec.ResourceSnippetParameters;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.MediaType;
++import org.springframework.restdocs.payload.PayloadDocumentation;
+ import org.springframework.test.context.bean.override.mockito.MockitoBean;
+ import org.springframework.test.web.servlet.MvcResult;
+ import tools.jackson.databind.ObjectMapper;
+@@ -60,6 +66,27 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                 .andExpect(jsonPath("$.termsAgreementRequired").value(true))
++                .andDo(document(
++                        "auth-web-oidc-callback",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("웹 소셜 로그인 완료")
++                                .description("인가 코드를 서버가 토큰으로 바꾸고 id_token을 검증한 뒤 세션을 발급합니다. "
++                                        + "refresh token은 Secure·HttpOnly 쿠키로 내려갑니다.")
++                                .requestSchema(schema("SocialLoginRequest"))
++                                .responseSchema(schema("WebSessionResponse"))
++                                .pathParameters(parameterWithName("provider").description("kakao 또는 google"))
++                                .requestFields(
++                                        PayloadDocumentation.fieldWithPath("code")
++                                                .description("제공자가 돌려준 인가 코드"),
++                                        PayloadDocumentation.fieldWithPath("state")
++                                                .description("인가를 시작할 때 서버가 준 값"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("accessToken")
++                                                .description("API 호출에 싣는 access token"),
++                                        PayloadDocumentation.fieldWithPath("termsAgreementRequired")
++                                                .description("약관에 동의해야 서비스를 쓸 수 있는 상태인지"))
++                                .build())))
+                 .andReturn();
+ 
+         String setCookie = result.getResponse().getHeader("Set-Cookie");
+@@ -80,6 +107,28 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
+                 .andExpect(status().isCreated())
+                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
++                .andDo(document(
++                        "auth-native-oidc-callback",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("네이티브 소셜 로그인 완료")
++                                .description("쿠키를 쓰지 않는 앱을 위해 refresh token까지 응답 본문으로 내려 줍니다.")
++                                .requestSchema(schema("SocialLoginRequest"))
++                                .responseSchema(schema("NativeSessionResponse"))
++                                .pathParameters(parameterWithName("provider").description("kakao 또는 google"))
++                                .requestFields(
++                                        PayloadDocumentation.fieldWithPath("code")
++                                                .description("제공자가 돌려준 인가 코드"),
++                                        PayloadDocumentation.fieldWithPath("state")
++                                                .description("인가를 시작할 때 서버가 준 값"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("accessToken")
++                                                .description("API 호출에 싣는 access token"),
++                                        PayloadDocumentation.fieldWithPath("refreshToken")
++                                                .description("access token이 만료되면 새로 받을 때 쓰는 값"),
++                                        PayloadDocumentation.fieldWithPath("termsAgreementRequired")
++                                                .description("약관에 동의해야 서비스를 쓸 수 있는 상태인지"))
++                                .build())))
+                 .andReturn();
+ 
+         assertThat(result.getResponse().getHeader("Set-Cookie")).isNull();
+@@ -154,7 +203,25 @@ class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
+                                 org.hamcrest.Matchers.containsString("state="),
+                                 org.hamcrest.Matchers.containsString("nonce="),
+                                 org.hamcrest.Matchers.containsString("code_challenge="),
+-                                org.hamcrest.Matchers.containsString("code_challenge_method=S256"))));
++                                org.hamcrest.Matchers.containsString("code_challenge_method=S256"))))
++                .andDo(document(
++                        "auth-oidc-authorization",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("소셜 인가 시작")
++                                .description("서버가 state와 nonce, PKCE 값을 만들어 저장하고 인가 화면 주소를 돌려줍니다.")
++                                .responseSchema(schema("SocialAuthorizationResponse"))
++                                .pathParameters(parameterWithName("provider").description("kakao 또는 google"))
++                                .queryParameters(
++                                        parameterWithName("clientType").description("WEB 또는 NATIVE"),
++                                        parameterWithName("purpose").optional()
++                                                .description("LOGIN 또는 WITHDRAWAL. 비우면 LOGIN"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("authorizationUri")
++                                                .description("사용자를 보낼 인가 화면 주소"),
++                                        PayloadDocumentation.fieldWithPath("state")
++                                                .description("돌아올 때 그대로 보내는 값"))
++                                .build())));
+     }
+ 
+     private SocialLoginRequest loginRequest(String clientType) throws Exception {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..4250aa28cb2f81f7dc0f042a94c2df56d9bf77c1
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+@@ -0,0 +1,103 @@
++package com.bibbidi.wedding.auth.controller;
++
++import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
++import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
++import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
++import static com.epages.restdocs.apispec.Schema.schema;
++import static org.springframework.http.HttpHeaders.AUTHORIZATION;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.session.SessionIssueService;
++import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
++import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
++import com.epages.restdocs.apispec.ResourceSnippetParameters;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.restdocs.payload.PayloadDocumentation;
++import tools.jackson.databind.ObjectMapper;
++
++class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
++
++    @Autowired
++    private ObjectMapper objectMapper;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private AccessTokenIssuer accessTokenIssuer;
++
++    @Autowired
++    private UserService userService;
++
++    private IssuedSession session;
++    private Long userId;
++
++    @BeforeEach
++    void setUp() {
++        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
++        UserResult active = userService.activate(created.id());
++        userId = active.id();
++        session = sessionIssueService.issueForNewFamily(
++                new SessionOwner(active.id(), active.status(), active.role(), active.nickname(),
++                        active.email()),
++                ClientType.WEB);
++    }
++
++    @Test
++    @DisplayName("소셜 재인증으로 받은 표를 내면 탈퇴한다")
++    void shouldWithdrawWithDeleteGrant() throws Exception {
++        mockMvc.perform(delete("/api/users/me")
++                        .header(AUTHORIZATION, "Bearer " + session.accessToken())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new WithdrawalRequest(accessTokenIssuer.issueDeleteGrant(userId)))))
++                .andExpect(status().isNoContent())
++                .andDo(document(
++                        "users-withdraw",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Auth")
++                                .summary("회원 탈퇴")
++                                .description("access token만으로는 탈퇴시키지 않습니다. "
++                                        + "소셜로 다시 인증해 받은 표를 함께 내야 합니다. "
++                                        + "탈퇴하면 그 회원의 모든 세션을 끊습니다.")
++                                .requestSchema(schema("WithdrawalRequest"))
++                                .requestHeaders(headerWithName(AUTHORIZATION)
++                                        .description("로그인한 회원의 access token"))
++                                .requestFields(PayloadDocumentation.fieldWithPath("deleteGrant")
++                                        .description("소셜 재인증으로 받은 탈퇴용 표"))
++                                .build())));
++    }
++
++    @Test
++    @DisplayName("탈퇴 표가 없으면 요청을 거절한다")
++    void shouldRejectWithdrawalWithoutDeleteGrant() throws Exception {
++        mockMvc.perform(delete("/api/users/me")
++                        .header(AUTHORIZATION, "Bearer " + session.accessToken())
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new WithdrawalRequest(""))))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    @DisplayName("로그인하지 않으면 탈퇴할 수 없다")
++    void shouldRequireAuthenticationToWithdraw() throws Exception {
++        mockMvc.perform(delete("/api/users/me")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(
++                                new WithdrawalRequest(accessTokenIssuer.issueDeleteGrant(userId)))))
++                .andExpect(status().isUnauthorized())
++                .andExpect(jsonPath("$.errorCode").value(201));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a3aee7a0d8b85a5171b0680590b5b62d4e5b024e
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+@@ -0,0 +1,110 @@
++package com.bibbidi.wedding.auth.service.cleanup;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.domain.HandoffCode;
++import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
++import com.bibbidi.wedding.auth.domain.RefreshSession;
++import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
++import com.bibbidi.wedding.auth.domain.SocialProvider;
++import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
++import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
++import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
++import java.time.LocalDateTime;
++import java.util.UUID;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.transaction.annotation.Transactional;
++
++/** 스케줄러를 기다리지 않고 정리 서비스를 직접 불러 확인한다. */
++@SpringBootTest
++@ActiveProfiles("test")
++@Transactional
++class ExpiredAuthRecordCleanupServiceIntegrationTest {
++
++    private static final Long USER_ID = 1L;
++
++    @Autowired
++    private ExpiredAuthRecordCleanupService cleanupService;
++
++    @Autowired
++    private OidcAuthRequestRepository oidcAuthRequestRepository;
++
++    @Autowired
++    private HandoffCodeRepository handoffCodeRepository;
++
++    @Autowired
++    private RefreshSessionRepository refreshSessionRepository;
++
++    @Test
++    @DisplayName("만료됐거나 이미 쓴 인가 요청과 handoff code를 지운다")
++    void shouldDeleteExpiredOrUsedRecords() {
++        LocalDateTime now = LocalDateTime.now();
++        oidcAuthRequestRepository.save(authRequest("expired-state", now.minusMinutes(1), null));
++        oidcAuthRequestRepository.save(authRequest("used-state", now.plusMinutes(10), now));
++        OidcAuthRequest alive =
++                oidcAuthRequestRepository.save(authRequest("alive-state", now.plusMinutes(10), null));
++
++        handoffCodeRepository.save(handoffCode("expired-code", now.minusSeconds(1), null));
++        handoffCodeRepository.save(handoffCode("used-code", now.plusSeconds(60), now));
++        HandoffCode aliveCode =
++                handoffCodeRepository.save(handoffCode("alive-code", now.plusSeconds(60), null));
++
++        ExpiredAuthRecordCleanupService.CleanupResult result = cleanupService.cleanUp();
++
++        assertThat(result.oidcAuthRequests()).isEqualTo(2);
++        assertThat(result.handoffCodes()).isEqualTo(2);
++        assertThat(oidcAuthRequestRepository.findByStateHash(alive.stateHash())).isPresent();
++        assertThat(handoffCodeRepository.findByCodeHash(aliveCode.codeHash())).isPresent();
++    }
++
++    @Test
++    @DisplayName("살아 있는 refresh 세션은 지우지 않는다")
++    void shouldKeepUsableRefreshSession() {
++        LocalDateTime now = LocalDateTime.now();
++        RefreshSession alive = refreshSessionRepository.save(RefreshSession.issue(
++                USER_ID, UUID.randomUUID().toString(), ClientType.WEB, "alive-hash", now.plusDays(30)));
++        refreshSessionRepository.save(RefreshSession.issue(
++                USER_ID, UUID.randomUUID().toString(), ClientType.WEB, "expired-hash", now.minusDays(1)));
++
++        ExpiredAuthRecordCleanupService.CleanupResult result = cleanupService.cleanUp();
++
++        assertThat(result.refreshSessions()).isEqualTo(1);
++        assertThat(refreshSessionRepository.findByTokenHash(alive.tokenHash())).isPresent();
++        assertThat(refreshSessionRepository.findByTokenHash("expired-hash")).isEmpty();
++    }
++
++    @Test
++    @DisplayName("지울 것이 없으면 아무것도 지우지 않는다")
++    void shouldDeleteNothingWhenAllRecordsAreAlive() {
++        ExpiredAuthRecordCleanupService.CleanupResult result = cleanupService.cleanUp();
++
++        assertThat(result.oidcAuthRequests()).isZero();
++        assertThat(result.handoffCodes()).isZero();
++        assertThat(result.refreshSessions()).isZero();
++    }
++
++    private static OidcAuthRequest authRequest(
++            String stateHash, LocalDateTime expiresAt, LocalDateTime usedAt) {
++        return new OidcAuthRequest(
++                null,
++                stateHash,
++                SocialProvider.KAKAO,
++                "nonce",
++                "code-verifier",
++                ClientType.WEB,
++                SocialAuthPurpose.LOGIN,
++                expiresAt,
++                usedAt);
++    }
++
++    private static HandoffCode handoffCode(
++            String codeHash, LocalDateTime expiresAt, LocalDateTime usedAt) {
++        return new HandoffCode(
++                null, codeHash, USER_ID, UUID.randomUUID().toString(), expiresAt, usedAt);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..168e4eb39ea54f822038e189c21aefb580f3ff01
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java
+@@ -0,0 +1,124 @@
++package com.bibbidi.wedding.auth.service.handoff;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.session.SessionIssueService;
++import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.transaction.annotation.Transactional;
++
++@SpringBootTest
++@ActiveProfiles("test")
++@Transactional
++class HandoffServiceIntegrationTest {
++
++    @Autowired
++    private HandoffService handoffService;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private SessionRefreshService sessionRefreshService;
++
++    @Autowired
++    private UserService userService;
++
++    private SessionOwner owner;
++    private IssuedSession nativeSession;
++
++    @BeforeEach
++    void setUp() {
++        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
++        UserResult active = userService.activate(created.id());
++        owner = new SessionOwner(
++                active.id(), active.status(), active.role(), active.nickname(), active.email());
++        nativeSession = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
++    }
++
++    @Test
++    @DisplayName("넘겨받은 웹 세션은 앱 세션과 같은 기기 계열에 들어간다")
++    void shouldPutHandedOffWebSessionInSameFamily() {
++        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
++
++        IssuedSession webSession = handoffService.exchange(code);
++
++        assertThat(webSession.familyId()).isEqualTo(nativeSession.familyId());
++        assertThat(webSession.clientType()).isEqualTo(ClientType.WEB);
++    }
++
++    @Test
++    @DisplayName("handoff code는 한 번만 통한다")
++    void shouldAllowHandoffCodeOnlyOnce() {
++        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
++        handoffService.exchange(code);
++
++        assertThatThrownBy(() -> handoffService.exchange(code))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.HANDOFF_CODE_INVALID);
++    }
++
++    @Test
++    @DisplayName("서버가 만든 적 없는 code는 거절한다")
++    void shouldRejectUnknownHandoffCode() {
++        assertThatThrownBy(() -> handoffService.exchange("code-we-never-made"))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.HANDOFF_CODE_INVALID);
++    }
++
++    @Test
++    @DisplayName("다른 회원의 refresh token으로는 code를 받을 수 없다")
++    void shouldRejectIssuingCodeForOtherUsersSession() {
++        UserResult other = userService.createPendingUser("other", null);
++
++        assertThatThrownBy(() -> handoffService.issueCode(other.id(), nativeSession.refreshToken()))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
++    }
++
++    @Test
++    @DisplayName("이미 갱신에 쓴 refresh token으로는 code를 받을 수 없다")
++    void shouldRejectIssuingCodeWithRotatedRefreshToken() {
++        sessionRefreshService.refresh(nativeSession.refreshToken(), ClientType.NATIVE);
++
++        assertThatThrownBy(
++                () -> handoffService.issueCode(owner.userId(), nativeSession.refreshToken()))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
++    }
++
++    @Test
++    @DisplayName("앱 쪽에서 토큰 재사용이 감지되면 넘겨준 웹 세션도 함께 끊긴다")
++    void shouldRevokeHandedOffWebSessionWhenNativeTokenIsReused() {
++        String code = handoffService.issueCode(owner.userId(), nativeSession.refreshToken());
++        IssuedSession webSession = handoffService.exchange(code);
++        sessionRefreshService.refresh(nativeSession.refreshToken(), ClientType.NATIVE);
++
++        assertThatThrownBy(
++                () -> sessionRefreshService.refresh(nativeSession.refreshToken(), ClientType.NATIVE))
++                .isInstanceOf(BusinessException.class);
++
++        assertThatThrownBy(
++                () -> sessionRefreshService.refresh(webSession.refreshToken(), ClientType.WEB))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e66dde6a21ee16ace7dd703744d04f56f5fb7dc
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java
+@@ -0,0 +1,101 @@
++package com.bibbidi.wedding.auth.service.withdrawal;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.session.SessionIssueService;
++import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
++import com.bibbidi.wedding.auth.token.AccessTokenIssuer;
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.transaction.annotation.Transactional;
++
++@SpringBootTest
++@ActiveProfiles("test")
++@Transactional
++class WithdrawalServiceIntegrationTest {
++
++    @Autowired
++    private WithdrawalService withdrawalService;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private SessionRefreshService sessionRefreshService;
++
++    @Autowired
++    private AccessTokenIssuer accessTokenIssuer;
++
++    @Autowired
++    private UserService userService;
++
++    private SessionOwner owner;
++
++    @BeforeEach
++    void setUp() {
++        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
++        UserResult active = userService.activate(created.id());
++        owner = new SessionOwner(
++                active.id(), active.status(), active.role(), active.nickname(), active.email());
++    }
++
++    @Test
++    @DisplayName("탈퇴하면 그 회원의 모든 세션을 끊는다")
++    void shouldRevokeAllSessionsOnWithdrawal() {
++        IssuedSession web = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
++        IssuedSession mobile = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
++
++        withdrawalService.withdraw(owner.userId(), accessTokenIssuer.issueDeleteGrant(owner.userId()));
++
++        assertThatThrownBy(() -> sessionRefreshService.refresh(web.refreshToken(), ClientType.WEB))
++                .isInstanceOf(BusinessException.class);
++        assertThatThrownBy(() -> sessionRefreshService.refresh(mobile.refreshToken(), ClientType.NATIVE))
++                .isInstanceOf(BusinessException.class);
++    }
++
++    @Test
++    @DisplayName("탈퇴한 회원은 더 이상 조회되지 않는다")
++    void shouldDeleteUserOnWithdrawal() {
++        withdrawalService.withdraw(owner.userId(), accessTokenIssuer.issueDeleteGrant(owner.userId()));
++
++        assertThatThrownBy(() -> userService.findCurrentUserInfo(owner.userId()))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.USER_NOT_FOUND);
++    }
++
++    @Test
++    @DisplayName("다른 회원의 탈퇴 표로는 탈퇴할 수 없다")
++    void shouldRejectDeleteGrantOfOtherUser() {
++        UserResult other = userService.createPendingUser("other", null);
++        String otherGrant = accessTokenIssuer.issueDeleteGrant(other.id());
++
++        assertThatThrownBy(() -> withdrawalService.withdraw(owner.userId(), otherGrant))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.DELETE_GRANT_INVALID);
++
++        assertThat(userService.findCurrentUserInfo(owner.userId()).id()).isEqualTo(owner.userId());
++    }
++
++    @Test
++    @DisplayName("탈퇴 표가 아니면 거절한다")
++    void shouldRejectMalformedDeleteGrant() {
++        assertThatThrownBy(() -> withdrawalService.withdraw(owner.userId(), "not-a-grant"))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.DELETE_GRANT_INVALID);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/terms/controller/TermsControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/terms/controller/TermsControllerIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d392831ccea344198f8e78c6694514d8ac729600
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/terms/controller/TermsControllerIntegrationTest.java
+@@ -0,0 +1,49 @@
++package com.bibbidi.wedding.terms.controller;
++
++import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
++import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
++import static com.epages.restdocs.apispec.Schema.schema;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.epages.restdocs.apispec.ResourceSnippetParameters;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.restdocs.payload.PayloadDocumentation;
++import org.springframework.test.context.jdbc.Sql;
++
++@Sql("/terms-fixture.sql")
++class TermsControllerIntegrationTest extends BibbidiIntegrationTest {
++
++    @Test
++    @DisplayName("가입 전에도 약관을 볼 수 있다")
++    void shouldFindTermsWithoutLogin() throws Exception {
++        mockMvc.perform(get("/api/terms"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$").isArray())
++                .andExpect(jsonPath("$[0].code").isNotEmpty())
++                .andDo(document(
++                        "terms-find-all",
++                        resource(ResourceSnippetParameters.builder()
++                                .tag("Terms")
++                                .summary("약관 조회")
++                                .description("가입 화면에서 보여 줄 약관을 모두 내려 줍니다. 로그인 없이 부를 수 있습니다.")
++                                .responseSchema(schema("TermsResponse"))
++                                .responseFields(
++                                        PayloadDocumentation.fieldWithPath("[].id")
++                                                .description("동의할 때 돌려보내는 식별자"),
++                                        PayloadDocumentation.fieldWithPath("[].code")
++                                                .description("약관 종류"),
++                                        PayloadDocumentation.fieldWithPath("[].version")
++                                                .description("문구의 판"),
++                                        PayloadDocumentation.fieldWithPath("[].title")
++                                                .description("약관 제목"),
++                                        PayloadDocumentation.fieldWithPath("[].content")
++                                                .description("약관 전문"),
++                                        PayloadDocumentation.fieldWithPath("[].required")
++                                                .description("동의해야만 가입이 끝나는지"))
++                                .build())));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/terms/service/TermsServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/terms/service/TermsServiceIntegrationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..39307ae37a34531b9d90f1a74e293b0094732089
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/terms/service/TermsServiceIntegrationTest.java
+@@ -0,0 +1,101 @@
++package com.bibbidi.wedding.terms.service;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.user.service.UserService;
++import java.util.List;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.test.context.jdbc.Sql;
++import org.springframework.transaction.annotation.Transactional;
++
++@SpringBootTest
++@ActiveProfiles("test")
++@Transactional
++@Sql("/terms-fixture.sql")
++class TermsServiceIntegrationTest {
++
++    private static final Long REQUIRED_SERVICE_TERMS_ID = 1L;
++    private static final Long REQUIRED_PRIVACY_TERMS_ID = 2L;
++    private static final Long OPTIONAL_MARKETING_TERMS_ID = 3L;
++
++    @Autowired
++    private TermsService termsService;
++
++    @Autowired
++    private UserService userService;
++
++    private Long userId;
++
++    @BeforeEach
++    void setUp() {
++        userId = userService.createPendingUser("current", null).id();
++    }
++
++    @Test
++    @DisplayName("보여 줄 약관을 모두 내려 준다")
++    void shouldFindAllTerms() {
++        List<TermsResult> terms = termsService.findAll();
++
++        assertThat(terms).hasSize(3);
++        assertThat(terms).filteredOn(TermsResult::required).hasSize(2);
++    }
++
++    @Test
++    @DisplayName("필수 약관에 모두 동의하면 동의를 기록한다")
++    void shouldRecordAgreementWhenAllRequiredAgreed() {
++        termsService.agree(userId, List.of(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID));
++
++        assertThat(termsService.findAgreedTermsIds(userId))
++                .containsExactlyInAnyOrder(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID);
++    }
++
++    @Test
++    @DisplayName("선택 약관까지 동의해도 기록한다")
++    void shouldRecordAgreementIncludingOptionalTerms() {
++        termsService.agree(userId, List.of(
++                REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID, OPTIONAL_MARKETING_TERMS_ID));
++
++        assertThat(termsService.findAgreedTermsIds(userId))
++                .containsExactlyInAnyOrder(
++                        REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID, OPTIONAL_MARKETING_TERMS_ID);
++    }
++
++    @Test
++    @DisplayName("필수 약관이 하나라도 빠지면 아무것도 기록하지 않는다")
++    void shouldRejectWhenRequiredTermsAreMissing() {
++        assertThatThrownBy(() -> termsService.agree(userId, List.of(REQUIRED_SERVICE_TERMS_ID)))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.TERMS_AGREEMENT_REQUIRED);
++        assertThat(termsService.findAgreedTermsIds(userId)).isEmpty();
++    }
++
++    @Test
++    @DisplayName("존재하지 않는 약관에 동의하려 하면 거절한다")
++    void shouldRejectUnknownTerms() {
++        assertThatThrownBy(() -> termsService.agree(userId, List.of(
++                REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID, 999L)))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.INVALID_REQUEST);
++    }
++
++    @Test
++    @DisplayName("탈퇴하면 그 회원의 동의 기록을 지운다")
++    void shouldDeleteAgreementsOnWithdrawal() {
++        termsService.agree(userId, List.of(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID));
++
++        termsService.deleteAgreementsOf(userId);
++
++        assertThat(termsService.findAgreedTermsIds(userId)).isEmpty();
++        assertThat(termsService.findAll()).hasSize(3);
++    }
++}
+diff --git a/BE/src/test/resources/application-test.yaml b/BE/src/test/resources/application-test.yaml
+index 08964fc2b031435a38a3cec26cc907043f5075c7..0eafd1e938808f73e2397c9455872014808c8060 100644
+--- a/BE/src/test/resources/application-test.yaml
++++ b/BE/src/test/resources/application-test.yaml
+@@ -40,6 +40,8 @@ auth:
+     permit-all:
+       - /api/auth/**
+       - /api/catalog
++      # 가입하기 전에도 약관을 봐야 한다.
++      - /api/terms
+       - /api/users/nickname/availability
+       - /api/feedbacks
+       - /actuator/health
+diff --git a/BE/src/test/resources/terms-fixture.sql b/BE/src/test/resources/terms-fixture.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..d95d5a2af5f101e60825b207d36005cc066ee4be
+--- /dev/null
++++ b/BE/src/test/resources/terms-fixture.sql
+@@ -0,0 +1,4 @@
++INSERT INTO terms (id, code, version, title, content, required, created_at, updated_at) VALUES
++(1, 'SERVICE', 'v1', '서비스 이용약관', '서비스 이용약관 전문', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
++(2, 'PRIVACY', 'v1', '개인정보 처리방침', '개인정보 처리방침 전문', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
++(3, 'MARKETING', 'v1', '마케팅 정보 수신', '마케팅 정보 수신 동의 전문', FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

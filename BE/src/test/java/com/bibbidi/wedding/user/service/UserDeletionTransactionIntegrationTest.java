@@ -6,8 +6,8 @@ import static org.mockito.BDDMockito.willThrow;
 
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
-import com.bibbidi.wedding.auth.service.AuthService;
+import com.bibbidi.wedding.common.domain.UserRole;
+import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
@@ -29,13 +29,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @ActiveProfiles("test")
 class UserDeletionTransactionIntegrationTest {
 
-    private static final String PASSWORD = "wish";
-
     @Autowired
-    private AuthService authService;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
+    private UserService userService;
 
     @Autowired
     private JpaUserRepository jpaUserRepository;
@@ -61,7 +56,7 @@ class UserDeletionTransactionIntegrationTest {
     @DisplayName("체크리스트 삭제 중 실패하면 먼저 삭제한 일정과 할 일도 모두 롤백한다")
     void shouldRollbackAllDeletedDataWhenDeletionFails() {
         JpaUserEntity user = jpaUserRepository.saveAndFlush(
-                new JpaUserEntity(null, "bibbidi", passwordHasher.hash(PASSWORD), null)
+                new JpaUserEntity(null, "bibbidi", UserStatus.ACTIVE, UserRole.NORMAL, null, null)
         );
         JpaChecklistEntity checklist = jpaChecklistRepository.saveAndFlush(
                 new JpaChecklistEntity(null, user.id())
@@ -94,7 +89,7 @@ class UserDeletionTransactionIntegrationTest {
                 .given(jpaChecklistRepository)
                 .deleteByChecklistId(checklist.id());
 
-        assertThatThrownBy(() -> authService.deleteUser(user.id(), PASSWORD))
+        assertThatThrownBy(() -> userService.delete(user.id()))
                 .isInstanceOf(DataAccessException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("checklist deletion failed");

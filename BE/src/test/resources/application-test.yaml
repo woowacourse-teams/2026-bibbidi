@@ -19,3 +19,98 @@ spring:
 discord:
   url:
     feedback: https://discord.test/webhook
+
+auth:
+  jwt:
+    # 테스트 전용 값이다. 운영 비밀말과 아무 관계가 없다.
+    secret: test-only-jwt-secret-value-for-bibbidi-auth
+    issuer: bibbidi-test
+    audience: bibbidi-test-client
+    access-token-lifetime: 30m
+    delete-grant-lifetime: 5m
+    signature-algorithm: HS256
+    header-name: Authorization
+  session:
+    refresh-token-lifetime: 30d
+    handoff-code-lifetime: 60s
+    auth-request-lifetime: 10m
+  security:
+    permit-pending-user:
+      - /api/auth/native/handoff-codes
+      - /api/auth/delete-grants/**
+    permit-all:
+      - /api/auth/**
+      - /api/catalog
+      # 가입하기 전에도 약관을 봐야 한다.
+      - /api/terms
+      - /api/users/nickname/availability
+      - /api/feedbacks
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /swagger-ui/**
+      - /docs/**
+  refresh-cookie:
+    name: BIBBIDI_REFRESH
+    path: /api/auth
+    same-site: Lax
+    secure: true
+  cleanup:
+    batch-size: 100
+    max-rounds-per-run: 5
+    revoked-session-retention: 30d
+    # 테스트에서는 스케줄러를 기다리지 않고 서비스를 직접 부른다.
+    cron: "-"
+  oidc-public-key:
+    cached-key-lifetime: 8d
+    scheduled-refresh-interval: 7d
+    unknown-key-refresh-min-interval: 5m
+    max-cached-provider-count: 16
+    # 테스트는 제공자를 실제로 호출하지 않는다.
+    scheduled-refresh-enabled: false
+  oidc:
+    providers:
+      kakao:
+        client-id: test-kakao-client-id
+        client-secret: test-kakao-client-secret
+        issuers:
+          - https://kauth.kakao.com
+        audiences:
+          - test-kakao-client-id
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://kauth.kakao.com/oauth/authorize
+        token-uri: https://kauth.kakao.com/oauth/token
+        jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
+        scopes:
+          - openid
+          - profile_nickname
+          - account_email
+        nickname-claim: nickname
+        email-claim: email
+        redirect-uris:
+          web: https://test.bibbidi.kr/auth/kakao
+          native: bibbidi://auth/kakao
+      google:
+        client-id: test-google-client-id
+        client-secret: test-google-client-secret
+        issuers:
+          - https://accounts.google.com
+          - accounts.google.com
+        audiences:
+          - test-google-client-id
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+        token-uri: https://oauth2.googleapis.com/token
+        jwks-uri: https://www.googleapis.com/oauth2/v3/certs
+        scopes:
+          - openid
+          - profile
+          - email
+        nickname-claim: name
+        email-claim: email
+        redirect-uris:
+          web: https://test.bibbidi.kr/auth/google
+          native: bibbidi://auth/google

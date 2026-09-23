@@ -1,0 +1,26 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+index 64556a3ef01fb15a2f543475e09fa12403d3cceb..d6d3a9f04923c977093238b707bbee38ad94f23c 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+@@ -27,7 +27,9 @@ public final class User {
+         this.email = email;
+     }
+ 
+-    /** 소셜 인증만 끝난 사용자다. 약관에 동의하기 전이라 아직 서비스를 쓸 수 없다. */
++    /**
++     * 소셜 인증만 끝난 사용자다. 약관에 동의하기 전이라 아직 서비스를 쓸 수 없다.
++     */
+     public static User pending(String nickname, @Nullable String email) {
+         return new User(null, nickname, UserStatus.PENDING, UserRole.NORMAL, email);
+     }
+@@ -36,7 +38,9 @@ public final class User {
+         return new User(id, nickname, status, role, email);
+     }
+ 
+-    /** 필수 약관에 모두 동의하면 서비스를 쓸 수 있는 상태가 된다. */
++    /**
++     * 필수 약관에 모두 동의하면 서비스를 쓸 수 있는 상태가 된다.
++     */
+     public User activate() {
+         return new User(id, nickname, UserStatus.ACTIVE, role, email);
+     }

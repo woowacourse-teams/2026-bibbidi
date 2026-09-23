@@ -1,0 +1,20 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+index e5399db639ebe107fc890970a14d29a9ae11af14..a37ac07260d16f08e37aa297abe6a116c00d383f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+@@ -54,9 +54,13 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
+                     claims.nickname(),
+                     claims.email()
+             );
+-            // 토큰이 이미 신원을 증명했다. 사용자 이름과 비밀번호로 확인하는 인증이 아니다.
+             SecurityContextHolder.getContext().setAuthentication(
+-                    new PreAuthenticatedAuthenticationToken(user, null, user.getAuthorities()));
++                    new PreAuthenticatedAuthenticationToken(
++                            user,
++                            null,
++                            user.getAuthorities()
++                    )
++            );
+         } catch (BusinessException exception) {
+             SecurityContextHolder.clearContext();
+             failureResponseWriter.respond(request, response, exception);

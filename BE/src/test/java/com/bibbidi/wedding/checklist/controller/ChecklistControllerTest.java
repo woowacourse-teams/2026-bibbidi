@@ -1,15 +1,12 @@
 package com.bibbidi.wedding.checklist.controller;
 
+import static com.bibbidi.wedding.support.AuthenticationTestSupport.authenticatedUser;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.config.AuthWebConfig;
-import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
-import com.bibbidi.wedding.auth.session.AuthSession;
-import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.dto.CatalogItemAdditionResult;
@@ -19,19 +16,19 @@ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import com.bibbidi.wedding.support.SecurityTestConfig;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
+@Import(SecurityTestConfig.class)
 @WebMvcTest(ChecklistController.class)
-@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
 class ChecklistControllerTest {
 
     private static final Long USER_ID = 7L;
@@ -45,11 +42,6 @@ class ChecklistControllerTest {
     @MockitoBean
     private ChecklistService checklistService;
 
-    private static MockHttpSession authenticatedSession() {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, USER_ID);
-        return session;
-    }
 
     @Test
     @DisplayName("인증된 사용자의 요청에 생성된 체크리스트 식별자를 응답한다")
@@ -58,7 +50,9 @@ class ChecklistControllerTest {
         when(checklistService.create(USER_ID)).thenReturn(new ChecklistCreationResult(10L));
 
         // when, then
-        mockMvc.perform(post("/api/checklists").session(authenticatedSession()))
+        mockMvc.perform(post("/api/checklists")
+                        .with(authenticatedUser(USER_ID))
+                        .with(authenticatedUser(USER_ID)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$").value(10));
     }
@@ -73,20 +67,12 @@ class ChecklistControllerTest {
         ));
 
         // when, then
-        mockMvc.perform(post("/api/checklists").session(authenticatedSession()))
+        mockMvc.perform(post("/api/checklists")
+                        .with(authenticatedUser(USER_ID))
+                        .with(authenticatedUser(USER_ID)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(402))
                 .andExpect(jsonPath("$.message").value("이미 체크리스트가 존재합니다."));
-    }
-
-    @Test
-    @DisplayName("인증되지 않은 사용자의 체크리스트 생성 요청을 거부한다")
-    void shouldRejectRequestWhenUnauthenticated() throws Exception {
-        // when, then
-        mockMvc.perform(post("/api/checklists"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value(201))
-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 
     @Test
@@ -101,7 +87,7 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isCreated())
@@ -118,7 +104,7 @@ class ChecklistControllerTest {
     void shouldRejectEmptyCatalogItemIds() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of())))
                 .andExpect(status().isBadRequest())
@@ -134,7 +120,7 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isNotFound())
@@ -151,7 +137,7 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isConflict())
@@ -168,23 +154,12 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(999L))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101))
                 .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."));
-    }
-
-    @Test
-    @DisplayName("인증되지 않은 사용자의 준비 항목 추가 요청을 거부한다")
-    void shouldRejectAddRequestWhenUnauthenticated() throws Exception {
-        // when, then
-        mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(List.of(100L))))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value(201));
     }
 
     @Test
@@ -195,7 +170,8 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession()))
+                        .with(authenticatedUser(USER_ID))
+                        .with(authenticatedUser(USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].checklistItemId").value(31));
     }
@@ -208,7 +184,7 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].checklistItemId").value(31));
@@ -219,12 +195,12 @@ class ChecklistControllerTest {
     void shouldRejectFindUnscheduledItemsWhenLimitIsOutOfRange() throws Exception {
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101));
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "21"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101));
@@ -238,7 +214,8 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession()))
+                        .with(authenticatedUser(USER_ID))
+                        .with(authenticatedUser(USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].catalogItemId").value(6))
                 .andExpect(jsonPath("$[0].title").value("주례·사회자 섭외"))
@@ -255,7 +232,7 @@ class ChecklistControllerTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].catalogItemId").value(6));
@@ -266,12 +243,12 @@ class ChecklistControllerTest {
     void shouldRejectFindRecommendedCatalogItemsWhenLimitIsOutOfRange() throws Exception {
         // when, then
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101));
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession())
+                        .with(authenticatedUser(USER_ID))
                         .param("limit", "21"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(101));

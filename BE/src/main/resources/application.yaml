@@ -14,16 +14,96 @@ discord:
   url:
     feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
 
-server:
-  servlet:
-    session:
-      timeout: 24h
-      cookie:
-        name: JSESSIONID
-        path: /
-        http-only: true
-        secure: true
-        same-site: lax
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:}
+    issuer: ${AUTH_JWT_ISSUER:bibbidi}
+    audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
+    access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:6h}
+    delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:10m}
+    signature-algorithm: ${AUTH_JWT_SIGNATURE_ALGORITHM:HS256}
+    header-name: Authorization
+  session:
+    refresh-token-lifetime: ${AUTH_REFRESH_TOKEN_LIFETIME:30d}
+    handoff-code-lifetime: ${AUTH_HANDOFF_CODE_LIFETIME:600s}
+    auth-request-lifetime: ${AUTH_REQUEST_LIFETIME:10m}
+  refresh-cookie:
+    name: ${AUTH_REFRESH_COOKIE_NAME:BIBBIDI_REFRESH}
+    path: ${AUTH_REFRESH_COOKIE_PATH:/api/auth}
+    same-site: ${AUTH_REFRESH_COOKIE_SAME_SITE:Lax}
+    secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
+  cleanup:
+    batch-size: ${AUTH_CLEANUP_BATCH_SIZE:500}
+    max-rounds-per-run: ${AUTH_CLEANUP_MAX_ROUNDS:20}
+    revoked-session-retention: ${AUTH_CLEANUP_REVOKED_RETENTION:30d}
+    cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
+  oidc-public-key:
+    cached-key-lifetime: ${AUTH_OIDC_PUBLIC_KEY_LIFETIME:8d}
+    scheduled-refresh-interval: ${AUTH_OIDC_PUBLIC_KEY_REFRESH_INTERVAL:7d}
+    unknown-key-refresh-min-interval: ${AUTH_OIDC_PUBLIC_KEY_UNKNOWN_KEY_MIN_INTERVAL:5m}
+    max-cached-provider-count: ${AUTH_OIDC_PUBLIC_KEY_MAX_PROVIDERS:16}
+    scheduled-refresh-enabled: ${AUTH_OIDC_PUBLIC_KEY_SCHEDULED_REFRESH_ENABLED:true}
+  oidc:
+    providers:
+      kakao:
+        client-id: ${KAKAO_CLIENT_ID:}
+        client-secret: ${KAKAO_CLIENT_SECRET:}
+        issuers:
+          - https://kauth.kakao.com
+        audiences:
+          - ${KAKAO_CLIENT_ID:}
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://kauth.kakao.com/oauth/authorize
+        token-uri: https://kauth.kakao.com/oauth/token
+        jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
+        scopes:
+          - openid
+          - profile_nickname
+          - account_email
+        nickname-claim: nickname
+        email-claim: email
+        redirect-uris:
+          web: ${KAKAO_WEB_REDIRECT_URI:}
+          native: ${KAKAO_NATIVE_REDIRECT_URI:}
+      google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+        issuers:
+          - https://accounts.google.com
+          - accounts.google.com
+        audiences:
+          - ${GOOGLE_CLIENT_ID:}
+        allowed-algorithms:
+          - RS256
+        authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+        token-uri: https://oauth2.googleapis.com/token
+        jwks-uri: https://www.googleapis.com/oauth2/v3/certs
+        scopes:
+          - openid
+          - profile
+          - email
+        nickname-claim: name
+        email-claim: email
+        redirect-uris:
+          web: ${GOOGLE_WEB_REDIRECT_URI:}
+          native: ${GOOGLE_NATIVE_REDIRECT_URI:}
+  security:
+    permit-pending-user:
+      - /api/auth/native/handoff-codes
+      - /api/auth/delete-grants/**
+    permit-all:
+      - /api/auth/**
+      - /api/catalog
+      - /api/terms
+      - /api/users/nickname/availability
+      - /api/feedbacks
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /swagger-ui/**
+      - /docs/**
 
 management:
   endpoints:
@@ -50,65 +130,3 @@ logging:
     format:
       console: ecs
   include-application-name: false
-
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bibbidi}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
-    hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:10}
-      minimum-idle: 1
-      idle-timeout: 600000
-      connection-timeout: 30000
-      max-lifetime: 110000
-      keepalive-time: 30000
-      connection-test-query: "SELECT 1"
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-
----
-spring:
-  config:
-    activate:
-      on-profile: "!prod & !dev"
-
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
-    username: sa
-    password: ""
-
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
-    username: sa
-    password: ""
-
-  jpa:
-    defer-datasource-initialization: true
-    hibernate:
-      ddl-auto: create-drop
-
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:load_catalog.sql

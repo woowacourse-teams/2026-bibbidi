@@ -10,6 +10,8 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.common.domain.UserRole;
+import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
@@ -27,6 +29,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
+    private static final Long USER_ID = 1L;
+
     @Mock
     private UserRepository userRepository;
 
@@ -41,25 +45,53 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("사용자 ID로 비밀번호 해시가 없는 현재 사용자 정보를 조회한다")
-    void shouldFindCurrentUserWithoutPasswordHash() {
-        User user = new User(1L, "current", "password-hash");
-        given(userRepository.findById(1L)).willReturn(user);
+    @DisplayName("소셜 인증만 끝난 회원은 아직 서비스를 쓸 수 없는 상태로 만든다")
+    void shouldCreatePendingUser() {
+        given(userRepository.create(any(User.class)))
+                .willReturn(new User(USER_ID, "current", UserStatus.PENDING, UserRole.NORMAL, "current@bibbidi.kr"));
 
-        UserResult result = userService.findCurrentUserInfo(1L);
+        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
 
-        assertThat(result).isEqualTo(new UserResult(1L, "current"));
-        then(userRepository).should().findById(1L);
+        assertThat(created)
+                .extracting(UserResult::id, UserResult::nickname, UserResult::status, UserResult::email)
+                .containsExactly(USER_ID, "current", UserStatus.PENDING, "current@bibbidi.kr");
+        then(userRepository).should()
+                .create(argThat(user -> user.status() == UserStatus.PENDING && user.id() == null));
+    }
+
+    @Test
+    @DisplayName("가입이 끝나지 않은 회원을 활성화한다")
+    void shouldActivatePendingUser() {
+        given(userRepository.findById(USER_ID))
+                .willReturn(new User(USER_ID, "current", UserStatus.PENDING, UserRole.NORMAL, null));
+        given(userRepository.update(any(User.class)))
+                .willReturn(new User(USER_ID, "current", UserStatus.ACTIVE, UserRole.NORMAL, null));
+
+        UserResult activated = userService.activate(USER_ID);
+
+        assertThat(activated.status()).isEqualTo(UserStatus.ACTIVE);
+        then(userRepository).should().update(argThat(User::isActive));
+    }
+
+    @Test
+    @DisplayName("이미 활성화된 회원은 다시 저장하지 않는다")
+    void shouldNotUpdateAlreadyActiveUser() {
+        given(userRepository.findById(USER_ID))
+                .willReturn(new User(USER_ID, "current", UserStatus.ACTIVE, UserRole.NORMAL, null));
+
+        UserResult result = userService.activate(USER_ID);
+
+        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+        then(userRepository).should(never()).update(any(User.class));
     }
 
     @Test
     @DisplayName("현재 사용자 정보 조회 시 DB에 사용자가 없으면 사용자 없음 오류를 유지한다")
-    void shouldKeepUserNotFoundWhenFindingMissingCurrentUser() {
-        given(userRepository.findById(1L)).willThrow(
-                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
-        );
+    void shouldKeepUserNotFoundWhenFindingCurrentUser() {
+        given(userRepository.findById(USER_ID))
+                .willThrow(new BusinessException(ClientError.USER_NOT_FOUND, "없음"));
 
-        assertThatThrownBy(() -> userService.findCurrentUserInfo(1L))
+        assertThatThrownBy(() -> userService.findCurrentUserInfo(USER_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.USER_NOT_FOUND);
@@ -67,135 +99,62 @@ class UserServiceTest {
 
     @Test
     @DisplayName("대소문자만 다른 닉네임도 요청한 표기로 변경한다")
-    void shouldChangeNicknameWhenOnlyLetterCaseDiffers() {
-        User user = new User(1L, "Bibbidi", "password-hash");
-        given(userRepository.findById(1L)).willReturn(user);
+    void shouldChangeNicknameCase() {
+        given(userRepository.findById(USER_ID))
+                .willReturn(new User(USER_ID, "current", UserStatus.ACTIVE, UserRole.NORMAL, null));
         given(userRepository.update(any(User.class)))
-                .willReturn(new User(1L, "bibbidi", "password-hash"));
+                .willReturn(new User(USER_ID, "CURRENT", UserStatus.ACTIVE, UserRole.NORMAL, null));
 
-        UserResult result = userService.changeNickname(1L, "bibbidi");
+        UserResult changed = userService.changeNickname(USER_ID, "CURRENT");
 
-        assertThat(result).isEqualTo(new UserResult(1L, "bibbidi"));
-        then(userRepository).should().update(argThat(changedUser ->
-                changedUser.id().equals(1L)
-                        && changedUser.nickname().equals("bibbidi")
-                        && changedUser.passwordHash().equals("password-hash")
-        ));
+        assertThat(changed.nickname()).isEqualTo("CURRENT");
     }
 
     @Test
     @DisplayName("현재 닉네임과 정확히 같으면 저장하지 않고 현재 정보를 반환한다")
-    void shouldReturnCurrentUserWithoutSavingWhenNicknameIsExactlySame() {
-        User user = new User(1L, "Bibbidi", "password-hash");
-        given(userRepository.findById(1L)).willReturn(user);
+    void shouldNotUpdateWhenNicknameIsSame() {
+        given(userRepository.findById(USER_ID))
+                .willReturn(new User(USER_ID, "current", UserStatus.ACTIVE, UserRole.NORMAL, null));
 
-        UserResult result = userService.changeNickname(1L, "Bibbidi");
+        UserResult result = userService.changeNickname(USER_ID, "current");
 
-        assertThat(result).isEqualTo(new UserResult(1L, "Bibbidi"));
+        assertThat(result.nickname()).isEqualTo("current");
         then(userRepository).should(never()).update(any(User.class));
     }
 
     @Test
-    @DisplayName("Session의 사용자 ID로 DB에서 사용자를 찾을 수 없으면 사용자 없음 오류를 유지한다")
-    void shouldKeepUserNotFoundWhenSessionUserDoesNotExist() {
-        given(userRepository.findById(1L)).willThrow(
-                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
-        );
+    @DisplayName("쓰지 않는 닉네임은 사용할 수 있다고 응답한다")
+    void shouldRespondNicknameAvailable() {
+        given(userRepository.existsByNickname("magic")).willReturn(false);
 
-        assertThatThrownBy(() -> userService.changeNickname(1L, "new-name"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.USER_NOT_FOUND);
+        assertThat(userService.checkNicknameAvailability("magic").available()).isTrue();
     }
 
     @Test
-    @DisplayName("탈퇴 인증 정보 조회에서 사용자가 없으면 사용자 없음 오류를 유지한다")
-    void shouldKeepUserNotFoundWhenDeletionAuthenticationUserDoesNotExist() {
-        given(userRepository.findById(1L)).willThrow(
-                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
-        );
+    @DisplayName("이미 쓰는 닉네임은 사용할 수 없다고 응답한다")
+    void shouldRespondNicknameUnavailable() {
+        given(userRepository.existsByNickname("current")).willReturn(true);
 
-        assertThatThrownBy(() -> userService.findAuthenticationInfo(1L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).clientError())
-                .isEqualTo(ClientError.USER_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("비밀번호 로그인 회원이 쓰지 않는 닉네임은 사용할 수 있다고 응답한다")
-    void shouldReportNicknameAsAvailableWhenNoPasswordLoginUserUsesIt() {
-        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(false);
-
-        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
-
-        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", true));
-    }
-
-    @Test
-    @DisplayName("비밀번호 로그인 회원이 이미 쓰는 닉네임은 사용할 수 없다고 응답한다")
-    void shouldReportNicknameAsUnavailableWhenPasswordLoginUserUsesIt() {
-        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(true);
-
-        NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
-
-        assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
-    }
-
-    @Test
-    @DisplayName("현재 사용자의 비밀번호 해시를 도메인에서 변경하고 저장한다")
-    void shouldChangeAndSaveCurrentUserPasswordHash() {
-        User user = new User(1L, "current", "current-hash");
-        given(userRepository.findById(1L)).willReturn(user);
-        given(userRepository.update(any(User.class)))
-                .willReturn(new User(1L, "current", "new-password-hash"));
-
-        userService.changePasswordHash(1L, "new-password-hash");
-
-        then(userRepository).should().update(argThat(changedUser ->
-                changedUser.id().equals(1L)
-                        && changedUser.nickname().equals("current")
-                        && changedUser.passwordHash().equals("new-password-hash")
-        ));
+        assertThat(userService.checkNicknameAvailability("current").available()).isFalse();
     }
 
     @Test
     @DisplayName("현재 사용자의 결혼 예정일을 조회한다")
-    void shouldFindCurrentUserWeddingDate() {
-        LocalDate weddingDate = LocalDate.of(2027, 5, 15);
-        WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
-        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
+    void shouldFindWeddingDate() {
+        given(userRepository.findWeddingDateByUserId(USER_ID))
+                .willReturn(new WeddingDate(USER_ID, LocalDate.of(2027, 5, 15)));
 
-        WeddingDateResult result = userService.findWeddingDate(1L);
-
-        assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
-        then(userRepository).should().findWeddingDateByUserId(1L);
+        assertThat(userService.findWeddingDate(USER_ID).weddingDate())
+                .isEqualTo(LocalDate.of(2027, 5, 15));
     }
 
     @Test
-    @DisplayName("동일한 결혼 예정일도 성공적으로 저장한다")
-    void shouldSaveSameWeddingDate() {
-        LocalDate weddingDate = LocalDate.of(2027, 5, 15);
-        WeddingDate currentWeddingDate = new WeddingDate(1L, weddingDate);
-        given(userRepository.findWeddingDateByUserId(1L)).willReturn(currentWeddingDate);
-        given(userRepository.saveWeddingDate(any(WeddingDate.class))).willReturn(currentWeddingDate);
+    @DisplayName("탈퇴하면 체크리스트를 먼저 지우고 사용자를 지운다")
+    void shouldDeleteChecklistBeforeUser() {
+        userService.delete(USER_ID);
 
-        WeddingDateResult result = userService.updateWeddingDate(1L, weddingDate);
-
-        assertThat(result).isEqualTo(new WeddingDateResult(weddingDate));
-        then(userRepository).should().saveWeddingDate(argThat(changedWeddingDate ->
-                changedWeddingDate.userId().equals(1L)
-                        && changedWeddingDate.date().equals(weddingDate)
-        ));
-        then(checklistService).shouldHaveNoInteractions();
-    }
-
-    @Test
-    @DisplayName("결혼 준비 데이터를 삭제한 뒤 사용자를 삭제한다")
-    void shouldDeleteUser() {
-        userService.delete(1L);
-
-        InOrder order = inOrder(checklistService, userRepository);
-        order.verify(checklistService).deleteByOwnerId(1L);
-        order.verify(userRepository).deleteById(1L);
+        InOrder inOrder = inOrder(checklistService, userRepository);
+        inOrder.verify(checklistService).deleteByOwnerId(USER_ID);
+        inOrder.verify(userRepository).deleteById(USER_ID);
     }
 }

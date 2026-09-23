@@ -1,0 +1,213 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenHeaderReader.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenHeaderReader.java
+similarity index 97%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenHeaderReader.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenHeaderReader.java
+index 9167b28503c95773b8199e5da2c5778439f1ddbc..4a0a071e6a22c2d632f2e7003d7d9b572e52d3e1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenHeaderReader.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenHeaderReader.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.oidc.idtoken;
++package com.bibbidi.wedding.auth.oidc.verification;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifier.java
+similarity index 96%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifier.java
+index c1dce01429dbaf3ee0e20a638516092390c12131..a914f19b1a062247d07f716b416425cbd6eeb7d5 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifier.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.oidc.idtoken;
++package com.bibbidi.wedding.auth.oidc.verification;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
+@@ -40,7 +40,7 @@ public class IdTokenVerifier {
+         this.publicKeyFactory = publicKeyFactory;
+     }
+ 
+-    public SocialUserIdentity verify(SocialProvider provider, String idToken, String expectedNonce) {
++    public VerifiedOidcUser verify(SocialProvider provider, String idToken, String expectedNonce) {
+         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
+         IdTokenHeaderReader.IdTokenHeader header = headerReader.read(idToken);
+         validateAlgorithm(configuration, header.algorithm());
+@@ -53,7 +53,7 @@ public class IdTokenVerifier {
+         validateAudience(configuration, claims);
+         validateNonce(claims, expectedNonce);
+ 
+-        return new SocialUserIdentity(
++        return new VerifiedOidcUser(
+                 provider,
+                 subject(claims),
+                 claims.get(configuration.nicknameClaim(), String.class),
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/SocialUserIdentity.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/VerifiedOidcUser.java
+similarity index 59%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/SocialUserIdentity.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/VerifiedOidcUser.java
+index 424a9d01bc69872ecf96c1a534b28c6b7f81f472..0dbe043d9f04d9e9dd07654b748c5594d3a42612 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/SocialUserIdentity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/verification/VerifiedOidcUser.java
+@@ -1,17 +1,20 @@
+-package com.bibbidi.wedding.auth.oidc.idtoken;
++package com.bibbidi.wedding.auth.oidc.verification;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import org.jspecify.annotations.Nullable;
+ 
+ /**
+- * id_token 검증을 마치고 확인한 사용자다.
++ * id_token 검증을 모두 통과한 사용자다.
++ *
++ * <p>서명과 발급자, 대상, nonce를 확인한 뒤에만 만들어진다. 검증 전 값과 섞이지 않도록 따로 둔다.
++ * 제공자의 UserInfo 엔드포인트를 부르지 않고 id_token의 claim에서 가져온다.
+  *
+  * @param provider 어느 제공자가 보증했는지
+  * @param providerUserId 제공자가 주는 사용자 식별자. 받은 문자열을 그대로 쓴다
+  * @param nickname 제공자가 준 닉네임
+  * @param email 제공자가 준 이메일. 회원 식별이나 계정 병합에는 쓰지 않는다
+  */
+-public record SocialUserIdentity(
++public record VerifiedOidcUser(
+         SocialProvider provider,
+         String providerUserId,
+         @Nullable String nickname,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+index 72c6d0cbd9b28d7e1b964ea097462b322354c75a..838e1b55f0023e2e64676134d68570286a7d22e6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+@@ -5,8 +5,8 @@ import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
+ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.client.OidcTokenExchangeClient;
+-import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+-import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
++import com.bibbidi.wedding.auth.oidc.verification.IdTokenVerifier;
++import com.bibbidi.wedding.auth.oidc.verification.VerifiedOidcUser;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
+ import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -63,7 +63,7 @@ public class SocialLoginService {
+             String state,
+             @Nullable String browserBinder
+     ) {
+-        SocialUserIdentity identity =
++        VerifiedOidcUser identity =
+                 verifyCallback(provider, clientType, SocialAuthPurpose.LOGIN, code, state, browserBinder);
+         return sessionIssueService.issueForNewFamily(
+                 socialUserRegistrationService.findOrCreate(identity), clientType);
+@@ -80,7 +80,7 @@ public class SocialLoginService {
+             @Nullable String browserBinder,
+             Long currentUserId
+     ) {
+-        SocialUserIdentity identity = verifyCallback(
++        VerifiedOidcUser identity = verifyCallback(
+                 provider, clientType, SocialAuthPurpose.WITHDRAWAL, code, state, browserBinder);
+         Long linkedUserId = socialUserRegistrationService.findLinkedUserId(
+                 identity, ClientError.DELETE_GRANT_INVALID);
+@@ -91,7 +91,7 @@ public class SocialLoginService {
+         return currentUserId;
+     }
+ 
+-    private SocialUserIdentity verifyCallback(
++    private VerifiedOidcUser verifyCallback(
+             SocialProvider provider,
+             ClientType clientType,
+             SocialAuthPurpose purpose,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
+index 31f0166f5d99c3171d8a2e309559a051f91e19fa..3e9c7c02031625b2f039749180b6278a582f323a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialIdentity;
+-import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
++import com.bibbidi.wedding.auth.oidc.verification.VerifiedOidcUser;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+@@ -31,7 +31,7 @@ public class SocialUserRegistrationService {
+         this.userService = userService;
+     }
+ 
+-    public SessionOwner findOrCreate(SocialUserIdentity identity) {
++    public SessionOwner findOrCreate(VerifiedOidcUser identity) {
+         return socialIdentityRepository
+                 .findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
+                 .map(linked -> toOwner(userService.findCurrentUserInfo(linked.userId())))
+@@ -41,7 +41,7 @@ public class SocialUserRegistrationService {
+     /**
+      * 이 소셜 계정에 연결된 회원을 찾는다. 연결돼 있지 않으면 거절한다.
+      */
+-    public Long findLinkedUserId(SocialUserIdentity identity, ClientError errorWhenMissing) {
++    public Long findLinkedUserId(VerifiedOidcUser identity, ClientError errorWhenMissing) {
+         return socialIdentityRepository
+                 .findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
+                 .map(SocialIdentity::userId)
+@@ -52,7 +52,7 @@ public class SocialUserRegistrationService {
+     /**
+      * 닉네임은 제공자에서 받은 값을 그대로 쓰고, 받지 못했으면 가입을 진행하지 않는다.
+      */
+-    private SessionOwner create(SocialUserIdentity identity) {
++    private SessionOwner create(VerifiedOidcUser identity) {
+         if (identity.nickname() == null || identity.nickname().isBlank()) {
+             throw new BusinessException(ClientError.SOCIAL_NICKNAME_REQUIRED,
+                     "소셜 계정에서 닉네임을 받지 못해 가입을 진행할 수 없습니다. provider=" + identity.provider());
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+index 5946949d3e30933664a2865fb4ce5b2cddb76e57..b51d1d7f4fe2125f3b9f6e9296e203c70a8da8b1 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+@@ -16,8 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.client.OidcTokenExchangeClient;
+-import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+-import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
++import com.bibbidi.wedding.auth.oidc.verification.IdTokenVerifier;
++import com.bibbidi.wedding.auth.oidc.verification.VerifiedOidcUser;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.epages.restdocs.apispec.ResourceSnippetParameters;
+ import jakarta.servlet.http.Cookie;
+@@ -56,7 +56,7 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
+         given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
+                 .willReturn("id-token");
+         given(idTokenVerifier.verify(any(SocialProvider.class), anyString(), anyString()))
+-                .willReturn(new SocialUserIdentity(
++                .willReturn(new VerifiedOidcUser(
+                         SocialProvider.KAKAO, "social-user-1", "비비디", "user@bibbidi.kr"));
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifierTest.java
+similarity index 95%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifierTest.java
+index 8e51c4599fad42487d3d3927505132269ac0c6d6..167cc8eb87b94e51fa946ffc2f9d6a7d4fa171f9 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/verification/IdTokenVerifierTest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.oidc.idtoken;
++package com.bibbidi.wedding.auth.oidc.verification;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+@@ -66,14 +66,14 @@ class IdTokenVerifierTest {
+         String idToken = OidcTestKeys.idToken(issuer, audience, "social-user-1",
+                 Map.of("nonce", NONCE, nicknameClaim, nickname, "email", "user@bibbidi.kr"));
+ 
+-        SocialUserIdentity identity = idTokenVerifier.verify(provider, idToken, NONCE);
++        VerifiedOidcUser identity = idTokenVerifier.verify(provider, idToken, NONCE);
+ 
+         assertThat(identity)
+                 .extracting(
+-                        SocialUserIdentity::provider,
+-                        SocialUserIdentity::providerUserId,
+-                        SocialUserIdentity::nickname,
+-                        SocialUserIdentity::email)
++                        VerifiedOidcUser::provider,
++                        VerifiedOidcUser::providerUserId,
++                        VerifiedOidcUser::nickname,
++                        VerifiedOidcUser::email)
+                 .containsExactly(provider, "social-user-1", nickname, "user@bibbidi.kr");
+     }

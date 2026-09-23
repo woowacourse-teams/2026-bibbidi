@@ -1,0 +1,403 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+index 9c25e2465a17954c463a1a33bcc9619c537b377b..82c65215865c664e004cbf773f3592d2efe069cc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+@@ -1,8 +1,5 @@
+ package com.bibbidi.wedding.auth.config;
+ 
+-import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
+-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+-import com.bibbidi.wedding.auth.config.SessionProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Configuration;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
+index eb767f2aec17f666e92e55af8d3aa4c0df61b4e0..7b64ff7da23d83812a6dac507a176cdf7455a674 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
+@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
+  * @param secret 서명 비밀말. 기본값을 두지 않아 비어 있으면 애플리케이션이 뜨지 않는다.
+  * @param issuer 발급자 식별자
+  * @param audience 대상 식별자
+- * @param accessTokenTtl access token 수명
+- * @param deleteGrantTtl 탈퇴용 재인증 표의 수명
++ * @param accessTokenLifetime access token 수명
++ * @param deleteGrantLifetime 탈퇴용 재인증 표의 수명
+  * @param headerName access token을 싣는 요청 헤더 이름
+  */
+ @ConfigurationProperties(prefix = "auth.jwt")
+@@ -18,8 +18,8 @@ public record BibbidiTokenProperties(
+         String secret,
+         String issuer,
+         String audience,
+-        Duration accessTokenTtl,
+-        Duration deleteGrantTtl,
++        Duration accessTokenLifetime,
++        Duration deleteGrantLifetime,
+         String headerName
+ ) {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
+index e309f29271f8ddfdeebf73ef108fa66f0f8abf48..35c81f5feb6b5fd43b288b9868b1cb9b0f9ee8fb 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
+@@ -4,20 +4,22 @@ import java.time.Duration;
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+ 
+ /**
+- * 서명 공개키 캐시에 관한 값이다.
++ * 제공자의 서명 공개키를 담아 두는 방식에 관한 값이다.
+  *
+- * @param ttl 캐시에 담아 두는 기간. 미리 받아 두는 주기보다 길어야 틈이 생기지 않는다
+- * @param refreshInterval 미리 받아 두는 주기
+- * @param forcedRefreshMinInterval 모르는 키를 만났을 때 강제로 다시 받는 최소 간격
+- * @param maximumSize 캐시에 담을 제공자 수 상한
+- * @param warmUpEnabled 미리 받아 둘지 여부. 테스트에서는 꺼서 외부 호출을 하지 않는다
++ * @param cachedKeyLifetime 받아 둔 공개키를 얼마나 들고 있을지.
++ *                          미리 받아 두는 주기보다 길어야 키가 비는 순간이 생기지 않는다
++ * @param scheduledRefreshInterval 미리 받아 두는 주기
++ * @param unknownKeyRefreshMinInterval 모르는 키 식별자를 만났을 때 제공자를 다시 부르기까지 두는 최소 간격.
++ *                                     엉터리 식별자를 계속 보내 외부 호출을 유발하지 못하게 막는다
++ * @param maxCachedProviderCount 공개키를 담아 둘 제공자 수 상한
++ * @param scheduledRefreshEnabled 미리 받아 둘지 여부. 테스트에서는 꺼서 제공자를 부르지 않는다
+  */
+ @ConfigurationProperties(prefix = "auth.oidc-public-key")
+ public record OidcPublicKeyCacheProperties(
+-        Duration ttl,
+-        Duration refreshInterval,
+-        Duration forcedRefreshMinInterval,
+-        long maximumSize,
+-        boolean warmUpEnabled
++        Duration cachedKeyLifetime,
++        Duration scheduledRefreshInterval,
++        Duration unknownKeyRefreshMinInterval,
++        long maxCachedProviderCount,
++        boolean scheduledRefreshEnabled
+ ) {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
+index 93ce40802b949d6abaa75dc30b4e98e978fa45f7..45c7e1a99195223fb34b51c1b00b41a7c357b3c6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
+@@ -89,7 +89,7 @@ public class SecurityConfig {
+                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                 .authorizeHttpRequests(requests -> requests
+                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+-                        .requestMatchers(securityProperties.requireAuthenticationPatterns()).authenticated()
++                        .requestMatchers(securityProperties.permitPendingUserPatterns()).authenticated()
+                         .requestMatchers(securityProperties.permitAllPatterns()).permitAll()
+                         .requestMatchers(TERMS_AGREEMENT_PATH).authenticated()
+                         .anyRequest().access(activeUser()))
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
+index 565eddf24c56d2f4cc54889a1c95a5999cca81f4..8d4c7d66512793be2e38e0278ce9d47b5df74198 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
+@@ -9,13 +9,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
+  *
+  * <p>수집 도구가 컨테이너 망에서 직접 긁는 경로는 열어 두고, 외부 차단은 앞단 nginx가 한다.
+  *
+- * @param requireAuthentication 인증은 필요하지만 약관 동의 전에도 부를 수 있는 경로.
+- *                              permitAll보다 먼저 판단한다
++ * @param permitPendingUser 로그인은 필요하지만 가입을 끝내지 않은 회원도 부를 수 있는 경로.
++ *                          permitAll보다 먼저 판단한다
+  * @param permitAll 인증 없이 허용할 경로
+  */
+ @ConfigurationProperties(prefix = "auth.security")
+ public record SecurityProperties(
+-        List<String> requireAuthentication,
++        List<String> permitPendingUser,
+         List<String> permitAll
+ ) {
+ 
+@@ -26,8 +26,8 @@ public record SecurityProperties(
+         return ROLE_AUTHORITY_PREFIX + role.name();
+     }
+ 
+-    public String[] requireAuthenticationPatterns() {
+-        return requireAuthentication.toArray(String[]::new);
++    public String[] permitPendingUserPatterns() {
++        return permitPendingUser.toArray(String[]::new);
+     }
+ 
+     public String[] permitAllPatterns() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
+index bf2ac1c1b70556ed6ac9188d27d6ed80417bd291..5116c9da748a7a0d3ec3efc81294612f82e70b5d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
+@@ -6,14 +6,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
+ /**
+  * 로그인 상태를 얼마나 유지할지에 관한 값이다.
+  *
+- * @param refreshTokenTtl refresh token 수명. 갱신할 때마다 이만큼 다시 밀린다
+- * @param handoffCodeTtl 네이티브에서 WebView로 넘길 때 쓰는 코드의 수명
+- * @param authRequestTtl 인가 요청을 기다려 주는 시간
++ * @param refreshTokenLifetime refresh token 수명. 갱신할 때마다 이만큼 다시 밀린다
++ * @param handoffCodeLifetime 네이티브에서 WebView로 넘길 때 쓰는 코드의 수명
++ * @param authRequestLifetime 인가 요청을 기다려 주는 시간
+  */
+ @ConfigurationProperties(prefix = "auth.session")
+ public record SessionProperties(
+-        Duration refreshTokenTtl,
+-        Duration handoffCodeTtl,
+-        Duration authRequestTtl
++        Duration refreshTokenLifetime,
++        Duration handoffCodeLifetime,
++        Duration authRequestLifetime
+ ) {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
+index 48b090c024188117ad308b1b914da7ce02a32645..d24fee57457e820eb290362b1b2af349109cbbbd 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
+@@ -34,7 +34,7 @@ public class OidcBinderCookieFactory {
+     }
+ 
+     public ResponseCookie create(String browserBinder) {
+-        return build(browserBinder, sessionProperties.authRequestTtl());
++        return build(browserBinder, sessionProperties.authRequestLifetime());
+     }
+ 
+     public ResponseCookie expired() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
+index 27f0d432a78bfeaca0ec8181b15a09a83e51e03b..171736128f4507dde23597d6fbc2cc2cf3dc8f83 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
+@@ -29,7 +29,7 @@ public class RefreshCookieFactory {
+     }
+ 
+     public ResponseCookie create(String refreshToken) {
+-        return build(refreshToken, sessionProperties.refreshTokenTtl());
++        return build(refreshToken, sessionProperties.refreshTokenLifetime());
+     }
+ 
+     public ResponseCookie expired() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+index a788c998d2b6fa71205fa213d8c4c2637ccbeac7..6971a391f7e9b1f380eaf1440eb2632f0d9d9cf2 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+@@ -39,8 +39,8 @@ public class OidcPublicKeyCache {
+         this.providerProperties = providerProperties;
+         this.cacheProperties = cacheProperties;
+         this.cache = Caffeine.newBuilder()
+-                .expireAfterWrite(cacheProperties.ttl())
+-                .maximumSize(cacheProperties.maximumSize())
++                .expireAfterWrite(cacheProperties.cachedKeyLifetime())
++                .maximumSize(cacheProperties.maxCachedProviderCount())
+                 .build();
+     }
+ 
+@@ -68,7 +68,7 @@ public class OidcPublicKeyCache {
+         Instant now = Instant.now();
+         Instant lastRefreshedAt = lastForcedRefreshAt.get(provider);
+         if (lastRefreshedAt != null
+-                && lastRefreshedAt.plus(cacheProperties.forcedRefreshMinInterval()).isAfter(now)) {
++                && lastRefreshedAt.plus(cacheProperties.unknownKeyRefreshMinInterval()).isAfter(now)) {
+             log.warn("서명 공개키 재조회를 건너뜁니다. 최소 간격 안입니다. provider={}", provider);
+             return cache.getIfPresent(provider);
+         }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+index 3668fb35ff7e6821a5816279de9e9c13179f7cbf..42e1529893ad257ceee48f75e75230b7031b2a24 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+@@ -35,13 +35,13 @@ public class OidcPublicKeyWarmUpScheduler {
+         warmUp();
+     }
+ 
+-    @Scheduled(fixedDelayString = "${auth.oidc-public-key.refresh-interval}")
++    @Scheduled(fixedDelayString = "${auth.oidc-public-key.scheduled-refresh-interval}")
+     public void warmUpPeriodically() {
+         warmUp();
+     }
+ 
+     private void warmUp() {
+-        if (!cacheProperties.warmUpEnabled()) {
++        if (!cacheProperties.scheduledRefreshEnabled()) {
+             return;
+         }
+         for (SocialProvider provider : providerProperties.configuredProviders()) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+index 3e5ae8835cddd0d7189624c2dd27d45dda6fe582..ef3a6d601f172cd2659922a96f6e77be4f7105e8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+@@ -72,7 +72,7 @@ public class HandoffService {
+                 secretValueGenerator.hash(code),
+                 session.userId(),
+                 session.familyId(),
+-                now.plus(sessionProperties.handoffCodeTtl())));
++                now.plus(sessionProperties.handoffCodeLifetime())));
+         return code;
+     }
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+index b8004acfb52e970a0cd8b2d68d3496b40c814002..b4f869284d0114b2faf3fa6d0d31088f5eceadc8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+@@ -63,7 +63,7 @@ public class OidcAuthRequestService {
+                 browserBinder == null ? null : secretValueGenerator.hash(browserBinder),
+                 clientType,
+                 purpose,
+-                LocalDateTime.now().plus(sessionProperties.authRequestTtl())));
++                LocalDateTime.now().plus(sessionProperties.authRequestLifetime())));
+ 
+         String authorizationUri = authorizationUriFactory.create(
+                 configuration, clientType, state, nonce, secretValueGenerator.toCodeChallenge(codeVerifier));
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+index 9460501183527d759e3220f953623d2724d91f99..a109defcc28c7afcd90229c3a9fb4cbfadb35f7f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+@@ -45,7 +45,7 @@ public class SessionIssueService {
+                 familyId,
+                 clientType,
+                 refreshToken.hash(),
+-                LocalDateTime.now().plus(sessionProperties.refreshTokenTtl())));
++                LocalDateTime.now().plus(sessionProperties.refreshTokenLifetime())));
+ 
+         String accessToken = bibbidiTokenIssuer.issueAccessToken(new BibbidiTokenClaims(
+                 owner.userId(), owner.status(), owner.role(), owner.nickname(), owner.email()));
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+index 78b22383c5f14fe9007c90f09aba6e02b6e8960b..0ad9bcd8ccea4838d98faf9298d21d8cfd7ef7b6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+@@ -49,7 +49,7 @@ public class BibbidiTokenIssuer {
+                 .audience().add(properties.audience()).and()
+                 .subject(String.valueOf(claims.userId()))
+                 .issuedAt(Date.from(issuedAt))
+-                .expiration(Date.from(issuedAt.plus(properties.accessTokenTtl())))
++                .expiration(Date.from(issuedAt.plus(properties.accessTokenLifetime())))
+                 .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.ACCESS.name())
+                 .claim(BibbidiTokenClaimNames.STATUS, claims.status().name())
+                 .claim(BibbidiTokenClaimNames.ROLE, claims.role().name())
+@@ -68,13 +68,13 @@ public class BibbidiTokenIssuer {
+                 .audience().add(properties.audience()).and()
+                 .subject(String.valueOf(userId))
+                 .issuedAt(Date.from(issuedAt))
+-                .expiration(Date.from(issuedAt.plus(properties.deleteGrantTtl())))
++                .expiration(Date.from(issuedAt.plus(properties.deleteGrantLifetime())))
+                 .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.DELETE_GRANT.name())
+                 .signWith(signingKey.signingKey())
+                 .compact();
+     }
+ 
+-    public Duration accessTokenTtl() {
+-        return properties.accessTokenTtl();
++    public Duration accessTokenLifetime() {
++        return properties.accessTokenLifetime();
+     }
+ }
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index 2b079f2257f394871ee4286be98125b9d8e246e6..e52ab6cfadc04ea48585ecf01f1e4a0bfe4358cb 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -20,13 +20,13 @@ auth:
+     secret: ${AUTH_JWT_SECRET:}
+     issuer: ${AUTH_JWT_ISSUER:bibbidi}
+     audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
+-    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
+-    delete-grant-ttl: ${AUTH_DELETE_GRANT_TTL:5m}
++    access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:30m}
++    delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:5m}
+     header-name: Authorization
+   session:
+-    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:30d}
+-    handoff-code-ttl: ${AUTH_HANDOFF_CODE_TTL:60s}
+-    auth-request-ttl: ${AUTH_REQUEST_TTL:10m}
++    refresh-token-lifetime: ${AUTH_REFRESH_TOKEN_LIFETIME:30d}
++    handoff-code-lifetime: ${AUTH_HANDOFF_CODE_LIFETIME:60s}
++    auth-request-lifetime: ${AUTH_REQUEST_LIFETIME:10m}
+   refresh-cookie:
+     name: ${AUTH_REFRESH_COOKIE_NAME:BIBBIDI_REFRESH}
+     path: ${AUTH_REFRESH_COOKIE_PATH:/api/auth}
+@@ -38,11 +38,11 @@ auth:
+     revoked-session-retention: ${AUTH_CLEANUP_REVOKED_RETENTION:30d}
+     cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
+   oidc-public-key:
+-    ttl: ${AUTH_JWKS_TTL:8d}
+-    refresh-interval: ${AUTH_JWKS_REFRESH_INTERVAL:7d}
+-    forced-refresh-min-interval: ${AUTH_JWKS_FORCED_REFRESH_MIN_INTERVAL:5m}
+-    maximum-size: ${AUTH_JWKS_MAX_SIZE:16}
+-    warm-up-enabled: ${AUTH_JWKS_WARM_UP_ENABLED:true}
++    cached-key-lifetime: ${AUTH_OIDC_PUBLIC_KEY_LIFETIME:8d}
++    scheduled-refresh-interval: ${AUTH_OIDC_PUBLIC_KEY_REFRESH_INTERVAL:7d}
++    unknown-key-refresh-min-interval: ${AUTH_OIDC_PUBLIC_KEY_UNKNOWN_KEY_MIN_INTERVAL:5m}
++    max-cached-provider-count: ${AUTH_OIDC_PUBLIC_KEY_MAX_PROVIDERS:16}
++    scheduled-refresh-enabled: ${AUTH_OIDC_PUBLIC_KEY_SCHEDULED_REFRESH_ENABLED:true}
+   oidc:
+     providers:
+       kakao:
+@@ -90,7 +90,8 @@ auth:
+           native: ${GOOGLE_NATIVE_REDIRECT_URI:}
+   security:
+     # permit-all보다 먼저 판단한다. /api/auth 아래지만 로그인해야 부를 수 있는 것들이다.
+-    require-authentication:
++    # 가입을 끝내지 않은 회원도 부를 수 있다.
++    permit-pending-user:
+       - /api/auth/native/handoff-codes
+       - /api/auth/delete-grants/**
+     permit-all:
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index d5839e353dfb75fd792b3662aaa4597155c2f32d..fda9dfe798a7e27b71ddcfbb145cdf0957fc2645 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -146,14 +146,14 @@ class BibbidiTokenTest {
+                 .isInstanceOf(IllegalStateException.class);
+     }
+ 
+-    private static BibbidiTokenProperties properties(Duration accessTokenTtl) {
+-        return properties(accessTokenTtl, SECRET, ISSUER, AUDIENCE);
++    private static BibbidiTokenProperties properties(Duration accessTokenLifetime) {
++        return properties(accessTokenLifetime, SECRET, ISSUER, AUDIENCE);
+     }
+ 
+     private static BibbidiTokenProperties properties(
+-            Duration accessTokenTtl, String secret, String issuer, String audience) {
++            Duration accessTokenLifetime, String secret, String issuer, String audience) {
+         return new BibbidiTokenProperties(
+-                secret, issuer, audience, accessTokenTtl, Duration.ofMinutes(5), "Authorization");
++                secret, issuer, audience, accessTokenLifetime, Duration.ofMinutes(5), "Authorization");
+     }
+ 
+     private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {
+diff --git a/BE/src/test/resources/application-test.yaml b/BE/src/test/resources/application-test.yaml
+index 4ef1bc7276c99d20664113d27b852de74f98aa7f..386b7f697f2d58449aa287fa5a2af181451165d4 100644
+--- a/BE/src/test/resources/application-test.yaml
++++ b/BE/src/test/resources/application-test.yaml
+@@ -26,15 +26,15 @@ auth:
+     secret: test-only-jwt-secret-value-for-bibbidi-auth
+     issuer: bibbidi-test
+     audience: bibbidi-test-client
+-    access-token-ttl: 30m
+-    delete-grant-ttl: 5m
++    access-token-lifetime: 30m
++    delete-grant-lifetime: 5m
+     header-name: Authorization
+   session:
+-    refresh-token-ttl: 30d
+-    handoff-code-ttl: 60s
+-    auth-request-ttl: 10m
++    refresh-token-lifetime: 30d
++    handoff-code-lifetime: 60s
++    auth-request-lifetime: 10m
+   security:
+-    require-authentication:
++    permit-pending-user:
+       - /api/auth/native/handoff-codes
+       - /api/auth/delete-grants/**
+     permit-all:
+@@ -62,12 +62,12 @@ auth:
+     # 테스트에서는 스케줄러를 기다리지 않고 서비스를 직접 부른다.
+     cron: "-"
+   oidc-public-key:
+-    ttl: 8d
+-    refresh-interval: 7d
+-    forced-refresh-min-interval: 5m
+-    maximum-size: 16
++    cached-key-lifetime: 8d
++    scheduled-refresh-interval: 7d
++    unknown-key-refresh-min-interval: 5m
++    max-cached-provider-count: 16
+     # 테스트는 제공자를 실제로 호출하지 않는다.
+-    warm-up-enabled: false
++    scheduled-refresh-enabled: false
+   oidc:
+     providers:
+       kakao:

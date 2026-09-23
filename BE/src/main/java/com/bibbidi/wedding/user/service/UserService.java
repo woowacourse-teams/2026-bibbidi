@@ -5,6 +5,7 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,31 +22,30 @@ public class UserService {
     }
 
     @Transactional
-    public UserResult createUser(String nickname, String passwordHash) {
-        User user = new User(null, nickname, passwordHash);
-        User savedUser = userRepository.create(user);
-
+    public UserResult createPendingUser(String nickname, String email) {
+        User savedUser = userRepository.create(User.pending(nickname, email));
         return UserResult.from(savedUser);
     }
 
-    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
-        boolean isAvailableNickname = !userRepository.existsPasswordLoginUserByNickname(nickname);
-        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
-    }
-
-    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
-        User user = userRepository.findPasswordLoginUserByNickname(nickname);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findAuthenticationInfo(Long userId) {
-        User user = userRepository.findById(userId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
+    @Transactional
+    public UserResult activate(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+        if (user.isActive()) {
+            return UserResult.from(user);
+        }
+        return UserResult.from(userRepository.update(user.activate()));
+    }
+
+    @Transactional
+    public UserResult agreeToTerms(Long currentUserId, String termsVersion) {
+        User user = userRepository.findById(currentUserId);
+        return UserResult.from(userRepository.update(
+                user.agreeToTerms(termsVersion, LocalDateTime.now())));
+    }
+
+    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
     }
 
     public UserResult findCurrentUserInfo(Long currentUserId) {
@@ -64,13 +64,6 @@ public class UserService {
         WeddingDate changedWeddingDate = currentWeddingDate.changeDate(weddingDate);
         WeddingDate savedWeddingDate = userRepository.saveWeddingDate(changedWeddingDate);
         return WeddingDateResult.from(savedWeddingDate);
-    }
-
-    @Transactional
-    public void changePasswordHash(Long currentUserId, String passwordHash) {
-        User user = userRepository.findById(currentUserId);
-        User changedUser = user.changePasswordHash(passwordHash);
-        userRepository.update(changedUser);
     }
 
     @Transactional

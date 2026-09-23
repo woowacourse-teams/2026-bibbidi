@@ -8,11 +8,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
 
-    boolean existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+    boolean existsByNicknameIgnoreCase(String nickname);
 
-    boolean existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(String nickname, Long id);
+    boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, Long id);
 
-    Optional<JpaUserEntity> findByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+    Optional<JpaUserEntity> findByNicknameIgnoreCase(String nickname);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM JpaUserEntity user WHERE user.id = :userId")

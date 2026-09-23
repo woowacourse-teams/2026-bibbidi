@@ -10,7 +10,11 @@ SET time_zone = '+09:00';
 CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT,
     nickname VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    email VARCHAR(255) NULL,
+    terms_version VARCHAR(20) NULL,
+    terms_agreed_at DATETIME NULL,
     wedding_date DATE NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
@@ -130,6 +134,105 @@ CREATE TABLE feedbacks (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE social_identities (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_social_identities_provider_user (provider, provider_user_id),
+    UNIQUE KEY uk_social_identities_user (user_id)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE oidc_auth_requests (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    state_hash VARCHAR(64) NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    nonce VARCHAR(255) NOT NULL,
+    code_verifier VARCHAR(255) NOT NULL,
+    browser_binder_hash VARCHAR(64) NULL,
+    client_type VARCHAR(10) NOT NULL,
+    purpose VARCHAR(20) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_oidc_auth_requests_state (state_hash),
+    KEY idx_oidc_auth_requests_expires_at (expires_at)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE refresh_sessions (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    family_id CHAR(36) NOT NULL,
+    client_type VARCHAR(10) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    rotated_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_refresh_sessions_token (token_hash),
+    KEY idx_refresh_sessions_user (user_id),
+    KEY idx_refresh_sessions_family (family_id),
+    KEY idx_refresh_sessions_expires_at (expires_at)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE handoff_codes (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    code_hash VARCHAR(64) NOT NULL,
+    user_id BIGINT NOT NULL,
+    family_id CHAR(36) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_handoff_codes_code (code_hash),
+    KEY idx_handoff_codes_expires_at (expires_at)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE terms (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    code VARCHAR(50) NOT NULL,
+    version VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    required BOOLEAN NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_terms_code_version (code, version)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE terms_agreements (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    terms_id BIGINT NOT NULL,
+    agreed_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_terms_agreements_user_terms (user_id, terms_id),
+    KEY idx_terms_agreements_user (user_id)
 ) ENGINE = InnoDB
   DEFAULT CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci;

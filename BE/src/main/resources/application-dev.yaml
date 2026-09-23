@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:bibbidi;MODE=MySQL;DB_CLOSE_DELAY=-1;IGNORECASE=TRUE
+    username: sa
+    password: ""
+
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: create-drop
+
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:load_catalog.sql

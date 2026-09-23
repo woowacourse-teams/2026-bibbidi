@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.checklist.controller;
 
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
@@ -16,9 +17,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
 import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
+import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.time.LocalDate;
@@ -28,20 +30,25 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
 @Sql("/checklist-fixture.sql")
 class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
+    @Autowired
+    private BibbidiTokenIssuer bibbidiTokenIssuer;
+
+    private String bearerToken(Long userId) {
+        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, "테스트회원");
+    }
+
     private static final Long USER_ID = 7L;
-    private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
     private static final String CREATE_SUMMARY = "빈 체크리스트 생성";
     private static final String CREATE_DESCRIPTION =
-            "인증 Session의 사용자 ID를 소유자로 사용해 할 일이 없는 체크리스트를 생성합니다.";
+            "access token의 사용자 ID를 소유자로 사용해 할 일이 없는 체크리스트를 생성합니다.";
     private static final String SESSION_COOKIE_DESCRIPTION =
-            "로그인 시 발급된 JSESSIONID Session Cookie";
+            "로그인 시 발급된 access token";
     private static final String WRITE_SUMMARY = "직접 할 일 생성";
     private static final String WRITE_DESCRIPTION =
             "준비 목록에 없는 할 일을 제목과 카테고리만으로 현재 사용자의 체크리스트에 추가합니다. "
@@ -63,23 +70,14 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static MockHttpSession authenticatedSession() {
-        return sessionOf(USER_ID);
-    }
 
-    private static MockHttpSession sessionOf(Long userId) {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
-        return session;
-    }
 
     @Test
     @DisplayName("인증된 사용자는 자신이 소유한 빈 체크리스트를 생성한다")
     void shouldCreateEmptyChecklistForAuthenticatedUser() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$").isNumber())
                 .andDo(document(
@@ -89,7 +87,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .summary(CREATE_SUMMARY)
                                         .description(CREATE_DESCRIPTION + " 생성된 체크리스트 ID를 그대로 응답 본문으로 반환합니다.")
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .build()
@@ -106,8 +104,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldReturnChecklistItemsWithAppointments() throws Exception {
 
         mockMvc.perform(get("/api/checklists/me")
-                        .session(sessionOf(1L))
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, bearerToken(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(1))
@@ -138,7 +135,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description("현재 사용자의 모든 할 일과 각 할 일에 연결된 일정을 조회합니다.")
                                         .responseSchema(schema("ChecklistWithAppointmentsResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .responseFields(
@@ -194,7 +191,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("체크리스트가 없는 사용자의 조회 요청을 거절한다")
     void shouldRejectWhenChecklistDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/checklists/me")
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNotFound())
                 .andDo(document(
                                 "checklists-find-me-not-found",
@@ -217,11 +214,11 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("빈 체크리스트의 진행도는 0%이며 전체 완료 상태가 아니다")
     void shouldReturnZeroProgressForEmptyChecklist() throws Exception {
         mockMvc.perform(post("/api/checklists")
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/checklists/me/progress")
-                        .session(authenticatedSession()))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(0))
                 .andExpect(jsonPath("$.doneCount").value(0))
@@ -249,8 +246,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .param("limit", "4"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
@@ -266,7 +262,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(FIND_UNSCHEDULED_DESCRIPTION)
                                         .responseSchema(schema("UnscheduledChecklistItemResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .queryParameters(
@@ -298,7 +294,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
@@ -331,8 +327,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("체크리스트가 없는 사용자의 일정이 필요한 할 일 조회 요청을 거절한다")
     void shouldRejectFindUnscheduledItemsWhenChecklistDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/checklists/me/unscheduled-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(303))
                 .andDo(document(
@@ -343,7 +338,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .responseFields(
@@ -365,8 +360,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when, then
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .param("limit", "4"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
@@ -379,7 +373,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(FIND_RECOMMENDED_DESCRIPTION)
                                         .responseSchema(schema("RecommendedCatalogItemResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .queryParameters(
@@ -428,8 +422,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("체크리스트가 없는 사용자의 추가하면 좋은 할 일 조회 요청을 거절한다")
     void shouldRejectFindRecommendedCatalogItemsWhenChecklistDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/checklists/me/recommended-catalog-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(303))
                 .andDo(document(
@@ -440,7 +433,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description("현재 사용자에게 체크리스트가 없으면 조회 요청을 거절합니다.")
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .responseFields(
@@ -455,7 +448,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private long addCatalogItem(Long catalogItemId) throws Exception {
         String response = mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(catalogItemId))))
                 .andExpect(status().isCreated())
@@ -467,7 +460,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private long writeCustomItem(String title) throws Exception {
         String response = mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateChecklistItemRequest(title, 2L))))
                 .andExpect(status().isCreated())
@@ -487,7 +480,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                 null
         );
         mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", checklistItemId)
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -497,16 +490,14 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("이미 체크리스트를 가진 사용자의 생성 요청은 거절하고 사용자 계정은 유지한다")
     void shouldRejectDuplicateChecklistAndKeepUser() throws Exception {
         // given
-        MockHttpSession session = authenticatedSession();
+        String token = bearerToken(USER_ID);
         mockMvc.perform(post("/api/checklists")
-                        .session(session)
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, token))
                 .andExpect(status().isCreated());
 
         // when, then
         mockMvc.perform(post("/api/checklists")
-                        .session(session)
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
+                        .header(AUTHORIZATION, token))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(402))
                 .andExpect(jsonPath("$.message").value("이미 체크리스트가 존재합니다."))
@@ -518,7 +509,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(CREATE_DESCRIPTION)
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .responseFields(
@@ -532,7 +523,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("인증 Session이 없으면 체크리스트를 생성할 수 없다")
+    @DisplayName("access token이 없으면 체크리스트를 생성할 수 없다")
     void shouldRequireAuthenticationToCreateChecklist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists"))
@@ -561,8 +552,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldAddSelectedCatalogItemsToOwnChecklist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isCreated())
@@ -578,7 +568,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(ADD_DESCRIPTION)
                                         .responseSchema(schema("AddCatalogItemsResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
@@ -603,15 +593,14 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectWhenCatalogItemAlreadyAdded() throws Exception {
         // given
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isCreated());
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L, 101L))))
                 .andExpect(status().isConflict())
@@ -625,7 +614,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(ADD_DESCRIPTION)
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
@@ -647,7 +636,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectWhenCatalogItemDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L, 999L))))
                 .andExpect(status().isBadRequest())
@@ -660,8 +649,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectAddWhenChecklistDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/catalog-items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(100L))))
                 .andExpect(status().isNotFound())
@@ -675,7 +663,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(ADD_DESCRIPTION)
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
@@ -697,8 +685,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldWriteCustomItemToOwnChecklist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
@@ -718,7 +705,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .requestSchema(schema("CreateChecklistItemRequest"))
                                         .responseSchema(schema("ChecklistItemResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
@@ -745,7 +732,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldAllowDuplicateTitleForCustomItems() throws Exception {
         // given
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
@@ -753,7 +740,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
@@ -767,8 +754,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectWriteWhenCategoryDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("청첩장 문구 정하기", 999L))))
@@ -783,7 +769,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(WRITE_DESCRIPTION)
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.COOKIE)
+                                                headerWithName(HttpHeaders.AUTHORIZATION)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .requestFields(
@@ -806,7 +792,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectBlankTitle() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("   ", 2L))))
@@ -821,7 +807,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTooLongTitle() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("가".repeat(51), 2L))))
@@ -834,7 +820,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectWriteWhenChecklistDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
+                        .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
@@ -844,7 +830,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("인증 Session이 없으면 직접 할 일을 만들 수 없다")
+    @DisplayName("access token이 없으면 직접 할 일을 만들 수 없다")
     void shouldRequireAuthenticationToWriteItem() throws Exception {
         // when, then
         mockMvc.perform(post("/api/checklists/me/items")

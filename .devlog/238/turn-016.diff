@@ -1,0 +1,148 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
+index 4955cc6339bca03956595cfb2db8d7557dea2065..dfbef2d6e95fd72893a7d52594dc7e31e8240a42 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
+@@ -8,6 +8,7 @@ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.service.session.IssuedSession;
+ import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+ import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -31,6 +32,7 @@ public class HandoffService {
+     private final HandoffCodeRepository handoffCodeRepository;
+     private final RefreshSessionRepository refreshSessionRepository;
+     private final SecretValueGenerator secretValueGenerator;
++    private final BibbidiTokenParser bibbidiTokenParser;
+     private final SessionIssueService sessionIssueService;
+     private final UserService userService;
+     private final SessionProperties sessionProperties;
+@@ -39,6 +41,7 @@ public class HandoffService {
+             HandoffCodeRepository handoffCodeRepository,
+             RefreshSessionRepository refreshSessionRepository,
+             SecretValueGenerator secretValueGenerator,
++            BibbidiTokenParser bibbidiTokenParser,
+             SessionIssueService sessionIssueService,
+             UserService userService,
+             SessionProperties sessionProperties
+@@ -46,6 +49,7 @@ public class HandoffService {
+         this.handoffCodeRepository = handoffCodeRepository;
+         this.refreshSessionRepository = refreshSessionRepository;
+         this.secretValueGenerator = secretValueGenerator;
++        this.bibbidiTokenParser = bibbidiTokenParser;
+         this.sessionIssueService = sessionIssueService;
+         this.userService = userService;
+         this.sessionProperties = sessionProperties;
+@@ -58,7 +62,7 @@ public class HandoffService {
+     public String issueCode(Long currentUserId, String refreshToken) {
+         LocalDateTime now = LocalDateTime.now();
+         RefreshSession session = refreshSessionRepository
+-                .findByTokenHash(secretValueGenerator.hash(refreshToken))
++                .findByTokenHash(bibbidiTokenParser.hashRefreshToken(refreshToken))
+                 .orElseThrow(() -> new BusinessException(ClientError.REFRESH_SESSION_INVALID,
+                         "저장된 refresh 세션을 찾지 못했습니다."));
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
+index bd0501f75cc0a6fe75e34435db6160d3c67e7fc8..e0b2c232f902d95bcdd4e2ea63085880dcec067d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
+@@ -3,7 +3,7 @@ package com.bibbidi.wedding.auth.service.session;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.RefreshSession;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+-import com.bibbidi.wedding.auth.token.SecretValueGenerator;
++import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+@@ -25,18 +25,18 @@ import org.springframework.transaction.annotation.Transactional;
+ public class SessionRefreshService {
+ 
+     private final RefreshSessionRepository refreshSessionRepository;
+-    private final SecretValueGenerator secretValueGenerator;
++    private final BibbidiTokenParser bibbidiTokenParser;
+     private final SessionIssueService sessionIssueService;
+     private final UserService userService;
+ 
+     public SessionRefreshService(
+             RefreshSessionRepository refreshSessionRepository,
+-            SecretValueGenerator secretValueGenerator,
++            BibbidiTokenParser bibbidiTokenParser,
+             SessionIssueService sessionIssueService,
+             UserService userService
+     ) {
+         this.refreshSessionRepository = refreshSessionRepository;
+-        this.secretValueGenerator = secretValueGenerator;
++        this.bibbidiTokenParser = bibbidiTokenParser;
+         this.sessionIssueService = sessionIssueService;
+         this.userService = userService;
+     }
+@@ -64,7 +64,7 @@ public class SessionRefreshService {
+     }
+ 
+     private RefreshSession findSession(String refreshToken) {
+-        return refreshSessionRepository.findByTokenHash(secretValueGenerator.hash(refreshToken))
++        return refreshSessionRepository.findByTokenHash(bibbidiTokenParser.hashRefreshToken(refreshToken))
+                 .orElseThrow(() -> new BusinessException(ClientError.REFRESH_SESSION_INVALID,
+                         "저장된 refresh 세션을 찾지 못했습니다."));
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+index 3a3be830385c34c3b2dd4114a006972542a6a7e0..c97c5ab57f75fdcb49d7f4ea6502a4f664136ee3 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+@@ -19,10 +19,24 @@ public class BibbidiTokenParser {
+ 
+     private final BibbidiTokenProperties properties;
+     private final BibbidiTokenSigningKey signingKey;
++    private final SecretValueGenerator secretValueGenerator;
+ 
+-    public BibbidiTokenParser(BibbidiTokenProperties properties, BibbidiTokenSigningKey signingKey) {
++    public BibbidiTokenParser(
++            BibbidiTokenProperties properties,
++            BibbidiTokenSigningKey signingKey,
++            SecretValueGenerator secretValueGenerator
++    ) {
+         this.properties = properties;
+         this.signingKey = signingKey;
++        this.secretValueGenerator = secretValueGenerator;
++    }
++
++    /**
++     * refresh token은 서명이 없어 읽을 것이 없다. 저장해 둔 값을 찾으려면 같은 방식으로 해시해야 한다.
++     * 발급할 때 쓴 방식과 어긋나지 않도록 그 짝을 여기에 둔다.
++     */
++    public String hashRefreshToken(String refreshToken) {
++        return secretValueGenerator.hash(refreshToken);
+     }
+ 
+     public BibbidiTokenClaims parseAccessToken(String token) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index 4881772556629fbf561b0858cee019f2227776ee..4c7041f66e2b7ef1f6b5c05431d81d1f7de62ac9 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -116,6 +116,15 @@ class BibbidiTokenTest {
+                 .isEqualTo(new SecretValueGenerator().hash(refreshToken.value()));
+     }
+ 
++    @Test
++    @DisplayName("발급할 때 쓴 해시와 읽을 때 쓰는 해시가 같다")
++    void shouldHashRefreshTokenSameWayOnIssueAndLookup() {
++        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        IssuedRefreshToken issued = issuer(properties).issueRefreshToken();
++
++        assertThat(parser(properties).hashRefreshToken(issued.value())).isEqualTo(issued.hash());
++    }
++
+     @Test
+     @DisplayName("refresh token은 발급할 때마다 다른 값이다")
+     void shouldIssueDifferentRefreshTokenEachTime() {
+@@ -152,6 +161,7 @@ class BibbidiTokenTest {
+     }
+ 
+     private static BibbidiTokenParser parser(BibbidiTokenProperties properties) {
+-        return new BibbidiTokenParser(properties, new BibbidiTokenSigningKey(properties));
++        return new BibbidiTokenParser(
++                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
+     }
+ }
