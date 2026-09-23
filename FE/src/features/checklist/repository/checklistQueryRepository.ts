@@ -124,6 +124,18 @@ function toAuthenticatedItem(item: MyChecklistItemModel) {
   } satisfies ChecklistQueryItemModel;
 }
 
+function requireCustomItemCreatedAt(
+  item: MyChecklistItemModel,
+): MyChecklistItemModel & { createdAt: string } {
+  if (item.createdAt === null) {
+    throw new ChecklistQueryLoadError(
+      `직접 추가한 체크리스트 항목의 생성 시각이 없습니다: ${item.id}`,
+    );
+  }
+
+  return { ...item, createdAt: item.createdAt };
+}
+
 function createGroupedCategory(
   id: string,
   title: string,
@@ -241,10 +253,10 @@ function assembleAuthenticatedChecklist(
             String(item.categoryId) === category.id &&
             item.sourceCatalogItemId === null,
         )
+        .map(requireCustomItemCreatedAt)
         .sort(
           (left, right) =>
-            (left.createdAt ?? "").localeCompare(right.createdAt ?? "") ||
-            left.id - right.id,
+            left.createdAt.localeCompare(right.createdAt) || left.id - right.id,
         )
         .map(toAuthenticatedItem);
       const querySteps = steps.map((step) => ({

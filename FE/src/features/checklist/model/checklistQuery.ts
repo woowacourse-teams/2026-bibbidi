@@ -38,7 +38,12 @@ export interface ChecklistQueryModel {
 export function getChecklistCategoryItems(
   category: ChecklistQueryCategoryModel,
 ): ChecklistQueryItemModel[] {
-  return category.steps && category.customItems
-    ? [...category.steps.flatMap((step) => step.items), ...category.customItems]
-    : category.items;
+  if (!category.steps) {
+    return category.items;
+  }
+
+  return [
+    ...category.steps.flatMap((step) => step.items),
+    ...(category.customItems ?? []),
+  ];
 }
