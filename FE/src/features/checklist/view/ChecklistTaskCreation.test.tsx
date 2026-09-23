@@ -14,22 +14,26 @@ import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 
 const categories: ChecklistCategoryViewModel[] = [
   {
+    completedCount: 0,
     countLabel: "0개",
-    expanded: false,
+    groups: [],
     id: "10",
     progress: 0,
     progressLabel: "0%",
     tasks: [],
     title: "예식장",
+    totalCount: 0,
   },
   {
+    completedCount: 0,
     countLabel: "0개",
-    expanded: false,
+    groups: [],
     id: "20",
     progress: 0,
     progressLabel: "0%",
     tasks: [],
     title: "청첩장·하객",
+    totalCount: 0,
   },
 ];
 

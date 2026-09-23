@@ -11,6 +11,7 @@ import {
   AppointmentCompletionResponse,
   remoteAppointmentManagementDataSource,
 } from "./remoteAppointmentManagementDataSource";
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
@@ -71,6 +72,7 @@ export interface RemoteMyChecklistCommandDataSource {
 export interface ChecklistItemChangeResponse {
   catalogItemId: number | null;
   categoryId: number;
+  createdAt: string;
   id: number;
   status: ChecklistItemStatus;
   title: string;
@@ -263,6 +265,7 @@ function isChecklistItemChangeResponse(
     isValidChecklistId(value.id) &&
     (value.catalogItemId === null || isValidChecklistId(value.catalogItemId)) &&
     isValidChecklistId(value.categoryId) &&
+    isValidLocalDateTime(value.createdAt) &&
     typeof value.title === "string" &&
     isChecklistItemStatus(value.status)
   );

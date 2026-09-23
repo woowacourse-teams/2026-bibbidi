@@ -35,6 +35,7 @@ describe("parseMyChecklist", () => {
               },
             ],
             categoryId: 1,
+            createdAt: "2026-09-23T09:00:00",
             id: 10,
             sourceCatalogItemId: 101,
             status: "prev",
@@ -43,6 +44,7 @@ describe("parseMyChecklist", () => {
           {
             appointments: [],
             categoryId: 2,
+            createdAt: "2026-09-23T09:00:00",
             id: 11,
             sourceCatalogItemId: null,
             status: "continue",
@@ -51,6 +53,7 @@ describe("parseMyChecklist", () => {
           {
             appointments: [],
             categoryId: 2,
+            createdAt: "2026-09-23T09:00:00",
             id: 12,
             sourceCatalogItemId: null,
             status: "done",
@@ -75,6 +78,7 @@ describe("parseMyChecklist", () => {
             },
           ],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 101,
           status: "prev",
@@ -83,6 +87,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 2,
+          createdAt: "2026-09-23T09:00:00",
           id: 11,
           sourceCatalogItemId: null,
           status: "continue",
@@ -91,6 +96,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 2,
+          createdAt: "2026-09-23T09:00:00",
           id: 12,
           sourceCatalogItemId: null,
           status: "done",
@@ -109,6 +115,7 @@ describe("parseMyChecklist", () => {
             appointments: [],
             catalogItemId: 201,
             categoryId: 1,
+            createdAt: "2026-09-23T09:00:00",
             id: 10,
             status: "prev",
             title: "기존 필드 항목",
@@ -121,6 +128,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 201,
           status: "prev",
@@ -139,6 +147,7 @@ describe("parseMyChecklist", () => {
             appointments: [],
             catalogItemId: 201,
             categoryId: 1,
+            createdAt: "2026-09-23T09:00:00",
             id: 10,
             sourceCatalogItemId: null,
             status: "prev",
@@ -152,6 +161,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: null,
           status: "prev",
@@ -176,6 +186,35 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-02-30T09:00:00",
+          id: 10,
+          sourceCatalogItemId: 101,
+          status: "prev",
+          title: "항목",
+        },
+      ],
+    },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          createdAt: undefined,
+          id: 10,
+          sourceCatalogItemId: 101,
+          status: "prev",
+          title: "항목",
+        },
+      ],
+    },
+    {
+      id: 1,
+      items: [
+        {
+          appointments: [],
+          categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           isDone: true,
           sourceCatalogItemId: 101,
@@ -189,6 +228,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: undefined,
           status: "prev",
@@ -202,6 +242,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: "101",
           status: "prev",
@@ -226,6 +267,7 @@ describe("parseMyChecklist", () => {
             },
           ],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 101,
           status: "prev",
@@ -239,6 +281,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 101,
           status: "unknown",
@@ -252,6 +295,7 @@ describe("parseMyChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 101,
           status: true,
@@ -287,6 +331,7 @@ describe("parseMyChecklist", () => {
                 },
               ],
               categoryId: 1,
+              createdAt: "2026-09-23T09:00:00",
               id: 10,
               sourceCatalogItemId: 101,
               status: "prev",
@@ -317,6 +362,7 @@ describe("parseMyChecklist", () => {
               },
             ],
             categoryId: 1,
+            createdAt: "2026-09-23T09:00:00",
             id: 10,
             sourceCatalogItemId: 101,
             status: "prev",
@@ -338,6 +384,7 @@ describe("remoteMyChecklistDataSource.getChecklist", () => {
             {
               appointments: [],
               categoryId: 1,
+              createdAt: "2026-09-23T09:00:00",
               id: 10,
               sourceCatalogItemId: 101,
               status: "done",
@@ -356,6 +403,7 @@ describe("remoteMyChecklistDataSource.getChecklist", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 10,
           sourceCatalogItemId: 101,
           status: "done",

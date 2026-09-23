@@ -1,5 +1,5 @@
 .checklist-page {
-  min-width: 1280px;
+  min-width: 320px;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
 }
@@ -10,10 +10,6 @@
 }
 
 @media (max-width: 760px) {
-  .checklist-page {
-    min-width: 320px;
-  }
-
   .checklist-page__content {
     width: min(calc(100% - 32px), 960px);
     margin: 0 auto;

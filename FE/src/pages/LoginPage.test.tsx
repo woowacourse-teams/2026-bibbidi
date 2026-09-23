@@ -179,6 +179,7 @@ describe("LoginPage", () => {
               {
                 catalogItemId: 101,
                 categoryId: 10,
+                createdAt: "2026-09-23T09:00:00",
                 id: 10,
                 status: "prev",
                 title: "추가된 할 일",
