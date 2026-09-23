@@ -1,3 +1,5 @@
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const NEARBY_APPOINTMENTS_ENDPOINT = `${apiBaseUrl}/api/appointments/me/nearby`;
 const NEARBY_APPOINTMENTS_REQUEST_TIMEOUT_MS = 10_000;
@@ -116,33 +118,6 @@ function isValidDate(value: unknown): value is string {
   ];
 
   return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1];
-}
-
-function isValidLocalDateTime(value: unknown): value is string {
-  if (typeof value !== "string") {
-    return false;
-  }
-
-  const match =
-    /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?$/.exec(value);
-
-  if (!match) {
-    return false;
-  }
-
-  const hour = Number(match[2]);
-  const minute = Number(match[3]);
-  const second = Number(match[4]);
-
-  return (
-    isValidDate(match[1]) &&
-    hour >= 0 &&
-    hour <= 23 &&
-    minute >= 0 &&
-    minute <= 59 &&
-    second >= 0 &&
-    second <= 59
-  );
 }
 
 function isNullableLocalDateTime(value: unknown): value is string | null {

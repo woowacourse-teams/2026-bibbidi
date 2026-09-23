@@ -32,7 +32,9 @@ interface ChecklistProps {
   onOpenTaskCreation?: () => void;
   onRequestScheduleCreation?: () => void;
   onSelectTask: (taskId: string) => void;
+  onVisitPreparation?: (categoryId: string) => void;
   onVisitLogin?: () => void;
+  revealCustomCategory?: { categoryId: string; requestId: number } | null;
   selectedTaskId: string | null;
   taskCreation?: ChecklistTaskCreationController;
 }
@@ -61,18 +63,36 @@ export function Checklist({
   onOpenTaskCreation,
   onRequestScheduleCreation,
   onSelectTask,
+  onVisitPreparation,
   onVisitLogin,
+  revealCustomCategory = null,
   selectedTaskId,
   taskCreation,
 }: ChecklistProps) {
-  const [expandedCategoryIds, setExpandedCategoryIds] = useState(
+  const [expandedGroupIds, setExpandedGroupIds] = useState(
     () =>
       new Set(
-        categories
-          .filter((category) => category.expanded)
-          .map((category) => category.id),
+        categories.flatMap((category) =>
+          category.groups
+            .filter((group) => group.expanded)
+            .map((group) => group.id),
+        ),
       ),
   );
+  const [collapsedRevealRequestId, setCollapsedRevealRequestId] = useState<
+    number | null
+  >(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    () =>
+      categories.find((category) =>
+        category.tasks.some((task) => task.id === selectedTaskId),
+      )?.id ??
+      categories[0]?.id ??
+      null,
+  );
+  const [dismissedRevealRequestId, setDismissedRevealRequestId] = useState<
+    number | null
+  >(null);
   const isMobileLayout = useIsMobileLayout();
   const checklistRef = useRef<HTMLDivElement>(null);
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
@@ -101,10 +121,22 @@ export function Checklist({
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
-  const tasks = categories.flatMap((category) => category.tasks);
-  const completedTaskCount = tasks.filter(
-    (task) => task.status === "complete",
-  ).length;
+  const revealedCategoryId =
+    revealCustomCategory?.requestId === dismissedRevealRequestId
+      ? null
+      : revealCustomCategory?.categoryId;
+  const selectedCategory =
+    categories.find(
+      (category) => category.id === selectedTaskContext?.task.categoryId,
+    ) ??
+    categories.find((category) => category.id === revealedCategoryId) ??
+    categories.find((category) => category.id === selectedCategoryId) ??
+    categories[0];
+  const revealCustomGroupId = categories
+    .find((category) => category.id === revealCustomCategory?.categoryId)
+    ?.groups.find((group) => group.isCustom)?.id;
+  const tasks = selectedCategory?.tasks ?? [];
+  const completedTaskCount = selectedCategory?.completedCount ?? 0;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
   const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
   const isAppointmentEditingOpen =
@@ -317,18 +349,32 @@ export function Checklist({
     selectedTaskContext,
   ]);
 
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategoryIds((currentIds) => {
+  const toggleGroup = (groupId: string, isExpanded: boolean) => {
+    setExpandedGroupIds((currentIds) => {
       const nextIds = new Set(currentIds);
 
-      if (nextIds.has(categoryId)) {
-        nextIds.delete(categoryId);
+      if (isExpanded) {
+        nextIds.delete(groupId);
       } else {
-        nextIds.add(categoryId);
+        nextIds.add(groupId);
       }
 
       return nextIds;
     });
+
+    if (isExpanded && groupId === revealCustomGroupId && revealCustomCategory) {
+      setCollapsedRevealRequestId(revealCustomCategory.requestId);
+    }
+  };
+
+  const selectCategory = (categoryId: string) => {
+    if (categoryId === selectedCategory?.id) {
+      return;
+    }
+
+    setSelectedCategoryId(categoryId);
+    setDismissedRevealRequestId(revealCustomCategory?.requestId ?? null);
+    onCloseTaskDetail();
   };
 
   const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
@@ -368,149 +414,214 @@ export function Checklist({
             : undefined
         }
       >
-        <div
-          aria-label="결혼 준비 체크리스트"
-          className="checklist"
-          ref={checklistRef}
-        >
-          <header className="checklist__toolbar" ref={toolbarRef}>
-            <div className="checklist__summary">
-              <h1>체크리스트</h1>
-              <p>
-                {isAuthenticated
-                  ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
-                  : "로그인하면 체크리스트가 그대로 저장돼요."}
-              </p>
-            </div>
-            <button
-              className="checklist__add-task"
-              onClick={() => {
-                addTaskButtonRef.current?.focus();
-                onOpenTaskCreation?.();
-              }}
-              ref={addTaskButtonRef}
-              type="button"
-            >
-              <span aria-hidden="true">＋</span>할 일 추가
-            </button>
-          </header>
+        <div className="checklist-layout">
+          <nav aria-label="체크리스트 대분류" className="checklist-categories">
+            <ul className="checklist-categories__list">
+              {categories.map((category) => {
+                const isCurrent = category.id === selectedCategory?.id;
 
-          {tasks.length === 0 ? (
-            <p className="checklist__empty">등록된 할 일이 없어요.</p>
-          ) : (
-            categories.map((category, categoryIndex) => {
-              const isExpanded = expandedCategoryIds.has(category.id);
-              const taskListId = `${category.id}-tasks`;
-
-              return (
-                <section
-                  aria-labelledby={`${category.id}-title`}
-                  className="checklist__category"
-                  key={category.id}
-                >
-                  <h2 className="checklist__category-heading">
+                return (
+                  <li key={category.id}>
                     <button
-                      aria-controls={taskListId}
-                      aria-expanded={isExpanded}
-                      aria-labelledby={`${category.id}-title`}
-                      className="checklist__category-header"
-                      onClick={() => toggleCategory(category.id)}
-                      ref={categoryIndex === 0 ? fallbackFocusRef : undefined}
+                      aria-controls="checklist-category-content"
+                      aria-label={`${category.title} ${category.countLabel}`}
+                      aria-pressed={isCurrent}
+                      className={`checklist-categories__button${
+                        isCurrent
+                          ? " checklist-categories__button--current"
+                          : ""
+                      }`}
+                      onClick={() => selectCategory(category.id)}
                       type="button"
                     >
-                      <span className="checklist__category-title-area">
-                        <span
-                          aria-hidden="true"
-                          className={`checklist__disclosure${
-                            isExpanded ? " checklist__disclosure--expanded" : ""
-                          }`}
-                        >
-                          ›
-                        </span>
-                        <span
-                          className="checklist__category-title"
-                          id={`${category.id}-title`}
-                        >
-                          {category.title}
-                        </span>
-                        <span className="checklist__category-count">
-                          {category.countLabel}
-                        </span>
-                      </span>
-
-                      <span className="checklist__progress-area">
-                        <span
-                          aria-label={`${category.title} 진행률`}
-                          aria-valuemax={100}
-                          aria-valuemin={0}
-                          aria-valuenow={category.progress}
-                          className="checklist__progress"
-                          role="progressbar"
-                        >
-                          <span
-                            className="checklist__progress-fill"
-                            style={{ width: `${category.progress}%` }}
-                          />
-                        </span>
-                        <span className="checklist__progress-label">
-                          {category.progressLabel}
-                        </span>
+                      <span>{category.title}</span>
+                      <span className="checklist-categories__count">
+                        {category.countLabel}
                       </span>
                     </button>
-                  </h2>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-                  <ul
-                    aria-label={`${category.title} 할 일`}
-                    className="checklist__tasks"
-                    hidden={!isExpanded}
-                    id={taskListId}
+          <main
+            aria-label="결혼 준비 체크리스트"
+            className="checklist"
+            id="checklist-category-content"
+            ref={checklistRef}
+          >
+            <header className="checklist__toolbar" ref={toolbarRef}>
+              <div className="checklist__summary">
+                <h1>{selectedCategory?.title ?? "체크리스트"}</h1>
+                <p>
+                  {isAuthenticated
+                    ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
+                    : "로그인하면 체크리스트가 그대로 저장돼요."}
+                </p>
+              </div>
+              <button
+                className="checklist__add-task"
+                onClick={() => {
+                  addTaskButtonRef.current?.focus();
+                  onOpenTaskCreation?.();
+                }}
+                ref={addTaskButtonRef}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>할 일 추가
+              </button>
+            </header>
+
+            {selectedCategory && tasks.length === 0 ? (
+              <section className="checklist__empty">
+                <h2>아직 담은 할 일이 없어요</h2>
+                <p>준비 목록에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
+                <div className="checklist__empty-actions">
+                  <button
+                    className="checklist__empty-primary"
+                    onClick={() => onVisitPreparation?.(selectedCategory.id)}
+                    type="button"
                   >
-                    {category.tasks.map((task) => {
-                      const isSelected = selectedTaskId === task.id;
+                    준비 목록에서 추가
+                  </button>
+                  <button
+                    className="checklist__empty-secondary"
+                    onClick={onOpenTaskCreation}
+                    type="button"
+                  >
+                    직접 추가
+                  </button>
+                </div>
+              </section>
+            ) : (
+              <div className="checklist__groups">
+                {selectedCategory?.groups.map((group, groupIndex) => {
+                  const isExpanded =
+                    expandedGroupIds.has(group.id) ||
+                    (group.id === revealCustomGroupId &&
+                      revealCustomCategory?.requestId !==
+                        collapsedRevealRequestId);
+                  const taskListId = `${group.id}-tasks`;
 
-                      return (
-                        <li
-                          className={`checklist__task checklist__task--${task.status}${
-                            isSelected ? " checklist__task--selected" : ""
-                          }`}
-                          key={task.id}
+                  return (
+                    <section
+                      aria-labelledby={`${group.id}-title`}
+                      className="checklist__group"
+                      key={group.id}
+                    >
+                      <h2 className="checklist__group-heading">
+                        <button
+                          aria-controls={taskListId}
+                          aria-expanded={isExpanded}
+                          aria-label={`${group.numberLabel} ${group.title}, ${group.countLabel}, 진행률 ${group.progressLabel}`}
+                          className="checklist__group-header"
+                          onClick={() => toggleGroup(group.id, isExpanded)}
+                          ref={groupIndex === 0 ? fallbackFocusRef : undefined}
+                          type="button"
                         >
-                          <button
-                            aria-controls={
-                              isMobileLayout
-                                ? "checklist-task-detail-bottom-sheet"
-                                : "checklist-task-detail-panel"
-                            }
-                            aria-expanded={isSelected}
-                            className="checklist__task-button"
-                            onClick={(event) => selectTask(task.id, event)}
-                            ref={(button) => {
-                              if (button) {
-                                taskButtonRefs.current.set(task.id, button);
-                              } else {
-                                taskButtonRefs.current.delete(task.id);
-                              }
-                            }}
-                            type="button"
-                          >
-                            <span className="checklist__task-title">
-                              {task.title}
+                          <span className="checklist__group-copy">
+                            <span className="checklist__group-number">
+                              {group.numberLabel}
                             </span>
-                            <span className="checklist__task-schedule">
-                              {task.schedule}
+                            <span className="checklist__group-title-area">
+                              <span
+                                className="checklist__group-title"
+                                id={`${group.id}-title`}
+                              >
+                                {group.title}
+                              </span>
+                              <span className="checklist__group-count">
+                                {group.countLabel}
+                              </span>
                             </span>
-                            <span className="checklist__task-status">
-                              {task.statusLabel}
+                          </span>
+
+                          <span className="checklist__progress-area">
+                            <span
+                              aria-label={`${group.title} 진행률`}
+                              aria-valuemax={100}
+                              aria-valuemin={0}
+                              aria-valuenow={group.progress}
+                              className="checklist__progress"
+                              role="progressbar"
+                            >
+                              <span
+                                className="checklist__progress-fill"
+                                style={{ width: `${group.progress}%` }}
+                              />
                             </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })
-          )}
+                            <span className="checklist__progress-label">
+                              {group.progressLabel}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className={`checklist__disclosure${
+                                isExpanded
+                                  ? " checklist__disclosure--expanded"
+                                  : ""
+                              }`}
+                            >
+                              ›
+                            </span>
+                          </span>
+                        </button>
+                      </h2>
+
+                      <ul
+                        aria-label={`${group.title} 할 일`}
+                        className="checklist__tasks"
+                        hidden={!isExpanded}
+                        id={taskListId}
+                      >
+                        {group.tasks.map((task) => {
+                          const isSelected = selectedTaskId === task.id;
+
+                          return (
+                            <li
+                              className={`checklist__task checklist__task--${task.status}${
+                                isSelected ? " checklist__task--selected" : ""
+                              }`}
+                              key={task.id}
+                            >
+                              <button
+                                aria-controls={
+                                  isMobileLayout
+                                    ? "checklist-task-detail-bottom-sheet"
+                                    : "checklist-task-detail-panel"
+                                }
+                                aria-expanded={isSelected}
+                                className="checklist__task-button"
+                                onClick={(event) => selectTask(task.id, event)}
+                                ref={(button) => {
+                                  if (button) {
+                                    taskButtonRefs.current.set(task.id, button);
+                                  } else {
+                                    taskButtonRefs.current.delete(task.id);
+                                  }
+                                }}
+                                type="button"
+                              >
+                                <span className="checklist__task-title">
+                                  {task.title}
+                                </span>
+                                <span className="checklist__task-schedule">
+                                  {task.schedule}
+                                </span>
+                                <span className="checklist__task-status">
+                                  {task.statusLabel}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+          </main>
         </div>
       </div>
 

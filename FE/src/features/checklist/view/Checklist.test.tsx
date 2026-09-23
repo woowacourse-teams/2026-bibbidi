@@ -78,12 +78,82 @@ function createChecklistQuery(): ChecklistQueryModel {
   };
 }
 
+function createGroupedChecklistQuery(): ChecklistQueryModel {
+  const completedTask = {
+    appointments: [],
+    categoryId: "10",
+    checklistItemId: 10,
+    id: "checklist-item-10",
+    sourceCatalogItemId: 101,
+    status: "done" as const,
+    title: "계약 완료",
+  };
+  const incompleteTask = {
+    ...completedTask,
+    checklistItemId: 11,
+    id: "checklist-item-11",
+    sourceCatalogItemId: 102,
+    status: "prev" as const,
+    title: "방문 상담",
+  };
+  const secondCategoryTask = {
+    ...incompleteTask,
+    categoryId: "20",
+    checklistItemId: 20,
+    id: "checklist-item-20",
+    sourceCatalogItemId: 201,
+    title: "드레스 투어",
+  };
+
+  return {
+    categories: [
+      {
+        customItems: [],
+        id: "10",
+        items: [completedTask, incompleteTask],
+        steps: [
+          {
+            id: "step-1",
+            items: [completedTask],
+            order: 1,
+            title: "계약하기",
+          },
+          { id: "step-2", items: [], order: 2, title: "빈 단계" },
+          {
+            id: "step-3",
+            items: [incompleteTask],
+            order: 3,
+            title: "상담하기",
+          },
+        ],
+        title: "예식장",
+      },
+      {
+        customItems: [],
+        id: "20",
+        items: [secondCategoryTask],
+        steps: [
+          {
+            id: "step-4",
+            items: [secondCategoryTask],
+            order: 1,
+            title: "투어하기",
+          },
+        ],
+        title: "스드메",
+      },
+    ],
+  };
+}
+
 function ChecklistHarness({
   categories = createChecklistViewModel(createChecklistQuery()),
   initialSelectedTaskId = null,
+  onVisitPreparation,
 }: {
   categories?: ReturnType<typeof createChecklistViewModel>;
   initialSelectedTaskId?: string | null;
+  onVisitPreparation?: (categoryId: string) => void;
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState(initialSelectedTaskId);
 
@@ -93,6 +163,7 @@ function ChecklistHarness({
       onBackTaskDetail={() => setSelectedTaskId(null)}
       onCloseTaskDetail={() => setSelectedTaskId(null)}
       onSelectTask={setSelectedTaskId}
+      onVisitPreparation={onVisitPreparation}
       selectedTaskId={selectedTaskId}
     />
   );
@@ -921,6 +992,7 @@ describe("Checklist 목록 표현", () => {
   });
 
   it("전체 할 일이 0개면 하나의 빈 상태 문구를 표시한다", () => {
+    const onVisitPreparation = vi.fn();
     render(
       <ChecklistHarness
         categories={createChecklistViewModel({
@@ -929,11 +1001,17 @@ describe("Checklist 목록 표현", () => {
             { id: "20", items: [], title: "스드메" },
           ],
         })}
+        onVisitPreparation={onVisitPreparation}
       />,
     );
 
-    expect(screen.getByText("등록된 할 일이 없어요.")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "예식장" })).toBeNull();
+    expect(screen.getByText("아직 담은 할 일이 없어요")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "예식장" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "준비 목록에서 추가" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "준비 목록에서 추가" }));
+    expect(onVisitPreparation).toHaveBeenCalledWith("10");
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
   });
 
@@ -944,6 +1022,42 @@ describe("Checklist 목록 표현", () => {
     expect(container.querySelector(".checklist__completion-mark")).toBeNull();
     expect(completedTask.closest(".checklist__task--complete")).not.toBeNull();
     expect(within(completedTask).getByText("완료")).toBeTruthy();
+  });
+
+  it("첫 미완료 중분류를 열고 여러 중분류를 동시에 펼치며 대분류를 전환한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+
+    const completedGroup = screen.getByRole("button", {
+      name: /계약하기/,
+    });
+    const incompleteGroup = screen.getByRole("button", {
+      name: /상담하기/,
+    });
+
+    expect(completedGroup.getAttribute("aria-expanded")).toBe("false");
+    expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByText("빈 단계")).toBeNull();
+
+    fireEvent.click(completedGroup);
+    expect(completedGroup.getAttribute("aria-expanded")).toBe("true");
+    expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("계약 완료")).toBeTruthy();
+    expect(screen.getByText("방문 상담")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /방문 상담/ }));
+    expect(
+      screen.getByRole("complementary", { name: "방문 상담" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "스드메 0/1" }));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
+    expect(screen.getByText("드레스 투어")).toBeTruthy();
+    expect(screen.queryByText("방문 상담")).toBeNull();
   });
 });
 
@@ -1328,7 +1442,7 @@ describe("Checklist 할 일 편집", () => {
         .getByRole("button", { name: "할 일 제목 수정" })
         .hasAttribute("disabled"),
     ).toBe(false);
-    const movedCategoryList = document.getElementById("20-tasks");
+    const movedCategoryList = document.getElementById("20-legacy-tasks");
     expect(movedCategoryList).toBeTruthy();
     expect(
       within(movedCategoryList as HTMLElement).getByRole("button", {

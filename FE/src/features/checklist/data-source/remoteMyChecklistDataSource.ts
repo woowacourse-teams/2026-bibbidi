@@ -3,6 +3,7 @@ import {
   MyChecklistAppointmentModel,
   MyChecklistModel,
 } from "../model/myChecklist";
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
@@ -170,6 +171,7 @@ export function parseMyChecklist(value: unknown): MyChecklistModel {
         !isRecord(item) ||
         !isValidId(item.id) ||
         !isValidId(item.categoryId) ||
+        !isValidLocalDateTime(item.createdAt) ||
         typeof item.title !== "string" ||
         !isChecklistItemStatus(item.status) ||
         !Array.isArray(item.appointments) ||
@@ -181,6 +183,7 @@ export function parseMyChecklist(value: unknown): MyChecklistModel {
       return {
         appointments: item.appointments.map(parseAppointment),
         categoryId: item.categoryId,
+        createdAt: item.createdAt,
         id: item.id,
         sourceCatalogItemId: parseSourceCatalogItemId(item),
         status: item.status,
