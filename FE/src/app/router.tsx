@@ -8,6 +8,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { PlannerPage } from "../pages/PlannerPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SignupPage } from "../pages/SignupPage";
+import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -46,6 +47,11 @@ export const appRoutes: RouteObject[] = [
       {
         path: "/signup",
         Component: SignupPage,
+      },
+      {
+        // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.
+        path: "/auth/:provider",
+        Component: SocialLoginCallbackPage,
       },
     ],
   },
