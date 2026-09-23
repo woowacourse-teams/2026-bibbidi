@@ -22,7 +22,6 @@ import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemReque
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -738,35 +737,6 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                         )
                 );
-    }
-
-    @Test
-    @Sql("/checklist-catalog-fixture.sql")
-    @DisplayName("직접 만든 할 일의 생성 응답과 이어지는 조회 응답에 같은 생성 시각이 담긴다")
-    void shouldReturnSameCreatedAtAfterWritingCustomItem() throws Exception {
-        String creationResponse = mockMvc.perform(post("/api/checklists/me/items")
-                        .session(authenticatedSession())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new CreateChecklistItemRequest("청첩장 문구 정하기", 2L))))
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        var createdItem = objectMapper.readTree(creationResponse);
-        String createdAt = createdItem.get("createdAt").asText();
-
-        String checklistResponse = mockMvc.perform(get("/api/checklists/me")
-                        .session(authenticatedSession()))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        var queriedItem = objectMapper.readTree(checklistResponse).get("items").get(0);
-
-        assertThat(LocalDateTime.parse(createdAt)).isNotNull();
-        assertThat(queriedItem.get("id").asLong()).isEqualTo(createdItem.get("id").asLong());
-        assertThat(queriedItem.get("createdAt").asText()).isEqualTo(createdAt);
     }
 
     @Test

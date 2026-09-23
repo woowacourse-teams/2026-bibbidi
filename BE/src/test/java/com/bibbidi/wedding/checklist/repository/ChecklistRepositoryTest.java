@@ -183,7 +183,9 @@ class ChecklistRepositoryTest {
     @DisplayName("기존 할 일을 저장하면 변경 가능한 필드만 갱신하고 생성 시각은 유지한다")
     void shouldUpdateMutableFieldsWithoutReplacingCreatedAt() {
         Checklist checklist = saveChecklist(OWNER_ID);
-        ChecklistItem original = saveItem(checklist, null);
+        saveItem(checklist, null);
+        entityManager.clear();
+        ChecklistItem original = checklistRepository.getByOwnerId(OWNER_ID).items().getFirst();
         ChecklistItem changed = new ChecklistItem(
                 original.id(),
                 CATEGORY_ID + 1,
