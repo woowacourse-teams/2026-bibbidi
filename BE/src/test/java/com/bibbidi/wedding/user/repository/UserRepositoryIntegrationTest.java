@@ -20,6 +20,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Transactional
 class UserRepositoryIntegrationTest {
 
+    private static final LocalDate WEDDING_DATE = LocalDate.of(
+            2027,
+            5,
+            15);
+
     @Autowired
     private UserRepository userRepository;
 
@@ -53,8 +58,16 @@ class UserRepositoryIntegrationTest {
         User changed = userRepository.update(created.changeNickname("new-name"));
 
         assertThat(changed)
-                .extracting(User::id, User::nickname, User::status, User::email)
-                .containsExactly(created.id(), "new-name", UserStatus.PENDING, "current@bibbidi.kr");
+                .extracting(
+                        User::id,
+                        User::nickname,
+                        User::status,
+                        User::email)
+                .containsExactly(
+                        created.id(),
+                        "new-name",
+                        UserStatus.PENDING,
+                        "current@bibbidi.kr");
     }
 
     @Test
@@ -65,8 +78,14 @@ class UserRepositoryIntegrationTest {
         User activated = userRepository.update(created.activate());
 
         assertThat(activated)
-                .extracting(User::id, User::nickname, User::status)
-                .containsExactly(created.id(), "current", UserStatus.ACTIVE);
+                .extracting(
+                        User::id,
+                        User::nickname,
+                        User::status)
+                .containsExactly(
+                        created.id(),
+                        "current",
+                        UserStatus.ACTIVE);
     }
 
     @Test
@@ -85,20 +104,26 @@ class UserRepositoryIntegrationTest {
         User created = userRepository.create(User.pending("current", "current@bibbidi.kr"));
 
         userRepository.saveWeddingDate(
-                userRepository.findWeddingDateByUserId(created.id()).changeDate(LocalDate.of(2027, 5, 15)));
+                userRepository.findWeddingDateByUserId(created.id()).changeDate(WEDDING_DATE));
 
         assertThat(userRepository.findWeddingDateByUserId(created.id()).date())
-                .isEqualTo(LocalDate.of(2027, 5, 15));
+                .isEqualTo(WEDDING_DATE);
         assertThat(userRepository.findById(created.id()))
-                .extracting(User::nickname, User::status, User::email)
-                .containsExactly("current", UserStatus.PENDING, "current@bibbidi.kr");
+                .extracting(
+                        User::nickname,
+                        User::status,
+                        User::email)
+                .containsExactly(
+                        "current",
+                        UserStatus.PENDING,
+                        "current@bibbidi.kr");
     }
 
     @Test
     @DisplayName("같은 결혼 예정일을 다시 저장해도 수정 시각을 갱신한다")
     void shouldUpdateTimestampWhenSameWeddingDateIsSaved() throws InterruptedException {
         User created = userRepository.create(User.pending("current", null));
-        WeddingDate weddingDate = new WeddingDate(created.id(), LocalDate.of(2027, 5, 15));
+        WeddingDate weddingDate = new WeddingDate(created.id(), WEDDING_DATE);
         userRepository.saveWeddingDate(weddingDate);
         LocalDateTime before = updatedAt(created.id());
 
@@ -110,7 +135,9 @@ class UserRepositoryIntegrationTest {
 
     private LocalDateTime updatedAt(Long userId) {
         return jdbcTemplate.queryForObject(
-                "SELECT updated_at FROM users WHERE id = ?", LocalDateTime.class, userId);
+                "SELECT updated_at FROM users WHERE id = ?",
+                LocalDateTime.class,
+                userId);
     }
 
     @Test

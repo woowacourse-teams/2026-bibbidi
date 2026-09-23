@@ -1,0 +1,885 @@
+diff --git a/BE/files2.txt b/BE/files2.txt
+deleted file mode 100644
+index c69ffd50fa9878260686d1c583d6fb20e56633de..0000000000000000000000000000000000000000
+--- a/BE/files2.txt
++++ /dev/null
+@@ -1,20 +0,0 @@
+-src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java
+-src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+-src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+-src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+-src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiSessionResponse.java
+-src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiTokenResponse.java
+-src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
+-src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
+-src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+-src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+-src/main/java/com/bibbidi/wedding/auth/service/WithdrawalService.java
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+-src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+diff --git a/BE/out.txt b/BE/out.txt
+deleted file mode 100644
+index 4a41f283f42b0cf2a059f38ea6143c57ecfb00d7..0000000000000000000000000000000000000000
+--- a/BE/out.txt
++++ /dev/null
+@@ -1,45 +0,0 @@
+-src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java:41: return build(cookieProperties.name(), cookieProperties.path(), "", Duration.ZERO);
+-src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java:66: return build(OIDC_BINDER_COOKIE_NAME, OIDC_BINDER_COOKIE_PATH, "", Duration.ZERO);
+-src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java:40: .findLatestUsableSession(userId, ClientType.NATIVE, now)
+-src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java:78: return new SocialAuthorizationResult(authorizationUri, state, browserBinder);
+-src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java:55: return oidcAuthRequestService.start(provider, clientType, purpose);
+-src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java:94: VerifiedOidcUser identity = idTokenVerifier.verify(provider, idToken, request.nonce());
+-src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java:131: return idTokenVerifier.verify(provider, idToken, request.nonce());
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:37: Claims claims = parse(token, TokenCategory.ACCESS, ClientError.ACCESS_TOKEN_INVALID);
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:50: stringClaim(claims, BibbidiTokenClaimNames.NICKNAME, "nickname"),
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:51: stringClaim(claims, BibbidiTokenClaimNames.EMAIL, "email"));
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:55: Claims claims = parse(token, TokenCategory.DELETE_GRANT, ClientError.DELETE_GRANT_INVALID);
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:61: String category = stringClaim(claims, BibbidiTokenClaimNames.CATEGORY, "category");
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:62: validateTokenCategory(expected, invalidError, category);
+-src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java:99: throw new BusinessException(invalidError, "��ū�� �������� ���߽��ϴ�.", exception);
+-src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java:53: given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
+-src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java:58: .verify(any(SocialProvider.class), anyString(), anyString());
+-src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java:88: given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
+-src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java:90: given(idTokenVerifier.verify(any(SocialProvider.class), anyString(), anyString()))
+-src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java:91: .willReturn(new VerifiedOidcUser(SocialProvider.KAKAO, "social-user-1", "nickname", "current@bibbidi.kr"));
+-src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java:49: owner = new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(), active.email());
+-src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java:74: executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)),
+-src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java:75: executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)));
+-src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java:173: new UserAuthInfo(pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:25: new BibbidiTokenClaims(1L, UserStatus.ACTIVE, UserRole.NORMAL, "current", "current@bibbidi.kr");
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:53: String forged = issuer(properties(Duration.ofMinutes(30), SECRET + "-other", ISSUER, AUDIENCE))
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:65: String otherIssuer = issuer(properties(Duration.ofMinutes(30), SECRET, "other", AUDIENCE))
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:67: String otherAudience = issuer(properties(Duration.ofMinutes(30), SECRET, ISSUER, "other"))
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:170: properties(Duration.ofMinutes(30), "", ISSUER, AUDIENCE)))
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:173: properties(Duration.ofMinutes(30), "too-short", ISSUER, AUDIENCE)))
+-src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java:178: return properties(accessTokenLifetime, SECRET, ISSUER, AUDIENCE);
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:126: new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:170: new WeddingDateRequest(LocalDate.of(2020, 1, 1)));
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:200: new WeddingDateRequest(LocalDate.of(2027, 5, 15)));
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:216: new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:234: new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+-src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java:288: return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, nickname);
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:56: .extracting(User::id, User::nickname, User::status, User::email)
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:57: .containsExactly(created.id(), "new-name", UserStatus.PENDING, "current@bibbidi.kr");
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:68: .extracting(User::id, User::nickname, User::status)
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:69: .containsExactly(created.id(), "current", UserStatus.ACTIVE);
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:88: userRepository.findWeddingDateByUserId(created.id()).changeDate(LocalDate.of(2027, 5, 15)));
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:91: .isEqualTo(LocalDate.of(2027, 5, 15));
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:93: .extracting(User::nickname, User::status, User::email)
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:94: .containsExactly("current", UserStatus.PENDING, "current@bibbidi.kr");
+-src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java:101: WeddingDate weddingDate = new WeddingDate(created.id(), LocalDate.of(2027, 5, 15));
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+index 88f3d7fdd8cc956c7640dae82023561edeb48026..2ff43a5802b17d5e09c42e82535d93a12922eae6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+@@ -50,8 +50,11 @@ public class AuthSessionController {
+             @RequestParam(defaultValue = "LOGIN") SocialAuthPurpose purpose,
+             HttpServletResponse response
+     ) {
++        SocialProvider socialProvider = SocialProvider.from(provider);
+         SocialAuthorizationResult result = socialLoginService.startAuthorization(
+-                SocialProvider.from(provider), clientType, purpose);
++                socialProvider,
++                clientType,
++                purpose);
+ 
+         if (result.browserBinder() != null) {
+             response.addHeader(HttpHeaders.SET_COOKIE,
+@@ -68,12 +71,14 @@ public class AuthSessionController {
+             HttpServletRequest servletRequest,
+             HttpServletResponse response
+     ) {
++        SocialProvider socialProvider = SocialProvider.from(provider);
++        String browserBinder = authCookieFactory.readOidcBinder(servletRequest);
+         IssuedSession session = socialLoginService.login(
+-                SocialProvider.from(provider),
++                socialProvider,
+                 ClientType.WEB,
+                 request.code(),
+                 request.state(),
+-                authCookieFactory.readOidcBinder(servletRequest));
++                browserBinder);
+ 
+         response.addHeader(
+                 HttpHeaders.SET_COOKIE,
+@@ -90,12 +95,14 @@ public class AuthSessionController {
+             @PathVariable String provider,
+             @Valid @RequestBody SocialLoginRequest request
+     ) {
+-        return BibbidiTokenResponse.from(socialLoginService.login(
+-                SocialProvider.from(provider),
++        SocialProvider socialProvider = SocialProvider.from(provider);
++        IssuedSession session = socialLoginService.login(
++                socialProvider,
+                 ClientType.NATIVE,
+                 request.code(),
+                 request.state(),
+-                null));
++                null);
++        return BibbidiTokenResponse.from(session);
+     }
+ 
+     @PostMapping("/api/auth/web/sessions/refresh")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+index 1ebfe434332730e3fc777bbc2830fc1204d38bc0..62331cd8f6fb35b3b25f0d2cddf83b2beccddeec 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+@@ -43,12 +43,15 @@ public class WithdrawalController {
+             @Valid @RequestBody SocialLoginRequest request,
+             HttpServletRequest servletRequest
+     ) {
+-        return new DeleteGrantResponse(withdrawalService.issueDeleteGrantToken(
+-                SocialProvider.from(provider),
++        SocialProvider socialProvider = SocialProvider.from(provider);
++        String browserBinder = authCookieFactory.readOidcBinder(servletRequest);
++        String deleteGrantToken = withdrawalService.issueDeleteGrantToken(
++                socialProvider,
+                 request.code(),
+                 request.state(),
+-                authCookieFactory.readOidcBinder(servletRequest),
+-                currentUserId));
++                browserBinder,
++                currentUserId);
++        return new DeleteGrantResponse(deleteGrantToken);
+     }
+ 
+     @DeleteMapping("/api/users/me")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiTokenResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiTokenResponse.java
+index d33716d8f0e902979dca95e1135651d60d184169..9c329bdc79c878df208229147ab4161e956d1e32 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiTokenResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/BibbidiTokenResponse.java
+@@ -10,6 +10,8 @@ public record BibbidiTokenResponse(
+ 
+     public static BibbidiTokenResponse from(IssuedSession session) {
+         return new BibbidiTokenResponse(
+-                session.accessToken(), session.refreshToken(), session.termsAgreementRequired());
++                session.accessToken(),
++                session.refreshToken(),
++                session.termsAgreementRequired());
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
+index 1ff5e62d656538735de684f2602cb7fed649ae45..ab91559e2ff622bd6c03bec94417e436f8597fac 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/repository/RefreshSessionRepository.java
+@@ -58,10 +58,11 @@ public class RefreshSessionRepository {
+ 
+     public int deleteExpiredOrRevoked(
+             LocalDateTime now, LocalDateTime revokedThreshold, int batchSize) {
++        PageRequest firstBatch = PageRequest.of(0, batchSize);
+         List<Long> ids = jpaRefreshSessionRepository.findIdsToClean(
+                 now,
+                 revokedThreshold,
+-                PageRequest.of(0, batchSize)
++                firstBatch
+         );
+         jpaRefreshSessionRepository.deleteAllByIdInBatch(ids);
+         return ids.size();
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+index 34ff8bde088e67806dda52865a0d996e7594d786..eda0629833182acf040f6392f852920b51989d8d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+@@ -53,27 +53,30 @@ public class OidcAuthRequestService {
+         String codeVerifier = secretValueGenerator.generate();
+         String browserBinder = clientType == ClientType.WEB ? secretValueGenerator.generate() : null;
+ 
+-        oidcAuthRequestRepository.save(
+-                OidcAuthRequest.start(
+-                        secretValueGenerator.toSha256Hex(state),
+-                        provider,
+-                        nonce,
+-                        codeVerifier,
+-                        browserBinder == null
+-                                ? null
+-                                : secretValueGenerator.toSha256Hex(browserBinder),
+-                        clientType,
+-                        purpose,
+-                        LocalDateTime.now().plus(sessionProperties.authRequestLifetime())
+-                )
++        String stateHash = secretValueGenerator.toSha256Hex(state);
++        String browserBinderHash = browserBinder == null
++                ? null
++                : secretValueGenerator.toSha256Hex(browserBinder);
++        LocalDateTime expiresAt = LocalDateTime.now().plus(sessionProperties.authRequestLifetime());
++        OidcAuthRequest authRequest = OidcAuthRequest.start(
++                stateHash,
++                provider,
++                nonce,
++                codeVerifier,
++                browserBinderHash,
++                clientType,
++                purpose,
++                expiresAt
+         );
++        oidcAuthRequestRepository.save(authRequest);
+ 
++        String codeChallenge = secretValueGenerator.toCodeChallenge(codeVerifier);
+         String authorizationUri = authorizationUriFactory.create(
+                 configuration,
+                 clientType,
+                 state,
+                 nonce,
+-                secretValueGenerator.toCodeChallenge(codeVerifier)
++                codeChallenge
+         );
+         return new SocialAuthorizationResult(
+                 authorizationUri,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+index 1f68891ef2fed33e52d5d87eaaadc9c3c45fd971..c6f807d799e04d6b34f2c2f571744659afa2e7b7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+@@ -93,11 +93,12 @@ public class SocialLoginService {
+                 browserBinder
+         );
+         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
++        String redirectUri = authorizationUriFactory.redirectUri(configuration, request.clientType());
+         String idToken = tokenExchangeClient.exchangeForIdToken(
+                 configuration,
+                 code,
+                 request.codeVerifier(),
+-                authorizationUriFactory.redirectUri(configuration, request.clientType()));
++                redirectUri);
+         VerifiedOidcUser identity = idTokenVerifier.verify(
+                 provider,
+                 idToken,
+@@ -133,11 +134,12 @@ public class SocialLoginService {
+         );
+         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
+ 
++        String redirectUri = authorizationUriFactory.redirectUri(configuration, clientType);
+         String idToken = tokenExchangeClient.exchangeForIdToken(
+                 configuration,
+                 code,
+                 request.codeVerifier(),
+-                authorizationUriFactory.redirectUri(configuration, clientType));
++                redirectUri);
+ 
+         return idTokenVerifier.verify(
+                 provider,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+index 50e67e434ed65ad2476f5246447c9d170cbfa243..1e88c82d3ae92d74c2fdfc9db7e1f777d3b2a7e8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+@@ -38,26 +38,31 @@ public class BibbidiTokenParser {
+                 token,
+                 TokenCategory.ACCESS,
+                 ClientError.ACCESS_TOKEN_INVALID);
++        Long userId = userId(claims, ClientError.ACCESS_TOKEN_INVALID);
++        UserStatus status = parseEnumClaim(
++                claims,
++                BibbidiTokenClaimNames.STATUS,
++                UserStatus.class,
++                "status");
++        UserRole role = parseEnumClaim(
++                claims,
++                BibbidiTokenClaimNames.ROLE,
++                UserRole.class,
++                "role");
++        String nickname = stringClaim(
++                claims,
++                BibbidiTokenClaimNames.NICKNAME,
++                "nickname");
++        String email = stringClaim(
++                claims,
++                BibbidiTokenClaimNames.EMAIL,
++                "email");
+         return new BibbidiTokenClaims(
+-                userId(claims, ClientError.ACCESS_TOKEN_INVALID),
+-                parseEnumClaim(
+-                        claims,
+-                        BibbidiTokenClaimNames.STATUS,
+-                        UserStatus.class,
+-                        "status"),
+-                parseEnumClaim(
+-                        claims,
+-                        BibbidiTokenClaimNames.ROLE,
+-                        UserRole.class,
+-                        "role"),
+-                stringClaim(
+-                        claims,
+-                        BibbidiTokenClaimNames.NICKNAME,
+-                        "nickname"),
+-                stringClaim(
+-                        claims,
+-                        BibbidiTokenClaimNames.EMAIL,
+-                        "email"));
++                userId,
++                status,
++                role,
++                nickname,
++                email);
+     }
+ 
+     public Long parseDeleteGrantToken(String token) {
+@@ -125,8 +130,10 @@ public class BibbidiTokenParser {
+         try {
+             return Long.valueOf(claims.getSubject());
+         } catch (NumberFormatException | NullPointerException exception) {
+-            throw new BusinessException(invalidError,
+-                    "토큰의 sub가 사용자 식별자가 아닙니다.", exception);
++            throw new BusinessException(
++                    invalidError,
++                    "토큰의 sub가 사용자 식별자가 아닙니다.",
++                    exception);
+         }
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+index 5fd3d01472670b07e0b52be2673be0eb833bc510..b1e1fa5d23d5102f8aa7cbecb048ac28b4fd5438 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+@@ -50,12 +50,25 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
+ 
+     @BeforeEach
+     void stubProvider() {
+-        given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
++        given(oidcTokenExchangeClient.exchangeForIdToken(
++                any(),
++                anyString(),
++                anyString(),
++                anyString()))
+                 .willReturn("id-token");
+-        willAnswer(invocation -> new VerifiedOidcUser(
+-                invocation.getArgument(0), "social-user-1", "비비디", "user@bibbidi.kr"))
++        willAnswer(invocation -> {
++            SocialProvider provider = invocation.getArgument(0);
++            return new VerifiedOidcUser(
++                    provider,
++                    "social-user-1",
++                    "비비디",
++                    "user@bibbidi.kr");
++        })
+                 .given(idTokenVerifier)
+-                .verify(any(SocialProvider.class), anyString(), anyString());
++                .verify(
++                        any(SocialProvider.class),
++                        anyString(),
++                        anyString());
+     }
+ 
+     @Test
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+index 449713fffecdb7f8b68913ef99ea492f478d484b..9b0b127b99b5457eace0fbba8e4a1b5eab546b54 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+@@ -55,7 +55,11 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
+         UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
+         UserResult active = userService.activate(created.id());
+         owner = new UserAuthInfo(
+-                active.id(), active.status(), active.role(), active.nickname(), active.email());
++                active.id(),
++                active.status(),
++                active.role(),
++                active.nickname(),
++                active.email());
+     }
+ 
+     @Test
+@@ -191,7 +195,11 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
+     void shouldBlockPendingUserUntilTermsAgreed() throws Exception {
+         UserResult pending = userService.createPendingUser("pending", null);
+         UserAuthInfo pendingOwner = new UserAuthInfo(
+-                pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
++                pending.id(),
++                pending.status(),
++                pending.role(),
++                pending.nickname(),
++                pending.email());
+         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
+ 
+         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+index e33263258c351dc95afbe394f93d9c85a0fa7e5a..88d403dcddd4a7e06882f216de82ea04b242f19e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+@@ -47,7 +47,11 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
+         UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
+         UserResult active = userService.activate(created.id());
+         UserAuthInfo owner = new UserAuthInfo(
+-                active.id(), active.status(), active.role(), active.nickname(), active.email());
++                active.id(),
++                active.status(),
++                active.role(),
++                active.nickname(),
++                active.email());
+         nativeSession = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+index 8f526054393b0d865e3d9534f5e426f8ebf78579..64efc87cf9f56fe57f194e944a787b3b15cd7277 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+@@ -80,15 +80,30 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
+         UserAuthInfo created = socialUserRegistrationService.findOrCreate(identity);
+         UserResult active = userService.activate(created.userId());
+         userId = active.id();
+-        session = sessionIssueService.issueForNewFamily(
+-                new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(),
+-                        active.email()),
+-                ClientType.WEB);
+-
+-        given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
++        UserAuthInfo owner = new UserAuthInfo(
++                active.id(),
++                active.status(),
++                active.role(),
++                active.nickname(),
++                active.email());
++        session = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
++
++        given(oidcTokenExchangeClient.exchangeForIdToken(
++                any(),
++                anyString(),
++                anyString(),
++                anyString()))
+                 .willReturn("id-token");
+-        given(idTokenVerifier.verify(any(SocialProvider.class), anyString(), anyString()))
+-                .willReturn(new VerifiedOidcUser(SocialProvider.KAKAO, "social-user-1", "nickname", "current@bibbidi.kr"));
++        VerifiedOidcUser verifiedUser = new VerifiedOidcUser(
++                SocialProvider.KAKAO,
++                "social-user-1",
++                "nickname",
++                "current@bibbidi.kr");
++        given(idTokenVerifier.verify(
++                any(SocialProvider.class),
++                anyString(),
++                anyString()))
++                .willReturn(verifiedUser);
+     }
+ 
+     @Test
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+index b539cd79c1761f3807ddc5af849a33e5b54d773c..e65cf7006a2317c9f90f4df74d226759bcc006c8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+@@ -11,6 +11,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import java.util.List;
++import java.util.concurrent.Callable;
+ import java.util.UUID;
+ import java.util.concurrent.CountDownLatch;
+ import java.util.concurrent.ExecutorService;
+@@ -46,7 +47,12 @@ class SessionRefreshServiceIntegrationTest {
+         UserResult created = userService.createPendingUser(
+                 "refresh-" + UUID.randomUUID().toString().substring(0, 8), "current@bibbidi.kr");
+         UserResult active = userService.activate(created.id());
+-        owner = new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(), active.email());
++        owner = new UserAuthInfo(
++                active.id(),
++                active.status(),
++                active.role(),
++                active.nickname(),
++                active.email());
+     }
+ 
+     @Test
+@@ -70,9 +76,14 @@ class SessionRefreshServiceIntegrationTest {
+         ExecutorService executor = Executors.newFixedThreadPool(2);
+ 
+         try {
++            String refreshToken = issued.refreshToken();
++            Callable<Boolean> refresh = () -> refreshAfterSignal(
++                    refreshToken,
++                    ready,
++                    start);
+             List<Future<Boolean>> results = List.of(
+-                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)),
+-                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)));
++                    executor.submit(refresh),
++                    executor.submit(refresh));
+             ready.await();
+             start.countDown();
+ 
+@@ -169,8 +180,12 @@ class SessionRefreshServiceIntegrationTest {
+     @DisplayName("가입이 끝나지 않은 회원에게는 약관 동의가 필요하다고 알린다")
+     void shouldMarkTermsAgreementRequiredForPendingUser() {
+         UserResult pending = userService.createPendingUser("pending", null);
+-        UserAuthInfo pendingOwner =
+-                new UserAuthInfo(pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
++        UserAuthInfo pendingOwner = new UserAuthInfo(
++                pending.id(),
++                pending.status(),
++                pending.role(),
++                pending.nickname(),
++                pending.email());
+ 
+         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index 19460266c7df0e945014ac5986a0cab82f0f0a7b..6378cdcbbaa6ad15f078f595eac02fa48497aff5 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -20,14 +20,20 @@ class BibbidiTokenTest {
+     private static final String SECRET = "test-only-jwt-secret-value-for-bibbidi-auth";
+     private static final String ISSUER = "bibbidi-test";
+     private static final String AUDIENCE = "bibbidi-test-client";
++    private static final Duration ACCESS_TOKEN_LIFETIME = Duration.ofMinutes(30);
++    private static final Duration DELETE_GRANT_LIFETIME = Duration.ofMinutes(5);
+ 
+-    private static final BibbidiTokenClaims CLAIMS =
+-            new BibbidiTokenClaims(1L, UserStatus.ACTIVE, UserRole.NORMAL, "current", "current@bibbidi.kr");
++    private static final BibbidiTokenClaims CLAIMS = new BibbidiTokenClaims(
++            1L,
++            UserStatus.ACTIVE,
++            UserRole.NORMAL,
++            "current",
++            "current@bibbidi.kr");
+ 
+     @Test
+     @DisplayName("발급한 access token에서 사용자와 표시용 정보를 그대로 꺼낸다")
+     void shouldIssueAndParseAccessToken() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+         BibbidiTokenIssuer issuer = issuer(properties);
+ 
+         BibbidiTokenClaims parsed = parser(properties).parseAccessToken(issuer.issueAccessToken(CLAIMS));
+@@ -50,10 +56,14 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("다른 비밀말로 서명한 token은 거절한다")
+     void shouldRejectTokenSignedWithOtherSecret() {
+-        String forged = issuer(properties(Duration.ofMinutes(30), SECRET + "-other", ISSUER, AUDIENCE))
+-                .issueAccessToken(CLAIMS);
+-
+-        assertThatThrownBy(() -> parser(properties(Duration.ofMinutes(30))).parseAccessToken(forged))
++        BibbidiTokenProperties otherSecret = properties(
++                ACCESS_TOKEN_LIFETIME,
++                SECRET + "-other",
++                ISSUER,
++                AUDIENCE);
++        String forged = issuer(otherSecret).issueAccessToken(CLAIMS);
++
++        assertThatThrownBy(() -> parser(properties(ACCESS_TOKEN_LIFETIME)).parseAccessToken(forged))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.ACCESS_TOKEN_INVALID);
+@@ -62,11 +72,19 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("발급자나 대상이 다른 token은 거절한다")
+     void shouldRejectTokenWithOtherIssuerOrAudience() {
+-        String otherIssuer = issuer(properties(Duration.ofMinutes(30), SECRET, "other", AUDIENCE))
+-                .issueAccessToken(CLAIMS);
+-        String otherAudience = issuer(properties(Duration.ofMinutes(30), SECRET, ISSUER, "other"))
+-                .issueAccessToken(CLAIMS);
+-        BibbidiTokenParser parser = parser(properties(Duration.ofMinutes(30)));
++        BibbidiTokenProperties otherIssuerProperties = properties(
++                ACCESS_TOKEN_LIFETIME,
++                SECRET,
++                "other",
++                AUDIENCE);
++        BibbidiTokenProperties otherAudienceProperties = properties(
++                ACCESS_TOKEN_LIFETIME,
++                SECRET,
++                ISSUER,
++                "other");
++        String otherIssuer = issuer(otherIssuerProperties).issueAccessToken(CLAIMS);
++        String otherAudience = issuer(otherAudienceProperties).issueAccessToken(CLAIMS);
++        BibbidiTokenParser parser = parser(properties(ACCESS_TOKEN_LIFETIME));
+ 
+         assertThatThrownBy(() -> parser.parseAccessToken(otherIssuer))
+                 .isInstanceOf(BusinessException.class);
+@@ -77,7 +95,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("문자열이 아닌 access token claim은 인증 오류로 거절한다")
+     void shouldRejectAccessTokenWithInvalidClaimType() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+         Instant now = Instant.now();
+         BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
+         String token = Jwts.builder()
+@@ -102,7 +120,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("탈퇴용 표를 access token 자리에 넣으면 용도가 다르다고 거절한다")
+     void shouldRejectDeleteGrantUsedAsAccessToken() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+         String deleteGrant = issuer(properties).issueDeleteGrantToken(1L);
+ 
+         assertThatThrownBy(() -> parser(properties).parseAccessToken(deleteGrant))
+@@ -114,7 +132,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("탈퇴용 표에서 대상 회원을 꺼낸다")
+     void shouldParseDeleteGrant() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+ 
+         Long userId = parser(properties).parseDeleteGrantToken(issuer(properties).issueDeleteGrantToken(7L));
+ 
+@@ -124,7 +142,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("access token을 탈퇴용 표 자리에 넣으면 거절한다")
+     void shouldRejectAccessTokenUsedAsDeleteGrant() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+         String accessToken = issuer(properties).issueAccessToken(CLAIMS);
+ 
+         assertThatThrownBy(() -> parser(properties).parseDeleteGrantToken(accessToken))
+@@ -136,7 +154,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("refresh token은 뜻을 담지 않는 값과 저장용 해시를 함께 준다")
+     void shouldIssueRefreshTokenWithHash() {
+-        IssuedRefreshToken refreshToken = issuer(properties(Duration.ofMinutes(30))).issueRefreshToken();
++        IssuedRefreshToken refreshToken = issuer(properties(ACCESS_TOKEN_LIFETIME)).issueRefreshToken();
+ 
+         assertThat(refreshToken.value()).isNotBlank();
+         assertThat(refreshToken.hash())
+@@ -148,7 +166,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("발급할 때 쓴 해시와 읽을 때 쓰는 해시가 같다")
+     void shouldHashRefreshTokenSameWayOnIssueAndLookup() {
+-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
+         IssuedRefreshToken issued = issuer(properties).issueRefreshToken();
+ 
+         assertThat(parser(properties).hashRefreshToken(issued.value())).isEqualTo(issued.hash());
+@@ -157,7 +175,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("refresh token은 발급할 때마다 다른 값이다")
+     void shouldIssueDifferentRefreshTokenEachTime() {
+-        BibbidiTokenIssuer issuer = issuer(properties(Duration.ofMinutes(30)));
++        BibbidiTokenIssuer issuer = issuer(properties(ACCESS_TOKEN_LIFETIME));
+ 
+         assertThat(issuer.issueRefreshToken().value())
+                 .isNotEqualTo(issuer.issueRefreshToken().value());
+@@ -166,31 +184,56 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("비밀말이 비었거나 너무 짧으면 애플리케이션을 띄우지 않는다")
+     void shouldRejectWeakSecret() {
+-        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
+-                properties(Duration.ofMinutes(30), "", ISSUER, AUDIENCE)))
++        BibbidiTokenProperties emptySecret = properties(
++                ACCESS_TOKEN_LIFETIME,
++                "",
++                ISSUER,
++                AUDIENCE);
++        BibbidiTokenProperties shortSecret = properties(
++                ACCESS_TOKEN_LIFETIME,
++                "too-short",
++                ISSUER,
++                AUDIENCE);
++
++        assertThatThrownBy(() -> new BibbidiTokenSigningKey(emptySecret))
+                 .isInstanceOf(IllegalStateException.class);
+-        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
+-                properties(Duration.ofMinutes(30), "too-short", ISSUER, AUDIENCE)))
++        assertThatThrownBy(() -> new BibbidiTokenSigningKey(shortSecret))
+                 .isInstanceOf(IllegalStateException.class);
+     }
+ 
+     private static BibbidiTokenProperties properties(Duration accessTokenLifetime) {
+-        return properties(accessTokenLifetime, SECRET, ISSUER, AUDIENCE);
++        return properties(
++                accessTokenLifetime,
++                SECRET,
++                ISSUER,
++                AUDIENCE);
+     }
+ 
+     private static BibbidiTokenProperties properties(
+             Duration accessTokenLifetime, String secret, String issuer, String audience) {
+         return new BibbidiTokenProperties(
+-                secret, issuer, audience, accessTokenLifetime, Duration.ofMinutes(5), "HS256", "Authorization");
++                secret,
++                issuer,
++                audience,
++                accessTokenLifetime,
++                DELETE_GRANT_LIFETIME,
++                "HS256",
++                "Authorization");
+     }
+ 
+     private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {
++        BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
+         return new BibbidiTokenIssuer(
+-                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
++                properties,
++                signingKey,
++                new SecretValueGenerator());
+     }
+ 
+     private static BibbidiTokenParser parser(BibbidiTokenProperties properties) {
++        BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
+         return new BibbidiTokenParser(
+-                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
++                properties,
++                signingKey,
++                new SecretValueGenerator());
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java
+index 67661777e0d4e36b4209210004917515f8c4a23b..0923a9af4709fe46b00b54ed24d597d301743257 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/controller/UserControllerIntegrationTest.java
+@@ -38,6 +38,14 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+             "access token이 가리키는 사용자의 닉네임을 변경합니다. 사용자 ID는 바뀌지 않습니다.";
+     private static final String WEDDING_DATE_DESCRIPTION =
+             "access token이 가리키는 사용자의 결혼 예정일을 저장하거나 변경합니다. 과거 날짜와 동일한 날짜도 허용합니다.";
++    private static final LocalDate WEDDING_DATE = LocalDate.of(
++            2027,
++            5,
++            15);
++    private static final LocalDate PAST_WEDDING_DATE = LocalDate.of(
++            2020,
++            1,
++            1);
+ 
+     @Autowired
+     private ObjectMapper objectMapper;
+@@ -123,7 +131,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .header(AUTHORIZATION, token)
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(
+-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
++                                new WeddingDateRequest(WEDDING_DATE))))
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.weddingDate").value("2027-05-15"))
+                 .andDo(document(
+@@ -167,7 +175,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+     void shouldSaveSamePastWeddingDateRepeatedly() throws Exception {
+         String token = bearerTokenOf(currentUserId, "current");
+         String request = objectMapper.writeValueAsString(
+-                new WeddingDateRequest(LocalDate.of(2020, 1, 1)));
++                new WeddingDateRequest(PAST_WEDDING_DATE));
+ 
+         mockMvc.perform(put("/api/users/me/wedding-date")
+                         .header(AUTHORIZATION, token)
+@@ -197,7 +205,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+     @DisplayName("잘못된 결혼 예정일 형식은 요청을 거절한다")
+     void shouldRejectInvalidWeddingDateFormat() throws Exception {
+         ObjectNode request = objectMapper.valueToTree(
+-                new WeddingDateRequest(LocalDate.of(2027, 5, 15)));
++                new WeddingDateRequest(WEDDING_DATE));
+         request.put("weddingDate", "2027-13-40");
+ 
+         mockMvc.perform(put("/api/users/me/wedding-date")
+@@ -213,7 +221,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+         mockMvc.perform(put("/api/users/me/wedding-date")
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(
+-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
++                                new WeddingDateRequest(WEDDING_DATE))))
+                 .andExpect(status().isUnauthorized())
+                 .andExpect(jsonPath("$.errorCode").value(201));
+ 
+@@ -231,7 +239,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+                         .header(AUTHORIZATION, token)
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(
+-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
++                                new WeddingDateRequest(WEDDING_DATE))))
+                 .andExpect(status().isOk());
+ 
+         mockMvc.perform(put("/api/users/me/nickname")
+@@ -285,6 +293,9 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
+     }
+ 
+     private String bearerTokenOf(Long userId, String nickname) {
+-        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, nickname);
++        return AuthenticationTestSupport.bearerTokenOf(
++                bibbidiTokenIssuer,
++                userId,
++                nickname);
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+index 8eeb7db0db1ea8ee565932ea7048f25a9e68c2f4..4a15b529d45c7d8f3008507fb2ce6ea70799a754 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+@@ -20,6 +20,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
+ @Transactional
+ class UserRepositoryIntegrationTest {
+ 
++    private static final LocalDate WEDDING_DATE = LocalDate.of(
++            2027,
++            5,
++            15);
++
+     @Autowired
+     private UserRepository userRepository;
+ 
+@@ -53,8 +58,16 @@ class UserRepositoryIntegrationTest {
+         User changed = userRepository.update(created.changeNickname("new-name"));
+ 
+         assertThat(changed)
+-                .extracting(User::id, User::nickname, User::status, User::email)
+-                .containsExactly(created.id(), "new-name", UserStatus.PENDING, "current@bibbidi.kr");
++                .extracting(
++                        User::id,
++                        User::nickname,
++                        User::status,
++                        User::email)
++                .containsExactly(
++                        created.id(),
++                        "new-name",
++                        UserStatus.PENDING,
++                        "current@bibbidi.kr");
+     }
+ 
+     @Test
+@@ -65,8 +78,14 @@ class UserRepositoryIntegrationTest {
+         User activated = userRepository.update(created.activate());
+ 
+         assertThat(activated)
+-                .extracting(User::id, User::nickname, User::status)
+-                .containsExactly(created.id(), "current", UserStatus.ACTIVE);
++                .extracting(
++                        User::id,
++                        User::nickname,
++                        User::status)
++                .containsExactly(
++                        created.id(),
++                        "current",
++                        UserStatus.ACTIVE);
+     }
+ 
+     @Test
+@@ -85,20 +104,26 @@ class UserRepositoryIntegrationTest {
+         User created = userRepository.create(User.pending("current", "current@bibbidi.kr"));
+ 
+         userRepository.saveWeddingDate(
+-                userRepository.findWeddingDateByUserId(created.id()).changeDate(LocalDate.of(2027, 5, 15)));
++                userRepository.findWeddingDateByUserId(created.id()).changeDate(WEDDING_DATE));
+ 
+         assertThat(userRepository.findWeddingDateByUserId(created.id()).date())
+-                .isEqualTo(LocalDate.of(2027, 5, 15));
++                .isEqualTo(WEDDING_DATE);
+         assertThat(userRepository.findById(created.id()))
+-                .extracting(User::nickname, User::status, User::email)
+-                .containsExactly("current", UserStatus.PENDING, "current@bibbidi.kr");
++                .extracting(
++                        User::nickname,
++                        User::status,
++                        User::email)
++                .containsExactly(
++                        "current",
++                        UserStatus.PENDING,
++                        "current@bibbidi.kr");
+     }
+ 
+     @Test
+     @DisplayName("같은 결혼 예정일을 다시 저장해도 수정 시각을 갱신한다")
+     void shouldUpdateTimestampWhenSameWeddingDateIsSaved() throws InterruptedException {
+         User created = userRepository.create(User.pending("current", null));
+-        WeddingDate weddingDate = new WeddingDate(created.id(), LocalDate.of(2027, 5, 15));
++        WeddingDate weddingDate = new WeddingDate(created.id(), WEDDING_DATE);
+         userRepository.saveWeddingDate(weddingDate);
+         LocalDateTime before = updatedAt(created.id());
+ 
+@@ -110,7 +135,9 @@ class UserRepositoryIntegrationTest {
+ 
+     private LocalDateTime updatedAt(Long userId) {
+         return jdbcTemplate.queryForObject(
+-                "SELECT updated_at FROM users WHERE id = ?", LocalDateTime.class, userId);
++                "SELECT updated_at FROM users WHERE id = ?",
++                LocalDateTime.class,
++                userId);
+     }
+ 
+     @Test

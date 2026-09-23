@@ -50,12 +50,25 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
 
     @BeforeEach
     void stubProvider() {
-        given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
+        given(oidcTokenExchangeClient.exchangeForIdToken(
+                any(),
+                anyString(),
+                anyString(),
+                anyString()))
                 .willReturn("id-token");
-        willAnswer(invocation -> new VerifiedOidcUser(
-                invocation.getArgument(0), "social-user-1", "비비디", "user@bibbidi.kr"))
+        willAnswer(invocation -> {
+            SocialProvider provider = invocation.getArgument(0);
+            return new VerifiedOidcUser(
+                    provider,
+                    "social-user-1",
+                    "비비디",
+                    "user@bibbidi.kr");
+        })
                 .given(idTokenVerifier)
-                .verify(any(SocialProvider.class), anyString(), anyString());
+                .verify(
+                        any(SocialProvider.class),
+                        anyString(),
+                        anyString());
     }
 
     @Test

@@ -47,7 +47,11 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
         UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
         UserResult active = userService.activate(created.id());
         UserAuthInfo owner = new UserAuthInfo(
-                active.id(), active.status(), active.role(), active.nickname(), active.email());
+                active.id(),
+                active.status(),
+                active.role(),
+                active.nickname(),
+                active.email());
         nativeSession = sessionIssueService.issueForNewFamily(owner, ClientType.NATIVE);
     }
 

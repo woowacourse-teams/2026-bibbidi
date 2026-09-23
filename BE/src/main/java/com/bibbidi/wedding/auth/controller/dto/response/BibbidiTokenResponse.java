@@ -10,6 +10,8 @@ public record BibbidiTokenResponse(
 
     public static BibbidiTokenResponse from(IssuedSession session) {
         return new BibbidiTokenResponse(
-                session.accessToken(), session.refreshToken(), session.termsAgreementRequired());
+                session.accessToken(),
+                session.refreshToken(),
+                session.termsAgreementRequired());
     }
 }

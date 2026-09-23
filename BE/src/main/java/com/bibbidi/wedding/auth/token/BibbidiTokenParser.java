@@ -38,26 +38,31 @@ public class BibbidiTokenParser {
                 token,
                 TokenCategory.ACCESS,
                 ClientError.ACCESS_TOKEN_INVALID);
+        Long userId = userId(claims, ClientError.ACCESS_TOKEN_INVALID);
+        UserStatus status = parseEnumClaim(
+                claims,
+                BibbidiTokenClaimNames.STATUS,
+                UserStatus.class,
+                "status");
+        UserRole role = parseEnumClaim(
+                claims,
+                BibbidiTokenClaimNames.ROLE,
+                UserRole.class,
+                "role");
+        String nickname = stringClaim(
+                claims,
+                BibbidiTokenClaimNames.NICKNAME,
+                "nickname");
+        String email = stringClaim(
+                claims,
+                BibbidiTokenClaimNames.EMAIL,
+                "email");
         return new BibbidiTokenClaims(
-                userId(claims, ClientError.ACCESS_TOKEN_INVALID),
-                parseEnumClaim(
-                        claims,
-                        BibbidiTokenClaimNames.STATUS,
-                        UserStatus.class,
-                        "status"),
-                parseEnumClaim(
-                        claims,
-                        BibbidiTokenClaimNames.ROLE,
-                        UserRole.class,
-                        "role"),
-                stringClaim(
-                        claims,
-                        BibbidiTokenClaimNames.NICKNAME,
-                        "nickname"),
-                stringClaim(
-                        claims,
-                        BibbidiTokenClaimNames.EMAIL,
-                        "email"));
+                userId,
+                status,
+                role,
+                nickname,
+                email);
     }
 
     public Long parseDeleteGrantToken(String token) {
@@ -125,8 +130,10 @@ public class BibbidiTokenParser {
         try {
             return Long.valueOf(claims.getSubject());
         } catch (NumberFormatException | NullPointerException exception) {
-            throw new BusinessException(invalidError,
-                    "토큰의 sub가 사용자 식별자가 아닙니다.", exception);
+            throw new BusinessException(
+                    invalidError,
+                    "토큰의 sub가 사용자 식별자가 아닙니다.",
+                    exception);
         }
     }
 

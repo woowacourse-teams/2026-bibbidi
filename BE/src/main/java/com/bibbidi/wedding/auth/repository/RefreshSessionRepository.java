@@ -58,10 +58,11 @@ public class RefreshSessionRepository {
 
     public int deleteExpiredOrRevoked(
             LocalDateTime now, LocalDateTime revokedThreshold, int batchSize) {
+        PageRequest firstBatch = PageRequest.of(0, batchSize);
         List<Long> ids = jpaRefreshSessionRepository.findIdsToClean(
                 now,
                 revokedThreshold,
-                PageRequest.of(0, batchSize)
+                firstBatch
         );
         jpaRefreshSessionRepository.deleteAllByIdInBatch(ids);
         return ids.size();

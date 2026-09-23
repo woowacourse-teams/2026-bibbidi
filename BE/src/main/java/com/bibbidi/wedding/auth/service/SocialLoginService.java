@@ -93,11 +93,12 @@ public class SocialLoginService {
                 browserBinder
         );
         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
+        String redirectUri = authorizationUriFactory.redirectUri(configuration, request.clientType());
         String idToken = tokenExchangeClient.exchangeForIdToken(
                 configuration,
                 code,
                 request.codeVerifier(),
-                authorizationUriFactory.redirectUri(configuration, request.clientType()));
+                redirectUri);
         VerifiedOidcUser identity = idTokenVerifier.verify(
                 provider,
                 idToken,
@@ -133,11 +134,12 @@ public class SocialLoginService {
         );
         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
 
+        String redirectUri = authorizationUriFactory.redirectUri(configuration, clientType);
         String idToken = tokenExchangeClient.exchangeForIdToken(
                 configuration,
                 code,
                 request.codeVerifier(),
-                authorizationUriFactory.redirectUri(configuration, clientType));
+                redirectUri);
 
         return idTokenVerifier.verify(
                 provider,

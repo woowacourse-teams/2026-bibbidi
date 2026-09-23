@@ -11,6 +11,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +47,12 @@ class SessionRefreshServiceIntegrationTest {
         UserResult created = userService.createPendingUser(
                 "refresh-" + UUID.randomUUID().toString().substring(0, 8), "current@bibbidi.kr");
         UserResult active = userService.activate(created.id());
-        owner = new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(), active.email());
+        owner = new UserAuthInfo(
+                active.id(),
+                active.status(),
+                active.role(),
+                active.nickname(),
+                active.email());
     }
 
     @Test
@@ -70,9 +76,14 @@ class SessionRefreshServiceIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
+            String refreshToken = issued.refreshToken();
+            Callable<Boolean> refresh = () -> refreshAfterSignal(
+                    refreshToken,
+                    ready,
+                    start);
             List<Future<Boolean>> results = List.of(
-                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)),
-                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)));
+                    executor.submit(refresh),
+                    executor.submit(refresh));
             ready.await();
             start.countDown();
 
@@ -169,8 +180,12 @@ class SessionRefreshServiceIntegrationTest {
     @DisplayName("가입이 끝나지 않은 회원에게는 약관 동의가 필요하다고 알린다")
     void shouldMarkTermsAgreementRequiredForPendingUser() {
         UserResult pending = userService.createPendingUser("pending", null);
-        UserAuthInfo pendingOwner =
-                new UserAuthInfo(pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
+        UserAuthInfo pendingOwner = new UserAuthInfo(
+                pending.id(),
+                pending.status(),
+                pending.role(),
+                pending.nickname(),
+                pending.email());
 
         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
 

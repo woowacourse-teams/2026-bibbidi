@@ -50,8 +50,11 @@ public class AuthSessionController {
             @RequestParam(defaultValue = "LOGIN") SocialAuthPurpose purpose,
             HttpServletResponse response
     ) {
+        SocialProvider socialProvider = SocialProvider.from(provider);
         SocialAuthorizationResult result = socialLoginService.startAuthorization(
-                SocialProvider.from(provider), clientType, purpose);
+                socialProvider,
+                clientType,
+                purpose);
 
         if (result.browserBinder() != null) {
             response.addHeader(HttpHeaders.SET_COOKIE,
@@ -68,12 +71,14 @@ public class AuthSessionController {
             HttpServletRequest servletRequest,
             HttpServletResponse response
     ) {
+        SocialProvider socialProvider = SocialProvider.from(provider);
+        String browserBinder = authCookieFactory.readOidcBinder(servletRequest);
         IssuedSession session = socialLoginService.login(
-                SocialProvider.from(provider),
+                socialProvider,
                 ClientType.WEB,
                 request.code(),
                 request.state(),
-                authCookieFactory.readOidcBinder(servletRequest));
+                browserBinder);
 
         response.addHeader(
                 HttpHeaders.SET_COOKIE,
@@ -90,12 +95,14 @@ public class AuthSessionController {
             @PathVariable String provider,
             @Valid @RequestBody SocialLoginRequest request
     ) {
-        return BibbidiTokenResponse.from(socialLoginService.login(
-                SocialProvider.from(provider),
+        SocialProvider socialProvider = SocialProvider.from(provider);
+        IssuedSession session = socialLoginService.login(
+                socialProvider,
                 ClientType.NATIVE,
                 request.code(),
                 request.state(),
-                null));
+                null);
+        return BibbidiTokenResponse.from(session);
     }
 
     @PostMapping("/api/auth/web/sessions/refresh")

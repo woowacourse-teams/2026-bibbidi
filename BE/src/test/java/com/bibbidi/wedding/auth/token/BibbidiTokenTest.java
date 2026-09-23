@@ -20,14 +20,20 @@ class BibbidiTokenTest {
     private static final String SECRET = "test-only-jwt-secret-value-for-bibbidi-auth";
     private static final String ISSUER = "bibbidi-test";
     private static final String AUDIENCE = "bibbidi-test-client";
+    private static final Duration ACCESS_TOKEN_LIFETIME = Duration.ofMinutes(30);
+    private static final Duration DELETE_GRANT_LIFETIME = Duration.ofMinutes(5);
 
-    private static final BibbidiTokenClaims CLAIMS =
-            new BibbidiTokenClaims(1L, UserStatus.ACTIVE, UserRole.NORMAL, "current", "current@bibbidi.kr");
+    private static final BibbidiTokenClaims CLAIMS = new BibbidiTokenClaims(
+            1L,
+            UserStatus.ACTIVE,
+            UserRole.NORMAL,
+            "current",
+            "current@bibbidi.kr");
 
     @Test
     @DisplayName("발급한 access token에서 사용자와 표시용 정보를 그대로 꺼낸다")
     void shouldIssueAndParseAccessToken() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
         BibbidiTokenIssuer issuer = issuer(properties);
 
         BibbidiTokenClaims parsed = parser(properties).parseAccessToken(issuer.issueAccessToken(CLAIMS));
@@ -50,10 +56,14 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("다른 비밀말로 서명한 token은 거절한다")
     void shouldRejectTokenSignedWithOtherSecret() {
-        String forged = issuer(properties(Duration.ofMinutes(30), SECRET + "-other", ISSUER, AUDIENCE))
-                .issueAccessToken(CLAIMS);
+        BibbidiTokenProperties otherSecret = properties(
+                ACCESS_TOKEN_LIFETIME,
+                SECRET + "-other",
+                ISSUER,
+                AUDIENCE);
+        String forged = issuer(otherSecret).issueAccessToken(CLAIMS);
 
-        assertThatThrownBy(() -> parser(properties(Duration.ofMinutes(30))).parseAccessToken(forged))
+        assertThatThrownBy(() -> parser(properties(ACCESS_TOKEN_LIFETIME)).parseAccessToken(forged))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.ACCESS_TOKEN_INVALID);
@@ -62,11 +72,19 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("발급자나 대상이 다른 token은 거절한다")
     void shouldRejectTokenWithOtherIssuerOrAudience() {
-        String otherIssuer = issuer(properties(Duration.ofMinutes(30), SECRET, "other", AUDIENCE))
-                .issueAccessToken(CLAIMS);
-        String otherAudience = issuer(properties(Duration.ofMinutes(30), SECRET, ISSUER, "other"))
-                .issueAccessToken(CLAIMS);
-        BibbidiTokenParser parser = parser(properties(Duration.ofMinutes(30)));
+        BibbidiTokenProperties otherIssuerProperties = properties(
+                ACCESS_TOKEN_LIFETIME,
+                SECRET,
+                "other",
+                AUDIENCE);
+        BibbidiTokenProperties otherAudienceProperties = properties(
+                ACCESS_TOKEN_LIFETIME,
+                SECRET,
+                ISSUER,
+                "other");
+        String otherIssuer = issuer(otherIssuerProperties).issueAccessToken(CLAIMS);
+        String otherAudience = issuer(otherAudienceProperties).issueAccessToken(CLAIMS);
+        BibbidiTokenParser parser = parser(properties(ACCESS_TOKEN_LIFETIME));
 
         assertThatThrownBy(() -> parser.parseAccessToken(otherIssuer))
                 .isInstanceOf(BusinessException.class);
@@ -77,7 +95,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("문자열이 아닌 access token claim은 인증 오류로 거절한다")
     void shouldRejectAccessTokenWithInvalidClaimType() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
         Instant now = Instant.now();
         BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
         String token = Jwts.builder()
@@ -102,7 +120,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("탈퇴용 표를 access token 자리에 넣으면 용도가 다르다고 거절한다")
     void shouldRejectDeleteGrantUsedAsAccessToken() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
         String deleteGrant = issuer(properties).issueDeleteGrantToken(1L);
 
         assertThatThrownBy(() -> parser(properties).parseAccessToken(deleteGrant))
@@ -114,7 +132,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("탈퇴용 표에서 대상 회원을 꺼낸다")
     void shouldParseDeleteGrant() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
 
         Long userId = parser(properties).parseDeleteGrantToken(issuer(properties).issueDeleteGrantToken(7L));
 
@@ -124,7 +142,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("access token을 탈퇴용 표 자리에 넣으면 거절한다")
     void shouldRejectAccessTokenUsedAsDeleteGrant() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
         String accessToken = issuer(properties).issueAccessToken(CLAIMS);
 
         assertThatThrownBy(() -> parser(properties).parseDeleteGrantToken(accessToken))
@@ -136,7 +154,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("refresh token은 뜻을 담지 않는 값과 저장용 해시를 함께 준다")
     void shouldIssueRefreshTokenWithHash() {
-        IssuedRefreshToken refreshToken = issuer(properties(Duration.ofMinutes(30))).issueRefreshToken();
+        IssuedRefreshToken refreshToken = issuer(properties(ACCESS_TOKEN_LIFETIME)).issueRefreshToken();
 
         assertThat(refreshToken.value()).isNotBlank();
         assertThat(refreshToken.hash())
@@ -148,7 +166,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("발급할 때 쓴 해시와 읽을 때 쓰는 해시가 같다")
     void shouldHashRefreshTokenSameWayOnIssueAndLookup() {
-        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        BibbidiTokenProperties properties = properties(ACCESS_TOKEN_LIFETIME);
         IssuedRefreshToken issued = issuer(properties).issueRefreshToken();
 
         assertThat(parser(properties).hashRefreshToken(issued.value())).isEqualTo(issued.hash());
@@ -157,7 +175,7 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("refresh token은 발급할 때마다 다른 값이다")
     void shouldIssueDifferentRefreshTokenEachTime() {
-        BibbidiTokenIssuer issuer = issuer(properties(Duration.ofMinutes(30)));
+        BibbidiTokenIssuer issuer = issuer(properties(ACCESS_TOKEN_LIFETIME));
 
         assertThat(issuer.issueRefreshToken().value())
                 .isNotEqualTo(issuer.issueRefreshToken().value());
@@ -166,31 +184,56 @@ class BibbidiTokenTest {
     @Test
     @DisplayName("비밀말이 비었거나 너무 짧으면 애플리케이션을 띄우지 않는다")
     void shouldRejectWeakSecret() {
-        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
-                properties(Duration.ofMinutes(30), "", ISSUER, AUDIENCE)))
+        BibbidiTokenProperties emptySecret = properties(
+                ACCESS_TOKEN_LIFETIME,
+                "",
+                ISSUER,
+                AUDIENCE);
+        BibbidiTokenProperties shortSecret = properties(
+                ACCESS_TOKEN_LIFETIME,
+                "too-short",
+                ISSUER,
+                AUDIENCE);
+
+        assertThatThrownBy(() -> new BibbidiTokenSigningKey(emptySecret))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
-                properties(Duration.ofMinutes(30), "too-short", ISSUER, AUDIENCE)))
+        assertThatThrownBy(() -> new BibbidiTokenSigningKey(shortSecret))
                 .isInstanceOf(IllegalStateException.class);
     }
 
     private static BibbidiTokenProperties properties(Duration accessTokenLifetime) {
-        return properties(accessTokenLifetime, SECRET, ISSUER, AUDIENCE);
+        return properties(
+                accessTokenLifetime,
+                SECRET,
+                ISSUER,
+                AUDIENCE);
     }
 
     private static BibbidiTokenProperties properties(
             Duration accessTokenLifetime, String secret, String issuer, String audience) {
         return new BibbidiTokenProperties(
-                secret, issuer, audience, accessTokenLifetime, Duration.ofMinutes(5), "HS256", "Authorization");
+                secret,
+                issuer,
+                audience,
+                accessTokenLifetime,
+                DELETE_GRANT_LIFETIME,
+                "HS256",
+                "Authorization");
     }
 
     private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {
+        BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
         return new BibbidiTokenIssuer(
-                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
+                properties,
+                signingKey,
+                new SecretValueGenerator());
     }
 
     private static BibbidiTokenParser parser(BibbidiTokenProperties properties) {
+        BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
         return new BibbidiTokenParser(
-                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
+                properties,
+                signingKey,
+                new SecretValueGenerator());
     }
 }

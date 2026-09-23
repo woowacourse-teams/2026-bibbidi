@@ -80,15 +80,30 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
         UserAuthInfo created = socialUserRegistrationService.findOrCreate(identity);
         UserResult active = userService.activate(created.userId());
         userId = active.id();
-        session = sessionIssueService.issueForNewFamily(
-                new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(),
-                        active.email()),
-                ClientType.WEB);
+        UserAuthInfo owner = new UserAuthInfo(
+                active.id(),
+                active.status(),
+                active.role(),
+                active.nickname(),
+                active.email());
+        session = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
 
-        given(oidcTokenExchangeClient.exchangeForIdToken(any(), anyString(), anyString(), anyString()))
+        given(oidcTokenExchangeClient.exchangeForIdToken(
+                any(),
+                anyString(),
+                anyString(),
+                anyString()))
                 .willReturn("id-token");
-        given(idTokenVerifier.verify(any(SocialProvider.class), anyString(), anyString()))
-                .willReturn(new VerifiedOidcUser(SocialProvider.KAKAO, "social-user-1", "nickname", "current@bibbidi.kr"));
+        VerifiedOidcUser verifiedUser = new VerifiedOidcUser(
+                SocialProvider.KAKAO,
+                "social-user-1",
+                "nickname",
+                "current@bibbidi.kr");
+        given(idTokenVerifier.verify(
+                any(SocialProvider.class),
+                anyString(),
+                anyString()))
+                .willReturn(verifiedUser);
     }
 
     @Test

@@ -53,27 +53,30 @@ public class OidcAuthRequestService {
         String codeVerifier = secretValueGenerator.generate();
         String browserBinder = clientType == ClientType.WEB ? secretValueGenerator.generate() : null;
 
-        oidcAuthRequestRepository.save(
-                OidcAuthRequest.start(
-                        secretValueGenerator.toSha256Hex(state),
-                        provider,
-                        nonce,
-                        codeVerifier,
-                        browserBinder == null
-                                ? null
-                                : secretValueGenerator.toSha256Hex(browserBinder),
-                        clientType,
-                        purpose,
-                        LocalDateTime.now().plus(sessionProperties.authRequestLifetime())
-                )
+        String stateHash = secretValueGenerator.toSha256Hex(state);
+        String browserBinderHash = browserBinder == null
+                ? null
+                : secretValueGenerator.toSha256Hex(browserBinder);
+        LocalDateTime expiresAt = LocalDateTime.now().plus(sessionProperties.authRequestLifetime());
+        OidcAuthRequest authRequest = OidcAuthRequest.start(
+                stateHash,
+                provider,
+                nonce,
+                codeVerifier,
+                browserBinderHash,
+                clientType,
+                purpose,
+                expiresAt
         );
+        oidcAuthRequestRepository.save(authRequest);
 
+        String codeChallenge = secretValueGenerator.toCodeChallenge(codeVerifier);
         String authorizationUri = authorizationUriFactory.create(
                 configuration,
                 clientType,
                 state,
                 nonce,
-                secretValueGenerator.toCodeChallenge(codeVerifier)
+                codeChallenge
         );
         return new SocialAuthorizationResult(
                 authorizationUri,

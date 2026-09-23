@@ -55,7 +55,11 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
         UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
         UserResult active = userService.activate(created.id());
         owner = new UserAuthInfo(
-                active.id(), active.status(), active.role(), active.nickname(), active.email());
+                active.id(),
+                active.status(),
+                active.role(),
+                active.nickname(),
+                active.email());
     }
 
     @Test
@@ -191,7 +195,11 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
     void shouldBlockPendingUserUntilTermsAgreed() throws Exception {
         UserResult pending = userService.createPendingUser("pending", null);
         UserAuthInfo pendingOwner = new UserAuthInfo(
-                pending.id(), pending.status(), pending.role(), pending.nickname(), pending.email());
+                pending.id(),
+                pending.status(),
+                pending.role(),
+                pending.nickname(),
+                pending.email());
         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders

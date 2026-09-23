@@ -38,6 +38,14 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
             "access token이 가리키는 사용자의 닉네임을 변경합니다. 사용자 ID는 바뀌지 않습니다.";
     private static final String WEDDING_DATE_DESCRIPTION =
             "access token이 가리키는 사용자의 결혼 예정일을 저장하거나 변경합니다. 과거 날짜와 동일한 날짜도 허용합니다.";
+    private static final LocalDate WEDDING_DATE = LocalDate.of(
+            2027,
+            5,
+            15);
+    private static final LocalDate PAST_WEDDING_DATE = LocalDate.of(
+            2020,
+            1,
+            1);
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -123,7 +131,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                         .header(AUTHORIZATION, token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+                                new WeddingDateRequest(WEDDING_DATE))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weddingDate").value("2027-05-15"))
                 .andDo(document(
@@ -167,7 +175,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldSaveSamePastWeddingDateRepeatedly() throws Exception {
         String token = bearerTokenOf(currentUserId, "current");
         String request = objectMapper.writeValueAsString(
-                new WeddingDateRequest(LocalDate.of(2020, 1, 1)));
+                new WeddingDateRequest(PAST_WEDDING_DATE));
 
         mockMvc.perform(put("/api/users/me/wedding-date")
                         .header(AUTHORIZATION, token)
@@ -197,7 +205,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     @DisplayName("잘못된 결혼 예정일 형식은 요청을 거절한다")
     void shouldRejectInvalidWeddingDateFormat() throws Exception {
         ObjectNode request = objectMapper.valueToTree(
-                new WeddingDateRequest(LocalDate.of(2027, 5, 15)));
+                new WeddingDateRequest(WEDDING_DATE));
         request.put("weddingDate", "2027-13-40");
 
         mockMvc.perform(put("/api/users/me/wedding-date")
@@ -213,7 +221,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
         mockMvc.perform(put("/api/users/me/wedding-date")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+                                new WeddingDateRequest(WEDDING_DATE))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value(201));
 
@@ -231,7 +239,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
                         .header(AUTHORIZATION, token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new WeddingDateRequest(LocalDate.of(2027, 5, 15)))))
+                                new WeddingDateRequest(WEDDING_DATE))))
                 .andExpect(status().isOk());
 
         mockMvc.perform(put("/api/users/me/nickname")
@@ -285,6 +293,9 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private String bearerTokenOf(Long userId, String nickname) {
-        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, nickname);
+        return AuthenticationTestSupport.bearerTokenOf(
+                bibbidiTokenIssuer,
+                userId,
+                nickname);
     }
 }

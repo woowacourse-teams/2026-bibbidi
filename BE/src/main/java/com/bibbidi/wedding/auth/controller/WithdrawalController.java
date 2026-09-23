@@ -43,12 +43,15 @@ public class WithdrawalController {
             @Valid @RequestBody SocialLoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        return new DeleteGrantResponse(withdrawalService.issueDeleteGrantToken(
-                SocialProvider.from(provider),
+        SocialProvider socialProvider = SocialProvider.from(provider);
+        String browserBinder = authCookieFactory.readOidcBinder(servletRequest);
+        String deleteGrantToken = withdrawalService.issueDeleteGrantToken(
+                socialProvider,
                 request.code(),
                 request.state(),
-                authCookieFactory.readOidcBinder(servletRequest),
-                currentUserId));
+                browserBinder,
+                currentUserId);
+        return new DeleteGrantResponse(deleteGrantToken);
     }
 
     @DeleteMapping("/api/users/me")
