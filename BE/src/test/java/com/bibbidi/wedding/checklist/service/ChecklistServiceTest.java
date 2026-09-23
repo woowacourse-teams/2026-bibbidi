@@ -818,7 +818,8 @@ class ChecklistServiceTest {
                 CATEGORY_ID,
                 "계약서 확인",
                 sourceCatalogItemId,
-                status
+                status,
+                null
         );
     }
 

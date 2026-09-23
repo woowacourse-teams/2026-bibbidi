@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
@@ -99,7 +100,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Test
     @Sql("/appointment-fixture.sql")
-    @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES (2, 1, 1, NULL, '청첩장 제작', 'CONTINUE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), (3, 1, 1, NULL, '피팅 예약', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+    @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES (2, 1, 1, NULL, '청첩장 제작', 'CONTINUE', '2026-08-01 09:10:11', CURRENT_TIMESTAMP), (3, 1, 1, NULL, '피팅 예약', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     @Sql(statements = "INSERT INTO appointments (id, checklist_item_id, title, appointment_date, start_time, end_time, place, memo, is_done, done_by_checklist_item, created_at, updated_at) VALUES (100, 1, 'appointment', '2026-09-10', '2026-09-10 10:00:00', '2026-09-10 11:00:00', 'place', 'memo', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     @DisplayName("로그인한 사용자의 할 일을 상태와 일정과 함께 조회한다")
     void shouldReturnChecklistItemsWithAppointments() throws Exception {
@@ -113,6 +114,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.items[0].categoryId").value(1))
                 .andExpect(jsonPath("$.items[0].sourceCatalogItemId").isEmpty())
                 .andExpect(jsonPath("$.items[0].status").value("prev"))
+                .andExpect(jsonPath("$.items[0].createdAt").isString())
                 .andExpect(jsonPath("$.items[0].appointments[0].title").value("appointment"))
                 .andExpect(jsonPath("$.items[0].appointments[0].date").value("2026-09-10"))
                 .andExpect(jsonPath("$.items[0].appointments[0].startTime").value("2026-09-10T10:00:00"))
@@ -122,10 +124,12 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.items[1].id").value(2))
                 .andExpect(jsonPath("$.items[1].title").value("청첩장 제작"))
                 .andExpect(jsonPath("$.items[1].status").value("continue"))
+                .andExpect(jsonPath("$.items[1].createdAt").value("2026-08-01T09:10:11"))
                 .andExpect(jsonPath("$.items[1].appointments").isEmpty())
                 .andExpect(jsonPath("$.items[2].id").value(3))
                 .andExpect(jsonPath("$.items[2].title").value("피팅 예약"))
                 .andExpect(jsonPath("$.items[2].status").value("done"))
+                .andExpect(jsonPath("$.items[2].createdAt").isString())
                 .andDo(document(
                                 "checklists-find-me",
                                 resource(ResourceSnippetParameters.builder()
@@ -145,6 +149,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                                         .optional(),
                                                 fieldWithPath("items[].title").description("할 일 제목"),
                                                 fieldWithPath("items[].status").description("할 일 상태. prev, continue, done"),
+                                                fieldWithPath("items[].createdAt").description("할 일 생성 시각"),
                                                 fieldWithPath("items[].appointments").description("할 일에 연결된 일정 목록"),
                                                 fieldWithPath("items[].appointments[].id").description("일정 ID"),
                                                 fieldWithPath("items[].appointments[].title").description("일정 제목"),
@@ -703,6 +708,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.categoryId").value(2))
                 .andExpect(jsonPath("$.title").value("청첩장 문구 정하기"))
                 .andExpect(jsonPath("$.status").value("prev"))
+                .andExpect(jsonPath("$.createdAt").isString())
                 .andDo(document(
                                 "checklists-write-item",
                                 resource(ResourceSnippetParameters.builder()
@@ -724,7 +730,8 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일은 항상 null"),
                                                 fieldWithPath("categoryId").description("할 일이 속한 카테고리 ID"),
                                                 fieldWithPath("title").description("할 일 제목"),
-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
+                                                fieldWithPath("createdAt").description("할 일 생성 시각")
                                         )
                                         .build()
                                 )

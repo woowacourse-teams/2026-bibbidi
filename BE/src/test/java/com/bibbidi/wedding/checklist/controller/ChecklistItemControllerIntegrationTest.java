@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
@@ -128,7 +129,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                                 fieldWithPath("title").description("할 일 제목"),
-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
+                                                fieldWithPath("createdAt").description("할 일 생성 시각")
                                         )
                                         .build())
                         )
@@ -337,10 +339,57 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                         fieldWithPath("categoryId").description("변경된 카테고리 ID"),
                                         fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done"),
+                                        fieldWithPath("createdAt").description("할 일 생성 시각")
                                 )
                                 .build())
                 ));
+    }
+
+    @Test
+    @DisplayName("제목, 카테고리, 상태를 변경해도 생성 시각은 유지된다")
+    void shouldKeepCreatedAtAfterChangingItem() throws Exception {
+        String originalCreatedAt = createdAtOfCustomItem();
+
+        String titleResponse = mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleRequestBody(NEW_TITLE)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(titleResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
+
+        String categoryResponse = mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(NEW_CATEGORY_ID)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(categoryResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
+
+        String statusResponse = mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
+                        .session(authenticatedSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusRequestBody("continue")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(statusResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
+        assertThat(createdAtOfCustomItem()).isEqualTo(originalCreatedAt);
+    }
+
+    private String createdAtOfCustomItem() throws Exception {
+        String checklistResponse = mockMvc.perform(get("/api/checklists/me")
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var items = objectMapper.readTree(checklistResponse).get("items");
+        for (int index = 0; index < items.size(); index++) {
+            var item = items.get(index);
+            if (item.get("id").asLong() == CUSTOM_ITEM_ID) {
+                return item.get("createdAt").asText();
+            }
+        }
+        throw new AssertionError("조회 응답에서 직접 만든 할 일을 찾지 못했습니다.");
     }
 
     @Test
@@ -501,7 +550,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                         .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                                 fieldWithPath("title").description("변경된 할 일 제목"),
-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
+                                                fieldWithPath("createdAt").description("할 일 생성 시각")
                                         )
                                         .build())
                         )
