@@ -70,7 +70,7 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description("앱이 넘겨 준 1회용 코드를 내면 웹 세션 쿠키를 받습니다. "
                                         + "이 세션은 앱 세션과 같은 기기 계열에 들어갑니다.")
                                 .requestSchema(schema("HandoffCodeExchangeRequest"))
-                                .responseSchema(schema("WebSessionResponse"))
+                                .responseSchema(schema("BibbidiSessionResponse"))
                                 .requestFields(PayloadDocumentation.fieldWithPath("code")
                                         .description("앱이 발급받아 WebView에 넘긴 1회용 코드"))
                                 .responseFields(

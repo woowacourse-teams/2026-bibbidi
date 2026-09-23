@@ -1,0 +1,158 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
+index 1d45b00dee99185c70f4786795664124ed208d54..3cb926939f16a8688c0e55eb9861a529daf57be1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
+@@ -5,7 +5,7 @@ import com.bibbidi.wedding.auth.domain.RefreshSession;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+-import com.bibbidi.wedding.auth.token.SecretValueGenerator;
++import com.bibbidi.wedding.auth.token.IssuedRefreshToken;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import java.time.LocalDateTime;
+@@ -22,18 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
+ public class SessionIssueService {
+ 
+     private final BibbidiTokenIssuer bibbidiTokenIssuer;
+-    private final SecretValueGenerator secretValueGenerator;
+     private final RefreshSessionRepository refreshSessionRepository;
+     private final SessionProperties sessionProperties;
+ 
+     public SessionIssueService(
+             BibbidiTokenIssuer bibbidiTokenIssuer,
+-            SecretValueGenerator secretValueGenerator,
+             RefreshSessionRepository refreshSessionRepository,
+             SessionProperties sessionProperties
+     ) {
+         this.bibbidiTokenIssuer = bibbidiTokenIssuer;
+-        this.secretValueGenerator = secretValueGenerator;
+         this.refreshSessionRepository = refreshSessionRepository;
+         this.sessionProperties = sessionProperties;
+     }
+@@ -43,12 +40,12 @@ public class SessionIssueService {
+     }
+ 
+     public IssuedSession issue(SessionOwner owner, ClientType clientType, String familyId) {
+-        String refreshToken = secretValueGenerator.generate();
++        IssuedRefreshToken refreshToken = bibbidiTokenIssuer.issueRefreshToken();
+         refreshSessionRepository.save(RefreshSession.issue(
+                 owner.userId(),
+                 familyId,
+                 clientType,
+-                secretValueGenerator.hash(refreshToken),
++                refreshToken.hash(),
+                 LocalDateTime.now().plus(sessionProperties.refreshTokenTtl())));
+ 
+         String accessToken = bibbidiTokenIssuer.issueAccessToken(new BibbidiTokenClaims(
+@@ -56,7 +53,7 @@ public class SessionIssueService {
+ 
+         return new IssuedSession(
+                 accessToken,
+-                refreshToken,
++                refreshToken.value(),
+                 clientType,
+                 familyId,
+                 owner.status() == UserStatus.PENDING);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+index 90ee446549cfb3bfb53cbfe49c8c799c8ce6b848..764422ed0476c2eaa265cc45dd5b935f4c4e37d1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+@@ -7,16 +7,37 @@ import java.util.Date;
+ import java.util.UUID;
+ import org.springframework.stereotype.Component;
+ 
+-/** 서명 토큰을 발급한다. 수명과 식별자는 모두 설정에서 온다. */
++/**
++ * 우리가 내주는 토큰을 만든다. 수명과 식별자는 모두 설정에서 온다.
++ *
++ * <p>access token과 탈퇴용 표는 서명한 JWT로, refresh token은 뜻을 담지 않는 난수로 만든다.
++ * refresh token은 서명으로 검증하지 않고 저장해 둔 해시와 대조하므로, 값과 함께 저장할 해시를 준다.
++ * 저장은 이 자리의 일이 아니라 부르는 쪽이 한다.
++ */
+ @Component
+ public class BibbidiTokenIssuer {
+ 
+     private final BibbidiTokenProperties properties;
+     private final BibbidiTokenSigningKey signingKey;
++    private final SecretValueGenerator secretValueGenerator;
+ 
+-    public BibbidiTokenIssuer(BibbidiTokenProperties properties, BibbidiTokenSigningKey signingKey) {
++    public BibbidiTokenIssuer(
++            BibbidiTokenProperties properties,
++            BibbidiTokenSigningKey signingKey,
++            SecretValueGenerator secretValueGenerator
++    ) {
+         this.properties = properties;
+         this.signingKey = signingKey;
++        this.secretValueGenerator = secretValueGenerator;
++    }
++
++    /**
++     * refresh token은 뜻을 담지 않는 난수다.
++     * 서명할 내용이 없고, 폐기할 수 있어야 하므로 서버가 해시를 들고 대조한다.
++     */
++    public IssuedRefreshToken issueRefreshToken() {
++        String value = secretValueGenerator.generate();
++        return new IssuedRefreshToken(value, secretValueGenerator.hash(value));
+     }
+ 
+     public String issueAccessToken(BibbidiTokenClaims claims) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/IssuedRefreshToken.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/IssuedRefreshToken.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..63c7dd2e8c66065ea79389e1c5d7df6bf4cafae9
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/IssuedRefreshToken.java
+@@ -0,0 +1,10 @@
++package com.bibbidi.wedding.auth.token;
++
++/**
++ * 새로 만든 refresh token이다.
++ *
++ * @param value 클라이언트에게 내주는 값. 서버는 이것을 보관하지 않는다
++ * @param hash 서버가 저장할 값. 들어온 token을 같은 방식으로 해시해 대조한다
++ */
++public record IssuedRefreshToken(String value, String hash) {
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index 35a8388ca570c8367b223492d17617cdfd340e05..4881772556629fbf561b0858cee019f2227776ee 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -104,6 +104,27 @@ class BibbidiTokenTest {
+                 .isEqualTo(ClientError.DELETE_GRANT_INVALID);
+     }
+ 
++    @Test
++    @DisplayName("refresh token은 뜻을 담지 않는 값과 저장용 해시를 함께 준다")
++    void shouldIssueRefreshTokenWithHash() {
++        IssuedRefreshToken refreshToken = issuer(properties(Duration.ofMinutes(30))).issueRefreshToken();
++
++        assertThat(refreshToken.value()).isNotBlank();
++        assertThat(refreshToken.hash())
++                .isNotBlank()
++                .isNotEqualTo(refreshToken.value())
++                .isEqualTo(new SecretValueGenerator().hash(refreshToken.value()));
++    }
++
++    @Test
++    @DisplayName("refresh token은 발급할 때마다 다른 값이다")
++    void shouldIssueDifferentRefreshTokenEachTime() {
++        BibbidiTokenIssuer issuer = issuer(properties(Duration.ofMinutes(30)));
++
++        assertThat(issuer.issueRefreshToken().value())
++                .isNotEqualTo(issuer.issueRefreshToken().value());
++    }
++
+     @Test
+     @DisplayName("비밀말이 비었거나 너무 짧으면 애플리케이션을 띄우지 않는다")
+     void shouldRejectWeakSecret() {
+@@ -126,7 +147,8 @@ class BibbidiTokenTest {
+     }
+ 
+     private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {
+-        return new BibbidiTokenIssuer(properties, new BibbidiTokenSigningKey(properties));
++        return new BibbidiTokenIssuer(
++                properties, new BibbidiTokenSigningKey(properties), new SecretValueGenerator());
+     }
+ 
+     private static BibbidiTokenParser parser(BibbidiTokenProperties properties) {

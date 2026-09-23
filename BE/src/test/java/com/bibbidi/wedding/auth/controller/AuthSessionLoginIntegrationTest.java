@@ -78,7 +78,7 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
                                 .description("인가 코드를 서버가 토큰으로 바꾸고 id_token을 검증한 뒤 세션을 발급합니다. "
                                         + "refresh token은 Secure·HttpOnly 쿠키로 내려갑니다.")
                                 .requestSchema(schema("SocialLoginRequest"))
-                                .responseSchema(schema("WebSessionResponse"))
+                                .responseSchema(schema("BibbidiSessionResponse"))
                                 .pathParameters(parameterWithName("provider").description("kakao 또는 google"))
                                 .requestFields(
                                         PayloadDocumentation.fieldWithPath("code")
@@ -118,7 +118,7 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
                                 .summary("네이티브 소셜 로그인 완료")
                                 .description("쿠키를 쓰지 않는 앱을 위해 refresh token까지 응답 본문으로 내려 줍니다.")
                                 .requestSchema(schema("SocialLoginRequest"))
-                                .responseSchema(schema("NativeSessionResponse"))
+                                .responseSchema(schema("BibbidiTokenResponse"))
                                 .pathParameters(parameterWithName("provider").description("kakao 또는 google"))
                                 .requestFields(
                                         PayloadDocumentation.fieldWithPath("code")

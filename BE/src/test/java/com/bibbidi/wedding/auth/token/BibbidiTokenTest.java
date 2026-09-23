@@ -9,6 +9,9 @@ import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +72,31 @@ class BibbidiTokenTest {
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> parser.parseAccessToken(otherAudience))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("문자열이 아닌 access token claim은 인증 오류로 거절한다")
+    void shouldRejectAccessTokenWithInvalidClaimType() {
+        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+        Instant now = Instant.now();
+        BibbidiTokenSigningKey signingKey = new BibbidiTokenSigningKey(properties);
+        String token = Jwts.builder()
+                .issuer(properties.issuer())
+                .audience().add(properties.audience()).and()
+                .subject("1")
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(300)))
+                .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.ACCESS.name())
+                .claim(BibbidiTokenClaimNames.STATUS, 1)
+                .claim(BibbidiTokenClaimNames.ROLE, UserRole.NORMAL.name())
+                .claim(BibbidiTokenClaimNames.NICKNAME, "current")
+                .signWith(signingKey.signingKey(), Jwts.SIG.HS256)
+                .compact();
+
+        assertThatThrownBy(() -> parser(properties).parseAccessToken(token))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).clientError())
+                .isEqualTo(ClientError.ACCESS_TOKEN_INVALID);
     }
 
     @Test

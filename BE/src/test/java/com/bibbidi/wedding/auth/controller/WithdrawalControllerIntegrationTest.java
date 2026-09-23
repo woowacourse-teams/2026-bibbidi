@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.controller.dto.request.WithdrawalRequest;
@@ -103,7 +104,6 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
         Cookie binder = authorization.getResponse().getCookie("BIBBIDI_OIDC_BINDER");
 
         mockMvc.perform(post("/api/auth/delete-grants/{provider}/callback", "kakao")
-                        .param("clientType", "WEB")
                         .header(AUTHORIZATION, "Bearer " + session.accessToken())
                         .cookie(binder)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +118,6 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .summary("Issue a delete grant")
                                 .description("Issues a delete grant after successful social reauthentication.")
                                 .pathParameters(parameterWithName("provider").description("kakao or google"))
-                                .queryParameters(parameterWithName("clientType").description("WEB or NATIVE"))
                                 .requestSchema(schema("SocialLoginRequest"))
                                 .requestHeaders(headerWithName(AUTHORIZATION)
                                         .description("濡쒓렇?명븳 ?뚯썝??access token"))
@@ -138,10 +137,12 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldWithdrawWithDeleteGrant() throws Exception {
         mockMvc.perform(delete("/api/users/me")
                         .header(AUTHORIZATION, "Bearer " + session.accessToken())
+                        .cookie(new Cookie("BIBBIDI_REFRESH", session.refreshToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new WithdrawalRequest(bibbidiTokenIssuer.issueDeleteGrantToken(userId)))))
                 .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")))
                 .andDo(document(
                         "users-withdraw",
                         resource(ResourceSnippetParameters.builder()
@@ -156,6 +157,18 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .requestFields(PayloadDocumentation.fieldWithPath("deleteGrant")
                                         .description("소셜 재인증으로 받은 탈퇴용 표"))
                                 .build())));
+    }
+
+    @Test
+    @DisplayName("네이티브 탈퇴 응답에는 웹 refresh 쿠키를 설정하지 않는다")
+    void shouldNotSetRefreshCookieOnNativeWithdrawal() throws Exception {
+        mockMvc.perform(delete("/api/users/me")
+                        .header(AUTHORIZATION, "Bearer " + session.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new WithdrawalRequest(bibbidiTokenIssuer.issueDeleteGrantToken(userId)))))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist("Set-Cookie"));
     }
 
     @Test

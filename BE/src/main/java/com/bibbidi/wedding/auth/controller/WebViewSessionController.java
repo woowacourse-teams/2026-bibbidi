@@ -2,13 +2,13 @@ package com.bibbidi.wedding.auth.controller;
 
 import com.bibbidi.wedding.auth.controller.dto.request.HandoffCodeExchangeRequest;
 import com.bibbidi.wedding.auth.controller.dto.response.HandoffCodeResponse;
-import com.bibbidi.wedding.auth.controller.dto.response.WebSessionResponse;
+import com.bibbidi.wedding.auth.controller.dto.response.BibbidiSessionResponse;
 import com.bibbidi.wedding.auth.service.HandoffService;
 import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,11 +35,15 @@ public class WebViewSessionController {
     }
 
     @PostMapping("/api/auth/web/handoff-codes/exchange")
-    public ResponseEntity<WebSessionResponse> exchange(
-            @Valid @RequestBody HandoffCodeExchangeRequest request) {
+    @ResponseStatus(HttpStatus.CREATED)
+    public BibbidiSessionResponse exchange(
+            @Valid @RequestBody HandoffCodeExchangeRequest request,
+            HttpServletResponse response
+    ) {
         IssuedSession session = handoffService.exchange(request.code());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE, authCookieFactory.refreshToken(session.refreshToken()).toString())
-                .body(WebSessionResponse.from(session));
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                authCookieFactory.refreshToken(session.refreshToken()).toString());
+        return BibbidiSessionResponse.from(session);
     }
 }

@@ -34,7 +34,10 @@ public class BibbidiTokenParser {
     }
 
     public BibbidiTokenClaims parseAccessToken(String token) {
-        Claims claims = parse(token, TokenCategory.ACCESS, ClientError.ACCESS_TOKEN_INVALID);
+        Claims claims = parse(
+                token,
+                TokenCategory.ACCESS,
+                ClientError.ACCESS_TOKEN_INVALID);
         return new BibbidiTokenClaims(
                 userId(claims, ClientError.ACCESS_TOKEN_INVALID),
                 parseEnumClaim(
@@ -47,19 +50,34 @@ public class BibbidiTokenParser {
                         BibbidiTokenClaimNames.ROLE,
                         UserRole.class,
                         "role"),
-                claims.get(BibbidiTokenClaimNames.NICKNAME, String.class),
-                claims.get(BibbidiTokenClaimNames.EMAIL, String.class));
+                stringClaim(
+                        claims,
+                        BibbidiTokenClaimNames.NICKNAME,
+                        "nickname"),
+                stringClaim(
+                        claims,
+                        BibbidiTokenClaimNames.EMAIL,
+                        "email"));
     }
 
     public Long parseDeleteGrantToken(String token) {
-        Claims claims = parse(token, TokenCategory.DELETE_GRANT, ClientError.DELETE_GRANT_INVALID);
+        Claims claims = parse(
+                token,
+                TokenCategory.DELETE_GRANT,
+                ClientError.DELETE_GRANT_INVALID);
         return userId(claims, ClientError.DELETE_GRANT_INVALID);
     }
 
     private Claims parse(String token, TokenCategory expected, ClientError invalidError) {
         Claims claims = parseSigned(token, invalidError);
-        String category = claims.get(BibbidiTokenClaimNames.CATEGORY, String.class);
-        validateTokenCategory(expected, invalidError, category);
+        String category = stringClaim(
+                claims,
+                BibbidiTokenClaimNames.CATEGORY,
+                "category");
+        validateTokenCategory(
+                expected,
+                invalidError,
+                category);
         return claims;
     }
 
@@ -96,7 +114,10 @@ public class BibbidiTokenParser {
                     exception
             );
         } catch (JwtException | IllegalArgumentException exception) {
-            throw new BusinessException(invalidError, "토큰을 검증하지 못했습니다.", exception);
+            throw new BusinessException(
+                    invalidError,
+                    "토큰을 검증하지 못했습니다.",
+                    exception);
         }
     }
 
@@ -115,10 +136,21 @@ public class BibbidiTokenParser {
             Class<E> enumType,
             String claimLabel
     ) {
-        String value = claims.get(claimName, String.class);
         try {
+            String value = claims.get(claimName, String.class);
             return Enum.valueOf(enumType, value);
-        } catch (IllegalArgumentException | NullPointerException exception) {
+        } catch (JwtException | IllegalArgumentException | NullPointerException exception) {
+            throw new BusinessException(
+                    ClientError.ACCESS_TOKEN_INVALID,
+                    "토큰의 " + claimLabel + " claim이 올바르지 않습니다.",
+                    exception);
+        }
+    }
+
+    private static String stringClaim(Claims claims, String claimName, String claimLabel) {
+        try {
+            return claims.get(claimName, String.class);
+        } catch (JwtException | IllegalArgumentException exception) {
             throw new BusinessException(
                     ClientError.ACCESS_TOKEN_INVALID,
                     "토큰의 " + claimLabel + " claim이 올바르지 않습니다.",

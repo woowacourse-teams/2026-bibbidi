@@ -52,7 +52,11 @@ public class SocialLoginService {
             ClientType clientType,
             SocialAuthPurpose purpose
     ) {
-        return oidcAuthRequestService.start(provider, clientType, purpose);
+        return oidcAuthRequestService.start(
+                provider,
+                clientType,
+                purpose
+        );
     }
 
     public IssuedSession login(
@@ -78,19 +82,26 @@ public class SocialLoginService {
 
     public Long verifyForWithdrawal(
             SocialProvider provider,
-            ClientType clientType,
             String code,
             String state,
             @Nullable String browserBinder,
             Long currentUserId
     ) {
-        VerifiedOidcUser identity = verifyCallback(
+        OidcAuthRequest request = oidcAuthRequestService.consumeForWithdrawal(
                 provider,
-                clientType,
-                SocialAuthPurpose.WITHDRAWAL,
-                code,
                 state,
                 browserBinder
+        );
+        OidcProviderProperties.Provider configuration = providerProperties.get(provider);
+        String idToken = tokenExchangeClient.exchangeForIdToken(
+                configuration,
+                code,
+                request.codeVerifier(),
+                authorizationUriFactory.redirectUri(configuration, request.clientType()));
+        VerifiedOidcUser identity = idTokenVerifier.verify(
+                provider,
+                idToken,
+                request.nonce()
         );
         Long linkedUserId = socialUserRegistrationService.findLinkedUserId(
                 identity,
@@ -128,6 +139,10 @@ public class SocialLoginService {
                 request.codeVerifier(),
                 authorizationUriFactory.redirectUri(configuration, clientType));
 
-        return idTokenVerifier.verify(provider, idToken, request.nonce());
+        return idTokenVerifier.verify(
+                provider,
+                idToken,
+                request.nonce()
+        );
     }
 }

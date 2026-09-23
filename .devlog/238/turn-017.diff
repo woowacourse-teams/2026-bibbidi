@@ -1,0 +1,799 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java
+index c5999bb3ff03924d18a6bf650bcae8858ef9cfee..66872b96720364e114ad13ce3d8a587e2c94aa6a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java
+@@ -4,8 +4,8 @@ import com.bibbidi.wedding.auth.controller.dto.HandoffCodeExchangeRequest;
+ import com.bibbidi.wedding.auth.controller.dto.HandoffCodeResponse;
+ import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+ import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
+-import com.bibbidi.wedding.auth.service.handoff.HandoffService;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.HandoffService;
++import com.bibbidi.wedding.auth.service.IssuedSession;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+ import org.springframework.http.HttpStatus;
+@@ -17,8 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ /**
+- * 네이티브에서 한 로그인을 앱 안 WebView로 넘긴다.
+- * 앱이 코드를 받아 WebView 주소에 실어 열면, WebView가 그 코드를 내고 웹 세션 쿠키를 받는다.
++ * 네이티브에서 한 로그인을 앱 안 WebView로 넘긴다. 앱이 코드를 받아 WebView 주소에 실어 열면, WebView가 그 코드를 내고 웹 세션 쿠키를 받는다.
+  */
+ @RestController
+ public class HandoffController {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java
+index 68baea4658da4aa4e7dd7ffe489909e2e10de32c..53ff20e6f1ed1a29bc1e12a7e93c1fef5f37815c 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java
+@@ -4,8 +4,8 @@ import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+ import com.bibbidi.wedding.auth.controller.dto.NativeSessionResponse;
+ import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
++import com.bibbidi.wedding.auth.service.IssuedSession;
++import com.bibbidi.wedding.auth.service.SessionRefreshService;
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+@@ -18,8 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ /**
+- * 로그인 상태를 이어 가거나 끊는다.
+- * 웹은 쿠키로, 네이티브는 응답 본문으로 refresh token을 주고받는다.
++ * 로그인 상태를 이어 가거나 끊는다. 웹은 쿠키로, 네이티브는 응답 본문으로 refresh token을 주고받는다.
+  */
+ @RestController
+ public class SessionController {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
+index 01eadcfec332c733c641d88c203320adae6ebc5e..6221cdd68215bfb2fb51fa58bfd543db362e9bfc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
+@@ -7,9 +7,9 @@ import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.service.login.SocialAuthorizationResult;
+-import com.bibbidi.wedding.auth.service.login.SocialLoginService;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.SocialAuthorizationResult;
++import com.bibbidi.wedding.auth.service.SocialLoginService;
++import com.bibbidi.wedding.auth.service.IssuedSession;
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
+index 30bc84c88be01f461ec8b7f9f0680b297e0e5f61..a1e975aba8345370899cccd51bc924e5230a4057 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
+@@ -2,14 +2,16 @@ package com.bibbidi.wedding.auth.controller;
+ 
+ import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
+ import com.bibbidi.wedding.auth.controller.dto.TermsAgreementResponse;
+-import com.bibbidi.wedding.auth.service.terms.TermsAgreementService;
++import com.bibbidi.wedding.auth.service.TermsAgreementService;
+ import jakarta.validation.Valid;
+ import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+-/** 가입을 끝내는 자리다. 동의하기 전에는 이 API 말고는 부를 수 없다. */
++/**
++ * 가입을 끝내는 자리다. 동의하기 전에는 이 API 말고는 부를 수 없다.
++ */
+ @RestController
+ public class TermsAgreementController {
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+index ef09742e85974983f3a288561126e9ac862ceb9a..be073418e73fcb8d84c9696ff7887dcc3f9371b1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+@@ -5,7 +5,7 @@ import com.bibbidi.wedding.auth.controller.dto.SocialLoginRequest;
+ import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.service.withdrawal.WithdrawalService;
++import com.bibbidi.wedding.auth.service.WithdrawalService;
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+@@ -21,8 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ /**
+- * 탈퇴를 맡는다.
+- * 토큰만으로는 지우지 않는다. 소셜로 한 번 더 인증해 받은 표를 함께 내야 한다.
++ * 탈퇴를 맡는다. 토큰만으로는 지우지 않는다. 소셜로 한 번 더 인증해 받은 표를 함께 내야 한다.
+  */
+ @RestController
+ public class WithdrawalController {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java
+index a9ef36280bb5da3ed7745ddd0e981b269df0da00..69ed972af7eadd654bbe8066513ef21a8f67bd1c 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java
+@@ -1,12 +1,12 @@
+ package com.bibbidi.wedding.auth.controller.dto;
+ 
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.IssuedSession;
+ 
+ /**
+  * 네이티브 앱에 주는 응답이다. 쿠키를 쓰지 않으므로 refresh token도 본문으로 준다.
+  *
+- * @param accessToken API를 부를 때 Authorization 헤더에 싣는 값
+- * @param refreshToken access token이 만료되면 새로 받을 때 쓰는 값
++ * @param accessToken            API를 부를 때 Authorization 헤더에 싣는 값
++ * @param refreshToken           access token이 만료되면 새로 받을 때 쓰는 값
+  * @param termsAgreementRequired 약관에 동의해야 서비스를 쓸 수 있는 상태인지
+  */
+ public record NativeSessionResponse(
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java
+index 2ed223a84ae9c3541b580cd75e6ee8aef754a19e..36651fd23bc5a26a9d2e2681de2e88f0bfa8c0e7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java
+@@ -1,10 +1,10 @@
+ package com.bibbidi.wedding.auth.controller.dto;
+ 
+-import com.bibbidi.wedding.auth.service.login.SocialAuthorizationResult;
++import com.bibbidi.wedding.auth.service.SocialAuthorizationResult;
+ 
+ /**
+  * @param authorizationUri 이 주소로 사용자를 보내면 소셜 로그인 화면이 열린다
+- * @param state 인가가 끝나고 돌아올 때 함께 오는 값. 그대로 다시 보내면 된다
++ * @param state            인가가 끝나고 돌아올 때 함께 오는 값. 그대로 다시 보내면 된다
+  */
+ public record SocialAuthorizationResponse(String authorizationUri, String state) {
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java
+index b10e0d9a440acf0b2a9bb179ad9d762fffc282f9..8ee237b5985f4395b8ddfb45e03d19814eef4ed7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java
+@@ -1,11 +1,11 @@
+ package com.bibbidi.wedding.auth.controller.dto;
+ 
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
++import com.bibbidi.wedding.auth.service.IssuedSession;
+ 
+ /**
+  * 웹에 주는 응답이다. refresh token은 본문에 담지 않고 쿠키로 내려간다.
+  *
+- * @param accessToken API를 부를 때 Authorization 헤더에 싣는 값
++ * @param accessToken            API를 부를 때 Authorization 헤더에 싣는 값
+  * @param termsAgreementRequired 약관에 동의해야 서비스를 쓸 수 있는 상태인지
+  */
+ public record WebSessionResponse(String accessToken, boolean termsAgreementRequired) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/ActiveUserAuthorizationManager.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/ActiveUserAuthorizationManager.java
+deleted file mode 100644
+index 722fd761321540af31049517e7b8536152aa3fcd..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/ActiveUserAuthorizationManager.java
++++ /dev/null
+@@ -1,30 +0,0 @@
+-package com.bibbidi.wedding.auth.security;
+-
+-import java.util.function.Supplier;
+-import org.springframework.security.authorization.AuthorizationDecision;
+-import org.springframework.security.authorization.AuthorizationManager;
+-import org.springframework.security.core.Authentication;
+-import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
+-import org.springframework.stereotype.Component;
+-
+-/**
+- * 약관에 동의해 가입을 끝낸 회원만 통과시킨다.
+- *
+- * <p>가입 상태를 권한 이름으로 바꿔 쓰지 않는다. 권한은 무엇을 할 수 있는지를 가르는 축이고,
+- * 가입 상태는 서비스를 쓸 준비가 됐는지를 가르는 다른 축이기 때문이다.
+- */
+-@Component
+-public class ActiveUserAuthorizationManager
+-        implements AuthorizationManager<RequestAuthorizationContext> {
+-
+-    @Override
+-    public AuthorizationDecision authorize(
+-            Supplier<? extends Authentication> authentication, RequestAuthorizationContext context) {
+-        Authentication current = authentication.get();
+-        if (current == null || !current.isAuthenticated()) {
+-            return new AuthorizationDecision(false);
+-        }
+-        return new AuthorizationDecision(
+-                current.getPrincipal() instanceof AuthenticatedUser user && user.isActive());
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+index a713006938b8469f5e027ea40d5c6a1010ce1521..ed2132b8070c0d628458f90bc1032403b514234a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+@@ -11,9 +11,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+ import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+ import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+ import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
++import org.springframework.security.authorization.AuthorizationDecision;
++import org.springframework.security.authorization.AuthorizationManager;
+ import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.core.Authentication;
+ import org.springframework.security.web.SecurityFilterChain;
+ import org.springframework.security.web.access.intercept.AuthorizationFilter;
++import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
+ 
+ /**
+  * 인증은 access token 하나로만 한다. 서버 세션을 만들지 않는다. CORS 헤더는 앞단 nginx가 붙이므로 여기서 켜지 않는다. 켜면 헤더가 겹친다.
+@@ -30,20 +34,34 @@ public class SecurityConfig {
+     private final AuthenticationFailureResponseWriter failureResponseWriter;
+     private final SecurityProperties securityProperties;
+     private final BibbidiTokenProperties bibbidiTokenProperties;
+-    private final ActiveUserAuthorizationManager activeUserAuthorizationManager;
+ 
+     public SecurityConfig(
+             BibbidiTokenParser bibbidiTokenParser,
+             AuthenticationFailureResponseWriter failureResponseWriter,
+             SecurityProperties securityProperties,
+-            BibbidiTokenProperties bibbidiTokenProperties,
+-            ActiveUserAuthorizationManager activeUserAuthorizationManager
++            BibbidiTokenProperties bibbidiTokenProperties
+     ) {
+         this.bibbidiTokenParser = bibbidiTokenParser;
+         this.failureResponseWriter = failureResponseWriter;
+         this.securityProperties = securityProperties;
+         this.bibbidiTokenProperties = bibbidiTokenProperties;
+-        this.activeUserAuthorizationManager = activeUserAuthorizationManager;
++    }
++
++    /**
++     * 약관에 동의해 가입을 끝낸 회원만 통과시킨다.
++     *
++     * <p>가입 상태를 권한 이름으로 바꿔 쓰지 않는다. 권한은 무엇을 할 수 있는지를 가르는 축이고,
++     * 가입 상태는 서비스를 쓸 준비가 됐는지를 가르는 다른 축이기 때문이다.
++     */
++    private static AuthorizationManager<RequestAuthorizationContext> activeUser() {
++        return (authentication, context) -> {
++            Authentication current = authentication.get();
++            if (current == null || !current.isAuthenticated()) {
++                return new AuthorizationDecision(false);
++            }
++            return new AuthorizationDecision(
++                    current.getPrincipal() instanceof AuthenticatedUser user && user.isActive());
++        };
+     }
+ 
+     @Bean
+@@ -71,7 +89,7 @@ public class SecurityConfig {
+                         .requestMatchers(securityProperties.requireAuthenticationPatterns()).authenticated()
+                         .requestMatchers(securityProperties.permitAllPatterns()).permitAll()
+                         .requestMatchers(TERMS_AGREEMENT_PATH).authenticated()
+-                        .anyRequest().access(activeUserAuthorizationManager))
++                        .anyRequest().access(activeUser()))
+                 // 인가를 판단하는 필터가 우리 인증 결과를 보게 그 앞에 둔다.
+                 .addFilterBefore(bibbidiTokenAuthenticationFilter(), AuthorizationFilter.class)
+                 .exceptionHandling(handling -> handling
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupScheduler.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java
+similarity index 77%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupScheduler.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java
+index 76d02aa20823c0a8f1734ad4708abc5287bb88b1..36202c5da12e2f5a046fa3fc9a65ee49d5b019ca 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupScheduler.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java
+@@ -1,9 +1,11 @@
+-package com.bibbidi.wedding.auth.service.cleanup;
++package com.bibbidi.wedding.auth.service;
+ 
+ import org.springframework.scheduling.annotation.Scheduled;
+ import org.springframework.stereotype.Component;
+ 
+-/** 정리 작업을 정해진 시각에 돌린다. 도는 시각은 설정에서 온다. */
++/**
++ * 정리 작업을 정해진 시각에 돌린다. 도는 시각은 설정에서 온다.
++ */
+ @Component
+ public class ExpiredAuthRecordCleanupScheduler {
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
+similarity index 95%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
+index 8d0411c638bb4ed0315f76aebb3746908c82255e..4b63b5f3535c0a4d980f57caad1f0eca3d2290cf 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.cleanup;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.config.AuthCleanupProperties;
+ import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
+@@ -77,8 +77,8 @@ public class ExpiredAuthRecordCleanupService {
+ 
+     /**
+      * @param oidcAuthRequests 지운 인가 요청 수
+-     * @param handoffCodes 지운 handoff code 수
+-     * @param refreshSessions 지운 refresh 세션 수
++     * @param handoffCodes     지운 handoff code 수
++     * @param refreshSessions  지운 refresh 세션 수
+      */
+     public record CleanupResult(int oidcAuthRequests, int handoffCodes, int refreshSessions) {
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+similarity index 91%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+index dfbef2d6e95fd72893a7d52594dc7e31e8240a42..9a475a40a6edc841a851706d79388db4f83147e6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+@@ -1,13 +1,10 @@
+-package com.bibbidi.wedding.auth.service.handoff;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.HandoffCode;
+ import com.bibbidi.wedding.auth.domain.RefreshSession;
+ import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+@@ -56,8 +53,7 @@ public class HandoffService {
+     }
+ 
+     /**
+-     * 앱이 자기 refresh token을 내밀면 그 기기 계열에 묶인 코드를 내준다.
+-     * 코드로 만들어질 웹 세션이 앱 세션과 같은 계열에 들어가야 함께 폐기되기 때문이다.
++     * 앱이 자기 refresh token을 내밀면 그 기기 계열에 묶인 코드를 내준다. 코드로 만들어질 웹 세션이 앱 세션과 같은 계열에 들어가야 함께 폐기되기 때문이다.
+      */
+     public String issueCode(Long currentUserId, String refreshToken) {
+         LocalDateTime now = LocalDateTime.now();
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/IssuedSession.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/IssuedSession.java
+similarity index 53%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/session/IssuedSession.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/IssuedSession.java
+index 3c6c8454314d72c33fbe1ce55103883e54114f99..d14ba6aa7e93ff612b047b7d3ec603d34192fc80 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/IssuedSession.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/IssuedSession.java
+@@ -1,10 +1,9 @@
+-package com.bibbidi.wedding.auth.service.session;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ 
+ /**
+- * 로그인이나 갱신으로 새로 내준 한 쌍이다.
+- * refresh token을 어떤 형태로 내보낼지는 컨트롤러가 clientType을 보고 정한다.
++ * 로그인이나 갱신으로 새로 내준 한 쌍이다. refresh token을 어떤 형태로 내보낼지는 컨트롤러가 clientType을 보고 정한다.
+  */
+ public record IssuedSession(
+         String accessToken,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+similarity index 94%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+index 1037d474a5e6072a3bdab7bf06e8e7a2279f929d..11591507d9dcccccbd6080685d43e0c9ce20b64e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.login;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
+@@ -20,8 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
+  * 소셜 인증을 시작할 때 서버가 만든 값을 보관하고, 돌아온 요청이 그 요청이 맞는지 확인한다.
+  *
+  * <p>state는 인가 주소를 타고 나갔다 돌아오므로 새어 나갈 수 있다. 그래서 웹에는 밖으로 나가지 않는
+- * 값을 쿠키로 따로 심어 두고, 돌아왔을 때 시작한 브라우저가 맞는지 본다. 이것이 없으면 공격자가
+- * 자기 계정으로 받은 코드를 피해자 브라우저에 제출시켜 남의 계정으로 로그인시킬 수 있다.
++ * 값을 쿠키로 따로 심어 두고, 돌아왔을 때 시작한 브라우저가 맞는지 본다. 이것이 없으면 공격자가 자기 계정으로 받은 코드를 피해자 브라우저에 제출시켜 남의 계정으로 로그인시킬 수 있다.
+  */
+ @Service
+ @Transactional
+@@ -71,7 +70,9 @@ public class OidcAuthRequestService {
+         return new SocialAuthorizationResult(authorizationUri, state, browserBinder);
+     }
+ 
+-    /** 한 번 쓴 요청은 다시 쓸 수 없다. 시작할 때와 조건이 다르면 거절한다. */
++    /**
++     * 한 번 쓴 요청은 다시 쓸 수 없다. 시작할 때와 조건이 다르면 거절한다.
++     */
+     public OidcAuthRequest consume(
+             SocialProvider provider,
+             ClientType clientType,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+similarity index 92%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+index 3cb926939f16a8688c0e55eb9861a529daf57be1..0fd87724cae2bea562410e39550eb8877091178f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.session;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.RefreshSession;
+@@ -14,8 +14,7 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ /**
+- * 로그인한 사용자에게 access token과 refresh token을 내준다.
+- * 새 기기에서 시작하면 기기 계열을 새로 만들고, 이어지는 갱신은 그 계열을 물려받는다.
++ * 로그인한 사용자에게 access token과 refresh token을 내준다. 새 기기에서 시작하면 기기 계열을 새로 만들고, 이어지는 갱신은 그 계열을 물려받는다.
+  */
+ @Service
+ @Transactional
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionOwner.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionOwner.java
+similarity index 76%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionOwner.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SessionOwner.java
+index 80ebb8f89c8c4f3ff1d9f340ade57b5e6ee8c512..3d4dcf99cdbf640d54abb9a5aaa925f3919413fc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionOwner.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionOwner.java
+@@ -1,10 +1,12 @@
+-package com.bibbidi.wedding.auth.service.session;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.common.domain.UserRole;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import org.jspecify.annotations.Nullable;
+ 
+-/** 토큰에 실을 사용자 정보다. */
++/**
++ * 토큰에 실을 사용자 정보다.
++ */
+ public record SessionOwner(
+         Long userId,
+         UserStatus status,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionRefreshService.java
+similarity index 96%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SessionRefreshService.java
+index e0b2c232f902d95bcdd4e2ea63085880dcec067d..b5dd1128d2f153e721fce49463af1f1a611de231 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionRefreshService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.session;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.RefreshSession;
+@@ -57,7 +57,9 @@ public class SessionRefreshService {
+         return sessionIssueService.issue(owner(session.userId()), clientType, session.familyId());
+     }
+ 
+-    /** 로그아웃이다. 그 기기 계열만 끊고 다른 기기는 건드리지 않는다. */
++    /**
++     * 로그아웃이다. 그 기기 계열만 끊고 다른 기기는 건드리지 않는다.
++     */
+     public void revokeSession(String refreshToken) {
+         RefreshSession session = findSession(refreshToken);
+         refreshSessionRepository.revokeFamily(session.familyId(), LocalDateTime.now());
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialAuthorizationResult.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialAuthorizationResult.java
+similarity index 50%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialAuthorizationResult.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SocialAuthorizationResult.java
+index 209bc43b505e473e159e62ffd1f71e5db180885c..5f1fd947d36fa1166102de0d942ce1083548aa87 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialAuthorizationResult.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialAuthorizationResult.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.login;
++package com.bibbidi.wedding.auth.service;
+ 
+ import org.jspecify.annotations.Nullable;
+ 
+@@ -6,9 +6,8 @@ import org.jspecify.annotations.Nullable;
+  * 사용자를 보낼 인가 화면 주소다.
+  *
+  * @param authorizationUri 이 주소로 보내면 소셜 로그인 화면이 열린다
+- * @param state 돌아올 때 함께 오는 값. 클라이언트는 그대로 돌려주기만 한다
+- * @param browserBinder 인가를 시작한 브라우저에만 쿠키로 심어 둘 값.
+- *                      쿠키를 쓰지 않는 네이티브 요청에는 없다
++ * @param state            돌아올 때 함께 오는 값. 클라이언트는 그대로 돌려주기만 한다
++ * @param browserBinder    인가를 시작한 브라우저에만 쿠키로 심어 둘 값. 쿠키를 쓰지 않는 네이티브 요청에는 없다
+  */
+ public record SocialAuthorizationResult(
+         String authorizationUri,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialLoginService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+similarity index 92%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialLoginService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+index 8460ead73a22b97d14979fc87a0475c87e1427a0..6e3619f931a135a491332973cd381c0af87f0f2f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialLoginService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.login;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
+@@ -9,8 +9,6 @@ import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+ import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import org.jspecify.annotations.Nullable;
+@@ -21,8 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
+  * 소셜 로그인 흐름을 이어 붙이는 자리다. 판단과 저장은 아래 서비스들이 맡고 여기서는 순서만 정한다.
+  *
+  * <p>인가 요청 보관과 확인은 {@link OidcAuthRequestService}가, 회원을 찾거나 만드는 일은
+- * {@link SocialUserRegistrationService}가, 토큰 발급은
+- * {@link SessionIssueService}가 한다.
++ * {@link SocialUserRegistrationService}가, 토큰 발급은 {@link SessionIssueService}가 한다.
+  */
+ @Service
+ @Transactional
+@@ -72,7 +69,9 @@ public class SocialLoginService {
+                 socialUserRegistrationService.findOrCreate(identity), clientType);
+     }
+ 
+-    /** 탈퇴 직전 본인 확인이다. 지금 로그인한 회원의 소셜 계정이 맞는지만 본다. */
++    /**
++     * 탈퇴 직전 본인 확인이다. 지금 로그인한 회원의 소셜 계정이 맞는지만 본다.
++     */
+     public Long verifyForWithdrawal(
+             SocialProvider provider,
+             ClientType clientType,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialUserRegistrationService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
+similarity index 89%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialUserRegistrationService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
+index d90a049de8aeacd2582a9cff1554515f582bf57e..31f0166f5d99c3171d8a2e309559a051f91e19fa 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/SocialUserRegistrationService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialUserRegistrationService.java
+@@ -1,9 +1,8 @@
+-package com.bibbidi.wedding.auth.service.login;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialIdentity;
+ import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+@@ -39,7 +38,9 @@ public class SocialUserRegistrationService {
+                 .orElseGet(() -> create(identity));
+     }
+ 
+-    /** 이 소셜 계정에 연결된 회원을 찾는다. 연결돼 있지 않으면 거절한다. */
++    /**
++     * 이 소셜 계정에 연결된 회원을 찾는다. 연결돼 있지 않으면 거절한다.
++     */
+     public Long findLinkedUserId(SocialUserIdentity identity, ClientError errorWhenMissing) {
+         return socialIdentityRepository
+                 .findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
+@@ -48,7 +49,9 @@ public class SocialUserRegistrationService {
+                         "이 소셜 계정은 회원과 연결돼 있지 않습니다. provider=" + identity.provider()));
+     }
+ 
+-    /** 닉네임은 제공자에서 받은 값을 그대로 쓰고, 받지 못했으면 가입을 진행하지 않는다. */
++    /**
++     * 닉네임은 제공자에서 받은 값을 그대로 쓰고, 받지 못했으면 가입을 진행하지 않는다.
++     */
+     private SessionOwner create(SocialUserIdentity identity) {
+         if (identity.nickname() == null || identity.nickname().isBlank()) {
+             throw new BusinessException(ClientError.SOCIAL_NICKNAME_REQUIRED,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/terms/TermsAgreementService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/TermsAgreementService.java
+similarity index 97%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/terms/TermsAgreementService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/TermsAgreementService.java
+index 8abf919ec56ae1afc528f7682e13f9c956fd21b7..a531e23f7a6b3caef504c5552aed464adfd854d9 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/terms/TermsAgreementService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/TermsAgreementService.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.terms;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/WithdrawalService.java
+similarity index 94%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalService.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/service/WithdrawalService.java
+index 50d97403685a893447056c4e4596c4a751ccadd9..40e25829a8e2c7153e96efd71af40993337cb816 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/WithdrawalService.java
+@@ -1,10 +1,9 @@
+-package com.bibbidi.wedding.auth.service.withdrawal;
++package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+-import com.bibbidi.wedding.auth.service.login.SocialLoginService;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -52,7 +51,9 @@ public class WithdrawalService {
+         this.userService = userService;
+     }
+ 
+-    /** 소셜 재인증이 끝나면 수명이 짧은 탈퇴용 표를 내준다. */
++    /**
++     * 소셜 재인증이 끝나면 수명이 짧은 탈퇴용 표를 내준다.
++     */
+     public String issueDeleteGrant(
+             SocialProvider provider,
+             ClientType clientType,
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
+index 896393f0a0a0c6792ea204ad3d85f7774c6b75ba..49e05a440aa85b9e831cee96d8920a82443fc263 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
+@@ -13,9 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ import com.bibbidi.wedding.auth.controller.dto.HandoffCodeExchangeRequest;
+ import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.service.IssuedSession;
++import com.bibbidi.wedding.auth.service.SessionIssueService;
++import com.bibbidi.wedding.auth.service.SessionOwner;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+@@ -28,7 +28,9 @@ import org.springframework.http.MediaType;
+ import org.springframework.restdocs.payload.PayloadDocumentation;
+ import tools.jackson.databind.ObjectMapper;
+ 
+-/** 네이티브 로그인을 앱 안 WebView로 넘기는 흐름을 확인하고 문서로 남긴다. */
++/**
++ * 네이티브 로그인을 앱 안 WebView로 넘기는 흐름을 확인하고 문서로 남긴다.
++ */
+ class HandoffControllerIntegrationTest extends BibbidiIntegrationTest {
+ 
+     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
+index ff50fd5b713bb673f33521f0d343e364d14228ba..c3ac3978e6198ea98c90f8fbea3d4578257b846a 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
+@@ -14,9 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+ import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.service.IssuedSession;
++import com.bibbidi.wedding.auth.service.SessionIssueService;
++import com.bibbidi.wedding.auth.service.SessionOwner;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+@@ -32,7 +32,9 @@ import org.springframework.restdocs.payload.PayloadDocumentation;
+ import org.springframework.test.context.jdbc.Sql;
+ import tools.jackson.databind.ObjectMapper;
+ 
+-/** 로그인 상태를 이어 가거나 끊는 API를 확인하고 문서로 남긴다. */
++/**
++ * 로그인 상태를 이어 가거나 끊는 API를 확인하고 문서로 남긴다.
++ */
+ @Sql("/terms-fixture.sql")
+ class SessionControllerIntegrationTest extends BibbidiIntegrationTest {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+index 31273773d574add8cea82873571c9e632bf59700..7d43368a250140eca61cd2dc96dd9388dadc1453 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+@@ -11,9 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ 
+ import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
++import com.bibbidi.wedding.auth.service.IssuedSession;
++import com.bibbidi.wedding.auth.service.SessionIssueService;
++import com.bibbidi.wedding.auth.service.SessionOwner;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+ import com.bibbidi.wedding.user.service.UserResult;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+similarity index 97%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+index b18584b2c007547f423eef56dcae55c9fb3f1c3b..e2fe083fb16a562b817ac93d26784fd1e8f17552 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/cleanup/ExpiredAuthRecordCleanupServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupServiceIntegrationTest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.cleanup;
++package com.bibbidi.wedding.auth.service;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
+@@ -20,7 +20,9 @@ import org.springframework.boot.test.context.SpringBootTest;
+ import org.springframework.test.context.ActiveProfiles;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+-/** 스케줄러를 기다리지 않고 정리 서비스를 직접 불러 확인한다. */
++/**
++ * 스케줄러를 기다리지 않고 정리 서비스를 직접 불러 확인한다.
++ */
+ @SpringBootTest
+ @ActiveProfiles("test")
+ @Transactional
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/HandoffServiceIntegrationTest.java
+similarity index 94%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/service/HandoffServiceIntegrationTest.java
+index 168e4eb39ea54f822038e189c21aefb580f3ff01..cebd08bd82f3beb9cfdf763a93f9f87e9b4a09c8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/handoff/HandoffServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/HandoffServiceIntegrationTest.java
+@@ -1,13 +1,9 @@
+-package com.bibbidi.wedding.auth.service.handoff;
++package com.bibbidi.wedding.auth.service;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
+-import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/session/SessionRefreshServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+similarity index 99%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/service/session/SessionRefreshServiceIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+index a3268186a7eadaca7240fb1601b72f32dbcd410d..c947c0c35dca89659b9de867155324d7e056a6e3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/session/SessionRefreshServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/SessionRefreshServiceIntegrationTest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.service.session;
++package com.bibbidi.wedding.auth.service;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/WithdrawalServiceIntegrationTest.java
+similarity index 92%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/service/WithdrawalServiceIntegrationTest.java
+index 21ee474deeb423b4165c346f0df67cff449b9b66..33153276d5399a9c1d5b1120655f8f56f2a7cfe2 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/withdrawal/WithdrawalServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/WithdrawalServiceIntegrationTest.java
+@@ -1,13 +1,9 @@
+-package com.bibbidi.wedding.auth.service.withdrawal;
++package com.bibbidi.wedding.auth.service;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.session.IssuedSession;
+-import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+-import com.bibbidi.wedding.auth.service.session.SessionOwner;
+-import com.bibbidi.wedding.auth.service.session.SessionRefreshService;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+index 59534eab69069be152d8158afa1155b3487e9e4b..21ba7f307f7a02ce70ca8d01d3af9d610fe74a3c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
++++ b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+@@ -2,7 +2,6 @@ package com.bibbidi.wedding.support;
+ 
+ import static org.mockito.Mockito.mock;
+ 
+-import com.bibbidi.wedding.auth.security.ActiveUserAuthorizationManager;
+ import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
+ import com.bibbidi.wedding.auth.security.SecurityConfig;
+ import com.bibbidi.wedding.auth.security.SecurityProperties;
+@@ -23,11 +22,6 @@ import tools.jackson.databind.ObjectMapper;
+ @EnableConfigurationProperties({SecurityProperties.class, BibbidiTokenProperties.class})
+ public class SecurityTestConfig {
+ 
+-    @Bean
+-    public ActiveUserAuthorizationManager activeUserAuthorizationManager() {
+-        return new ActiveUserAuthorizationManager();
+-    }
+-
+     @Bean
+     public BibbidiTokenParser bibbidiTokenParser() {
+         return mock(BibbidiTokenParser.class);

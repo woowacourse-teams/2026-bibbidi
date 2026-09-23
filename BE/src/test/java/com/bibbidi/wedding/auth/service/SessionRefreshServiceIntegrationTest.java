@@ -10,6 +10,12 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -36,7 +43,8 @@ class SessionRefreshServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        UserResult created = userService.createPendingUser("current", "current@bibbidi.kr");
+        UserResult created = userService.createPendingUser(
+                "refresh-" + UUID.randomUUID().toString().substring(0, 8), "current@bibbidi.kr");
         UserResult active = userService.activate(created.id());
         owner = new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(), active.email());
     }
@@ -50,6 +58,48 @@ class SessionRefreshServiceIntegrationTest {
 
         assertThat(refreshed.refreshToken()).isNotEqualTo(issued.refreshToken());
         assertThat(refreshed.familyId()).isEqualTo(issued.familyId());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("같은 refresh token을 동시에 갱신하면 한 요청만 성공한다")
+    void shouldAllowOnlyOneConcurrentRefresh() throws Exception {
+        IssuedSession issued = sessionIssueService.issueForNewFamily(owner, ClientType.WEB);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            List<Future<Boolean>> results = List.of(
+                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)),
+                    executor.submit(() -> refreshAfterSignal(issued.refreshToken(), ready, start)));
+            ready.await();
+            start.countDown();
+
+            assertThat(results.stream().map(this::resultOf).filter(Boolean::booleanValue)).hasSize(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private boolean refreshAfterSignal(String refreshToken, CountDownLatch ready, CountDownLatch start)
+            throws InterruptedException {
+        ready.countDown();
+        start.await();
+        try {
+            sessionRefreshService.refresh(refreshToken, ClientType.WEB);
+            return true;
+        } catch (BusinessException exception) {
+            return false;
+        }
+    }
+
+    private boolean resultOf(Future<Boolean> result) {
+        try {
+            return result.get();
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
     }
 
     @Test

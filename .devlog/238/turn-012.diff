@@ -1,0 +1,428 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
+index e7154a616fe4f9aae26e61e74fe262c96d0d3ef0..30c65741cc9cd2d0a4cd9ca475dcfa62f22385b8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
+@@ -1,6 +1,6 @@
+ package com.bibbidi.wedding.auth.config;
+ 
+-import com.bibbidi.wedding.auth.oidc.jwks.JwksCacheProperties;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCacheProperties;
+ import com.bibbidi.wedding.auth.oidc.client.OidcApiClient;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import java.net.http.HttpClient;
+@@ -20,7 +20,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
+  */
+ @Configuration
+ @EnableScheduling
+-@EnableConfigurationProperties({OidcProviderProperties.class, JwksCacheProperties.class})
++@EnableConfigurationProperties({OidcProviderProperties.class, OidcPublicKeyCacheProperties.class})
+ public class OidcClientConfig {
+ 
+     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcApiClient.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcApiClient.java
+index 810d898a1c3d8092ac8bee1c5eb8c87597eea8ef..5768e2329de3caa5c1c6281e81bfe621657175d2 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcApiClient.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcApiClient.java
+@@ -1,6 +1,6 @@
+ package com.bibbidi.wedding.auth.oidc.client;
+ 
+-import com.bibbidi.wedding.auth.oidc.jwks.JsonWebKeySet;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeySet;
+ import java.net.URI;
+ import org.springframework.http.MediaType;
+ import org.springframework.util.MultiValueMap;
+@@ -18,7 +18,7 @@ public interface OidcApiClient {
+ 
+     /** 서명 공개키 묶음을 받아 온다. */
+     @GetExchange
+-    JsonWebKeySet fetchJsonWebKeySet(URI uri);
++    OidcPublicKeySet fetchOidcPublicKeySet(URI uri);
+ 
+     /** 인가 코드를 토큰으로 바꾼다. */
+     @PostExchange(contentType = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/JwksFetchClient.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcPublicKeyFetchClient.java
+similarity index 78%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/JwksFetchClient.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcPublicKeyFetchClient.java
+index 6e8d0fc1dd6d4dbf62f4b33c14bd1e156d05ff75..943a34b6d601af3b93148f325538e9bd2f0f7344 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/JwksFetchClient.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcPublicKeyFetchClient.java
+@@ -1,6 +1,6 @@
+ package com.bibbidi.wedding.auth.oidc.client;
+ 
+-import com.bibbidi.wedding.auth.oidc.jwks.JsonWebKeySet;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeySet;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.net.URI;
+@@ -12,17 +12,17 @@ import org.springframework.web.client.RestClientException;
+  * 실패를 조용히 삼키지 않고 오류로 드러낸다. 못 받으면 로그인 자체가 성립하지 않기 때문이다.
+  */
+ @Component
+-public class JwksFetchClient {
++public class OidcPublicKeyFetchClient {
+ 
+     private final OidcApiClient oidcApiClient;
+ 
+-    public JwksFetchClient(OidcApiClient oidcApiClient) {
++    public OidcPublicKeyFetchClient(OidcApiClient oidcApiClient) {
+         this.oidcApiClient = oidcApiClient;
+     }
+ 
+-    public JsonWebKeySet fetch(String jwksUri) {
++    public OidcPublicKeySet fetch(String jwksUri) {
+         try {
+-            JsonWebKeySet keySet = oidcApiClient.fetchJsonWebKeySet(URI.create(jwksUri));
++            OidcPublicKeySet keySet = oidcApiClient.fetchOidcPublicKeySet(URI.create(jwksUri));
+             if (keySet == null || keySet.keys() == null || keySet.keys().isEmpty()) {
+                 throw new BusinessException(ClientError.SOCIAL_AUTHENTICATION_FAILED,
+                         "서명 공개키 응답이 비어 있습니다. jwksUri=" + jwksUri);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
+index cd72ce4a21eb39e8b45145e3bd9650161533bce9..67789bcb2e46aa02c643591f4b5863ca454a5ede 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.oidc.idtoken;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.oidc.jwks.JwksPublicKeyCache;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
+ import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -24,18 +24,18 @@ public class IdTokenVerifier {
+     private static final String NONCE = "nonce";
+ 
+     private final OidcProviderProperties providerProperties;
+-    private final JwksPublicKeyCache jwksPublicKeyCache;
++    private final OidcPublicKeyCache oidcPublicKeyCache;
+     private final IdTokenHeaderReader headerReader;
+     private final RsaPublicKeyFactory publicKeyFactory;
+ 
+     public IdTokenVerifier(
+             OidcProviderProperties providerProperties,
+-            JwksPublicKeyCache jwksPublicKeyCache,
++            OidcPublicKeyCache oidcPublicKeyCache,
+             IdTokenHeaderReader headerReader,
+             RsaPublicKeyFactory publicKeyFactory
+     ) {
+         this.providerProperties = providerProperties;
+-        this.jwksPublicKeyCache = jwksPublicKeyCache;
++        this.oidcPublicKeyCache = oidcPublicKeyCache;
+         this.headerReader = headerReader;
+         this.publicKeyFactory = publicKeyFactory;
+     }
+@@ -46,7 +46,7 @@ public class IdTokenVerifier {
+         validateAlgorithm(configuration, header.algorithm());
+ 
+         PublicKey publicKey = publicKeyFactory.create(
+-                jwksPublicKeyCache.findKey(provider, header.keyId()));
++                oidcPublicKeyCache.findKey(provider, header.keyId()));
+         Claims claims = parseSigned(idToken, publicKey);
+ 
+         validateIssuer(configuration, claims);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKey.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKey.java
+similarity index 78%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKey.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKey.java
+index 02ce0a902785cce70ddf363cc0653a94d11dff65..569006ec5e54affaaeab8f25eb7f1ae51e4fb7c2 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKey.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKey.java
+@@ -9,5 +9,5 @@ package com.bibbidi.wedding.auth.oidc.jwks;
+  * @param n RSA 모듈러스(base64url)
+  * @param e RSA 지수(base64url)
+  */
+-public record JsonWebKey(String kid, String kty, String alg, String n, String e) {
++public record OidcPublicKey(String kid, String kty, String alg, String n, String e) {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksPublicKeyCache.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+similarity index 70%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksPublicKeyCache.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+index 0a915f5d9020b58c2d327690fdd4f7fd1487627f..a81abd1f150892430b1a49bd79cb2a34375fafb7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksPublicKeyCache.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.oidc.jwks;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.oidc.client.JwksFetchClient;
++import com.bibbidi.wedding.auth.oidc.client.OidcPublicKeyFetchClient;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+@@ -21,20 +21,20 @@ import org.springframework.stereotype.Component;
+  */
+ @Slf4j
+ @Component
+-public class JwksPublicKeyCache {
++public class OidcPublicKeyCache {
+ 
+-    private final JwksFetchClient jwksFetchClient;
++    private final OidcPublicKeyFetchClient oidcPublicKeyFetchClient;
+     private final OidcProviderProperties providerProperties;
+-    private final JwksCacheProperties cacheProperties;
+-    private final Cache<SocialProvider, JsonWebKeySet> cache;
++    private final OidcPublicKeyCacheProperties cacheProperties;
++    private final Cache<SocialProvider, OidcPublicKeySet> cache;
+     private final Map<SocialProvider, Instant> lastForcedRefreshAt = new ConcurrentHashMap<>();
+ 
+-    public JwksPublicKeyCache(
+-            JwksFetchClient jwksFetchClient,
++    public OidcPublicKeyCache(
++            OidcPublicKeyFetchClient oidcPublicKeyFetchClient,
+             OidcProviderProperties providerProperties,
+-            JwksCacheProperties cacheProperties
++            OidcPublicKeyCacheProperties cacheProperties
+     ) {
+-        this.jwksFetchClient = jwksFetchClient;
++        this.oidcPublicKeyFetchClient = oidcPublicKeyFetchClient;
+         this.providerProperties = providerProperties;
+         this.cacheProperties = cacheProperties;
+         this.cache = Caffeine.newBuilder()
+@@ -43,14 +43,14 @@ public class JwksPublicKeyCache {
+                 .build();
+     }
+ 
+-    public JsonWebKey findKey(SocialProvider provider, String keyId) {
+-        JsonWebKeySet keySet = cache.get(provider, this::load);
+-        JsonWebKey key = select(keySet, keyId);
++    public OidcPublicKey findKey(SocialProvider provider, String keyId) {
++        OidcPublicKeySet keySet = cache.get(provider, this::load);
++        OidcPublicKey key = select(keySet, keyId);
+         if (key != null) {
+             return key;
+         }
+ 
+-        JsonWebKey refreshed = select(refreshIfAllowed(provider), keyId);
++        OidcPublicKey refreshed = select(refreshIfAllowed(provider), keyId);
+         if (refreshed == null) {
+             throw new BusinessException(ClientError.SOCIAL_AUTHENTICATION_FAILED,
+                     "제공자의 서명 공개키에서 kid를 찾지 못했습니다. provider=" + provider + " kid=" + keyId);
+@@ -63,7 +63,7 @@ public class JwksPublicKeyCache {
+         cache.put(provider, load(provider));
+     }
+ 
+-    private JsonWebKeySet refreshIfAllowed(SocialProvider provider) {
++    private OidcPublicKeySet refreshIfAllowed(SocialProvider provider) {
+         Instant now = Instant.now();
+         Instant lastRefreshedAt = lastForcedRefreshAt.get(provider);
+         if (lastRefreshedAt != null
+@@ -73,16 +73,16 @@ public class JwksPublicKeyCache {
+         }
+ 
+         lastForcedRefreshAt.put(provider, now);
+-        JsonWebKeySet keySet = load(provider);
++        OidcPublicKeySet keySet = load(provider);
+         cache.put(provider, keySet);
+         return keySet;
+     }
+ 
+-    private JsonWebKeySet load(SocialProvider provider) {
+-        return jwksFetchClient.fetch(providerProperties.get(provider).jwksUri());
++    private OidcPublicKeySet load(SocialProvider provider) {
++        return oidcPublicKeyFetchClient.fetch(providerProperties.get(provider).jwksUri());
+     }
+ 
+-    private static JsonWebKey select(JsonWebKeySet keySet, String keyId) {
++    private static OidcPublicKey select(OidcPublicKeySet keySet, String keyId) {
+         if (keySet == null) {
+             return null;
+         }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java
+similarity index 88%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java
+index 447b1014ac074bc8e8f6e4651301d1c0cb966182..4061a76cee016588f8842cf0a60fbe0e493be6e6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java
+@@ -12,8 +12,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
+  * @param maximumSize 캐시에 담을 제공자 수 상한
+  * @param warmUpEnabled 미리 받아 둘지 여부. 테스트에서는 꺼서 외부 호출을 하지 않는다
+  */
+-@ConfigurationProperties(prefix = "auth.oidc-jwks")
+-public record JwksCacheProperties(
++@ConfigurationProperties(prefix = "auth.oidc-public-key")
++public record OidcPublicKeyCacheProperties(
+         Duration ttl,
+         Duration refreshInterval,
+         Duration forcedRefreshMinInterval,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKeySet.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeySet.java
+similarity index 68%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKeySet.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeySet.java
+index b3c14fdd6a8bbb0eb92ac367aa6b75f468bd7c0b..f8e7e0d9408e4a18ad3567291b71196754796ae6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JsonWebKeySet.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeySet.java
+@@ -3,5 +3,5 @@ package com.bibbidi.wedding.auth.oidc.jwks;
+ import java.util.List;
+ 
+ /** 제공자가 공개한 서명 키 묶음이다. */
+-public record JsonWebKeySet(List<JsonWebKey> keys) {
++public record OidcPublicKeySet(List<OidcPublicKey> keys) {
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheWarmUpScheduler.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+similarity index 72%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheWarmUpScheduler.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+index c088ae62220131f404a5da3323aa123a836a9ac8..d33ff0c9d9350a2bc555616b891d15e0ac85cc7e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/JwksCacheWarmUpScheduler.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+@@ -13,18 +13,18 @@ import org.springframework.stereotype.Component;
+  */
+ @Slf4j
+ @Component
+-public class JwksCacheWarmUpScheduler {
++public class OidcPublicKeyWarmUpScheduler {
+ 
+-    private final JwksPublicKeyCache jwksPublicKeyCache;
++    private final OidcPublicKeyCache oidcPublicKeyCache;
+     private final OidcProviderProperties providerProperties;
+-    private final JwksCacheProperties cacheProperties;
++    private final OidcPublicKeyCacheProperties cacheProperties;
+ 
+-    public JwksCacheWarmUpScheduler(
+-            JwksPublicKeyCache jwksPublicKeyCache,
++    public OidcPublicKeyWarmUpScheduler(
++            OidcPublicKeyCache oidcPublicKeyCache,
+             OidcProviderProperties providerProperties,
+-            JwksCacheProperties cacheProperties
++            OidcPublicKeyCacheProperties cacheProperties
+     ) {
+-        this.jwksPublicKeyCache = jwksPublicKeyCache;
++        this.oidcPublicKeyCache = oidcPublicKeyCache;
+         this.providerProperties = providerProperties;
+         this.cacheProperties = cacheProperties;
+     }
+@@ -34,7 +34,7 @@ public class JwksCacheWarmUpScheduler {
+         warmUp();
+     }
+ 
+-    @Scheduled(fixedDelayString = "${auth.oidc-jwks.refresh-interval}")
++    @Scheduled(fixedDelayString = "${auth.oidc-public-key.refresh-interval}")
+     public void warmUpPeriodically() {
+         warmUp();
+     }
+@@ -45,7 +45,7 @@ public class JwksCacheWarmUpScheduler {
+         }
+         for (SocialProvider provider : providerProperties.configuredProviders()) {
+             try {
+-                jwksPublicKeyCache.refresh(provider);
++                oidcPublicKeyCache.refresh(provider);
+             } catch (RuntimeException exception) {
+                 log.warn("서명 공개키를 미리 받아 두지 못했습니다. provider={}", provider, exception);
+             }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/RsaPublicKeyFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/RsaPublicKeyFactory.java
+index 37104dd4aa95cfb29f50ca3fa01772f6cc1a30ed..cdba7f825cc2c14d0b8e2066ed01b62c7da97343 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/RsaPublicKeyFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/RsaPublicKeyFactory.java
+@@ -16,7 +16,7 @@ public class RsaPublicKeyFactory {
+ 
+     private static final String RSA = "RSA";
+ 
+-    public PublicKey create(JsonWebKey key) {
++    public PublicKey create(OidcPublicKey key) {
+         try {
+             BigInteger modulus = new BigInteger(1, Base64.getUrlDecoder().decode(key.n()));
+             BigInteger exponent = new BigInteger(1, Base64.getUrlDecoder().decode(key.e()));
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index 6f1961b131f5de81bb92650f3795f7b2db3513ea..2b079f2257f394871ee4286be98125b9d8e246e6 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -37,7 +37,7 @@ auth:
+     max-rounds-per-run: ${AUTH_CLEANUP_MAX_ROUNDS:20}
+     revoked-session-retention: ${AUTH_CLEANUP_REVOKED_RETENTION:30d}
+     cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
+-  oidc-jwks:
++  oidc-public-key:
+     ttl: ${AUTH_JWKS_TTL:8d}
+     refresh-interval: ${AUTH_JWKS_REFRESH_INTERVAL:7d}
+     forced-refresh-min-interval: ${AUTH_JWKS_FORCED_REFRESH_MIN_INTERVAL:5m}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
+index 96ef7543c531865ba4019584dbdd64df3ea260e2..c2215187a712d69b87f4ee1e0e3895ece42bd3f7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
+@@ -7,7 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
+ import static org.mockito.BDDMockito.given;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.oidc.jwks.JwksPublicKeyCache;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
+ import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -38,7 +38,7 @@ class IdTokenVerifierTest {
+     private static final String GOOGLE_AUDIENCE = "test-google-client-id";
+ 
+     @Mock
+-    private JwksPublicKeyCache jwksPublicKeyCache;
++    private OidcPublicKeyCache oidcPublicKeyCache;
+ 
+     private IdTokenVerifier idTokenVerifier;
+ 
+@@ -46,7 +46,7 @@ class IdTokenVerifierTest {
+     void setUp() {
+         idTokenVerifier = new IdTokenVerifier(
+                 providerProperties(),
+-                jwksPublicKeyCache,
++                oidcPublicKeyCache,
+                 new IdTokenHeaderReader(new ObjectMapper()),
+                 new RsaPublicKeyFactory());
+     }
+@@ -135,7 +135,7 @@ class IdTokenVerifierTest {
+         OidcProviderProperties onlyEdDsa = new OidcProviderProperties(
+                 Map.of("kakao", kakao(List.of("EdDSA"))));
+         IdTokenVerifier verifier = new IdTokenVerifier(
+-                onlyEdDsa, jwksPublicKeyCache, new IdTokenHeaderReader(new ObjectMapper()),
++                onlyEdDsa, oidcPublicKeyCache, new IdTokenHeaderReader(new ObjectMapper()),
+                 new RsaPublicKeyFactory());
+         String idToken = OidcTestKeys.idToken(KAKAO_ISSUER, KAKAO_AUDIENCE, "social-user-1",
+                 Map.of("nonce", NONCE, "nickname", "비비디"));
+@@ -160,8 +160,8 @@ class IdTokenVerifierTest {
+     }
+ 
+     private void givenCachedPublicKey() {
+-        given(jwksPublicKeyCache.findKey(any(SocialProvider.class), anyString()))
+-                .willReturn(OidcTestKeys.publicJsonWebKey());
++        given(oidcPublicKeyCache.findKey(any(SocialProvider.class), anyString()))
++                .willReturn(OidcTestKeys.publicKey());
+     }
+ 
+     private static OidcProviderProperties providerProperties() {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/support/OidcTestKeys.java b/BE/src/test/java/com/bibbidi/wedding/support/OidcTestKeys.java
+index e159ba76410c95bc1a996898b7c49a969b406270..343d853e5a17c1953f1b36fefdea2ff6ca701da3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/support/OidcTestKeys.java
++++ b/BE/src/test/java/com/bibbidi/wedding/support/OidcTestKeys.java
+@@ -1,6 +1,6 @@
+ package com.bibbidi.wedding.support;
+ 
+-import com.bibbidi.wedding.auth.oidc.jwks.JsonWebKey;
++import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKey;
+ import io.jsonwebtoken.Jwts;
+ import java.security.KeyPair;
+ import java.security.KeyPairGenerator;
+@@ -25,9 +25,9 @@ public final class OidcTestKeys {
+     private OidcTestKeys() {
+     }
+ 
+-    public static JsonWebKey publicJsonWebKey() {
++    public static OidcPublicKey publicKey() {
+         RSAPublicKey publicKey = (RSAPublicKey) KEY_PAIR.getPublic();
+-        return new JsonWebKey(
++        return new OidcPublicKey(
+                 KEY_ID,
+                 "RSA",
+                 "RS256",
+diff --git a/BE/src/test/resources/application-test.yaml b/BE/src/test/resources/application-test.yaml
+index 0eafd1e938808f73e2397c9455872014808c8060..4ef1bc7276c99d20664113d27b852de74f98aa7f 100644
+--- a/BE/src/test/resources/application-test.yaml
++++ b/BE/src/test/resources/application-test.yaml
+@@ -61,7 +61,7 @@ auth:
+     revoked-session-retention: 30d
+     # 테스트에서는 스케줄러를 기다리지 않고 서비스를 직접 부른다.
+     cron: "-"
+-  oidc-jwks:
++  oidc-public-key:
+     ttl: 8d
+     refresh-interval: 7d
+     forced-refresh-min-interval: 5m

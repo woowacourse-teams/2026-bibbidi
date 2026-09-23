@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class UserControllerIntegrationTest extends BibbidiIntegrationTest {
 
@@ -195,10 +196,14 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     @Test
     @DisplayName("잘못된 결혼 예정일 형식은 요청을 거절한다")
     void shouldRejectInvalidWeddingDateFormat() throws Exception {
+        ObjectNode request = objectMapper.valueToTree(
+                new WeddingDateRequest(LocalDate.of(2027, 5, 15)));
+        request.put("weddingDate", "2027-13-40");
+
         mockMvc.perform(put("/api/users/me/wedding-date")
                         .header(AUTHORIZATION, bearerTokenOf(currentUserId, "current"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"weddingDate\":\"2027-13-40\"}"))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 

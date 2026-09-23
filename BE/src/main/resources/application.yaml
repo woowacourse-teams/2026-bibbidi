@@ -16,17 +16,16 @@ discord:
 
 auth:
   jwt:
-    # 비밀말은 기본값을 두지 않는다. 없거나 32바이트 미만이면 애플리케이션이 뜨지 않는다.
     secret: ${AUTH_JWT_SECRET:}
     issuer: ${AUTH_JWT_ISSUER:bibbidi}
     audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
-    access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:30m}
-    delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:5m}
+    access-token-lifetime: ${AUTH_ACCESS_TOKEN_LIFETIME:6h}
+    delete-grant-lifetime: ${AUTH_DELETE_GRANT_LIFETIME:10m}
     signature-algorithm: ${AUTH_JWT_SIGNATURE_ALGORITHM:HS256}
     header-name: Authorization
   session:
     refresh-token-lifetime: ${AUTH_REFRESH_TOKEN_LIFETIME:30d}
-    handoff-code-lifetime: ${AUTH_HANDOFF_CODE_LIFETIME:60s}
+    handoff-code-lifetime: ${AUTH_HANDOFF_CODE_LIFETIME:600s}
     auth-request-lifetime: ${AUTH_REQUEST_LIFETIME:10m}
   refresh-cookie:
     name: ${AUTH_REFRESH_COOKIE_NAME:BIBBIDI_REFRESH}
@@ -90,19 +89,15 @@ auth:
           web: ${GOOGLE_WEB_REDIRECT_URI:}
           native: ${GOOGLE_NATIVE_REDIRECT_URI:}
   security:
-    # permit-all보다 먼저 판단한다. /api/auth 아래지만 로그인해야 부를 수 있는 것들이다.
-    # 가입을 끝내지 않은 회원도 부를 수 있다.
     permit-pending-user:
       - /api/auth/native/handoff-codes
       - /api/auth/delete-grants/**
     permit-all:
       - /api/auth/**
       - /api/catalog
-      # 가입하기 전에도 약관을 봐야 한다.
       - /api/terms
       - /api/users/nickname/availability
       - /api/feedbacks
-      # 수집 도구가 컨테이너 망에서 직접 긁는다. 외부 차단은 nginx가 한다.
       - /actuator/health
       - /actuator/health/**
       - /actuator/info

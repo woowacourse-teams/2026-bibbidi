@@ -1,0 +1,740 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+index abc2672c4a60d9d660eaa81ed99ed099f723a2da..67af98e4eed0317ca3f7f00476f61979fff4f6eb 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.config;
+ 
+ import com.bibbidi.wedding.auth.controller.RefreshCookieProperties;
+-import com.bibbidi.wedding.auth.token.JwtProperties;
++import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Configuration;
+@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
+ @Configuration
+ @EnableConfigurationProperties(
+         {
+-                JwtProperties.class,
++                BibbidiTokenProperties.class,
+                 SessionProperties.class,
+                 AuthCleanupProperties.class,
+                 RefreshCookieProperties.class
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+index a37ac07260d16f08e37aa297abe6a116c00d383f..dcea4466cfd5753d30d7b79a02e3a6d870320dd6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+@@ -2,7 +2,7 @@ package com.bibbidi.wedding.auth.security;
+ 
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.JwtProperties;
++import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import jakarta.servlet.FilterChain;
+ import jakarta.servlet.ServletException;
+@@ -28,11 +28,11 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
+     public BibbidiTokenAuthenticationFilter(
+             BibbidiTokenParser bibbidiTokenParser,
+             AuthenticationFailureResponseWriter failureResponseWriter,
+-            JwtProperties jwtProperties
++            BibbidiTokenProperties bibbidiTokenProperties
+     ) {
+         this.bibbidiTokenParser = bibbidiTokenParser;
+         this.failureResponseWriter = failureResponseWriter;
+-        this.headerName = jwtProperties.headerName();
++        this.headerName = bibbidiTokenProperties.headerName();
+     }
+ 
+     @Override
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+index c50b69cac954f6950c656e7b1090d565e02729c2..a713006938b8469f5e027ea40d5c6a1010ce1521 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.security;
+ 
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.JwtProperties;
++import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Bean;
+@@ -29,20 +29,20 @@ public class SecurityConfig {
+     private final BibbidiTokenParser bibbidiTokenParser;
+     private final AuthenticationFailureResponseWriter failureResponseWriter;
+     private final SecurityProperties securityProperties;
+-    private final JwtProperties jwtProperties;
++    private final BibbidiTokenProperties bibbidiTokenProperties;
+     private final ActiveUserAuthorizationManager activeUserAuthorizationManager;
+ 
+     public SecurityConfig(
+             BibbidiTokenParser bibbidiTokenParser,
+             AuthenticationFailureResponseWriter failureResponseWriter,
+             SecurityProperties securityProperties,
+-            JwtProperties jwtProperties,
++            BibbidiTokenProperties bibbidiTokenProperties,
+             ActiveUserAuthorizationManager activeUserAuthorizationManager
+     ) {
+         this.bibbidiTokenParser = bibbidiTokenParser;
+         this.failureResponseWriter = failureResponseWriter;
+         this.securityProperties = securityProperties;
+-        this.jwtProperties = jwtProperties;
++        this.bibbidiTokenProperties = bibbidiTokenProperties;
+         this.activeUserAuthorizationManager = activeUserAuthorizationManager;
+     }
+ 
+@@ -51,7 +51,7 @@ public class SecurityConfig {
+         return new BibbidiTokenAuthenticationFilter(
+                 bibbidiTokenParser,
+                 failureResponseWriter,
+-                jwtProperties
++                bibbidiTokenProperties
+         );
+     }
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
+index 6cf617aa24b7d101bbda5adc2ea0951ebc24f759..4955cc6339bca03956595cfb2db8d7557dea2065 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/handoff/HandoffService.java
+@@ -8,7 +8,7 @@ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.service.session.IssuedSession;
+ import com.bibbidi.wedding.auth.service.session.SessionIssueService;
+ import com.bibbidi.wedding.auth.service.session.SessionOwner;
+-import com.bibbidi.wedding.auth.token.OpaqueTokenGenerator;
++import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+@@ -30,7 +30,7 @@ public class HandoffService {
+ 
+     private final HandoffCodeRepository handoffCodeRepository;
+     private final RefreshSessionRepository refreshSessionRepository;
+-    private final OpaqueTokenGenerator opaqueTokenGenerator;
++    private final SecretValueGenerator secretValueGenerator;
+     private final SessionIssueService sessionIssueService;
+     private final UserService userService;
+     private final SessionProperties sessionProperties;
+@@ -38,14 +38,14 @@ public class HandoffService {
+     public HandoffService(
+             HandoffCodeRepository handoffCodeRepository,
+             RefreshSessionRepository refreshSessionRepository,
+-            OpaqueTokenGenerator opaqueTokenGenerator,
++            SecretValueGenerator secretValueGenerator,
+             SessionIssueService sessionIssueService,
+             UserService userService,
+             SessionProperties sessionProperties
+     ) {
+         this.handoffCodeRepository = handoffCodeRepository;
+         this.refreshSessionRepository = refreshSessionRepository;
+-        this.opaqueTokenGenerator = opaqueTokenGenerator;
++        this.secretValueGenerator = secretValueGenerator;
+         this.sessionIssueService = sessionIssueService;
+         this.userService = userService;
+         this.sessionProperties = sessionProperties;
+@@ -58,7 +58,7 @@ public class HandoffService {
+     public String issueCode(Long currentUserId, String refreshToken) {
+         LocalDateTime now = LocalDateTime.now();
+         RefreshSession session = refreshSessionRepository
+-                .findByTokenHash(opaqueTokenGenerator.hash(refreshToken))
++                .findByTokenHash(secretValueGenerator.hash(refreshToken))
+                 .orElseThrow(() -> new BusinessException(ClientError.REFRESH_SESSION_INVALID,
+                         "저장된 refresh 세션을 찾지 못했습니다."));
+ 
+@@ -67,9 +67,9 @@ public class HandoffService {
+                     "쓸 수 없거나 다른 회원의 refresh 세션입니다. sessionId=" + session.id());
+         }
+ 
+-        String code = opaqueTokenGenerator.generate();
++        String code = secretValueGenerator.generate();
+         handoffCodeRepository.save(HandoffCode.issue(
+-                opaqueTokenGenerator.hash(code),
++                secretValueGenerator.hash(code),
+                 session.userId(),
+                 session.familyId(),
+                 now.plus(sessionProperties.handoffCodeTtl())));
+@@ -79,7 +79,7 @@ public class HandoffService {
+     public IssuedSession exchange(String code) {
+         LocalDateTime now = LocalDateTime.now();
+         HandoffCode handoffCode = handoffCodeRepository
+-                .findByCodeHash(opaqueTokenGenerator.hash(code))
++                .findByCodeHash(secretValueGenerator.hash(code))
+                 .orElseThrow(() -> new BusinessException(ClientError.HANDOFF_CODE_INVALID,
+                         "서버가 만든 적 없는 handoff code입니다."));
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java
+index 4406ace21141b5f108ce6e4ee74d7ca0bb8dd20c..1037d474a5e6072a3bdab7bf06e8e7a2279f929d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/login/OidcAuthRequestService.java
+@@ -6,9 +6,8 @@ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcSecretGenerator;
+ import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
+-import com.bibbidi.wedding.auth.token.OpaqueTokenGenerator;
++import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+@@ -30,23 +29,20 @@ public class OidcAuthRequestService {
+ 
+     private final OidcProviderProperties providerProperties;
+     private final OidcAuthorizationUriFactory authorizationUriFactory;
+-    private final OidcSecretGenerator secretGenerator;
+-    private final OpaqueTokenGenerator opaqueTokenGenerator;
++    private final SecretValueGenerator secretValueGenerator;
+     private final OidcAuthRequestRepository oidcAuthRequestRepository;
+     private final SessionProperties sessionProperties;
+ 
+     public OidcAuthRequestService(
+             OidcProviderProperties providerProperties,
+             OidcAuthorizationUriFactory authorizationUriFactory,
+-            OidcSecretGenerator secretGenerator,
+-            OpaqueTokenGenerator opaqueTokenGenerator,
++            SecretValueGenerator secretValueGenerator,
+             OidcAuthRequestRepository oidcAuthRequestRepository,
+             SessionProperties sessionProperties
+     ) {
+         this.providerProperties = providerProperties;
+         this.authorizationUriFactory = authorizationUriFactory;
+-        this.secretGenerator = secretGenerator;
+-        this.opaqueTokenGenerator = opaqueTokenGenerator;
++        this.secretValueGenerator = secretValueGenerator;
+         this.oidcAuthRequestRepository = oidcAuthRequestRepository;
+         this.sessionProperties = sessionProperties;
+     }
+@@ -55,23 +51,23 @@ public class OidcAuthRequestService {
+             SocialProvider provider, ClientType clientType, SocialAuthPurpose purpose) {
+         OidcProviderProperties.Provider configuration = providerProperties.get(provider);
+ 
+-        String state = secretGenerator.generate();
+-        String nonce = secretGenerator.generate();
+-        String codeVerifier = secretGenerator.generate();
+-        String browserBinder = clientType == ClientType.WEB ? secretGenerator.generate() : null;
++        String state = secretValueGenerator.generate();
++        String nonce = secretValueGenerator.generate();
++        String codeVerifier = secretValueGenerator.generate();
++        String browserBinder = clientType == ClientType.WEB ? secretValueGenerator.generate() : null;
+ 
+         oidcAuthRequestRepository.save(OidcAuthRequest.start(
+-                opaqueTokenGenerator.hash(state),
++                secretValueGenerator.hash(state),
+                 provider,
+                 nonce,
+                 codeVerifier,
+-                browserBinder == null ? null : opaqueTokenGenerator.hash(browserBinder),
++                browserBinder == null ? null : secretValueGenerator.hash(browserBinder),
+                 clientType,
+                 purpose,
+                 LocalDateTime.now().plus(sessionProperties.authRequestTtl())));
+ 
+         String authorizationUri = authorizationUriFactory.create(
+-                configuration, clientType, state, nonce, secretGenerator.toCodeChallenge(codeVerifier));
++                configuration, clientType, state, nonce, secretValueGenerator.toCodeChallenge(codeVerifier));
+         return new SocialAuthorizationResult(authorizationUri, state, browserBinder);
+     }
+ 
+@@ -85,7 +81,7 @@ public class OidcAuthRequestService {
+     ) {
+         LocalDateTime now = LocalDateTime.now();
+         OidcAuthRequest request = oidcAuthRequestRepository
+-                .findByStateHash(opaqueTokenGenerator.hash(state))
++                .findByStateHash(secretValueGenerator.hash(state))
+                 .orElseThrow(() -> new BusinessException(ClientError.OIDC_AUTH_REQUEST_INVALID,
+                         "서버가 만든 적 없는 state입니다."));
+ 
+@@ -109,6 +105,6 @@ public class OidcAuthRequestService {
+         if (browserBinder == null || browserBinder.isBlank()) {
+             return null;
+         }
+-        return opaqueTokenGenerator.hash(browserBinder);
++        return secretValueGenerator.hash(browserBinder);
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
+index c4987607a973cb1f99984ffa1a5307eaa66fe551..1d45b00dee99185c70f4786795664124ed208d54 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionIssueService.java
+@@ -5,7 +5,7 @@ import com.bibbidi.wedding.auth.domain.RefreshSession;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+-import com.bibbidi.wedding.auth.token.OpaqueTokenGenerator;
++import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.auth.token.SessionProperties;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import java.time.LocalDateTime;
+@@ -22,18 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
+ public class SessionIssueService {
+ 
+     private final BibbidiTokenIssuer bibbidiTokenIssuer;
+-    private final OpaqueTokenGenerator opaqueTokenGenerator;
++    private final SecretValueGenerator secretValueGenerator;
+     private final RefreshSessionRepository refreshSessionRepository;
+     private final SessionProperties sessionProperties;
+ 
+     public SessionIssueService(
+             BibbidiTokenIssuer bibbidiTokenIssuer,
+-            OpaqueTokenGenerator opaqueTokenGenerator,
++            SecretValueGenerator secretValueGenerator,
+             RefreshSessionRepository refreshSessionRepository,
+             SessionProperties sessionProperties
+     ) {
+         this.bibbidiTokenIssuer = bibbidiTokenIssuer;
+-        this.opaqueTokenGenerator = opaqueTokenGenerator;
++        this.secretValueGenerator = secretValueGenerator;
+         this.refreshSessionRepository = refreshSessionRepository;
+         this.sessionProperties = sessionProperties;
+     }
+@@ -43,12 +43,12 @@ public class SessionIssueService {
+     }
+ 
+     public IssuedSession issue(SessionOwner owner, ClientType clientType, String familyId) {
+-        String refreshToken = opaqueTokenGenerator.generate();
++        String refreshToken = secretValueGenerator.generate();
+         refreshSessionRepository.save(RefreshSession.issue(
+                 owner.userId(),
+                 familyId,
+                 clientType,
+-                opaqueTokenGenerator.hash(refreshToken),
++                secretValueGenerator.hash(refreshToken),
+                 LocalDateTime.now().plus(sessionProperties.refreshTokenTtl())));
+ 
+         String accessToken = bibbidiTokenIssuer.issueAccessToken(new BibbidiTokenClaims(
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
+index b85f68ad7f8de1fa0b5bf8f1c6e2526e83313f6f..bd0501f75cc0a6fe75e34435db6160d3c67e7fc8 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/session/SessionRefreshService.java
+@@ -3,7 +3,7 @@ package com.bibbidi.wedding.auth.service.session;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.RefreshSession;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+-import com.bibbidi.wedding.auth.token.OpaqueTokenGenerator;
++import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+@@ -25,18 +25,18 @@ import org.springframework.transaction.annotation.Transactional;
+ public class SessionRefreshService {
+ 
+     private final RefreshSessionRepository refreshSessionRepository;
+-    private final OpaqueTokenGenerator opaqueTokenGenerator;
++    private final SecretValueGenerator secretValueGenerator;
+     private final SessionIssueService sessionIssueService;
+     private final UserService userService;
+ 
+     public SessionRefreshService(
+             RefreshSessionRepository refreshSessionRepository,
+-            OpaqueTokenGenerator opaqueTokenGenerator,
++            SecretValueGenerator secretValueGenerator,
+             SessionIssueService sessionIssueService,
+             UserService userService
+     ) {
+         this.refreshSessionRepository = refreshSessionRepository;
+-        this.opaqueTokenGenerator = opaqueTokenGenerator;
++        this.secretValueGenerator = secretValueGenerator;
+         this.sessionIssueService = sessionIssueService;
+         this.userService = userService;
+     }
+@@ -64,7 +64,7 @@ public class SessionRefreshService {
+     }
+ 
+     private RefreshSession findSession(String refreshToken) {
+-        return refreshSessionRepository.findByTokenHash(opaqueTokenGenerator.hash(refreshToken))
++        return refreshSessionRepository.findByTokenHash(secretValueGenerator.hash(refreshToken))
+                 .orElseThrow(() -> new BusinessException(ClientError.REFRESH_SESSION_INVALID,
+                         "저장된 refresh 세션을 찾지 못했습니다."));
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenClaimNames.java
+similarity index 83%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenClaimNames.java
+index 2d9d349a9be624e250d710435218d5d638383e16..aab5189814fcf0b336db8cc501bb5329c7a1c83f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenClaimNames.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.token;
+ 
+ /** 직접 정한 claim 이름을 한곳에 모은다. 표준 claim은 jjwt가 제공하는 이름을 그대로 쓴다. */
+-final class JwtClaimNames {
++final class BibbidiTokenClaimNames {
+ 
+     static final String CATEGORY = "category";
+     static final String STATUS = "status";
+@@ -9,6 +9,6 @@ final class JwtClaimNames {
+     static final String NICKNAME = "nickname";
+     static final String EMAIL = "email";
+ 
+-    private JwtClaimNames() {
++    private BibbidiTokenClaimNames() {
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+index 20f3f698e12c1a91de87af2db9ccb51fdc4f0c4c..90ee446549cfb3bfb53cbfe49c8c799c8ce6b848 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+@@ -11,12 +11,12 @@ import org.springframework.stereotype.Component;
+ @Component
+ public class BibbidiTokenIssuer {
+ 
+-    private final JwtProperties properties;
+-    private final JwtSigningKeySource keySource;
++    private final BibbidiTokenProperties properties;
++    private final BibbidiTokenSigningKey signingKey;
+ 
+-    public BibbidiTokenIssuer(JwtProperties properties, JwtSigningKeySource keySource) {
++    public BibbidiTokenIssuer(BibbidiTokenProperties properties, BibbidiTokenSigningKey signingKey) {
+         this.properties = properties;
+-        this.keySource = keySource;
++        this.signingKey = signingKey;
+     }
+ 
+     public String issueAccessToken(BibbidiTokenClaims claims) {
+@@ -28,12 +28,12 @@ public class BibbidiTokenIssuer {
+                 .subject(String.valueOf(claims.userId()))
+                 .issuedAt(Date.from(issuedAt))
+                 .expiration(Date.from(issuedAt.plus(properties.accessTokenTtl())))
+-                .claim(JwtClaimNames.CATEGORY, TokenCategory.ACCESS.name())
+-                .claim(JwtClaimNames.STATUS, claims.status().name())
+-                .claim(JwtClaimNames.ROLE, claims.role().name())
+-                .claim(JwtClaimNames.NICKNAME, claims.nickname())
+-                .claim(JwtClaimNames.EMAIL, claims.email())
+-                .signWith(keySource.signingKey())
++                .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.ACCESS.name())
++                .claim(BibbidiTokenClaimNames.STATUS, claims.status().name())
++                .claim(BibbidiTokenClaimNames.ROLE, claims.role().name())
++                .claim(BibbidiTokenClaimNames.NICKNAME, claims.nickname())
++                .claim(BibbidiTokenClaimNames.EMAIL, claims.email())
++                .signWith(signingKey.signingKey())
+                 .compact();
+     }
+ 
+@@ -47,8 +47,8 @@ public class BibbidiTokenIssuer {
+                 .subject(String.valueOf(userId))
+                 .issuedAt(Date.from(issuedAt))
+                 .expiration(Date.from(issuedAt.plus(properties.deleteGrantTtl())))
+-                .claim(JwtClaimNames.CATEGORY, TokenCategory.DELETE_GRANT.name())
+-                .signWith(keySource.signingKey())
++                .claim(BibbidiTokenClaimNames.CATEGORY, TokenCategory.DELETE_GRANT.name())
++                .signWith(signingKey.signingKey())
+                 .compact();
+     }
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+index 5f3960c25de952604e9a43e5f94a85472047b7e6..3a3be830385c34c3b2dd4114a006972542a6a7e0 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+@@ -17,12 +17,12 @@ import org.springframework.stereotype.Component;
+ @Component
+ public class BibbidiTokenParser {
+ 
+-    private final JwtProperties properties;
+-    private final JwtSigningKeySource keySource;
++    private final BibbidiTokenProperties properties;
++    private final BibbidiTokenSigningKey signingKey;
+ 
+-    public BibbidiTokenParser(JwtProperties properties, JwtSigningKeySource keySource) {
++    public BibbidiTokenParser(BibbidiTokenProperties properties, BibbidiTokenSigningKey signingKey) {
+         this.properties = properties;
+-        this.keySource = keySource;
++        this.signingKey = signingKey;
+     }
+ 
+     public BibbidiTokenClaims parseAccessToken(String token) {
+@@ -31,8 +31,8 @@ public class BibbidiTokenParser {
+                 userId(claims, ClientError.ACCESS_TOKEN_INVALID),
+                 status(claims),
+                 role(claims),
+-                claims.get(JwtClaimNames.NICKNAME, String.class),
+-                claims.get(JwtClaimNames.EMAIL, String.class));
++                claims.get(BibbidiTokenClaimNames.NICKNAME, String.class),
++                claims.get(BibbidiTokenClaimNames.EMAIL, String.class));
+     }
+ 
+     /** 탈퇴 재인증 표를 검사하고 그 표가 가리키는 사용자를 돌려준다. */
+@@ -43,7 +43,7 @@ public class BibbidiTokenParser {
+ 
+     private Claims parse(String token, TokenCategory expected, ClientError invalidError) {
+         Claims claims = parseSigned(token, invalidError);
+-        String category = claims.get(JwtClaimNames.CATEGORY, String.class);
++        String category = claims.get(BibbidiTokenClaimNames.CATEGORY, String.class);
+         if (!expected.name().equals(category)) {
+             throw new BusinessException(invalidError,
+                     "토큰 용도가 다릅니다. 기대한 용도: " + expected.name());
+@@ -54,7 +54,7 @@ public class BibbidiTokenParser {
+     private Claims parseSigned(String token, ClientError invalidError) {
+         try {
+             return Jwts.parser()
+-                    .verifyWith(keySource.signingKey())
++                    .verifyWith(signingKey.signingKey())
+                     .requireIssuer(properties.issuer())
+                     .requireAudience(properties.audience())
+                     .build()
+@@ -76,7 +76,7 @@ public class BibbidiTokenParser {
+     }
+ 
+     private static UserRole role(Claims claims) {
+-        String role = claims.get(JwtClaimNames.ROLE, String.class);
++        String role = claims.get(BibbidiTokenClaimNames.ROLE, String.class);
+         try {
+             return UserRole.valueOf(role);
+         } catch (IllegalArgumentException | NullPointerException exception) {
+@@ -86,7 +86,7 @@ public class BibbidiTokenParser {
+     }
+ 
+     private static UserStatus status(Claims claims) {
+-        String status = claims.get(JwtClaimNames.STATUS, String.class);
++        String status = claims.get(BibbidiTokenClaimNames.STATUS, String.class);
+         try {
+             return UserStatus.valueOf(status);
+         } catch (IllegalArgumentException | NullPointerException exception) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java
+similarity index 95%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java
+index 1be0a8d39e7ce288698ae8b5b9604e71334b8e3b..69811d5486ac3a9816c8a027c9c5e9157bc52e84 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java
+@@ -14,7 +14,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
+  * @param headerName access token을 싣는 요청 헤더 이름
+  */
+ @ConfigurationProperties(prefix = "auth.jwt")
+-public record JwtProperties(
++public record BibbidiTokenProperties(
+         String secret,
+         String issuer,
+         String audience,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
+similarity index 91%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
+index 0292f98c1564fbd6d23805f79559d7b6765f250b..5c60524da0a75ab432528f6568d9e44934366914 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
+@@ -10,13 +10,13 @@ import org.springframework.stereotype.Component;
+  * 비밀말이 없거나 HS256이 요구하는 256비트에 못 미치면 애플리케이션을 띄우지 않는다.
+  */
+ @Component
+-public class JwtSigningKeySource {
++public class BibbidiTokenSigningKey {
+ 
+     private static final int MINIMUM_SECRET_BYTES = 32;
+ 
+     private final SecretKey signingKey;
+ 
+-    public JwtSigningKeySource(JwtProperties properties) {
++    public BibbidiTokenSigningKey(BibbidiTokenProperties properties) {
+         byte[] secret = secretBytes(properties.secret());
+         this.signingKey = Keys.hmacShaKeyFor(secret);
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/OpaqueTokenGenerator.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/OpaqueTokenGenerator.java
+deleted file mode 100644
+index 29b773db4bf26cece590a5961e09038cce64d93d..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/OpaqueTokenGenerator.java
++++ /dev/null
+@@ -1,38 +0,0 @@
+-package com.bibbidi.wedding.auth.token;
+-
+-import java.nio.charset.StandardCharsets;
+-import java.security.MessageDigest;
+-import java.security.NoSuchAlgorithmException;
+-import java.security.SecureRandom;
+-import java.util.Base64;
+-import java.util.HexFormat;
+-import org.springframework.stereotype.Component;
+-
+-/**
+- * 뜻을 담지 않는 1회용 값을 만들고, 저장할 해시를 계산한다.
+- * refresh token과 handoff code처럼 훔치면 바로 쓰이는 값은 원문을 저장하지 않는다.
+- */
+-@Component
+-public class OpaqueTokenGenerator {
+-
+-    private static final int TOKEN_BYTES = 32;
+-    private static final String SHA_256 = "SHA-256";
+-
+-    private final SecureRandom secureRandom = new SecureRandom();
+-
+-    public String generate() {
+-        byte[] bytes = new byte[TOKEN_BYTES];
+-        secureRandom.nextBytes(bytes);
+-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+-    }
+-
+-    public String hash(String token) {
+-        try {
+-            byte[] digest = MessageDigest.getInstance(SHA_256)
+-                    .digest(token.getBytes(StandardCharsets.UTF_8));
+-            return HexFormat.of().formatHex(digest);
+-        } catch (NoSuchAlgorithmException exception) {
+-            throw new IllegalStateException(SHA_256 + "을 사용할 수 없습니다.", exception);
+-        }
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcSecretGenerator.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/SecretValueGenerator.java
+similarity index 56%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcSecretGenerator.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/token/SecretValueGenerator.java
+index c7296f1ae94a114a0a152ebb39ce49c066559e8b..24088b9236a27ad66ea83c030ef814f6f730f3ad 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcSecretGenerator.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/SecretValueGenerator.java
+@@ -1,15 +1,22 @@
+-package com.bibbidi.wedding.auth.oidc.provider;
++package com.bibbidi.wedding.auth.token;
+ 
++import java.nio.charset.StandardCharsets;
+ import java.security.MessageDigest;
+ import java.security.NoSuchAlgorithmException;
+ import java.security.SecureRandom;
+-import java.nio.charset.StandardCharsets;
+ import java.util.Base64;
++import java.util.HexFormat;
+ import org.springframework.stereotype.Component;
+ 
+-/** state, nonce, PKCE 값처럼 추측할 수 없어야 하는 값을 만든다. */
++/**
++ * 추측할 수 없어야 하는 값을 만들고, 저장할 해시를 계산한다.
++ *
++ * <p>refresh token과 handoff code처럼 훔치면 바로 쓰이는 값, 그리고 state와 브라우저 바인딩 값이
++ * 모두 여기서 나온다. 뜻을 담지 않으므로 값 자체로는 아무것도 알아낼 수 없고, 저장할 때는 원문 대신
++ * 해시만 남긴다.
++ */
+ @Component
+-public class OidcSecretGenerator {
++public class SecretValueGenerator {
+ 
+     private static final int SECRET_BYTES = 32;
+     private static final String SHA_256 = "SHA-256";
+@@ -22,14 +29,19 @@ public class OidcSecretGenerator {
+         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+     }
+ 
+-    /** PKCE에서 code_verifier를 넘겨줄 때 쓰는 변형값이다. */
++    /** 저장할 해시다. 원문과 대조할 때 같은 방식으로 계산해 비교한다. */
++    public String hash(String value) {
++        return HexFormat.of().formatHex(sha256(value));
++    }
++
++    /** PKCE에서 code_verifier 대신 인가 주소에 실어 보내는 값이다. */
+     public String toCodeChallenge(String codeVerifier) {
+         return Base64.getUrlEncoder().withoutPadding().encodeToString(sha256(codeVerifier));
+     }
+ 
+     private static byte[] sha256(String value) {
+         try {
+-            return MessageDigest.getInstance(SHA_256).digest(value.getBytes(StandardCharsets.US_ASCII));
++            return MessageDigest.getInstance(SHA_256).digest(value.getBytes(StandardCharsets.UTF_8));
+         } catch (NoSuchAlgorithmException exception) {
+             throw new IllegalStateException(SHA_256 + "을 사용할 수 없습니다.", exception);
+         }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index db7d7bc1ac585dd9ce621728d32af0204e205e93..35a8388ca570c8367b223492d17617cdfd340e05 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -23,7 +23,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("발급한 access token에서 사용자와 표시용 정보를 그대로 꺼낸다")
+     void shouldIssueAndParseAccessToken() {
+-        JwtProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+         BibbidiTokenIssuer issuer = issuer(properties);
+ 
+         BibbidiTokenClaims parsed = parser(properties).parseAccessToken(issuer.issueAccessToken(CLAIMS));
+@@ -34,7 +34,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("만료된 access token은 만료 오류로 거절한다")
+     void shouldRejectExpiredAccessToken() {
+-        JwtProperties properties = properties(Duration.ofSeconds(-1));
++        BibbidiTokenProperties properties = properties(Duration.ofSeconds(-1));
+         String expired = issuer(properties).issueAccessToken(CLAIMS);
+ 
+         assertThatThrownBy(() -> parser(properties).parseAccessToken(expired))
+@@ -73,7 +73,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("탈퇴용 표를 access token 자리에 넣으면 용도가 다르다고 거절한다")
+     void shouldRejectDeleteGrantUsedAsAccessToken() {
+-        JwtProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+         String deleteGrant = issuer(properties).issueDeleteGrant(1L);
+ 
+         assertThatThrownBy(() -> parser(properties).parseAccessToken(deleteGrant))
+@@ -85,7 +85,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("탈퇴용 표에서 대상 회원을 꺼낸다")
+     void shouldParseDeleteGrant() {
+-        JwtProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+ 
+         Long userId = parser(properties).parseDeleteGrant(issuer(properties).issueDeleteGrant(7L));
+ 
+@@ -95,7 +95,7 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("access token을 탈퇴용 표 자리에 넣으면 거절한다")
+     void shouldRejectAccessTokenUsedAsDeleteGrant() {
+-        JwtProperties properties = properties(Duration.ofMinutes(30));
++        BibbidiTokenProperties properties = properties(Duration.ofMinutes(30));
+         String accessToken = issuer(properties).issueAccessToken(CLAIMS);
+ 
+         assertThatThrownBy(() -> parser(properties).parseDeleteGrant(accessToken))
+@@ -107,29 +107,29 @@ class BibbidiTokenTest {
+     @Test
+     @DisplayName("비밀말이 비었거나 너무 짧으면 애플리케이션을 띄우지 않는다")
+     void shouldRejectWeakSecret() {
+-        assertThatThrownBy(() -> new JwtSigningKeySource(
++        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
+                 properties(Duration.ofMinutes(30), "", ISSUER, AUDIENCE)))
+                 .isInstanceOf(IllegalStateException.class);
+-        assertThatThrownBy(() -> new JwtSigningKeySource(
++        assertThatThrownBy(() -> new BibbidiTokenSigningKey(
+                 properties(Duration.ofMinutes(30), "too-short", ISSUER, AUDIENCE)))
+                 .isInstanceOf(IllegalStateException.class);
+     }
+ 
+-    private static JwtProperties properties(Duration accessTokenTtl) {
++    private static BibbidiTokenProperties properties(Duration accessTokenTtl) {
+         return properties(accessTokenTtl, SECRET, ISSUER, AUDIENCE);
+     }
+ 
+-    private static JwtProperties properties(
++    private static BibbidiTokenProperties properties(
+             Duration accessTokenTtl, String secret, String issuer, String audience) {
+-        return new JwtProperties(
++        return new BibbidiTokenProperties(
+                 secret, issuer, audience, accessTokenTtl, Duration.ofMinutes(5), "Authorization");
+     }
+ 
+-    private static BibbidiTokenIssuer issuer(JwtProperties properties) {
+-        return new BibbidiTokenIssuer(properties, new JwtSigningKeySource(properties));
++    private static BibbidiTokenIssuer issuer(BibbidiTokenProperties properties) {
++        return new BibbidiTokenIssuer(properties, new BibbidiTokenSigningKey(properties));
+     }
+ 
+-    private static BibbidiTokenParser parser(JwtProperties properties) {
+-        return new BibbidiTokenParser(properties, new JwtSigningKeySource(properties));
++    private static BibbidiTokenParser parser(BibbidiTokenProperties properties) {
++        return new BibbidiTokenParser(properties, new BibbidiTokenSigningKey(properties));
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+index 30ac70efa31596050470423b3df8d7b361862eed..59534eab69069be152d8158afa1155b3487e9e4b 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
++++ b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+@@ -7,7 +7,7 @@ import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
+ import com.bibbidi.wedding.auth.security.SecurityConfig;
+ import com.bibbidi.wedding.auth.security.SecurityProperties;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.JwtProperties;
++import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.boot.test.context.TestConfiguration;
+ import org.springframework.context.annotation.Bean;
+@@ -20,7 +20,7 @@ import tools.jackson.databind.ObjectMapper;
+  */
+ @TestConfiguration
+ @Import(SecurityConfig.class)
+-@EnableConfigurationProperties({SecurityProperties.class, JwtProperties.class})
++@EnableConfigurationProperties({SecurityProperties.class, BibbidiTokenProperties.class})
+ public class SecurityTestConfig {
+ 
+     @Bean

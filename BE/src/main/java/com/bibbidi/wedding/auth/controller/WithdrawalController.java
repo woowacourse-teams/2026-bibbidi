@@ -3,20 +3,18 @@ package com.bibbidi.wedding.auth.controller;
 import com.bibbidi.wedding.auth.controller.dto.response.DeleteGrantResponse;
 import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
 import com.bibbidi.wedding.auth.controller.dto.request.WithdrawalRequest;
-import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.service.WithdrawalService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -42,13 +40,11 @@ public class WithdrawalController {
     public DeleteGrantResponse issueDeleteGrantToken(
             @AuthenticationPrincipal(expression = "userId") Long currentUserId,
             @PathVariable String provider,
-            @RequestParam ClientType clientType,
             @Valid @RequestBody SocialLoginRequest request,
             HttpServletRequest servletRequest
     ) {
         return new DeleteGrantResponse(withdrawalService.issueDeleteGrantToken(
                 SocialProvider.from(provider),
-                clientType,
                 request.code(),
                 request.state(),
                 authCookieFactory.readOidcBinder(servletRequest),
@@ -56,13 +52,18 @@ public class WithdrawalController {
     }
 
     @DeleteMapping("/api/users/me")
-    public ResponseEntity<Void> withdraw(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void withdraw(
             @AuthenticationPrincipal(expression = "userId") Long currentUserId,
-            @Valid @RequestBody WithdrawalRequest request
+            @Valid @RequestBody WithdrawalRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
     ) {
         withdrawalService.withdraw(currentUserId, request.deleteGrant());
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, authCookieFactory.expiredRefreshToken().toString())
-                .build();
+        if (authCookieFactory.hasRefreshToken(servletRequest)) {
+            servletResponse.addHeader(
+                    HttpHeaders.SET_COOKIE,
+                    authCookieFactory.expiredRefreshToken().toString());
+        }
     }
 }

@@ -6,12 +6,14 @@ import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -20,6 +22,9 @@ class UserRepositoryIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("소셜에서 받은 닉네임이 겹쳐도 회원을 만든다")
@@ -87,6 +92,25 @@ class UserRepositoryIntegrationTest {
         assertThat(userRepository.findById(created.id()))
                 .extracting(User::nickname, User::status, User::email)
                 .containsExactly("current", UserStatus.PENDING, "current@bibbidi.kr");
+    }
+
+    @Test
+    @DisplayName("같은 결혼 예정일을 다시 저장해도 수정 시각을 갱신한다")
+    void shouldUpdateTimestampWhenSameWeddingDateIsSaved() throws InterruptedException {
+        User created = userRepository.create(User.pending("current", null));
+        WeddingDate weddingDate = new WeddingDate(created.id(), LocalDate.of(2027, 5, 15));
+        userRepository.saveWeddingDate(weddingDate);
+        LocalDateTime before = updatedAt(created.id());
+
+        Thread.sleep(10);
+        userRepository.saveWeddingDate(weddingDate);
+
+        assertThat(updatedAt(created.id())).isAfter(before);
+    }
+
+    private LocalDateTime updatedAt(Long userId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM users WHERE id = ?", LocalDateTime.class, userId);
     }
 
     @Test

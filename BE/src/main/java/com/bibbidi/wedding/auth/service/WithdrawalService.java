@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.auth.service;
 
-import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
 import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
@@ -47,7 +46,6 @@ public class WithdrawalService {
 
     public String issueDeleteGrantToken(
             SocialProvider provider,
-            ClientType clientType,
             String code,
             String state,
             @Nullable String browserBinder,
@@ -55,7 +53,6 @@ public class WithdrawalService {
     ) {
         Long verifiedUserId = socialLoginService.verifyForWithdrawal(
                 provider,
-                clientType,
                 code,
                 state,
                 browserBinder,

@@ -31,13 +31,16 @@ public class RefreshSessionRepository {
 
     public Optional<RefreshSession> findByTokenHash(String tokenHash) {
         return jpaRefreshSessionRepository
-                .findByTokenHash(tokenHash)
+                .findByTokenHashForUpdate(tokenHash)
                 .map(authMapper::toDomain);
     }
 
     public Optional<RefreshSession> findLatestUsableNativeSession(Long userId, LocalDateTime now) {
         return jpaRefreshSessionRepository
-                .findLatestUsableSession(userId, ClientType.NATIVE, now)
+                .findLatestUsableSession(
+                        userId,
+                        ClientType.NATIVE,
+                        now)
                 .map(authMapper::toDomain);
     }
 

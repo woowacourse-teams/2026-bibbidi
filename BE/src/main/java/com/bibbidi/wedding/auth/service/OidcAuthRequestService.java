@@ -75,7 +75,11 @@ public class OidcAuthRequestService {
                 nonce,
                 secretValueGenerator.toCodeChallenge(codeVerifier)
         );
-        return new SocialAuthorizationResult(authorizationUri, state, browserBinder);
+        return new SocialAuthorizationResult(
+                authorizationUri,
+                state,
+                browserBinder
+        );
     }
 
     public OidcAuthRequest consume(
@@ -105,6 +109,33 @@ public class OidcAuthRequestService {
         }
 
         return oidcAuthRequestRepository.save(request.use(now));
+    }
+
+    public OidcAuthRequest consumeForWithdrawal(
+            SocialProvider provider,
+            String state,
+            @Nullable String browserBinder
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        OidcAuthRequest request = findByState(state);
+        if (!request.isUsable(now)
+                || request.provider() != provider
+                || request.purpose() != SocialAuthPurpose.WITHDRAWAL) {
+            throw new BusinessException(ClientError.OIDC_AUTH_REQUEST_INVALID,
+                    "이미 썼거나 만료됐거나 시작할 때와 조건이 다른 인가 요청입니다. requestId=" + request.id());
+        }
+        if (!request.matchesBrowser(hashOrNull(browserBinder))) {
+            throw new BusinessException(ClientError.OIDC_AUTH_REQUEST_INVALID,
+                    "인가를 시작한 브라우저가 아닙니다. requestId=" + request.id());
+        }
+        return oidcAuthRequestRepository.save(request.use(now));
+    }
+
+    private OidcAuthRequest findByState(String state) {
+        return oidcAuthRequestRepository
+                .findByStateHash(secretValueGenerator.toSha256Hex(state))
+                .orElseThrow(() -> new BusinessException(ClientError.OIDC_AUTH_REQUEST_INVALID,
+                        "서버가 만든 적 없는 state입니다."));
     }
 
     private @Nullable String hashOrNull(@Nullable String browserBinder) {

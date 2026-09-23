@@ -9,6 +9,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
@@ -73,7 +74,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                                 .tag("Auth")
                                 .summary("웹 세션 갱신")
                                 .description("refresh 쿠키로 새 한 쌍을 받습니다. 쓴 refresh token은 다시 쓸 수 없습니다.")
-                                .responseSchema(schema("WebSessionResponse"))
+                                .responseSchema(schema("BibbidiSessionResponse"))
                                 .responseFields(
                                         PayloadDocumentation.fieldWithPath("accessToken")
                                                 .description("새 access token"),
@@ -84,7 +85,12 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 .getResponse()
                 .getHeader("Set-Cookie");
 
-        assertThat(setCookie).contains(REFRESH_COOKIE).contains("HttpOnly").contains("Secure");
+        assertThat(setCookie)
+                .contains(REFRESH_COOKIE)
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=Lax")
+                .contains("Path=/api/auth");
     }
 
     @Test
@@ -99,6 +105,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"))
                 .andDo(document(
                         "auth-native-session-refresh",
                         resource(ResourceSnippetParameters.builder()
@@ -106,7 +113,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                                 .summary("네이티브 세션 갱신")
                                 .description("앱은 쿠키를 쓰지 않으므로 refresh token을 본문으로 주고받습니다.")
                                 .requestSchema(schema("NativeSessionRefreshRequest"))
-                                .responseSchema(schema("NativeSessionResponse"))
+                                .responseSchema(schema("BibbidiTokenResponse"))
                                 .requestFields(PayloadDocumentation.fieldWithPath("refreshToken")
                                         .description("지금 가지고 있는 refresh token"))
                                 .responseFields(

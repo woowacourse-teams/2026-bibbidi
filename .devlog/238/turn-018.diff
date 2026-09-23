@@ -1,0 +1,459 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+index 67af98e4eed0317ca3f7f00476f61979fff4f6eb..9c25e2465a17954c463a1a33bcc9619c537b377b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+@@ -1,8 +1,8 @@
+ package com.bibbidi.wedding.auth.config;
+ 
+-import com.bibbidi.wedding.auth.controller.RefreshCookieProperties;
+-import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Configuration;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
+similarity index 95%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
+index 69811d5486ac3a9816c8a027c9c5e9157bc52e84..eb767f2aec17f666e92e55af8d3aa4c0df61b4e0 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/BibbidiTokenProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.token;
++package com.bibbidi.wedding.auth.config;
+ 
+ import java.time.Duration;
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
+index 30c65741cc9cd2d0a4cd9ca475dcfa62f22385b8..8b7cf808a26714c91578b3ce26578b359e52f98d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcClientConfig.java
+@@ -1,8 +1,6 @@
+ package com.bibbidi.wedding.auth.config;
+ 
+-import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCacheProperties;
+ import com.bibbidi.wedding.auth.oidc.client.OidcApiClient;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import java.net.http.HttpClient;
+ import java.time.Duration;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+@@ -15,8 +13,7 @@ import org.springframework.web.client.support.RestClientAdapter;
+ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
+ 
+ /**
+- * 소셜 제공자를 부르는 클라이언트를 만든다.
+- * 제공자가 늦게 답하더라도 요청 스레드가 묶이지 않도록 연결과 읽기에 제한 시간을 둔다.
++ * 소셜 제공자를 부르는 클라이언트를 만든다. 제공자가 늦게 답하더라도 요청 스레드가 묶이지 않도록 연결과 읽기에 제한 시간을 둔다.
+  */
+ @Configuration
+ @EnableScheduling
+@@ -31,16 +28,22 @@ public class OidcClientConfig {
+         RestClient restClient = RestClient.builder()
+                 .requestFactory(requestFactory())
+                 .build();
++
+         HttpServiceProxyFactory proxyFactory = HttpServiceProxyFactory
+                 .builderFor(RestClientAdapter.create(restClient))
+                 .build();
++
+         return proxyFactory.createClient(OidcApiClient.class);
+     }
+ 
+     private static JdkClientHttpRequestFactory requestFactory() {
+-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+-                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
++        HttpClient httpClient = HttpClient.newBuilder()
++                .connectTimeout(CONNECT_TIMEOUT)
++                .build();
++
++        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+         requestFactory.setReadTimeout(READ_TIMEOUT);
++
+         return requestFactory;
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcProviderProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcProviderProperties.java
+similarity index 98%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcProviderProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/OidcProviderProperties.java
+index 78b79aa9b5ffc8aa01a7660486b319a433c34ddc..1bf0fed92f21eea1465c872bcaa0fa5e153e8ac5 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcProviderProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcProviderProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.oidc.provider;
++package com.bibbidi.wedding.auth.config;
+ 
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
+similarity index 95%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
+index 4061a76cee016588f8842cf0a60fbe0e493be6e6..e309f29271f8ddfdeebf73ef108fa66f0f8abf48 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCacheProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/OidcPublicKeyCacheProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.oidc.jwks;
++package com.bibbidi.wedding.auth.config;
+ 
+ import java.time.Duration;
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/RefreshCookieProperties.java
+similarity index 92%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/RefreshCookieProperties.java
+index a7afc09cd7ca9a73d1d975c33a72f5de436bc9af..ada3a4a0dedc72a67c4b39cd894e65adcbca2988 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/RefreshCookieProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller;
++package com.bibbidi.wedding.auth.config;
+ 
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
+similarity index 94%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
+index ed2132b8070c0d628458f90bc1032403b514234a..93ce40802b949d6abaa75dc30b4e98e978fa45f7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityConfig.java
+@@ -1,18 +1,21 @@
+-package com.bibbidi.wedding.auth.security;
++package com.bibbidi.wedding.auth.config;
+ 
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
++import com.bibbidi.wedding.auth.security.AuthenticatedUser;
++import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
++import com.bibbidi.wedding.auth.security.BibbidiTokenAuthenticationFilter;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.context.annotation.Bean;
+ import org.springframework.context.annotation.Configuration;
+ import org.springframework.http.HttpMethod;
++import org.springframework.security.authorization.AuthorizationDecision;
++import org.springframework.security.authorization.AuthorizationManager;
+ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+ import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+ import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+ import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
+-import org.springframework.security.authorization.AuthorizationDecision;
+-import org.springframework.security.authorization.AuthorizationManager;
+ import org.springframework.security.config.http.SessionCreationPolicy;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.web.SecurityFilterChain;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
+similarity index 96%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
+index 02db0f71b82a533c4d1fc645bd75a441d8697a4e..565eddf24c56d2f4cc54889a1c95a5999cca81f4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SecurityProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.security;
++package com.bibbidi.wedding.auth.config;
+ 
+ import com.bibbidi.wedding.common.domain.UserRole;
+ import java.util.List;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/SessionProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
+similarity index 93%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/token/SessionProperties.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
+index 5f54fc574fe2ab2c0c53412c177be0a4f6e98cab..bf2ac1c1b70556ed6ac9188d27d6ed80417bd291 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/SessionProperties.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/SessionProperties.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.token;
++package com.bibbidi.wedding.auth.config;
+ 
+ import java.time.Duration;
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
+index 149081067c6c95a103bc7e45e675334e5aea5143..48b090c024188117ad308b1b914da7ce02a32645 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
+@@ -1,6 +1,7 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import jakarta.servlet.http.Cookie;
+ import jakarta.servlet.http.HttpServletRequest;
+ import java.time.Duration;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
+index 130b8ef6149d321189cdd01554ccae1391f8d956..27f0d432a78bfeaca0ec8181b15a09a83e51e03b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
+@@ -1,6 +1,7 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import jakarta.servlet.http.HttpServletRequest;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+similarity index 93%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+index 66872b96720364e114ad13ce3d8a587e2c94aa6a..8db38d0cfbaa3317d4d0e46ac5c8301c1276bbc1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/HandoffController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+@@ -20,12 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
+  * 네이티브에서 한 로그인을 앱 안 WebView로 넘긴다. 앱이 코드를 받아 WebView 주소에 실어 열면, WebView가 그 코드를 내고 웹 세션 쿠키를 받는다.
+  */
+ @RestController
+-public class HandoffController {
++public class WebViewSessionController {
+ 
+     private final HandoffService handoffService;
+     private final RefreshCookieFactory refreshCookieFactory;
+ 
+-    public HandoffController(HandoffService handoffService, RefreshCookieFactory refreshCookieFactory) {
++    public WebViewSessionController(HandoffService handoffService, RefreshCookieFactory refreshCookieFactory) {
+         this.handoffService = handoffService;
+         this.refreshCookieFactory = refreshCookieFactory;
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcTokenExchangeClient.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcTokenExchangeClient.java
+index 25730a52405443d9ce564f38eaba4bcf311ce1bd..4332258ac90c9235032bf7d277854abe56472408 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcTokenExchangeClient.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/client/OidcTokenExchangeClient.java
+@@ -1,6 +1,6 @@
+ package com.bibbidi.wedding.auth.oidc.client;
+ 
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.net.URI;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
+index 67789bcb2e46aa02c643591f4b5863ca454a5ede..c1dce01429dbaf3ee0e20a638516092390c12131 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifier.java
+@@ -3,7 +3,7 @@ package com.bibbidi.wedding.auth.oidc.idtoken;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
+ import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import io.jsonwebtoken.Claims;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+index a81abd1f150892430b1a49bd79cb2a34375fafb7..a788c998d2b6fa71205fa213d8c4c2637ccbeac7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyCache.java
+@@ -1,8 +1,9 @@
+ package com.bibbidi.wedding.auth.oidc.jwks;
+ 
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcPublicKeyCacheProperties;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.client.OidcPublicKeyFetchClient;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.github.benmanes.caffeine.cache.Cache;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+index d33ff0c9d9350a2bc555616b891d15e0ac85cc7e..3668fb35ff7e6821a5816279de9e9c13179f7cbf 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/jwks/OidcPublicKeyWarmUpScheduler.java
+@@ -1,7 +1,8 @@
+ package com.bibbidi.wedding.auth.oidc.jwks;
+ 
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcPublicKeyCacheProperties;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
+ import jakarta.annotation.PostConstruct;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.scheduling.annotation.Scheduled;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcAuthorizationUriFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcAuthorizationUriFactory.java
+index e4efb5a7a1b2294d5e74410b317650329c18f0a4..2f4bf9e8f4cde1f83fff26e1b601f217a71a480e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcAuthorizationUriFactory.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/oidc/provider/OidcAuthorizationUriFactory.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.oidc.provider;
+ 
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java
+index 3b64fdf1ac9094460800496c7eb988a7263030c6..f81763920d3ba43dd81217df5ec0c84499c1463b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.security;
+ 
++import com.bibbidi.wedding.auth.config.SecurityProperties;
+ import com.bibbidi.wedding.common.domain.UserRole;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import java.util.Collection;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+index dcea4466cfd5753d30d7b79a02e3a6d870320dd6..05f1d3bb5bc8a776012ef9accac01742236db37f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+@@ -2,7 +2,7 @@ package com.bibbidi.wedding.auth.security;
+ 
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import jakarta.servlet.FilterChain;
+ import jakarta.servlet.ServletException;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+index 9a475a40a6edc841a851706d79388db4f83147e6..3e5ae8835cddd0d7189624c2dd27d45dda6fe582 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/HandoffService.java
+@@ -7,7 +7,7 @@ import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+index 11591507d9dcccccbd6080685d43e0c9ce20b64e..b8004acfb52e970a0cd8b2d68d3496b40c814002 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/OidcAuthRequestService.java
+@@ -5,10 +5,10 @@ import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
+ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
+ import com.bibbidi.wedding.auth.token.SecretValueGenerator;
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import java.time.LocalDateTime;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+index 0fd87724cae2bea562410e39550eb8877091178f..9460501183527d759e3220f953623d2724d91f99 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SessionIssueService.java
+@@ -6,7 +6,7 @@ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
+ import com.bibbidi.wedding.auth.token.IssuedRefreshToken;
+-import com.bibbidi.wedding.auth.token.SessionProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import java.time.LocalDateTime;
+ import java.util.UUID;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+index 6e3619f931a135a491332973cd381c0af87f0f2f..72c6d0cbd9b28d7e1b964ea097462b322354c75a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/SocialLoginService.java
+@@ -8,7 +8,7 @@ import com.bibbidi.wedding.auth.oidc.client.OidcTokenExchangeClient;
+ import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+ import com.bibbidi.wedding.auth.oidc.idtoken.SocialUserIdentity;
+ import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import org.jspecify.annotations.Nullable;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+index 764422ed0476c2eaa265cc45dd5b935f4c4e37d1..78b22383c5f14fe9007c90f09aba6e02b6e8960b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenIssuer.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.token;
+ 
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import io.jsonwebtoken.Jwts;
+ import java.time.Duration;
+ import java.time.Instant;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+index c97c5ab57f75fdcb49d7f4ea6502a4f664136ee3..71cb566e51aad58e02ff87408881a6b2e163b3f7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenParser.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.token;
+ 
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import com.bibbidi.wedding.common.domain.UserRole;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
+index 5c60524da0a75ab432528f6568d9e44934366914..489ff3758b9e0778f28112f4a6685a8caf561c36 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/BibbidiTokenSigningKey.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.token;
+ 
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import io.jsonwebtoken.security.Keys;
+ import java.nio.charset.StandardCharsets;
+ import javax.crypto.SecretKey;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+similarity index 99%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+index 49e05a440aa85b9e831cee96d8920a82443fc263..b372cb078b2ef3efd6f6c9bcd007fad5c07de8f8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/HandoffControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+@@ -31,7 +31,7 @@ import tools.jackson.databind.ObjectMapper;
+ /**
+  * 네이티브 로그인을 앱 안 WebView로 넘기는 흐름을 확인하고 문서로 남긴다.
+  */
+-class HandoffControllerIntegrationTest extends BibbidiIntegrationTest {
++class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
+ 
+     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
+index c2215187a712d69b87f4ee1e0e3895ece42bd3f7..8e51c4599fad42487d3d3927505132269ac0c6d6 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/oidc/idtoken/IdTokenVerifierTest.java
+@@ -9,7 +9,7 @@ import static org.mockito.BDDMockito.given;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
+ import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
+-import com.bibbidi.wedding.auth.oidc.provider.OidcProviderProperties;
++import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.support.OidcTestKeys;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+index 4c7041f66e2b7ef1f6b5c05431d81d1f7de62ac9..d5839e353dfb75fd792b3662aaa4597155c2f32d 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/token/BibbidiTokenTest.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.auth.token;
+ 
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+index 21ba7f307f7a02ce70ca8d01d3af9d610fe74a3c..e02064c52ae1e7e9aaf08d23cc4d0d2f547e0ea7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
++++ b/BE/src/test/java/com/bibbidi/wedding/support/SecurityTestConfig.java
+@@ -3,10 +3,10 @@ package com.bibbidi.wedding.support;
+ import static org.mockito.Mockito.mock;
+ 
+ import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
+-import com.bibbidi.wedding.auth.security.SecurityConfig;
+-import com.bibbidi.wedding.auth.security.SecurityProperties;
++import com.bibbidi.wedding.auth.config.SecurityConfig;
++import com.bibbidi.wedding.auth.config.SecurityProperties;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+-import com.bibbidi.wedding.auth.token.BibbidiTokenProperties;
++import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+ import org.springframework.boot.context.properties.EnableConfigurationProperties;
+ import org.springframework.boot.test.context.TestConfiguration;
+ import org.springframework.context.annotation.Bean;
