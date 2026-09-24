@@ -1,10 +1,4 @@
-import {
-  MouseEvent,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
@@ -94,10 +88,8 @@ export function Checklist({
     number | null
   >(null);
   const isMobileLayout = useIsMobileLayout();
-  const checklistRef = useRef<HTMLDivElement>(null);
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const addTaskButtonRef = useRef<HTMLButtonElement>(null);
-  const toolbarRef = useRef<HTMLElement>(null);
   const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
   const wasAppointmentCreationOpenRef = useRef(
     appointmentCreation?.isOpen ?? false,
@@ -180,37 +172,6 @@ export function Checklist({
     statusFeedback.kind === "status"
       ? statusFeedback.errorMessage
       : undefined;
-
-  useLayoutEffect(() => {
-    const checklist = checklistRef.current;
-    const toolbar = toolbarRef.current;
-
-    if (!checklist || !toolbar) {
-      return;
-    }
-
-    const updateToolbarHeight = () => {
-      const toolbarHeight = toolbar.getBoundingClientRect().height;
-
-      if (toolbarHeight > 0) {
-        checklist.style.setProperty(
-          "--checklist-toolbar-height",
-          `${toolbarHeight}px`,
-        );
-      }
-    };
-
-    updateToolbarHeight();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver(updateToolbarHeight);
-    resizeObserver.observe(toolbar);
-
-    return () => resizeObserver.disconnect();
-  }, []);
 
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
@@ -445,13 +406,12 @@ export function Checklist({
             </ul>
           </nav>
 
-          <main
+          <section
             aria-label="결혼 준비 체크리스트"
             className="checklist"
             id="checklist-category-content"
-            ref={checklistRef}
           >
-            <header className="checklist__toolbar" ref={toolbarRef}>
+            <header className="checklist__toolbar">
               <div className="checklist__summary">
                 <h1>{selectedCategory?.title ?? "체크리스트"}</h1>
                 <p>
@@ -507,7 +467,9 @@ export function Checklist({
                   return (
                     <section
                       aria-labelledby={`${group.id}-title`}
-                      className="checklist__group"
+                      className={`checklist__group${
+                        isExpanded ? " checklist__group--expanded" : ""
+                      }`}
                       key={group.id}
                     >
                       <h2 className="checklist__group-heading">
@@ -602,6 +564,10 @@ export function Checklist({
                                 }}
                                 type="button"
                               >
+                                <span
+                                  aria-hidden="true"
+                                  className="checklist__task-marker"
+                                />
                                 <span className="checklist__task-title">
                                   {task.title}
                                 </span>
@@ -621,7 +587,7 @@ export function Checklist({
                 })}
               </div>
             )}
-          </main>
+          </section>
         </div>
       </div>
 

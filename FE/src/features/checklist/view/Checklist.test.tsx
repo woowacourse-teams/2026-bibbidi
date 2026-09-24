@@ -1040,11 +1040,20 @@ describe("Checklist 목록 표현", () => {
 
     expect(completedGroup.getAttribute("aria-expanded")).toBe("false");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      completedGroup.closest(".checklist__group")?.className,
+    ).not.toContain("checklist__group--expanded");
+    expect(incompleteGroup.closest(".checklist__group")?.className).toContain(
+      "checklist__group--expanded",
+    );
     expect(screen.queryByText("빈 단계")).toBeNull();
 
     fireEvent.click(completedGroup);
     expect(completedGroup.getAttribute("aria-expanded")).toBe("true");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
+    expect(completedGroup.closest(".checklist__group")?.className).toContain(
+      "checklist__group--expanded",
+    );
     expect(screen.getByText("계약 완료")).toBeTruthy();
     expect(screen.getByText("방문 상담")).toBeTruthy();
 

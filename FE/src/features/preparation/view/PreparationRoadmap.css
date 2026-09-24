@@ -1,7 +1,7 @@
 .preparation-roadmap {
   --preparation-roadmap-grid-height: 537px;
-  --preparation-roadmap-connector: #c58f80;
-  --preparation-roadmap-accent-text: #5b5147;
+  --preparation-roadmap-connector: var(--color-palette-coral-muted);
+  --preparation-roadmap-accent-text: var(--color-fg-brand-contrast);
 
   isolation: isolate;
   display: grid;
