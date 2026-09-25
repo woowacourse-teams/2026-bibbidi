@@ -8,11 +8,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderCallback(provider: string, search: string) {
+function renderCallback(
+  provider: string,
+  search: string,
+  onSuccess?: Parameters<typeof SocialLoginCallback>[0]["onSuccess"],
+) {
   render(
     <StrictMode>
       <SocialLoginCallback
         loginLink={<a href="/login">로그인으로 돌아가기</a>}
+        onSuccess={onSuccess}
         provider={provider}
         search={search}
       />
@@ -70,6 +75,29 @@ describe("SocialLoginCallback", () => {
         "가입을 시작했어요. 약관 동의 화면은 준비 중이에요.",
       ),
     ).toBeTruthy();
+  });
+
+  it("콜백 세션을 인증 계층에 전달한다", async () => {
+    const onSuccess = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(
+            { accessToken: "token", termsAgreementRequired: false },
+            201,
+          ),
+        ),
+    );
+
+    renderCallback("kakao", "?code=abc&state=xyz", onSuccess);
+
+    await screen.findByText("로그인했어요.");
+    expect(onSuccess).toHaveBeenCalledWith({
+      accessToken: "token",
+      termsAgreementRequired: false,
+    });
   });
 
   it("서버가 거절하면 서버 메시지를 보여 주고 로그인으로 돌아갈 수 있다", async () => {

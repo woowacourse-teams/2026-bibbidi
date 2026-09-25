@@ -1,4 +1,5 @@
 import { CurrentUser } from "../model/auth";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CURRENT_USER_ENDPOINT = `${apiBaseUrl}/api/users/me`;
@@ -68,6 +69,7 @@ function toRequestError(error: unknown, didTimeout: boolean): Error {
 
 export async function getCurrentUser(
   signal?: AbortSignal,
+  retryUnauthorized = true,
 ): Promise<CurrentUser> {
   const controller = new AbortController();
   let didTimeout = false;
@@ -87,11 +89,15 @@ export async function getCurrentUser(
     let response: Response;
 
     try {
-      response = await fetch(CURRENT_USER_ENDPOINT, {
-        credentials: "include",
-        method: "GET",
-        signal: controller.signal,
-      });
+      response = await authenticatedFetch(
+        CURRENT_USER_ENDPOINT,
+        {
+          credentials: "include",
+          method: "GET",
+          signal: controller.signal,
+        },
+        { retryUnauthorized },
+      );
     } catch (error) {
       throw toRequestError(error, didTimeout);
     }

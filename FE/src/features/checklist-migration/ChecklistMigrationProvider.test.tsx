@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../auth";
+import { installLegacyWebSessionFetch } from "../../test/webAuth";
 import { ChecklistMigrationProvider } from "./ChecklistMigrationProvider";
 
 const STORAGE_KEY = "bibbidi:preparation-checklist";
@@ -152,7 +153,7 @@ describe("ChecklistMigrationProvider", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />);
 
@@ -171,7 +172,7 @@ describe("ChecklistMigrationProvider", () => {
       .mockResolvedValue(
         new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />);
 
@@ -201,7 +202,7 @@ describe("ChecklistMigrationProvider", () => {
         }),
       );
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />);
 
@@ -231,7 +232,7 @@ describe("ChecklistMigrationProvider", () => {
           { status: 401 },
         ),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />);
 
@@ -291,7 +292,7 @@ describe("ChecklistMigrationProvider", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />, true);
 
@@ -337,7 +338,7 @@ describe("ChecklistMigrationProvider", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
     const view = renderProviders(<AuthStateProbe />);
 
     await waitFor(() => expect(addRequestSignal).toBeDefined());
@@ -408,7 +409,7 @@ describe("ChecklistMigrationProvider", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthSessionSwitch />);
 

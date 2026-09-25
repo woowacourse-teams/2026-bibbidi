@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChecklistMigrationProvider } from "../checklist-migration";
+import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
 import { AuthProvider, useAuth } from "./AuthProvider";
 import { PlannerAccessGuard } from "./PlannerAccessGuard";
 
@@ -41,6 +42,7 @@ function renderPlanner(content: ReactNode = <h1>플래너 대시보드</h1>) {
 }
 
 beforeEach(() => {
+  resetWebAuthSessionForTest();
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
     removeItem: vi.fn(),
@@ -49,8 +51,19 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetWebAuthSessionForTest();
   vi.unstubAllGlobals();
 });
+
+function expiredWebSessionResponse() {
+  return new Response(
+    JSON.stringify({
+      errorCode: 206,
+      message: "로그인 상태를 유지할 수 없습니다.",
+    }),
+    { status: 401 },
+  );
+}
 
 describe("PlannerAccessGuard", () => {
   it("인증 확인 중에는 플래너 접근자를 리다이렉트하지 않고 로딩 상태를 표시한다", () => {
@@ -72,11 +85,14 @@ describe("PlannerAccessGuard", () => {
   it("인증 사용자는 플래너를 표시한다", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
-          status: 200,
-        }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValueOnce(expiredWebSessionResponse())
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            status: 200,
+          }),
+        ),
     );
 
     renderPlanner();
@@ -89,14 +105,17 @@ describe("PlannerAccessGuard", () => {
   it("비로그인 사용자는 안전한 플래너 복귀 정보를 유지해 로그인으로 보낸다", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
           new Response(
-            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            JSON.stringify({
+              errorCode: 201,
+              message: "로그인이 필요합니다.",
+            }),
             { status: 401 },
           ),
         ),
+      ),
     );
 
     renderPlanner();
@@ -109,11 +128,13 @@ describe("PlannerAccessGuard", () => {
       "fetch",
       vi
         .fn()
+        .mockResolvedValueOnce(expiredWebSessionResponse())
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ nickname: "bibbidi" }), {
             status: 200,
           }),
         )
+        .mockResolvedValueOnce(expiredWebSessionResponse())
         .mockResolvedValueOnce(
           new Response(
             JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),

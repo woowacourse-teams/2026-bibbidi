@@ -2,6 +2,7 @@ import {
   ChecklistItemStatus,
   isChecklistItemStatus,
 } from "../model/myChecklist";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import {
   AppointmentCreationRequest,
   AppointmentCreationResponse,
@@ -312,7 +313,7 @@ async function createChecklist(signal?: AbortSignal): Promise<number> {
     let response: Response;
 
     try {
-      response = await fetch(CHECKLIST_ENDPOINT, {
+      response = await authenticatedFetch(CHECKLIST_ENDPOINT, {
         credentials: "include",
         method: "POST",
         signal: controller.signal,
@@ -399,7 +400,7 @@ async function createCustomChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
+      response = await authenticatedFetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
         body: JSON.stringify({ categoryId, title }),
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -506,7 +507,7 @@ async function changeChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/${property}`,
         {
           body: requestBody,
@@ -632,7 +633,7 @@ async function hasRemainingAppointments(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/remaining-appointments`,
         {
           credentials: "include",

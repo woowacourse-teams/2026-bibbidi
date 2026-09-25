@@ -3,6 +3,7 @@ import {
   MyChecklistAppointmentModel,
   MyChecklistModel,
 } from "../model/myChecklist";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
@@ -228,7 +229,7 @@ async function getChecklist(signal?: AbortSignal): Promise<MyChecklistModel> {
     let response: Response;
 
     try {
-      response = await fetch(MY_CHECKLIST_ENDPOINT, {
+      response = await authenticatedFetch(MY_CHECKLIST_ENDPOINT, {
         credentials: "include",
         method: "GET",
         signal: controller.signal,
