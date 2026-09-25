@@ -1,5 +1,9 @@
 import { ReactNode, SubmitEvent, useEffect, useRef, useState } from "react";
 
+import {
+  isConnectedSocialProvider,
+  startSocialAuthorization,
+} from "../../social-login";
 import { LoginResult } from "../model/login";
 import { useLoginForm } from "../view-model/useLoginForm";
 import "./LoginForm.css";
@@ -63,6 +67,7 @@ interface LoginFormProps {
 
 export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
   const [socialLoginNotice, setSocialLoginNotice] = useState("");
+  const [isSocialRedirecting, setIsSocialRedirecting] = useState(false);
   const {
     formError,
     formErrorRevision,
@@ -73,7 +78,7 @@ export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
     values,
   } = useLoginForm({ onSuccess });
   const formErrorRef = useRef<HTMLParagraphElement>(null);
-  const isFormDisabled = isSubmitting || isSuccess;
+  const isFormDisabled = isSubmitting || isSuccess || isSocialRedirecting;
 
   useEffect(() => {
     if (formError) {
@@ -84,6 +89,27 @@ export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     void submit();
+  };
+
+  const handleSocialLogin = (provider: {
+    id: SocialProvider;
+    label: string;
+  }) => {
+    if (!isConnectedSocialProvider(provider.id)) {
+      setSocialLoginNotice(`${provider.label} 로그인은 준비 중이에요.`);
+      return;
+    }
+
+    setIsSocialRedirecting(true);
+    setSocialLoginNotice(`${provider.label} 로그인 화면으로 이동하고 있어요.`);
+    startSocialAuthorization(provider.id)
+      .then((authorizationUri) => window.location.assign(authorizationUri))
+      .catch(() => {
+        setIsSocialRedirecting(false);
+        setSocialLoginNotice(
+          `${provider.label} 로그인을 시작하지 못했어요. 다시 시도해 주세요.`,
+        );
+      });
   };
 
   return (
@@ -162,9 +188,7 @@ export function LoginForm({ onSuccess, signupLink }: LoginFormProps) {
             className={`login-form__social-button login-form__social-button--${provider.id}`}
             disabled={isFormDisabled}
             key={provider.id}
-            onClick={() =>
-              setSocialLoginNotice(`${provider.label} 로그인은 준비 중이에요.`)
-            }
+            onClick={() => handleSocialLogin(provider)}
             type="button"
           >
             <span className="login-form__social-icon">

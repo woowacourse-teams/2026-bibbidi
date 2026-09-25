@@ -1,0 +1,24 @@
+.social-login-callback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.social-login-callback__message {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.social-login-callback__error {
+  margin: 0;
+  color: var(--color-fg-critical);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
