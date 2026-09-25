@@ -1,6 +1,7 @@
 :root {
   /* Bibidi core palette */
   --color-palette-coral: #e88471;
+  --color-palette-coral-muted: #c58f80;
   --color-palette-ivory: #f0f0e9;
   --color-palette-yellow: #fdda6e;
   --color-palette-cream: #f8e8c1;
@@ -22,6 +23,7 @@
   --color-fg-neutral-muted: #555d6d;
   --color-fg-placeholder: #b0b3ba;
   --color-fg-brand: #8a493f;
+  --color-fg-brand-contrast: #5b5147;
   --color-fg-informative: #217cf9;
   --color-fg-on-brand: #ffffff;
   --color-fg-critical: #fa342c;
