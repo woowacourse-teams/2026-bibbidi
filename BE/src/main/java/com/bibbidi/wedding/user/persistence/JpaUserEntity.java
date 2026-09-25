@@ -46,6 +46,9 @@ public class JpaUserEntity extends BaseTimeEntity {
     @Column(name = "wedding_date")
     private LocalDate weddingDate;
 
+    @Column(name = "password_hash", insertable = false, updatable = false)
+    private String passwordHash;
+
     protected JpaUserEntity() {
     }
 
@@ -110,5 +113,9 @@ public class JpaUserEntity extends BaseTimeEntity {
 
     public LocalDate weddingDate() {
         return weddingDate;
+    }
+
+    public String passwordHash() {
+        return passwordHash;
     }
 }

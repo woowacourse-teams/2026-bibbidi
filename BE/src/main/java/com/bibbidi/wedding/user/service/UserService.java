@@ -4,8 +4,10 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
+import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,10 @@ public class UserService {
         return UserResult.from(user);
     }
 
+    public Optional<PasswordLoginInfo> findPasswordLoginInfo(String nickname) {
+        return userRepository.findPasswordLoginInfo(nickname);
+    }
+
     public WeddingDateResult findWeddingDate(Long currentUserId) {
         WeddingDate weddingDate = userRepository.findWeddingDateByUserId(currentUserId);
         return WeddingDateResult.from(weddingDate);
@@ -64,6 +70,11 @@ public class UserService {
         WeddingDate changedWeddingDate = currentWeddingDate.changeDate(weddingDate);
         WeddingDate savedWeddingDate = userRepository.saveWeddingDate(changedWeddingDate);
         return WeddingDateResult.from(savedWeddingDate);
+    }
+
+    @Transactional
+    public void removePassword(Long userId) {
+        userRepository.removePasswordHash(userId);
     }
 
     @Transactional

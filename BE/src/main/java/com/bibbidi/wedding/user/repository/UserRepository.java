@@ -7,6 +7,8 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
+import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -59,6 +61,15 @@ public class UserRepository {
         JpaUserEntity saved = jpaUserRepository.saveAndFlush(
                 userMapper.toEntity(userMapper.toDomain(currentEntity), weddingDate.date()));
         return new WeddingDate(saved.id(), saved.weddingDate());
+    }
+
+    public Optional<PasswordLoginInfo> findPasswordLoginInfo(String nickname) {
+        return jpaUserRepository.findByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)
+                .map(entity -> new PasswordLoginInfo(entity.id(), entity.passwordHash()));
+    }
+
+    public int removePasswordHash(Long userId) {
+        return jpaUserRepository.removePasswordHashByUserId(userId);
     }
 
     public int deleteById(Long userId) {
