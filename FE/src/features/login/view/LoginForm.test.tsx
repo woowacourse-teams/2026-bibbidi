@@ -86,10 +86,10 @@ describe("LoginForm", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LoginForm signupLink={<a href="/signup">회원가입</a>} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "구글로 계속하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "애플로 계속하기" }));
 
     expect(screen.getByRole("status").textContent).toBe(
-      "구글 로그인은 준비 중이에요.",
+      "애플 로그인은 준비 중이에요.",
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -115,6 +115,22 @@ describe("LoginForm", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+
+  it("구글 버튼을 누르면 서버에 웹 인가 주소를 요청한다", async () => {
+    const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LoginForm signupLink={<a href="/signup">회원가입</a>} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "구글로 계속하기" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/oidc/google/authorization?clientType=WEB",
+      expect.objectContaining({ credentials: "include", method: "GET" }),
+    );
+    expect(screen.getByRole("status").textContent).toBe(
+      "구글 로그인 화면으로 이동하고 있어요.",
+    );
   });
 
   it("카카오 인가 주소를 받지 못하면 다시 시도하라는 안내를 표시한다", async () => {

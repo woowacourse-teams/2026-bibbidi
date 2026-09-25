@@ -117,4 +117,65 @@ describe("authenticatedFetch", () => {
     expect(hasWebAccessToken()).toBe(false);
     expect(listener).toHaveBeenCalledOnce();
   });
+
+  it("401 후 refresh 대기 중 호출자가 취소하면 재시도하지 않는다", async () => {
+    const controller = new AbortController();
+    let resolveRefresh: (response: Response) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ errorCode: 204 }, 401))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRefresh = resolve;
+          }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    acceptWebAccessToken(accessToken(Date.now() + 120_000));
+
+    const request = authenticatedFetch("/api/users/me", {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    resolveRefresh(
+      jsonResponse({
+        accessToken: accessToken(Date.now() + 300_000),
+        termsAgreementRequired: false,
+      }),
+    );
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("선제 refresh 대기 중 호출자가 취소하면 원 요청을 보내지 않는다", async () => {
+    const controller = new AbortController();
+    let resolveRefresh: (response: Response) => void = () => undefined;
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    acceptWebAccessToken(accessToken(Date.now() + 30_000));
+
+    const request = authenticatedFetch("/api/users/me", {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    resolveRefresh(
+      jsonResponse({
+        accessToken: accessToken(Date.now() + 300_000),
+        termsAgreementRequired: false,
+      }),
+    );
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+  });
 });

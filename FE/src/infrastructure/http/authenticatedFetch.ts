@@ -9,6 +9,43 @@ interface AuthenticatedFetchOptions {
   retryUnauthorized?: boolean;
 }
 
+function abortReason(signal: AbortSignal): unknown {
+  return (
+    signal.reason ??
+    new DOMException("The operation was aborted.", "AbortError")
+  );
+}
+
+function waitForCaller<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal | null,
+): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+
+  if (signal.aborted) {
+    return Promise.reject(abortReason(signal));
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const handleAbort = () => {
+      signal.removeEventListener("abort", handleAbort);
+      reject(abortReason(signal));
+    };
+    const settle = (callback: (value: T) => void) => (value: T) => {
+      signal.removeEventListener("abort", handleAbort);
+      callback(value);
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    promise.then(settle(resolve), (error: unknown) => {
+      signal.removeEventListener("abort", handleAbort);
+      reject(error);
+    });
+  });
+}
+
 function withBearerToken(init: RequestInit | undefined, accessToken: string) {
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${accessToken}`);
@@ -35,7 +72,10 @@ async function requestWithAccessToken(
   }
 
   try {
-    const refreshedSession = await refreshWebSession();
+    const refreshedSession = await waitForCaller(
+      refreshWebSession(),
+      init?.signal,
+    );
     const retriedResponse = await fetch(
       input,
       withBearerToken(init, refreshedSession.accessToken),
@@ -61,10 +101,14 @@ export function authenticatedFetch(
   init?: RequestInit,
   options: AuthenticatedFetchOptions = {},
 ): Promise<Response> {
+  if (init?.signal?.aborted) {
+    return Promise.reject(abortReason(init.signal));
+  }
+
   const accessToken = accessTokenForRequest();
 
   if (accessToken instanceof Promise) {
-    return accessToken.then((token) =>
+    return waitForCaller(accessToken, init?.signal).then((token) =>
       requestWithAccessToken(input, init, options, token),
     );
   }

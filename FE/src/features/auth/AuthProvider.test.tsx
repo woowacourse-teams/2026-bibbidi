@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
+import {
+  hasWebAccessToken,
+  resetWebAuthSessionForTest,
+} from "../../infrastructure/auth/webSessionManager";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
 beforeEach(() => {
@@ -118,6 +121,7 @@ describe("AuthProvider", () => {
 
     expect(await screen.findByText("guest")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(hasWebAccessToken()).toBe(false);
   });
 
   it("refresh의 일시적인 네트워크 실패를 비로그인으로 확정하지 않는다", async () => {

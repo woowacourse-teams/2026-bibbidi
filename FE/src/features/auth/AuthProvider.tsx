@@ -62,6 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const session = await refreshWebSession();
 
           if (session.termsAgreementRequired) {
+            clearWebAccessToken();
             return { status: "guest" } as const;
           }
         } catch (error) {
