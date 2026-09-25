@@ -34,6 +34,9 @@ describe("isConnectedSocialProvider", () => {
   it("서버와 연동한 카카오와 구글만 연결된 제공자로 본다", () => {
     expect(isConnectedSocialProvider("kakao")).toBe(true);
     expect(isConnectedSocialProvider("google")).toBe(true);
+  it("서버와 연동한 카카오만 연결된 제공자로 본다", () => {
+    expect(isConnectedSocialProvider("kakao")).toBe(true);
+    expect(isConnectedSocialProvider("google")).toBe(false);
     expect(isConnectedSocialProvider("apple")).toBe(false);
   });
 });

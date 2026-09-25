@@ -15,6 +15,7 @@ function createChecklistItem(
   return {
     appointments: [],
     categoryId: 10,
+    createdAt: "2026-09-23T09:00:00",
     id,
     sourceCatalogItemId,
     status,
@@ -137,6 +138,7 @@ describe("ChecklistMigrationProvider", () => {
                   {
                     catalogItemId: 102,
                     categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
                     id: 11,
                     status: "prev",
                     title: "추가된 할 일",
@@ -275,6 +277,7 @@ describe("ChecklistMigrationProvider", () => {
                   {
                     catalogItemId: 101,
                     categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
                     id: 10,
                     status: "prev",
                     title: "추가된 할 일",
@@ -391,6 +394,7 @@ describe("ChecklistMigrationProvider", () => {
                   {
                     catalogItemId: 101,
                     categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
                     id: 10,
                     status: "prev",
                     title: "추가된 할 일",

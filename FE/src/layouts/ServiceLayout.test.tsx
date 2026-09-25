@@ -49,6 +49,7 @@ function createChecklistItem(
   return {
     appointments: [],
     categoryId: 10,
+    createdAt: "2026-09-23T09:00:00",
     id,
     sourceCatalogItemId,
     status,
@@ -846,6 +847,7 @@ describe("ServiceLayout", () => {
                   {
                     catalogItemId: 1002,
                     categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
                     id: 11,
                     status: "prev",
                     title: "서버가 추가한 두 번째 할 일",
@@ -874,13 +876,16 @@ describe("ServiceLayout", () => {
       ["/preparation"],
     );
 
-    expect(await screen.findByText("1/1")).toBeTruthy();
+    const headerSummary = await screen.findByRole("region", {
+      name: "결혼 준비 현황",
+    });
+    expect(await within(headerSummary).findByText("1/1")).toBeTruthy();
     expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
     fireEvent.click(
       await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
     );
 
-    expect(await screen.findByText("1/2")).toBeTruthy();
+    expect(await within(headerSummary).findByText("1/2")).toBeTruthy();
     expect(
       within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
         "50%",
@@ -983,6 +988,7 @@ describe("ServiceLayout", () => {
               {
                 catalogItemId: 1002,
                 categoryId: 10,
+                createdAt: "2026-09-23T09:00:00",
                 id: 11,
                 status: "prev",
                 title: "체크리스트 항목 11",
@@ -1091,6 +1097,7 @@ describe("ServiceLayout", () => {
               {
                 catalogItemId: 1002,
                 categoryId: 10,
+                createdAt: "2026-09-23T09:00:00",
                 id: 11,
                 status: "prev",
                 title: "체크리스트 항목 11",
@@ -1164,6 +1171,7 @@ describe("ServiceLayout", () => {
                   {
                     catalogItemId: 1001,
                     categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
                     id: 10,
                     status: "prev",
                     title: "체크리스트 항목 10",

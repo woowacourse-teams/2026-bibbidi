@@ -108,7 +108,6 @@ import { ChecklistAppointmentCreationInput } from "./useChecklistAppointmentCrea
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
   return {
     categories: [
-      { id: "20", items: [], title: "두 번째 카테고리" },
       {
         id: "10",
         items: [
@@ -124,6 +123,7 @@ function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQuer
         ],
         title: "첫 번째 카테고리",
       },
+      { id: "20", items: [], title: "두 번째 카테고리" },
     ],
   };
 }
@@ -337,8 +337,11 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     renderChecklistFeature();
 
     await screen.findByText("직접 작성 항목");
+    const taskList = screen.getByRole("list", {
+      name: "첫 번째 카테고리 할 일",
+    });
     expect(
-      screen
+      within(taskList)
         .getAllByRole("listitem")
         .map((item) => within(item).getByText(/항목$/).textContent),
     ).toEqual(["서버 Catalog 항목", "직접 작성 항목"]);
@@ -1173,7 +1176,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       target: { value: "  청첩장 문구 확정  " },
     });
     fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
+      target: { value: "20" },
     });
 
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
@@ -1181,7 +1184,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     await waitFor(() =>
       expect(repositoryMocks.createCustomItem).toHaveBeenCalledWith(
         "청첩장 문구 확정",
-        "10",
+        "20",
         expect.any(AbortSignal),
       ),
     );
@@ -1193,8 +1196,29 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "추가 중" }));
     expect(repositoryMocks.createCustomItem).toHaveBeenCalledOnce();
 
+    const updatedChecklist = createAuthenticatedChecklist();
+    const createdItem = {
+      appointments: [],
+      categoryId: "20",
+      checklistItemId: 501,
+      createdAt: "2026-09-23T10:00:00",
+      id: "checklist-item-501",
+      sourceCatalogItemId: null,
+      status: "prev" as const,
+      title: "청첩장 문구 확정",
+    };
+    updatedChecklist.categories[1] = {
+      customItems: [createdItem],
+      id: "20",
+      items: [createdItem],
+      steps: [],
+      title: "예복 준비",
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(updatedChecklist);
+
     await act(async () => {
       resolveCreation();
+      repositoryMocks.publishRevision();
     });
 
     await waitFor(() =>
@@ -1204,7 +1228,18 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       screen.queryByRole("complementary", { name: "할 일 추가" }),
     ).toBeNull();
     expect(document.activeElement).toBe(addTaskButton);
-    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
+    expect(
+      screen
+        .getByRole("button", { name: "예복 준비 0/1" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: /내가 추가한 일/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(screen.getByText("청첩장 문구 확정")).toBeTruthy();
 
     fireEvent.click(addTaskButton);
     const reopenedPanel = screen.getByRole("complementary", {
@@ -1377,7 +1412,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 describe("ChecklistFeature 상세 URL 선택", () => {
   it("할 일 클릭과 닫기·Escape를 URL에 반영하고 다른 query와 포커스를 유지한다", async () => {
     const checklist = createChecklist("URL 인코딩 할 일");
-    checklist.categories[1]!.items[0]!.id = "task-한글";
+    checklist.categories[0]!.items[0]!.id = "task-한글";
     repositoryMocks.getChecklist.mockResolvedValue(checklist);
     renderChecklistFeature(["/checklist?filter=remaining"]);
 
@@ -1411,8 +1446,8 @@ describe("ChecklistFeature 상세 URL 선택", () => {
 
   it("브라우저 뒤로가기로 이전 선택과 목록 상태를 복원한다", async () => {
     const checklist = createChecklist("첫 번째 할 일");
-    checklist.categories[1]!.items.push({
-      ...checklist.categories[1]!.items[0]!,
+    checklist.categories[0]!.items.push({
+      ...checklist.categories[0]!.items[0]!,
       id: "catalog-item-102",
       sourceCatalogItemId: 102,
       title: "두 번째 할 일",
@@ -1861,10 +1896,16 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
 
     renderChecklistFeature();
 
-    expect(await screen.findByText("등록된 할 일이 없어요.")).toBeTruthy();
+    expect(await screen.findByText("아직 담은 할 일이 없어요")).toBeTruthy();
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "빈 카테고리" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "준비 목록에서 추가" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "빈 카테고리" })).toBeTruthy();
     expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "준비 목록에서 추가" }));
+    expect(getCurrentUrl()).toBe("/?categoryId=10");
   });
 
   it("일반 오류를 화면 안에서 안내하고 다시 조회한다", async () => {
@@ -2004,30 +2045,33 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
   });
 });
 
-describe("ChecklistFeature 기존 UI", () => {
-  it("카테고리를 기존 순서대로 표시하고 accordion을 열고 닫는다", async () => {
+describe("ChecklistFeature 대분류와 중분류 UI", () => {
+  it("대분류를 로드맵 순서대로 표시하고 중분류를 열고 닫는다", async () => {
     renderChecklistFeature();
     await screen.findByText("로컬 체크리스트 항목");
 
-    expect(
-      screen
-        .getAllByRole("heading", { level: 2 })
-        .map((heading) => within(heading).getByText(/카테고리$/).textContent),
-    ).toEqual(["두 번째 카테고리", "첫 번째 카테고리"]);
-    const categoryButton = screen.getByRole("button", {
-      name: "첫 번째 카테고리",
+    const categoryNavigation = screen.getByRole("navigation", {
+      name: "체크리스트 대분류",
     });
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
-    expect(categoryButton.getAttribute("aria-controls")).toBeTruthy();
+    expect(
+      within(categoryNavigation)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["첫 번째 카테고리0/1", "두 번째 카테고리0/0"]);
+    const groupButton = screen
+      .getAllByRole("button", { name: /첫 번째 카테고리/ })
+      .find((button) => button.hasAttribute("aria-expanded"));
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("true");
+    expect(groupButton?.getAttribute("aria-controls")).toBeTruthy();
 
-    fireEvent.click(categoryButton);
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(groupButton as HTMLButtonElement);
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("false");
     expect(
       screen.queryByRole("list", { name: "첫 번째 카테고리 할 일" }),
     ).toBeNull();
 
-    fireEvent.click(categoryButton);
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(groupButton as HTMLButtonElement);
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("true");
     expect(
       screen.getByRole("list", { name: "첫 번째 카테고리 할 일" }),
     ).toBeTruthy();

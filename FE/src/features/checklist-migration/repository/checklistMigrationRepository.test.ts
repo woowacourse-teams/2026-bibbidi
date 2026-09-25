@@ -30,6 +30,7 @@ function createChecklist(
     items: catalogItemIds.map((sourceCatalogItemId, index) => ({
       appointments: [],
       categoryId: 1,
+      createdAt: `2026-09-23T09:${String(index).padStart(2, "0")}:00`,
       id: index + 1,
       sourceCatalogItemId,
       status: "prev",
@@ -71,6 +72,7 @@ function createAddedItems(
   return catalogItemIds.map((catalogItemId) => ({
     catalogItemId,
     categoryId: 1,
+    createdAt: "2026-09-23T09:00:00",
     id: catalogItemId,
     status: "prev",
     title: `추가 항목 ${catalogItemId}`,
