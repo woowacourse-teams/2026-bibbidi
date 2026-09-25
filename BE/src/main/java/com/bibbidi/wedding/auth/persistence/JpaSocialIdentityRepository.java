@@ -13,6 +13,10 @@ public interface JpaSocialIdentityRepository extends JpaRepository<JpaSocialIden
             SocialProvider provider, String providerUserId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE JpaSocialIdentityEntity identity SET identity.userId = :newUserId WHERE identity.userId = :userId")
+    int changeUserId(@Param("userId") Long userId, @Param("newUserId") Long newUserId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM JpaSocialIdentityEntity identity WHERE identity.userId = :userId")
     int deleteByUserId(@Param("userId") Long userId);
 }
