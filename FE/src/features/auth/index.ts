@@ -7,11 +7,7 @@ export {
   refreshWebSession,
   webUserIdFromAccessToken,
 } from "../../infrastructure/auth/webSessionManager";
-export {
-  createLoginEvent,
-  createLogoutEvent,
-  createSignUpEvent,
-} from "./analytics/authAnalytics";
+export { createLogoutEvent } from "./analytics/authAnalytics";
 export { useLogout } from "./useLogout";
 export { LoginRequiredDialog } from "./LoginRequiredDialog";
 export { PlannerAccessGuard } from "./PlannerAccessGuard";

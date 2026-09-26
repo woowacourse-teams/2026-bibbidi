@@ -410,7 +410,7 @@ describe("ServiceLayout", () => {
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "회원가입" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "회원가입" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
