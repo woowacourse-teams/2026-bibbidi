@@ -1,14 +1,17 @@
 package com.bibbidi.wedding.auth.service;
 
 import com.bibbidi.wedding.auth.domain.ClientType;
+import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
 import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
 import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+import java.time.LocalDateTime;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,16 +23,22 @@ public class LegacyAccountTransferService {
 
     private final PasswordEncoder passwordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
     private final UserService userService;
+    private final TermsService termsService;
     private final SocialIdentityRepository socialIdentityRepository;
+    private final RefreshSessionRepository refreshSessionRepository;
     private final SessionIssueService sessionIssueService;
 
     public LegacyAccountTransferService(
             UserService userService,
+            TermsService termsService,
             SocialIdentityRepository socialIdentityRepository,
+            RefreshSessionRepository refreshSessionRepository,
             SessionIssueService sessionIssueService
     ) {
         this.userService = userService;
+        this.termsService = termsService;
         this.socialIdentityRepository = socialIdentityRepository;
+        this.refreshSessionRepository = refreshSessionRepository;
         this.sessionIssueService = sessionIssueService;
     }
 
@@ -42,6 +51,9 @@ public class LegacyAccountTransferService {
                 ));
 
         socialIdentityRepository.changeUserId(currentUserId, legacyAccount.userId());
+        termsService.moveAgreements(currentUserId, legacyAccount.userId());
+        userService.copyTermsAgreement(currentUserId, legacyAccount.userId());
+        refreshSessionRepository.revokeAllOfUser(currentUserId, LocalDateTime.now());
         userService.removePassword(legacyAccount.userId());
         userService.delete(currentUserId);
 

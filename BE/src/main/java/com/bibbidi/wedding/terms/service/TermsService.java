@@ -71,6 +71,11 @@ public class TermsService {
     }
 
     @Transactional
+    public void moveAgreements(Long userId, Long newUserId) {
+        termsRepository.changeAgreementsUserId(userId, newUserId);
+    }
+
+    @Transactional
     public void deleteAgreementsOf(Long userId) {
         termsRepository.deleteAgreementsByUserId(userId);
     }
