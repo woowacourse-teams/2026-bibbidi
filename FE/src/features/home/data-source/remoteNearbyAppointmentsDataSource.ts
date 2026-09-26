@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
@@ -202,7 +203,7 @@ async function getNearbyAppointments(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${NEARBY_APPOINTMENTS_ENDPOINT}?limit=${encodeURIComponent(limit)}`,
         {
           credentials: "include",

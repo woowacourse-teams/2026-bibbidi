@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
+import { installLegacyWebSessionFetch } from "../test/webAuth";
 import { appRoutes } from "./router";
 
 function installFetch(currentUserResponse: Response) {
-  vi.stubGlobal(
-    "fetch",
+  installLegacyWebSessionFetch(
     vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(currentUserResponse.clone());
@@ -140,8 +140,7 @@ describe("appRoutes", () => {
 
   it("플래너 조회 중 로그인 세션이 사라지면 로그인 화면으로 이동한다", async () => {
     let currentUserRequestCount = 0;
-    vi.stubGlobal(
-      "fetch",
+    installLegacyWebSessionFetch(
       vi.fn().mockImplementation((url: string) => {
         if (url === "/api/users/me") {
           currentUserRequestCount += 1;

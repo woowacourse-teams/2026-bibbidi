@@ -1,5 +1,11 @@
 export { AuthProvider, useAuth } from "./AuthProvider";
 export {
+  acceptWebAccessToken,
+  clearWebAccessToken,
+  hasWebAccessToken,
+  refreshWebSession,
+} from "../../infrastructure/auth/webSessionManager";
+export {
   createLoginEvent,
   createLogoutEvent,
   createSignUpEvent,

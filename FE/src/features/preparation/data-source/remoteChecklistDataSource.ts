@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import type { AddedChecklistCatalogItemModel } from "../../checklist";
 import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
@@ -198,15 +199,18 @@ async function addCatalogItemIds(
     let response: Response;
 
     try {
-      response = await fetch(ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT, {
-        body: JSON.stringify(catalogItemIds),
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
+      response = await authenticatedFetch(
+        ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT,
+        {
+          body: JSON.stringify(catalogItemIds),
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          signal: request.controller.signal,
         },
-        method: "POST",
-        signal: request.controller.signal,
-      });
+      );
     } catch (error) {
       throw toRequestError(error, request.didTimeout(), signal);
     }

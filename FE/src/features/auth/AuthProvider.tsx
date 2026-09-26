@@ -10,6 +10,13 @@ import {
 } from "react";
 
 import { CurrentUserApiError, getCurrentUser } from "./api/getCurrentUser";
+import {
+  clearWebAccessToken,
+  hasWebAccessToken,
+  refreshWebSession,
+  subscribeAuthenticationRequired,
+} from "../../infrastructure/auth/webSessionManager";
+import { WebSessionExpiredError } from "../../infrastructure/auth/webSessionApi";
 import { AuthState, CurrentUser } from "./model/auth";
 
 interface AuthContextValue {
@@ -23,6 +30,9 @@ interface AuthContextValue {
 interface AuthProviderProps {
   children: ReactNode;
 }
+
+type AuthenticationSynchronizationResult =
+  { status: "guest" } | { status: "user"; user: CurrentUser };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -44,10 +54,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     currentUserControllerRef.current = controller;
     let isActive = true;
 
-    getCurrentUser(controller.signal)
-      .then((user) => {
+    const synchronizeAuthentication = async () => {
+      let retryUnauthorized = true;
+
+      if (!hasWebAccessToken()) {
+        try {
+          const session = await refreshWebSession();
+
+          if (session.termsAgreementRequired) {
+            clearWebAccessToken();
+            return { status: "guest" } as const;
+          }
+        } catch (error) {
+          if (!(error instanceof WebSessionExpiredError)) {
+            throw error;
+          }
+
+          // refresh cookie가 없는 동안에는 기존 JSESSIONID 사용자를 한 번 확인한다.
+          // 이미 실패한 refresh를 현재 사용자 401에서 반복하지 않는다.
+          retryUnauthorized = false;
+        }
+      }
+
+      return {
+        status: "user",
+        user: await getCurrentUser(controller.signal, retryUnauthorized),
+      } satisfies AuthenticationSynchronizationResult;
+    };
+
+    synchronizeAuthentication()
+      .then((result) => {
         if (isActive && authRevisionRef.current === authRevision) {
-          setAuthState({ status: "synchronizing", user });
+          setAuthState(
+            result.status === "guest"
+              ? { status: "guest" }
+              : { status: "synchronizing", user: result.user },
+          );
         }
       })
       .catch((error: unknown) => {
@@ -81,6 +123,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [requestRevision]);
 
+  useEffect(
+    () =>
+      subscribeAuthenticationRequired(() => {
+        invalidateCurrentUserRequest();
+        setAuthState({ status: "guest" });
+      }),
+    [invalidateCurrentUserRequest],
+  );
+
   const beginAuthentication = useCallback(
     (user: CurrentUser) => {
       invalidateCurrentUserRequest();
@@ -104,6 +155,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const endAuthentication = useCallback(() => {
     invalidateCurrentUserRequest();
+    clearWebAccessToken();
     setAuthState({ status: "guest" });
   }, [invalidateCurrentUserRequest]);
 

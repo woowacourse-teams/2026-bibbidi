@@ -157,15 +157,18 @@ describe("remoteWeddingDateDataSource", () => {
 
   it("응답 본문을 읽는 중 취소되면 사용자 오류 대신 취소로 처리한다", async () => {
     const controller = new AbortController();
+    const json = vi.fn(
+      () =>
+        new Promise((_resolve, reject) =>
+          controller.signal.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          ),
+        ),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
-        json: () =>
-          new Promise((_resolve, reject) =>
-            controller.signal.addEventListener("abort", () =>
-              reject(new DOMException("aborted", "AbortError")),
-            ),
-          ),
+        json,
         ok: true,
         status: 200,
       }),
@@ -176,7 +179,7 @@ describe("remoteWeddingDateDataSource", () => {
     const expectation = expect(request).rejects.toBeInstanceOf(
       RemoteWeddingDateRequestAbortedError,
     );
-    await Promise.resolve();
+    await vi.waitFor(() => expect(json).toHaveBeenCalledOnce());
     controller.abort();
     await expectation;
   });

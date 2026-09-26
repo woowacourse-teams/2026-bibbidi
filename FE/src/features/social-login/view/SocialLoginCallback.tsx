@@ -4,6 +4,7 @@ import { completeSocialLogin, SocialLoginApiError } from "../api/socialLogin";
 import {
   isConnectedSocialProvider,
   readSocialLoginCallbackParams,
+  SocialLoginSession,
 } from "../model/socialLogin";
 import "./SocialLoginCallback.css";
 
@@ -17,12 +18,14 @@ const INVALID_CALLBACK_MESSAGE =
 
 interface SocialLoginCallbackProps {
   loginLink: ReactNode;
+  onSuccess?: (session: SocialLoginSession) => void;
   provider: string;
   search: string;
 }
 
 export function SocialLoginCallback({
   loginLink,
+  onSuccess,
   provider,
   search,
 }: SocialLoginCallbackProps) {
@@ -45,6 +48,7 @@ export function SocialLoginCallback({
 
     completeSocialLogin(provider, params.code, params.state)
       .then((session) => {
+        onSuccess?.(session);
         setCallbackState({
           status: "success",
           termsAgreementRequired: session.termsAgreementRequired,
@@ -59,7 +63,7 @@ export function SocialLoginCallback({
               : INVALID_CALLBACK_MESSAGE,
         });
       });
-  }, [canRequest, params, provider]);
+  }, [canRequest, onSuccess, params, provider]);
 
   if (callbackState.status === "pending") {
     return (

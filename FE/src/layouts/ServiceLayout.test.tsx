@@ -39,6 +39,7 @@ import { PreparationRoadmapFeature } from "../features/preparation/PreparationRo
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../shared/responsive";
 import { installMatchMedia } from "../test/matchMedia";
+import { installLegacyWebSessionFetch } from "../test/webAuth";
 import { ServiceLayout } from "./ServiceLayout";
 
 function createChecklistItem(
@@ -133,7 +134,7 @@ describe("ServiceLayout", () => {
         );
       }
 
-      if (url === "/api/logout") {
+      if (url === "/api/auth/web/sessions/current") {
         return new Promise<Response>((resolve) => {
           logoutResolvers.push(resolve);
         });
@@ -141,7 +142,7 @@ describe("ServiceLayout", () => {
 
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     function CacheCapture() {
       const repository = useMyChecklistQueryRepository();
@@ -190,7 +191,9 @@ describe("ServiceLayout", () => {
     fireEvent.click(logoutButton);
 
     expect(
-      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+      fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/auth/web/sessions/current",
+      ),
     ).toHaveLength(1);
     expect(logoutButton.hasAttribute("disabled")).toBe(true);
     expect(logoutButton.getAttribute("aria-busy")).toBe("true");
@@ -213,7 +216,9 @@ describe("ServiceLayout", () => {
     expect(analyticsMocks.track).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(
-      fetchMock.mock.calls.filter(([url]) => url === "/api/logout"),
+      fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/auth/web/sessions/current",
+      ),
     ).toHaveLength(2);
     expect(screen.queryByRole("alert")).toBeNull();
 
@@ -247,8 +252,7 @@ describe("ServiceLayout", () => {
 
   it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
     let resolveCurrentUser: (response: Response) => void = () => undefined;
-    vi.stubGlobal(
-      "fetch",
+    installLegacyWebSessionFetch(
       vi.fn().mockImplementation(
         () =>
           new Promise<Response>((resolve) => {
@@ -264,7 +268,7 @@ describe("ServiceLayout", () => {
       screen.getByRole("status", { name: "로그인 상태 확인 중" }),
     ).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "계정 메뉴" })).toBeNull();
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2));
 
     await act(async () => {
       resolveCurrentUser(
@@ -276,10 +280,7 @@ describe("ServiceLayout", () => {
   });
 
   it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => new Promise(() => undefined)),
-    );
+    installLegacyWebSessionFetch(vi.fn(() => new Promise(() => undefined)));
 
     renderServiceLayout(
       <>
@@ -309,8 +310,7 @@ describe("ServiceLayout", () => {
   });
 
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
-    vi.stubGlobal(
-      "fetch",
+    installLegacyWebSessionFetch(
       vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ nickname: "bibbidi" }), {
           status: 200,
@@ -382,7 +382,7 @@ describe("ServiceLayout", () => {
 
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
@@ -405,7 +405,7 @@ describe("ServiceLayout", () => {
           { status: 401 },
         ),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
@@ -415,8 +415,7 @@ describe("ServiceLayout", () => {
   });
 
   it("비로그인 플래너 링크는 이동 없이 로그인 안내를 열고 배경을 비활성화한다", async () => {
-    vi.stubGlobal(
-      "fetch",
+    installLegacyWebSessionFetch(
       vi
         .fn()
         .mockResolvedValue(
@@ -533,7 +532,7 @@ describe("ServiceLayout", () => {
         ),
       );
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
@@ -574,7 +573,7 @@ describe("ServiceLayout", () => {
 
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
@@ -622,7 +621,7 @@ describe("ServiceLayout", () => {
 
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route
@@ -689,7 +688,7 @@ describe("ServiceLayout", () => {
 
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     const { container } = renderServiceLayout(
       <Route
@@ -777,8 +776,7 @@ describe("ServiceLayout", () => {
 
   it("모바일 체크리스트의 taskId가 비어 있으면 앱 chrome을 유지한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
-    vi.stubGlobal(
-      "fetch",
+    installLegacyWebSessionFetch(
       vi
         .fn()
         .mockResolvedValue(
@@ -861,7 +859,7 @@ describe("ServiceLayout", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route
@@ -963,7 +961,7 @@ describe("ServiceLayout", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route path="/checklist" element={<ChecklistFeature />} />,
@@ -1070,7 +1068,7 @@ describe("ServiceLayout", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
@@ -1185,7 +1183,7 @@ describe("ServiceLayout", () => {
 
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
-    vi.stubGlobal("fetch", fetchMock);
+    installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
       <Route path="/preparation" element={<PreparationRoadmapFeature />} />,

@@ -14,6 +14,7 @@ vi.mock("../infrastructure/analytics", () => ({
 }));
 
 import { AuthProvider, useAuth } from "../features/auth";
+import { resetWebAuthSessionForTest } from "../infrastructure/auth/webSessionManager";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { LoginPage } from "./LoginPage";
 
@@ -29,6 +30,7 @@ function createChecklistItem(id: number, sourceCatalogItemId: number | null) {
 }
 
 beforeEach(() => {
+  resetWebAuthSessionForTest();
   analyticsMocks.track.mockReset();
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
@@ -38,13 +40,25 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetWebAuthSessionForTest();
   vi.unstubAllGlobals();
 });
+
+function expiredWebSessionResponse() {
+  return new Response(
+    JSON.stringify({
+      errorCode: 206,
+      message: "로그인 상태를 유지할 수 없습니다.",
+    }),
+    { status: 401 },
+  );
+}
 
 describe("LoginPage", () => {
   it("일반 로그인이 완료되면 준비 목록인 루트로 이동한다", async () => {
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce(expiredWebSessionResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
@@ -99,7 +113,7 @@ describe("LoginPage", () => {
         screen.getByRole("heading", { name: "홈 페이지 bibbidi" }),
       ).toBeTruthy();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "login",
@@ -110,6 +124,7 @@ describe("LoginPage", () => {
   it("로그인 실패에는 성공 이벤트를 전송하지 않는다", async () => {
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce(expiredWebSessionResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
@@ -158,6 +173,7 @@ describe("LoginPage", () => {
     vi.stubGlobal("localStorage", storage);
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce(expiredWebSessionResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
@@ -238,7 +254,7 @@ describe("LoginPage", () => {
       await screen.findByRole("heading", { name: "홈 페이지 bibbidi" }),
     ).toBeTruthy();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/api/checklists/me/catalog-items",
       expect.objectContaining({ body: JSON.stringify([101]), method: "POST" }),
     );
@@ -256,6 +272,7 @@ describe("LoginPage", () => {
     async (initialEntry, expectedPage) => {
       const fetchMock = vi
         .fn()
+        .mockResolvedValueOnce(expiredWebSessionResponse())
         .mockResolvedValueOnce(
           new Response(
             JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
