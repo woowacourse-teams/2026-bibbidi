@@ -44,6 +44,10 @@ public class SocialIdentityRepository {
                 .map(authMapper::toDomain);
     }
 
+    public int changeUserId(Long userId, Long newUserId) {
+        return jpaSocialIdentityRepository.changeUserId(userId, newUserId);
+    }
+
     public int deleteByUserId(Long userId) {
         return jpaSocialIdentityRepository.deleteByUserId(userId);
     }

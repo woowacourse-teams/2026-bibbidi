@@ -14,7 +14,7 @@ ALTER TABLE users
     ALTER COLUMN role DROP DEFAULT;
 
 ALTER TABLE users
-    DROP COLUMN password_hash;
+    MODIFY COLUMN password_hash VARCHAR(255) NULL;
 
 CREATE TABLE social_identities (
     id BIGINT NOT NULL AUTO_INCREMENT,

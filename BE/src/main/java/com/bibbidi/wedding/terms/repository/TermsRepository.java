@@ -55,6 +55,10 @@ public class TermsRepository {
                 .toList();
     }
 
+    public int changeAgreementsUserId(Long userId, Long newUserId) {
+        return jpaTermsAgreementRepository.changeUserId(userId, newUserId);
+    }
+
     public int deleteAgreementsByUserId(Long userId) {
         return jpaTermsAgreementRepository.deleteByUserId(userId);
     }

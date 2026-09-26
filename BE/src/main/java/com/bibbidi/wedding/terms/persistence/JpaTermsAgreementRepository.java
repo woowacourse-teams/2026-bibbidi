@@ -11,6 +11,10 @@ public interface JpaTermsAgreementRepository extends JpaRepository<JpaTermsAgree
     List<JpaTermsAgreementEntity> findAllByUserId(Long userId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE JpaTermsAgreementEntity agreement SET agreement.userId = :newUserId WHERE agreement.userId = :userId")
+    int changeUserId(@Param("userId") Long userId, @Param("newUserId") Long newUserId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM JpaTermsAgreementEntity agreement WHERE agreement.userId = :userId")
     int deleteByUserId(@Param("userId") Long userId);
 }
