@@ -5,6 +5,7 @@ import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
 import { ChecklistPage } from "../pages/ChecklistPage";
 import { LoginPage } from "../pages/LoginPage";
+import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlannerPage } from "../pages/PlannerPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SignupPage } from "../pages/SignupPage";
@@ -47,6 +48,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "/signup",
         Component: SignupPage,
+      },
+      {
+        path: "/onboarding",
+        Component: OnboardingPage,
       },
       {
         // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.

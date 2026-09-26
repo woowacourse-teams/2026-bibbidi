@@ -22,6 +22,7 @@ import { AuthState, CurrentUser } from "./model/auth";
 interface AuthContextValue {
   authState: AuthState;
   beginAuthentication: (user: CurrentUser) => void;
+  beginOnboarding: () => void;
   completeAuthentication: (user: CurrentUser) => void;
   endAuthentication: () => void;
   refreshAuth: () => void;
@@ -32,7 +33,9 @@ interface AuthProviderProps {
 }
 
 type AuthenticationSynchronizationResult =
-  { status: "guest" } | { status: "user"; user: CurrentUser };
+  | { status: "guest" }
+  | { status: "onboardingRequired" }
+  | { status: "user"; user: CurrentUser };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -62,8 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const session = await refreshWebSession();
 
           if (session.termsAgreementRequired) {
-            clearWebAccessToken();
-            return { status: "guest" } as const;
+            return { status: "onboardingRequired" } as const;
           }
         } catch (error) {
           if (!(error instanceof WebSessionExpiredError)) {
@@ -85,11 +87,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     synchronizeAuthentication()
       .then((result) => {
         if (isActive && authRevisionRef.current === authRevision) {
-          setAuthState(
-            result.status === "guest"
-              ? { status: "guest" }
-              : { status: "synchronizing", user: result.user },
-          );
+          if (result.status === "user") {
+            setAuthState({ status: "synchronizing", user: result.user });
+            return;
+          }
+
+          setAuthState({ status: result.status });
         }
       })
       .catch((error: unknown) => {
@@ -140,6 +143,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [invalidateCurrentUserRequest],
   );
 
+  const beginOnboarding = useCallback(() => {
+    invalidateCurrentUserRequest();
+    setAuthState({ status: "onboardingRequired" });
+  }, [invalidateCurrentUserRequest]);
+
   const completeAuthentication = useCallback((user: CurrentUser) => {
     setAuthState((currentState) => {
       if (
@@ -169,6 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     () => ({
       authState,
       beginAuthentication,
+      beginOnboarding,
       completeAuthentication,
       endAuthentication,
       refreshAuth,
@@ -176,6 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [
       authState,
       beginAuthentication,
+      beginOnboarding,
       completeAuthentication,
       endAuthentication,
       refreshAuth,

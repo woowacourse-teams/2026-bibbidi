@@ -101,7 +101,7 @@ describe("AuthProvider", () => {
     );
   });
 
-  it("약관 동의가 필요한 소셜 세션은 현재 사용자를 조회하지 않는다", async () => {
+  it("약관 동의가 필요한 소셜 세션은 access token을 유지하고 온보딩 상태로 복구한다", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -119,9 +119,9 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByText("guest")).toBeTruthy();
+    expect(await screen.findByText("onboardingRequired")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(hasWebAccessToken()).toBe(false);
+    expect(hasWebAccessToken()).toBe(true);
   });
 
   it("refresh의 일시적인 네트워크 실패를 비로그인으로 확정하지 않는다", async () => {

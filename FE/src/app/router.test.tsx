@@ -1,4 +1,10 @@
-import { act, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +12,10 @@ import { AuthProvider } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { installLegacyWebSessionFetch } from "../test/webAuth";
+import {
+  hasWebAccessToken,
+  resetWebAuthSessionForTest,
+} from "../infrastructure/auth/webSessionManager";
 import { appRoutes } from "./router";
 
 function installFetch(currentUserResponse: Response) {
@@ -26,6 +36,12 @@ function installFetch(currentUserResponse: Response) {
       if (url === "/api/checklists/me") {
         return Promise.resolve(
           new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
         );
       }
 
@@ -58,6 +74,7 @@ function renderRouter(initialEntries: string[], initialIndex?: number) {
 }
 
 beforeEach(() => {
+  resetWebAuthSessionForTest();
   vi.stubGlobal("localStorage", {
     getItem: vi.fn().mockReturnValue(null),
     removeItem: vi.fn(),
@@ -66,10 +83,228 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetWebAuthSessionForTest();
   vi.unstubAllGlobals();
 });
 
 describe("appRoutes", () => {
+  it("가입 미완료 사용자가 서비스 경로에 접근하면 온보딩으로 이동한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/auth/web/sessions/refresh") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              accessToken: "pending-token",
+              termsAgreementRequired: true,
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url === "/api/terms") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: 1,
+                code: "service",
+                version: "2026-09",
+                title: "서비스 이용약관",
+                content: "서비스 이용약관 전문",
+                required: true,
+              },
+            ]),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url === "/api/auth/web/sessions/current") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const router = renderRouter(["/checklist"]);
+
+    expect(
+      await screen.findByRole("heading", { name: "가입 마무리" }),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/onboarding");
+    expect(
+      fetchMock.mock.calls.some(
+        ([input]) => input.toString() === "/api/checklists/me",
+      ),
+    ).toBe(false);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "다른 계정으로 로그인" }),
+    );
+
+    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
+    expect(hasWebAccessToken()).toBe(false);
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/auth/web/sessions/current",
+        expect.objectContaining({
+          credentials: "include",
+          method: "DELETE",
+        }),
+      ),
+    );
+  });
+
+  it("온보딩을 완료하면 인증 상태를 다시 확인하고 홈으로 이동한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/auth/web/sessions/refresh") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              accessToken: "pending-token",
+              termsAgreementRequired: true,
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url === "/api/terms") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: 1,
+                code: "service",
+                version: "2026-09",
+                title: "서비스 이용약관",
+                content: "서비스 이용약관 전문",
+                required: true,
+              },
+            ]),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url === "/api/users/me/terms-agreement") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ accessToken: "active-token" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/users/me/nickname") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "비비디" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/appointments/me/nearby?limit=6") {
+        return Promise.resolve(
+          new Response(JSON.stringify([]), { status: 200 }),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const router = renderRouter(["/onboarding"]);
+
+    await screen.findByText("서비스 이용약관");
+    fireEvent.click(screen.getByLabelText("전체 동의"));
+    fireEvent.change(screen.getByLabelText("닉네임"), {
+      target: { value: "비비디" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+      }),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/");
+    expect(
+      fetchMock.mock.calls
+        .map(([input]) => input.toString())
+        .filter((url) =>
+          [
+            "/api/users/me/terms-agreement",
+            "/api/users/me/nickname",
+            "/api/users/me",
+          ].includes(url),
+        ),
+    ).toEqual([
+      "/api/users/me/terms-agreement",
+      "/api/users/me/nickname",
+      "/api/users/me",
+    ]);
+  });
+
+  it("비로그인 사용자가 온보딩에 직접 접근하면 로그인으로 이동한다", async () => {
+    installFetch(
+      new Response(
+        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+        { status: 401 },
+      ),
+    );
+    const router = renderRouter(["/onboarding"]);
+
+    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
+  });
+
+  it("가입 완료 사용자가 온보딩에 직접 접근하면 홈으로 이동한다", async () => {
+    installFetch(
+      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+    );
+    const router = renderRouter(["/onboarding"]);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+      }),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/");
+  });
+
   it("루트에서 준비 목록을 표시한다", async () => {
     installFetch(
       new Response(
