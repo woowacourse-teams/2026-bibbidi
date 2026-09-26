@@ -2,8 +2,10 @@ export { AuthProvider, useAuth } from "./AuthProvider";
 export {
   acceptWebAccessToken,
   clearWebAccessToken,
+  currentWebUserId,
   hasWebAccessToken,
   refreshWebSession,
+  webUserIdFromAccessToken,
 } from "../../infrastructure/auth/webSessionManager";
 export {
   createLoginEvent,

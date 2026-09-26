@@ -4,6 +4,7 @@ import {
   acceptWebAccessToken,
   accessTokenForRequest,
   clearWebAccessToken,
+  currentWebUserId,
   hasWebAccessToken,
   refreshWebSession,
   resetWebAuthSessionForTest,
@@ -11,8 +12,10 @@ import {
 } from "./webSessionManager";
 import { WebSessionRefreshError } from "./webSessionApi";
 
-function accessToken(expiresAt: number): string {
-  const payload = btoa(JSON.stringify({ exp: Math.floor(expiresAt / 1_000) }))
+function accessToken(expiresAt: number, userId = "1"): string {
+  const payload = btoa(
+    JSON.stringify({ exp: Math.floor(expiresAt / 1_000), sub: userId }),
+  )
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -30,6 +33,12 @@ afterEach(() => {
 });
 
 describe("webSessionManager", () => {
+  it("저장 중인 access token의 회원 ID를 메모리에서만 읽는다", () => {
+    acceptWebAccessToken(accessToken(Date.now() + 120_000, "27"));
+
+    expect(currentWebUserId()).toBe("27");
+  });
+
   it("access token을 Web Storage에 기록하지 않는다", () => {
     const localStorageSetItem = vi.fn();
     const sessionStorageSetItem = vi.fn();

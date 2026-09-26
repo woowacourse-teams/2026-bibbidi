@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, RouteObject } from "react-router";
 import { PlannerAccessGuard } from "../features/auth";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
+import { AccountSetupPage } from "../pages/AccountSetupPage";
 import { ChecklistPage } from "../pages/ChecklistPage";
 import { LoginPage } from "../pages/LoginPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
@@ -52,6 +53,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "/onboarding",
         Component: OnboardingPage,
+      },
+      {
+        path: "/onboarding/account",
+        Component: AccountSetupPage,
       },
       {
         // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.

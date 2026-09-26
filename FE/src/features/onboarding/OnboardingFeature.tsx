@@ -57,18 +57,12 @@ export function OnboardingFeature({
     areSomeTermsAgreed,
     expandedTermIds,
     formError,
-    handleNicknameBlur,
-    handleNicknameChange,
     isFormValid,
     isSubmitting,
-    nickname,
-    nicknameError,
     retryTermsLoad,
     setAllTermsAgreement,
     setTermAgreement,
-    submissionStage,
     submit,
-    termsAgreed,
     termsLoadState,
     toggleTermContent,
   } = useOnboardingFlow({ onAuthenticationExpired, onSuccess });
@@ -133,7 +127,7 @@ export function OnboardingFeature({
     <form className="onboarding" noValidate onSubmit={handleSubmit}>
       <h1 className="onboarding__title">가입 마무리</h1>
       <p className="onboarding__description">
-        필수 약관에 동의하고 사용할 닉네임을 정해 주세요.
+        서비스를 이용하려면 필수 약관에 동의해 주세요.
       </p>
 
       <fieldset className="onboarding__terms">
@@ -141,7 +135,7 @@ export function OnboardingFeature({
         <label className="onboarding__agree-all">
           <input
             checked={areAllTermsAgreed}
-            disabled={isSubmitting || termsAgreed}
+            disabled={isSubmitting}
             onChange={(event) => setAllTermsAgreement(event.target.checked)}
             ref={agreeAllCheckboxRef}
             type="checkbox"
@@ -160,7 +154,7 @@ export function OnboardingFeature({
                   <label className="onboarding__term-label">
                     <input
                       checked={agreedTermIds.has(term.id)}
-                      disabled={isSubmitting || termsAgreed}
+                      disabled={isSubmitting}
                       onChange={(event) =>
                         setTermAgreement(term.id, event.target.checked)
                       }
@@ -190,37 +184,6 @@ export function OnboardingFeature({
         </ul>
       </fieldset>
 
-      <div className="onboarding__field">
-        <label className="onboarding__label" htmlFor="onboarding-nickname">
-          닉네임
-        </label>
-        <input
-          aria-describedby="onboarding-nickname-message"
-          aria-invalid={Boolean(nicknameError)}
-          autoComplete="username"
-          className="onboarding__input"
-          disabled={isSubmitting}
-          id="onboarding-nickname"
-          name="nickname"
-          onBlur={handleNicknameBlur}
-          onChange={(event) => handleNicknameChange(event.target.value)}
-          placeholder="닉네임을 입력하세요"
-          type="text"
-          value={nickname}
-        />
-        <p
-          className={
-            nicknameError
-              ? "onboarding__message onboarding__message--error"
-              : "onboarding__message"
-          }
-          id="onboarding-nickname-message"
-          role={nicknameError ? "alert" : undefined}
-        >
-          {nicknameError ?? "공백이 아닌 10자 이하로 입력해 주세요."}
-        </p>
-      </div>
-
       <div className="onboarding__submit-area">
         <button
           aria-busy={isSubmitting}
@@ -228,11 +191,7 @@ export function OnboardingFeature({
           disabled={isSubmitting || isSwitchingAccount || !isFormValid}
           type="submit"
         >
-          {submissionStage === "terms"
-            ? "약관 동의 중..."
-            : submissionStage === "nickname"
-              ? "닉네임 저장 중..."
-              : "비비디 시작하기"}
+          {isSubmitting ? "약관 동의 중..." : "동의하고 계속하기"}
         </button>
         {formError ? (
           <p className="onboarding__error" role="alert">
