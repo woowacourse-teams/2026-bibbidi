@@ -95,6 +95,19 @@ afterEach(() => {
 });
 
 describe("appRoutes", () => {
+  it("회원가입 주소는 로그인 화면으로 이동한다", async () => {
+    installFetch(
+      new Response(
+        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+        { status: 401 },
+      ),
+    );
+    const router = renderRouter(["/signup"]);
+
+    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
+  });
+
   it("가입 미완료 사용자가 서비스 경로에 접근하면 온보딩으로 이동한다", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString();

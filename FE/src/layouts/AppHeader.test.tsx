@@ -35,9 +35,7 @@ describe("AppHeader", () => {
     expect(
       screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
     ).toBe("/login");
-    expect(
-      screen.getByRole("link", { name: "회원가입" }).getAttribute("href"),
-    ).toBe("/signup");
+    expect(screen.queryByRole("link", { name: "회원가입" })).toBeNull();
     expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
   });
 

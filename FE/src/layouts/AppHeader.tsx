@@ -99,9 +99,6 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
             <NavLink className="app-header__login" to="/login">
               로그인
             </NavLink>
-            <NavLink className="app-header__signup" to="/signup">
-              회원가입
-            </NavLink>
           </nav>
         ) : (
           <div

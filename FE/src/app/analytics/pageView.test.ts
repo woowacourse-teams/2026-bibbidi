@@ -9,7 +9,6 @@ describe("normalizePagePath", () => {
     ["/planner/", "/planner"],
     ["/checklist", "/checklist"],
     ["/login", "/login"],
-    ["/signup", "/signup"],
   ] as const)(
     "허용된 경로 %s를 화면 경로로 정규화한다",
     (pathname, expected) => {
@@ -17,7 +16,7 @@ describe("normalizePagePath", () => {
     },
   );
 
-  it.each(["/preparation", "/unknown", "/checklist/task-123"])(
+  it.each(["/preparation", "/signup", "/unknown", "/checklist/task-123"])(
     "리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다",
     (pathname) => {
       expect(normalizePagePath(pathname)).toBeNull();

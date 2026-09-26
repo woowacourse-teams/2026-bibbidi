@@ -9,7 +9,6 @@ import { LoginPage } from "../pages/LoginPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlannerPage } from "../pages/PlannerPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
-import { SignupPage } from "../pages/SignupPage";
 import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
 export const appRoutes: RouteObject[] = [
@@ -48,7 +47,7 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "/signup",
-        Component: SignupPage,
+        element: <Navigate replace to="/login" />,
       },
       {
         path: "/onboarding",
