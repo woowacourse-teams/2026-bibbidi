@@ -47,9 +47,12 @@ public class UserService {
 
     @Transactional
     public void copyTermsAgreement(Long fromUserId, Long toUserId) {
-        User agreedUser = userRepository.findById(fromUserId);
-        User user = userRepository.findById(toUserId);
-        userRepository.update(user.agreeToTerms(agreedUser.termsVersion(), agreedUser.termsAgreedAt()));
+        User fromUser = userRepository.findById(fromUserId);
+        String termsVersion = fromUser.termsVersion();
+        LocalDateTime termsAgreedAt = fromUser.termsAgreedAt();
+        User toUser = userRepository.findById(toUserId);
+        User agreedUser = toUser.agreeToTerms(termsVersion, termsAgreedAt);
+        userRepository.update(agreedUser);
     }
 
     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
