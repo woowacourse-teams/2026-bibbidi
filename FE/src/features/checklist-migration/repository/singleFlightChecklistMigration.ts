@@ -1,3 +1,4 @@
+import { MyChecklistModel } from "../../checklist";
 import {
   ChecklistMigrationRepository,
   ChecklistMigrationRequestAbortedError,
@@ -14,11 +15,11 @@ export function createSingleFlightChecklistMigration(
 ): ChecklistMigrationRepository {
   let migrationRun: MigrationRun | undefined;
 
-  const startMigration = (): MigrationRun => {
+  const startMigration = (initialChecklist: MyChecklistModel): MigrationRun => {
     const controller = new AbortController();
     const run = {
       controller,
-      promise: repository.migrate(controller.signal),
+      promise: repository.migrate(initialChecklist, controller.signal),
       subscribers: new Set<symbol>(),
     };
 
@@ -94,12 +95,15 @@ export function createSingleFlightChecklistMigration(
     });
 
   return {
-    migrate(signal) {
+    migrate(initialChecklist, signal) {
       if (signal?.aborted) {
         return Promise.reject(new ChecklistMigrationRequestAbortedError());
       }
 
-      return subscribe(migrationRun ?? startMigration(), signal);
+      return subscribe(
+        migrationRun ?? startMigration(initialChecklist),
+        signal,
+      );
     },
   };
 }

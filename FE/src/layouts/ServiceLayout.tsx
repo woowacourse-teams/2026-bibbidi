@@ -58,6 +58,10 @@ export function ServiceLayout() {
     return <Navigate replace to="/onboarding" />;
   }
 
+  if (authState.status === "accountSetupRequired") {
+    return <Navigate replace to="/onboarding/account" />;
+  }
+
   return (
     <div className="service-layout">
       <div

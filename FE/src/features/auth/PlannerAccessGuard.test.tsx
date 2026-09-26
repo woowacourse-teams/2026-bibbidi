@@ -92,6 +92,9 @@ describe("PlannerAccessGuard", () => {
           new Response(JSON.stringify({ nickname: "bibbidi" }), {
             status: 200,
           }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
         ),
     );
 
@@ -133,6 +136,9 @@ describe("PlannerAccessGuard", () => {
           new Response(JSON.stringify({ nickname: "bibbidi" }), {
             status: 200,
           }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
         )
         .mockResolvedValueOnce(expiredWebSessionResponse())
         .mockResolvedValueOnce(

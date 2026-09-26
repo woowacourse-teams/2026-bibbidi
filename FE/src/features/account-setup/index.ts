@@ -4,3 +4,8 @@ export {
   clearAccountSetupProgress,
   hasAccountSetupProgress,
 } from "./model/accountSetupProgress";
+export {
+  AccountSetupCompletionAuthenticationRequiredError,
+  AccountSetupCompletionRequestAbortedError,
+  createAccountSetupCompletionRepository,
+} from "./repository/accountSetupCompletionRepository";

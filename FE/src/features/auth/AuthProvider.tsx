@@ -25,6 +25,8 @@ interface AuthContextValue {
   beginOnboarding: () => void;
   completeAuthentication: (user: CurrentUser) => void;
   endAuthentication: () => void;
+  failAuthentication: (user: CurrentUser) => void;
+  requireAccountSetup: (user: CurrentUser) => void;
   refreshAuth: () => void;
 }
 
@@ -161,6 +163,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, []);
 
+  const requireAccountSetup = useCallback((user: CurrentUser) => {
+    setAuthState((currentState) => {
+      if (
+        currentState.status !== "synchronizing" ||
+        currentState.user.nickname !== user.nickname
+      ) {
+        return currentState;
+      }
+
+      return { status: "accountSetupRequired", user };
+    });
+  }, []);
+
+  const failAuthentication = useCallback((user: CurrentUser) => {
+    setAuthState((currentState) => {
+      if (
+        currentState.status !== "synchronizing" ||
+        currentState.user.nickname !== user.nickname
+      ) {
+        return currentState;
+      }
+
+      return { status: "error" };
+    });
+  }, []);
+
   const endAuthentication = useCallback(() => {
     invalidateCurrentUserRequest();
     clearWebAccessToken();
@@ -180,6 +208,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       beginOnboarding,
       completeAuthentication,
       endAuthentication,
+      failAuthentication,
+      requireAccountSetup,
       refreshAuth,
     }),
     [
@@ -188,6 +218,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       beginOnboarding,
       completeAuthentication,
       endAuthentication,
+      failAuthentication,
+      requireAccountSetup,
       refreshAuth,
     ],
   );

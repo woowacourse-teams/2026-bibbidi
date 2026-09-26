@@ -3,7 +3,6 @@ import { WebSessionExpiredError } from "../../../infrastructure/auth/webSessionA
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const LEGACY_ACCOUNT_TRANSFER_ENDPOINT = `${apiBaseUrl}/api/users/me/legacy-account-transfer`;
-const NICKNAME_ENDPOINT = `${apiBaseUrl}/api/users/me/nickname`;
 const ACCOUNT_SETUP_REQUEST_TIMEOUT_MS = 10_000;
 
 export interface AccountTransferSession {
@@ -163,23 +162,4 @@ export async function transferLegacyAccount(
     accessToken: body.accessToken,
     termsAgreementRequired: body.termsAgreementRequired,
   };
-}
-
-export async function changeAccountNickname(
-  nickname: string,
-  signal?: AbortSignal,
-): Promise<void> {
-  const body = await requestJson(
-    NICKNAME_ENDPOINT,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname }),
-    },
-    signal,
-  );
-
-  if (!isRecord(body) || typeof body.nickname !== "string") {
-    throw new AccountSetupApiError(0, 200);
-  }
 }

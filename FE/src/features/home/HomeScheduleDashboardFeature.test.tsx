@@ -121,6 +121,8 @@ beforeEach(() => {
     beginOnboarding: vi.fn(),
     completeAuthentication: vi.fn(),
     endAuthentication: vi.fn(),
+    failAuthentication: vi.fn(),
+    requireAccountSetup: vi.fn(),
     refreshAuth,
   });
 });
@@ -838,6 +840,8 @@ describe("HomeScheduleDashboardFeature", () => {
       beginOnboarding: vi.fn(),
       completeAuthentication: vi.fn(),
       endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
       refreshAuth,
     });
     result.rerender(

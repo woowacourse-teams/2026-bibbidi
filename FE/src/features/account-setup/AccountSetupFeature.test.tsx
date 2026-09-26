@@ -7,6 +7,7 @@ import {
   currentWebUserId,
   resetWebAuthSessionForTest,
 } from "../../infrastructure/auth/webSessionManager";
+import { MyChecklistProvider } from "../checklist";
 import { AccountSetupFeature } from "./AccountSetupFeature";
 import { clearAccountSetupProgress } from "./model/accountSetupProgress";
 
@@ -40,7 +41,11 @@ function renderFeature(
     ...overrides,
   };
 
-  const view = render(<AccountSetupFeature {...props} />);
+  const view = render(
+    <MyChecklistProvider sessionKey="account-setup-test">
+      <AccountSetupFeature {...props} />
+    </MyChecklistProvider>,
+  );
   return { props, ...view };
 }
 
@@ -70,7 +75,7 @@ afterEach(() => {
 });
 
 describe("AccountSetupFeature", () => {
-  it("기존 계정과 새 계정을 동등하게 선택하고 이전 선택으로 돌아간다", () => {
+  it("기존 계정 입력을 선택하고 이전 선택으로 돌아간다", () => {
     const { unmount } = renderFeature();
 
     expect(
@@ -98,34 +103,24 @@ describe("AccountSetupFeature", () => {
     ).toBeTruthy();
   });
 
-  it.each([
-    {
-      choiceName: /^기존 계정 이어쓰기/,
-      formName: "기존 닉네임",
-    },
-    {
-      choiceName: /^새 계정으로 시작하기/,
-      formName: "새 닉네임",
-    },
-  ])(
-    "$formName 폼은 새로고침에 해당하는 재마운트 뒤에도 유지하고 입력값은 복원하지 않는다",
-    ({ choiceName, formName }) => {
-      const { unmount } = renderFeature();
+  it("기존 계정 폼은 재마운트 뒤에도 유지하고 입력값은 복원하지 않는다", () => {
+    const { unmount } = renderFeature();
 
-      fireEvent.click(screen.getByRole("button", { name: choiceName }));
-      fireEvent.change(screen.getByLabelText(formName), {
-        target: { value: "저장하지 않을 값" },
-      });
-      unmount();
+    fireEvent.click(
+      screen.getByRole("button", { name: /^기존 계정 이어쓰기/ }),
+    );
+    fireEvent.change(screen.getByLabelText("기존 닉네임"), {
+      target: { value: "저장하지 않을 값" },
+    });
+    unmount();
 
-      renderFeature();
+    renderFeature();
 
-      expect(screen.getByLabelText(formName)).toBeTruthy();
-      expect((screen.getByLabelText(formName) as HTMLInputElement).value).toBe(
-        "",
-      );
-    },
-  );
+    expect(screen.getByLabelText("기존 닉네임")).toBeTruthy();
+    expect(
+      (screen.getByLabelText("기존 닉네임") as HTMLInputElement).value,
+    ).toBe("");
+  });
 
   it("다른 계정으로 전환 중에는 계정 선택을 막는다", () => {
     renderFeature({ isSwitchingAccount: true });
@@ -178,6 +173,7 @@ describe("AccountSetupFeature", () => {
         method: "POST",
       }),
     );
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -362,35 +358,76 @@ describe("AccountSetupFeature", () => {
     expect(screen.queryByText("세션 만료")).toBeNull();
   });
 
-  it("새 계정은 검증한 닉네임만 저장한다", async () => {
+  it("새 계정으로 시작하면 닉네임 변경 없이 빈 체크리스트를 생성한다", async () => {
     const onSuccess = vi.fn();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse({ id: 10, nickname: "비비디" }));
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          jsonResponse(
+            { errorCode: 303, message: "체크리스트가 없습니다." },
+            404,
+          ),
+        );
+      }
+
+      if (url === "/api/checklists") {
+        return Promise.resolve(jsonResponse(10, 201));
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
     vi.stubGlobal("fetch", fetchMock);
     renderFeature({ onSuccess });
 
     fireEvent.click(
       screen.getByRole("button", { name: /^새 계정으로 시작하기/ }),
     );
-    fireEvent.change(screen.getByLabelText("새 닉네임"), {
-      target: { value: " 비비디 " },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "새 계정으로 시작하기" }),
-    );
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/users/me/nickname",
+      "/api/checklists",
       expect.objectContaining({
-        body: JSON.stringify({ nickname: "비비디" }),
-        method: "PUT",
+        method: "POST",
       }),
     );
+    expect(
+      fetchMock.mock.calls.some(([url]) => url === "/api/users/me/nickname"),
+    ).toBe(false);
   });
 
-  it("새 계정 제출 전에 세션이 사라지면 재로그인을 요청한다", async () => {
+  it("체크리스트 생성 실패를 표시하고 새 계정 생성을 다시 시도한다", async () => {
+    const onSuccess = vi.fn();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { errorCode: 303, message: "체크리스트가 없습니다." },
+          404,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ errorCode: 901, message: "내부 오류" }, 500),
+      )
+      .mockResolvedValueOnce(jsonResponse(10, 201));
+    vi.stubGlobal("fetch", fetchMock);
+    renderFeature({ onSuccess });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^새 계정으로 시작하기/ }),
+    );
+    expect(
+      await screen.findByText(
+        "계정 설정을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^새 계정으로 시작하기/ }),
+    );
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+  });
+
+  it("새 계정 시작 전에 세션이 사라지면 재로그인을 요청한다", async () => {
     const onAuthenticationExpired = vi.fn();
     clearWebAccessToken();
     vi.stubGlobal(
@@ -405,12 +442,6 @@ describe("AccountSetupFeature", () => {
 
     fireEvent.click(
       screen.getByRole("button", { name: /^새 계정으로 시작하기/ }),
-    );
-    fireEvent.change(screen.getByLabelText("새 닉네임"), {
-      target: { value: "비비디" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "새 계정으로 시작하기" }),
     );
 
     await waitFor(() => expect(onAuthenticationExpired).toHaveBeenCalledOnce());

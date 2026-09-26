@@ -1,6 +1,6 @@
 const ACCOUNT_SETUP_CHOICE_KEY = "bibbidi.account-setup.choice";
 
-export type AccountSetupChoice = "legacy" | "new";
+export type AccountSetupChoice = "legacy";
 
 function currentSessionStorage(): Storage | null {
   if (typeof window === "undefined") {
@@ -18,7 +18,7 @@ export function readAccountSetupChoice(): AccountSetupChoice | undefined {
   try {
     const choice = currentSessionStorage()?.getItem(ACCOUNT_SETUP_CHOICE_KEY);
 
-    return choice === "legacy" || choice === "new" ? choice : undefined;
+    return choice === "legacy" ? choice : undefined;
   } catch {
     return undefined;
   }
