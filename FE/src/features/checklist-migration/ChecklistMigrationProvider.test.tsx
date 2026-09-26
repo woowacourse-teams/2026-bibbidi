@@ -166,27 +166,102 @@ describe("ChecklistMigrationProvider", () => {
     expect(storage.getSerializedValue()).toBeNull();
   });
 
-  it("로컬 ID가 없으면 체크리스트 API 없이 인증을 완료한다", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
-      );
+  it("로컬 ID가 없어도 체크리스트 존재를 확인한 뒤 인증을 완료한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
     installLegacyWebSessionFetch(fetchMock);
 
     renderProviders(<AuthStateProbe />);
 
     expect(await screen.findByText("authenticated:bibbidi")).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/users/me",
       expect.objectContaining({ method: "GET" }),
     );
   });
 
-  it("일반 동기화 실패 후에도 로그인 상태를 유지하고 로컬 ID를 보존한다", async () => {
+  it("체크리스트가 없으면 계정 설정 필요 상태로 전환한다", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              errorCode: 303,
+              message: "체크리스트가 없습니다.",
+            }),
+            { status: 404 },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
+    installLegacyWebSessionFetch(fetchMock);
+
+    renderProviders(<AuthStateProbe />);
+
+    expect(await screen.findByText("accountSetupRequired")).toBeTruthy();
+  });
+
+  it("준비 항목 이전 실패 후에도 로그인 상태를 유지하고 로컬 ID를 보존한다", async () => {
     const storage = createStorage([101]);
     vi.stubGlobal("localStorage", storage);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+        );
+      }
+
+      return Promise.resolve(
+        new Response(JSON.stringify({ errorCode: 901, message: "서버 오류" }), {
+          status: 500,
+        }),
+      );
+    });
+    installLegacyWebSessionFetch(fetchMock);
+
+    renderProviders(<AuthStateProbe />);
+
+    expect(await screen.findByText("authenticated:bibbidi")).toBeTruthy();
+    expect(storage.getSerializedValue()).toBe(
+      JSON.stringify({ version: 1, catalogItemIds: [101] }),
+    );
+  });
+
+  it("체크리스트 존재 확인 실패는 인증 오류 상태에서 다시 시도하게 한다", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
@@ -206,10 +281,9 @@ describe("ChecklistMigrationProvider", () => {
 
     renderProviders(<AuthStateProbe />);
 
-    expect(await screen.findByText("authenticated:bibbidi")).toBeTruthy();
-    expect(storage.getSerializedValue()).toBe(
-      JSON.stringify({ version: 1, catalogItemIds: [101] }),
-    );
+    expect(
+      await screen.findByText("로그인 상태를 확인하지 못했습니다."),
+    ).toBeTruthy();
   });
 
   it("동기화 인증 오류는 인증 상태 재확인으로 연결한다", async () => {

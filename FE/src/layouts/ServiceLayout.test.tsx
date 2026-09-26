@@ -91,6 +91,10 @@ function renderServiceLayout(
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
             <Route element={<ServiceLayout />}>{routes}</Route>
+            <Route
+              path="/onboarding/account"
+              element={<div>계정 선택 화면</div>}
+            />
           </Routes>
         </MemoryRouter>
       </ChecklistMigrationProvider>
@@ -253,12 +257,19 @@ describe("ServiceLayout", () => {
   it("인증 확인 중에도 서비스 화면과 안정적인 헤더 영역을 표시한다", async () => {
     let resolveCurrentUser: (response: Response) => void = () => undefined;
     installLegacyWebSessionFetch(
-      vi.fn().mockImplementation(
-        () =>
-          new Promise<Response>((resolve) => {
-            resolveCurrentUser = resolve;
-          }),
-      ),
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/checklists/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ id: 1, items: [] }), {
+              status: 200,
+            }),
+          );
+        }
+
+        return new Promise<Response>((resolve) => {
+          resolveCurrentUser = resolve;
+        });
+      }),
     );
 
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
@@ -537,7 +548,7 @@ describe("ServiceLayout", () => {
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("준비 목록과 헤더가 내 체크리스트 조회를 공유한다", async () => {
@@ -1120,21 +1131,13 @@ describe("ServiceLayout", () => {
     ).toBeNull();
   });
 
-  it("체크리스트가 없으면 생성한 뒤 준비 항목을 추가한다", async () => {
+  it("체크리스트가 없으면 계정 선택 화면으로 이동한다", async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
             new Response(JSON.stringify({ nickname: "비비디" }), {
-              status: 200,
-            }),
-          );
-        }
-
-        if (url === "/api/catalog") {
-          return Promise.resolve(
-            new Response(JSON.stringify(preparationCatalogResponseFixture), {
               status: 200,
             }),
           );
@@ -1152,35 +1155,6 @@ describe("ServiceLayout", () => {
           );
         }
 
-        if (url === "/api/checklists" && init?.method === "POST") {
-          return Promise.resolve(
-            new Response(JSON.stringify(1), { status: 201 }),
-          );
-        }
-
-        if (
-          url === "/api/checklists/me/catalog-items" &&
-          init?.method === "POST"
-        ) {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                items: [
-                  {
-                    catalogItemId: 1001,
-                    categoryId: 10,
-                    createdAt: "2026-09-23T09:00:00",
-                    id: 10,
-                    status: "prev",
-                    title: "체크리스트 항목 10",
-                  },
-                ],
-              }),
-              { status: 201 },
-            ),
-          );
-        }
-
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       });
     installLegacyWebSessionFetch(fetchMock);
@@ -1190,24 +1164,10 @@ describe("ServiceLayout", () => {
       ["/preparation"],
     );
 
-    const addButton = await screen.findByRole("button", {
-      name: "첫 번째 할 일 추가",
-    });
-    fireEvent.click(addButton);
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "첫 번째 할 일 추가" }),
-      ).toBeNull(),
-    );
+    expect(await screen.findByText("계정 선택 화면")).toBeTruthy();
     const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
-    const createRequestIndex = requestedUrls.indexOf("/api/checklists");
-    const addRequestIndex = requestedUrls.indexOf(
-      "/api/checklists/me/catalog-items",
-    );
-
-    expect(createRequestIndex).toBeGreaterThanOrEqual(0);
-    expect(addRequestIndex).toBeGreaterThan(createRequestIndex);
+    expect(requestedUrls).not.toContain("/api/checklists");
+    expect(requestedUrls).not.toContain("/api/checklists/me/catalog-items");
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

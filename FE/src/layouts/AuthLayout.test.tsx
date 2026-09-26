@@ -22,10 +22,16 @@ afterEach(() => {
 describe("AuthLayout", () => {
   it("로그인 사용자가 인증 화면에 접근하면 홈으로 이동한다", async () => {
     installLegacyWebSessionFetch(
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
-          status: 200,
-        }),
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          url === "/api/checklists/me"
+            ? new Response(JSON.stringify({ id: 1, items: [] }), {
+                status: 200,
+              })
+            : new Response(JSON.stringify({ nickname: "bibbidi" }), {
+                status: 200,
+              }),
+        ),
       ),
     );
 

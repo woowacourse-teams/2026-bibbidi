@@ -181,7 +181,8 @@ describe("appRoutes", () => {
     );
   });
 
-  it("약관 동의 뒤 계정 선택에서 새 닉네임을 저장하고 홈으로 이동한다", async () => {
+  it("약관 동의 뒤 새 계정 체크리스트를 만들고 홈으로 이동한다", async () => {
+    let hasChecklist = false;
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -223,14 +224,6 @@ describe("appRoutes", () => {
         );
       }
 
-      if (url === "/api/users/me/nickname") {
-        return Promise.resolve(
-          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
-            status: 200,
-          }),
-        );
-      }
-
       if (url === "/api/users/me") {
         return Promise.resolve(
           new Response(JSON.stringify({ nickname: "비비디" }), {
@@ -240,8 +233,27 @@ describe("appRoutes", () => {
       }
 
       if (url === "/api/checklists/me") {
+        if (!hasChecklist) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                errorCode: 303,
+                message: "체크리스트가 없습니다.",
+              }),
+              { status: 404 },
+            ),
+          );
+        }
+
         return Promise.resolve(
           new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+        );
+      }
+
+      if (url === "/api/checklists") {
+        hasChecklist = true;
+        return Promise.resolve(
+          new Response(JSON.stringify(1), { status: 201 }),
         );
       }
 
@@ -285,12 +297,6 @@ describe("appRoutes", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /^새 계정으로 시작하기/ }),
     );
-    fireEvent.change(screen.getByLabelText("새 닉네임"), {
-      target: { value: "비비디" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "새 계정으로 시작하기" }),
-    );
 
     expect(
       await screen.findByRole("heading", {
@@ -305,14 +311,14 @@ describe("appRoutes", () => {
         .filter((url) =>
           [
             "/api/users/me/terms-agreement",
-            "/api/users/me/nickname",
             "/api/users/me",
+            "/api/checklists",
           ].includes(url),
         ),
     ).toEqual([
       "/api/users/me/terms-agreement",
       "/api/users/me",
-      "/api/users/me/nickname",
+      "/api/checklists",
       "/api/users/me",
     ]);
   });
@@ -349,7 +355,7 @@ describe("appRoutes", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("진행 표시가 있는 가입 완료 사용자는 계정 선택 주소를 새로 열어도 유지한다", async () => {
+  it("진행 표시가 있어도 체크리스트가 있는 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
     beginAccountSetupProgress();
     installFetch(
       new Response(JSON.stringify({ nickname: "provider-name" }), {
@@ -360,10 +366,10 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "사용할 계정을 선택해 주세요",
+        name: "로드맵에서 필요한 일만, 내 체크리스트에",
       }),
     ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/onboarding/account");
+    expect(router.state.location.pathname).toBe("/");
   });
 
   it("진행 표시가 없는 가입 완료 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
