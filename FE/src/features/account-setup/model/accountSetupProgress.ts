@@ -1,3 +1,5 @@
+import { clearAccountSetupChoice } from "./accountSetupChoice";
+
 const ACCOUNT_SETUP_PROGRESS_KEY = "bibbidi.account-setup.pending";
 
 let pendingInMemory = false;
@@ -16,6 +18,7 @@ function currentSessionStorage(): Storage | null {
 
 export function beginAccountSetupProgress(): void {
   pendingInMemory = true;
+  clearAccountSetupChoice();
 
   try {
     currentSessionStorage()?.setItem(ACCOUNT_SETUP_PROGRESS_KEY, "true");
@@ -26,6 +29,7 @@ export function beginAccountSetupProgress(): void {
 
 export function clearAccountSetupProgress(): void {
   pendingInMemory = false;
+  clearAccountSetupChoice();
 
   try {
     currentSessionStorage()?.removeItem(ACCOUNT_SETUP_PROGRESS_KEY);

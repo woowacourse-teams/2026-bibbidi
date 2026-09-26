@@ -8,6 +8,7 @@ import {
   resetWebAuthSessionForTest,
 } from "../../infrastructure/auth/webSessionManager";
 import { AccountSetupFeature } from "./AccountSetupFeature";
+import { clearAccountSetupProgress } from "./model/accountSetupProgress";
 
 function accessToken(userId: string): string {
   const payload = btoa(
@@ -39,8 +40,8 @@ function renderFeature(
     ...overrides,
   };
 
-  render(<AccountSetupFeature {...props} />);
-  return props;
+  const view = render(<AccountSetupFeature {...props} />);
+  return { props, ...view };
 }
 
 function selectLegacyAccount() {
@@ -58,17 +59,19 @@ function fillLegacyAccount(password = "bibbidi1234") {
 
 beforeEach(() => {
   resetWebAuthSessionForTest();
+  clearAccountSetupProgress();
   acceptWebAccessToken(accessToken("10"));
 });
 
 afterEach(() => {
   resetWebAuthSessionForTest();
+  clearAccountSetupProgress();
   vi.unstubAllGlobals();
 });
 
 describe("AccountSetupFeature", () => {
   it("기존 계정과 새 계정을 동등하게 선택하고 이전 선택으로 돌아간다", () => {
-    renderFeature();
+    const { unmount } = renderFeature();
 
     expect(
       screen.getByRole("button", { name: /^기존 계정 이어쓰기/ }),
@@ -86,7 +89,43 @@ describe("AccountSetupFeature", () => {
     expect(
       screen.getByRole("heading", { name: "사용할 계정을 선택해 주세요" }),
     ).toBeTruthy();
+
+    unmount();
+    renderFeature();
+
+    expect(
+      screen.getByRole("heading", { name: "사용할 계정을 선택해 주세요" }),
+    ).toBeTruthy();
   });
+
+  it.each([
+    {
+      choiceName: /^기존 계정 이어쓰기/,
+      formName: "기존 닉네임",
+    },
+    {
+      choiceName: /^새 계정으로 시작하기/,
+      formName: "새 닉네임",
+    },
+  ])(
+    "$formName 폼은 새로고침에 해당하는 재마운트 뒤에도 유지하고 입력값은 복원하지 않는다",
+    ({ choiceName, formName }) => {
+      const { unmount } = renderFeature();
+
+      fireEvent.click(screen.getByRole("button", { name: choiceName }));
+      fireEvent.change(screen.getByLabelText(formName), {
+        target: { value: "저장하지 않을 값" },
+      });
+      unmount();
+
+      renderFeature();
+
+      expect(screen.getByLabelText(formName)).toBeTruthy();
+      expect((screen.getByLabelText(formName) as HTMLInputElement).value).toBe(
+        "",
+      );
+    },
+  );
 
   it("다른 계정으로 전환 중에는 계정 선택을 막는다", () => {
     renderFeature({ isSwitchingAccount: true });

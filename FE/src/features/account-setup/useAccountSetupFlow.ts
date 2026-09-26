@@ -26,12 +26,16 @@ import {
   toAccountSetupNickname,
   validateAccountSetupNickname,
 } from "./model/accountSetup";
+import {
+  clearAccountSetupChoice,
+  readAccountSetupChoice,
+  saveAccountSetupChoice,
+  type AccountSetupChoice,
+} from "./model/accountSetupChoice";
 
 const AUTHENTICATION_ERROR_CODES = new Set([201, 204, 205, 206]);
 const ACCOUNT_SETUP_ERROR_MESSAGE =
   "계정 설정을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.";
-
-export type AccountSetupChoice = "legacy" | "new";
 
 interface UseAccountSetupFlowOptions {
   onAuthenticationExpired: () => void;
@@ -44,7 +48,7 @@ export function useAccountSetupFlow({
   onSuccess,
   onTermsRequired,
 }: UseAccountSetupFlowOptions) {
-  const [choice, setChoice] = useState<AccountSetupChoice>();
+  const [choice, setChoice] = useState(readAccountSetupChoice);
   const [legacyValues, setLegacyValues] = useState(initialLoginFormValues);
   const [nickname, setNickname] = useState("");
   const [nicknameTouched, setNicknameTouched] = useState(false);
@@ -65,6 +69,7 @@ export function useAccountSetupFlow({
       return;
     }
 
+    saveAccountSetupChoice(nextChoice);
     setChoice(nextChoice);
     setFormError(undefined);
     setNicknameError(undefined);
@@ -75,6 +80,7 @@ export function useAccountSetupFlow({
       return;
     }
 
+    clearAccountSetupChoice();
     setChoice(undefined);
     setLegacyValues((currentValues) => ({
       ...currentValues,

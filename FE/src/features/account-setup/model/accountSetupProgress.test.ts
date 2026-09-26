@@ -5,6 +5,10 @@ import {
   clearAccountSetupProgress,
   hasAccountSetupProgress,
 } from "./accountSetupProgress";
+import {
+  readAccountSetupChoice,
+  saveAccountSetupChoice,
+} from "./accountSetupChoice";
 
 afterEach(() => {
   clearAccountSetupProgress();
@@ -34,5 +38,16 @@ describe("accountSetupProgress", () => {
     expect(sessionStorage.removeItem).toHaveBeenCalledWith(
       "bibbidi.account-setup.pending",
     );
+  });
+
+  it("새 가입 흐름을 시작하거나 완료하면 이전 선택을 제거한다", () => {
+    saveAccountSetupChoice("new");
+
+    beginAccountSetupProgress();
+    expect(readAccountSetupChoice()).toBeUndefined();
+
+    saveAccountSetupChoice("legacy");
+    clearAccountSetupProgress();
+    expect(readAccountSetupChoice()).toBeUndefined();
   });
 });
