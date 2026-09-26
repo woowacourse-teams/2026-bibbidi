@@ -4,7 +4,6 @@ import { acceptWebAccessToken, refreshWebSession } from "../auth";
 import { WebSessionExpiredError } from "../../infrastructure/auth/webSessionApi";
 import {
   agreeToOnboardingTerms,
-  changeOnboardingNickname,
   getOnboardingTerms,
   OnboardingApiError,
   OnboardingNetworkError,
@@ -14,8 +13,6 @@ import {
 import {
   createRequiredTermsContract,
   RequiredTermsContract,
-  toOnboardingNickname,
-  validateOnboardingNickname,
 } from "./model/onboarding";
 
 const TERMS_LOAD_ERROR_MESSAGE =
@@ -28,8 +25,6 @@ type TermsLoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; contract: RequiredTermsContract };
-
-type SubmissionStage = "idle" | "terms" | "nickname";
 
 interface UseOnboardingFlowOptions {
   onAuthenticationExpired: () => void;
@@ -47,13 +42,8 @@ export function useOnboardingFlow({
   const [expandedTermIds, setExpandedTermIds] = useState<Set<number>>(
     new Set(),
   );
-  const [nickname, setNickname] = useState("");
-  const [nicknameTouched, setNicknameTouched] = useState(false);
-  const [nicknameError, setNicknameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
-  const [submissionStage, setSubmissionStage] =
-    useState<SubmissionStage>("idle");
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const loadTermsControllerRef = useRef<AbortController | null>(null);
   const submissionControllerRef = useRef<AbortController | null>(null);
   const submissionInProgress = useRef(false);
@@ -81,7 +71,6 @@ export function useOnboardingFlow({
 
         setAgreedTermIds(new Set());
         setExpandedTermIds(new Set());
-        setTermsAgreed(false);
         setTermsLoadState({ status: "ready", contract });
       })
       .catch((error: unknown) => {
@@ -161,22 +150,6 @@ export function useOnboardingFlow({
     });
   };
 
-  const handleNicknameChange = (value: string) => {
-    setNickname(value);
-    setFormError(undefined);
-
-    if (nicknameTouched) {
-      setNicknameError(validateOnboardingNickname(value));
-    } else {
-      setNicknameError(undefined);
-    }
-  };
-
-  const handleNicknameBlur = () => {
-    setNicknameTouched(true);
-    setNicknameError(validateOnboardingNickname(nickname));
-  };
-
   const recoverUncertainTermsAgreement = async (
     signal: AbortSignal,
   ): Promise<boolean> => {
@@ -241,44 +214,12 @@ export function useOnboardingFlow({
     return false;
   };
 
-  const handleNicknameError = (error: unknown) => {
-    if (!(error instanceof OnboardingApiError)) {
-      setFormError("닉네임을 저장하지 못했어요. 다시 시도해 주세요.");
-      return;
-    }
-
-    if (
-      error.status === 401 ||
-      AUTHENTICATION_ERROR_CODES.has(error.errorCode)
-    ) {
-      onAuthenticationExpired();
-      return;
-    }
-
-    if (error.errorCode === 101) {
-      setNicknameError("닉네임을 다시 확인해 주세요.");
-      return;
-    }
-
-    if (error.errorCode === 211) {
-      setTermsAgreed(false);
-      setFormError("약관 동의 상태를 다시 확인해 주세요.");
-      return;
-    }
-
-    setFormError("닉네임을 저장하지 못했어요. 다시 시도해 주세요.");
-  };
-
   const submit = async () => {
     if (submissionInProgress.current || termsLoadState.status !== "ready") {
       return;
     }
 
-    const nextNicknameError = validateOnboardingNickname(nickname);
-    setNicknameTouched(true);
-    setNicknameError(nextNicknameError);
-
-    if (nextNicknameError || !areAllTermsAgreed) {
+    if (!areAllTermsAgreed) {
       return;
     }
 
@@ -288,62 +229,34 @@ export function useOnboardingFlow({
     setFormError(undefined);
 
     try {
-      let canChangeNickname = termsAgreed;
-
-      if (!canChangeNickname) {
-        setSubmissionStage("terms");
-
-        try {
-          const accessToken = await agreeToOnboardingTerms(
-            termsLoadState.contract.version,
-            controller.signal,
-          );
-          acceptWebAccessToken(accessToken);
-          setTermsAgreed(true);
-          canChangeNickname = true;
-        } catch (error) {
-          if (error instanceof OnboardingRequestAbortedError) {
-            return;
-          }
-
-          if (
-            error instanceof OnboardingNetworkError ||
-            error instanceof OnboardingTimeoutError
-          ) {
-            canChangeNickname = await recoverUncertainTermsAgreement(
-              controller.signal,
-            );
-
-            if (canChangeNickname) {
-              setTermsAgreed(true);
-            }
-          } else {
-            canChangeNickname = handleTermsAgreementError(error);
-          }
-        }
-      }
-
-      if (!canChangeNickname || controller.signal.aborted) {
-        return;
-      }
-
-      setSubmissionStage("nickname");
+      setIsSubmitting(true);
+      let termsWereAgreed = false;
 
       try {
-        await changeOnboardingNickname(
-          toOnboardingNickname(nickname),
+        const accessToken = await agreeToOnboardingTerms(
+          termsLoadState.contract.version,
           controller.signal,
         );
+        acceptWebAccessToken(accessToken);
+        termsWereAgreed = true;
       } catch (error) {
         if (error instanceof OnboardingRequestAbortedError) {
           return;
         }
 
-        handleNicknameError(error);
-        return;
+        if (
+          error instanceof OnboardingNetworkError ||
+          error instanceof OnboardingTimeoutError
+        ) {
+          termsWereAgreed = await recoverUncertainTermsAgreement(
+            controller.signal,
+          );
+        } else {
+          termsWereAgreed = handleTermsAgreementError(error);
+        }
       }
 
-      if (!controller.signal.aborted) {
+      if (termsWereAgreed && !controller.signal.aborted) {
         onSuccess();
       }
     } finally {
@@ -354,7 +267,7 @@ export function useOnboardingFlow({
       }
 
       if (!controller.signal.aborted) {
-        setSubmissionStage("idle");
+        setIsSubmitting(false);
       }
     }
   };
@@ -365,18 +278,12 @@ export function useOnboardingFlow({
     areSomeTermsAgreed,
     expandedTermIds,
     formError,
-    handleNicknameBlur,
-    handleNicknameChange,
-    isFormValid: areAllTermsAgreed && !validateOnboardingNickname(nickname),
-    isSubmitting: submissionStage !== "idle",
-    nickname,
-    nicknameError,
+    isFormValid: areAllTermsAgreed,
+    isSubmitting,
     retryTermsLoad,
     setAllTermsAgreement,
     setTermAgreement,
-    submissionStage,
     submit,
-    termsAgreed,
     termsLoadState,
     toggleTermContent,
   };

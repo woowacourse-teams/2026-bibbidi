@@ -4,7 +4,6 @@ import { OnboardingTerm } from "../model/onboarding";
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const TERMS_ENDPOINT = `${apiBaseUrl}/api/terms`;
 const TERMS_AGREEMENT_ENDPOINT = `${apiBaseUrl}/api/users/me/terms-agreement`;
-const NICKNAME_ENDPOINT = `${apiBaseUrl}/api/users/me/nickname`;
 const ONBOARDING_REQUEST_TIMEOUT_MS = 10_000;
 
 type RequestKind = "public" | "authenticated";
@@ -167,24 +166,4 @@ export async function agreeToOnboardingTerms(
   }
 
   return body.accessToken;
-}
-
-export async function changeOnboardingNickname(
-  nickname: string,
-  signal?: AbortSignal,
-): Promise<void> {
-  const body = await requestJson(
-    NICKNAME_ENDPOINT,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname }),
-    },
-    "authenticated",
-    signal,
-  );
-
-  if (!isRecord(body) || typeof body.nickname !== "string") {
-    throw new OnboardingApiError(0, 200);
-  }
 }

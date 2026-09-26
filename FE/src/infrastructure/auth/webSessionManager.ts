@@ -59,7 +59,9 @@ function decodeBase64Url(value: string): string {
   return atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
 }
 
-function readAccessTokenExpiration(accessToken: string): number | null {
+function readAccessTokenPayload(
+  accessToken: string,
+): Record<string, unknown> | null {
   const payload = accessToken.split(".")[1];
 
   if (!payload) {
@@ -69,14 +71,24 @@ function readAccessTokenExpiration(accessToken: string): number | null {
   try {
     const decoded = JSON.parse(decodeBase64Url(payload)) as unknown;
 
-    if (!isRecord(decoded) || typeof decoded.exp !== "number") {
-      return null;
-    }
-
-    return decoded.exp * 1_000;
+    return isRecord(decoded) ? decoded : null;
   } catch {
     return null;
   }
+}
+
+function readAccessTokenExpiration(accessToken: string): number | null {
+  const payload = readAccessTokenPayload(accessToken);
+  return payload && typeof payload.exp === "number"
+    ? payload.exp * 1_000
+    : null;
+}
+
+export function webUserIdFromAccessToken(accessToken: string): string | null {
+  const payload = readAccessTokenPayload(accessToken);
+  return payload && typeof payload.sub === "string" && payload.sub
+    ? payload.sub
+    : null;
 }
 
 function cancelScheduledRefresh(state: WebAuthSessionState) {
@@ -144,6 +156,11 @@ export function clearWebAccessToken(): void {
 
 export function hasWebAccessToken(): boolean {
   return currentWebAuthSessionState().storedAccessToken !== null;
+}
+
+export function currentWebUserId(): string | null {
+  const currentToken = currentWebAuthSessionState().storedAccessToken;
+  return currentToken ? webUserIdFromAccessToken(currentToken.value) : null;
 }
 
 export function subscribeAuthenticationRequired(

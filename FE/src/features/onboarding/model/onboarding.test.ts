@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  createRequiredTermsContract,
-  validateOnboardingNickname,
-} from "./onboarding";
+import { createRequiredTermsContract } from "./onboarding";
 
 function term(id: number, version: string, required = true) {
   return {
@@ -38,15 +35,5 @@ describe("createRequiredTermsContract", () => {
     expect(
       createRequiredTermsContract([term(1, "v1"), term(2, "v2")]),
     ).toBeNull();
-  });
-});
-
-describe("validateOnboardingNickname", () => {
-  it("공백이거나 10자를 넘는 닉네임을 거절한다", () => {
-    expect(validateOnboardingNickname("   ")).toBe("닉네임을 입력해 주세요.");
-    expect(validateOnboardingNickname("12345678901")).toBe(
-      "닉네임은 10자 이하로 입력해 주세요.",
-    );
-    expect(validateOnboardingNickname(" 비비디 ")).toBeUndefined();
   });
 });

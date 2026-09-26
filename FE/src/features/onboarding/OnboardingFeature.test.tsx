@@ -36,12 +36,9 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
-async function completeForm() {
+async function agreeToAllTerms() {
   await screen.findByRole("heading", { name: "가입 마무리" });
   fireEvent.click(screen.getByLabelText("전체 동의"));
-  fireEvent.change(screen.getByLabelText("닉네임"), {
-    target: { value: " 비비디 " },
-  });
 }
 
 beforeEach(() => {
@@ -55,13 +52,12 @@ afterEach(() => {
 });
 
 describe("OnboardingFeature", () => {
-  it("약관 전문과 전체 동의를 제공하고 약관 동의 후 새 토큰으로 닉네임을 변경한다", async () => {
+  it("약관 전문과 전체 동의를 제공하고 동의 후 새 토큰을 반영한다", async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(requiredTerms))
-      .mockResolvedValueOnce(jsonResponse({ accessToken: "active-token" }))
-      .mockResolvedValueOnce(jsonResponse({ id: 1, nickname: "비비디" }));
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "active-token" }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(
@@ -96,16 +92,13 @@ describe("OnboardingFeature", () => {
     expect(
       (screen.getByLabelText("전체 동의") as HTMLInputElement).checked,
     ).toBe(true);
-    fireEvent.change(screen.getByLabelText("닉네임"), {
-      target: { value: " 비비디 " },
-    });
     expect(
       (screen.getByLabelText("서비스 이용약관") as HTMLInputElement).checked,
     ).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/users/me/terms-agreement");
     expect(fetchMock.mock.calls[1]?.[1]).toEqual(
       expect.objectContaining({
@@ -118,21 +111,9 @@ describe("OnboardingFeature", () => {
         "Authorization",
       ),
     ).toBe("Bearer pending-token");
-    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/users/me/nickname");
-    expect(fetchMock.mock.calls[2]?.[1]).toEqual(
-      expect.objectContaining({
-        body: JSON.stringify({ nickname: "비비디" }),
-        method: "PUT",
-      }),
-    );
-    expect(
-      new Headers((fetchMock.mock.calls[2]?.[1] as RequestInit).headers).get(
-        "Authorization",
-      ),
-    ).toBe("Bearer active-token");
   });
 
-  it("약관 동의 응답이 유실되면 세션을 갱신하고 닉네임 변경부터 계속한다", async () => {
+  it("약관 동의 응답이 유실되면 세션을 갱신하고 다음 단계로 이동한다", async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
@@ -143,8 +124,7 @@ describe("OnboardingFeature", () => {
           accessToken: "recovered-active-token",
           termsAgreementRequired: false,
         }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ id: 1, nickname: "비비디" }));
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     render(
@@ -157,33 +137,26 @@ describe("OnboardingFeature", () => {
       />,
     );
 
-    await completeForm();
-    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+    await agreeToAllTerms();
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "/api/terms",
       "/api/users/me/terms-agreement",
       "/api/auth/web/sessions/refresh",
-      "/api/users/me/nickname",
     ]);
-    expect(
-      new Headers((fetchMock.mock.calls[3]?.[1] as RequestInit).headers).get(
-        "Authorization",
-      ),
-    ).toBe("Bearer recovered-active-token");
   });
 
-  it("닉네임 변경만 실패하면 약관 동의를 반복하지 않고 재시도한다", async () => {
+  it("약관 동의가 명시적으로 실패하면 사용자가 다시 제출할 수 있다", async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(requiredTerms))
-      .mockResolvedValueOnce(jsonResponse({ accessToken: "active-token" }))
       .mockResolvedValueOnce(
         jsonResponse({ errorCode: 901, message: "서버 내부 정보" }, 500),
       )
-      .mockResolvedValueOnce(jsonResponse({ id: 1, nickname: "비비디" }));
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "active-token" }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(
@@ -196,25 +169,22 @@ describe("OnboardingFeature", () => {
       />,
     );
 
-    await completeForm();
-    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+    await agreeToAllTerms();
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
     expect(
       await screen.findByText(
-        "닉네임을 저장하지 못했어요. 다시 시도해 주세요.",
+        "약관 동의를 처리하지 못했어요. 다시 시도해 주세요.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("서버 내부 정보")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(
       fetchMock.mock.calls.filter(
         ([url]) => url === "/api/users/me/terms-agreement",
       ),
-    ).toHaveLength(1);
-    expect(
-      fetchMock.mock.calls.filter(([url]) => url === "/api/users/me/nickname"),
     ).toHaveLength(2);
   });
 
@@ -248,11 +218,11 @@ describe("OnboardingFeature", () => {
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: "비비디 시작하기" }),
+      screen.queryByRole("button", { name: "동의하고 계속하기" }),
     ).toBeNull();
   });
 
-  it("인증을 갱신할 수 없으면 닉네임 요청 없이 로그인 만료를 알린다", async () => {
+  it("인증을 갱신할 수 없으면 로그인 만료를 알린다", async () => {
     const onAuthenticationExpired = vi.fn();
     const fetchMock = vi
       .fn()
@@ -275,8 +245,8 @@ describe("OnboardingFeature", () => {
       />,
     );
 
-    await completeForm();
-    fireEvent.click(screen.getByRole("button", { name: "비비디 시작하기" }));
+    await agreeToAllTerms();
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
 
     await waitFor(() => expect(onAuthenticationExpired).toHaveBeenCalledOnce());
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([

@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
+import { hasAccountSetupProgress } from "../features/account-setup";
 import { getSafeLoginReturnPath, useAuth } from "../features/auth";
 import { BrandHeader } from "./BrandHeader";
 import "./AuthLayout.css";
@@ -7,8 +8,17 @@ import "./AuthLayout.css";
 export function AuthLayout() {
   const { authState } = useAuth();
   const { pathname, search } = useLocation();
+  const hasPendingAccountSetup = hasAccountSetupProgress();
+  const isOnboardingPath =
+    pathname === "/onboarding" || pathname === "/onboarding/account";
+  const canUseAccountSetup =
+    pathname === "/onboarding/account" && hasPendingAccountSetup;
 
-  if (authState.status === "authenticated") {
+  if (authState.status === "authenticated" && !canUseAccountSetup) {
+    if (pathname === "/onboarding" && hasPendingAccountSetup) {
+      return <Navigate replace to="/onboarding/account" />;
+    }
+
     return <Navigate replace to={getSafeLoginReturnPath(search) ?? "/"} />;
   }
 
@@ -16,7 +26,7 @@ export function AuthLayout() {
     return <Navigate replace to="/onboarding" />;
   }
 
-  if (authState.status === "guest" && pathname === "/onboarding") {
+  if (authState.status === "guest" && isOnboardingPath) {
     return <Navigate replace to="/login" />;
   }
 
