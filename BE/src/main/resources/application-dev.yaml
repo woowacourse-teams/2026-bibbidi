@@ -13,4 +13,6 @@ spring:
   sql:
     init:
       mode: always
-      data-locations: classpath:load_catalog.sql
+      data-locations:
+        - classpath:load_catalog.sql
+        - classpath:load_terms.sql

@@ -65,4 +65,5 @@ tasks.named('bootJar') {
 
 tasks.named('processResources') {
     from('database/mysql/load_catalog.sql')
+    from('database/mysql/load_terms.sql')
 }
