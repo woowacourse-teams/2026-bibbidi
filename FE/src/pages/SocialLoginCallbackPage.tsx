@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Link, useLocation, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { acceptWebAccessToken, useAuth } from "../features/auth";
 import {
@@ -10,16 +10,21 @@ import {
 export function SocialLoginCallbackPage() {
   const { provider = "" } = useParams();
   const { search } = useLocation();
-  const { refreshAuth } = useAuth();
+  const navigate = useNavigate();
+  const { beginOnboarding, refreshAuth } = useAuth();
   const handleSuccess = useCallback(
     (session: SocialLoginSession) => {
       acceptWebAccessToken(session.accessToken);
 
-      if (!session.termsAgreementRequired) {
-        refreshAuth();
+      if (session.termsAgreementRequired) {
+        beginOnboarding();
+        navigate("/onboarding", { replace: true });
+        return;
       }
+
+      refreshAuth();
     },
-    [refreshAuth],
+    [beginOnboarding, navigate, refreshAuth],
   );
 
   return (
