@@ -217,6 +217,14 @@ describe("HomeScheduleDashboardFeature", () => {
         "0개",
       ),
     ).toBeNull();
+    const checklistLink = screen.getByRole("link", {
+      name: "체크리스트 보기",
+    });
+    expect(checklistLink.getAttribute("href")).toBe("/checklist");
+    fireEvent.click(checklistLink);
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/checklist",
+    );
   });
 
   it("오류를 Error UI로 전환하고 다시 시도한다", async () => {
@@ -344,6 +352,15 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(within(section).getAllByText("미완료")).toHaveLength(2);
     expect(within(section).getByText("가족")).toBeTruthy();
     expect(within(section).getByText("웨딩홀")).toBeTruthy();
+    expect(
+      within(section)
+        .getByRole("link", { name: "로드맵에서 할 일 찾기" })
+        .getAttribute("href"),
+    ).toBe("/");
+    fireEvent.click(
+      within(section).getByRole("link", { name: "로드맵에서 할 일 찾기" }),
+    );
+    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
     const addLinks = within(section).getAllByRole("link", {
       name: "일정 추가",
     });
@@ -375,6 +392,15 @@ describe("HomeScheduleDashboardFeature", () => {
         screen.getByRole("region", { name: "일정이 필요한 할 일" }),
       ).queryByText("0개"),
     ).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "로드맵에서 할 일 찾기" })
+        .getAttribute("href"),
+    ).toBe("/");
+    fireEvent.click(
+      screen.getByRole("link", { name: "로드맵에서 할 일 찾기" }),
+    );
+    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
   });
 
   it("일정이 필요한 할 일 오류만 재시도하고 가까운 일정 결과를 유지한다", async () => {
@@ -579,12 +605,10 @@ describe("HomeScheduleDashboardFeature", () => {
     ).toHaveLength(2);
     expect(
       within(section)
-        .getByRole("link", { name: "준비 목록 보기" })
+        .getByRole("link", { name: "로드맵 보기" })
         .getAttribute("href"),
     ).toBe("/");
-    fireEvent.click(
-      within(section).getByRole("link", { name: "준비 목록 보기" }),
-    );
+    fireEvent.click(within(section).getByRole("link", { name: "로드맵 보기" }));
     expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
   });
 
@@ -600,9 +624,9 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(await screen.findByText("추천할 일이 없어요")).toBeTruthy();
     expect(screen.getByRole("region", { name: "추천 할 일" })).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "준비 목록 보기" }).getAttribute("href"),
+      screen.getByRole("link", { name: "로드맵 보기" }).getAttribute("href"),
     ).toBe("/");
-    fireEvent.click(screen.getByRole("link", { name: "준비 목록 보기" }));
+    fireEvent.click(screen.getByRole("link", { name: "로드맵 보기" }));
     expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
   });
 

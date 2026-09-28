@@ -1008,9 +1008,9 @@ describe("Checklist 목록 표현", () => {
     expect(screen.getByText("아직 담은 할 일이 없어요")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "예식장" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "준비 목록에서 추가" }),
+      screen.getByRole("button", { name: "로드맵에서 추가" }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "준비 목록에서 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "로드맵에서 추가" }));
     expect(onVisitPreparation).toHaveBeenCalledWith("10");
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
   });
