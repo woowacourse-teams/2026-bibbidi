@@ -1,0 +1,13 @@
+diff --git a/Infra/nginx/nginx.conf.template b/Infra/nginx/nginx.conf.template
+index 2e692bfece80063d57014c0bdcf741ce13d49668..637b5922e66589045f62a82e036fef87d02da6ba 100644
+--- a/Infra/nginx/nginx.conf.template
++++ b/Infra/nginx/nginx.conf.template
+@@ -145,8 +145,6 @@ http {
+             return 404;
+         }
+ 
+-        # H2 콘솔은 frame으로 화면을 그린다. frame 허용은 백엔드가 SAMEORIGIN으로 붙이므로 여기서는 X-Frame-Options를 붙이지 않는다.
+-        # 콘솔은 교육장 IP에서만 연다. 들어올 수 있는 곳이 정해져 있어 요청 수 제한은 두지 않는다.
+         location ^~ /h2-console {
+             allow ${H2_CONSOLE_ALLOWED_IP};
+             deny all;

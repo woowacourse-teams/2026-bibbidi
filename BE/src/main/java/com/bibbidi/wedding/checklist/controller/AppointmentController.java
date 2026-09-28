@@ -11,13 +11,13 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
-import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,7 +41,7 @@ public class AppointmentController {
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/checklist-items/{checklistItemId}/appointments")
     public AppointmentResponse create(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long checklistItemId,
             @Valid @RequestBody CreateAppointmentRequest request
     ) {
@@ -52,7 +52,7 @@ public class AppointmentController {
 
     @GetMapping("/api/appointments/me/nearby")
     public List<NearbyAppointmentResponse> findNearby(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
     ) {
         LocalDateTime requestedAt = LocalDateTime.now();
@@ -63,7 +63,7 @@ public class AppointmentController {
 
     @PutMapping("/api/appointments/{appointmentId}")
     public AppointmentResponse update(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long appointmentId,
             @Valid @RequestBody UpdateAppointmentRequest request
     ) {
@@ -74,7 +74,7 @@ public class AppointmentController {
 
     @PutMapping("/api/appointments/{appointmentId}/complete")
     public AppointmentCompletionResponse changeCompletion(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long appointmentId,
             @Valid @RequestBody @NotNull(message = "완료 여부는 필수입니다.") Boolean isDone
     ) {
@@ -90,7 +90,7 @@ public class AppointmentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/api/appointments/{appointmentId}")
     public void delete(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long appointmentId
     ) {
         appointmentService.delete(userId, appointmentId);

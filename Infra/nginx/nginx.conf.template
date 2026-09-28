@@ -145,6 +145,21 @@ http {
             return 404;
         }
 
+        location ^~ /h2-console {
+            allow ${H2_CONSOLE_ALLOWED_IP};
+            deny all;
+
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         location / {
             limit_req zone=per_ip_api burst=60 nodelay;
             limit_conn per_ip_conn 40;

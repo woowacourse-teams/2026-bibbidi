@@ -1,0 +1,4216 @@
+diff --git a/BE/build.gradle b/BE/build.gradle
+index fee2a8d809ae99f51fb75eef462bcb67a474946d..af65fe7d825778075e28977b32f23ee7ea00d4cc 100644
+--- a/BE/build.gradle
++++ b/BE/build.gradle
+@@ -29,25 +29,27 @@ repositories {
+ }
+ 
+ dependencies {
+-    // APPLICATION
+     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+     implementation 'org.springframework.boot:spring-boot-starter-validation'
+     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+-    implementation 'org.springframework.security:spring-security-crypto'
++    implementation 'org.springframework.boot:spring-boot-starter-security'
++    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
++    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
++    implementation 'org.springframework.boot:spring-boot-starter-cache'
++    implementation 'com.github.ben-manes.caffeine:caffeine'
++    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+-    implementation 'org.bouncycastle:bcprov-jdk18on:1.85.2'
+     compileOnly 'org.projectlombok:lombok'
+     runtimeOnly 'com.mysql:mysql-connector-j'
+     runtimeOnly 'com.h2database:h2'
+     annotationProcessor 'org.projectlombok:lombok'
+-
+-    // TEST
+     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.2'
++    testImplementation 'org.springframework.security:spring-security-test'
+     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+     testCompileOnly 'org.projectlombok:lombok'
+     testAnnotationProcessor 'org.projectlombok:lombok'
+diff --git a/BE/database/mysql/bibbidi_mvp_schema.sql b/BE/database/mysql/bibbidi_mvp_schema.sql
+index e4611427c8aec8783873b68ebc42a15f0e8f668a..b942c2d78aebb81ceb7c2f5ac59848a11c82d6c2 100644
+--- a/BE/database/mysql/bibbidi_mvp_schema.sql
++++ b/BE/database/mysql/bibbidi_mvp_schema.sql
+@@ -10,7 +10,10 @@ SET time_zone = '+09:00';
+ CREATE TABLE users (
+     id BIGINT NOT NULL AUTO_INCREMENT,
+     nickname VARCHAR(255) NOT NULL,
+-    password_hash VARCHAR(255) NOT NULL,
++    status VARCHAR(20) NOT NULL,
++    email VARCHAR(255) NULL,
++    terms_version VARCHAR(20) NULL,
++    terms_agreed_at DATETIME NULL,
+     wedding_date DATE NULL,
+     created_at DATETIME NOT NULL,
+     updated_at DATETIME NOT NULL,
+@@ -133,3 +136,72 @@ CREATE TABLE feedbacks (
+ ) ENGINE = InnoDB
+   DEFAULT CHARACTER SET = utf8mb4
+   COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE social_identities (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    user_id BIGINT NOT NULL,
++    provider VARCHAR(20) NOT NULL,
++    provider_user_id VARCHAR(255) NOT NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_social_identities_provider_user (provider, provider_user_id),
++    UNIQUE KEY uk_social_identities_user (user_id)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE oidc_auth_requests (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    state_hash VARCHAR(64) NOT NULL,
++    provider VARCHAR(20) NOT NULL,
++    nonce VARCHAR(255) NOT NULL,
++    code_verifier VARCHAR(255) NOT NULL,
++    client_type VARCHAR(10) NOT NULL,
++    purpose VARCHAR(20) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    used_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_oidc_auth_requests_state (state_hash),
++    KEY idx_oidc_auth_requests_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE refresh_sessions (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    user_id BIGINT NOT NULL,
++    family_id CHAR(36) NOT NULL,
++    client_type VARCHAR(10) NOT NULL,
++    token_hash VARCHAR(64) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    revoked_at DATETIME NULL,
++    rotated_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_refresh_sessions_token (token_hash),
++    KEY idx_refresh_sessions_user (user_id),
++    KEY idx_refresh_sessions_family (family_id),
++    KEY idx_refresh_sessions_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE handoff_codes (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    code_hash VARCHAR(64) NOT NULL,
++    user_id BIGINT NOT NULL,
++    family_id CHAR(36) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    used_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_handoff_codes_code (code_hash),
++    KEY idx_handoff_codes_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
+diff --git a/BE/database/mysql/migration/004_add_social_auth_tables.sql b/BE/database/mysql/migration/004_add_social_auth_tables.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..952e49a59d8551f529c35d10cc08a17aa28339a0
+--- /dev/null
++++ b/BE/database/mysql/migration/004_add_social_auth_tables.sql
+@@ -0,0 +1,85 @@
++-- 소셜 OIDC 로그인과 JWT 인증 도입에 필요한 스키마 변경이다.
++-- users에 가입 상태와 약관 동의, 이메일을 더하고 비밀번호 인증을 걷어낸다.
++-- 1회용 값(state, refresh token, handoff code)은 원문을 남기지 않고 해시만 저장한다.
++
++ALTER TABLE users
++    ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' AFTER nickname,
++    ADD COLUMN email VARCHAR(255) NULL AFTER status,
++    ADD COLUMN terms_version VARCHAR(20) NULL AFTER email,
++    ADD COLUMN terms_agreed_at DATETIME NULL AFTER terms_version;
++
++-- 기본값은 기존 회원을 ACTIVE로 채우기 위한 것이다. 채운 뒤에는 애플리케이션이 항상 값을 넣는다.
++ALTER TABLE users
++    ALTER COLUMN status DROP DEFAULT;
++
++ALTER TABLE users
++    DROP COLUMN password_hash;
++
++CREATE TABLE social_identities (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    user_id BIGINT NOT NULL,
++    provider VARCHAR(20) NOT NULL,
++    provider_user_id VARCHAR(255) NOT NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_social_identities_provider_user (provider, provider_user_id),
++    UNIQUE KEY uk_social_identities_user (user_id)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE oidc_auth_requests (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    state_hash VARCHAR(64) NOT NULL,
++    provider VARCHAR(20) NOT NULL,
++    nonce VARCHAR(255) NOT NULL,
++    code_verifier VARCHAR(255) NOT NULL,
++    client_type VARCHAR(10) NOT NULL,
++    purpose VARCHAR(20) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    used_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_oidc_auth_requests_state (state_hash),
++    KEY idx_oidc_auth_requests_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE refresh_sessions (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    user_id BIGINT NOT NULL,
++    family_id CHAR(36) NOT NULL,
++    client_type VARCHAR(10) NOT NULL,
++    token_hash VARCHAR(64) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    revoked_at DATETIME NULL,
++    rotated_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_refresh_sessions_token (token_hash),
++    KEY idx_refresh_sessions_user (user_id),
++    KEY idx_refresh_sessions_family (family_id),
++    KEY idx_refresh_sessions_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
++
++CREATE TABLE handoff_codes (
++    id BIGINT NOT NULL AUTO_INCREMENT,
++    code_hash VARCHAR(64) NOT NULL,
++    user_id BIGINT NOT NULL,
++    family_id CHAR(36) NOT NULL,
++    expires_at DATETIME NOT NULL,
++    used_at DATETIME NULL,
++    created_at DATETIME NOT NULL,
++    updated_at DATETIME NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_handoff_codes_code (code_hash),
++    KEY idx_handoff_codes_expires_at (expires_at)
++) ENGINE = InnoDB
++  DEFAULT CHARACTER SET = utf8mb4
++  COLLATE = utf8mb4_0900_ai_ci;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b16b8b26b3970db28d6dc6bbae40aa7809ea5a13
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthPropertiesConfig.java
+@@ -0,0 +1,11 @@
++package com.bibbidi.wedding.auth.config;
++
++import com.bibbidi.wedding.auth.token.JwtProperties;
++import org.springframework.boot.context.properties.EnableConfigurationProperties;
++import org.springframework.context.annotation.Configuration;
++
++/** 인증 설정값을 빈으로 등록한다. 값은 모두 application.yaml과 환경 변수에서 온다. */
++@Configuration
++@EnableConfigurationProperties(JwtProperties.class)
++public class AuthPropertiesConfig {
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthWebConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthWebConfig.java
+deleted file mode 100644
+index f7b240ed829403200cf005b1f150aff0e63088ca..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/config/AuthWebConfig.java
++++ /dev/null
+@@ -1,22 +0,0 @@
+-package com.bibbidi.wedding.auth.config;
+-
+-import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
+-import java.util.List;
+-import org.springframework.context.annotation.Configuration;
+-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+-
+-@Configuration
+-public class AuthWebConfig implements WebMvcConfigurer {
+-
+-    private final AuthArgumentResolver authArgumentResolver;
+-
+-    public AuthWebConfig(AuthArgumentResolver authArgumentResolver) {
+-        this.authArgumentResolver = authArgumentResolver;
+-    }
+-
+-    @Override
+-    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+-        resolvers.add(authArgumentResolver);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthController.java
+deleted file mode 100644
+index a8ee4cd2145881e6a9362c350115ec8d64c53d92..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthController.java
++++ /dev/null
+@@ -1,82 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
+-import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
+-import com.bibbidi.wedding.auth.controller.dto.CreateUserResponse;
+-import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
+-import com.bibbidi.wedding.auth.controller.dto.LoginResponse;
+-import com.bibbidi.wedding.auth.service.AuthResult;
+-import com.bibbidi.wedding.auth.service.AuthService;
+-import com.bibbidi.wedding.auth.session.AuthSessionManager;
+-import com.bibbidi.wedding.common.auth.Auth;
+-import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
+-import com.bibbidi.wedding.user.service.UserResult;
+-import jakarta.servlet.http.HttpServletRequest;
+-import jakarta.servlet.http.HttpServletResponse;
+-import jakarta.validation.Valid;
+-import org.springframework.http.HttpStatus;
+-import org.springframework.web.bind.annotation.DeleteMapping;
+-import org.springframework.web.bind.annotation.PostMapping;
+-import org.springframework.web.bind.annotation.PutMapping;
+-import org.springframework.web.bind.annotation.RequestBody;
+-import org.springframework.web.bind.annotation.ResponseStatus;
+-import org.springframework.web.bind.annotation.RestController;
+-
+-@RestController
+-public class AuthController {
+-
+-    private final AuthService authService;
+-    private final AuthSessionManager sessionManager;
+-
+-    public AuthController(
+-            AuthService authService,
+-            AuthSessionManager sessionManager
+-    ) {
+-        this.authService = authService;
+-        this.sessionManager = sessionManager;
+-    }
+-
+-    @ResponseStatus(HttpStatus.CREATED)
+-    @PostMapping("/api/users")
+-    public CreateUserResponse createUser(@Valid @RequestBody CreateUserRequest request) {
+-        UserResult result = authService.register(request.nickname(), request.password());
+-        return CreateUserResponse.from(result);
+-    }
+-
+-    @PostMapping("/api/login")
+-    public LoginResponse login(
+-            @Valid @RequestBody LoginRequest request,
+-            HttpServletRequest servletRequest
+-    ) {
+-        AuthResult result = authService.login(request.nickname(), request.password());
+-        sessionManager.replaceWithAuthenticatedSession(servletRequest, result.userId());
+-        return LoginResponse.from(result);
+-    }
+-
+-    @ResponseStatus(HttpStatus.NO_CONTENT)
+-    @DeleteMapping("/api/logout")
+-    public void logout(HttpServletRequest request, HttpServletResponse response) {
+-        sessionManager.invalidate(request, response);
+-    }
+-
+-    @PutMapping("/api/users/me/password")
+-    @ResponseStatus(HttpStatus.NO_CONTENT)
+-    public void changePassword(
+-            @Auth Long currentUserId,
+-            @Valid @RequestBody ChangePasswordRequest request
+-    ) {
+-        authService.changePassword(currentUserId, request.currentPassword(), request.newPassword());
+-    }
+-
+-    @ResponseStatus(HttpStatus.NO_CONTENT)
+-    @DeleteMapping("/api/users/me")
+-    public void deleteCurrentUser(
+-            @Auth Long currentUserId,
+-            @Valid @RequestBody DeleteUserRequest request,
+-            HttpServletRequest servletRequest,
+-            HttpServletResponse servletResponse
+-    ) {
+-        authService.deleteUser(currentUserId, request.password());
+-        sessionManager.invalidate(servletRequest, servletResponse);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/ChangePasswordRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/ChangePasswordRequest.java
+deleted file mode 100644
+index 51753cc691d2eb22f84bc9940eba82100be6b1b9..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/ChangePasswordRequest.java
++++ /dev/null
+@@ -1,13 +0,0 @@
+-package com.bibbidi.wedding.auth.controller.dto;
+-
+-import com.bibbidi.wedding.auth.password.ValidPassword;
+-import jakarta.validation.constraints.NotBlank;
+-
+-public record ChangePasswordRequest(
+-        @NotBlank(message = "현재 비밀번호는 비어 있을 수 없습니다.")
+-        String currentPassword,
+-
+-        @ValidPassword
+-        String newPassword
+-) {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserRequest.java
+deleted file mode 100644
+index b81b366aea5831c77ee81e88a309a0152feb82fa..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserRequest.java
++++ /dev/null
+@@ -1,15 +0,0 @@
+-package com.bibbidi.wedding.auth.controller.dto;
+-
+-import com.bibbidi.wedding.auth.password.ValidPassword;
+-import jakarta.validation.constraints.NotBlank;
+-import jakarta.validation.constraints.Size;
+-
+-public record CreateUserRequest(
+-        @NotBlank(message = "닉네임은 비어 있을 수 없습니다.")
+-        @Size(max = 10, message = "닉네임은 10자 이하여야 합니다.")
+-        String nickname,
+-
+-        @ValidPassword
+-        String password
+-) {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserResponse.java
+deleted file mode 100644
+index 3d9626f5a6ca6afda97cec86aff3d0f58f485219..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/CreateUserResponse.java
++++ /dev/null
+@@ -1,13 +0,0 @@
+-package com.bibbidi.wedding.auth.controller.dto;
+-
+-import com.bibbidi.wedding.user.service.UserResult;
+-
+-public record CreateUserResponse(
+-        long id,
+-        String nickname
+-) {
+-
+-    public static CreateUserResponse from(UserResult result) {
+-        return new CreateUserResponse(result.id(), result.nickname());
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginRequest.java
+deleted file mode 100644
+index db4d675f328d9a105df96a74537ef88f8d987ed3..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginRequest.java
++++ /dev/null
+@@ -1,15 +0,0 @@
+-package com.bibbidi.wedding.auth.controller.dto;
+-
+-import jakarta.validation.constraints.NotBlank;
+-import jakarta.validation.constraints.Size;
+-
+-public record LoginRequest(
+-        @NotBlank(message = "닉네임은 비어 있을 수 없습니다.")
+-        @Size(max = 10, message = "닉네임은 10자 이하여야 합니다.")
+-        String nickname,
+-
+-        @NotBlank(message = "비밀번호는 비어 있을 수 없습니다.")
+-        @Size(min = 4, max = 20, message = "비밀번호는 4자 이상 20자 이하여야 합니다.")
+-        String password
+-) {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginResponse.java
+deleted file mode 100644
+index ecd03211d18cf0a6bff5cf02cece13079b9e074f..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/LoginResponse.java
++++ /dev/null
+@@ -1,13 +0,0 @@
+-package com.bibbidi.wedding.auth.controller.dto;
+-
+-import com.bibbidi.wedding.auth.service.AuthResult;
+-
+-public record LoginResponse(
+-        Long userId,
+-        String nickname
+-) {
+-
+-    public static LoginResponse from(AuthResult result) {
+-        return new LoginResponse(result.userId(), result.nickname());
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/domain/ClientType.java b/BE/src/main/java/com/bibbidi/wedding/auth/domain/ClientType.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..655ed5a077fb7ed76f8f966b6b6962c1ac4afabf
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/domain/ClientType.java
+@@ -0,0 +1,7 @@
++package com.bibbidi.wedding.auth.domain;
++
++/** refresh token을 어떤 형태로 주고받는지 가른다. 웹은 쿠키, 네이티브는 응답 본문이다. */
++public enum ClientType {
++    WEB,
++    NATIVE,
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialAuthPurpose.java b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialAuthPurpose.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..78717c48fc15ef4edd4593169d805efc04410045
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialAuthPurpose.java
+@@ -0,0 +1,7 @@
++package com.bibbidi.wedding.auth.domain;
++
++/** 소셜 인증을 무엇 때문에 시작했는지다. 로그인과 탈퇴 재인증이 같은 흐름을 쓰되 결과가 다르다. */
++public enum SocialAuthPurpose {
++    LOGIN,
++    WITHDRAWAL,
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialProvider.java b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialProvider.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1691df4397a886be73aa0e1b22f6457a88a7893
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialProvider.java
+@@ -0,0 +1,28 @@
++package com.bibbidi.wedding.auth.domain;
++
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import java.util.Arrays;
++import java.util.Locale;
++
++/**
++ * 지원하는 소셜 로그인 제공자다.
++ * 제공자별로 달라지는 값은 모두 설정에 두고, 이 enum은 설정을 찾는 열쇠로만 쓴다.
++ */
++public enum SocialProvider {
++    KAKAO,
++    GOOGLE;
++
++    public static SocialProvider from(String value) {
++        return Arrays.stream(values())
++                .filter(provider -> provider.name().equalsIgnoreCase(value))
++                .findFirst()
++                .orElseThrow(() -> new BusinessException(
++                        ClientError.UNSUPPORTED_SOCIAL_PROVIDER,
++                        "지원하지 않는 소셜 제공자 요청: " + value));
++    }
++
++    public String configKey() {
++        return name().toLowerCase(Locale.ROOT);
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java b/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java
+deleted file mode 100644
+index 9e96e55fc6bb8d7c7d3bbd26db427a130d79d570..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java
++++ /dev/null
+@@ -1,37 +0,0 @@
+-package com.bibbidi.wedding.auth.password;
+-
+-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+-import org.springframework.security.crypto.password.PasswordEncoder;
+-import org.springframework.stereotype.Component;
+-
+-@Component
+-public class Argon2PasswordHasher implements PasswordHasher {
+-
+-    private static final int SALT_LENGTH = 16;
+-    private static final int HASH_LENGTH = 32;
+-    private static final int PARALLELISM = 1;
+-    private static final int MEMORY_KIB = 19 * 1024;
+-    private static final int ITERATIONS = 2;
+-
+-    private final PasswordEncoder passwordEncoder;
+-
+-    public Argon2PasswordHasher() {
+-        passwordEncoder = new Argon2PasswordEncoder(
+-                SALT_LENGTH,
+-                HASH_LENGTH,
+-                PARALLELISM,
+-                MEMORY_KIB,
+-                ITERATIONS
+-        );
+-    }
+-
+-    @Override
+-    public String hash(String rawPassword) {
+-        return passwordEncoder.encode(rawPassword);
+-    }
+-
+-    @Override
+-    public boolean matches(String rawPassword, String passwordHash) {
+-        return passwordEncoder.matches(rawPassword, passwordHash);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/password/PasswordHasher.java b/BE/src/main/java/com/bibbidi/wedding/auth/password/PasswordHasher.java
+deleted file mode 100644
+index a6c1fb6c43645d0ee588cd7b9993aa2f5c77bf09..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/password/PasswordHasher.java
++++ /dev/null
+@@ -1,8 +0,0 @@
+-package com.bibbidi.wedding.auth.password;
+-
+-public interface PasswordHasher {
+-
+-    String hash(String rawPassword);
+-
+-    boolean matches(String rawPassword, String passwordHash);
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/password/ValidPassword.java b/BE/src/main/java/com/bibbidi/wedding/auth/password/ValidPassword.java
+deleted file mode 100644
+index 50b75272b26f84d92c35527ea2550f86abd03c09..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/password/ValidPassword.java
++++ /dev/null
+@@ -1,27 +0,0 @@
+-package com.bibbidi.wedding.auth.password;
+-
+-import jakarta.validation.Constraint;
+-import jakarta.validation.Payload;
+-import jakarta.validation.constraints.NotBlank;
+-import jakarta.validation.constraints.Size;
+-import java.lang.annotation.ElementType;
+-import java.lang.annotation.Retention;
+-import java.lang.annotation.RetentionPolicy;
+-import java.lang.annotation.Target;
+-
+-@Constraint(validatedBy = {})
+-@NotBlank(message = "비밀번호는 비어 있을 수 없습니다.")
+-@Size(min = 4, max = 20, message = "비밀번호는 4자 이상 20자 이하여야 합니다.")
+-@Target({
+-        ElementType.FIELD,
+-        ElementType.PARAMETER
+-})
+-@Retention(RetentionPolicy.RUNTIME)
+-public @interface ValidPassword {
+-
+-    String message() default "비밀번호가 올바르지 않습니다.";
+-
+-    Class<?>[] groups() default {};
+-
+-    Class<? extends Payload>[] payload() default {};
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeEntity.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeEntity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c56ad098a85cb9b6ab8ae4fe955e4613f330766
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeEntity.java
+@@ -0,0 +1,82 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Table;
++import java.time.LocalDateTime;
++
++/**
++ * 네이티브 로그인을 WebView로 넘길 때 쓰는 1회용 코드다.
++ * 코드 원문은 저장하지 않고, 넘겨받은 웹 세션이 앱 세션과 같은 기기 계열에 들어가도록 family_id를 함께 둔다.
++ */
++@Entity
++@Table(name = "handoff_codes")
++public class JpaHandoffCodeEntity extends BaseTimeEntity {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    @Column(name = "id", nullable = false)
++    private Long id;
++
++    @Column(name = "code_hash", nullable = false, length = 64)
++    private String codeHash;
++
++    @Column(name = "user_id", nullable = false)
++    private Long userId;
++
++    @Column(name = "family_id", nullable = false, length = 36)
++    private String familyId;
++
++    @Column(name = "expires_at", nullable = false)
++    private LocalDateTime expiresAt;
++
++    @Column(name = "used_at")
++    private LocalDateTime usedAt;
++
++    protected JpaHandoffCodeEntity() {
++    }
++
++    public JpaHandoffCodeEntity(
++            Long id,
++            String codeHash,
++            Long userId,
++            String familyId,
++            LocalDateTime expiresAt,
++            LocalDateTime usedAt
++    ) {
++        this.id = id;
++        this.codeHash = codeHash;
++        this.userId = userId;
++        this.familyId = familyId;
++        this.expiresAt = expiresAt;
++        this.usedAt = usedAt;
++    }
++
++    public Long id() {
++        return id;
++    }
++
++    public String codeHash() {
++        return codeHash;
++    }
++
++    public Long userId() {
++        return userId;
++    }
++
++    public String familyId() {
++        return familyId;
++    }
++
++    public LocalDateTime expiresAt() {
++        return expiresAt;
++    }
++
++    public LocalDateTime usedAt() {
++        return usedAt;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeRepository.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..23ce110a91e01ea815988d5a4490a2ea74cede58
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaHandoffCodeRepository.java
+@@ -0,0 +1,22 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++import org.springframework.data.domain.Pageable;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++
++public interface JpaHandoffCodeRepository extends JpaRepository<JpaHandoffCodeEntity, Long> {
++
++    Optional<JpaHandoffCodeEntity> findByCodeHash(String codeHash);
++
++    @Query("""
++            SELECT code.id
++              FROM JpaHandoffCodeEntity code
++             WHERE code.expiresAt < :threshold
++                OR code.usedAt IS NOT NULL
++            """)
++    List<Long> findIdsToClean(@Param("threshold") LocalDateTime threshold, Pageable pageable);
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestEntity.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestEntity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..644b52400e91d3fec78bdddef943adc604faf581
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestEntity.java
+@@ -0,0 +1,117 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.domain.SocialProvider;
++import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
++import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Table;
++import java.time.LocalDateTime;
++
++/**
++ * 인가 URL을 내줄 때 서버가 만든 값을 담아 둔다.
++ * 돌아온 요청이 우리가 시작한 그 요청인지 확인하는 데 쓰고, 한 번 쓰면 다시 쓰지 못한다.
++ */
++@Entity
++@Table(name = "oidc_auth_requests")
++public class JpaOidcAuthRequestEntity extends BaseTimeEntity {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    @Column(name = "id", nullable = false)
++    private Long id;
++
++    @Column(name = "state_hash", nullable = false, length = 64)
++    private String stateHash;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "provider", nullable = false, length = 20)
++    private SocialProvider provider;
++
++    @Column(name = "nonce", nullable = false)
++    private String nonce;
++
++    @Column(name = "code_verifier", nullable = false)
++    private String codeVerifier;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "client_type", nullable = false, length = 10)
++    private ClientType clientType;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "purpose", nullable = false, length = 20)
++    private SocialAuthPurpose purpose;
++
++    @Column(name = "expires_at", nullable = false)
++    private LocalDateTime expiresAt;
++
++    @Column(name = "used_at")
++    private LocalDateTime usedAt;
++
++    protected JpaOidcAuthRequestEntity() {
++    }
++
++    public JpaOidcAuthRequestEntity(
++            Long id,
++            String stateHash,
++            SocialProvider provider,
++            String nonce,
++            String codeVerifier,
++            ClientType clientType,
++            SocialAuthPurpose purpose,
++            LocalDateTime expiresAt,
++            LocalDateTime usedAt
++    ) {
++        this.id = id;
++        this.stateHash = stateHash;
++        this.provider = provider;
++        this.nonce = nonce;
++        this.codeVerifier = codeVerifier;
++        this.clientType = clientType;
++        this.purpose = purpose;
++        this.expiresAt = expiresAt;
++        this.usedAt = usedAt;
++    }
++
++    public Long id() {
++        return id;
++    }
++
++    public String stateHash() {
++        return stateHash;
++    }
++
++    public SocialProvider provider() {
++        return provider;
++    }
++
++    public String nonce() {
++        return nonce;
++    }
++
++    public String codeVerifier() {
++        return codeVerifier;
++    }
++
++    public ClientType clientType() {
++        return clientType;
++    }
++
++    public SocialAuthPurpose purpose() {
++        return purpose;
++    }
++
++    public LocalDateTime expiresAt() {
++        return expiresAt;
++    }
++
++    public LocalDateTime usedAt() {
++        return usedAt;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestRepository.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d62836687aa448716a3f50008666430aeab526c1
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaOidcAuthRequestRepository.java
+@@ -0,0 +1,22 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++import org.springframework.data.domain.Pageable;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++
++public interface JpaOidcAuthRequestRepository extends JpaRepository<JpaOidcAuthRequestEntity, Long> {
++
++    Optional<JpaOidcAuthRequestEntity> findByStateHash(String stateHash);
++
++    @Query("""
++            SELECT request.id
++              FROM JpaOidcAuthRequestEntity request
++             WHERE request.expiresAt < :threshold
++                OR request.usedAt IS NOT NULL
++            """)
++    List<Long> findIdsToClean(@Param("threshold") LocalDateTime threshold, Pageable pageable);
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionEntity.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionEntity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2d3331361eb375bca8003b2aefc89278c78f6d9
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionEntity.java
+@@ -0,0 +1,104 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Table;
++import java.time.LocalDateTime;
++
++/**
++ * 살아 있는 refresh token 하나를 나타낸다.
++ * 토큰 원문은 저장하지 않고 해시만 남긴다. 같은 기기에서 이어진 토큰은 family_id를 공유한다.
++ */
++@Entity
++@Table(name = "refresh_sessions")
++public class JpaRefreshSessionEntity extends BaseTimeEntity {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    @Column(name = "id", nullable = false)
++    private Long id;
++
++    @Column(name = "user_id", nullable = false)
++    private Long userId;
++
++    @Column(name = "family_id", nullable = false, length = 36)
++    private String familyId;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "client_type", nullable = false, length = 10)
++    private ClientType clientType;
++
++    @Column(name = "token_hash", nullable = false, length = 64)
++    private String tokenHash;
++
++    @Column(name = "expires_at", nullable = false)
++    private LocalDateTime expiresAt;
++
++    @Column(name = "revoked_at")
++    private LocalDateTime revokedAt;
++
++    @Column(name = "rotated_at")
++    private LocalDateTime rotatedAt;
++
++    protected JpaRefreshSessionEntity() {
++    }
++
++    public JpaRefreshSessionEntity(
++            Long id,
++            Long userId,
++            String familyId,
++            ClientType clientType,
++            String tokenHash,
++            LocalDateTime expiresAt,
++            LocalDateTime revokedAt,
++            LocalDateTime rotatedAt
++    ) {
++        this.id = id;
++        this.userId = userId;
++        this.familyId = familyId;
++        this.clientType = clientType;
++        this.tokenHash = tokenHash;
++        this.expiresAt = expiresAt;
++        this.revokedAt = revokedAt;
++        this.rotatedAt = rotatedAt;
++    }
++
++    public Long id() {
++        return id;
++    }
++
++    public Long userId() {
++        return userId;
++    }
++
++    public String familyId() {
++        return familyId;
++    }
++
++    public ClientType clientType() {
++        return clientType;
++    }
++
++    public String tokenHash() {
++        return tokenHash;
++    }
++
++    public LocalDateTime expiresAt() {
++        return expiresAt;
++    }
++
++    public LocalDateTime revokedAt() {
++        return revokedAt;
++    }
++
++    public LocalDateTime rotatedAt() {
++        return rotatedAt;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb652976d8a89929bb65f2096bbb46d58b2dc001
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaRefreshSessionRepository.java
+@@ -0,0 +1,43 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++import org.springframework.data.domain.Pageable;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++
++public interface JpaRefreshSessionRepository extends JpaRepository<JpaRefreshSessionEntity, Long> {
++
++    Optional<JpaRefreshSessionEntity> findByTokenHash(String tokenHash);
++
++    /** 재사용이 감지되면 그 기기 계열에 딸린 세션을 한꺼번에 막는다. */
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("""
++            UPDATE JpaRefreshSessionEntity session
++               SET session.revokedAt = :revokedAt
++             WHERE session.familyId = :familyId
++               AND session.revokedAt IS NULL
++            """)
++    int revokeFamily(@Param("familyId") String familyId, @Param("revokedAt") LocalDateTime revokedAt);
++
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("""
++            UPDATE JpaRefreshSessionEntity session
++               SET session.revokedAt = :revokedAt
++             WHERE session.userId = :userId
++               AND session.revokedAt IS NULL
++            """)
++    int revokeAllOfUser(@Param("userId") Long userId, @Param("revokedAt") LocalDateTime revokedAt);
++
++    /** 정리 대상 id를 먼저 뽑는다. 한 번에 다 지우면 운영 MySQL에서 락을 오래 잡는다. */
++    @Query("""
++            SELECT session.id
++              FROM JpaRefreshSessionEntity session
++             WHERE session.expiresAt < :threshold
++                OR session.revokedAt < :threshold
++            """)
++    List<Long> findIdsToClean(@Param("threshold") LocalDateTime threshold, Pageable pageable);
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityEntity.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityEntity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a70b32af2a79d8e05e9b9321f505ff6011abea9
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityEntity.java
+@@ -0,0 +1,59 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import com.bibbidi.wedding.auth.domain.SocialProvider;
++import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Table;
++
++/** 어떤 소셜 계정이 어떤 회원인지 잇는다. provider_user_id는 받은 문자열을 그대로 저장한다. */
++@Entity
++@Table(name = "social_identities")
++public class JpaSocialIdentityEntity extends BaseTimeEntity {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    @Column(name = "id", nullable = false)
++    private Long id;
++
++    @Column(name = "user_id", nullable = false)
++    private Long userId;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "provider", nullable = false, length = 20)
++    private SocialProvider provider;
++
++    @Column(name = "provider_user_id", nullable = false)
++    private String providerUserId;
++
++    protected JpaSocialIdentityEntity() {
++    }
++
++    public JpaSocialIdentityEntity(Long id, Long userId, SocialProvider provider, String providerUserId) {
++        this.id = id;
++        this.userId = userId;
++        this.provider = provider;
++        this.providerUserId = providerUserId;
++    }
++
++    public Long id() {
++        return id;
++    }
++
++    public Long userId() {
++        return userId;
++    }
++
++    public SocialProvider provider() {
++        return provider;
++    }
++
++    public String providerUserId() {
++        return providerUserId;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0ca9528b4065e01fc97e436622ace9fbc4fbf18b
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java
+@@ -0,0 +1,18 @@
++package com.bibbidi.wedding.auth.persistence;
++
++import com.bibbidi.wedding.auth.domain.SocialProvider;
++import java.util.Optional;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++
++public interface JpaSocialIdentityRepository extends JpaRepository<JpaSocialIdentityEntity, Long> {
++
++    Optional<JpaSocialIdentityEntity> findByProviderAndProviderUserId(
++            SocialProvider provider, String providerUserId);
++
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("DELETE FROM JpaSocialIdentityEntity identity WHERE identity.userId = :userId")
++    int deleteByUserId(@Param("userId") Long userId);
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthentication.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthentication.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..3e58be5490fc954ba5abc3c6921bac1f190fc433
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthentication.java
+@@ -0,0 +1,34 @@
++package com.bibbidi.wedding.auth.security;
++
++import java.util.Collection;
++import java.util.List;
++import org.springframework.security.authentication.AbstractAuthenticationToken;
++import org.springframework.security.core.GrantedAuthority;
++import org.springframework.security.core.authority.SimpleGrantedAuthority;
++
++/** 검증을 마친 access token이 만들어 내는 인증 정보다. */
++public class AccessTokenAuthentication extends AbstractAuthenticationToken {
++
++    private final AuthenticatedUser principal;
++
++    private AccessTokenAuthentication(AuthenticatedUser principal, Collection<GrantedAuthority> authorities) {
++        super(authorities);
++        this.principal = principal;
++        setAuthenticated(true);
++    }
++
++    public static AccessTokenAuthentication of(AuthenticatedUser user) {
++        return new AccessTokenAuthentication(user, List.of(
++                new SimpleGrantedAuthority(AuthorityNames.STATUS_PREFIX + user.status().name())));
++    }
++
++    @Override
++    public AuthenticatedUser getPrincipal() {
++        return principal;
++    }
++
++    @Override
++    public Object getCredentials() {
++        return null;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthenticationFilter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthenticationFilter.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6976f9063f4bdb4bf7164514174b08c69dd3ae2f
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AccessTokenAuthenticationFilter.java
+@@ -0,0 +1,74 @@
++package com.bibbidi.wedding.auth.security;
++
++import com.bibbidi.wedding.auth.token.AccessTokenClaims;
++import com.bibbidi.wedding.auth.token.AccessTokenParser;
++import com.bibbidi.wedding.auth.token.JwtProperties;
++import com.bibbidi.wedding.common.exception.BusinessException;
++import jakarta.servlet.FilterChain;
++import jakarta.servlet.ServletException;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
++import java.io.IOException;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.stereotype.Component;
++import org.springframework.web.filter.OncePerRequestFilter;
++
++/**
++ * 요청 헤더의 access token을 검사해 SecurityContext에 사용자를 올린다.
++ * 토큰이 없으면 그대로 통과시켜 비로그인 허용 경로가 동작하게 하고,
++ * 토큰이 있는데 올바르지 않으면 인증 진입점이 401을 내도록 예외를 남긴다.
++ */
++@Component
++public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
++
++    private static final String BEARER_PREFIX = "Bearer ";
++
++    private final AccessTokenParser accessTokenParser;
++    private final AuthenticationFailureResponseWriter failureResponseWriter;
++    private final String headerName;
++
++    public AccessTokenAuthenticationFilter(
++            AccessTokenParser accessTokenParser,
++            AuthenticationFailureResponseWriter failureResponseWriter,
++            JwtProperties jwtProperties
++    ) {
++        this.accessTokenParser = accessTokenParser;
++        this.failureResponseWriter = failureResponseWriter;
++        this.headerName = jwtProperties.headerName();
++    }
++
++    @Override
++    protected void doFilterInternal(
++            HttpServletRequest request,
++            HttpServletResponse response,
++            FilterChain filterChain
++    ) throws ServletException, IOException {
++        String token = bearerToken(request);
++        if (token == null) {
++            filterChain.doFilter(request, response);
++            return;
++        }
++
++        try {
++            AccessTokenClaims claims = accessTokenParser.parseAccessToken(token);
++            SecurityContextHolder.getContext().setAuthentication(
++                    AccessTokenAuthentication.of(new AuthenticatedUser(
++                            claims.userId(), claims.status(), claims.nickname(), claims.email())));
++        } catch (BusinessException exception) {
++            SecurityContextHolder.clearContext();
++            failureResponseWriter.respond(request, response, exception);
++            return;
++        }
++
++        filterChain.doFilter(request, response);
++    }
++
++    private String bearerToken(HttpServletRequest request) {
++        String header = request.getHeader(headerName);
++        if (header == null || !header.startsWith(BEARER_PREFIX)) {
++            return null;
++        }
++        String token = header.substring(BEARER_PREFIX.length()).trim();
++        return token.isEmpty() ? null : token;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e63619676f33da16ecc0598d8d143a92d0c597df
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticatedUser.java
+@@ -0,0 +1,17 @@
++package com.bibbidi.wedding.auth.security;
++
++import com.bibbidi.wedding.common.domain.UserStatus;
++import org.jspecify.annotations.Nullable;
++
++/** 요청을 보낸 사용자다. access token에서 꺼낸 값만 담는다. */
++public record AuthenticatedUser(
++        Long userId,
++        UserStatus status,
++        String nickname,
++        @Nullable String email
++) {
++
++    public boolean isActive() {
++        return status == UserStatus.ACTIVE;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticationFailureResponseWriter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticationFailureResponseWriter.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ffb06336d6a94883e208f6a82b30b3b89e1e4eaf
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthenticationFailureResponseWriter.java
+@@ -0,0 +1,45 @@
++package com.bibbidi.wedding.auth.security;
++
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.common.exception.ErrorResponse;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.http.MediaType;
++import org.springframework.stereotype.Component;
++import tools.jackson.databind.ObjectMapper;
++
++/**
++ * 필터 단계에서 끝난 요청도 컨트롤러와 같은 오류 형식을 내도록 직접 응답을 쓴다.
++ * 토큰 값은 기록하지 않는다.
++ */
++@Slf4j
++@Component
++public class AuthenticationFailureResponseWriter {
++
++    private final ObjectMapper objectMapper;
++
++    public AuthenticationFailureResponseWriter(ObjectMapper objectMapper) {
++        this.objectMapper = objectMapper;
++    }
++
++    public void respond(HttpServletRequest request, HttpServletResponse response, BusinessException exception)
++            throws IOException {
++        respond(request, response, exception.clientError(), exception.getMessage());
++    }
++
++    public void respond(HttpServletRequest request, HttpServletResponse response, ClientError error, String logMessage)
++            throws IOException {
++        log.warn("errorCode={} method={} uri={} status={} message={}",
++                error.errorCode(), request.getMethod(), request.getRequestURI(),
++                error.httpStatus().value(), logMessage);
++
++        response.setStatus(error.httpStatus().value());
++        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
++        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
++        objectMapper.writeValue(response.getWriter(), ErrorResponse.from(error));
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthorityNames.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthorityNames.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f7940f0cb806a97e852e4c1bd4eb04fcc973f95
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/AuthorityNames.java
+@@ -0,0 +1,11 @@
++package com.bibbidi.wedding.auth.security;
++
++/** 가입 상태를 권한으로 옮길 때 쓰는 이름이다. */
++public final class AuthorityNames {
++
++    public static final String STATUS_PREFIX = "STATUS_";
++    public static final String STATUS_ACTIVE = STATUS_PREFIX + "ACTIVE";
++
++    private AuthorityNames() {
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..fed4a69ff2b2c0183fbc117c27e1cbc8bb3551eb
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityConfig.java
+@@ -0,0 +1,63 @@
++package com.bibbidi.wedding.auth.security;
++
++import com.bibbidi.wedding.common.exception.ClientError;
++import org.springframework.boot.context.properties.EnableConfigurationProperties;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.http.HttpMethod;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.web.SecurityFilterChain;
++import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
++
++/**
++ * 인증은 access token 하나로만 한다. 서버 세션을 만들지 않는다.
++ * CORS 헤더는 앞단 nginx가 붙이므로 여기서 켜지 않는다. 켜면 헤더가 겹친다.
++ */
++@Configuration
++@EnableWebSecurity
++@EnableConfigurationProperties(SecurityWhitelist.class)
++public class SecurityConfig {
++
++    private final AccessTokenAuthenticationFilter accessTokenAuthenticationFilter;
++    private final AuthenticationFailureResponseWriter failureResponseWriter;
++    private final SecurityWhitelist whitelist;
++
++    public SecurityConfig(
++            AccessTokenAuthenticationFilter accessTokenAuthenticationFilter,
++            AuthenticationFailureResponseWriter failureResponseWriter,
++            SecurityWhitelist whitelist
++    ) {
++        this.accessTokenAuthenticationFilter = accessTokenAuthenticationFilter;
++        this.failureResponseWriter = failureResponseWriter;
++        this.whitelist = whitelist;
++    }
++
++    @Bean
++    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
++        return http
++                .csrf(csrf -> csrf.disable())
++                .cors(cors -> cors.disable())
++                .formLogin(formLogin -> formLogin.disable())
++                .httpBasic(httpBasic -> httpBasic.disable())
++                .logout(logout -> logout.disable())
++                .requestCache(cache -> cache.disable())
++                .anonymous(anonymous -> anonymous.disable())
++                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
++                .authorizeHttpRequests(requests -> requests
++                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
++                        .requestMatchers(whitelist.permitAll().toArray(String[]::new)).permitAll()
++                        .requestMatchers(TermsAgreementPath.PATH).authenticated()
++                        .anyRequest().hasAuthority(AuthorityNames.STATUS_ACTIVE))
++                .addFilterBefore(accessTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
++                .exceptionHandling(handling -> handling
++                        .authenticationEntryPoint((request, response, exception) -> failureResponseWriter.respond(
++                                request, response, ClientError.AUTHENTICATION_REQUIRED,
++                                "인증이 필요한 요청에 유효한 access token이 없습니다."))
++                        .accessDeniedHandler((request, response, exception) -> failureResponseWriter.respond(
++                                request, response, ClientError.TERMS_AGREEMENT_REQUIRED,
++                                "약관에 동의하지 않은 사용자의 요청입니다.")))
++                .build();
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityWhitelist.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityWhitelist.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..66df68342c9f367146585322206e9c73ac0dc4f9
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/SecurityWhitelist.java
+@@ -0,0 +1,14 @@
++package com.bibbidi.wedding.auth.security;
++
++import java.util.List;
++import org.springframework.boot.context.properties.ConfigurationProperties;
++
++/**
++ * 로그인하지 않아도 들어올 수 있는 경로다.
++ * actuator는 수집 도구가 컨테이너 망에서 직접 긁으므로 열어 두고, 외부 차단은 nginx가 한다.
++ *
++ * @param permitAll 인증 없이 허용할 경로 패턴
++ */
++@ConfigurationProperties(prefix = "auth.security")
++public record SecurityWhitelist(List<String> permitAll) {
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/TermsAgreementPath.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/TermsAgreementPath.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cc8dd0c81d91ad38405f1134b21e3c42032b3c8
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/TermsAgreementPath.java
+@@ -0,0 +1,13 @@
++package com.bibbidi.wedding.auth.security;
++
++/**
++ * 약관에 동의하기 전 사용자가 유일하게 부를 수 있는 경로다.
++ * 인가 규칙과 컨트롤러가 같은 값을 보도록 한곳에 둔다.
++ */
++public final class TermsAgreementPath {
++
++    public static final String PATH = "/api/users/me/terms-agreement";
++
++    private TermsAgreementPath() {
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthResult.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthResult.java
+deleted file mode 100644
+index d60580e893a1ca1bb771a850caa4cf849cc67eb7..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthResult.java
++++ /dev/null
+@@ -1,7 +0,0 @@
+-package com.bibbidi.wedding.auth.service;
+-
+-public record AuthResult(
+-        Long userId,
+-        String nickname
+-) {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthService.java
+deleted file mode 100644
+index e17d8b42da558dc749c1f538b8071b0d774e5b30..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/AuthService.java
++++ /dev/null
+@@ -1,73 +0,0 @@
+-package com.bibbidi.wedding.auth.service;
+-
+-import com.bibbidi.wedding.auth.password.PasswordHasher;
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
+-import com.bibbidi.wedding.user.service.UserResult;
+-import com.bibbidi.wedding.user.service.UserService;
+-import java.util.NoSuchElementException;
+-import org.springframework.stereotype.Service;
+-import org.springframework.transaction.annotation.Transactional;
+-
+-@Service
+-public class AuthService {
+-
+-    private final UserService userService;
+-    private final PasswordHasher passwordHasher;
+-
+-    public AuthService(UserService userService, PasswordHasher passwordHasher) {
+-        this.userService = userService;
+-        this.passwordHasher = passwordHasher;
+-    }
+-
+-    public UserResult register(String nickname, String rawPassword) {
+-        String passwordHash = passwordHasher.hash(rawPassword);
+-        return userService.createUser(nickname, passwordHash);
+-    }
+-
+-    public AuthResult login(String nickname, String rawPassword) {
+-        UserAuthenticationInfo user;
+-        try {
+-            user = userService.findAuthenticationInfo(nickname);
+-        } catch (NoSuchElementException ignored) {
+-            throw new BusinessException(ClientError.AUTHENTICATION_FAILED, "로그인 인증에 실패했습니다.");
+-        }
+-
+-        if (!passwordHasher.matches(rawPassword, user.passwordHash())) {
+-            throw new BusinessException(ClientError.AUTHENTICATION_FAILED, "로그인 인증에 실패했습니다.");
+-        }
+-
+-        return new AuthResult(user.userId(), user.nickname());
+-    }
+-
+-    @Transactional
+-    public void changePassword(Long currentUserId, String currentPassword, String newPassword) {
+-        UserAuthenticationInfo user = userService.findCurrentUserAuthenticationInfo(currentUserId);
+-        if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
+-            throw new BusinessException(
+-                    ClientError.AUTHENTICATION_FAILED,
+-                    "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
+-            );
+-        }
+-
+-        if (currentPassword.equals(newPassword)) {
+-            return;
+-        }
+-
+-        String newPasswordHash = passwordHasher.hash(newPassword);
+-        userService.changePasswordHash(currentUserId, newPasswordHash);
+-    }
+-
+-    @Transactional
+-    public void deleteUser(Long currentUserId, String currentPassword) {
+-        UserAuthenticationInfo user = userService.findAuthenticationInfo(currentUserId);
+-        if (!passwordHasher.matches(currentPassword, user.passwordHash())) {
+-            throw new BusinessException(
+-                    ClientError.AUTHENTICATION_FAILED,
+-                    "현재 비밀번호 검증에 실패했습니다. userId=" + currentUserId
+-            );
+-        }
+-        userService.delete(currentUserId);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthArgumentResolver.java b/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthArgumentResolver.java
+deleted file mode 100644
+index 977977dd0a5ff9a4560c4872808c938f572b52bf..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthArgumentResolver.java
++++ /dev/null
+@@ -1,41 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import com.bibbidi.wedding.common.auth.Auth;
+-import jakarta.servlet.http.HttpServletRequest;
+-import org.springframework.core.MethodParameter;
+-import org.springframework.stereotype.Component;
+-import org.springframework.web.bind.support.WebDataBinderFactory;
+-import org.springframework.web.context.request.NativeWebRequest;
+-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+-import org.springframework.web.method.support.ModelAndViewContainer;
+-
+-@Component
+-public class AuthArgumentResolver implements HandlerMethodArgumentResolver {
+-
+-    private final SessionUserIdProvider sessionUserIdProvider;
+-
+-    public AuthArgumentResolver(SessionUserIdProvider sessionUserIdProvider) {
+-        this.sessionUserIdProvider = sessionUserIdProvider;
+-    }
+-
+-    @Override
+-    public boolean supportsParameter(MethodParameter parameter) {
+-        return parameter.hasParameterAnnotation(Auth.class)
+-                && parameter.getParameterType().equals(Long.class);
+-    }
+-
+-    @Override
+-    public Object resolveArgument(
+-            MethodParameter parameter,
+-            ModelAndViewContainer mavContainer,
+-            NativeWebRequest webRequest,
+-            WebDataBinderFactory binderFactory
+-    ) {
+-        HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
+-        if (request == null) {
+-            throw new IllegalStateException("HttpServletRequest를 확인할 수 없습니다.");
+-        }
+-
+-        return sessionUserIdProvider.getCurrentUserId(request);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSession.java b/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSession.java
+deleted file mode 100644
+index b215d6bd63f4b3764209a62cff18bac89a070bd7..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSession.java
++++ /dev/null
+@@ -1,9 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-public final class AuthSession {
+-
+-    public static final String USER_ID_ATTRIBUTE = "AUTHENTICATED_USER_ID";
+-
+-    private AuthSession() {
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionCookieManager.java b/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionCookieManager.java
+deleted file mode 100644
+index eb8bb9a692a9b20d6317c16c3711cf9015eccc85..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionCookieManager.java
++++ /dev/null
+@@ -1,35 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import jakarta.servlet.http.HttpServletResponse;
+-import java.time.Duration;
+-import org.springframework.boot.web.server.Cookie;
+-import org.springframework.boot.web.server.autoconfigure.ServerProperties;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.ResponseCookie;
+-import org.springframework.stereotype.Component;
+-
+-@Component
+-public class AuthSessionCookieManager {
+-
+-    private final String cookieName;
+-    private final String cookiePath;
+-    private final boolean cookieSecure;
+-
+-    public AuthSessionCookieManager(ServerProperties serverProperties) {
+-        Cookie cookie = serverProperties.getServlet().getSession().getCookie();
+-
+-        this.cookieName = cookie.getName();
+-        this.cookiePath = cookie.getPath();
+-        this.cookieSecure = Boolean.TRUE.equals(cookie.getSecure());
+-    }
+-
+-    public void expire(HttpServletResponse response) {
+-        ResponseCookie expiredCookie = ResponseCookie.from(cookieName, "")
+-                .path(cookiePath)
+-                .secure(cookieSecure)
+-                .maxAge(Duration.ZERO)
+-                .build();
+-
+-        response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionManager.java b/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionManager.java
+deleted file mode 100644
+index d9ab2ac008b4c4b7a45af5d5a548ab7f23fd696a..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/session/AuthSessionManager.java
++++ /dev/null
+@@ -1,35 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import jakarta.servlet.http.HttpServletRequest;
+-import jakarta.servlet.http.HttpServletResponse;
+-import jakarta.servlet.http.HttpSession;
+-import org.springframework.stereotype.Component;
+-
+-@Component
+-public class AuthSessionManager {
+-
+-    private final AuthSessionCookieManager sessionCookieManager;
+-
+-    public AuthSessionManager(AuthSessionCookieManager sessionCookieManager) {
+-        this.sessionCookieManager = sessionCookieManager;
+-    }
+-
+-    public void replaceWithAuthenticatedSession(HttpServletRequest request, Long userId) {
+-        invalidateCurrentSession(request);
+-
+-        HttpSession authenticatedSession = request.getSession(true);
+-        authenticatedSession.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
+-    }
+-
+-    public void invalidate(HttpServletRequest request, HttpServletResponse response) {
+-        invalidateCurrentSession(request);
+-        sessionCookieManager.expire(response);
+-    }
+-
+-    private void invalidateCurrentSession(HttpServletRequest request) {
+-        HttpSession session = request.getSession(false);
+-        if (session != null) {
+-            session.invalidate();
+-        }
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/session/SessionUserIdProvider.java b/BE/src/main/java/com/bibbidi/wedding/auth/session/SessionUserIdProvider.java
+deleted file mode 100644
+index ac6736a9c738c022ef59809838822a6d0ae787e9..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/session/SessionUserIdProvider.java
++++ /dev/null
+@@ -1,26 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import jakarta.servlet.http.HttpServletRequest;
+-import jakarta.servlet.http.HttpSession;
+-import org.springframework.stereotype.Component;
+-
+-@Component
+-public class SessionUserIdProvider {
+-
+-    public Long getCurrentUserId(HttpServletRequest request) {
+-        HttpSession session = request.getSession(false);
+-        if (session == null) {
+-            throw new BusinessException(ClientError.AUTHENTICATION_REQUIRED, "현재 사용자 ID 조회 실패: 요청에 세션이 없습니다.");
+-        }
+-
+-        Object userId = session.getAttribute(AuthSession.USER_ID_ATTRIBUTE);
+-        if (!(userId instanceof Long currentUserId) || currentUserId <= 0) {
+-            throw new BusinessException(ClientError.AUTHENTICATION_REQUIRED,
+-                    "현재 사용자 ID 조회 실패: 세션의 사용자 ID가 없거나 양수인 Long 타입이 아닙니다.");
+-        }
+-
+-        return currentUserId;
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenClaims.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenClaims.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..4a3c1773113194b7d72944cafc3f565ae81cf296
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenClaims.java
+@@ -0,0 +1,16 @@
++package com.bibbidi.wedding.auth.token;
++
++import com.bibbidi.wedding.common.domain.UserStatus;
++import org.jspecify.annotations.Nullable;
++
++/**
++ * access token이 싣고 다니는 값이다.
++ * JWT는 서명만 되고 암호화되지 않으므로 여기에 담은 값은 토큰을 가진 쪽이 그대로 읽을 수 있다.
++ */
++public record AccessTokenClaims(
++        Long userId,
++        UserStatus status,
++        String nickname,
++        @Nullable String email
++) {
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenIssuer.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenIssuer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d77fd3d57b649709957a5bc5e032c651c9d5af7d
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenIssuer.java
+@@ -0,0 +1,57 @@
++package com.bibbidi.wedding.auth.token;
++
++import io.jsonwebtoken.Jwts;
++import java.time.Duration;
++import java.time.Instant;
++import java.util.Date;
++import java.util.UUID;
++import org.springframework.stereotype.Component;
++
++/** 서명 토큰을 발급한다. 수명과 식별자는 모두 설정에서 온다. */
++@Component
++public class AccessTokenIssuer {
++
++    private final JwtProperties properties;
++    private final JwtSigningKeySource keySource;
++
++    public AccessTokenIssuer(JwtProperties properties, JwtSigningKeySource keySource) {
++        this.properties = properties;
++        this.keySource = keySource;
++    }
++
++    public String issueAccessToken(AccessTokenClaims claims) {
++        Instant issuedAt = Instant.now();
++        return Jwts.builder()
++                .id(UUID.randomUUID().toString())
++                .issuer(properties.issuer())
++                .audience().add(properties.audience()).and()
++                .subject(String.valueOf(claims.userId()))
++                .issuedAt(Date.from(issuedAt))
++                .expiration(Date.from(issuedAt.plus(properties.accessTokenTtl())))
++                .claim(JwtClaimNames.CATEGORY, TokenCategory.ACCESS.name())
++                .claim(JwtClaimNames.STATUS, claims.status().name())
++                .claim(JwtClaimNames.NICKNAME, claims.nickname())
++                .claim(JwtClaimNames.EMAIL, claims.email())
++                .signWith(keySource.signingKey())
++                .compact();
++    }
++
++    /** 탈퇴 전 소셜 재인증을 마쳤다는 표다. 사용자 식별과 만료만 담는다. */
++    public String issueDeleteGrant(Long userId) {
++        Instant issuedAt = Instant.now();
++        return Jwts.builder()
++                .id(UUID.randomUUID().toString())
++                .issuer(properties.issuer())
++                .audience().add(properties.audience()).and()
++                .subject(String.valueOf(userId))
++                .issuedAt(Date.from(issuedAt))
++                .expiration(Date.from(issuedAt.plus(properties.deleteGrantTtl())))
++                .claim(JwtClaimNames.CATEGORY, TokenCategory.DELETE_GRANT.name())
++                .signWith(keySource.signingKey())
++                .compact();
++    }
++
++    public Duration accessTokenTtl() {
++        return properties.accessTokenTtl();
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenParser.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenParser.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..84ba02f022d08764cf954c0afae0fef53e069662
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/AccessTokenParser.java
+@@ -0,0 +1,85 @@
++package com.bibbidi.wedding.auth.token;
++
++import com.bibbidi.wedding.common.domain.UserStatus;
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import io.jsonwebtoken.Claims;
++import io.jsonwebtoken.ExpiredJwtException;
++import io.jsonwebtoken.JwtException;
++import io.jsonwebtoken.Jwts;
++import org.springframework.stereotype.Component;
++
++/**
++ * 서명 토큰을 검사해 값을 꺼낸다.
++ * 서명과 만료는 jjwt가, 발급자·대상·용도는 여기서 확인한다.
++ */
++@Component
++public class AccessTokenParser {
++
++    private final JwtProperties properties;
++    private final JwtSigningKeySource keySource;
++
++    public AccessTokenParser(JwtProperties properties, JwtSigningKeySource keySource) {
++        this.properties = properties;
++        this.keySource = keySource;
++    }
++
++    public AccessTokenClaims parseAccessToken(String token) {
++        Claims claims = parse(token, TokenCategory.ACCESS, ClientError.ACCESS_TOKEN_INVALID);
++        return new AccessTokenClaims(
++                userId(claims, ClientError.ACCESS_TOKEN_INVALID),
++                status(claims),
++                claims.get(JwtClaimNames.NICKNAME, String.class),
++                claims.get(JwtClaimNames.EMAIL, String.class));
++    }
++
++    /** 탈퇴 재인증 표를 검사하고 그 표가 가리키는 사용자를 돌려준다. */
++    public Long parseDeleteGrant(String token) {
++        Claims claims = parse(token, TokenCategory.DELETE_GRANT, ClientError.DELETE_GRANT_INVALID);
++        return userId(claims, ClientError.DELETE_GRANT_INVALID);
++    }
++
++    private Claims parse(String token, TokenCategory expected, ClientError invalidError) {
++        Claims claims = parseSigned(token, invalidError);
++        String category = claims.get(JwtClaimNames.CATEGORY, String.class);
++        if (!expected.name().equals(category)) {
++            throw new BusinessException(invalidError,
++                    "토큰 용도가 다릅니다. 기대한 용도: " + expected.name());
++        }
++        return claims;
++    }
++
++    private Claims parseSigned(String token, ClientError invalidError) {
++        try {
++            return Jwts.parser()
++                    .verifyWith(keySource.signingKey())
++                    .requireIssuer(properties.issuer())
++                    .requireAudience(properties.audience())
++                    .build()
++                    .parseSignedClaims(token)
++                    .getPayload();
++        } catch (ExpiredJwtException exception) {
++            throw new BusinessException(ClientError.ACCESS_TOKEN_EXPIRED, "만료된 토큰입니다.", exception);
++        } catch (JwtException | IllegalArgumentException exception) {
++            throw new BusinessException(invalidError, "토큰을 검증하지 못했습니다.", exception);
++        }
++    }
++
++    private static Long userId(Claims claims, ClientError invalidError) {
++        try {
++            return Long.valueOf(claims.getSubject());
++        } catch (NumberFormatException | NullPointerException exception) {
++            throw new BusinessException(invalidError, "토큰의 sub가 사용자 식별자가 아닙니다.", exception);
++        }
++    }
++
++    private static UserStatus status(Claims claims) {
++        String status = claims.get(JwtClaimNames.STATUS, String.class);
++        try {
++            return UserStatus.valueOf(status);
++        } catch (IllegalArgumentException | NullPointerException exception) {
++            throw new BusinessException(ClientError.ACCESS_TOKEN_INVALID,
++                    "토큰의 status claim이 올바르지 않습니다.", exception);
++        }
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2f38e205e7689ecfeab5ff6837849e6eeccad8d
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtClaimNames.java
+@@ -0,0 +1,13 @@
++package com.bibbidi.wedding.auth.token;
++
++/** 직접 정한 claim 이름을 한곳에 모은다. 표준 claim은 jjwt가 제공하는 이름을 그대로 쓴다. */
++final class JwtClaimNames {
++
++    static final String CATEGORY = "category";
++    static final String STATUS = "status";
++    static final String NICKNAME = "nickname";
++    static final String EMAIL = "email";
++
++    private JwtClaimNames() {
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1be0a8d39e7ce288698ae8b5b9604e71334b8e3b
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtProperties.java
+@@ -0,0 +1,25 @@
++package com.bibbidi.wedding.auth.token;
++
++import java.time.Duration;
++import org.springframework.boot.context.properties.ConfigurationProperties;
++
++/**
++ * 서명 토큰에 관한 값은 모두 여기 모은다. 코드에 수명이나 식별자를 직접 적지 않는다.
++ *
++ * @param secret 서명 비밀말. 기본값을 두지 않아 비어 있으면 애플리케이션이 뜨지 않는다.
++ * @param issuer 발급자 식별자
++ * @param audience 대상 식별자
++ * @param accessTokenTtl access token 수명
++ * @param deleteGrantTtl 탈퇴용 재인증 표의 수명
++ * @param headerName access token을 싣는 요청 헤더 이름
++ */
++@ConfigurationProperties(prefix = "auth.jwt")
++public record JwtProperties(
++        String secret,
++        String issuer,
++        String audience,
++        Duration accessTokenTtl,
++        Duration deleteGrantTtl,
++        String headerName
++) {
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0292f98c1564fbd6d23805f79559d7b6765f250b
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/JwtSigningKeySource.java
+@@ -0,0 +1,39 @@
++package com.bibbidi.wedding.auth.token;
++
++import io.jsonwebtoken.security.Keys;
++import java.nio.charset.StandardCharsets;
++import javax.crypto.SecretKey;
++import org.springframework.stereotype.Component;
++
++/**
++ * 서명 비밀말을 HMAC 키로 바꾼다.
++ * 비밀말이 없거나 HS256이 요구하는 256비트에 못 미치면 애플리케이션을 띄우지 않는다.
++ */
++@Component
++public class JwtSigningKeySource {
++
++    private static final int MINIMUM_SECRET_BYTES = 32;
++
++    private final SecretKey signingKey;
++
++    public JwtSigningKeySource(JwtProperties properties) {
++        byte[] secret = secretBytes(properties.secret());
++        this.signingKey = Keys.hmacShaKeyFor(secret);
++    }
++
++    public SecretKey signingKey() {
++        return signingKey;
++    }
++
++    private static byte[] secretBytes(String secret) {
++        if (secret == null || secret.isBlank()) {
++            throw new IllegalStateException("auth.jwt.secret이 비어 있습니다. 환경 변수로 주입해야 합니다.");
++        }
++        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
++        if (bytes.length < MINIMUM_SECRET_BYTES) {
++            throw new IllegalStateException(
++                    "auth.jwt.secret이 너무 짧습니다. " + MINIMUM_SECRET_BYTES + "바이트 이상이어야 합니다.");
++        }
++        return bytes;
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/token/TokenCategory.java b/BE/src/main/java/com/bibbidi/wedding/auth/token/TokenCategory.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..eda57e08fd12f0c5156bfc20dc7d759ebfb4ae87
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/token/TokenCategory.java
+@@ -0,0 +1,10 @@
++package com.bibbidi.wedding.auth.token;
++
++/**
++ * 서명한 토큰의 용도다.
++ * 용도가 다른 토큰을 서로 바꿔 쓰지 못하도록 claim에 담아 검증할 때 확인한다.
++ */
++public enum TokenCategory {
++    ACCESS,
++    DELETE_GRANT,
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+index 1ab97f97f082b449c89c002373bb85a088f6181f..875c1c161381f05340e79a64d7f3f075246e2987 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/AppointmentController.java
+@@ -11,13 +11,13 @@ import com.bibbidi.wedding.checklist.service.dto.AppointmentCompletionResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
+ import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+-import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
+ import jakarta.validation.constraints.Max;
+ import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.NotNull;
+ import java.time.LocalDateTime;
+ import java.util.List;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.DeleteMapping;
+ import org.springframework.web.bind.annotation.GetMapping;
+@@ -41,7 +41,7 @@ public class AppointmentController {
+     @ResponseStatus(HttpStatus.CREATED)
+     @PostMapping("/api/checklist-items/{checklistItemId}/appointments")
+     public AppointmentResponse create(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long checklistItemId,
+             @Valid @RequestBody CreateAppointmentRequest request
+     ) {
+@@ -52,7 +52,7 @@ public class AppointmentController {
+ 
+     @GetMapping("/api/appointments/me/nearby")
+     public List<NearbyAppointmentResponse> findNearby(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @RequestParam(defaultValue = "6") @Min(1) @Max(20) int limit
+     ) {
+         LocalDateTime requestedAt = LocalDateTime.now();
+@@ -63,7 +63,7 @@ public class AppointmentController {
+ 
+     @PutMapping("/api/appointments/{appointmentId}")
+     public AppointmentResponse update(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long appointmentId,
+             @Valid @RequestBody UpdateAppointmentRequest request
+     ) {
+@@ -74,7 +74,7 @@ public class AppointmentController {
+ 
+     @PutMapping("/api/appointments/{appointmentId}/complete")
+     public AppointmentCompletionResponse changeCompletion(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long appointmentId,
+             @Valid @RequestBody @NotNull(message = "완료 여부는 필수입니다.") Boolean isDone
+     ) {
+@@ -90,7 +90,7 @@ public class AppointmentController {
+     @ResponseStatus(HttpStatus.NO_CONTENT)
+     @DeleteMapping("/api/appointments/{appointmentId}")
+     public void delete(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long appointmentId
+     ) {
+         appointmentService.delete(userId, appointmentId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+index 9d68dd63ffbf8257baf9ff6b7c4ff0b47f6b9f08..9bc56c8ae954034b6c5a1488e8e218c49671d7c6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistController.java
+@@ -15,13 +15,13 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistProgressResult;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+ import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
+ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
+-import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
+ import jakarta.validation.constraints.Max;
+ import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.NotEmpty;
+ import jakarta.validation.constraints.NotNull;
+ import java.util.List;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PostMapping;
+@@ -41,26 +41,26 @@ public class ChecklistController {
+ 
+     @ResponseStatus(HttpStatus.CREATED)
+     @PostMapping("/api/checklists")
+-    public Long create(@Auth Long userId) {
++    public Long create(@AuthenticationPrincipal(expression = "userId") Long userId) {
+         ChecklistCreationResult result = checklistService.create(userId);
+         return result.id();
+     }
+ 
+     @GetMapping("/api/checklists/me")
+-    public ChecklistWithAppointmentsResponse findMyChecklist(@Auth Long userId) {
++    public ChecklistWithAppointmentsResponse findMyChecklist(@AuthenticationPrincipal(expression = "userId") Long userId) {
+         ChecklistWithAppointmentsResult result = checklistService.findMyChecklist(userId);
+         return ChecklistWithAppointmentsResponse.from(result);
+     }
+ 
+     @GetMapping("/api/checklists/me/progress")
+-    public ChecklistProgressResponse findMyChecklistProgress(@Auth Long userId) {
++    public ChecklistProgressResponse findMyChecklistProgress(@AuthenticationPrincipal(expression = "userId") Long userId) {
+         ChecklistProgressResult result = checklistService.findMyChecklistProgress(userId);
+         return ChecklistProgressResponse.from(result);
+     }
+ 
+     @GetMapping("/api/checklists/me/unscheduled-items")
+     public List<UnscheduledChecklistItemResponse> findUnscheduledItems(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit
+     ) {
+         List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(userId, limit);
+@@ -70,7 +70,7 @@ public class ChecklistController {
+     }
+ 
+     @GetMapping("/api/checklists/me/recommended-catalog-items")
+-    public List<RecommendedCatalogItemResponse> findRecommendedCatalogItems(@Auth Long userId, @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit) {
++    public List<RecommendedCatalogItemResponse> findRecommendedCatalogItems(@AuthenticationPrincipal(expression = "userId") Long userId, @RequestParam(defaultValue = "4") @Min(1) @Max(20) int limit) {
+         List<RecommendedCatalogItemResult> results = checklistService.findRecommendedCatalogItems(userId, limit);
+         return results.stream()
+                 .map(RecommendedCatalogItemResponse::from)
+@@ -80,7 +80,7 @@ public class ChecklistController {
+     @ResponseStatus(HttpStatus.CREATED)
+     @PostMapping("/api/checklists/me/catalog-items")
+     public AddCatalogItemsResponse addItemsFromCatalog(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @Valid
+             @RequestBody
+             @NotEmpty(message = "추가할 준비 항목을 하나 이상 선택해야 합니다.")
+@@ -92,7 +92,7 @@ public class ChecklistController {
+ 
+     @ResponseStatus(HttpStatus.CREATED)
+     @PostMapping("/api/checklists/me/items")
+-    public ChecklistItemResponse addCustomItem(@Auth Long userId,
++    public ChecklistItemResponse addCustomItem(@AuthenticationPrincipal(expression = "userId") Long userId,
+                                                @Valid @RequestBody CreateChecklistItemRequest request) {
+         ChecklistItemResult result = checklistService.addCustomItem(userId, request.title(), request.categoryId());
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistItemController.java b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistItemController.java
+index ac1afcc7f40429a950489bf2efb19438aa4c2498..6eb93030797cd87b15b1c6e169a3176d9bdbb3e2 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistItemController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/checklist/controller/ChecklistItemController.java
+@@ -3,11 +3,11 @@ package com.bibbidi.wedding.checklist.controller;
+ import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
+ import com.bibbidi.wedding.checklist.service.ChecklistService;
+ import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
+-import com.bibbidi.wedding.common.auth.Auth;
+ import jakarta.validation.Valid;
+ import jakarta.validation.constraints.NotBlank;
+ import jakarta.validation.constraints.NotNull;
+ import jakarta.validation.constraints.Size;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.web.bind.annotation.DeleteMapping;
+ import org.springframework.web.bind.annotation.GetMapping;
+@@ -28,7 +28,7 @@ public class ChecklistItemController {
+ 
+     @GetMapping("/api/checklist-items/{itemId}/remaining-appointments")
+     public boolean hasRemainingAppointments(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long itemId
+     ) {
+         return checklistService.hasRemainingAppointments(userId, itemId);
+@@ -36,7 +36,7 @@ public class ChecklistItemController {
+ 
+     @PutMapping("/api/checklist-items/{itemId}/category")
+     public ChecklistItemResponse changeCategory(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long itemId,
+             @Valid @RequestBody @NotNull(message = "카테고리를 선택해야 합니다.") Long categoryId
+     ) {
+@@ -47,7 +47,7 @@ public class ChecklistItemController {
+ 
+     @PutMapping("/api/checklist-items/{itemId}/title")
+     public ChecklistItemResponse changeTitle(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long itemId,
+             @Valid
+             @RequestBody
+@@ -67,7 +67,7 @@ public class ChecklistItemController {
+ 
+     @PutMapping("/api/checklist-items/{itemId}/status")
+     public ChecklistItemResponse changeStatus(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long itemId,
+             @Valid @RequestBody @NotNull(message = "할 일 상태를 선택해야 합니다.") String status
+     ) {
+@@ -79,7 +79,7 @@ public class ChecklistItemController {
+     @DeleteMapping("/api/checklist-items/{itemId}")
+     @ResponseStatus(HttpStatus.NO_CONTENT)
+     public void delete(
+-            @Auth Long userId,
++            @AuthenticationPrincipal(expression = "userId") Long userId,
+             @PathVariable Long itemId
+     ) {
+         checklistService.deleteItem(userId, itemId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/common/auth/Auth.java b/BE/src/main/java/com/bibbidi/wedding/common/auth/Auth.java
+deleted file mode 100644
+index 8e07739f516690f63f2fa50c1cfcc9c6420426f4..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/common/auth/Auth.java
++++ /dev/null
+@@ -1,13 +0,0 @@
+-package com.bibbidi.wedding.common.auth;
+-
+-import java.lang.annotation.Documented;
+-import java.lang.annotation.ElementType;
+-import java.lang.annotation.Retention;
+-import java.lang.annotation.RetentionPolicy;
+-import java.lang.annotation.Target;
+-
+-@Documented
+-@Target(ElementType.PARAMETER)
+-@Retention(RetentionPolicy.RUNTIME)
+-public @interface Auth {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/common/domain/UserStatus.java b/BE/src/main/java/com/bibbidi/wedding/common/domain/UserStatus.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..261be20fd55ae667fa004c6da2c70d5e61bbc161
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/common/domain/UserStatus.java
+@@ -0,0 +1,10 @@
++package com.bibbidi.wedding.common.domain;
++
++/**
++ * 회원 가입 완료 여부다. 약관에 동의하기 전에는 PENDING이다.
++ * user가 가진 값이면서 auth가 토큰에 실어 나르므로 두 feature가 함께 쓰는 곳에 둔다.
++ */
++public enum UserStatus {
++    PENDING,
++    ACTIVE,
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/common/exception/BusinessException.java b/BE/src/main/java/com/bibbidi/wedding/common/exception/BusinessException.java
+index 3cb9241bb1358f876a415ca6db9bf7e8c9e2991f..843ab3960bec0a8c2426e46a9c1873bf0d427a5a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/common/exception/BusinessException.java
++++ b/BE/src/main/java/com/bibbidi/wedding/common/exception/BusinessException.java
+@@ -9,6 +9,11 @@ public class BusinessException extends RuntimeException {
+         this.clientError = clientError;
+     }
+ 
++    public BusinessException(ClientError clientError, String logMessage, Throwable cause) {
++        super(logMessage, cause);
++        this.clientError = clientError;
++    }
++
+     public ClientError clientError() {
+         return clientError;
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/common/exception/ClientError.java b/BE/src/main/java/com/bibbidi/wedding/common/exception/ClientError.java
+index 8780ed42275235aaac87d1ce5938db02ed568655..e73f021d573464d7458285f6d9bb8fa222d4a3b1 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/common/exception/ClientError.java
++++ b/BE/src/main/java/com/bibbidi/wedding/common/exception/ClientError.java
+@@ -6,11 +6,20 @@ public enum ClientError {
+     // 100: 요청 오류
+     INVALID_REQUEST(HttpStatus.BAD_REQUEST, 101, "요청 값이 올바르지 않습니다."),
+     INVALID_APPOINTMENT_TIME_RANGE(HttpStatus.BAD_REQUEST, 102, "일정의 시작 시각은 종료 시각보다 늦을 수 없습니다."),
++    UNSUPPORTED_SOCIAL_PROVIDER(HttpStatus.BAD_REQUEST, 103, "지원하지 않는 소셜 로그인 제공자입니다."),
+ 
+     // 200: 인증/인가 오류
+     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, 201, "로그인이 필요합니다."),
+     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, 202, "인증 정보가 올바르지 않습니다."),
+     CHECKLIST_ITEM_ACCESS_DENIED(HttpStatus.FORBIDDEN, 203, "해당 할 일에 대한 작업 권한이 없습니다."),
++    ACCESS_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, 204, "로그인이 만료되었습니다. 다시 로그인해 주세요."),
++    ACCESS_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, 205, "인증 정보가 올바르지 않습니다."),
++    REFRESH_SESSION_INVALID(HttpStatus.UNAUTHORIZED, 206, "로그인 상태를 유지할 수 없습니다. 다시 로그인해 주세요."),
++    SOCIAL_AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, 207, "소셜 로그인 인증에 실패했습니다."),
++    OIDC_AUTH_REQUEST_INVALID(HttpStatus.UNAUTHORIZED, 208, "소셜 로그인 요청이 만료되었거나 올바르지 않습니다."),
++    HANDOFF_CODE_INVALID(HttpStatus.UNAUTHORIZED, 209, "로그인 정보를 넘겨받을 수 없습니다. 다시 시도해 주세요."),
++    DELETE_GRANT_INVALID(HttpStatus.UNAUTHORIZED, 210, "탈퇴를 진행하려면 소셜 인증을 다시 해 주세요."),
++    TERMS_AGREEMENT_REQUIRED(HttpStatus.FORBIDDEN, 211, "약관에 동의해야 서비스를 이용할 수 있습니다."),
+ 
+     // 300 : 리소스 오류
+     USER_NOT_FOUND(HttpStatus.NOT_FOUND, 301, "사용자를 찾을 수 없습니다."),
+@@ -29,6 +38,9 @@ public enum ClientError {
+             HttpStatus.UNPROCESSABLE_CONTENT, 405, "준비 목록에서 추가한 할 일은 제목을 변경할 수 없습니다."),
+     COMPLETED_CHECKLIST_ITEM_NOT_DELETABLE(
+             HttpStatus.UNPROCESSABLE_CONTENT, 406, "완료된 할 일은 삭제할 수 없습니다."),
++    DUPLICATE_SOCIAL_IDENTITY(HttpStatus.CONFLICT, 407, "이미 연결된 소셜 계정입니다."),
++    SOCIAL_NICKNAME_REQUIRED(
++            HttpStatus.UNPROCESSABLE_CONTENT, 408, "소셜 계정에서 닉네임을 받지 못했습니다."),
+ 
+     // 900: 서버 오류
+     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 901, "요청을 처리하는 중 오류가 발생했습니다.");
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/controller/UserController.java b/BE/src/main/java/com/bibbidi/wedding/user/controller/UserController.java
+index 5588bf3d9afb8b3c09ab0b774ed0f2cad481ef66..c23f8291a145cd68ecf3c9f8cede3f8c5a187914 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/controller/UserController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/controller/UserController.java
+@@ -1,6 +1,5 @@
+ package com.bibbidi.wedding.user.controller;
+ 
+-import com.bibbidi.wedding.common.auth.Auth;
+ import com.bibbidi.wedding.user.controller.dto.ChangeNicknameRequest;
+ import com.bibbidi.wedding.user.controller.dto.ChangeNicknameResponse;
+ import com.bibbidi.wedding.user.controller.dto.CurrentUserResponse;
+@@ -12,6 +11,7 @@ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.WeddingDateResult;
+ import jakarta.validation.Valid;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.ModelAttribute;
+ import org.springframework.web.bind.annotation.PutMapping;
+@@ -30,13 +30,13 @@ public class UserController {
+     }
+ 
+     @GetMapping("/me")
+-    public CurrentUserResponse findCurrentUser(@Auth Long currentUserId) {
++    public CurrentUserResponse findCurrentUser(@AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+         UserResult result = userService.findCurrentUserInfo(currentUserId);
+         return CurrentUserResponse.from(result);
+     }
+ 
+     @GetMapping("/me/wedding-date")
+-    public WeddingDateResponse findWeddingDate(@Auth Long currentUserId) {
++    public WeddingDateResponse findWeddingDate(@AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+         WeddingDateResult result = userService.findWeddingDate(currentUserId);
+         return WeddingDateResponse.from(result);
+     }
+@@ -51,7 +51,7 @@ public class UserController {
+ 
+     @PutMapping("/me/nickname")
+     public ChangeNicknameResponse changeNickname(
+-            @Auth Long currentUserId,
++            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
+             @Valid @RequestBody ChangeNicknameRequest request
+     ) {
+         UserResult result = userService.changeNickname(currentUserId, request.nickname());
+@@ -60,7 +60,7 @@ public class UserController {
+ 
+     @PutMapping("/me/wedding-date")
+     public WeddingDateResponse updateWeddingDate(
+-            @Auth Long currentUserId,
++            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
+             @Valid @RequestBody WeddingDateRequest request
+     ) {
+         WeddingDateResult result = userService.updateWeddingDate(currentUserId, request.weddingDate());
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+index 2b7417b1fb47d49a6d7551ee3dc31d07123e56b2..93fbfcd8672e5218bb0dccea2aaaaca71ca2da90 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+@@ -1,5 +1,7 @@
+ package com.bibbidi.wedding.user.domain;
+ 
++import com.bibbidi.wedding.common.domain.UserStatus;
++import java.time.LocalDateTime;
+ import org.jspecify.annotations.NonNull;
+ import org.jspecify.annotations.Nullable;
+ 
+@@ -7,24 +9,43 @@ public final class User {
+ 
+     private final Long id;
+     private final String nickname;
+-    private final String passwordHash;
++    private final UserStatus status;
++    private final String email;
++    private final String termsVersion;
++    private final LocalDateTime termsAgreedAt;
+ 
+     public User(
+             @Nullable Long id,
+             @NonNull String nickname,
+-            @NonNull String passwordHash
++            @NonNull UserStatus status,
++            @Nullable String email,
++            @Nullable String termsVersion,
++            @Nullable LocalDateTime termsAgreedAt
+     ) {
+         this.id = id;
+         this.nickname = nickname;
+-        this.passwordHash = passwordHash;
++        this.status = status;
++        this.email = email;
++        this.termsVersion = termsVersion;
++        this.termsAgreedAt = termsAgreedAt;
++    }
++
++    /** 소셜 인증만 끝난 사용자다. 약관에 동의하기 전이라 아직 서비스를 쓸 수 없다. */
++    public static User pending(String nickname, @Nullable String email) {
++        return new User(null, nickname, UserStatus.PENDING, email, null, null);
+     }
+ 
+     public User changeNickname(String nickname) {
+-        return new User(id, nickname, passwordHash);
++        return new User(id, nickname, status, email, termsVersion, termsAgreedAt);
+     }
+ 
+-    public User changePasswordHash(String passwordHash) {
+-        return new User(id, nickname, passwordHash);
++    /** 약관에 동의하면 서비스를 쓸 수 있는 상태가 된다. */
++    public User agreeToTerms(String termsVersion, LocalDateTime agreedAt) {
++        return new User(id, nickname, UserStatus.ACTIVE, email, termsVersion, agreedAt);
++    }
++
++    public boolean isActive() {
++        return status == UserStatus.ACTIVE;
+     }
+ 
+     public Long id() {
+@@ -35,8 +56,19 @@ public final class User {
+         return nickname;
+     }
+ 
+-    public String passwordHash() {
+-        return passwordHash;
++    public UserStatus status() {
++        return status;
+     }
+ 
++    public @Nullable String email() {
++        return email;
++    }
++
++    public @Nullable String termsVersion() {
++        return termsVersion;
++    }
++
++    public @Nullable LocalDateTime termsAgreedAt() {
++        return termsAgreedAt;
++    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+index 6eb569418c397fdfc3034a8fff54125337707216..144dc21363f4c0e92038fc427e74f4c7ee08ee6d 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+@@ -1,13 +1,17 @@
+ package com.bibbidi.wedding.user.persistence;
+ 
++import com.bibbidi.wedding.common.domain.UserStatus;
+ import com.bibbidi.wedding.common.persistence.BaseTimeEntity;
+ import jakarta.persistence.Column;
+ import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
+ import jakarta.persistence.GeneratedValue;
+ import jakarta.persistence.GenerationType;
+ import jakarta.persistence.Id;
+ import jakarta.persistence.Table;
+ import java.time.LocalDate;
++import java.time.LocalDateTime;
+ 
+ @Entity
+ @Table(name = "users")
+@@ -21,8 +25,18 @@ public class JpaUserEntity extends BaseTimeEntity {
+     @Column(name = "nickname", nullable = false)
+     private String nickname;
+ 
+-    @Column(name = "password_hash", nullable = false)
+-    private String passwordHash;
++    @Enumerated(EnumType.STRING)
++    @Column(name = "status", nullable = false, length = 20)
++    private UserStatus status;
++
++    @Column(name = "email")
++    private String email;
++
++    @Column(name = "terms_version", length = 20)
++    private String termsVersion;
++
++    @Column(name = "terms_agreed_at")
++    private LocalDateTime termsAgreedAt;
+ 
+     @Column(name = "wedding_date")
+     private LocalDate weddingDate;
+@@ -30,10 +44,21 @@ public class JpaUserEntity extends BaseTimeEntity {
+     protected JpaUserEntity() {
+     }
+ 
+-    public JpaUserEntity(Long id, String nickname, String passwordHash, LocalDate weddingDate) {
++    public JpaUserEntity(
++            Long id,
++            String nickname,
++            UserStatus status,
++            String email,
++            String termsVersion,
++            LocalDateTime termsAgreedAt,
++            LocalDate weddingDate
++    ) {
+         this.id = id;
+         this.nickname = nickname;
+-        this.passwordHash = passwordHash;
++        this.status = status;
++        this.email = email;
++        this.termsVersion = termsVersion;
++        this.termsAgreedAt = termsAgreedAt;
+         this.weddingDate = weddingDate;
+     }
+ 
+@@ -45,8 +70,20 @@ public class JpaUserEntity extends BaseTimeEntity {
+         return nickname;
+     }
+ 
+-    public String passwordHash() {
+-        return passwordHash;
++    public UserStatus status() {
++        return status;
++    }
++
++    public String email() {
++        return email;
++    }
++
++    public String termsVersion() {
++        return termsVersion;
++    }
++
++    public LocalDateTime termsAgreedAt() {
++        return termsAgreedAt;
+     }
+ 
+     public LocalDate weddingDate() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+index 1c90fc4957a1ae7f40fd2494d2db91c8ba6d22cc..f5a92d847389949a16f5b951b88e4da54019a6fc 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+@@ -8,11 +8,11 @@ import org.springframework.data.repository.query.Param;
+ 
+ public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
+ 
+-    boolean existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
++    boolean existsByNicknameIgnoreCase(String nickname);
+ 
+-    boolean existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(String nickname, Long id);
++    boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, Long id);
+ 
+-    Optional<JpaUserEntity> findByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
++    Optional<JpaUserEntity> findByNicknameIgnoreCase(String nickname);
+ 
+     @Modifying(flushAutomatically = true, clearAutomatically = true)
+     @Query("DELETE FROM JpaUserEntity user WHERE user.id = :userId")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
+index a8ce689cf23ce3f02f52ea2b49531280de46c886..e72d5be068b32f4acd29e070db4fefc464c23ab4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
+@@ -2,16 +2,34 @@ package com.bibbidi.wedding.user.repository;
+ 
+ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.persistence.JpaUserEntity;
++import java.time.LocalDate;
+ import org.springframework.stereotype.Component;
+ 
+ @Component
+ public class UserMapper {
+ 
+     public JpaUserEntity toEntity(User user) {
+-        return new JpaUserEntity(user.id(), user.nickname(), user.passwordHash(), null);
++        return toEntity(user, null);
++    }
++
++    public JpaUserEntity toEntity(User user, LocalDate weddingDate) {
++        return new JpaUserEntity(
++                user.id(),
++                user.nickname(),
++                user.status(),
++                user.email(),
++                user.termsVersion(),
++                user.termsAgreedAt(),
++                weddingDate);
+     }
+ 
+     public User toDomain(JpaUserEntity entity) {
+-        return new User(entity.id(), entity.nickname(), entity.passwordHash());
++        return new User(
++                entity.id(),
++                entity.nickname(),
++                entity.status(),
++                entity.email(),
++                entity.termsVersion(),
++                entity.termsAgreedAt());
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+index f798352721a6914073bc8ec7da71a18b0995f31d..27ee214f4d6e3beda3fa8a50921a8c6facac2912 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+@@ -1,6 +1,5 @@
+ package com.bibbidi.wedding.user.repository;
+ 
+-import static com.bibbidi.wedding.common.exception.ClientError.DUPLICATE_NICKNAME;
+ import static com.bibbidi.wedding.common.exception.ClientError.USER_NOT_FOUND;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -8,7 +7,6 @@ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.domain.WeddingDate;
+ import com.bibbidi.wedding.user.persistence.JpaUserEntity;
+ import com.bibbidi.wedding.user.persistence.JpaUserRepository;
+-import java.util.NoSuchElementException;
+ import org.jspecify.annotations.NonNull;
+ import org.springframework.stereotype.Repository;
+ 
+@@ -16,7 +14,6 @@ import org.springframework.stereotype.Repository;
+ public class UserRepository {
+ 
+     private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다. userId=";
+-    private static final String DUPLICATE_NICKNAME_MESSAGE = "이미 사용 중인 닉네임입니다. nickname=";
+ 
+     private final JpaUserRepository jpaUserRepository;
+     private final UserMapper userMapper;
+@@ -26,35 +23,26 @@ public class UserRepository {
+         this.userMapper = userMapper;
+     }
+ 
+-    public boolean existsPasswordLoginUserByNickname(String nickname) {
+-        return jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname);
++    public boolean existsByNickname(String nickname) {
++        return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
+     }
+ 
++    /**
++     * 소셜 가입으로 만들어지는 회원이다.
++     * 소셜에서 받은 닉네임은 서로 겹칠 수 있으므로 닉네임 중복을 막지 않는다.
++     */
+     public User create(User user) {
+-        validateNicknameNotUsed(user.nickname());
+         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
+         return userMapper.toDomain(saved);
+     }
+ 
+     public User update(User user) {
+-        validateNicknameNotUsedByOthers(user.nickname(), user.id());
+         JpaUserEntity currentEntity = getJpaUserEntity(user.id());
+-        JpaUserEntity updatedEntity = new JpaUserEntity(
+-                user.id(),
+-                user.nickname(),
+-                user.passwordHash(),
+-                currentEntity.weddingDate()
+-        );
+-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
++        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
++                userMapper.toEntity(user, currentEntity.weddingDate()));
+         return userMapper.toDomain(saved);
+     }
+ 
+-    public User findPasswordLoginUserByNickname(String nickname) {
+-        return jpaUserRepository.findByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)
+-                .map(userMapper::toDomain)
+-                .orElseThrow(NoSuchElementException::new);
+-    }
+-
+     public User findById(Long userId) {
+         return userMapper.toDomain(
+                 getJpaUserEntity(userId)
+@@ -68,13 +56,8 @@ public class UserRepository {
+ 
+     public WeddingDate saveWeddingDate(WeddingDate weddingDate) {
+         JpaUserEntity currentEntity = getJpaUserEntity(weddingDate.userId());
+-        JpaUserEntity updatedEntity = new JpaUserEntity(
+-                weddingDate.userId(),
+-                currentEntity.nickname(),
+-                currentEntity.passwordHash(),
+-                weddingDate.date()
+-        );
+-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
++        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
++                userMapper.toEntity(userMapper.toDomain(currentEntity), weddingDate.date()));
+         return new WeddingDate(saved.id(), saved.weddingDate());
+     }
+ 
+@@ -82,24 +65,6 @@ public class UserRepository {
+         return jpaUserRepository.deleteByUserId(userId);
+     }
+ 
+-    private void validateNicknameNotUsed(String nickname) {
+-        if (jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)) {
+-            throw new BusinessException(
+-                    DUPLICATE_NICKNAME,
+-                    DUPLICATE_NICKNAME_MESSAGE + nickname
+-            );
+-        }
+-    }
+-
+-    private void validateNicknameNotUsedByOthers(String nickname, Long userId) {
+-        if (jpaUserRepository.existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(nickname, userId)) {
+-            throw new BusinessException(
+-                    DUPLICATE_NICKNAME,
+-                    DUPLICATE_NICKNAME_MESSAGE + nickname
+-            );
+-        }
+-    }
+-
+     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {
+         return jpaUserRepository.findById(userId)
+                 .orElseThrow(
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserAuthenticationInfo.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserAuthenticationInfo.java
+deleted file mode 100644
+index 5ab38b2236666102c686da6dcf2601e066f2a8c3..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserAuthenticationInfo.java
++++ /dev/null
+@@ -1,8 +0,0 @@
+-package com.bibbidi.wedding.user.service;
+-
+-public record UserAuthenticationInfo(
+-        Long userId,
+-        String nickname,
+-        String passwordHash
+-) {
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+index 043a6270e728e8a84e6c927b8bd062def3f2fe08..6c221b2ee52d503179046f2d7250723d2d1b9852 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+@@ -5,6 +5,7 @@ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.domain.WeddingDate;
+ import com.bibbidi.wedding.user.repository.UserRepository;
+ import java.time.LocalDate;
++import java.time.LocalDateTime;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -20,32 +21,26 @@ public class UserService {
+         this.checklistService = checklistService;
+     }
+ 
++    /** 소셜 인증만 끝난 회원을 만든다. 약관에 동의해야 서비스를 쓸 수 있다. */
+     @Transactional
+-    public UserResult createUser(String nickname, String passwordHash) {
+-        User user = new User(null, nickname, passwordHash);
+-        User savedUser = userRepository.create(user);
+-
++    public UserResult createPendingUser(String nickname, String email) {
++        User savedUser = userRepository.create(User.pending(nickname, email));
+         return UserResult.from(savedUser);
+     }
+ 
+-    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+-        boolean isAvailableNickname = !userRepository.existsPasswordLoginUserByNickname(nickname);
+-        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+-    }
+-
+-    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
+-        User user = userRepository.findPasswordLoginUserByNickname(nickname);
+-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+-    }
+-
+-    public UserAuthenticationInfo findAuthenticationInfo(Long userId) {
+-        User user = userRepository.findById(userId);
+-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
++    /** 약관에 동의하면 서비스를 쓸 수 있는 상태가 된다. */
++    @Transactional
++    public UserResult agreeToTerms(Long currentUserId, String termsVersion) {
++        User user = userRepository.findById(currentUserId);
++        if (user.isActive()) {
++            return UserResult.from(user);
++        }
++        return UserResult.from(userRepository.update(user.agreeToTerms(termsVersion, LocalDateTime.now())));
+     }
+ 
+-    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
+-        User user = userRepository.findById(currentUserId);
+-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
++    public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
++        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
++        return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+     }
+ 
+     public UserResult findCurrentUserInfo(Long currentUserId) {
+@@ -66,13 +61,6 @@ public class UserService {
+         return WeddingDateResult.from(savedWeddingDate);
+     }
+ 
+-    @Transactional
+-    public void changePasswordHash(Long currentUserId, String passwordHash) {
+-        User user = userRepository.findById(currentUserId);
+-        User changedUser = user.changePasswordHash(passwordHash);
+-        userRepository.update(changedUser);
+-    }
+-
+     @Transactional
+     public void delete(Long userId) {
+         checklistService.deleteByOwnerId(userId);
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index a8b7adcb8a772eb6e3a1dc37cdada8d6f6f7d725..ce2d8f4d7d86ba6ad753b364b962544094646636 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -14,16 +14,28 @@ discord:
+   url:
+     feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
+ 
+-server:
+-  servlet:
+-    session:
+-      timeout: 24h
+-      cookie:
+-        name: JSESSIONID
+-        path: /
+-        http-only: true
+-        secure: true
+-        same-site: lax
++auth:
++  jwt:
++    # 비밀말은 기본값을 두지 않는다. 없거나 32바이트 미만이면 애플리케이션이 뜨지 않는다.
++    secret: ${AUTH_JWT_SECRET:}
++    issuer: ${AUTH_JWT_ISSUER:bibbidi}
++    audience: ${AUTH_JWT_AUDIENCE:bibbidi-client}
++    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
++    delete-grant-ttl: ${AUTH_DELETE_GRANT_TTL:5m}
++    header-name: Authorization
++  security:
++    permit-all:
++      - /api/auth/**
++      - /api/catalog
++      - /api/users/nickname/availability
++      - /api/feedbacks
++      # 수집 도구가 컨테이너 망에서 직접 긁는다. 외부 차단은 nginx가 한다.
++      - /actuator/health
++      - /actuator/health/**
++      - /actuator/info
++      - /actuator/prometheus
++      - /swagger-ui/**
++      - /docs/**
+ 
+ management:
+   endpoints:
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthControllerIntegrationTest.java
+deleted file mode 100644
+index 2e12032889244ea4ed312b9be1b00668e3e9a44b..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthControllerIntegrationTest.java
++++ /dev/null
+@@ -1,225 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+-import static com.epages.restdocs.apispec.Schema.schema;
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.hamcrest.Matchers.containsInAnyOrder;
+-import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
+-import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
+-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+-
+-import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
+-import com.bibbidi.wedding.auth.session.AuthSession;
+-import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+-import com.epages.restdocs.apispec.ResourceSnippetParameters;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.MediaType;
+-import org.springframework.mock.web.MockHttpSession;
+-import org.springframework.test.context.jdbc.Sql;
+-import org.springframework.test.web.servlet.MvcResult;
+-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+-import tools.jackson.databind.ObjectMapper;
+-
+-@Sql("/auth-login-fixture.sql")
+-class AuthControllerIntegrationTest extends BibbidiIntegrationTest {
+-
+-    private static final Long USER_ID = 1L;
+-    private static final String NICKNAME = "bibbidi";
+-    private static final String PASSWORD = "wish";
+-    private static final String LOGIN_DESCRIPTION =
+-            "닉네임과 비밀번호를 검증하고 인증 세션을 생성합니다. "
+-                    + "성공 시 JSESSIONID Session Cookie를 발급하며, "
+-                    + "이후 인증이 필요한 요청은 발급된 JSESSIONID Cookie를 그대로 전송합니다.";
+-    private static final String DOCUMENTED_SESSION_COOKIE =
+-            "JSESSIONID=<session-id>; Path=/; Secure; HttpOnly; SameSite=Lax";
+-
+-    @Autowired
+-    private ObjectMapper objectMapper;
+-
+-    @Test
+-    @DisplayName("올바른 인증 정보로 로그인하면 기존 세션을 교체하고 사용자 ID를 저장한다")
+-    void shouldReplaceSessionAndStoreUserIdWhenCredentialsAreValid() throws Exception {
+-        MockHttpSession previousSession = new MockHttpSession();
+-        String previousSessionId = previousSession.getId();
+-
+-        MvcResult result = mockMvc.perform(loginRequest(PASSWORD).session(previousSession))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.userId").value(USER_ID))
+-                .andExpect(jsonPath("$.nickname").value(NICKNAME))
+-                .andExpect(jsonPath("$.password").doesNotExist())
+-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+-                .andExpect(jsonPath("$.sessionId").doesNotExist())
+-                .andDo(document(
+-                        "auth-login",
+-                        preprocessResponse(modifyHeaders().set(
+-                                HttpHeaders.SET_COOKIE,
+-                                DOCUMENTED_SESSION_COOKIE
+-                        )),
+-                        resource(ResourceSnippetParameters.builder()
+-                                .tag("Authentication")
+-                                .summary("로그인")
+-                                .description(LOGIN_DESCRIPTION)
+-                                .requestSchema(schema("LoginRequest"))
+-                                .responseSchema(schema("LoginResponse"))
+-                                .requestFields(
+-                                        fieldWithPath("nickname").description("가입한 사용자 닉네임"),
+-                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
+-                                )
+-                                .responseFields(
+-                                        fieldWithPath("userId").description("로그인한 사용자 ID"),
+-                                        fieldWithPath("nickname").description("로그인한 사용자 닉네임")
+-                                )
+-                                .responseHeaders(
+-                                        headerWithName(HttpHeaders.SET_COOKIE)
+-                                                .description("인증에 사용할 JSESSIONID Session Cookie "
+-                                                        + "(Path=/; Secure; HttpOnly; SameSite=Lax)")
+-                                )
+-                                .build())
+-                ))
+-                .andReturn();
+-
+-        MockHttpSession authenticatedSession = (MockHttpSession) result.getRequest().getSession(false);
+-
+-        assertThat(previousSession.isInvalid()).isTrue();
+-        assertThat(authenticatedSession).isNotNull();
+-        assertThat(authenticatedSession.getId()).isNotEqualTo(previousSessionId);
+-        assertThat(authenticatedSession.getAttribute(AuthSession.USER_ID_ATTRIBUTE))
+-                .isEqualTo(USER_ID);
+-        assertThat(result.getResponse().getContentAsString())
+-                .doesNotContain(PASSWORD);
+-    }
+-
+-    @Test
+-    @DisplayName("존재하지 않는 닉네임과 잘못된 비밀번호는 동일한 인증 실패를 반환한다")
+-    void shouldReturnSameFailureForUnknownNicknameAndWrongPassword() throws Exception {
+-        LoginRequest unknownNicknameRequest = new LoginRequest("unknown", "unknown-password");
+-
+-        MvcResult unknownNickname = mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(unknownNicknameRequest)))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(202))
+-                .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.type").doesNotExist())
+-                .andExpect(jsonPath("$.detail").doesNotExist())
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
+-                .andDo(document(
+-                        "auth-login-failed",
+-                        resource(ResourceSnippetParameters.builder()
+-                                .tag("Authentication")
+-                                .summary("로그인")
+-                                .description(LOGIN_DESCRIPTION)
+-                                .requestSchema(schema("LoginRequest"))
+-                                .responseSchema(schema("ErrorResponse"))
+-                                .requestFields(
+-                                        fieldWithPath("nickname").description("가입한 사용자 닉네임"),
+-                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
+-                                )
+-                                .responseFields(
+-                                        fieldWithPath("errorCode").description("오류 코드"),
+-                                        fieldWithPath("message").description("오류 메시지")
+-                                )
+-                                .build())
+-                ))
+-                .andReturn();
+-
+-        MvcResult wrongPassword = mockMvc.perform(loginRequest("wrong-password"))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(202))
+-                .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.type").doesNotExist())
+-                .andExpect(jsonPath("$.detail").doesNotExist())
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
+-                .andReturn();
+-
+-        assertThat(unknownNickname.getResponse().getContentAsString())
+-                .isEqualTo(wrongPassword.getResponse().getContentAsString())
+-                .doesNotContain("unknown-password")
+-                .doesNotContain("wrong-password");
+-    }
+-
+-    @Test
+-    @DisplayName("로그인 입력이 유효하지 않으면 세션을 생성하지 않고 요청을 거절한다")
+-    void shouldRejectInvalidLoginRequestWithoutCreatingSession() throws Exception {
+-        LoginRequest request = new LoginRequest("", "123");
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isBadRequest())
+-                .andExpect(jsonPath("$.errorCode").value(101))
+-                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.errors.length()").value(2))
+-                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull())
+-                .andDo(document(
+-                        "auth-login-invalid-request",
+-                        resource(ResourceSnippetParameters.builder()
+-                                .tag("Authentication")
+-                                .summary("로그인")
+-                                .description(LOGIN_DESCRIPTION)
+-                                .requestSchema(schema("LoginRequest"))
+-                                .responseSchema(schema("ValidationErrorResponse"))
+-                                .requestFields(
+-                                        fieldWithPath("nickname").description("가입한 사용자 닉네임"),
+-                                        fieldWithPath("password").description("가입 시 설정한 사용자 비밀번호")
+-                                )
+-                                .responseFields(
+-                                        fieldWithPath("errorCode").description("오류 코드"),
+-                                        fieldWithPath("message").description("오류 메시지"),
+-                                        fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
+-                                        fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
+-                                        fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
+-                                )
+-                                .build())
+-                ));
+-    }
+-
+-    @Test
+-    @DisplayName("로그아웃하면 현재 세션을 무효화한다")
+-    void shouldInvalidateCurrentSessionWhenLoggingOut() throws Exception {
+-        MvcResult loginResult = mockMvc.perform(loginRequest(PASSWORD))
+-                .andExpect(status().isOk())
+-                .andReturn();
+-        MockHttpSession authenticatedSession = (MockHttpSession) loginResult.getRequest().getSession(false);
+-
+-        mockMvc.perform(delete("/api/logout").session(authenticatedSession))
+-                .andExpect(status().isNoContent())
+-                .andExpect(content().string(""))
+-                .andDo(document(
+-                        "auth-logout",
+-                        resource(ResourceSnippetParameters.builder()
+-                                .tag("Authentication")
+-                                .summary("로그아웃")
+-                                .description("현재 인증 세션을 무효화하고 JSESSIONID Cookie를 만료시킵니다.")
+-                                .responseHeaders(
+-                                        headerWithName(HttpHeaders.SET_COOKIE)
+-                                                .description("즉시 만료되는 JSESSIONID Session Cookie")
+-                                )
+-                                .build())
+-                ));
+-
+-        assertThat(authenticatedSession.isInvalid()).isTrue();
+-    }
+-
+-    private MockHttpServletRequestBuilder loginRequest(String password) {
+-        LoginRequest request = new LoginRequest(NICKNAME, password);
+-
+-        return post("/api/login")
+-                .contentType(MediaType.APPLICATION_JSON)
+-                .content(objectMapper.writeValueAsString(request));
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionIntegrationTest.java
+deleted file mode 100644
+index f1aea5d4bc4830fb22413e3a80246dc396c68885..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionIntegrationTest.java
++++ /dev/null
+@@ -1,115 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
+-import java.net.URI;
+-import java.net.http.HttpClient;
+-import java.net.http.HttpRequest;
+-import java.net.http.HttpResponse;
+-import org.junit.jupiter.api.BeforeEach;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.boot.test.context.SpringBootTest;
+-import org.springframework.boot.test.web.server.LocalServerPort;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.MediaType;
+-import org.springframework.test.context.ActiveProfiles;
+-import org.springframework.test.context.jdbc.Sql;
+-import tools.jackson.databind.ObjectMapper;
+-
+-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+-@ActiveProfiles("test")
+-@Sql(statements = "DELETE FROM users")
+-@Sql("/auth-login-fixture.sql")
+-@Sql(statements = "DELETE FROM users", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+-class AuthSessionIntegrationTest {
+-
+-    private static final long USER_ID = 1L;
+-    private static final String PASSWORD = "wish";
+-
+-    @LocalServerPort
+-    private int port;
+-
+-    @Autowired
+-    private ObjectMapper objectMapper;
+-
+-    private HttpClient httpClient;
+-
+-    @BeforeEach
+-    void setUp() {
+-        httpClient = HttpClient.newHttpClient();
+-    }
+-
+-    @Test
+-    @DisplayName("로그인 쿠키는 안전 속성을 사용하고 로그아웃은 만료된 세션에도 멱등하게 동작한다")
+-    void shouldIssueSecurelyConfiguredCookieAndLogoutIdempotently() throws Exception {
+-        LoginRequest loginRequest = new LoginRequest("bibbidi", PASSWORD);
+-
+-        HttpResponse<String> loginResponse = httpClient.send(
+-                request("/api/login")
+-                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+-                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(loginRequest)))
+-                        .build(),
+-                HttpResponse.BodyHandlers.ofString()
+-        );
+-
+-        assertThat(loginResponse.statusCode()).isEqualTo(200);
+-        String setCookie = loginResponse.headers()
+-                .firstValue(HttpHeaders.SET_COOKIE)
+-                .orElseThrow();
+-        String sessionCookie = setCookie.substring(0, setCookie.indexOf(';'));
+-        String sessionCookieName = sessionCookie.substring(0, sessionCookie.indexOf('='));
+-        String sessionId = sessionCookie.substring(sessionCookie.indexOf('=') + 1);
+-
+-        assertThat(setCookie)
+-                .contains("Path=/")
+-                .contains("Secure")
+-                .contains("HttpOnly")
+-                .contains("SameSite=Lax")
+-                .doesNotContain("Max-Age");
+-        assertThat(sessionCookieName).isEqualTo("JSESSIONID");
+-        assertThat(loginResponse.body())
+-                .contains("\"userId\":" + USER_ID)
+-                .contains("\"nickname\":\"bibbidi\"")
+-                .doesNotContain(PASSWORD)
+-                .doesNotContain(sessionId);
+-
+-        HttpResponse<String> logoutResponse = sendLogout(sessionCookie);
+-
+-        assertThat(logoutResponse.statusCode()).isEqualTo(204);
+-        assertThat(logoutResponse.body()).isEmpty();
+-        assertThat(logoutResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow())
+-                .startsWith(sessionCookieName + "=;")
+-                .contains("Path=/")
+-                .contains("Max-Age=0")
+-                .contains("Secure")
+-                .doesNotContain(sessionId);
+-
+-        HttpResponse<String> repeatedLogoutResponse = sendLogout(sessionCookie);
+-
+-        assertThat(repeatedLogoutResponse.statusCode()).isEqualTo(204);
+-        assertThat(repeatedLogoutResponse.body()).isEmpty();
+-        assertThat(repeatedLogoutResponse.headers().firstValue(HttpHeaders.SET_COOKIE).orElseThrow())
+-                .startsWith(sessionCookieName + "=;")
+-                .contains("Path=/")
+-                .contains("Max-Age=0")
+-                .contains("Secure")
+-                .doesNotContain(sessionId);
+-    }
+-
+-    private HttpResponse<String> sendLogout(String sessionCookie) throws Exception {
+-        return httpClient.send(
+-                request("/api/logout")
+-                        .header(HttpHeaders.COOKIE, sessionCookie)
+-                        .DELETE()
+-                        .build(),
+-                HttpResponse.BodyHandlers.ofString()
+-        );
+-    }
+-
+-    private HttpRequest.Builder request(String path) {
+-        return HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/PasswordChangeControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/PasswordChangeControllerIntegrationTest.java
+deleted file mode 100644
+index 6da3e5e271d91428362f2ab04684c0a04b454d32..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/PasswordChangeControllerIntegrationTest.java
++++ /dev/null
+@@ -1,291 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+-import static com.epages.restdocs.apispec.Schema.schema;
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.hamcrest.Matchers.containsInAnyOrder;
+-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+-
+-import com.bibbidi.wedding.auth.controller.dto.ChangePasswordRequest;
+-import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
+-import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
+-import com.bibbidi.wedding.auth.session.AuthSession;
+-import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+-import com.epages.restdocs.apispec.ResourceSnippetParameters;
+-import org.junit.jupiter.api.BeforeEach;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.MediaType;
+-import org.springframework.mock.web.MockHttpSession;
+-import org.springframework.test.web.servlet.MvcResult;
+-import tools.jackson.databind.ObjectMapper;
+-
+-class PasswordChangeControllerIntegrationTest extends BibbidiIntegrationTest {
+-
+-    private static final String PASSWORD = "wish";
+-    private static final String NEW_PASSWORD = "magic";
+-    private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
+-    private static final String CHANGE_PASSWORD_DESCRIPTION =
+-            "현재 인증 Session의 사용자가 현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다. "
+-                    + "비밀번호 변경 후에도 현재 Session은 유지됩니다.";
+-
+-    @Autowired
+-    private ObjectMapper objectMapper;
+-    private Long currentUserId;
+-    private Long otherUserId;
+-
+-    @BeforeEach
+-    void setUp() throws Exception {
+-        currentUserId = createUser("current");
+-        otherUserId = createUser("other");
+-    }
+-
+-    @Test
+-    @DisplayName("현재 사용자의 비밀번호를 변경하고 현재 Session을 유지한다")
+-    void shouldChangeCurrentUserPasswordAndKeepSession() throws Exception {
+-        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, NEW_PASSWORD);
+-        MockHttpSession session = authenticatedSession(currentUserId);
+-        String sessionId = session.getId();
+-
+-        MvcResult result = mockMvc.perform(put("/api/users/me/password")
+-                        .session(session)
+-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+-                        .param("userId", otherUserId.toString())
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isNoContent())
+-                .andExpect(content().string(""))
+-                .andDo(document(
+-                                "users-change-password",
+-                                resource(ResourceSnippetParameters.builder()
+-                                        .tag("User")
+-                                        .summary("비밀번호 변경")
+-                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+-                                        .requestSchema(schema("ChangePasswordRequest"))
+-                                        .requestHeaders(
+-                                                headerWithName(HttpHeaders.COOKIE)
+-                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+-                                        )
+-                                        .requestFields(
+-                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+-                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+-                                        )
+-                                        .build()
+-                                )
+-                        )
+-                ).andReturn();
+-
+-        assertThat(session.isInvalid()).isFalse();
+-        assertThat(session.getId()).isEqualTo(sessionId);
+-        assertThat(session.getAttribute(AuthSession.USER_ID_ATTRIBUTE)).isEqualTo(currentUserId);
+-        assertThat(result.getResponse().getContentAsString())
+-                .doesNotContain(PASSWORD)
+-                .doesNotContain(NEW_PASSWORD);
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", NEW_PASSWORD))))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.userId").value(currentUserId));
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", PASSWORD))))
+-                .andExpect(status().isUnauthorized());
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("other", PASSWORD))))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.userId").value(otherUserId));
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호가 일치하지 않으면 기존 비밀번호를 유지한다")
+-    void shouldKeepCurrentPasswordWhenCurrentPasswordDoesNotMatch() throws Exception {
+-        ChangePasswordRequest request = new ChangePasswordRequest("incorrect-current", NEW_PASSWORD);
+-
+-        MvcResult result = mockMvc.perform(put("/api/users/me/password")
+-                        .session(authenticatedSession(currentUserId))
+-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(202))
+-                .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다."))
+-                .andDo(document(
+-                                "users-change-password-current-password-mismatch",
+-                                resource(ResourceSnippetParameters.builder()
+-                                        .tag("User")
+-                                        .summary("비밀번호 변경")
+-                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+-                                        .requestSchema(schema("ChangePasswordRequest"))
+-                                        .responseSchema(schema("ErrorResponse"))
+-                                        .requestHeaders(
+-                                                headerWithName(HttpHeaders.COOKIE)
+-                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+-                                        )
+-                                        .requestFields(
+-                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+-                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+-                                        )
+-                                        .responseFields(
+-                                                fieldWithPath("errorCode").description("오류 코드"),
+-                                                fieldWithPath("message").description("오류 메시지")
+-                                        )
+-                                        .build())
+-                        )
+-                ).andReturn();
+-
+-        assertThat(result.getResponse().getContentAsString())
+-                .doesNotContain("incorrect-current")
+-                .doesNotContain(NEW_PASSWORD);
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", PASSWORD))))
+-                .andExpect(status().isOk());
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", NEW_PASSWORD))))
+-                .andExpect(status().isUnauthorized());
+-    }
+-
+-    @Test
+-    @DisplayName("새 비밀번호가 기존 비밀번호와 같으면 저장하지 않고 성공한다")
+-    void shouldSucceedWithoutUpdatingWhenNewPasswordIsSameAsCurrentPassword() throws Exception {
+-        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, PASSWORD);
+-        MockHttpSession session = authenticatedSession(currentUserId);
+-
+-        mockMvc.perform(put("/api/users/me/password")
+-                        .session(session)
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isNoContent())
+-                .andExpect(content().string(""));
+-
+-        assertThat(session.isInvalid()).isFalse();
+-        assertThat(session.getAttribute(AuthSession.USER_ID_ATTRIBUTE)).isEqualTo(currentUserId);
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", PASSWORD))))
+-                .andExpect(status().isOk());
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호가 없거나 새 비밀번호가 회원가입 정책에 맞지 않으면 변경하지 않는다")
+-    void shouldRejectInvalidPasswordChangeRequestWithoutUpdating() throws Exception {
+-        ChangePasswordRequest request = new ChangePasswordRequest("", "123");
+-
+-        mockMvc.perform(put("/api/users/me/password")
+-                        .session(authenticatedSession(currentUserId))
+-                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isBadRequest())
+-                .andExpect(jsonPath("$.errorCode").value(101))
+-                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.errors.length()").value(2))
+-                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("currentPassword", "newPassword")))
+-                .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
+-                        "현재 비밀번호는 비어 있을 수 없습니다.",
+-                        "비밀번호는 4자 이상 20자 이하여야 합니다."
+-                )))
+-                .andDo(document(
+-                                "users-change-password-invalid-request",
+-                                resource(ResourceSnippetParameters.builder()
+-                                        .tag("User")
+-                                        .summary("비밀번호 변경")
+-                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+-                                        .requestSchema(schema("ChangePasswordRequest"))
+-                                        .responseSchema(schema("ValidationErrorResponse"))
+-                                        .requestHeaders(
+-                                                headerWithName(HttpHeaders.COOKIE)
+-                                                        .description("로그인 시 발급된 JSESSIONID Session Cookie")
+-                                        )
+-                                        .requestFields(
+-                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+-                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+-                                        )
+-                                        .responseFields(
+-                                                fieldWithPath("errorCode").description("오류 코드"),
+-                                                fieldWithPath("message").description("오류 메시지"),
+-                                                fieldWithPath("errors").description("요청 필드별 검증 오류 목록"),
+-                                                fieldWithPath("errors[].field").description("검증에 실패한 요청 필드"),
+-                                                fieldWithPath("errors[].message").description("필드 검증 오류 메시지")
+-                                        )
+-                                        .build()
+-                                )
+-                        )
+-                );
+-
+-        mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest("current", PASSWORD))))
+-                .andExpect(status().isOk());
+-    }
+-
+-    @Test
+-    @DisplayName("인증 Session이 없으면 비밀번호를 변경할 수 없다")
+-    void shouldRequireAuthenticationToChangePassword() throws Exception {
+-        ChangePasswordRequest request = new ChangePasswordRequest(PASSWORD, NEW_PASSWORD);
+-
+-        mockMvc.perform(put("/api/users/me/password")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(201))
+-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+-                .andDo(document(
+-                                "users-change-password-authentication-required",
+-                                resource(ResourceSnippetParameters.builder()
+-                                        .tag("User")
+-                                        .summary("비밀번호 변경")
+-                                        .description(CHANGE_PASSWORD_DESCRIPTION)
+-                                        .requestSchema(schema("ChangePasswordRequest"))
+-                                        .responseSchema(schema("ErrorResponse"))
+-                                        .requestFields(
+-                                                fieldWithPath("currentPassword").description("본인 확인을 위한 현재 비밀번호"),
+-                                                fieldWithPath("newPassword").description("새 비밀번호(4자 이상 20자 이하)")
+-                                        )
+-                                        .responseFields(
+-                                                fieldWithPath("errorCode").description("오류 코드"),
+-                                                fieldWithPath("message").description("오류 메시지")
+-                                        )
+-                                        .build()
+-                                )
+-                        )
+-                );
+-    }
+-
+-    private Long createUser(String nickname) throws Exception {
+-        CreateUserRequest request = new CreateUserRequest(nickname, PASSWORD);
+-
+-        String response = mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isCreated())
+-                .andReturn()
+-                .getResponse()
+-                .getContentAsString();
+-
+-        return objectMapper.readTree(response).get("id").asLong();
+-    }
+-
+-    private MockHttpSession authenticatedSession(Long userId) {
+-        MockHttpSession session = new MockHttpSession();
+-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
+-        return session;
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/RegistrationControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/RegistrationControllerIntegrationTest.java
+deleted file mode 100644
+index a6b22dfbf6bd898c7a56f3b37e8248290f9320b4..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/RegistrationControllerIntegrationTest.java
++++ /dev/null
+@@ -1,125 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.hamcrest.Matchers.containsInAnyOrder;
+-import static org.hamcrest.Matchers.containsString;
+-import static org.hamcrest.Matchers.not;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+-
+-import com.bibbidi.wedding.auth.controller.dto.CreateUserRequest;
+-import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.http.MediaType;
+-import tools.jackson.databind.ObjectMapper;
+-
+-class RegistrationControllerIntegrationTest extends BibbidiIntegrationTest {
+-
+-    @Autowired
+-    private ObjectMapper objectMapper;
+-
+-    @Test
+-    @DisplayName("유효한 가입 요청이면 사용자를 생성한다")
+-    void shouldCreateUserWhenRequestIsValid() throws Exception {
+-        CreateUserRequest request = new CreateUserRequest("bibbidi", "wish");
+-
+-        mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isCreated())
+-                .andExpect(jsonPath("$.id").isNumber())
+-                .andExpect(jsonPath("$.nickname").value("bibbidi"))
+-                .andExpect(jsonPath("$.checklistId").doesNotExist())
+-                .andExpect(jsonPath("$.password").doesNotExist())
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
+-    }
+-
+-    @Test
+-    @DisplayName("닉네임과 비밀번호가 유효하지 않으면 원문 비밀번호를 기록하지 않고 요청을 거절한다")
+-    void shouldRejectWithoutPasswordLeakWhenRequestIsInvalid() throws Exception {
+-        CreateUserRequest request = new CreateUserRequest("12345678901", "q!3");
+-
+-        mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isBadRequest())
+-                .andExpect(jsonPath("$.errorCode").value(101))
+-                .andExpect(jsonPath("$.errorCode").isNumber())
+-                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.errors").isArray())
+-                .andExpect(jsonPath("$.errors.length()").value(2))
+-                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
+-                .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
+-                                        "닉네임은 10자 이하여야 합니다.",
+-                                        "비밀번호는 4자 이상 20자 이하여야 합니다."
+-                                )
+-                        )
+-                )
+-                .andExpect(jsonPath("$.type").doesNotExist())
+-                .andExpect(jsonPath("$.title").doesNotExist())
+-                .andExpect(jsonPath("$.detail").doesNotExist())
+-                .andExpect(jsonPath("$.instance").doesNotExist());
+-    }
+-
+-    @Test
+-    @DisplayName("닉네임이 비어 있거나 비밀번호가 20자를 초과하면 요청을 거절한다")
+-    void shouldRejectRequestWhenNicknameIsEmptyAndPasswordIsTooLong() throws Exception {
+-        CreateUserRequest request = new CreateUserRequest("", "123456789012345678901");
+-
+-        mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isBadRequest())
+-                .andExpect(jsonPath("$.errors.length()").value(2))
+-                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("nickname", "password")))
+-                .andExpect(jsonPath("$.errors[*].message", containsInAnyOrder(
+-                                        "닉네임은 비어 있을 수 없습니다.",
+-                                        "비밀번호는 4자 이상 20자 이하여야 합니다."
+-                                )
+-                        )
+-                );
+-    }
+-
+-    @Test
+-    @DisplayName("대소문자만 다른 닉네임이 이미 존재하면 가입을 거절한다")
+-    void shouldRejectWhenNicknameAlreadyExists() throws Exception {
+-        CreateUserRequest firstRequest = new CreateUserRequest("BibbidiTwo", "wish");
+-        CreateUserRequest duplicateRequest = new CreateUserRequest("bibbiditwo", "wish");
+-
+-        mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(firstRequest)))
+-                .andExpect(status().isCreated());
+-
+-        mockMvc.perform(post("/api/users")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(duplicateRequest)))
+-                .andExpect(status().isConflict())
+-                .andExpect(jsonPath("$.errorCode").value(401))
+-                .andExpect(jsonPath("$.errorCode").isNumber())
+-                .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.type").doesNotExist())
+-                .andExpect(jsonPath("$.title").doesNotExist())
+-                .andExpect(jsonPath("$.detail").doesNotExist())
+-                .andExpect(jsonPath("$.instance").doesNotExist())
+-                .andExpect(content().string(not(containsString("닉네임 중복으로 회원가입에 실패했습니다."))));
+-    }
+-
+-    @Test
+-    @DisplayName("Spring MVC의 4xx 오류에도 공통 오류 응답 형식을 적용한다")
+-    void shouldUseCommonErrorResponseWhenHttpMethodIsNotSupported() throws Exception {
+-        mockMvc.perform(get("/api/users"))
+-                .andExpect(status().isMethodNotAllowed())
+-                .andExpect(jsonPath("$.errorCode").value(101))
+-                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(jsonPath("$.errors").doesNotExist());
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/UserDeletionIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/UserDeletionIntegrationTest.java
+deleted file mode 100644
+index 42babe23bca35f5483cb7da354dad4cde9e43bbf..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/UserDeletionIntegrationTest.java
++++ /dev/null
+@@ -1,139 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+-import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+-import static com.epages.restdocs.apispec.Schema.schema;
+-import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
+-import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
+-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+-
+-import com.bibbidi.wedding.checklist.controller.dto.req.CreateAppointmentRequest;
+-import com.bibbidi.wedding.auth.controller.dto.LoginRequest;
+-import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
+-import com.bibbidi.wedding.checklist.controller.dto.req.CreateChecklistItemRequest;
+-import com.bibbidi.wedding.support.BibbidiIntegrationTest;
+-import com.bibbidi.wedding.user.controller.dto.DeleteUserRequest;
+-import com.epages.restdocs.apispec.ResourceSnippetParameters;
+-import java.time.LocalDate;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.MediaType;
+-import org.springframework.mock.web.MockHttpSession;
+-import org.springframework.test.context.jdbc.Sql;
+-import org.springframework.test.web.servlet.MvcResult;
+-import tools.jackson.databind.ObjectMapper;
+-
+-@Sql("/user-deletion-fixture.sql")
+-class UserDeletionIntegrationTest extends BibbidiIntegrationTest {
+-
+-    private static final String PASSWORD = "wish";
+-    private static final Long CATEGORY_ID = 1000L;
+-    private static final Long OTHER_CHECKLIST_ID = 1001L;
+-    private static final String DOCUMENTED_SESSION_COOKIE =
+-            "JSESSIONID=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax";
+-
+-    @Autowired
+-    private ObjectMapper objectMapper;
+-
+-    @Test
+-    @DisplayName("현재 사용자를 탈퇴시키고 세션을 만료한다")
+-    void shouldDeleteCurrentUserAndInvalidateSession() throws Exception {
+-        MockHttpSession currentSession = login("current");
+-        Long checklistItemId = createChecklistItem(currentSession);
+-        createAppointment(currentSession, checklistItemId);
+-
+-        mockMvc.perform(delete("/api/users/me")
+-                        .session(currentSession)
+-                        .header(HttpHeaders.COOKIE, "JSESSIONID=" + currentSession.getId())
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new DeleteUserRequest(PASSWORD))))
+-                .andExpect(status().isNoContent())
+-                .andDo(document(
+-                                "users-delete-me",
+-                                preprocessResponse(modifyHeaders().set(
+-                                                HttpHeaders.SET_COOKIE,
+-                                                DOCUMENTED_SESSION_COOKIE
+-                                        )
+-                                ),
+-                                resource(ResourceSnippetParameters.builder()
+-                                        .tag("User")
+-                                        .summary("회원 탈퇴")
+-                                        .description(
+-                                                "인증된 사용자를 탈퇴 처리하고 사용자의 결혼식 데이터를 삭제한 뒤 세션 쿠키를 만료합니다.")
+-                                        .requestSchema(schema("DeleteUserRequest"))
+-                                        .requestHeaders(
+-                                                headerWithName(HttpHeaders.COOKIE)
+-                                                        .description("인증된 JSESSIONID 세션 쿠키")
+-                                        )
+-                                        .requestFields(
+-                                                fieldWithPath("password")
+-                                                        .description("회원 탈퇴를 확인하기 위한 현재 비밀번호")
+-                                        )
+-                                        .responseHeaders(
+-                                                headerWithName(HttpHeaders.SET_COOKIE)
+-                                                        .description("만료된 JSESSIONID 세션 쿠키")
+-                                        )
+-                                        .build()
+-                                )
+-                        )
+-                );
+-
+-        mockMvc.perform(get("/api/catalog"))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.categories[0].id").value(CATEGORY_ID));
+-
+-        mockMvc.perform(get("/api/checklists/me").session(currentSession))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(201));
+-
+-        MockHttpSession otherSession = login("other");
+-        mockMvc.perform(get("/api/checklists/me").session(otherSession))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.id").value(OTHER_CHECKLIST_ID))
+-                .andExpect(jsonPath("$.items[0].appointments[0].id").isNumber());
+-    }
+-
+-    private MockHttpSession login(String nickname) throws Exception {
+-        MvcResult result = mockMvc.perform(post("/api/login")
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new LoginRequest(nickname, PASSWORD))))
+-                .andExpect(status().isOk())
+-                .andReturn();
+-
+-        return (MockHttpSession) result.getRequest().getSession(false);
+-    }
+-
+-    private Long createChecklistItem(MockHttpSession session) throws Exception {
+-        String response = mockMvc.perform(post("/api/checklists/me/items")
+-                        .session(session)
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(
+-                                new CreateChecklistItemRequest("custom item", CATEGORY_ID))))
+-                .andExpect(status().isCreated())
+-                .andReturn()
+-                .getResponse()
+-                .getContentAsString();
+-
+-        return objectMapper.readValue(response, ChecklistItemResponse.class).id();
+-    }
+-
+-    private void createAppointment(MockHttpSession session, Long checklistItemId) throws Exception {
+-        CreateAppointmentRequest request = new CreateAppointmentRequest(
+-                "appointment", LocalDate.of(2026, 9, 1), null, null, null, null
+-        );
+-
+-        mockMvc.perform(post("/api/checklist-items/{checklistItemId}/appointments", checklistItemId)
+-                        .session(session)
+-                        .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(request)))
+-                .andExpect(status().isCreated());
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasherTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasherTest.java
+deleted file mode 100644
+index 858ed4ac3f3fdf1f955aaf10aa653e9e8c07a2b8..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasherTest.java
++++ /dev/null
+@@ -1,35 +0,0 @@
+-package com.bibbidi.wedding.auth.password;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-
+-class Argon2PasswordHasherTest {
+-
+-    private final Argon2PasswordHasher hasher = new Argon2PasswordHasher();
+-
+-    @Test
+-    @DisplayName("원문 비밀번호를 그대로 저장하지 않고 해시로 변환한다")
+-    void shouldHashRawPasswordInsteadOfStoringItAsIs() {
+-        String hash = hasher.hash("wish");
+-
+-        assertThat(hash).isNotEqualTo("wish");
+-    }
+-
+-    @Test
+-    @DisplayName("원문 비밀번호와 해시가 일치하면 참을 반환한다")
+-    void shouldMatchWhenRawPasswordProducedTheHash() {
+-        String hash = hasher.hash("wish");
+-
+-        assertThat(hasher.matches("wish", hash)).isTrue();
+-    }
+-
+-    @Test
+-    @DisplayName("다른 비밀번호와는 해시가 일치하지 않는다")
+-    void shouldNotMatchWhenRawPasswordDidNotProduceTheHash() {
+-        String hash = hasher.hash("wish");
+-
+-        assertThat(hasher.matches("wrong", hash)).isFalse();
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/AuthServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/AuthServiceTest.java
+deleted file mode 100644
+index 0d66ba53846e5dacd0e6fb151faaf76106adee86..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/AuthServiceTest.java
++++ /dev/null
+@@ -1,194 +0,0 @@
+-package com.bibbidi.wedding.auth.service;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+-import static org.mockito.ArgumentMatchers.anyLong;
+-import static org.mockito.ArgumentMatchers.anyString;
+-import static org.mockito.BDDMockito.given;
+-import static org.mockito.BDDMockito.then;
+-import static org.mockito.Mockito.never;
+-
+-import com.bibbidi.wedding.auth.password.PasswordHasher;
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import com.bibbidi.wedding.user.service.UserAuthenticationInfo;
+-import com.bibbidi.wedding.user.service.UserResult;
+-import com.bibbidi.wedding.user.service.UserService;
+-import java.util.NoSuchElementException;
+-import org.junit.jupiter.api.BeforeEach;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.junit.jupiter.api.extension.ExtendWith;
+-import org.mockito.Mock;
+-import org.mockito.junit.jupiter.MockitoExtension;
+-
+-@ExtendWith(MockitoExtension.class)
+-class AuthServiceTest {
+-
+-    @Mock
+-    private UserService userService;
+-
+-    @Mock
+-    private PasswordHasher passwordHasher;
+-
+-    private AuthService authService;
+-
+-    @BeforeEach
+-    void setUp() {
+-        authService = new AuthService(userService, passwordHasher);
+-    }
+-
+-    @Test
+-    @DisplayName("회원가입 비밀번호를 해시한 뒤 사용자 생성을 요청한다")
+-    void shouldHashPasswordBeforeCreatingUser() {
+-        UserResult creationResult = new UserResult(1L, "비비디");
+-        given(passwordHasher.hash("password")).willReturn("password-hash");
+-        given(userService.createUser("비비디", "password-hash")).willReturn(creationResult);
+-
+-        UserResult result = authService.register("비비디", "password");
+-
+-        assertThat(result).isEqualTo(creationResult);
+-        then(userService).should().createUser("비비디", "password-hash");
+-    }
+-
+-    @Test
+-    @DisplayName("닉네임과 비밀번호가 일치하면 인증 결과를 반환한다")
+-    void shouldReturnAuthResultWhenCredentialsAreValid() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+-        given(userService.findAuthenticationInfo("비비디")).willReturn(user);
+-        given(passwordHasher.matches("password", "password-hash")).willReturn(true);
+-
+-        AuthResult result = authService.login("비비디", "password");
+-
+-        assertThat(result).isEqualTo(new AuthResult(1L, "비비디"));
+-    }
+-
+-    @Test
+-    @DisplayName("존재하지 않는 닉네임은 인증 실패로 처리한다")
+-    void shouldFailAuthenticationWhenNicknameDoesNotExist() {
+-        given(userService.findAuthenticationInfo("없는 사용자")).willThrow(new NoSuchElementException());
+-
+-        assertThatThrownBy(() -> authService.login("없는 사용자", "password"))
+-                .isInstanceOf(BusinessException.class)
+-                .hasMessage("로그인 인증에 실패했습니다.")
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+-    }
+-
+-    @Test
+-    @DisplayName("잘못된 비밀번호는 사용자 부재와 동일한 인증 실패로 처리한다")
+-    void shouldFailAuthenticationWhenPasswordDoesNotMatch() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+-        given(userService.findAuthenticationInfo("비비디")).willReturn(user);
+-        given(passwordHasher.matches("wrong-password", "password-hash")).willReturn(false);
+-
+-        assertThatThrownBy(() -> authService.login("비비디", "wrong-password"))
+-                .isInstanceOf(BusinessException.class)
+-                .hasMessage("로그인 인증에 실패했습니다.")
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호를 확인하고 새 비밀번호를 해시해 저장한다")
+-    void shouldVerifyAndHashPasswordBeforeUpdating() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+-        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+-        given(passwordHasher.hash("new-password")).willReturn("new-hash");
+-
+-        authService.changePassword(1L, "current-password", "new-password");
+-
+-        then(passwordHasher).should().matches("current-password", "current-hash");
+-        then(passwordHasher).should(never()).matches("new-password", "current-hash");
+-        then(userService).should().changePasswordHash(1L, "new-hash");
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호가 일치하지 않으면 기존 비밀번호 해시를 유지한다")
+-    void shouldNotUpdateWhenCurrentPasswordDoesNotMatch() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+-        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("wrong-password", "current-hash")).willReturn(false);
+-
+-        assertThatThrownBy(() -> authService.changePassword(1L, "wrong-password", "new-password"))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+-
+-        then(passwordHasher).should(never()).hash("new-password");
+-        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
+-    }
+-
+-    @Test
+-    @DisplayName("새 비밀번호가 기존 비밀번호와 같으면 저장하지 않고 성공한다")
+-    void shouldSucceedWithoutUpdatingWhenNewPasswordIsSameAsCurrentPassword() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+-        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+-
+-        authService.changePassword(1L, "current-password", "current-password");
+-
+-        then(passwordHasher).should().matches("current-password", "current-hash");
+-        then(passwordHasher).should(never()).hash("current-password");
+-        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
+-    }
+-
+-    @Test
+-    @DisplayName("새 비밀번호 해시에 실패하면 기존 비밀번호 해시를 유지한다")
+-    void shouldNotUpdateWhenHashingNewPasswordFails() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "current-hash");
+-        given(userService.findCurrentUserAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("current-password", "current-hash")).willReturn(true);
+-        given(passwordHasher.hash("new-password")).willThrow(new IllegalStateException("hashing failed"));
+-
+-        assertThatThrownBy(() -> authService.changePassword(1L, "current-password", "new-password"))
+-                .isInstanceOf(IllegalStateException.class);
+-
+-        then(passwordHasher).should(never()).matches("new-password", "current-hash");
+-        then(userService).should(never()).changePasswordHash(anyLong(), anyString());
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호가 일치하면 사용자 삭제를 요청한다")
+-    void shouldDeleteUserWhenCurrentPasswordMatches() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+-        given(userService.findAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("password", "password-hash")).willReturn(true);
+-
+-        authService.deleteUser(1L, "password");
+-
+-        then(userService).should().delete(1L);
+-    }
+-
+-    @Test
+-    @DisplayName("현재 비밀번호가 일치하지 않으면 사용자 삭제를 요청하지 않는다")
+-    void shouldNotDeleteUserWhenCurrentPasswordDoesNotMatch() {
+-        UserAuthenticationInfo user = new UserAuthenticationInfo(1L, "비비디", "password-hash");
+-        given(userService.findAuthenticationInfo(1L)).willReturn(user);
+-        given(passwordHasher.matches("wrong-password", "password-hash")).willReturn(false);
+-
+-        assertThatThrownBy(() -> authService.deleteUser(1L, "wrong-password"))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+-
+-        then(userService).should(never()).delete(anyLong());
+-    }
+-
+-    @Test
+-    @DisplayName("탈퇴할 사용자가 없으면 사용자 없음 오류를 유지한다")
+-    void shouldKeepUserNotFoundWhenDeletingMissingUser() {
+-        given(userService.findAuthenticationInfo(1L)).willThrow(
+-                new BusinessException(ClientError.USER_NOT_FOUND, "사용자 조회 실패")
+-        );
+-
+-        assertThatThrownBy(() -> authService.deleteUser(1L, "password"))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.USER_NOT_FOUND);
+-
+-        then(passwordHasher).shouldHaveNoInteractions();
+-        then(userService).should(never()).delete(anyLong());
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/session/AuthBoundaryIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/session/AuthBoundaryIntegrationTest.java
+deleted file mode 100644
+index d7aee9f981a313ed6722cf057956f55aabb8c8d4..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/session/AuthBoundaryIntegrationTest.java
++++ /dev/null
+@@ -1,157 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+-
+-import com.bibbidi.wedding.common.auth.Auth;
+-import org.junit.jupiter.api.BeforeEach;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.boot.test.context.SpringBootTest;
+-import org.springframework.boot.test.context.TestConfiguration;
+-import org.springframework.context.annotation.Bean;
+-import org.springframework.context.annotation.Import;
+-import org.springframework.mock.web.MockHttpSession;
+-import org.springframework.test.context.ActiveProfiles;
+-import org.springframework.test.web.servlet.MockMvc;
+-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+-import org.springframework.web.bind.annotation.GetMapping;
+-import org.springframework.web.bind.annotation.RestController;
+-import org.springframework.web.context.WebApplicationContext;
+-
+-@SpringBootTest
+-@ActiveProfiles("test")
+-@Import(AuthBoundaryIntegrationTest.AuthBoundaryTestConfiguration.class)
+-class AuthBoundaryIntegrationTest {
+-
+-    @Autowired
+-    private WebApplicationContext context;
+-
+-    @Autowired
+-    private OwnedResourceTestService ownedResourceTestService;
+-
+-    private MockMvc mockMvc;
+-
+-    @BeforeEach
+-    void setUp() {
+-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+-        ownedResourceTestService.reset();
+-    }
+-
+-    @Test
+-    @DisplayName("Session이 없는 보호 API 요청은 인증 필요 오류로 실패한다")
+-    void shouldRejectProtectedApiWithoutSession() throws Exception {
+-        mockMvc.perform(get("/api/auth-boundary/owned-resources"))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(201))
+-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist())
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
+-
+-        assertThat(ownedResourceTestService.lastOwnerId()).isNull();
+-    }
+-
+-    @Test
+-    @DisplayName("Session의 인증 정보가 유효하지 않으면 보호 API 요청을 거절한다")
+-    void shouldRejectProtectedApiWithInvalidSessionUserId() throws Exception {
+-        MockHttpSession session = authenticatedSession("7");
+-
+-        mockMvc.perform(get("/api/auth-boundary/owned-resources").session(session))
+-                .andExpect(status().isUnauthorized())
+-                .andExpect(jsonPath("$.errorCode").value(201))
+-                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+-                .andExpect(jsonPath("$.status").doesNotExist());
+-
+-        assertThat(ownedResourceTestService.lastOwnerId()).isNull();
+-    }
+-
+-    @Test
+-    @DisplayName("보호 API는 요청 사용자 ID 대신 Session의 현재 사용자 ID로 소유 리소스를 조회한다")
+-    void shouldUseSessionUserIdInsteadOfRequestUserIdForOwnedResource() throws Exception {
+-        MockHttpSession session = authenticatedSession(7L);
+-
+-        mockMvc.perform(get("/api/auth-boundary/owned-resources")
+-                        .param("userId", "999")
+-                        .session(session))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.ownerId").value(7));
+-
+-        assertThat(ownedResourceTestService.lastOwnerId()).isEqualTo(7L);
+-    }
+-
+-    @Test
+-    @DisplayName("Auth가 필요하지 않은 API는 Session 없이 접근할 수 있다")
+-    void shouldAllowApiWithoutAuthAndSession() throws Exception {
+-        mockMvc.perform(get("/api/auth-boundary/without-auth"))
+-                .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.loginRequired").value(false))
+-                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
+-    }
+-
+-    private MockHttpSession authenticatedSession(Object userId) {
+-        MockHttpSession session = new MockHttpSession();
+-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
+-        return session;
+-    }
+-
+-    @TestConfiguration
+-    static class AuthBoundaryTestConfiguration {
+-
+-        @Bean
+-        AuthBoundaryTestController authBoundaryTestController(OwnedResourceTestService service) {
+-            return new AuthBoundaryTestController(service);
+-        }
+-
+-        @Bean
+-        OwnedResourceTestService ownedResourceTestService() {
+-            return new OwnedResourceTestService();
+-        }
+-    }
+-
+-    @RestController
+-    static class AuthBoundaryTestController {
+-
+-        private final OwnedResourceTestService ownedResourceTestService;
+-
+-        AuthBoundaryTestController(OwnedResourceTestService ownedResourceTestService) {
+-            this.ownedResourceTestService = ownedResourceTestService;
+-        }
+-
+-        @GetMapping("/api/auth-boundary/owned-resources")
+-        OwnedResourceResponse findOwnedResources(@Auth Long currentUserId) {
+-            return new OwnedResourceResponse(ownedResourceTestService.findByOwnerId(currentUserId));
+-        }
+-
+-        @GetMapping("/api/auth-boundary/without-auth")
+-        AuthRequirementResponse withoutAuth() {
+-            return new AuthRequirementResponse(false);
+-        }
+-    }
+-
+-    static class OwnedResourceTestService {
+-
+-        private Long lastOwnerId;
+-
+-        Long findByOwnerId(Long ownerId) {
+-            lastOwnerId = ownerId;
+-            return ownerId;
+-        }
+-
+-        Long lastOwnerId() {
+-            return lastOwnerId;
+-        }
+-
+-        void reset() {
+-            lastOwnerId = null;
+-        }
+-    }
+-
+-    record OwnedResourceResponse(Long ownerId) {
+-    }
+-
+-    record AuthRequirementResponse(boolean loginRequired) {
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/session/SessionUserIdProviderTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/session/SessionUserIdProviderTest.java
+deleted file mode 100644
+index 04d33f2bcf48577310e3fdacf2d59ffe5a286a6f..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/session/SessionUserIdProviderTest.java
++++ /dev/null
+@@ -1,75 +0,0 @@
+-package com.bibbidi.wedding.auth.session;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.assertj.core.api.Assertions.catchThrowableOfType;
+-
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.mock.web.MockHttpServletRequest;
+-import org.springframework.mock.web.MockHttpSession;
+-
+-class SessionUserIdProviderTest {
+-
+-    private final SessionUserIdProvider sessionUserIdProvider = new SessionUserIdProvider();
+-
+-    @Test
+-    @DisplayName("Session이 없으면 새 Session을 만들지 않고 인증 필요 오류를 반환한다")
+-    void shouldRejectWithoutCreatingSessionWhenSessionDoesNotExist() {
+-        MockHttpServletRequest request = new MockHttpServletRequest();
+-
+-        BusinessException exception = catchThrowableOfType(
+-                BusinessException.class,
+-                () -> sessionUserIdProvider.getCurrentUserId(request)
+-        );
+-
+-        assertThat(exception.clientError()).isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+-        assertThat(request.getSession(false)).isNull();
+-    }
+-
+-    @Test
+-    @DisplayName("Session의 사용자 ID 타입이 올바르지 않으면 인증 필요 오류를 반환한다")
+-    void shouldRejectWhenSessionUserIdHasInvalidType() {
+-        MockHttpServletRequest request = requestWithUserId("1");
+-
+-        BusinessException exception = catchThrowableOfType(
+-                BusinessException.class,
+-                () -> sessionUserIdProvider.getCurrentUserId(request)
+-        );
+-
+-        assertThat(exception.clientError()).isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+-    }
+-
+-    @Test
+-    @DisplayName("Session의 사용자 ID가 양수가 아니면 인증 필요 오류를 반환한다")
+-    void shouldRejectWhenSessionUserIdIsNotPositive() {
+-        MockHttpServletRequest request = requestWithUserId(0L);
+-
+-        BusinessException exception = catchThrowableOfType(
+-                BusinessException.class,
+-                () -> sessionUserIdProvider.getCurrentUserId(request)
+-        );
+-
+-        assertThat(exception.clientError()).isEqualTo(ClientError.AUTHENTICATION_REQUIRED);
+-    }
+-
+-    @Test
+-    @DisplayName("Session에 유효한 사용자 ID가 있으면 현재 사용자 ID를 반환한다")
+-    void shouldReturnCurrentUserIdFromSession() {
+-        MockHttpServletRequest request = requestWithUserId(7L);
+-
+-        Long currentUserId = sessionUserIdProvider.getCurrentUserId(request);
+-
+-        assertThat(currentUserId).isEqualTo(7L);
+-    }
+-
+-    private MockHttpServletRequest requestWithUserId(Object userId) {
+-        MockHttpSession session = new MockHttpSession();
+-        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, userId);
+-
+-        MockHttpServletRequest request = new MockHttpServletRequest();
+-        request.setSession(session);
+-        return request;
+-    }
+-}

@@ -41,6 +41,7 @@ class ArchitectureConventionTest {
             "catalog",
             "checklist",
             "feedback",
+            "terms",
             "user"
     );
 

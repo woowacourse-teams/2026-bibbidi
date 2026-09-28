@@ -19,7 +19,8 @@ class ChecklistItemTest {
                 10L,
                 "Wedding hall consultation",
                 1L,
-                ChecklistItemStatus.PREV
+                ChecklistItemStatus.PREV,
+                null
         );
     }
 
@@ -135,7 +136,8 @@ class ChecklistItemTest {
                 10L,
                 "Wedding hall consultation",
                 null,
-                ChecklistItemStatus.DONE
+                ChecklistItemStatus.DONE,
+                null
         );
 
         // when
@@ -168,7 +170,8 @@ class ChecklistItemTest {
                 10L,
                 "Wedding hall consultation",
                 null,
-                ChecklistItemStatus.DONE
+                ChecklistItemStatus.DONE,
+                null
         );
 
         // when
@@ -314,7 +317,8 @@ class ChecklistItemTest {
                 10L,
                 "Wedding hall consultation",
                 null,
-                ChecklistItemStatus.PREV
+                ChecklistItemStatus.PREV,
+                null
         );
     }
 

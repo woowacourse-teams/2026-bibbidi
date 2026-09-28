@@ -1,0 +1,205 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+index 1f0d15569756a8c3c6370ccf9afbd1a0eb7026c9..f2dd1bf085bb608189dff6230c855db3a2158c8f 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+@@ -1,14 +1,17 @@
+ package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
++import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+ import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.terms.service.TermsService;
+ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
++import java.time.LocalDateTime;
+ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.stereotype.Service;
+@@ -20,16 +23,22 @@ public class LegacyAccountTransferService {
+ 
+     private final PasswordEncoder passwordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+     private final UserService userService;
++    private final TermsService termsService;
+     private final SocialIdentityRepository socialIdentityRepository;
++    private final RefreshSessionRepository refreshSessionRepository;
+     private final SessionIssueService sessionIssueService;
+ 
+     public LegacyAccountTransferService(
+             UserService userService,
++            TermsService termsService,
+             SocialIdentityRepository socialIdentityRepository,
++            RefreshSessionRepository refreshSessionRepository,
+             SessionIssueService sessionIssueService
+     ) {
+         this.userService = userService;
++        this.termsService = termsService;
+         this.socialIdentityRepository = socialIdentityRepository;
++        this.refreshSessionRepository = refreshSessionRepository;
+         this.sessionIssueService = sessionIssueService;
+     }
+ 
+@@ -42,6 +51,9 @@ public class LegacyAccountTransferService {
+                 ));
+ 
+         socialIdentityRepository.changeUserId(currentUserId, legacyAccount.userId());
++        termsService.moveAgreements(currentUserId, legacyAccount.userId());
++        userService.copyTermsAgreement(currentUserId, legacyAccount.userId());
++        refreshSessionRepository.revokeAllOfUser(currentUserId, LocalDateTime.now());
+         userService.removePassword(legacyAccount.userId());
+         userService.delete(currentUserId);
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsAgreementRepository.java b/BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsAgreementRepository.java
+index 6d31bcbe253aa58cb107507eca54f6bc49824481..f49dc9c0b32736741a2d8bfe1e190505d92c41d7 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsAgreementRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsAgreementRepository.java
+@@ -10,6 +10,10 @@ public interface JpaTermsAgreementRepository extends JpaRepository<JpaTermsAgree
+ 
+     List<JpaTermsAgreementEntity> findAllByUserId(Long userId);
+ 
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("UPDATE JpaTermsAgreementEntity agreement SET agreement.userId = :newUserId WHERE agreement.userId = :userId")
++    int changeUserId(@Param("userId") Long userId, @Param("newUserId") Long newUserId);
++
+     @Modifying(flushAutomatically = true, clearAutomatically = true)
+     @Query("DELETE FROM JpaTermsAgreementEntity agreement WHERE agreement.userId = :userId")
+     int deleteByUserId(@Param("userId") Long userId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/terms/repository/TermsRepository.java b/BE/src/main/java/com/bibbidi/wedding/terms/repository/TermsRepository.java
+index 5626422c115a29c505164596a3aa590ee6d93634..ee8b886667d941faaae2f7b3e4cd12f06fe4cbb4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/terms/repository/TermsRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/terms/repository/TermsRepository.java
+@@ -55,6 +55,10 @@ public class TermsRepository {
+                 .toList();
+     }
+ 
++    public int changeAgreementsUserId(Long userId, Long newUserId) {
++        return jpaTermsAgreementRepository.changeUserId(userId, newUserId);
++    }
++
+     public int deleteAgreementsByUserId(Long userId) {
+         return jpaTermsAgreementRepository.deleteByUserId(userId);
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java b/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
+index 6cd051e9c866c79711d83b3242738eed2274c5cb..fa69b9931c604905d95bd895c966163ae3a32c9c 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/terms/service/TermsService.java
+@@ -70,6 +70,11 @@ public class TermsService {
+                 .toList();
+     }
+ 
++    @Transactional
++    public void moveAgreements(Long userId, Long newUserId) {
++        termsRepository.changeAgreementsUserId(userId, newUserId);
++    }
++
+     @Transactional
+     public void deleteAgreementsOf(Long userId) {
+         termsRepository.deleteAgreementsByUserId(userId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+index e36d08de2f2c95f393173f28bb39a9dd15dcc163..f2ed298da4ddd496af5dd3a1af34a09e13f70060 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+@@ -45,6 +45,13 @@ public class UserService {
+                 user.agreeToTerms(termsVersion, LocalDateTime.now())));
+     }
+ 
++    @Transactional
++    public void copyTermsAgreement(Long fromUserId, Long toUserId) {
++        User agreedUser = userRepository.findById(fromUserId);
++        User user = userRepository.findById(toUserId);
++        userRepository.update(user.agreeToTerms(agreedUser.termsVersion(), agreedUser.termsAgreedAt()));
++    }
++
+     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+         boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+         return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+index 0e77751ab3d5f4f9bceb8c5ab67cd624633a1119..dae953019a220d764805e23d1c7a998ea7fb5510 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+@@ -3,11 +3,15 @@ package com.bibbidi.wedding.auth.service;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
++import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.verification.VerifiedOidcUser;
++import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+ import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.terms.service.TermsService;
++import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+ import org.junit.jupiter.api.DisplayName;
+@@ -26,6 +30,9 @@ class LegacyAccountTransferServiceIntegrationTest {
+ 
+     private static final String LEGACY_NICKNAME = "기존회원";
+     private static final String LEGACY_PASSWORD = "bibbidi1234";
++    private static final String TERMS_VERSION = "v1";
++    private static final Long REQUIRED_SERVICE_TERMS_ID = 1L;
++    private static final Long REQUIRED_PRIVACY_TERMS_ID = 2L;
+     private static final VerifiedOidcUser KAKAO_USER = new VerifiedOidcUser(
+             SocialProvider.KAKAO, "social-user-1", LEGACY_NICKNAME, "new@bibbidi.kr");
+     private static final VerifiedOidcUser GOOGLE_USER = new VerifiedOidcUser(
+@@ -37,6 +44,18 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Autowired
+     private SocialUserRegistrationService socialUserRegistrationService;
+ 
++    @Autowired
++    private TermsAgreementService termsAgreementService;
++
++    @Autowired
++    private SessionIssueService sessionIssueService;
++
++    @Autowired
++    private SessionRefreshService sessionRefreshService;
++
++    @Autowired
++    private TermsService termsService;
++
+     @Autowired
+     private UserService userService;
+ 
+@@ -69,4 +88,36 @@ class LegacyAccountTransferServiceIntegrationTest {
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+     }
++
++    @Test
++    @Sql({"/legacy-account-fixture.sql", "/terms-fixture.sql"})
++    @DisplayName("옮기면 소셜 회원으로 동의한 약관이 기존 회원의 동의로 옮겨진다")
++    void shouldMoveTermsAgreementToLegacyUser() {
++        PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();
++        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
++        termsAgreementService.agree(socialUser.userId(), TERMS_VERSION, true);
++
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
++
++        UserResult legacyUser = userService.findCurrentUserInfo(legacyAccount.userId());
++        assertThat(termsService.findAgreedTermsIds(legacyAccount.userId()))
++                .containsExactlyInAnyOrder(REQUIRED_SERVICE_TERMS_ID, REQUIRED_PRIVACY_TERMS_ID);
++        assertThat(termsService.findAgreedTermsIds(socialUser.userId())).isEmpty();
++        assertThat(legacyUser.termsVersion()).isEqualTo(TERMS_VERSION);
++        assertThat(legacyUser.termsAgreedAt()).isNotNull();
++    }
++
++    @Test
++    @DisplayName("옮기면 소셜 회원으로 받은 refresh token으로는 더 이상 갱신할 수 없다")
++    void shouldRevokeSocialUserSessions() {
++        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.WEB);
++
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
++
++        assertThatThrownBy(() -> sessionRefreshService.refresh(socialSession.refreshToken(), ClientType.WEB))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
++    }
+ }
