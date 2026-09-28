@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import loginCouplePreview from "../../../assets/login-couple-preview.png";
 import { startSocialAuthorization } from "../api/socialLogin";
 import { isConnectedSocialProvider } from "../model/socialLogin";
 import "./SocialLoginForm.css";
@@ -91,50 +92,67 @@ export function SocialLoginForm() {
   };
 
   return (
-    <section aria-labelledby="social-login-title" className="social-login-form">
-      <h1 className="social-login-form__title" id="social-login-title">
-        로그인
-      </h1>
-
-      <div className="social-login-form__buttons">
-        {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
-          <button
-            className={`social-login-form__button social-login-form__button--${provider.id}`}
-            disabled={isSocialRedirecting}
-            key={provider.id}
-            onClick={() => handleSocialLogin(provider)}
-            type="button"
-          >
-            <span className="social-login-form__icon">
-              <SocialProviderIcon provider={provider.id} />
-            </span>
-            <span>{provider.label}로 계속하기</span>
-          </button>
-        ))}
-      </div>
+    <section aria-label="소셜 로그인" className="social-login-form">
+      <header className="social-login-form__intro">
+        <h1 className="social-login-form__headline">
+          <span>모든 결혼 준비를 한 곳에서</span>
+          <span className="social-login-form__brand">bibbidi</span>
+        </h1>
+      </header>
 
       <aside
-        aria-labelledby="legacy-account-guide-title"
-        className="social-login-form__account-guide"
+        aria-label="함께 결혼을 준비하는 예비부부"
+        className="social-login-form__preview"
       >
-        <span aria-hidden="true" className="social-login-form__guide-icon">
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M9.5 14.5 14.5 9.5M7.25 16.75l-1 1a3.54 3.54 0 0 1-5-5l3.5-3.5a3.54 3.54 0 0 1 5 0M16.75 7.25l1-1a3.54 3.54 0 0 1 5 5l-3.5 3.5a3.54 3.54 0 0 1-5 0" />
-          </svg>
-        </span>
-        <span className="social-login-form__guide-copy">
-          <strong id="legacy-account-guide-title">
-            기존 계정이 있으신가요?
-          </strong>
-          <span>소셜 로그인을 진행하면 기존 계정과 연동할 수 있어요.</span>
-        </span>
+        <img
+          alt="체크리스트와 달력을 함께 살펴보는 예비부부"
+          src={loginCouplePreview}
+        />
       </aside>
 
-      {socialLoginNotice && (
-        <p className="social-login-form__notice" role="status">
-          {socialLoginNotice}
-        </p>
-      )}
+      <div className="social-login-form__login-options">
+        <div className="social-login-form__buttons">
+          {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
+            <button
+              className={`social-login-form__button social-login-form__button--${provider.id}`}
+              disabled={isSocialRedirecting}
+              key={provider.id}
+              onClick={() => handleSocialLogin(provider)}
+              type="button"
+            >
+              <span className="social-login-form__icon">
+                <SocialProviderIcon provider={provider.id} />
+              </span>
+              <span>{provider.label}로 계속하기</span>
+            </button>
+          ))}
+        </div>
+
+        <aside
+          aria-labelledby="legacy-account-guide-title"
+          className="social-login-form__account-guide"
+        >
+          <span aria-hidden="true" className="social-login-form__guide-icon">
+            <svg fill="none" viewBox="0 0 24 24">
+              <path d="M9.5 14.5 14.5 9.5M7.25 16.75l-1 1a3.54 3.54 0 0 1-5-5l3.5-3.5a3.54 3.54 0 0 1 5 0M16.75 7.25l1-1a3.54 3.54 0 0 1 5 5l-3.5 3.5a3.54 3.54 0 0 1-5 0" />
+            </svg>
+          </span>
+          <span className="social-login-form__guide-copy">
+            <strong id="legacy-account-guide-title">
+              기존 계정이 있으신가요?
+            </strong>
+            <span className="social-login-form__guide-description">
+              소셜 로그인 후 기존 계정과 연동할 수 있어요.
+            </span>
+          </span>
+        </aside>
+
+        {socialLoginNotice && (
+          <p className="social-login-form__notice" role="status">
+            {socialLoginNotice}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

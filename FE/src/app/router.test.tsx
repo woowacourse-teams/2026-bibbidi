@@ -104,7 +104,9 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/signup"]);
 
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(
+      await screen.findByRole("region", { name: "소셜 로그인" }),
+    ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/login");
   });
 
@@ -166,7 +168,9 @@ describe("appRoutes", () => {
       screen.getByRole("button", { name: "다른 계정으로 로그인" }),
     );
 
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(
+      await screen.findByRole("region", { name: "소셜 로그인" }),
+    ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/login");
     expect(hasWebAccessToken()).toBe(false);
     expect(hasAccountSetupProgress()).toBe(false);
@@ -335,7 +339,7 @@ describe("appRoutes", () => {
       const router = renderRouter([path]);
 
       expect(
-        await screen.findByRole("heading", { name: "로그인" }),
+        await screen.findByRole("region", { name: "소셜 로그인" }),
       ).toBeTruthy();
       expect(router.state.location.pathname).toBe("/login");
     },
@@ -467,7 +471,9 @@ describe("appRoutes", () => {
 
     await act(async () => router.navigate(-1));
 
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(
+      await screen.findByRole("region", { name: "소셜 로그인" }),
+    ).toBeTruthy();
   });
 
   it("알 수 없는 경로를 루트로 이동시킨다", async () => {
@@ -555,7 +561,9 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/planner"]);
 
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(
+      await screen.findByRole("region", { name: "소셜 로그인" }),
+    ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/login");
     expect(router.state.location.search).toBe("?returnTo=%2Fplanner");
     expect(currentUserRequestCount).toBe(2);

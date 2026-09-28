@@ -52,7 +52,9 @@ describe("AppPageViewTracker", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(
+      await screen.findByRole("region", { name: "소셜 로그인" }),
+    ).toBeTruthy();
     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",
