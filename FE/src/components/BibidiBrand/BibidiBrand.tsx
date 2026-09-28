@@ -5,7 +5,12 @@ export function BibidiBrand() {
   return (
     <>
       <span aria-hidden="true" className="bibidi-brand__logo-clip">
-        <img alt="" className="bibidi-brand__logo" src={bibidiLogo} />
+        <img
+          alt=""
+          className="bibidi-brand__logo"
+          draggable={false}
+          src={bibidiLogo}
+        />
       </span>
       <span className="bibidi-brand__name">bibbidi</span>
     </>

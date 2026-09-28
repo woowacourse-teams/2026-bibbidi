@@ -160,6 +160,10 @@ describe("AppHeader", () => {
     const brandLink = screen.getByRole("link", { name: "비비디 홈" });
     expect(brandLink.getAttribute("href")).toBe("/");
     expect(brandLink.textContent).toBe("bibbidi");
+    expect((brandLink as HTMLAnchorElement).draggable).toBe(false);
+    expect(brandLink.querySelector<HTMLImageElement>("img")?.draggable).toBe(
+      false,
+    );
     const desktopLinks = Array.from(
       screen
         .getByRole("navigation", { name: "주요 메뉴" })

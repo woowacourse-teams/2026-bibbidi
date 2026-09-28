@@ -22,13 +22,13 @@
 @media (max-width: 760px) {
   .auth-page {
     align-items: start;
-    padding: 42px 16px 48px;
+    padding: 42px 24px 48px;
   }
 
   .auth-page--login {
     align-items: stretch;
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
-    padding-top: clamp(56px, 9dvh, 80px);
+    padding-top: clamp(32px, 6dvh, 48px);
   }
 }
 
