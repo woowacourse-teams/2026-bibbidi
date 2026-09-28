@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.support;
 
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +28,6 @@ public abstract class BibbidiIntegrationTest {
     @BeforeEach
     void setUpRestDocs(RestDocumentationContextProvider restDocumentation) {
         mockMvc = webAppContextSetup(context)
-                .apply(springSecurity())
                 .apply(documentationConfiguration(restDocumentation))
                 .build();
     }

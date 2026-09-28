@@ -11,7 +11,6 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -38,9 +37,6 @@ class ChecklistRepositoryTest {
 
     @Autowired
     private JpaChecklistItemRepository jpaChecklistItemRepository;
-
-    @Autowired
-    private EntityManager entityManager;
 
     @Test
     @DisplayName("빈 체크리스트를 저장하고 생성된 식별자를 채워 반환한다")
@@ -168,7 +164,6 @@ class ChecklistRepositoryTest {
 
         // then
         assertThat(saved.id()).isNotNull();
-        assertThat(saved.createdAt()).isNotNull();
         assertThat(saved)
                 .extracting(
                         ChecklistItem::categoryId,
@@ -180,41 +175,13 @@ class ChecklistRepositoryTest {
     }
 
     @Test
-    @DisplayName("기존 할 일을 저장하면 변경 가능한 필드만 갱신하고 생성 시각은 유지한다")
-    void shouldUpdateMutableFieldsWithoutReplacingCreatedAt() {
-        Checklist checklist = saveChecklist(OWNER_ID);
-        saveItem(checklist, null);
-        entityManager.clear();
-        ChecklistItem original = checklistRepository.getByOwnerId(OWNER_ID).items().getFirst();
-        ChecklistItem changed = new ChecklistItem(
-                original.id(),
-                CATEGORY_ID + 1,
-                "계약서 재확인",
-                null,
-                ChecklistItemStatus.DONE,
-                original.createdAt().plusDays(1)
-        );
-
-        ChecklistItem saved = checklistRepository.saveItem(checklist, changed);
-        entityManager.clear();
-        ChecklistItem reloaded = checklistRepository.getByOwnerId(OWNER_ID).items().getFirst();
-
-        assertThat(saved.createdAt()).isEqualTo(original.createdAt());
-        assertThat(reloaded)
-                .extracting(ChecklistItem::categoryId, ChecklistItem::title,
-                        ChecklistItem::status, ChecklistItem::createdAt)
-                .containsExactly(CATEGORY_ID + 1, "계약서 재확인",
-                        ChecklistItemStatus.DONE, original.createdAt());
-    }
-
-    @Test
     @DisplayName("여러 할 일을 한 번에 저장하고 생성된 식별자를 채워 반환한다")
     void shouldSaveAllItemsAndReturnGeneratedIds() {
         // given
         Checklist checklist = saveChecklist(OWNER_ID);
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null),
-                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV, null)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV),
+                new ChecklistItem(null, CATEGORY_ID, "견적 비교", 101L, ChecklistItemStatus.PREV)
         );
 
         // when
@@ -248,7 +215,7 @@ class ChecklistRepositoryTest {
         Checklist checklist = saveChecklist(OWNER_ID);
         saveItem(checklist, 100L);
         List<ChecklistItem> items = List.of(
-                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV, null)
+                new ChecklistItem(null, CATEGORY_ID, "계약서 확인", 100L, ChecklistItemStatus.PREV)
         );
 
         // when, then
@@ -317,8 +284,7 @@ class ChecklistRepositoryTest {
                 CATEGORY_ID,
                 "계약서 확인",
                 sourceCatalogItemId,
-                ChecklistItemStatus.PREV,
-                null
+                ChecklistItemStatus.PREV
         ));
     }
 }

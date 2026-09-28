@@ -2,7 +2,6 @@ package com.bibbidi.wedding.checklist.domain;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -14,22 +13,19 @@ public final class ChecklistItem {
     private final String title;
     private final Long sourceCatalogItemId;
     private final ChecklistItemStatus status;
-    private final LocalDateTime createdAt;
 
     public ChecklistItem(
             @Nullable Long id,
             @Nullable Long categoryId,
             @NonNull String title,
             @Nullable Long sourceCatalogItemId,
-            @NonNull ChecklistItemStatus status,
-            @Nullable LocalDateTime createdAt
+            @NonNull ChecklistItemStatus status
     ) {
         this.id = id;
         this.categoryId = categoryId;
         this.title = title;
         this.sourceCatalogItemId = sourceCatalogItemId;
         this.status = status;
-        this.createdAt = createdAt;
     }
 
     public ChecklistItem changeStatus(ChecklistItemStatus status) {
@@ -38,8 +34,7 @@ public final class ChecklistItem {
                 categoryId,
                 title,
                 sourceCatalogItemId,
-                status,
-                createdAt
+                status
         );
     }
 
@@ -56,8 +51,7 @@ public final class ChecklistItem {
                 categoryId,
                 title,
                 sourceCatalogItemId,
-                status,
-                createdAt
+                status
         );
     }
 
@@ -74,8 +68,7 @@ public final class ChecklistItem {
                 categoryId,
                 title,
                 sourceCatalogItemId,
-                status,
-                createdAt
+                status
         );
     }
 
@@ -114,10 +107,6 @@ public final class ChecklistItem {
 
     public ChecklistItemStatus status() {
         return status;
-    }
-
-    public LocalDateTime createdAt() {
-        return createdAt;
     }
 
     public boolean isDone() {

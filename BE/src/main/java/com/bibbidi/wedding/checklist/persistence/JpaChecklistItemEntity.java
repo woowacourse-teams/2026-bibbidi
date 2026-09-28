@@ -63,12 +63,6 @@ public class JpaChecklistItemEntity extends BaseTimeEntity {
         this.status = status;
     }
 
-    public void update(Long categoryId, String title, ChecklistItemStatus status) {
-        this.categoryId = categoryId;
-        this.title = title;
-        this.status = status;
-    }
-
     public Long id() {
         return id;
     }
