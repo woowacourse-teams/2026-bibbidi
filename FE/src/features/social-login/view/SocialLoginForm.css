@@ -1,20 +1,47 @@
 .social-login-form {
   display: flex;
-  width: min(100%, 360px);
+  width: min(100%, 352px);
+  min-height: 100%;
+  min-width: 0;
   flex-direction: column;
+  justify-content: space-between;
+  justify-self: center;
 }
 
-.social-login-form__title {
-  margin: 0 0 28px;
+.social-login-form__intro {
+  flex: none;
+}
+
+.social-login-form__headline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
   color: var(--color-fg-neutral);
-  font-size: 28px;
+  font-size: clamp(25px, 3vw, 31px);
   font-weight: 800;
-  line-height: 1.35;
-  letter-spacing: -0.03em;
+  line-height: 1.32;
+  letter-spacing: -0.045em;
+}
+
+.social-login-form__brand {
+  color: var(--color-fg-neutral);
+  font-family: "Nunito", sans-serif;
+  font-size: 1.42em;
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: -0.065em;
 }
 
 .social-login-form__buttons {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.social-login-form__login-options {
+  display: flex;
+  flex: none;
   flex-direction: column;
   gap: 12px;
 }
@@ -104,15 +131,17 @@
 
 .social-login-form__account-guide {
   display: grid;
+  width: min(calc(100vw - 24px), 352px);
+  flex: none;
+  align-self: center;
   align-items: center;
   grid-template-columns: 36px 1fr;
   gap: 12px;
-  margin-top: 24px;
-  border-top: 1px solid var(--color-stroke-neutral-weak);
+  background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral-muted);
   font-size: 14px;
   line-height: 1.55;
-  padding: 20px 2px 0;
+  padding: 0 2px;
 }
 
 .social-login-form__guide-icon {
@@ -148,6 +177,10 @@
   font-weight: 700;
 }
 
+.social-login-form__guide-description {
+  white-space: nowrap;
+}
+
 .social-login-form__notice {
   margin: 12px 0 0;
   color: var(--color-fg-neutral-muted);
@@ -157,8 +190,67 @@
   text-align: center;
 }
 
+.social-login-form__preview {
+  display: none;
+}
+
+@media (min-width: 744px) {
+  .social-login-form {
+    width: min(100%, 960px);
+    min-height: min(560px, 100%);
+    display: grid;
+    align-items: start;
+    grid-template-columns: minmax(280px, 352px) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(32px, 5vw, 72px);
+  }
+
+  .social-login-form__intro {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .social-login-form__login-options {
+    align-self: start;
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 72px;
+  }
+
+  .social-login-form__preview {
+    display: block;
+    width: 66.6667%;
+    justify-self: center;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    overflow: hidden;
+    border-radius: 32px;
+    background: var(--color-bg-layer-basement);
+  }
+
+  .social-login-form__preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
 @media (max-width: 520px) {
-  .social-login-form__title {
-    font-size: 26px;
+  .social-login-form__headline {
+    font-size: clamp(23px, 7.2vw, 28px);
+  }
+
+  .social-login-form__account-guide {
+    grid-template-columns: 32px 1fr;
+    gap: 8px;
+  }
+
+  .social-login-form__guide-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .social-login-form__guide-description {
+    font-size: 12px;
   }
 }

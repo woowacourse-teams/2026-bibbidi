@@ -8,6 +8,47 @@ afterEach(() => {
 });
 
 describe("SocialLoginForm", () => {
+  it.each([
+    ["iPhone SE 3", 375, 667],
+    ["iPhone 13 mini", 375, 812],
+    ["iPhone 14", 390, 844],
+    ["iPhone 15 Pro", 393, 852],
+    ["iPhone 17 Pro", 402, 874],
+    ["iPhone Air", 420, 912],
+    ["iPhone 16 Plus", 430, 932],
+    ["iPhone 17 Pro Max", 440, 956],
+  ])("%s viewport(%d×%d)에서 로그인 요소를 유지한다", (_, width, height) => {
+    vi.stubGlobal("innerWidth", width);
+    vi.stubGlobal("innerHeight", height);
+
+    render(<SocialLoginForm />);
+
+    expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
+    expect(
+      screen.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual(["카카오로 계속하기", "구글로 계속하기", "애플로 계속하기"]);
+
+    const accountGuide = screen.getByText(
+      "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
+    );
+    expect(accountGuide.className).toBe("social-login-form__guide-description");
+  });
+
+  it("서비스 설명과 영문 브랜드 이름을 표시한다", () => {
+    render(<SocialLoginForm />);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+
+    expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서bibbidi");
+    expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "로그인" })).toBeNull();
+    expect(
+      screen.getByRole("complementary", {
+        name: "함께 결혼을 준비하는 예비부부",
+      }),
+    ).toBeTruthy();
+  });
+
   it("세 소셜 로그인 버튼과 기존 계정 연동 안내를 표시한다", () => {
     render(<SocialLoginForm />);
 
@@ -18,7 +59,7 @@ describe("SocialLoginForm", () => {
       name: "기존 계정이 있으신가요?",
     });
     expect(guide.textContent).toContain(
-      "소셜 로그인을 진행하면 기존 계정과 연동할 수 있어요.",
+      "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
     );
   });
 

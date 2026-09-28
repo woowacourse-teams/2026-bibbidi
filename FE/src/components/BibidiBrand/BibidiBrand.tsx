@@ -7,7 +7,7 @@ export function BibidiBrand() {
       <span aria-hidden="true" className="bibidi-brand__logo-clip">
         <img alt="" className="bibidi-brand__logo" src={bibidiLogo} />
       </span>
-      <span className="bibidi-brand__name">비비디</span>
+      <span className="bibidi-brand__name">bibbidi</span>
     </>
   );
 }
