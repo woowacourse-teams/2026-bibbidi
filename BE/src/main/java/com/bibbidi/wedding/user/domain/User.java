@@ -52,6 +52,10 @@ public final class User {
         return new User(id, nickname, status, role, email, termsVersion, termsAgreedAt);
     }
 
+    public User changeEmail(@Nullable String email) {
+        return new User(id, nickname, status, role, email, termsVersion, termsAgreedAt);
+    }
+
     public User activate() {
         return agreeToTerms(termsVersion, LocalDateTime.now());
     }

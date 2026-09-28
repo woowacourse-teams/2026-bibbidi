@@ -55,6 +55,15 @@ public class UserService {
         userRepository.update(agreedUser);
     }
 
+    @Transactional
+    public void copyEmail(Long fromUserId, Long toUserId) {
+        User fromUser = userRepository.findById(fromUserId);
+        String email = fromUser.email();
+        User toUser = userRepository.findById(toUserId);
+        User emailChangedUser = toUser.changeEmail(email);
+        userRepository.update(emailChangedUser);
+    }
+
     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
         boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
         return new NicknameAvailabilityResult(nickname, isAvailableNickname);

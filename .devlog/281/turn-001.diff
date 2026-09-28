@@ -1,0 +1,70 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+index f2dd1bf085bb608189dff6230c855db3a2158c8f..3ec172973eb91abea895ce42254b83ea31cdc8de 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+@@ -53,6 +53,7 @@ public class LegacyAccountTransferService {
+         socialIdentityRepository.changeUserId(currentUserId, legacyAccount.userId());
+         termsService.moveAgreements(currentUserId, legacyAccount.userId());
+         userService.copyTermsAgreement(currentUserId, legacyAccount.userId());
++        userService.copyEmail(currentUserId, legacyAccount.userId());
+         refreshSessionRepository.revokeAllOfUser(currentUserId, LocalDateTime.now());
+         userService.removePassword(legacyAccount.userId());
+         userService.delete(currentUserId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+index c1696b7db388e5061da0d869b84c89907f06b1e6..bc1d1ebb4532002847c5736de4a3ac5f30b766a6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/domain/User.java
+@@ -52,6 +52,10 @@ public final class User {
+         return new User(id, nickname, status, role, email, termsVersion, termsAgreedAt);
+     }
+ 
++    public User changeEmail(@Nullable String email) {
++        return new User(id, nickname, status, role, email, termsVersion, termsAgreedAt);
++    }
++
+     public User activate() {
+         return agreeToTerms(termsVersion, LocalDateTime.now());
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+index 5e39544fb9e18ecf0ab4026cce9a16c7cfd8dd08..da0ecd5dc067d1a2f1c087150816abe2c6b6c228 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+@@ -55,6 +55,15 @@ public class UserService {
+         userRepository.update(agreedUser);
+     }
+ 
++    @Transactional
++    public void copyEmail(Long fromUserId, Long toUserId) {
++        User fromUser = userRepository.findById(fromUserId);
++        String email = fromUser.email();
++        User toUser = userRepository.findById(toUserId);
++        User emailChangedUser = toUser.changeEmail(email);
++        userRepository.update(emailChangedUser);
++    }
++
+     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+         boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
+         return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+index dae953019a220d764805e23d1c7a998ea7fb5510..35feded32a68d7ed8d1e19c9bbc30bf5e917b80f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+@@ -107,6 +107,18 @@ class LegacyAccountTransferServiceIntegrationTest {
+         assertThat(legacyUser.termsAgreedAt()).isNotNull();
+     }
+ 
++    @Test
++    @DisplayName("옮기면 소셜 회원의 이메일이 기존 회원에게 복사된다")
++    void shouldCopySocialUserEmailToLegacyUser() {
++        PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();
++        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
++
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
++
++        UserResult legacyUser = userService.findCurrentUserInfo(legacyAccount.userId());
++        assertThat(legacyUser.email()).isEqualTo(KAKAO_USER.email());
++    }
++
+     @Test
+     @DisplayName("옮기면 소셜 회원으로 받은 refresh token으로는 더 이상 갱신할 수 없다")
+     void shouldRevokeSocialUserSessions() {

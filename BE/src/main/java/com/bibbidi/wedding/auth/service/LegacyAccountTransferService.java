@@ -53,6 +53,7 @@ public class LegacyAccountTransferService {
         socialIdentityRepository.changeUserId(currentUserId, legacyAccount.userId());
         termsService.moveAgreements(currentUserId, legacyAccount.userId());
         userService.copyTermsAgreement(currentUserId, legacyAccount.userId());
+        userService.copyEmail(currentUserId, legacyAccount.userId());
         refreshSessionRepository.revokeAllOfUser(currentUserId, LocalDateTime.now());
         userService.removePassword(legacyAccount.userId());
         userService.delete(currentUserId);
