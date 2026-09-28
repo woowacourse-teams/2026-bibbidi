@@ -108,6 +108,18 @@ class LegacyAccountTransferServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("옮기면 소셜 회원의 이메일이 기존 회원에게 복사된다")
+    void shouldCopySocialUserEmailToLegacyUser() {
+        PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();
+        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+
+        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
+
+        UserResult legacyUser = userService.findCurrentUserInfo(legacyAccount.userId());
+        assertThat(legacyUser.email()).isEqualTo(KAKAO_USER.email());
+    }
+
+    @Test
     @DisplayName("옮기면 소셜 회원으로 받은 refresh token으로는 더 이상 갱신할 수 없다")
     void shouldRevokeSocialUserSessions() {
         UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
