@@ -32,6 +32,19 @@ describe("SocialLoginForm", () => {
       "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
     );
     expect(accountGuide.className).toBe("social-login-form__guide-description");
+
+    const preview = screen.getByRole("complementary", {
+      name: "함께 결혼을 준비하는 예비부부",
+    });
+    const kakaoButton = screen.getByRole("button", {
+      name: "카카오로 계속하기",
+    });
+    expect(
+      Boolean(
+        preview.compareDocumentPosition(kakaoButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
   });
 
   it("서비스 설명과 영문 브랜드 이름을 표시한다", () => {

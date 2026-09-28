@@ -100,6 +100,16 @@ export function SocialLoginForm() {
         </h1>
       </header>
 
+      <aside
+        aria-label="함께 결혼을 준비하는 예비부부"
+        className="social-login-form__preview"
+      >
+        <img
+          alt="체크리스트와 달력을 함께 살펴보는 예비부부"
+          src={loginCouplePreview}
+        />
+      </aside>
+
       <div className="social-login-form__login-options">
         <div className="social-login-form__buttons">
           {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
@@ -143,16 +153,6 @@ export function SocialLoginForm() {
           </p>
         )}
       </div>
-
-      <aside
-        aria-label="함께 결혼을 준비하는 예비부부"
-        className="social-login-form__preview"
-      >
-        <img
-          alt="체크리스트와 달력을 함께 살펴보는 예비부부"
-          src={loginCouplePreview}
-        />
-      </aside>
     </section>
   );
 }

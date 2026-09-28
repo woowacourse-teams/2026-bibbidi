@@ -194,6 +194,33 @@
   display: none;
 }
 
+@media (max-width: 743px) {
+  .social-login-form__intro {
+    order: 1;
+  }
+
+  .social-login-form__preview {
+    display: block;
+    width: min(100%, 180px);
+    order: 2;
+    align-self: center;
+    margin: 28px auto 20px;
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--color-bg-layer-basement);
+  }
+
+  .social-login-form__preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .social-login-form__login-options {
+    order: 3;
+  }
+}
+
 @media (min-width: 744px) {
   .social-login-form {
     width: min(100%, 960px);
