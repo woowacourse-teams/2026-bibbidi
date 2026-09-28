@@ -145,10 +145,9 @@ http {
             return 404;
         }
 
-        # H2 콘솔은 frame으로 화면을 그린다. frame 허용은 백엔드가 SAMEORIGIN으로 붙이므로 여기서는 X-Frame-Options를 붙이지 않는다.
         location ^~ /h2-console {
-            limit_req zone=per_ip_api burst=60 nodelay;
-            limit_conn per_ip_conn 40;
+            allow ${H2_CONSOLE_ALLOWED_IP};
+            deny all;
 
             add_header Strict-Transport-Security "max-age=31536000" always;
             add_header X-Content-Type-Options nosniff always;
