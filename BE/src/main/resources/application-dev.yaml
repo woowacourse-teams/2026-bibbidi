@@ -5,6 +5,12 @@ spring:
     username: sa
     password: ""
 
+  h2:
+    console:
+      enabled: true
+      settings:
+        web-allow-others: true
+
   jpa:
     defer-datasource-initialization: true
     hibernate:

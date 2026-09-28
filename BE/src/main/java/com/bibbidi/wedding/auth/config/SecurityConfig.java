@@ -5,15 +5,20 @@ import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
 import com.bibbidi.wedding.auth.security.BibbidiTokenAuthenticationFilter;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.common.exception.ClientError;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
@@ -75,6 +80,21 @@ public class SecurityConfig {
                 failureResponseWriter,
                 bibbidiTokenProperties
         );
+    }
+
+    /**
+     * H2 콘솔을 켠 dev 서버에서만 만들어진다. 콘솔 화면이 frame으로 이뤄져 있어서 같은 도메인의 frame은 허용한다.
+     */
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    @ConditionalOnBooleanProperty("spring.h2.console.enabled")
+    public SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http) {
+        return http
+                .securityMatcher(PathRequest.toH2Console())
+                .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.frameOptions(FrameOptionsConfig::sameOrigin))
+                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
+                .build();
     }
 
     @Bean
