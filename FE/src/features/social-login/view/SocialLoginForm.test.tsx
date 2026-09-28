@@ -47,12 +47,12 @@ describe("SocialLoginForm", () => {
     ).toBe(true);
   });
 
-  it("서비스 설명과 영문 브랜드 이름을 표시한다", () => {
+  it("서비스 설명을 제목으로 표시한다", () => {
     render(<SocialLoginForm />);
 
     const heading = screen.getByRole("heading", { level: 1 });
 
-    expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서bibbidi");
+    expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서");
     expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "로그인" })).toBeNull();
     expect(
@@ -60,6 +60,13 @@ describe("SocialLoginForm", () => {
         name: "함께 결혼을 준비하는 예비부부",
       }),
     ).toBeTruthy();
+    expect(
+      (
+        screen.getByAltText(
+          "체크리스트와 달력을 함께 살펴보는 예비부부",
+        ) as HTMLImageElement
+      ).draggable,
+    ).toBe(false);
   });
 
   it("세 소셜 로그인 버튼과 기존 계정 연동 안내를 표시한다", () => {

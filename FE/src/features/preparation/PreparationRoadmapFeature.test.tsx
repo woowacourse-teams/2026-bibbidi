@@ -1051,6 +1051,7 @@ describe("PreparationRoadmapFeature 반응형 상세 패널", () => {
     expect(icon?.getAttribute("src")).toBe(
       "https://example.com/wedding-hall.png",
     );
+    expect(icon?.draggable).toBe(false);
     expect(
       screen
         .getByRole("button", {

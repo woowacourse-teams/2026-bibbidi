@@ -95,8 +95,9 @@ export function SocialLoginForm() {
     <section aria-label="소셜 로그인" className="social-login-form">
       <header className="social-login-form__intro">
         <h1 className="social-login-form__headline">
-          <span>모든 결혼 준비를 한 곳에서</span>
-          <span className="social-login-form__brand">bibbidi</span>
+          <span className="social-login-form__tagline">
+            모든 결혼 준비를 한 곳에서
+          </span>
         </h1>
       </header>
 
@@ -106,6 +107,7 @@ export function SocialLoginForm() {
       >
         <img
           alt="체크리스트와 달력을 함께 살펴보는 예비부부"
+          draggable={false}
           src={loginCouplePreview}
         />
       </aside>

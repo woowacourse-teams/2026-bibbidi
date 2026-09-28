@@ -90,6 +90,7 @@ function PreparationRoadmapSteps({
                 <img
                   alt=""
                   className="preparation-roadmap__step-icon"
+                  draggable={false}
                   onError={(event) => {
                     event.currentTarget.hidden = true;
                   }}

@@ -7,8 +7,11 @@ import { router } from "./app/router";
 import { AuthProvider } from "./features/auth";
 import { ChecklistMigrationProvider } from "./features/checklist-migration";
 import { analytics } from "./infrastructure/analytics";
+import { preventLinkDrag } from "./infrastructure/browser/preventLinkDrag";
 import "./styles/colors.css";
 import "./index.css";
+
+document.addEventListener("dragstart", preventLinkDrag);
 
 const rootElement = document.getElementById("root");
 
