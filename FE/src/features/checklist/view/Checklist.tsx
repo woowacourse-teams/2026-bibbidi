@@ -436,14 +436,14 @@ export function Checklist({
             {selectedCategory && tasks.length === 0 ? (
               <section className="checklist__empty">
                 <h2>아직 담은 할 일이 없어요</h2>
-                <p>준비 목록에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
+                <p>로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
                 <div className="checklist__empty-actions">
                   <button
                     className="checklist__empty-primary"
                     onClick={() => onVisitPreparation?.(selectedCategory.id)}
                     type="button"
                   >
-                    준비 목록에서 추가
+                    로드맵에서 추가
                   </button>
                   <button
                     className="checklist__empty-secondary"

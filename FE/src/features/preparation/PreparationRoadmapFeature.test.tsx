@@ -279,7 +279,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     render(<PreparationRoadmapFeature />);
 
     expect(screen.getByRole("status").textContent).toBe(
-      "준비 목록을 불러오고 있어요.",
+      "로드맵을 불러오고 있어요.",
     );
   });
 
@@ -289,7 +289,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     render(<PreparationRoadmapFeature />);
 
     expect(screen.getByRole("status").textContent).toBe(
-      "준비 목록을 불러오고 있어요.",
+      "로드맵을 불러오고 있어요.",
     );
     expect(repositoryMocks.getCatalog).not.toHaveBeenCalled();
   });
@@ -365,7 +365,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
       })
       .mockReturnValueOnce(new Promise(() => {}));
     const { rerender } = render(<PreparationRoadmapFeature />);
-    expect(await screen.findByText("표시할 준비 목록이 없어요.")).toBeTruthy();
+    expect(await screen.findByText("표시할 로드맵이 없어요.")).toBeTruthy();
 
     authMocks.authState = {
       status: "authenticated",
@@ -374,7 +374,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     rerender(<PreparationRoadmapFeature />);
 
     expect(screen.getByRole("status").textContent).toBe(
-      "준비 목록을 불러오고 있어요.",
+      "로드맵을 불러오고 있어요.",
     );
     await waitFor(() =>
       expect(repositoryMocks.getCatalog).toHaveBeenLastCalledWith(
@@ -388,9 +388,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
       .mockRejectedValueOnce(new Error("failed"))
       .mockReturnValueOnce(new Promise(() => {}));
     const { rerender } = render(<PreparationRoadmapFeature />);
-    expect(
-      await screen.findByText("준비 목록을 불러오지 못했어요."),
-    ).toBeTruthy();
+    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
 
     authMocks.authState = {
       status: "authenticated",
@@ -398,9 +396,9 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
     };
     rerender(<PreparationRoadmapFeature />);
 
-    expect(screen.queryByText("준비 목록을 불러오지 못했어요.")).toBeNull();
+    expect(screen.queryByText("로드맵을 불러오지 못했어요.")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe(
-      "준비 목록을 불러오고 있어요.",
+      "로드맵을 불러오고 있어요.",
     );
   });
 
@@ -428,7 +426,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
 
     render(<PreparationRoadmapFeature />);
 
-    expect(await screen.findByText("표시할 준비 목록이 없어요.")).toBeTruthy();
+    expect(await screen.findByText("표시할 로드맵이 없어요.")).toBeTruthy();
     expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
@@ -439,9 +437,7 @@ describe("PreparationRoadmapFeature 서버 상태", () => {
 
     render(<PreparationRoadmapFeature />);
 
-    expect(
-      await screen.findByText("준비 목록을 불러오지 못했어요."),
-    ).toBeTruthy();
+    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
     expect(authMocks.refreshAuth).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
@@ -724,9 +720,7 @@ describe("PreparationRoadmapFeature 비로그인 체크리스트", () => {
 
     render(<PreparationRoadmapFeature />);
 
-    expect(
-      await screen.findByText("준비 목록을 불러오지 못했어요."),
-    ).toBeTruthy();
+    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     expect(

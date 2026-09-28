@@ -11,7 +11,11 @@
 }
 
 .unscheduled-task__header {
+  display: flex;
   flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .unscheduled-task__header h2 {
@@ -20,6 +24,28 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
+}
+
+.unscheduled-task__roadmap-action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--color-fg-brand);
+  font-size: 14px;
+  font-weight: 600;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.unscheduled-task__chevron {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: currentcolor;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .unscheduled-task__list {
@@ -98,7 +124,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-fg-neutral);
+  color: var(--color-fg-brand);
   font: inherit;
   font-size: 13px;
   font-weight: 600;

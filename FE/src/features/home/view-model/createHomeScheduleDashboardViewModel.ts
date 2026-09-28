@@ -110,10 +110,11 @@ function createUpcomingViewModel(
       return {
         result: {
           actionLabel: "체크리스트 보기",
+          actionTo: "/checklist",
           actionVariant: "link",
           description: "일정이 있는 할 일은 여기에 표시돼요",
           icon: "calendar-days",
-          isActionDisabled: true,
+          isActionDisabled: false,
           title: "예정된 일정이 없어요",
           tone: "neutral",
         },
@@ -148,11 +149,12 @@ function createUnscheduledViewModel(
     case "empty":
       return {
         result: {
-          actionLabel: "체크리스트 보기",
+          actionLabel: "로드맵에서 할 일 찾기",
+          actionTo: "/",
           actionVariant: "link",
           description: "진행 중인 할 일의 일정을 모두 정했어요",
           icon: "calendar-check",
-          isActionDisabled: true,
+          isActionDisabled: false,
           title: "일정이 필요한 할 일이 없어요",
           tone: "neutral",
         },
@@ -189,10 +191,10 @@ function createRecommendedViewModel(
       return {
         countLabel: "0개",
         result: {
-          actionLabel: "준비 목록 보기",
+          actionLabel: "로드맵 보기",
           actionTo: "/",
           actionVariant: "link",
-          description: "새로 추가할 준비 목록의 할 일이 없어요",
+          description: "새로 추가할 로드맵의 할 일이 없어요",
           icon: "calendar-heart",
           isActionDisabled: false,
           title: "추천할 일이 없어요",
