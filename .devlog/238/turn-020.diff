@@ -1,0 +1,796 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3acc3c4dcb636000687cdb6693b39ea3bae0a89
+--- /dev/null
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthCookieFactory.java
+@@ -0,0 +1,105 @@
++package com.bibbidi.wedding.auth.controller;
++
++import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
++import com.bibbidi.wedding.auth.config.SessionProperties;
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
++import jakarta.servlet.http.Cookie;
++import jakarta.servlet.http.HttpServletRequest;
++import java.time.Duration;
++import java.util.Arrays;
++import org.jspecify.annotations.Nullable;
++import org.springframework.http.ResponseCookie;
++import org.springframework.stereotype.Component;
++
++/**
++ * 웹 브라우저에 내려 주는 인증 쿠키를 만든다.
++ *
++ * <p>두 가지를 다룬다. refresh token은 자바스크립트가 읽을 수 없어야 하므로 쿠키로 주고받고,
++ * 인가를 시작한 브라우저인지 가리는 값도 같은 방식으로 심는다.
++ * 네이티브 앱은 쿠키를 쓰지 않고 응답 본문으로 주고받는다.
++ */
++@Component
++public class AuthCookieFactory {
++
++    private static final String OIDC_BINDER_COOKIE_NAME = "BIBBIDI_OIDC_BINDER";
++    private static final String OIDC_BINDER_COOKIE_PATH = "/api/auth";
++
++    private final RefreshCookieProperties cookieProperties;
++    private final SessionProperties sessionProperties;
++
++    public AuthCookieFactory(
++            RefreshCookieProperties cookieProperties,
++            SessionProperties sessionProperties
++    ) {
++        this.cookieProperties = cookieProperties;
++        this.sessionProperties = sessionProperties;
++    }
++
++    public ResponseCookie refreshToken(String refreshToken) {
++        return build(
++                cookieProperties.name(),
++                cookieProperties.path(),
++                refreshToken,
++                sessionProperties.refreshTokenLifetime());
++    }
++
++    public ResponseCookie expiredRefreshToken() {
++        return build(cookieProperties.name(), cookieProperties.path(), "", Duration.ZERO);
++    }
++
++    /** refresh 쿠키가 없으면 로그인 상태를 이어 갈 수 없으므로 오류로 끝낸다. */
++    public String readRefreshToken(HttpServletRequest request) {
++        String refreshToken = read(request, cookieProperties.name());
++        if (refreshToken == null) {
++            throw new BusinessException(
++                    ClientError.REFRESH_SESSION_INVALID, "요청에 refresh 쿠키가 없습니다.");
++        }
++        return refreshToken;
++    }
++
++    /**
++     * 인가를 시작한 브라우저에만 남기는 값이다.
++     *
++     * <p>state는 인가 주소를 타고 제공자까지 갔다 돌아오므로 주소창이나 기록에 남을 수 있다.
++     * 이 값은 밖으로 나가지 않아, 돌아온 요청이 시작한 브라우저의 것인지 가릴 수 있다.
++     */
++    public ResponseCookie oidcBinder(String browserBinder) {
++        return build(
++                OIDC_BINDER_COOKIE_NAME,
++                OIDC_BINDER_COOKIE_PATH,
++                browserBinder,
++                sessionProperties.authRequestLifetime());
++    }
++
++    public ResponseCookie expiredOidcBinder() {
++        return build(OIDC_BINDER_COOKIE_NAME, OIDC_BINDER_COOKIE_PATH, "", Duration.ZERO);
++    }
++
++    /** 없을 수 있다. 네이티브 요청은 쿠키를 쓰지 않는다. */
++    public @Nullable String readOidcBinder(HttpServletRequest request) {
++        return read(request, OIDC_BINDER_COOKIE_NAME);
++    }
++
++    private @Nullable String read(HttpServletRequest request, String name) {
++        if (request.getCookies() == null) {
++            return null;
++        }
++        return Arrays.stream(request.getCookies())
++                .filter(cookie -> name.equals(cookie.getName()))
++                .map(Cookie::getValue)
++                .filter(value -> value != null && !value.isBlank())
++                .findFirst()
++                .orElse(null);
++    }
++
++    private ResponseCookie build(String name, String path, String value, Duration maxAge) {
++        return ResponseCookie.from(name, value)
++                .httpOnly(true)
++                .secure(cookieProperties.secure())
++                .path(path)
++                .sameSite(cookieProperties.sameSite())
++                .maxAge(maxAge)
++                .build();
++    }
++}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+similarity index 50%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+index 6221cdd68215bfb2fb51fa58bfd543db362e9bfc..c788a14544051a12026f0ca7079f409bad2dc39e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SocialLoginController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/AuthSessionController.java
+@@ -1,20 +1,23 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionResponse;
+-import com.bibbidi.wedding.auth.controller.dto.SocialAuthorizationResponse;
+-import com.bibbidi.wedding.auth.controller.dto.SocialLoginRequest;
+-import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
++import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
++import com.bibbidi.wedding.auth.controller.dto.response.NativeSessionResponse;
++import com.bibbidi.wedding.auth.controller.dto.response.SocialAuthorizationResponse;
++import com.bibbidi.wedding.auth.controller.dto.response.WebSessionResponse;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
++import com.bibbidi.wedding.auth.service.IssuedSession;
+ import com.bibbidi.wedding.auth.service.SocialAuthorizationResult;
+ import com.bibbidi.wedding.auth.service.SocialLoginService;
+-import com.bibbidi.wedding.auth.service.IssuedSession;
++import com.bibbidi.wedding.auth.service.SessionRefreshService;
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpHeaders;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.DeleteMapping;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+@@ -24,26 +27,29 @@ import org.springframework.web.bind.annotation.ResponseStatus;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ /**
+- * 소셜 로그인 입구다. 웹과 네이티브는 같은 검증을 거치지만 refresh token을 받는 방식이 달라 경로를 나눈다.
++ * 로그인 세션을 얻고, 잇고, 끊는다.
++ *
++ * <p>웹과 네이티브는 같은 검증을 거치지만 refresh token을 받는 방식이 달라 경로를 나눈다.
++ * 웹은 자바스크립트가 읽을 수 없는 쿠키로, 네이티브는 쿠키를 쓰지 않으므로 응답 본문으로 주고받는다.
+  *
+- * <p>웹은 인가를 시작할 때 브라우저에만 남는 값을 쿠키로 심고 돌아왔을 때 그 쿠키를 확인한다.
++ * <p>인가를 시작할 때 웹 브라우저에만 남는 값을 쿠키로 심고 돌아왔을 때 확인한다.
+  * 그래야 남이 받은 인가 결과를 피해자 브라우저에 제출시켜 남의 계정으로 로그인시키는 일을 막는다.
+  */
+ @RestController
+-public class SocialLoginController {
++public class AuthSessionController {
+ 
+     private final SocialLoginService socialLoginService;
+-    private final RefreshCookieFactory refreshCookieFactory;
+-    private final OidcBinderCookieFactory binderCookieFactory;
++    private final SessionRefreshService sessionRefreshService;
++    private final AuthCookieFactory authCookieFactory;
+ 
+-    public SocialLoginController(
++    public AuthSessionController(
+             SocialLoginService socialLoginService,
+-            RefreshCookieFactory refreshCookieFactory,
+-            OidcBinderCookieFactory binderCookieFactory
++            SessionRefreshService sessionRefreshService,
++            AuthCookieFactory authCookieFactory
+     ) {
+         this.socialLoginService = socialLoginService;
+-        this.refreshCookieFactory = refreshCookieFactory;
+-        this.binderCookieFactory = binderCookieFactory;
++        this.sessionRefreshService = sessionRefreshService;
++        this.authCookieFactory = authCookieFactory;
+     }
+ 
+     @GetMapping("/api/auth/oidc/{provider}/authorization")
+@@ -58,7 +64,7 @@ public class SocialLoginController {
+         ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+         if (result.browserBinder() != null) {
+             response.header(HttpHeaders.SET_COOKIE,
+-                    binderCookieFactory.create(result.browserBinder()).toString());
++                    authCookieFactory.oidcBinder(result.browserBinder()).toString());
+         }
+         return response.body(SocialAuthorizationResponse.from(result));
+     }
+@@ -74,11 +80,11 @@ public class SocialLoginController {
+                 ClientType.WEB,
+                 request.code(),
+                 request.state(),
+-                binderCookieFactory.read(servletRequest));
++                authCookieFactory.readOidcBinder(servletRequest));
+ 
+         return ResponseEntity.status(HttpStatus.CREATED)
+-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(session.refreshToken()).toString())
+-                .header(HttpHeaders.SET_COOKIE, binderCookieFactory.expired().toString())
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.refreshToken(session.refreshToken()).toString())
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.expiredOidcBinder().toString())
+                 .body(WebSessionResponse.from(session));
+     }
+ 
+@@ -95,4 +101,34 @@ public class SocialLoginController {
+                 request.state(),
+                 null));
+     }
++
++    @PostMapping("/api/auth/web/sessions/refresh")
++    public ResponseEntity<WebSessionResponse> refreshOnWeb(HttpServletRequest request) {
++        IssuedSession session = sessionRefreshService.refresh(
++                authCookieFactory.readRefreshToken(request), ClientType.WEB);
++        return ResponseEntity.ok()
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.refreshToken(session.refreshToken()).toString())
++                .body(WebSessionResponse.from(session));
++    }
++
++    @PostMapping("/api/auth/native/sessions/refresh")
++    public NativeSessionResponse refreshOnNative(
++            @Valid @RequestBody NativeSessionRefreshRequest request) {
++        return NativeSessionResponse.from(
++                sessionRefreshService.refresh(request.refreshToken(), ClientType.NATIVE));
++    }
++
++    @DeleteMapping("/api/auth/web/sessions/current")
++    public ResponseEntity<Void> logOutOnWeb(HttpServletRequest request) {
++        sessionRefreshService.revokeSession(authCookieFactory.readRefreshToken(request));
++        return ResponseEntity.noContent()
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.expiredRefreshToken().toString())
++                .build();
++    }
++
++    @DeleteMapping("/api/auth/native/sessions/current")
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    public void logOutOnNative(@Valid @RequestBody NativeSessionRefreshRequest request) {
++        sessionRefreshService.revokeSession(request.refreshToken());
++    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
+deleted file mode 100644
+index d24fee57457e820eb290362b1b2af349109cbbbd..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/OidcBinderCookieFactory.java
++++ /dev/null
+@@ -1,66 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
+-import com.bibbidi.wedding.auth.config.SessionProperties;
+-import jakarta.servlet.http.Cookie;
+-import jakarta.servlet.http.HttpServletRequest;
+-import java.time.Duration;
+-import java.util.Arrays;
+-import org.jspecify.annotations.Nullable;
+-import org.springframework.http.ResponseCookie;
+-import org.springframework.stereotype.Component;
+-
+-/**
+- * 인가를 시작한 브라우저에만 남기는 값을 쿠키로 다룬다.
+- *
+- * <p>state는 인가 주소를 타고 제공자까지 갔다 돌아오므로 주소창이나 기록에 남을 수 있다.
+- * 이 쿠키 값은 밖으로 나가지 않아, 돌아온 요청이 정말 시작한 브라우저의 것인지 가릴 수 있다.
+- */
+-@Component
+-public class OidcBinderCookieFactory {
+-
+-    private static final String COOKIE_NAME = "BIBBIDI_OIDC_BINDER";
+-    private static final String COOKIE_PATH = "/api/auth";
+-
+-    private final RefreshCookieProperties cookieProperties;
+-    private final SessionProperties sessionProperties;
+-
+-    public OidcBinderCookieFactory(
+-            RefreshCookieProperties cookieProperties,
+-            SessionProperties sessionProperties
+-    ) {
+-        this.cookieProperties = cookieProperties;
+-        this.sessionProperties = sessionProperties;
+-    }
+-
+-    public ResponseCookie create(String browserBinder) {
+-        return build(browserBinder, sessionProperties.authRequestLifetime());
+-    }
+-
+-    public ResponseCookie expired() {
+-        return build("", Duration.ZERO);
+-    }
+-
+-    /** 쿠키가 없을 수 있다. 네이티브 요청은 쿠키를 쓰지 않는다. */
+-    public @Nullable String read(HttpServletRequest request) {
+-        if (request.getCookies() == null) {
+-            return null;
+-        }
+-        return Arrays.stream(request.getCookies())
+-                .filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
+-                .map(Cookie::getValue)
+-                .filter(value -> value != null && !value.isBlank())
+-                .findFirst()
+-                .orElse(null);
+-    }
+-
+-    private ResponseCookie build(String value, Duration maxAge) {
+-        return ResponseCookie.from(COOKIE_NAME, value)
+-                .httpOnly(true)
+-                .secure(cookieProperties.secure())
+-                .path(COOKIE_PATH)
+-                .sameSite(cookieProperties.sameSite())
+-                .maxAge(maxAge)
+-                .build();
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
+deleted file mode 100644
+index 171736128f4507dde23597d6fbc2cc2cf3dc8f83..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/RefreshCookieFactory.java
++++ /dev/null
+@@ -1,61 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
+-import com.bibbidi.wedding.auth.config.SessionProperties;
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import jakarta.servlet.http.HttpServletRequest;
+-import java.time.Duration;
+-import java.util.Arrays;
+-import org.springframework.http.ResponseCookie;
+-import org.springframework.stereotype.Component;
+-
+-/**
+- * 웹은 refresh token을 자바스크립트가 읽을 수 없는 쿠키로 주고받는다.
+- * 네이티브는 이 쿠키를 쓰지 않고 응답 본문으로 받는다.
+- */
+-@Component
+-public class RefreshCookieFactory {
+-
+-    private final RefreshCookieProperties cookieProperties;
+-    private final SessionProperties sessionProperties;
+-
+-    public RefreshCookieFactory(
+-            RefreshCookieProperties cookieProperties,
+-            SessionProperties sessionProperties
+-    ) {
+-        this.cookieProperties = cookieProperties;
+-        this.sessionProperties = sessionProperties;
+-    }
+-
+-    public ResponseCookie create(String refreshToken) {
+-        return build(refreshToken, sessionProperties.refreshTokenLifetime());
+-    }
+-
+-    public ResponseCookie expired() {
+-        return build("", Duration.ZERO);
+-    }
+-
+-    public String read(HttpServletRequest request) {
+-        if (request.getCookies() == null) {
+-            throw new BusinessException(ClientError.REFRESH_SESSION_INVALID, "요청에 쿠키가 없습니다.");
+-        }
+-        return Arrays.stream(request.getCookies())
+-                .filter(cookie -> cookieProperties.name().equals(cookie.getName()))
+-                .map(jakarta.servlet.http.Cookie::getValue)
+-                .filter(value -> value != null && !value.isBlank())
+-                .findFirst()
+-                .orElseThrow(() -> new BusinessException(
+-                        ClientError.REFRESH_SESSION_INVALID, "요청에 refresh 쿠키가 없습니다."));
+-    }
+-
+-    private ResponseCookie build(String value, Duration maxAge) {
+-        return ResponseCookie.from(cookieProperties.name(), value)
+-                .httpOnly(true)
+-                .secure(cookieProperties.secure())
+-                .path(cookieProperties.path())
+-                .sameSite(cookieProperties.sameSite())
+-                .maxAge(maxAge)
+-                .build();
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java
+deleted file mode 100644
+index 53ff20e6f1ed1a29bc1e12a7e93c1fef5f37815c..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/SessionController.java
++++ /dev/null
+@@ -1,66 +0,0 @@
+-package com.bibbidi.wedding.auth.controller;
+-
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionResponse;
+-import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
+-import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.service.IssuedSession;
+-import com.bibbidi.wedding.auth.service.SessionRefreshService;
+-import jakarta.servlet.http.HttpServletRequest;
+-import jakarta.validation.Valid;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.HttpStatus;
+-import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.DeleteMapping;
+-import org.springframework.web.bind.annotation.PostMapping;
+-import org.springframework.web.bind.annotation.RequestBody;
+-import org.springframework.web.bind.annotation.ResponseStatus;
+-import org.springframework.web.bind.annotation.RestController;
+-
+-/**
+- * 로그인 상태를 이어 가거나 끊는다. 웹은 쿠키로, 네이티브는 응답 본문으로 refresh token을 주고받는다.
+- */
+-@RestController
+-public class SessionController {
+-
+-    private final SessionRefreshService sessionRefreshService;
+-    private final RefreshCookieFactory refreshCookieFactory;
+-
+-    public SessionController(
+-            SessionRefreshService sessionRefreshService,
+-            RefreshCookieFactory refreshCookieFactory
+-    ) {
+-        this.sessionRefreshService = sessionRefreshService;
+-        this.refreshCookieFactory = refreshCookieFactory;
+-    }
+-
+-    @PostMapping("/api/auth/web/sessions/refresh")
+-    public ResponseEntity<WebSessionResponse> refreshOnWeb(HttpServletRequest request) {
+-        IssuedSession session = sessionRefreshService.refresh(
+-                refreshCookieFactory.read(request), ClientType.WEB);
+-        return ResponseEntity.ok()
+-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(session.refreshToken()).toString())
+-                .body(WebSessionResponse.from(session));
+-    }
+-
+-    @PostMapping("/api/auth/native/sessions/refresh")
+-    public NativeSessionResponse refreshOnNative(
+-            @Valid @RequestBody NativeSessionRefreshRequest request) {
+-        return NativeSessionResponse.from(
+-                sessionRefreshService.refresh(request.refreshToken(), ClientType.NATIVE));
+-    }
+-
+-    @DeleteMapping("/api/auth/web/sessions/current")
+-    public ResponseEntity<Void> logOutOnWeb(HttpServletRequest request) {
+-        sessionRefreshService.revokeSession(refreshCookieFactory.read(request));
+-        return ResponseEntity.noContent()
+-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.expired().toString())
+-                .build();
+-    }
+-
+-    @DeleteMapping("/api/auth/native/sessions/current")
+-    @ResponseStatus(HttpStatus.NO_CONTENT)
+-    public void logOutOnNative(@Valid @RequestBody NativeSessionRefreshRequest request) {
+-        sessionRefreshService.revokeSession(request.refreshToken());
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
+index a1e975aba8345370899cccd51bc924e5230a4057..b27b4f3ec65a9a8a38701de8568c1481e56fca70 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/TermsAgreementController.java
+@@ -1,7 +1,7 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
+-import com.bibbidi.wedding.auth.controller.dto.TermsAgreementResponse;
++import com.bibbidi.wedding.auth.controller.dto.request.TermsAgreementRequest;
++import com.bibbidi.wedding.auth.controller.dto.response.TermsAgreementResponse;
+ import com.bibbidi.wedding.auth.service.TermsAgreementService;
+ import jakarta.validation.Valid;
+ import org.springframework.security.core.annotation.AuthenticationPrincipal;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+index 8db38d0cfbaa3317d4d0e46ac5c8301c1276bbc1..ae9be514af9c9c158f8a49b0369a8e4905b6fd20 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WebViewSessionController.java
+@@ -1,9 +1,9 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.HandoffCodeExchangeRequest;
+-import com.bibbidi.wedding.auth.controller.dto.HandoffCodeResponse;
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+-import com.bibbidi.wedding.auth.controller.dto.WebSessionResponse;
++import com.bibbidi.wedding.auth.controller.dto.request.HandoffCodeExchangeRequest;
++import com.bibbidi.wedding.auth.controller.dto.response.HandoffCodeResponse;
++import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.controller.dto.response.WebSessionResponse;
+ import com.bibbidi.wedding.auth.service.HandoffService;
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ import jakarta.validation.Valid;
+@@ -23,11 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
+ public class WebViewSessionController {
+ 
+     private final HandoffService handoffService;
+-    private final RefreshCookieFactory refreshCookieFactory;
++    private final AuthCookieFactory authCookieFactory;
+ 
+-    public WebViewSessionController(HandoffService handoffService, RefreshCookieFactory refreshCookieFactory) {
++    public WebViewSessionController(HandoffService handoffService, AuthCookieFactory authCookieFactory) {
+         this.handoffService = handoffService;
+-        this.refreshCookieFactory = refreshCookieFactory;
++        this.authCookieFactory = authCookieFactory;
+     }
+ 
+     @PostMapping("/api/auth/native/handoff-codes")
+@@ -44,7 +44,7 @@ public class WebViewSessionController {
+             @Valid @RequestBody HandoffCodeExchangeRequest request) {
+         IssuedSession session = handoffService.exchange(request.code());
+         return ResponseEntity.status(HttpStatus.CREATED)
+-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(session.refreshToken()).toString())
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.refreshToken(session.refreshToken()).toString())
+                 .body(WebSessionResponse.from(session));
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+index be073418e73fcb8d84c9696ff7887dcc3f9371b1..428993a0ca75cbda50280de82dd635666dc3b5b4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/WithdrawalController.java
+@@ -1,8 +1,8 @@
+ package com.bibbidi.wedding.auth.controller;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.DeleteGrantResponse;
+-import com.bibbidi.wedding.auth.controller.dto.SocialLoginRequest;
+-import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
++import com.bibbidi.wedding.auth.controller.dto.response.DeleteGrantResponse;
++import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.WithdrawalRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.service.WithdrawalService;
+@@ -27,17 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
+ public class WithdrawalController {
+ 
+     private final WithdrawalService withdrawalService;
+-    private final RefreshCookieFactory refreshCookieFactory;
+-    private final OidcBinderCookieFactory binderCookieFactory;
++    private final AuthCookieFactory authCookieFactory;
+ 
+     public WithdrawalController(
+             WithdrawalService withdrawalService,
+-            RefreshCookieFactory refreshCookieFactory,
+-            OidcBinderCookieFactory binderCookieFactory
++            AuthCookieFactory authCookieFactory
+     ) {
+         this.withdrawalService = withdrawalService;
+-        this.refreshCookieFactory = refreshCookieFactory;
+-        this.binderCookieFactory = binderCookieFactory;
++        this.authCookieFactory = authCookieFactory;
+     }
+ 
+     @PostMapping("/api/auth/delete-grants/{provider}/callback")
+@@ -54,7 +51,7 @@ public class WithdrawalController {
+                 clientType,
+                 request.code(),
+                 request.state(),
+-                binderCookieFactory.read(servletRequest),
++                authCookieFactory.readOidcBinder(servletRequest),
+                 currentUserId));
+     }
+ 
+@@ -65,7 +62,7 @@ public class WithdrawalController {
+     ) {
+         withdrawalService.withdraw(currentUserId, request.deleteGrant());
+         return ResponseEntity.noContent()
+-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.expired().toString())
++                .header(HttpHeaders.SET_COOKIE, authCookieFactory.expiredRefreshToken().toString())
+                 .build();
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeExchangeRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/HandoffCodeExchangeRequest.java
+similarity index 76%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeExchangeRequest.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/HandoffCodeExchangeRequest.java
+index fa82b94b811f5b49c8b408e59758942c0b606d95..fe68472ece8fb04246e8d7d7b033d6ab459c9aa4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeExchangeRequest.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/HandoffCodeExchangeRequest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.request;
+ 
+ import jakarta.validation.constraints.NotBlank;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionRefreshRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/NativeSessionRefreshRequest.java
+similarity index 77%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionRefreshRequest.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/NativeSessionRefreshRequest.java
+index 39b9aa9428239693d9b53efe56ee6fc45dfbe5dd..992cd9e50ebb1bf7d2f3cadac3e553d873fc3632 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionRefreshRequest.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/NativeSessionRefreshRequest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.request;
+ 
+ import jakarta.validation.constraints.NotBlank;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialLoginRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/SocialLoginRequest.java
+similarity index 83%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialLoginRequest.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/SocialLoginRequest.java
+index 63f0558ae7871bd01575d9e8c0ad9ea88b1ba79e..3cdc2ebd3749aa8166fa3602e064f7acc252b81e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialLoginRequest.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/SocialLoginRequest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.request;
+ 
+ import jakarta.validation.constraints.NotBlank;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/TermsAgreementRequest.java
+similarity index 83%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementRequest.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/TermsAgreementRequest.java
+index 8de58c82a68055e8e93fc53dd01aae42b01070a5..3442a849e825e3f1cb9a990a66736ba888c92b5b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementRequest.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/TermsAgreementRequest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.request;
+ 
+ import jakarta.validation.constraints.NotEmpty;
+ import java.util.List;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WithdrawalRequest.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/WithdrawalRequest.java
+similarity index 76%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WithdrawalRequest.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/WithdrawalRequest.java
+index 0ab86fa2e4ae46cc79398791218ead8d24c66a55..489de3f283c2a2feeefc3a00fc978d70d6f3ac12 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WithdrawalRequest.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/request/WithdrawalRequest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.request;
+ 
+ import jakarta.validation.constraints.NotBlank;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/DeleteGrantResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/DeleteGrantResponse.java
+similarity index 70%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/DeleteGrantResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/DeleteGrantResponse.java
+index ecba2d580e3e882e6a174a67f64bd59110b70ee2..b7ccffee6f26df337601a6917a49606d99fbdf43 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/DeleteGrantResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/DeleteGrantResponse.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ /** @param deleteGrant 탈퇴를 요청할 때 함께 보내야 하는 표 */
+ public record DeleteGrantResponse(String deleteGrant) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/HandoffCodeResponse.java
+similarity index 66%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/HandoffCodeResponse.java
+index 12a26b466083f4e9f8729171885f0e6ce22ffced..edd02aaa73c1d3b55dc0e513e9e08d1793eba4bf 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/HandoffCodeResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/HandoffCodeResponse.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ /** @param code WebView를 열 때 넘기는 1회용 코드 */
+ public record HandoffCodeResponse(String code) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/NativeSessionResponse.java
+similarity index 93%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/NativeSessionResponse.java
+index 69ed972af7eadd654bbe8066513ef21a8f67bd1c..f35a9d9e44bcdfc4de9fd5fefcc376c8696aab77 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/NativeSessionResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/NativeSessionResponse.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/SocialAuthorizationResponse.java
+similarity index 90%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/SocialAuthorizationResponse.java
+index 36651fd23bc5a26a9d2e2681de2e88f0bfa8c0e7..47e68868beb08094bdf5b074edc5acda78eacd01 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/SocialAuthorizationResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/SocialAuthorizationResponse.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ import com.bibbidi.wedding.auth.service.SocialAuthorizationResult;
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/TermsAgreementResponse.java
+similarity index 51%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/TermsAgreementResponse.java
+index e4f1d5095461609f7a6c291368688e9f7576ab07..97cedcdb9e62d2c4ffa28aeab3ea220dc805b051 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/TermsAgreementResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/TermsAgreementResponse.java
+@@ -1,8 +1,7 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ /**
+- * 약관에 동의하면 상태가 바뀌므로 토큰을 새로 내준다.
+- * 이미 발급된 토큰은 만료될 때까지 동의 전 상태를 담고 있기 때문이다.
++ * 약관에 동의하면 상태가 바뀌므로 토큰을 새로 내준다. 이미 발급된 토큰은 만료될 때까지 동의 전 상태를 담고 있기 때문이다.
+  *
+  * @param accessToken 새 access token
+  */
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/WebSessionResponse.java
+similarity index 91%
+rename from BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java
+rename to BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/WebSessionResponse.java
+index 8ee237b5985f4395b8ddfb45e03d19814eef4ed7..5125e0ed0661b24d8ec498bacc3e33f4aee86d1e 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/WebSessionResponse.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/dto/response/WebSessionResponse.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.auth.controller.dto;
++package com.bibbidi.wedding.auth.controller.dto.response;
+ 
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+similarity index 99%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+index c8bf02d70e021b79f7e844297fec16b80aaff8c8..5946949d3e30933664a2865fb4ce5b2cddb76e57 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SocialLoginControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionLoginIntegrationTest.java
+@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.SocialLoginRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.SocialLoginRequest;
+ import com.bibbidi.wedding.auth.domain.SocialProvider;
+ import com.bibbidi.wedding.auth.oidc.client.OidcTokenExchangeClient;
+ import com.bibbidi.wedding.auth.oidc.idtoken.IdTokenVerifier;
+@@ -35,7 +35,7 @@ import tools.jackson.databind.ObjectMapper;
+  * 카카오와 구글을 실제로 부르지 않는다.
+  * 어댑터 경계에서 대역을 세우고, 서버가 웹과 네이티브에 어떤 형태로 내려 주는지를 확인한다.
+  */
+-class SocialLoginControllerIntegrationTest extends BibbidiIntegrationTest {
++class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
+ 
+     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
+     private static final String BINDER_COOKIE = "BIBBIDI_OIDC_BINDER";
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+similarity index 97%
+rename from BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+index c3ac3978e6198ea98c90f8fbea3d4578257b846a..fbeac31baf5d9204006cd4033dd69b3aedd1b559 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/SessionControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/AuthSessionRefreshIntegrationTest.java
+@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
+-import com.bibbidi.wedding.auth.controller.dto.TermsAgreementRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.TermsAgreementRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ import com.bibbidi.wedding.auth.service.SessionIssueService;
+@@ -36,7 +36,7 @@ import tools.jackson.databind.ObjectMapper;
+  * 로그인 상태를 이어 가거나 끊는 API를 확인하고 문서로 남긴다.
+  */
+ @Sql("/terms-fixture.sql")
+-class SessionControllerIntegrationTest extends BibbidiIntegrationTest {
++class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
+ 
+     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
+     private static final Long REQUIRED_SERVICE_TERMS_ID = 1L;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+index b372cb078b2ef3efd6f6c9bcd007fad5c07de8f8..18d7dc46664f84d204e71856e565544cf02e009a 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WebViewSessionControllerIntegrationTest.java
+@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.HandoffCodeExchangeRequest;
+-import com.bibbidi.wedding.auth.controller.dto.NativeSessionRefreshRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.HandoffCodeExchangeRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.NativeSessionRefreshRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ import com.bibbidi.wedding.auth.service.SessionIssueService;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+index 7d43368a250140eca61cd2dc96dd9388dadc1453..12b4c8dbade6ebfa78eb3cc631c12ad0d3d7dd36 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/WithdrawalControllerIntegrationTest.java
+@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+-import com.bibbidi.wedding.auth.controller.dto.WithdrawalRequest;
++import com.bibbidi.wedding.auth.controller.dto.request.WithdrawalRequest;
+ import com.bibbidi.wedding.auth.domain.ClientType;
+ import com.bibbidi.wedding.auth.service.IssuedSession;
+ import com.bibbidi.wedding.auth.service.SessionIssueService;

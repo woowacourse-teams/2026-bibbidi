@@ -1,0 +1,12 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+index 34893cf04078594000a7403cc68fe0a60a19e5c7..e5399db639ebe107fc890970a14d29a9ae11af14 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/security/BibbidiTokenAuthenticationFilter.java
+@@ -39,6 +39,7 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
+     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+             throws ServletException, IOException {
+         String token = bearerToken(request);
++
+         if (token == null) {
+             filterChain.doFilter(request, response);
+             return;

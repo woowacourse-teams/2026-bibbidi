@@ -1,0 +1,502 @@
+diff --git a/BE/database/mysql/bibbidi_mvp_schema.sql b/BE/database/mysql/bibbidi_mvp_schema.sql
+index 627e8da..e461142 100644
+--- a/BE/database/mysql/bibbidi_mvp_schema.sql
++++ b/BE/database/mysql/bibbidi_mvp_schema.sql
+@@ -9,13 +9,12 @@ SET time_zone = '+09:00';
+ 
+ CREATE TABLE users (
+     id BIGINT NOT NULL AUTO_INCREMENT,
+-    nickname VARCHAR(10) NOT NULL,
++    nickname VARCHAR(255) NOT NULL,
+     password_hash VARCHAR(255) NOT NULL,
+     wedding_date DATE NULL,
+     created_at DATETIME NOT NULL,
+     updated_at DATETIME NOT NULL,
+-    PRIMARY KEY (id),
+-    UNIQUE (nickname)
++    PRIMARY KEY (id)
+ ) ENGINE = InnoDB
+   DEFAULT CHARACTER SET = utf8mb4
+   COLLATE = utf8mb4_0900_ai_ci;
+diff --git a/BE/database/mysql/migration/002_drop_users_nickname_unique.sql b/BE/database/mysql/migration/002_drop_users_nickname_unique.sql
+new file mode 100644
+index 0000000..382e911
+--- /dev/null
++++ b/BE/database/mysql/migration/002_drop_users_nickname_unique.sql
+@@ -0,0 +1,6 @@
++-- 카카오에서 받은 닉네임은 서로 겹칠 수 있어 유일 제약을 유지할 수 없다.
++-- 기존 UNIQUE 인덱스는 CREATE TABLE에서 이름 없이 선언해 인덱스 이름이 컬럼명과 같은 nickname이다.
++
++ALTER TABLE users
++    DROP INDEX nickname,
++    MODIFY COLUMN nickname VARCHAR(255) NOT NULL;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+index f95cb0c..6eb5694 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+@@ -18,7 +18,7 @@ public class JpaUserEntity extends BaseTimeEntity {
+     @Column(name = "id", nullable = false)
+     private Long id;
+ 
+-    @Column(name = "nickname", nullable = false, unique = true, length = 10)
++    @Column(name = "nickname", nullable = false)
+     private String nickname;
+ 
+     @Column(name = "password_hash", nullable = false)
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+index f5a92d8..1c90fc4 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+@@ -8,11 +8,11 @@ import org.springframework.data.repository.query.Param;
+ 
+ public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
+ 
+-    boolean existsByNicknameIgnoreCase(String nickname);
++    boolean existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+ 
+-    boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, Long id);
++    boolean existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(String nickname, Long id);
+ 
+-    Optional<JpaUserEntity> findByNicknameIgnoreCase(String nickname);
++    Optional<JpaUserEntity> findByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+ 
+     @Modifying(flushAutomatically = true, clearAutomatically = true)
+     @Query("DELETE FROM JpaUserEntity user WHERE user.id = :userId")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+index 3851661..3397930 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+@@ -1,5 +1,6 @@
+ package com.bibbidi.wedding.user.repository;
+ 
++import static com.bibbidi.wedding.common.exception.ClientError.DUPLICATE_NICKNAME;
+ import static com.bibbidi.wedding.common.exception.ClientError.USER_NOT_FOUND;
+ 
+ import com.bibbidi.wedding.common.exception.BusinessException;
+@@ -14,6 +15,9 @@ import org.springframework.stereotype.Repository;
+ @Repository
+ public class UserRepository {
+ 
++    private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다.";
++    private static final String DUPLICATE_NICKNAME_MESSAGE = "이미 사용 중인 닉네임입니다. nickname=";
++
+     private final JpaUserRepository jpaUserRepository;
+     private final UserMapper userMapper;
+ 
+@@ -22,20 +26,18 @@ public class UserRepository {
+         this.userMapper = userMapper;
+     }
+ 
+-    public boolean existsByNickname(String nickname) {
+-        return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
+-    }
+-
+-    public boolean existsByNicknameExcludingUser(String nickname, Long userId) {
+-        return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
++    public boolean existsPasswordLoginUserByNickname(String nickname) {
++        return jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname);
+     }
+ 
+     public User create(User user) {
++        validateNicknameNotUsed(user.nickname());
+         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
+         return userMapper.toDomain(saved);
+     }
+ 
+     public User update(User user) {
++        validateNicknameNotUsedByOthers(user.nickname(), user.id());
+         JpaUserEntity currentEntity = getJpaUserEntity(user.id());
+         JpaUserEntity updatedEntity = new JpaUserEntity(
+                 user.id(),
+@@ -47,8 +49,8 @@ public class UserRepository {
+         return userMapper.toDomain(saved);
+     }
+ 
+-    public User findByNickname(String nickname) {
+-        return jpaUserRepository.findByNicknameIgnoreCase(nickname)
++    public User findPasswordLoginUserByNickname(String nickname) {
++        return jpaUserRepository.findByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)
+                 .map(userMapper::toDomain)
+                 .orElseThrow(NoSuchElementException::new);
+     }
+@@ -80,12 +82,30 @@ public class UserRepository {
+         return jpaUserRepository.deleteByUserId(userId);
+     }
+ 
++    private void validateNicknameNotUsed(String nickname) {
++        if (jpaUserRepository.existsByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)) {
++            throw new BusinessException(
++                    DUPLICATE_NICKNAME,
++                    DUPLICATE_NICKNAME_MESSAGE + nickname
++            );
++        }
++    }
++
++    private void validateNicknameNotUsedByOthers(String nickname, Long userId) {
++        if (jpaUserRepository.existsByNicknameIgnoreCaseAndIdNotAndPasswordHashIsNotNull(nickname, userId)) {
++            throw new BusinessException(
++                    DUPLICATE_NICKNAME,
++                    DUPLICATE_NICKNAME_MESSAGE + nickname
++            );
++        }
++    }
++
+     private @NonNull JpaUserEntity getJpaUserEntity(Long userId) {
+         return jpaUserRepository.findById(userId)
+                 .orElseThrow(
+                         () -> new BusinessException(
+                                 USER_NOT_FOUND,
+-                                "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다." + userId
++                                USER_NOT_FOUND_MESSAGE + userId
+                         )
+                 );
+     }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+index a11cd07..043a627 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+@@ -1,13 +1,10 @@
+ package com.bibbidi.wedding.user.service;
+ 
+ import com.bibbidi.wedding.checklist.service.ChecklistService;
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.domain.WeddingDate;
+ import com.bibbidi.wedding.user.repository.UserRepository;
+ import java.time.LocalDate;
+-import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -25,26 +22,19 @@ public class UserService {
+ 
+     @Transactional
+     public UserResult createUser(String nickname, String passwordHash) {
+-        try {
+-            User user = new User(null, nickname, passwordHash);
+-            User savedUser = userRepository.create(user);
+-
+-            return UserResult.from(savedUser);
+-        } catch (DataIntegrityViolationException exception) {
+-            throw new BusinessException(
+-                    ClientError.DUPLICATE_NICKNAME,
+-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
+-            );
+-        }
++        User user = new User(null, nickname, passwordHash);
++        User savedUser = userRepository.create(user);
++
++        return UserResult.from(savedUser);
+     }
+ 
+     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
+-        boolean isAvailableNickname = !userRepository.existsByNickname(nickname);
++        boolean isAvailableNickname = !userRepository.existsPasswordLoginUserByNickname(nickname);
+         return new NicknameAvailabilityResult(nickname, isAvailableNickname);
+     }
+ 
+     public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
+-        User user = userRepository.findByNickname(nickname);
++        User user = userRepository.findPasswordLoginUserByNickname(nickname);
+         return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
+     }
+ 
+@@ -97,15 +87,8 @@ public class UserService {
+             return UserResult.from(user);
+         }
+ 
+-        try {
+-            User changedUser = user.changeNickname(nickname);
+-            User savedUser = userRepository.update(changedUser);
+-            return UserResult.from(savedUser);
+-        } catch (DataIntegrityViolationException exception) {
+-            throw new BusinessException(
+-                    ClientError.DUPLICATE_NICKNAME,
+-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
+-            );
+-        }
++        User changedUser = user.changeNickname(nickname);
++        User savedUser = userRepository.update(changedUser);
++        return UserResult.from(savedUser);
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+index 79445e6..6602738 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+@@ -1,7 +1,10 @@
+ package com.bibbidi.wedding.user.repository;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
++import com.bibbidi.wedding.common.exception.BusinessException;
++import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.domain.WeddingDate;
+ import jakarta.persistence.EntityManager;
+@@ -30,13 +33,35 @@ class UserRepositoryIntegrationTest {
+     private JdbcTemplate jdbcTemplate;
+ 
+     @Test
+-    @DisplayName("닉네임 중복 검사에서 현재 사용자는 제외하고 다른 사용자는 대소문자 없이 찾는다")
+-    void shouldIgnoreCaseAndExcludeCurrentUserWhenCheckingNickname() {
++    @DisplayName("비밀번호 로그인 회원 중복 검사는 영문 대소문자를 구분하지 않는다")
++    void shouldIgnoreCaseWhenCheckingPasswordLoginUser() {
++        userRepository.create(new User(null, "Bibbidi", "hash-one"));
++
++        assertThat(userRepository.existsPasswordLoginUserByNickname("bibbidi")).isTrue();
++        assertThat(userRepository.existsPasswordLoginUserByNickname("Magic")).isFalse();
++    }
++
++    @Test
++    @DisplayName("다른 비밀번호 로그인 회원이 쓰는 닉네임으로는 저장할 수 없다")
++    void shouldRejectNicknameUsedByAnotherPasswordLoginUser() {
++        userRepository.create(new User(null, "Bibbidi", "hash-one"));
++
++        assertThatThrownBy(() -> userRepository.create(new User(null, "bibbidi", "hash-two")))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
++    }
++
++    @Test
++    @DisplayName("다른 비밀번호 로그인 회원이 쓰는 닉네임으로는 변경할 수 없다")
++    void shouldRejectNicknameChangeToOneUsedByAnotherPasswordLoginUser() {
+         User currentUser = userRepository.create(new User(null, "Bibbidi", "hash-one"));
+         userRepository.create(new User(null, "Magic", "hash-two"));
+ 
+-        assertThat(userRepository.existsByNicknameExcludingUser("bibbidi", currentUser.id())).isFalse();
+-        assertThat(userRepository.existsByNicknameExcludingUser("MAGIC", currentUser.id())).isTrue();
++        assertThatThrownBy(() -> userRepository.update(currentUser.changeNickname("magic")))
++                .isInstanceOf(BusinessException.class)
++                .extracting(exception -> ((BusinessException) exception).clientError())
++                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+     }
+ 
+     @Test
+@@ -53,7 +78,7 @@ class UserRepositoryIntegrationTest {
+         assertThat(updated.nickname()).isEqualTo("bibbidi");
+         assertThat(updated.passwordHash()).isEqualTo("password-hash");
+         assertThat(userRepository.findWeddingDateByUserId(user.id()).date()).isEqualTo(weddingDate);
+-        assertThat(userRepository.findByNickname("BIBBIDI").nickname()).isEqualTo("bibbidi");
++        assertThat(userRepository.findPasswordLoginUserByNickname("BIBBIDI").nickname()).isEqualTo("bibbidi");
+     }
+ 
+     @Test
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceConcurrencyIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceConcurrencyIntegrationTest.java
+deleted file mode 100644
+index 577b4a3..0000000
+--- a/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceConcurrencyIntegrationTest.java
++++ /dev/null
+@@ -1,124 +0,0 @@
+-package com.bibbidi.wedding.user.service;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import com.bibbidi.wedding.common.exception.BusinessException;
+-import com.bibbidi.wedding.common.exception.ClientError;
+-import com.bibbidi.wedding.user.domain.User;
+-import com.bibbidi.wedding.user.persistence.JpaUserRepository;
+-import com.bibbidi.wedding.user.repository.UserRepository;
+-import java.util.List;
+-import java.util.concurrent.CountDownLatch;
+-import java.util.concurrent.ExecutorService;
+-import java.util.concurrent.Executors;
+-import java.util.concurrent.Future;
+-import java.util.concurrent.TimeUnit;
+-import org.junit.jupiter.api.AfterEach;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.boot.test.context.SpringBootTest;
+-import org.springframework.test.context.ActiveProfiles;
+-
+-@SpringBootTest
+-@ActiveProfiles("test")
+-class UserServiceConcurrencyIntegrationTest {
+-
+-    private static final String NICKNAME = "bibbidi";
+-    private static final String PASSWORD_HASH = "password-hash";
+-
+-    @Autowired
+-    private UserService userService;
+-
+-    @Autowired
+-    private UserRepository userRepository;
+-
+-    @Autowired
+-    private JpaUserRepository jpaUserRepository;
+-
+-    @AfterEach
+-    void tearDown() {
+-        jpaUserRepository.deleteAll();
+-    }
+-
+-    @Test
+-    @DisplayName("같은 닉네임의 회원가입 요청이 동시에 와도 한 명만 가입시킨다")
+-    void shouldRegisterOnlyOneUserForConcurrentRequests() throws Exception {
+-        CountDownLatch ready = new CountDownLatch(2);
+-        CountDownLatch start = new CountDownLatch(1);
+-
+-        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+-            Future<Boolean> first = executor.submit(() -> tryCreateUser(ready, start));
+-            Future<Boolean> second = executor.submit(() -> tryCreateUser(ready, start));
+-
+-            boolean allRequestsAreReady = ready.await(5, TimeUnit.SECONDS);
+-            start.countDown();
+-            assertThat(allRequestsAreReady).isTrue();
+-
+-            List<Boolean> results = List.of(
+-                    first.get(5, TimeUnit.SECONDS),
+-                    second.get(5, TimeUnit.SECONDS)
+-            );
+-
+-            assertThat(results).containsExactlyInAnyOrder(true, false);
+-        }
+-
+-        assertThat(jpaUserRepository.count()).isOne();
+-        assertThat(userRepository.findByNickname(NICKNAME).nickname()).isEqualTo(NICKNAME);
+-    }
+-
+-    @Test
+-    @DisplayName("서로 다른 사용자가 같은 닉네임으로 동시에 변경해도 한 명만 변경시킨다")
+-    void shouldChangeNicknameForOnlyOneUserOnConcurrentRequests() throws Exception {
+-        User first = userRepository.create(new User(null, "first", PASSWORD_HASH));
+-        User second = userRepository.create(new User(null, "second", PASSWORD_HASH));
+-        CountDownLatch ready = new CountDownLatch(2);
+-        CountDownLatch start = new CountDownLatch(1);
+-
+-        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+-            Future<Boolean> firstChange = executor.submit(() -> tryChangeNickname(first.id(), ready, start));
+-            Future<Boolean> secondChange = executor.submit(() -> tryChangeNickname(second.id(), ready, start));
+-
+-            boolean allRequestsAreReady = ready.await(5, TimeUnit.SECONDS);
+-            start.countDown();
+-            assertThat(allRequestsAreReady).isTrue();
+-
+-            List<Boolean> results = List.of(
+-                    firstChange.get(5, TimeUnit.SECONDS),
+-                    secondChange.get(5, TimeUnit.SECONDS)
+-            );
+-
+-            assertThat(results).containsExactlyInAnyOrder(true, false);
+-        }
+-
+-        assertThat(userRepository.findByNickname(NICKNAME).id()).isIn(first.id(), second.id());
+-        assertThat(jpaUserRepository.count()).isEqualTo(2);
+-    }
+-
+-    private boolean tryCreateUser(CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+-        ready.countDown();
+-        start.await();
+-
+-        try {
+-            userService.createUser(NICKNAME, PASSWORD_HASH);
+-            return true;
+-        } catch (BusinessException exception) {
+-            assertThat(exception.clientError()).isEqualTo(ClientError.DUPLICATE_NICKNAME);
+-            return false;
+-        }
+-    }
+-
+-    private boolean tryChangeNickname(Long userId, CountDownLatch ready, CountDownLatch start)
+-            throws InterruptedException {
+-        ready.countDown();
+-        start.await();
+-
+-        try {
+-            userService.changeNickname(userId, NICKNAME);
+-            return true;
+-        } catch (BusinessException exception) {
+-            assertThat(exception.clientError()).isEqualTo(ClientError.DUPLICATE_NICKNAME);
+-            return false;
+-        }
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceTest.java
+index 9f457de..e08d3aa 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/service/UserServiceTest.java
+@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.ArgumentMatchers.argThat;
+ import static org.mockito.BDDMockito.given;
+ import static org.mockito.BDDMockito.then;
+-import static org.mockito.BDDMockito.willThrow;
+ import static org.mockito.Mockito.inOrder;
+ import static org.mockito.Mockito.never;
+ 
+@@ -24,7 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
+ import org.mockito.InOrder;
+ import org.mockito.Mock;
+ import org.mockito.junit.jupiter.MockitoExtension;
+-import org.springframework.dao.DataIntegrityViolationException;
+ 
+ @ExtendWith(MockitoExtension.class)
+ class UserServiceTest {
+@@ -97,20 +95,6 @@ class UserServiceTest {
+         then(userRepository).should(never()).update(any(User.class));
+     }
+ 
+-    @Test
+-    @DisplayName("다른 사용자가 이미 사용하는 닉네임이면 변경을 거절한다")
+-    void shouldRejectWhenAnotherUserAlreadyHasNickname() {
+-        User user = new User(1L, "current", "password-hash");
+-        given(userRepository.findById(1L)).willReturn(user);
+-        willThrow(new DataIntegrityViolationException("uk_users_nickname"))
+-                .given(userRepository).update(any(User.class));
+-
+-        assertThatThrownBy(() -> userService.changeNickname(1L, "TAKEN"))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+-    }
+-
+     @Test
+     @DisplayName("Session의 사용자 ID로 DB에서 사용자를 찾을 수 없으면 사용자 없음 오류를 유지한다")
+     void shouldKeepUserNotFoundWhenSessionUserDoesNotExist() {
+@@ -138,9 +122,9 @@ class UserServiceTest {
+     }
+ 
+     @Test
+-    @DisplayName("사용 중이지 않은 닉네임은 사용할 수 있다고 응답한다")
+-    void shouldReportNicknameAsAvailableWhenNobodyUsesIt() {
+-        given(userRepository.existsByNickname("bibbidi")).willReturn(false);
++    @DisplayName("비밀번호 로그인 회원이 쓰지 않는 닉네임은 사용할 수 있다고 응답한다")
++    void shouldReportNicknameAsAvailableWhenNoPasswordLoginUserUsesIt() {
++        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(false);
+ 
+         NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+ 
+@@ -148,27 +132,15 @@ class UserServiceTest {
+     }
+ 
+     @Test
+-    @DisplayName("이미 사용 중인 닉네임은 사용할 수 없다고 응답한다")
+-    void shouldReportNicknameAsUnavailableWhenSomebodyUsesIt() {
+-        given(userRepository.existsByNickname("bibbidi")).willReturn(true);
++    @DisplayName("비밀번호 로그인 회원이 이미 쓰는 닉네임은 사용할 수 없다고 응답한다")
++    void shouldReportNicknameAsUnavailableWhenPasswordLoginUserUsesIt() {
++        given(userRepository.existsPasswordLoginUserByNickname("bibbidi")).willReturn(true);
+ 
+         NicknameAvailabilityResult result = userService.checkNicknameAvailability("bibbidi");
+ 
+         assertThat(result).isEqualTo(new NicknameAvailabilityResult("bibbidi", false));
+     }
+ 
+-    @Test
+-    @DisplayName("이미 사용 중인 닉네임으로는 회원가입을 거절한다")
+-    void shouldRejectRegistrationWhenNicknameIsAlreadyTaken() {
+-        given(userRepository.create(any(User.class)))
+-                .willThrow(new DataIntegrityViolationException("uk_users_nickname"));
+-
+-        assertThatThrownBy(() -> userService.createUser("bibbidi", "password-hash"))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.DUPLICATE_NICKNAME);
+-    }
+-
+     @Test
+     @DisplayName("현재 사용자의 비밀번호 해시를 도메인에서 변경하고 저장한다")
+     void shouldChangeAndSaveCurrentUserPasswordHash() {

@@ -133,11 +133,12 @@ jobs:
           set -a
           . /opt/bibbidi/app/.env.nginx
           set +a
-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT}' \
+          test -n "$H2_CONSOLE_ALLOWED_IP"
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${H2_CONSOLE_ALLOWED_IP}' \
             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
             > /opt/bibbidi/app/infra/nginx/nginx.conf
           test -s /opt/bibbidi/app/infra/nginx/nginx.conf
-          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT)\}' \
+          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT|H2_CONSOLE_ALLOWED_IP)\}' \
             /opt/bibbidi/app/infra/nginx/nginx.conf
 
       - name: nginx 기동을 위한 TLS 인증서 초기화
