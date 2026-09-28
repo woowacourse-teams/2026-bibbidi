@@ -7,15 +7,12 @@ import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
-import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class UserRepository {
-
-    private static final String USER_NOT_FOUND_MESSAGE = "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다. userId=";
 
     private final JpaUserRepository jpaUserRepository;
     private final UserMapper userMapper;
@@ -29,10 +26,10 @@ public class UserRepository {
         return jpaUserRepository.existsByNicknameIgnoreCase(nickname);
     }
 
-    /**
-     * 소셜 가입으로 만들어지는 회원이다.
-     * 소셜에서 받은 닉네임은 서로 겹칠 수 있으므로 닉네임 중복을 막지 않는다.
-     */
+    public boolean existsByNicknameExcludingUser(String nickname, Long userId) {
+        return jpaUserRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
+    }
+
     public User create(User user) {
         JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(user));
         return userMapper.toDomain(saved);
@@ -40,9 +37,20 @@ public class UserRepository {
 
     public User update(User user) {
         JpaUserEntity currentEntity = getJpaUserEntity(user.id());
-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
-                userMapper.toEntity(user, currentEntity.weddingDate()));
+        JpaUserEntity updatedEntity = new JpaUserEntity(
+                user.id(),
+                user.nickname(),
+                user.passwordHash(),
+                currentEntity.weddingDate()
+        );
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
         return userMapper.toDomain(saved);
+    }
+
+    public User findByNickname(String nickname) {
+        return jpaUserRepository.findByNicknameIgnoreCase(nickname)
+                .map(userMapper::toDomain)
+                .orElseThrow(NoSuchElementException::new);
     }
 
     public User findById(Long userId) {
@@ -58,18 +66,14 @@ public class UserRepository {
 
     public WeddingDate saveWeddingDate(WeddingDate weddingDate) {
         JpaUserEntity currentEntity = getJpaUserEntity(weddingDate.userId());
-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
-                userMapper.toEntity(userMapper.toDomain(currentEntity), weddingDate.date()));
+        JpaUserEntity updatedEntity = new JpaUserEntity(
+                weddingDate.userId(),
+                currentEntity.nickname(),
+                currentEntity.passwordHash(),
+                weddingDate.date()
+        );
+        JpaUserEntity saved = jpaUserRepository.saveAndFlush(updatedEntity);
         return new WeddingDate(saved.id(), saved.weddingDate());
-    }
-
-    public Optional<PasswordLoginInfo> findPasswordLoginInfo(String nickname) {
-        return jpaUserRepository.findByNicknameIgnoreCaseAndPasswordHashIsNotNull(nickname)
-                .map(entity -> new PasswordLoginInfo(entity.id(), entity.passwordHash()));
-    }
-
-    public int removePasswordHash(Long userId) {
-        return jpaUserRepository.removePasswordHashByUserId(userId);
     }
 
     public int deleteById(Long userId) {
@@ -81,7 +85,7 @@ public class UserRepository {
                 .orElseThrow(
                         () -> new BusinessException(
                                 USER_NOT_FOUND,
-                                USER_NOT_FOUND_MESSAGE + userId
+                                "제공받은 아이디를 기반으로 회원을 찾을 수 없습니다." + userId
                         )
                 );
     }

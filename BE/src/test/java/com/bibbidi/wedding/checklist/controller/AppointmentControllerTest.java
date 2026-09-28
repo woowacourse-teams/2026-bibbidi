@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static com.bibbidi.wedding.support.AuthenticationTestSupport.authenticatedUser;
 import static org.mockito.Mockito.when;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -20,26 +19,28 @@ import com.bibbidi.wedding.checklist.service.AppointmentService;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+import com.bibbidi.wedding.auth.config.AuthWebConfig;
+import com.bibbidi.wedding.auth.session.AuthArgumentResolver;
+import com.bibbidi.wedding.auth.session.AuthSession;
+import com.bibbidi.wedding.auth.session.SessionUserIdProvider;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import com.bibbidi.wedding.support.SecurityTestConfig;
-import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
-@Import(SecurityTestConfig.class)
 @WebMvcTest(AppointmentController.class)
+@Import({AuthWebConfig.class, AuthArgumentResolver.class, SessionUserIdProvider.class})
 class AppointmentControllerTest {
-
-    private static final Long USER_ID = 1L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -72,7 +73,7 @@ class AppointmentControllerTest {
                 .thenReturn(serviceResult);
 
         mockMvc.perform(post("/api/checklist-items/1/appointments")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -102,7 +103,7 @@ class AppointmentControllerTest {
         );
 
         mockMvc.perform(post("/api/checklist-items/1/appointments")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -117,7 +118,7 @@ class AppointmentControllerTest {
                 LocalDateTime.of(2026, 9, 1, 10, 0), null, null);
 
         mockMvc.perform(post("/api/checklist-items/1/appointments")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -137,7 +138,7 @@ class AppointmentControllerTest {
         when(appointmentService.update(any(AppointmentUpdateCommand.class))).thenReturn(result);
 
         mockMvc.perform(put("/api/appointments/1")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -158,7 +159,7 @@ class AppointmentControllerTest {
                 LocalDateTime.of(2026, 9, 1, 10, 0), null, null);
 
         mockMvc.perform(put("/api/appointments/1")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -186,8 +187,7 @@ class AppointmentControllerTest {
     @DisplayName("일정 삭제 요청을 서비스 명령으로 전달한다")
     void shouldDeleteAppointment() throws Exception {
         mockMvc.perform(delete("/api/appointments/1")
-                        .with(authenticatedUser(USER_ID))
-                        .with(authenticatedUser(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
 
         then(appointmentService).should().delete(1L, 1L);
@@ -205,8 +205,7 @@ class AppointmentControllerTest {
         ));
 
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .with(authenticatedUser(USER_ID))
-                        .with(authenticatedUser(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1));
 
@@ -219,7 +218,7 @@ class AppointmentControllerTest {
         when(appointmentService.findNearby(eq(1L), eq(3), any(LocalDateTime.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .param("limit", "3"))
                 .andExpect(status().isOk());
 
@@ -230,7 +229,7 @@ class AppointmentControllerTest {
     @DisplayName("limit이 최대값을 넘으면 가까운 일정 조회를 거부한다")
     void shouldRejectNearbyRequestWhenLimitExceedsMax() throws Exception {
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .param("limit", "21"))
                 .andExpect(status().isBadRequest());
     }
@@ -239,7 +238,7 @@ class AppointmentControllerTest {
     @DisplayName("limit이 1보다 작으면 가까운 일정 조회를 거부한다")
     void shouldRejectNearbyRequestWhenLimitIsBelowMinimum() throws Exception {
         mockMvc.perform(get("/api/appointments/me/nearby")
-                        .with(authenticatedUser(USER_ID))
+                        .session(authenticatedSession())
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest());
     }
@@ -251,4 +250,9 @@ class AppointmentControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    private static MockHttpSession authenticatedSession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, 1L);
+        return session;
+    }
 }

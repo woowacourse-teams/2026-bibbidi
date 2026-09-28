@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willThrow;
 
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
@@ -79,7 +80,7 @@ class ChecklistItemCompletionTransactionIntegrationTest {
         );
         willThrow(new IllegalStateException("checklist item completion failed"))
                 .given(jpaChecklistItemRepository)
-                .flush();
+                .saveAndFlush(any(JpaChecklistItemEntity.class));
 
         // when, then
         assertThatThrownBy(() -> checklistService.changeItemStatus(OWNER_ID, checklistItem.id(), "done"))

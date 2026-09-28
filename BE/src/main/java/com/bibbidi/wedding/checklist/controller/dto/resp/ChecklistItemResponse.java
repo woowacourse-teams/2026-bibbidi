@@ -1,15 +1,13 @@
 package com.bibbidi.wedding.checklist.controller.dto.resp;
 
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
-import java.time.LocalDateTime;
 
 public record ChecklistItemResponse(
         Long id,
         Long catalogItemId,
         Long categoryId,
         String title,
-        String status,
-        LocalDateTime createdAt
+        String status
 ) {
 
     public static ChecklistItemResponse from(ChecklistItemResult result) {
@@ -18,8 +16,7 @@ public record ChecklistItemResponse(
                 result.catalogItemId(),
                 result.categoryId(),
                 result.title(),
-                result.status().value(),
-                result.createdAt()
+                result.status().value()
         );
     }
 }

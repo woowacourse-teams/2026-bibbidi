@@ -1,12 +1,10 @@
 package com.bibbidi.wedding.checklist.controller;
 
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
@@ -15,8 +13,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
-import com.bibbidi.wedding.support.AuthenticationTestSupport;
+import com.bibbidi.wedding.auth.session.AuthSession;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlMergeMode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,13 +29,6 @@ import tools.jackson.databind.ObjectMapper;
 @Sql("/checklist-item-fixture.sql")
 @SqlMergeMode(SqlMergeMode.MergeMode.MERGE)
 class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
-
-    @Autowired
-    private BibbidiTokenIssuer bibbidiTokenIssuer;
-
-    private String bearerToken(Long userId) {
-        return AuthenticationTestSupport.bearerTokenOf(bibbidiTokenIssuer, userId, "테스트회원");
-    }
 
     private static final String CHANGE_CATEGORY_URL = "/api/checklist-items/{itemId}/category";
     private static final String CHANGE_TITLE_URL = "/api/checklist-items/{itemId}/title";
@@ -56,8 +47,9 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     private static final Long NEW_CATEGORY_ID = 3L;
     private static final String NEW_TITLE = "청첩장 문구 최종 확정";
 
+    private static final String DOCUMENTED_SESSION_COOKIE = "JSESSIONID=<session-id>";
     private static final String SESSION_COOKIE_DESCRIPTION =
-            "로그인 시 발급된 access token";
+            "로그인 시 발급된 JSESSIONID Session Cookie";
     private static final String CHANGE_CATEGORY_SUMMARY = "직접 만든 할 일의 카테고리 변경";
     private static final String CHANGE_CATEGORY_DESCRIPTION =
             "직접 만든 할 일의 카테고리만 바꿉니다. 제목과 완료 상태, 연결된 일정은 그대로 유지합니다. "
@@ -84,6 +76,11 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private static MockHttpSession authenticatedSession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(AuthSession.USER_ID_ATTRIBUTE, USER_ID);
+        return session;
+    }
 
     private String requestBody(Long categoryId) {
         return objectMapper.writeValueAsString(categoryId);
@@ -102,7 +99,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldCompleteItemAndRemainingAppointments() throws Exception {
         // when
         mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("done")))
                 .andExpect(status().isOk())
@@ -119,7 +117,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 + " 요청 본문은 바꿀 상태(prev, continue, done 중 하나, 대소문자 구분 없음)를 나타내는 문자열 하나입니다.")
                                         .responseSchema(schema("ChecklistItemResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.AUTHORIZATION)
+                                                headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .pathParameters(
@@ -130,8 +128,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 fieldWithPath("catalogItemId").description("원본 준비 항목 ID. 직접 만든 할 일이면 null"),
                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                                 fieldWithPath("title").description("할 일 제목"),
-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
-                                                fieldWithPath("createdAt").description("할 일 생성 시각")
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                         )
                                         .build())
                         )
@@ -143,7 +140,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldReopenAppointmentsCompletedByChecklistItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("prev")))
                 .andExpect(status().isOk())
@@ -155,7 +152,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldReopenAppointmentsWhenItemBecomesInProgress() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, DONE_BY_CHECKLIST_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("continue")))
                 .andExpect(status().isOk())
@@ -167,7 +164,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectStatusChangeWhenStatusIsMissing() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody(null)))
                 .andExpect(status().isBadRequest())
@@ -179,7 +176,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectStatusChangeWhenStatusIsUnknown() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\": \"FINISHED\"}"))
                 .andExpect(status().isBadRequest())
@@ -191,7 +188,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectStatusChangeForOtherUsersItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, OTHER_USERS_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("done")))
                 .andExpect(status().isForbidden())
@@ -204,7 +201,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectStatusChangeWhenItemDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusRequestBody("done")))
                 .andExpect(status().isNotFound())
@@ -213,7 +210,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("access token이 없으면 할 일의 상태를 바꿀 수 없다")
+    @DisplayName("인증 Session이 없으면 할 일의 상태를 바꿀 수 없다")
     void shouldRequireAuthenticationToChangeStatus() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
@@ -229,7 +226,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldReportRemainingAppointmentsWhenAppointmentIsNotDone() throws Exception {
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(true))
                 .andDo(document(
@@ -240,7 +238,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(REMAINING_APPOINTMENTS_DESCRIPTION
                                         + " 응답 본문은 완료하지 않은 일정이 남아 있는지 여부를 나타내는 boolean 값 하나입니다.")
                                 .requestHeaders(
-                                        headerWithName(HttpHeaders.AUTHORIZATION)
+                                        headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)
                                 )
                                 .pathParameters(
@@ -255,7 +253,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldReportNoRemainingAppointmentsWhenEveryAppointmentIsDone() throws Exception {
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, ALL_APPOINTMENTS_DONE_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(false));
     }
@@ -267,7 +265,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
 
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(false));
     }
@@ -277,7 +275,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectRemainingAppointmentsLookupForOtherUsersItem() throws Exception {
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, OTHER_USERS_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203))
                 .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
@@ -288,14 +286,14 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectRemainingAppointmentsLookupWhenItemDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value(304))
                 .andExpect(jsonPath("$.message").value("할 일을 찾을 수 없습니다."));
     }
 
     @Test
-    @DisplayName("access token이 없으면 남은 일정을 확인할 수 없다")
+    @DisplayName("인증 Session이 없으면 남은 일정을 확인할 수 없다")
     void shouldRequireAuthenticationToLookUpRemainingAppointments() throws Exception {
         // when, then
         mockMvc.perform(get(REMAINING_APPOINTMENTS_URL, CUSTOM_ITEM_ID))
@@ -309,7 +307,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldChangeCategoryOfCustomItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isOk())
@@ -326,7 +325,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
                                 .responseSchema(schema("ChecklistItemResponse"))
                                 .requestHeaders(
-                                        headerWithName(HttpHeaders.AUTHORIZATION)
+                                        headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)
                                 )
                                 .pathParameters(
@@ -338,57 +337,10 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                 .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                         fieldWithPath("categoryId").description("변경된 카테고리 ID"),
                                         fieldWithPath("title").description("할 일 제목"),
-                                        fieldWithPath("status").description("할 일 상태. prev, continue, done"),
-                                        fieldWithPath("createdAt").description("할 일 생성 시각")
+                                        fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                 )
                                 .build())
                 ));
-    }
-
-    @Test
-    @DisplayName("제목, 카테고리, 상태를 변경해도 생성 시각은 유지된다")
-    void shouldKeepCreatedAtAfterChangingItem() throws Exception {
-        String originalCreatedAt = createdAtOfCustomItem();
-
-        String titleResponse = mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(titleRequestBody(NEW_TITLE)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        assertThat(objectMapper.readTree(titleResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
-
-        String categoryResponse = mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody(NEW_CATEGORY_ID)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        assertThat(objectMapper.readTree(categoryResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
-
-        String statusResponse = mockMvc.perform(put(CHANGE_STATUS_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusRequestBody("continue")))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        assertThat(objectMapper.readTree(statusResponse).get("createdAt").asText()).isEqualTo(originalCreatedAt);
-        assertThat(createdAtOfCustomItem()).isEqualTo(originalCreatedAt);
-    }
-
-    private String createdAtOfCustomItem() throws Exception {
-        String checklistResponse = mockMvc.perform(get("/api/checklists/me")
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        var items = objectMapper.readTree(checklistResponse).get("items");
-        for (int index = 0; index < items.size(); index++) {
-            var item = items.get(index);
-            if (item.get("id").asLong() == CUSTOM_ITEM_ID) {
-                return item.get("createdAt").asText();
-            }
-        }
-        throw new AssertionError("조회 응답에서 직접 만든 할 일을 찾지 못했습니다.");
     }
 
     @Test
@@ -396,7 +348,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldChangeCategoryOfDoneItemAndKeepOtherInformation() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, DONE_CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isOk())
@@ -410,7 +362,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldAcceptChangeToSameCategory() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(CURRENT_CATEGORY_ID)))
                 .andExpect(status().isOk())
@@ -422,7 +374,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectChangeForItemAddedFromCatalog() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CATALOG_SOURCED_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isUnprocessableEntity())
@@ -436,7 +389,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .description(CHANGE_CATEGORY_DESCRIPTION + " 요청 본문은 새로 지정할 카테고리 ID를 나타내는 숫자 하나입니다.")
                                 .responseSchema(schema("ErrorResponse"))
                                 .requestHeaders(
-                                        headerWithName(HttpHeaders.AUTHORIZATION)
+                                        headerWithName(HttpHeaders.COOKIE)
                                                 .description(SESSION_COOKIE_DESCRIPTION)
                                 )
                                 .pathParameters(
@@ -455,7 +408,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectChangeForOtherUsersItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, OTHER_USERS_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isForbidden())
@@ -468,7 +421,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectChangeWhenItemDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(NEW_CATEGORY_ID)))
                 .andExpect(status().isNotFound())
@@ -481,7 +434,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectChangeWhenCategoryDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(999L)))
                 .andExpect(status().isNotFound())
@@ -494,7 +447,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectChangeWhenCategoryIsMissing() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(null)))
                 .andExpect(status().isBadRequest())
@@ -502,7 +455,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("access token이 없으면 카테고리를 변경할 수 없다")
+    @DisplayName("인증 Session이 없으면 카테고리를 변경할 수 없다")
     void shouldRequireAuthenticationToChangeCategory() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_CATEGORY_URL, CUSTOM_ITEM_ID)
@@ -518,7 +471,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldChangeTitleOfCustomItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isOk())
@@ -535,7 +489,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다. 공백만 보낼 수 없고 50자를 넘을 수 없습니다.")
                                         .responseSchema(schema("ChecklistItemResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.AUTHORIZATION)
+                                                headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .pathParameters(
@@ -547,8 +501,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                                         .description("원본 준비 항목 ID. 직접 만든 할 일만 변경할 수 있으므로 항상 null"),
                                                 fieldWithPath("categoryId").description("할 일 카테고리 ID"),
                                                 fieldWithPath("title").description("변경된 할 일 제목"),
-                                                fieldWithPath("status").description("할 일 상태. prev, continue, done"),
-                                                fieldWithPath("createdAt").description("할 일 생성 시각")
+                                                fieldWithPath("status").description("할 일 상태. prev, continue, done")
                                         )
                                         .build())
                         )
@@ -560,7 +513,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldChangeTitleOfDoneItemAndKeepOtherInformation() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, DONE_CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isOk())
@@ -574,7 +527,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldAcceptChangeToSameTitle() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody("청첩장 문구 정하기")))
                 .andExpect(status().isOk())
@@ -586,7 +539,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTitleChangeForItemAddedFromCatalog() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CATALOG_SOURCED_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isUnprocessableEntity())
@@ -600,7 +554,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(CHANGE_TITLE_DESCRIPTION + " 요청 본문은 새로 지정할 제목을 나타내는 문자열 하나입니다.")
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.AUTHORIZATION)
+                                                headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .pathParameters(
@@ -620,7 +574,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldKeepSourceCatalogItemTitleWhenTitleChangeIsRejected() throws Exception {
         // when
         mockMvc.perform(put(CHANGE_TITLE_URL, CATALOG_SOURCED_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isUnprocessableEntity());
@@ -631,7 +585,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTitleChangeForOtherUsersItem() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, OTHER_USERS_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isForbidden())
@@ -644,7 +598,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTitleChangeWhenItemDoesNotExist() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody(NEW_TITLE)))
                 .andExpect(status().isNotFound())
@@ -657,7 +611,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTitleChangeWhenTitleIsBlank() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody("   ")))
                 .andExpect(status().isBadRequest())
@@ -669,7 +623,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectTitleChangeWhenTitleIsTooLong() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID))
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(titleRequestBody("가".repeat(51))))
                 .andExpect(status().isBadRequest())
@@ -677,7 +631,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @DisplayName("access token이 없으면 제목을 변경할 수 없다")
+    @DisplayName("인증 Session이 없으면 제목을 변경할 수 없다")
     void shouldRequireAuthenticationToChangeTitle() throws Exception {
         // when, then
         mockMvc.perform(put(CHANGE_TITLE_URL, CUSTOM_ITEM_ID)
@@ -693,7 +647,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldDeleteIncompleteItemAndAppointments() throws Exception {
         // when
         mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isNoContent())
                 .andDo(document(
                                 "checklist-items-delete",
@@ -702,7 +657,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .summary(DELETE_ITEM_SUMMARY)
                                         .description(DELETE_ITEM_DESCRIPTION)
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.AUTHORIZATION)
+                                                headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .pathParameters(
@@ -718,7 +673,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldDeleteContinueItemAndAppointments() throws Exception {
         // when
         mockMvc.perform(delete(DELETE_ITEM_URL, CONTINUE_CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
     }
 
@@ -727,7 +682,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldDeleteCatalogSourcedItemAndKeepCatalogItem() throws Exception {
         // when
         mockMvc.perform(delete(DELETE_ITEM_URL, CATALOG_SOURCED_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
     }
 
@@ -736,7 +691,8 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectDeletionWhenItemIsDone() throws Exception {
         // when, then
         mockMvc.perform(delete(DELETE_ITEM_URL, DONE_CUSTOM_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession())
+                        .header(HttpHeaders.COOKIE, DOCUMENTED_SESSION_COOKIE))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value(406))
                 .andExpect(jsonPath("$.message").value("완료된 할 일은 삭제할 수 없습니다."))
@@ -748,7 +704,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
                                         .description(DELETE_ITEM_DESCRIPTION)
                                         .responseSchema(schema("ErrorResponse"))
                                         .requestHeaders(
-                                                headerWithName(HttpHeaders.AUTHORIZATION)
+                                                headerWithName(HttpHeaders.COOKIE)
                                                         .description(SESSION_COOKIE_DESCRIPTION)
                                         )
                                         .pathParameters(
@@ -768,7 +724,7 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldRejectDeletionWhenItemBelongsToAnotherUser() throws Exception {
         // when, then
         mockMvc.perform(delete(DELETE_ITEM_URL, OTHER_USERS_ITEM_ID)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(203))
                 .andExpect(jsonPath("$.message").value("해당 할 일에 대한 작업 권한이 없습니다."));
@@ -779,15 +735,15 @@ class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldTreatMissingItemAsAlreadyDeleted() throws Exception {
         // when, then
         mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(delete(DELETE_ITEM_URL, 9999L)
-                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                        .session(authenticatedSession()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    @DisplayName("access token이 없으면 할 일을 삭제할 수 없다")
+    @DisplayName("인증 Session이 없으면 할 일을 삭제할 수 없다")
     void shouldRequireAuthenticationToDeleteItem() throws Exception {
         // when, then
         mockMvc.perform(delete(DELETE_ITEM_URL, CUSTOM_ITEM_ID))
