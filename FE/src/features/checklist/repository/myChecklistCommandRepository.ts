@@ -216,6 +216,7 @@ function toCustomChecklistItemModel(
   return {
     appointments: [],
     categoryId: item.categoryId,
+    createdAt: item.createdAt,
     id: item.id,
     sourceCatalogItemId: null,
     status: item.status,

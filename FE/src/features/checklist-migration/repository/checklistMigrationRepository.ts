@@ -18,7 +18,10 @@ import {
 const MAX_ADD_ATTEMPTS = 2;
 
 export interface ChecklistMigrationRepository {
-  migrate(signal?: AbortSignal): Promise<void>;
+  migrate(
+    initialChecklist: MyChecklistModel,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 
 export class ChecklistMigrationAuthenticationRequiredError extends Error {
@@ -118,6 +121,14 @@ export function createChecklistMigrationRepository(
     signal: AbortSignal,
   ) => {
     const checklist = await loadChecklist(signal);
+
+    return reconcileWithChecklist(checklist, localCatalogItemIds);
+  };
+
+  const reconcileWithChecklist = (
+    checklist: MyChecklistModel,
+    localCatalogItemIds: number[],
+  ) => {
     const serverCatalogItemIds = getServerCatalogItemIds(checklist);
 
     removeConfirmedCatalogItemIds(
@@ -128,20 +139,11 @@ export function createChecklistMigrationRepository(
     );
 
     return {
-      checklistExists: checklist.exists,
       missingCatalogItemIds: getMissingCatalogItemIds(
         localCatalogItemIds,
         serverCatalogItemIds,
       ),
     };
-  };
-
-  const ensureChecklist = async (signal: AbortSignal) => {
-    try {
-      await commandRepository.ensureChecklist(signal);
-    } catch (error) {
-      throwMigrationError(error);
-    }
   };
 
   const reconcileMissingChecklist = async (signal: AbortSignal) => {
@@ -152,7 +154,10 @@ export function createChecklistMigrationRepository(
     }
   };
 
-  const runMigration = async (signal: AbortSignal): Promise<void> => {
+  const runMigration = async (
+    initialChecklist: MyChecklistModel,
+    signal: AbortSignal,
+  ): Promise<void> => {
     let localCatalogItemIds: number[];
 
     try {
@@ -165,15 +170,10 @@ export function createChecklistMigrationRepository(
       return;
     }
 
-    let serverState = await reconcileWithServer(localCatalogItemIds, signal);
-
-    if (
-      !serverState.checklistExists &&
-      serverState.missingCatalogItemIds.length > 0
-    ) {
-      await ensureChecklist(signal);
-      serverState = await reconcileWithServer(localCatalogItemIds, signal);
-    }
+    let serverState = reconcileWithChecklist(
+      initialChecklist,
+      localCatalogItemIds,
+    );
 
     for (let attempt = 0; attempt < MAX_ADD_ATTEMPTS; attempt += 1) {
       if (serverState.missingCatalogItemIds.length === 0) {
@@ -243,8 +243,11 @@ export function createChecklistMigrationRepository(
   };
 
   return {
-    migrate(signal) {
-      return runMigration(signal ?? new AbortController().signal);
+    migrate(initialChecklist, signal) {
+      return runMigration(
+        initialChecklist,
+        signal ?? new AbortController().signal,
+      );
     },
   };
 }

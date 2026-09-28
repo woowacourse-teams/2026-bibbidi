@@ -16,7 +16,7 @@ const routes: RouteObject[] = [
   { path: "/planner", element: <h1>플래너</h1> },
   { path: "/checklist", element: <h1>체크리스트</h1> },
   { path: "/login", element: <h1>로그인</h1> },
-  { path: "/signup", element: <h1>회원가입</h1> },
+  { path: "/signup", element: <Navigate replace to="/login" /> },
   { path: "/preparation", element: <Navigate replace to="/" /> },
   { path: "*", element: <Navigate replace to="/" /> },
 ];
@@ -78,22 +78,20 @@ describe("startRouterPageViewTracking", () => {
     ).toEqual(["/", "/planner", "/", "/planner"]);
   });
 
-  it("replace 이동을 새 화면 페이지뷰로 측정한다", async () => {
-    const { analytics, router } = renderTrackedRouter(["/login"]);
+  it("회원가입 주소는 로그인 화면으로 이동한 뒤 로그인만 측정한다", async () => {
+    const { analytics, router } = renderTrackedRouter(["/signup"]);
 
-    await act(async () =>
-      router.navigate("/signup?returnTo=%2Fplanner", { replace: true }),
-    );
-
-    expect(analytics.track).toHaveBeenCalledTimes(2);
-    expect(analytics.track).toHaveBeenLastCalledWith({
+    expect(await screen.findByRole("heading", { name: "로그인" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
+    expect(analytics.track).toHaveBeenCalledOnce();
+    expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",
       parameters: {
-        page_location: "https://bibbidi.example/signup",
-        page_path: "/signup",
-        page_referrer: "https://bibbidi.example/login",
-        page_title: "회원가입",
-        screen_name: "signup",
+        page_location: "https://bibbidi.example/login",
+        page_path: "/login",
+        page_referrer: "",
+        page_title: "로그인",
+        screen_name: "login",
       },
     });
   });

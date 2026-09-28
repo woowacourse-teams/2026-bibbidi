@@ -3,10 +3,14 @@ import { PreparationTaskList } from "./PreparationTaskList";
 import "./PreparationStepChecklist.css";
 
 interface PreparationStepChecklistProps {
+  emptyDescription?: string;
+  isScrollable?: boolean;
   tasks: PreparationStepTaskViewModel[];
 }
 
 export function PreparationStepChecklist({
+  emptyDescription,
+  isScrollable = true,
   tasks,
 }: PreparationStepChecklistProps) {
   return (
@@ -21,7 +25,12 @@ export function PreparationStepChecklist({
           {tasks.length}개
         </span>
       </header>
-      <PreparationTaskList isScrollable tasks={tasks} variant="checklist" />
+      <PreparationTaskList
+        emptyDescription={emptyDescription}
+        isScrollable={isScrollable}
+        tasks={tasks}
+        variant="checklist"
+      />
       <footer className="preparation-step-checklist__footer">
         <a className="preparation-step-checklist__link" href="/checklist">
           내 체크리스트 보기

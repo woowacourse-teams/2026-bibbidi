@@ -365,6 +365,10 @@
   gap: 8px;
 }
 
+.home-dashboard-state__result-action--link {
+  color: var(--color-fg-brand);
+}
+
 .home-dashboard-state__result-action--button svg {
   width: 18px;
   height: 18px;

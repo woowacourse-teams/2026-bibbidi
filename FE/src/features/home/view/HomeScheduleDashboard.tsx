@@ -248,7 +248,7 @@ function UnscheduledTaskLoading({
     <section aria-busy="true" className="home-dashboard-loading__section">
       <LoadingStatus viewModel={viewModel} />
       <div aria-hidden="true">
-        <SkeletonSectionHeader showAction={false} />
+        <SkeletonSectionHeader />
         <ul className="home-dashboard-loading__unscheduled-list">
           {Array.from({ length: 3 }, (_, index) => (
             <UnscheduledTaskSkeleton key={index} />

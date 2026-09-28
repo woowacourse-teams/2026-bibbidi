@@ -35,7 +35,7 @@
 
 .recommended-schedule__catalog-action {
   flex: none;
-  color: var(--color-fg-neutral);
+  color: var(--color-fg-brand);
   font-size: 14px;
   font-weight: 600;
   gap: 5px;
@@ -46,7 +46,7 @@
   width: 17px;
   height: 17px;
   flex: none;
-  color: var(--color-fg-neutral-muted);
+  color: currentcolor;
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;

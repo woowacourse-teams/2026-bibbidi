@@ -1,0 +1,164 @@
+.social-login-form {
+  display: flex;
+  width: min(100%, 360px);
+  flex-direction: column;
+}
+
+.social-login-form__title {
+  margin: 0 0 28px;
+  color: var(--color-fg-neutral);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.03em;
+}
+
+.social-login-form__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.social-login-form__button {
+  display: flex;
+  width: 100%;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 20px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.social-login-form__button--kakao {
+  background: #fee500;
+  color: #191919;
+}
+
+.social-login-form__button--google {
+  border-color: #747775;
+  background: #ffffff;
+  color: #1f1f1f;
+}
+
+.social-login-form__button--apple {
+  background: #000000;
+  color: #ffffff;
+}
+
+.social-login-form__icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-login-form__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+.social-login-form__button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 3px;
+}
+
+.social-login-form__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .social-login-form__button--kakao:not(:disabled):hover {
+    background: #f4dc00;
+  }
+
+  .social-login-form__button--google:not(:disabled):hover {
+    background: #f8faff;
+  }
+
+  .social-login-form__button--apple:not(:disabled):hover {
+    background: #242424;
+  }
+}
+
+@media not all and (hover: hover) and (pointer: fine) {
+  .social-login-form__button:not(:disabled):active {
+    transform: scale(0.98);
+  }
+}
+
+.social-login-form__account-guide {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  margin-top: 24px;
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 20px 2px 0;
+}
+
+.social-login-form__guide-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+}
+
+.social-login-form__guide-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.social-login-form__guide-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.social-login-form__guide-copy strong {
+  color: var(--color-fg-brand);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.social-login-form__notice {
+  margin: 12px 0 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .social-login-form__title {
+    font-size: 26px;
+  }
+}

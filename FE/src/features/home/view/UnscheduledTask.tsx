@@ -22,6 +22,19 @@ function CalendarPlusIcon() {
   );
 }
 
+function ChevronRightIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="unscheduled-task__chevron"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
   return (
     <section
@@ -30,6 +43,10 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
     >
       <header className="unscheduled-task__header">
         <h2 id="unscheduled-task-title">{viewModel.title}</h2>
+        <Link className="unscheduled-task__roadmap-action" to="/">
+          {viewModel.roadmapActionLabel}
+          <ChevronRightIcon />
+        </Link>
       </header>
 
       <ul className="unscheduled-task__list">

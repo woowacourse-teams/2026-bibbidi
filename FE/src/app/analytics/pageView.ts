@@ -17,10 +17,6 @@ const PAGE_DEFINITIONS = {
     pageTitle: "로그인",
     screenName: "login",
   },
-  "/signup": {
-    pageTitle: "회원가입",
-    screenName: "signup",
-  },
 } as const;
 
 export type PagePath = keyof typeof PAGE_DEFINITIONS;

@@ -1,5 +1,10 @@
 import { ReactNode, useEffect, useMemo } from "react";
 
+import {
+  AccountSetupCompletionAuthenticationRequiredError,
+  AccountSetupCompletionRequestAbortedError,
+  createAccountSetupCompletionRepository,
+} from "../account-setup";
 import { useAuth } from "../auth";
 import {
   MyChecklistProvider,
@@ -24,22 +29,34 @@ export function ChecklistMigrationProvider({
 }: ChecklistMigrationProviderProps) {
   const { authState } = useAuth();
   const sessionKey =
-    authState.status === "authenticated" || authState.status === "synchronizing"
+    authState.status === "authenticated" ||
+    authState.status === "synchronizing" ||
+    authState.status === "accountSetupRequired"
       ? `authenticated:${authState.user.nickname}`
       : authState.status;
 
   return (
     <MyChecklistProvider sessionKey={sessionKey}>
-      <ChecklistMigrationCoordinator />
+      <PostAuthenticationChecklistCoordinator />
       {children}
     </MyChecklistProvider>
   );
 }
 
-function ChecklistMigrationCoordinator() {
-  const { authState, completeAuthentication, refreshAuth } = useAuth();
+function PostAuthenticationChecklistCoordinator() {
+  const {
+    authState,
+    completeAuthentication,
+    failAuthentication,
+    refreshAuth,
+    requireAccountSetup,
+  } = useAuth();
   const commandRepository = useMyChecklistCommandRepository();
   const queryRepository = useMyChecklistQueryRepository();
+  const accountSetupCompletionRepository = useMemo(
+    () => createAccountSetupCompletionRepository(queryRepository),
+    [queryRepository],
+  );
   const migrationRepository = useMemo(
     () =>
       createChecklistMigrationRepository(
@@ -64,13 +81,48 @@ function ChecklistMigrationCoordinator() {
     let isActive = true;
     const user = authState.user;
 
-    migration.migrate(controller.signal).then(
-      () => {
+    const synchronizeChecklist = async () => {
+      let completion;
+
+      try {
+        completion = await accountSetupCompletionRepository.getCompletion(
+          controller.signal,
+        );
+      } catch (error) {
+        if (
+          !isActive ||
+          error instanceof AccountSetupCompletionRequestAbortedError
+        ) {
+          return;
+        }
+
+        if (
+          error instanceof AccountSetupCompletionAuthenticationRequiredError
+        ) {
+          refreshAuth();
+          return;
+        }
+
+        failAuthentication(user);
+        return;
+      }
+
+      if (!isActive) {
+        return;
+      }
+
+      if (completion.status === "required") {
+        requireAccountSetup(user);
+        return;
+      }
+
+      try {
+        await migration.migrate(completion.checklist, controller.signal);
+
         if (isActive) {
           completeAuthentication(user);
         }
-      },
-      (error: unknown) => {
+      } catch (error) {
         if (
           !isActive ||
           error instanceof ChecklistMigrationRequestAbortedError
@@ -84,14 +136,24 @@ function ChecklistMigrationCoordinator() {
         }
 
         completeAuthentication(user);
-      },
-    );
+      }
+    };
+
+    void synchronizeChecklist();
 
     return () => {
       isActive = false;
       controller.abort();
     };
-  }, [authState, completeAuthentication, migration, refreshAuth]);
+  }, [
+    authState,
+    accountSetupCompletionRepository,
+    completeAuthentication,
+    failAuthentication,
+    migration,
+    refreshAuth,
+    requireAccountSetup,
+  ]);
 
   return null;
 }

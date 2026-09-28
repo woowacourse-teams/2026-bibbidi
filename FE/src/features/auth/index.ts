@@ -1,9 +1,13 @@
 export { AuthProvider, useAuth } from "./AuthProvider";
 export {
-  createLoginEvent,
-  createLogoutEvent,
-  createSignUpEvent,
-} from "./analytics/authAnalytics";
+  acceptWebAccessToken,
+  clearWebAccessToken,
+  currentWebUserId,
+  hasWebAccessToken,
+  refreshWebSession,
+  webUserIdFromAccessToken,
+} from "../../infrastructure/auth/webSessionManager";
+export { createLogoutEvent } from "./analytics/authAnalytics";
 export { useLogout } from "./useLogout";
 export { LoginRequiredDialog } from "./LoginRequiredDialog";
 export { PlannerAccessGuard } from "./PlannerAccessGuard";

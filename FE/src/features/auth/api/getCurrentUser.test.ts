@@ -1,11 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetWebAuthSessionForTest } from "../../../infrastructure/auth/webSessionManager";
 import {
   CurrentUserApiError,
   CurrentUserNetworkError,
   CurrentUserTimeoutError,
   getCurrentUser,
 } from "./getCurrentUser";
+
+beforeEach(() => {
+  resetWebAuthSessionForTest();
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -34,13 +39,15 @@ describe("getCurrentUser", () => {
   it("HTTP 오류를 공개 오류 정보가 있는 API 오류로 변환한다", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            errorCode: 201,
-            message: "로그인이 필요합니다.",
-          }),
-          { status: 401 },
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              errorCode: 201,
+              message: "로그인이 필요합니다.",
+            }),
+            { status: 401 },
+          ),
         ),
       ),
     );

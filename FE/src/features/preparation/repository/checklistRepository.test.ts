@@ -33,6 +33,7 @@ function createRemoteDataSource(catalogItemIds: number[] = []) {
       catalogItemIds.map((catalogItemId, index) => ({
         catalogItemId,
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: index + 100,
         status: "prev" as const,
         title: `추가 항목 ${catalogItemId}`,
@@ -73,6 +74,7 @@ function createQueryRepository(
       items: catalogItemIds.map((sourceCatalogItemId, index) => ({
         appointments: [],
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: index + 1,
         sourceCatalogItemId,
         status: "prev",
@@ -214,6 +216,7 @@ describe("ChecklistRepository", () => {
       {
         appointments: [],
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: 100,
         sourceCatalogItemId: 102,
         status: "prev",
@@ -222,6 +225,7 @@ describe("ChecklistRepository", () => {
       {
         appointments: [],
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: 101,
         sourceCatalogItemId: 201,
         status: "prev",
@@ -247,6 +251,7 @@ describe("ChecklistRepository", () => {
       {
         appointments: [],
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: 100,
         sourceCatalogItemId: 201,
         status: "prev",
@@ -265,6 +270,7 @@ describe("ChecklistRepository", () => {
         {
           catalogItemId: 102,
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 100,
           status: "prev",
           title: "추가 항목 102",
@@ -424,6 +430,7 @@ describe("ChecklistRepository", () => {
       {
         catalogItemId: 102,
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: 100,
         status: "prev",
         title: "추가 항목 102",

@@ -6,10 +6,27 @@ import "./AuthLayout.css";
 
 export function AuthLayout() {
   const { authState } = useAuth();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
+  const isOnboardingPath =
+    pathname === "/onboarding" || pathname === "/onboarding/account";
 
   if (authState.status === "authenticated") {
     return <Navigate replace to={getSafeLoginReturnPath(search) ?? "/"} />;
+  }
+
+  if (authState.status === "onboardingRequired" && pathname !== "/onboarding") {
+    return <Navigate replace to="/onboarding" />;
+  }
+
+  if (
+    authState.status === "accountSetupRequired" &&
+    pathname !== "/onboarding/account"
+  ) {
+    return <Navigate replace to="/onboarding/account" />;
+  }
+
+  if (authState.status === "guest" && isOnboardingPath) {
+    return <Navigate replace to="/login" />;
   }
 
   return (

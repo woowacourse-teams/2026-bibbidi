@@ -2,6 +2,7 @@ import {
   ChecklistItemStatus,
   isChecklistItemStatus,
 } from "../model/myChecklist";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import {
   AppointmentCreationRequest,
   AppointmentCreationResponse,
@@ -11,6 +12,7 @@ import {
   AppointmentCompletionResponse,
   remoteAppointmentManagementDataSource,
 } from "./remoteAppointmentManagementDataSource";
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
@@ -71,6 +73,7 @@ export interface RemoteMyChecklistCommandDataSource {
 export interface ChecklistItemChangeResponse {
   catalogItemId: number | null;
   categoryId: number;
+  createdAt: string;
   id: number;
   status: ChecklistItemStatus;
   title: string;
@@ -263,6 +266,7 @@ function isChecklistItemChangeResponse(
     isValidChecklistId(value.id) &&
     (value.catalogItemId === null || isValidChecklistId(value.catalogItemId)) &&
     isValidChecklistId(value.categoryId) &&
+    isValidLocalDateTime(value.createdAt) &&
     typeof value.title === "string" &&
     isChecklistItemStatus(value.status)
   );
@@ -309,7 +313,7 @@ async function createChecklist(signal?: AbortSignal): Promise<number> {
     let response: Response;
 
     try {
-      response = await fetch(CHECKLIST_ENDPOINT, {
+      response = await authenticatedFetch(CHECKLIST_ENDPOINT, {
         credentials: "include",
         method: "POST",
         signal: controller.signal,
@@ -396,7 +400,7 @@ async function createCustomChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
+      response = await authenticatedFetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
         body: JSON.stringify({ categoryId, title }),
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -503,7 +507,7 @@ async function changeChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/${property}`,
         {
           body: requestBody,
@@ -629,7 +633,7 @@ async function hasRemainingAppointments(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/remaining-appointments`,
         {
           credentials: "include",

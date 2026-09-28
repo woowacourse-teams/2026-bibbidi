@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import {
@@ -53,6 +53,14 @@ export function ServiceLayout() {
       contentRef.current.scrollTop = 0;
     }
   }, [pathname]);
+
+  if (authState.status === "onboardingRequired") {
+    return <Navigate replace to="/onboarding" />;
+  }
+
+  if (authState.status === "accountSetupRequired") {
+    return <Navigate replace to="/onboarding/account" />;
+  }
 
   return (
     <div className="service-layout">
