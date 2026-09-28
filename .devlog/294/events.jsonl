@@ -1,0 +1,20 @@
+{"type":"SESSION_STARTED","sessionId":"c0419fa9-ebec-4af9-b1bc-5ca389d93610","agent":"CLAUDE","cwd":"/Users/john_park/Desktop/2026-bibbidi/.claude/worktrees/fix-292","branch":"fix/292","head":"7b443958ddc866d6ef7b924b2004cc9f8ab07855","gitStatus":" M BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsEntity.java","timestamp":"2026-09-28T07:46:51.026Z"}
+{"type":"ISSUE_BOUND","issue":294,"source":"REBIND","timestamp":"2026-09-28T07:46:51.045Z"}
+{"type":"GRILL_ME_SKIPPED","issue":294,"timestamp":"2026-09-28T07:46:56.221Z"}
+{"type":"COMMIT_EXPLAINED","issue":294,"explanation":"운영 배포를 빨리 복구하려고 #292와 같은 수정을 release-be에 hotfix로 반영한다. 설계(Issue #294)와 다른 점은 없다.\n- BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsEntity.java: 약관 본문(content) 칸에서 @Lob을 빼고 columnDefinition = \"TEXT\"로 선언했다. 쓰지 않게 된 Lob import도 지웠다. fix/292(PR #293)의 수정과 내용이 같다.\n- 검증: ./BE/gradlew -p BE test, ./BE/gradlew -p BE build 통과. 같은 수정으로 로컬 MySQL 8.0.46에서 prod 프로필 기동과 health UP을 확인했다.","diffStat":" .../java/com/bibbidi/wedding/terms/persistence/JpaTermsEntity.java    | 4 +---\n 1 file changed, 1 insertion(+), 3 deletions(-)","tree":"4592390924baf750ddf04e867eae6a56c7e705c4","timestamp":"2026-09-28T07:47:22.654Z"}
+{"type":"TURN_FINISHED","turnId":"5","timestamp":"2026-09-28T07:47:32.692Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"6","prompt":"응 올려줘","redacted":false,"timestamp":"2026-09-28T07:47:43.744Z"}
+{"type":"COMMIT_CONFIRMED","issue":294,"tree":"4592390924baf750ddf04e867eae6a56c7e705c4","timestamp":"2026-09-28T07:47:47.748Z"}
+{"type":"TURN_FINISHED","turnId":"6","timestamp":"2026-09-28T07:48:40.897Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"7","prompt":"https://github.com/woowacourse-teams/2026-bibbidi/actions/runs/36393790236\n\n이거 왜 터지는 거야?","redacted":false,"timestamp":"2026-09-28T07:50:38.316Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"8","prompt":"다시 리벌트 하고 해야하는 거지?","redacted":false,"timestamp":"2026-09-28T07:51:26.036Z"}
+{"type":"TURN_FINISHED","turnId":"8","timestamp":"2026-09-28T07:52:10.901Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"9","prompt":"아 꼬인 거 같은데","redacted":false,"timestamp":"2026-09-28T07:52:34.879Z"}
+{"type":"TURN_FINISHED","turnId":"9","timestamp":"2026-09-28T07:53:27.500Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"10","prompt":"https://github.com/woowacourse-teams/2026-bibbidi/actions/workflows/backend-prod-cd.yml\n\n이거 왜 터지는 거야?\n\n1번을 안하고 2번을 해서 그런가?","redacted":false,"timestamp":"2026-09-28T07:57:56.315Z"}
+{"type":"TURN_FINISHED","turnId":"10","timestamp":"2026-09-28T07:59:06.053Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"11","prompt":"응 그렇게 진행해줘","redacted":false,"timestamp":"2026-09-28T07:59:39.486Z"}
+{"type":"COMMIT_EXPLAINED","issue":294,"explanation":"#296(되돌리기)이 #297보다 늦게 합쳐져 release-be의 약관 본문 칸이 다시 @Lob으로 돌아갔다. 같은 수정을 hotfix로 다시 넣어 운영 CD가 release-be 코드로 빌드·배포하게 한다. 설계(Issue #294)와 다른 점은 없다.\n- BE/src/main/java/com/bibbidi/wedding/terms/persistence/JpaTermsEntity.java: 약관 본문(content) 칸에서 @Lob을 빼고 columnDefinition = \"TEXT\"로 선언했다. 쓰지 않게 된 Lob import도 지웠다. 수정 후 BE 코드가 dev-be(6250f75)와 같다.\n- 검증: ./BE/gradlew -p BE test, ./BE/gradlew -p BE build 통과.","diffStat":" .../java/com/bibbidi/wedding/terms/persistence/JpaTermsEntity.java    | 4 +---\n 1 file changed, 1 insertion(+), 3 deletions(-)","tree":"4592390924baf750ddf04e867eae6a56c7e705c4","timestamp":"2026-09-28T08:00:50.032Z"}
+{"type":"TURN_FINISHED","turnId":"11","timestamp":"2026-09-28T08:01:02.942Z"}
+{"type":"USER_PROMPTED","issue":294,"turnId":"12","prompt":"응","redacted":false,"timestamp":"2026-09-28T08:01:07.127Z"}
+{"type":"COMMIT_CONFIRMED","issue":294,"tree":"4592390924baf750ddf04e867eae6a56c7e705c4","timestamp":"2026-09-28T08:01:11.266Z"}
