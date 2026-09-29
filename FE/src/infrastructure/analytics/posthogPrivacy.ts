@@ -95,7 +95,12 @@ const ATTRIBUTION_PROPERTIES = new Set([
   ...CAMPAIGN_KEYS.map((key) => `$session_entry_${key}`),
   "$referring_domain",
   "$session_entry_referring_domain",
+  "$host",
+  "$session_entry_host",
 ]);
+
+// Web analytics의 경로 표는 이 속성으로 집계한다. 공개 경로만 남기고 콜백 경로는 버린다.
+const PATH_PROPERTIES = new Set(["$pathname", "$session_entry_pathname"]);
 
 const INITIAL_PERSON_PROPERTIES = new Set([
   ...CAMPAIGN_KEYS.map((key) => `$initial_${key}`),
@@ -110,6 +115,10 @@ export function sanitizePostHogEvent(
   for (const [key, value] of Object.entries(event.properties)) {
     if (ALLOWED_PROPERTIES.has(key) || ATTRIBUTION_PROPERTIES.has(key))
       properties[key] = value;
+    if (PATH_PROPERTIES.has(key) && typeof value === "string") {
+      const path = analyticsPagePath(value);
+      if (path) properties[key] = path;
+    }
     if (
       ["$current_url", "page_location", "page_referrer"].includes(key) &&
       typeof value === "string"
