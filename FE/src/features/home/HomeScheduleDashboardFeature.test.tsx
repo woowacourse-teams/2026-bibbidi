@@ -224,7 +224,7 @@ describe("HomeScheduleDashboardFeature", () => {
     );
   });
 
-  it("로그인 사용자가 바뀌면 이전 사용자의 일정을 즉시 숨긴다", async () => {
+  it("동일 사용자가 로그아웃 후 재로그인하면 이전 일정을 다시 표시하지 않는다", async () => {
     vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
       exists: true,
       items: [
@@ -238,7 +238,7 @@ describe("HomeScheduleDashboardFeature", () => {
               memo: null,
               place: null,
               startTime: null,
-              title: "첫 사용자 일정",
+              title: "로그아웃 전 일정",
             },
           ],
           categoryId: 1,
@@ -246,10 +246,13 @@ describe("HomeScheduleDashboardFeature", () => {
           id: 10,
           sourceCatalogItemId: 100,
           status: "continue",
-          title: "첫 사용자 할 일",
+          title: "로그아웃 전 할 일",
         },
       ],
     });
+    const guestChecklistRepository = {
+      getChecklist: vi.fn(),
+    } as unknown as MyChecklistQueryRepository;
     const nextChecklistRepository = {
       getChecklist: vi.fn().mockReturnValue(new Promise(() => undefined)),
     } as unknown as MyChecklistQueryRepository;
@@ -262,12 +265,30 @@ describe("HomeScheduleDashboardFeature", () => {
     );
     const { rerender } = render(createDashboard());
 
-    expect(await screen.findByText("첫 사용자 일정")).toBeTruthy();
+    expect(await screen.findByText("로그아웃 전 일정")).toBeTruthy();
+
+    vi.mocked(useAuth).mockReturnValue({
+      authState: { status: "guest" },
+      beginAuthentication: vi.fn(),
+      beginOnboarding: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
+      refreshAuth,
+    });
+    vi.mocked(useMyChecklistQueryRepository).mockReturnValue(
+      guestChecklistRepository,
+    );
+    rerender(createDashboard());
+
+    expect(screen.queryByText("로그아웃 전 일정")).toBeNull();
+    expect(guestChecklistRepository.getChecklist).not.toHaveBeenCalled();
 
     vi.mocked(useAuth).mockReturnValue({
       authState: {
         status: "authenticated",
-        user: { id: 2, nickname: "새 사용자" },
+        user: { id: 1, nickname: "비비디" },
       },
       beginAuthentication: vi.fn(),
       beginOnboarding: vi.fn(),
@@ -282,7 +303,7 @@ describe("HomeScheduleDashboardFeature", () => {
     );
     rerender(createDashboard());
 
-    expect(screen.queryByText("첫 사용자 일정")).toBeNull();
+    expect(screen.queryByText("로그아웃 전 일정")).toBeNull();
     expect(nextChecklistRepository.getChecklist).toHaveBeenCalledOnce();
   });
 

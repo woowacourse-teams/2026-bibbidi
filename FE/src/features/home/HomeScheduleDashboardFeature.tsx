@@ -4,6 +4,7 @@ import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
 import {
   MyChecklistAuthenticationRequiredError,
+  type MyChecklistQueryRepository,
   MyChecklistRequestAbortedError,
   useMyChecklistQueryRepository,
 } from "../checklist";
@@ -60,7 +61,7 @@ interface HomeScheduleDashboardFeatureProps {
 }
 
 interface CalendarSchedulesState {
-  authScope: string;
+  repository: MyChecklistQueryRepository | null;
   schedules: CalendarScheduleModel[];
 }
 
@@ -77,7 +78,7 @@ export function HomeScheduleDashboardFeature({
   const checklistRepository = usePreparationChecklistRepository();
   const myChecklistRepository = useMyChecklistQueryRepository();
   const [calendarSchedules, setCalendarSchedules] =
-    useState<CalendarSchedulesState>({ authScope: "", schedules: [] });
+    useState<CalendarSchedulesState>({ repository: null, schedules: [] });
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
@@ -101,7 +102,7 @@ export function HomeScheduleDashboardFeature({
         }
 
         setCalendarSchedules({
-          authScope,
+          repository: myChecklistRepository,
           schedules: checklist.items.flatMap((item) =>
             item.appointments.map((appointment) => ({
               date: appointment.date,
@@ -121,7 +122,10 @@ export function HomeScheduleDashboardFeature({
           return;
         }
 
-        setCalendarSchedules({ authScope, schedules: [] });
+        setCalendarSchedules({
+          repository: myChecklistRepository,
+          schedules: [],
+        });
       },
     );
 
@@ -295,7 +299,8 @@ export function HomeScheduleDashboardFeature({
       onRetryUnscheduled={retryUnscheduled}
       referenceDate={getReferenceDate()}
       schedules={
-        calendarSchedules.authScope === authScope
+        authState.status === "authenticated" &&
+        calendarSchedules.repository === myChecklistRepository
           ? calendarSchedules.schedules
           : []
       }
