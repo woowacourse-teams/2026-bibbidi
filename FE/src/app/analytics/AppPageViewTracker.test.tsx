@@ -54,9 +54,7 @@ describe("AppPageViewTracker", () => {
       </StrictMode>,
     );
 
-    expect(
-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
-    ).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",

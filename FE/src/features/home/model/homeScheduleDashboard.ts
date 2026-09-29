@@ -1,6 +1,5 @@
 import { RecommendedCatalogItemListModel } from "./recommendedCatalogItem";
 import { UnscheduledTaskListModel } from "./unscheduledTask";
-import { UpcomingScheduleListModel } from "./upcomingSchedule";
 
 export interface HomeScheduleDashboardLoadingSectionModel {
   status: "loading";
@@ -13,17 +12,6 @@ export interface HomeScheduleDashboardEmptySectionModel {
 export interface HomeScheduleDashboardErrorSectionModel {
   status: "error";
 }
-
-export interface HomeScheduleDashboardUpcomingCompleteModel {
-  schedules: UpcomingScheduleListModel;
-  status: "complete";
-}
-
-export type HomeScheduleDashboardUpcomingModel =
-  | HomeScheduleDashboardLoadingSectionModel
-  | HomeScheduleDashboardEmptySectionModel
-  | HomeScheduleDashboardErrorSectionModel
-  | HomeScheduleDashboardUpcomingCompleteModel;
 
 export interface HomeScheduleDashboardUnscheduledCompleteModel {
   status: "complete";
@@ -50,5 +38,4 @@ export type HomeScheduleDashboardRecommendedModel =
 export interface HomeScheduleDashboardModel {
   recommended: HomeScheduleDashboardRecommendedModel;
   unscheduled: HomeScheduleDashboardUnscheduledModel;
-  upcoming: HomeScheduleDashboardUpcomingModel;
 }

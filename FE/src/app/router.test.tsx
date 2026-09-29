@@ -497,7 +497,7 @@ describe("appRoutes", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("인증 사용자가 플래너에서 기존 일정 대시보드를 본다", async () => {
+  it("인증 사용자가 플래너에서 월간 캘린더를 본다", async () => {
     installFetch(
       new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
         status: 200,
@@ -505,11 +505,16 @@ describe("appRoutes", () => {
     );
     renderRouter(["/planner"]);
 
-    expect(
-      await screen.findByRole("heading", { name: "가까운 일정" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     expect(screen.getByRole("main", { name: "플래너" })).toBeTruthy();
-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([input]) =>
+            input.toString() === "/api/appointments/me/nearby?limit=6",
+        ),
+    ).toBe(false);
   });
 
   it("비로그인 사용자가 플래너에 직접 접근하고 개인화 API는 호출하지 않는다", async () => {
@@ -521,8 +526,11 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/planner"]);
 
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     expect(
-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+      await screen.findByText(
+        "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
+      ),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/planner");
     expect(
@@ -576,7 +584,7 @@ describe("appRoutes", () => {
           );
         }
 
-        if (url === "/api/appointments/me/nearby?limit=6") {
+        if (url === "/api/checklists/me/unscheduled-items?limit=3") {
           return Promise.resolve(
             new Response(
               JSON.stringify({
@@ -593,11 +601,12 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/planner"]);
 
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    await waitFor(() => expect(currentUserRequestCount).toBe(2));
     expect(
-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/planner");
     expect(router.state.location.search).toBe("");
-    expect(currentUserRequestCount).toBe(2);
   });
 });
