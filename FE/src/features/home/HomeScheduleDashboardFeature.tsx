@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
+import {
+  MyChecklistAuthenticationRequiredError,
+  type MyChecklistQueryRepository,
+  MyChecklistRequestAbortedError,
+  useMyChecklistQueryRepository,
+} from "../checklist";
 import { usePreparationChecklistRepository } from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import {
@@ -9,6 +15,7 @@ import {
   unscheduledTasksRepository,
 } from "./homeDependencies";
 import {
+  CalendarScheduleModel,
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
@@ -53,6 +60,17 @@ interface HomeScheduleDashboardFeatureProps {
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
+type AuthenticatedAuthState = Extract<
+  ReturnType<typeof useAuth>["authState"],
+  { status: "authenticated" }
+>;
+
+interface CalendarSchedulesState {
+  authentication: AuthenticatedAuthState | null;
+  repository: MyChecklistQueryRepository | null;
+  schedules: CalendarScheduleModel[];
+}
+
 export function HomeScheduleDashboardFeature({
   getReferenceDate = getLocalDate,
   recommendedRepository = recommendedCatalogItemsRepository,
@@ -64,6 +82,15 @@ export function HomeScheduleDashboardFeature({
       ? `authenticated:${authState.user.id}`
       : authState.status;
   const checklistRepository = usePreparationChecklistRepository();
+  const myChecklistRepository = useMyChecklistQueryRepository();
+  const authentication =
+    authState.status === "authenticated" ? authState : null;
+  const [calendarSchedules, setCalendarSchedules] =
+    useState<CalendarSchedulesState>({
+      authentication: null,
+      repository: null,
+      schedules: [],
+    });
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
@@ -72,6 +99,62 @@ export function HomeScheduleDashboardFeature({
     useState(0);
   const [recommendedRequestRevision, setRecommendedRequestRevision] =
     useState(0);
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    myChecklistRepository.getChecklist(controller.signal).then(
+      (checklist) => {
+        if (!isActive) {
+          return;
+        }
+
+        setCalendarSchedules({
+          authentication,
+          repository: myChecklistRepository,
+          schedules: checklist.items.flatMap((item) =>
+            item.appointments.map((appointment) => ({
+              date: appointment.date,
+              id: appointment.id,
+              title: appointment.title,
+            })),
+          ),
+        });
+      },
+      (error: unknown) => {
+        if (!isActive || error instanceof MyChecklistRequestAbortedError) {
+          return;
+        }
+
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
+          refreshAuth();
+          return;
+        }
+
+        setCalendarSchedules({
+          authentication,
+          repository: myChecklistRepository,
+          schedules: [],
+        });
+      },
+    );
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [
+    authState.status,
+    authScope,
+    authentication,
+    myChecklistRepository,
+    refreshAuth,
+  ]);
+
   useEffect(() => {
     if (authState.status !== "authenticated") {
       return;
@@ -235,6 +318,13 @@ export function HomeScheduleDashboardFeature({
       onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
       referenceDate={getReferenceDate()}
+      schedules={
+        authentication !== null &&
+        calendarSchedules.authentication === authentication &&
+        calendarSchedules.repository === myChecklistRepository
+          ? calendarSchedules.schedules
+          : []
+      }
       viewModel={viewModel}
     />
   );

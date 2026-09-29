@@ -42,4 +42,47 @@ describe("MonthlyCalendar", () => {
     fireEvent.click(screen.getByRole("button", { name: "오늘" }));
     expect(screen.getByRole("table", { name: "2026년 9월 달력" })).toBeTruthy();
   });
+
+  it("저장된 일정을 해당 날짜에 제목과 추가 개수로 표시한다", () => {
+    render(
+      <MonthlyCalendar
+        referenceDate="2026-09-16"
+        schedules={[
+          {
+            date: "2026-09-16",
+            id: 1,
+            title: "웨딩홀 상담",
+          },
+          {
+            date: "2026-09-16",
+            id: 2,
+            title: "드레스 투어",
+          },
+          {
+            date: "2026-09-16",
+            id: 3,
+            title: "청첩장 수령",
+          },
+          {
+            date: "2026-10-01",
+            id: 4,
+            title: "예복 가봉",
+          },
+        ]}
+      />,
+    );
+
+    const september16 = screen
+      .getByLabelText("2026년 9월 16일, 오늘")
+      .closest("td");
+    const october1 = screen.getByLabelText("2026년 10월 1일").closest("td");
+
+    expect(september16).not.toBeNull();
+    expect(october1).not.toBeNull();
+    expect(within(september16!).getByText("웨딩홀 상담")).toBeTruthy();
+    expect(within(september16!).getByText("드레스 투어")).toBeTruthy();
+    expect(within(september16!).getByText("+1")).toBeTruthy();
+    expect(within(september16!).queryByText("청첩장 수령")).toBeNull();
+    expect(within(october1!).getByText("예복 가봉")).toBeTruthy();
+  });
 });

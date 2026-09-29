@@ -9,6 +9,7 @@ import {
   HomeScheduleDashboardUnscheduledViewModel,
   HomeScheduleDashboardViewModel,
 } from "../view-model/createHomeScheduleDashboardViewModel";
+import { CalendarScheduleModel } from "../model/homeScheduleDashboard";
 import "./HomeScheduleDashboard.css";
 import { RecommendedSchedule } from "./RecommendedSchedule";
 import { MonthlyCalendar } from "./MonthlyCalendar";
@@ -19,6 +20,7 @@ interface HomeScheduleDashboardProps {
   onRetryRecommended: () => void;
   onRetryUnscheduled: () => void;
   referenceDate: string;
+  schedules: CalendarScheduleModel[];
   viewModel: HomeScheduleDashboardViewModel;
 }
 
@@ -369,12 +371,13 @@ export function HomeScheduleDashboard({
   onRetryRecommended,
   onRetryUnscheduled,
   referenceDate,
+  schedules,
   viewModel,
 }: HomeScheduleDashboardProps) {
   return (
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
-        <MonthlyCalendar referenceDate={referenceDate} />
+        <MonthlyCalendar referenceDate={referenceDate} schedules={schedules} />
         <div className="home-dashboard-state__side">
           <UnscheduledTaskSection
             onRetry={onRetryUnscheduled}
