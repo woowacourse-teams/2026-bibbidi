@@ -115,7 +115,7 @@ export function ChecklistFeature({
         : undefined;
   const sessionIdentity =
     authState.status === "authenticated" || authState.status === "synchronizing"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status === "guest"
         ? "guest"
         : undefined;

@@ -77,7 +77,7 @@ function AuthSessionSwitch() {
           `:${authState.user.nickname}`}
       </p>
       <button
-        onClick={() => beginAuthentication({ nickname: "second" })}
+        onClick={() => beginAuthentication({ id: 2, nickname: "second" })}
         type="button"
       >
         사용자 변경
@@ -103,7 +103,7 @@ describe("ChecklistMigrationProvider", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
               status: 200,
             }),
           );
@@ -170,7 +170,7 @@ describe("ChecklistMigrationProvider", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
             status: 200,
           }),
         );
@@ -200,7 +200,7 @@ describe("ChecklistMigrationProvider", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
             status: 200,
           }),
         );
@@ -233,7 +233,7 @@ describe("ChecklistMigrationProvider", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
             status: 200,
           }),
         );
@@ -265,7 +265,7 @@ describe("ChecklistMigrationProvider", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
             status: 200,
           }),
         );
@@ -292,7 +292,9 @@ describe("ChecklistMigrationProvider", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+          status: 200,
+        }),
       )
       .mockResolvedValueOnce(
         new Response(
@@ -323,7 +325,7 @@ describe("ChecklistMigrationProvider", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
               status: 200,
             }),
           );
@@ -387,7 +389,7 @@ describe("ChecklistMigrationProvider", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
               status: 200,
             }),
           );
@@ -431,7 +433,7 @@ describe("ChecklistMigrationProvider", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "first" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "first" }), {
               status: 200,
             }),
           );

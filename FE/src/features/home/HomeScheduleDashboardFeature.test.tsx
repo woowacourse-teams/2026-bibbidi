@@ -116,7 +116,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue([]);
   vi.mocked(useAuth).mockReturnValue({
-    authState: { status: "authenticated", user: { nickname: "비비디" } },
+    authState: { status: "authenticated", user: { id: 1, nickname: "비비디" } },
     beginAuthentication: vi.fn(),
     beginOnboarding: vi.fn(),
     completeAuthentication: vi.fn(),
@@ -859,7 +859,10 @@ describe("HomeScheduleDashboardFeature", () => {
       .calls[0][2];
 
     vi.mocked(useAuth).mockReturnValue({
-      authState: { status: "authenticated", user: { nickname: "새 사용자" } },
+      authState: {
+        status: "authenticated",
+        user: { id: 2, nickname: "새 사용자" },
+      },
       beginAuthentication: vi.fn(),
       beginOnboarding: vi.fn(),
       completeAuthentication: vi.fn(),

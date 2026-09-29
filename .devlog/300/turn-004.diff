@@ -1,0 +1,211 @@
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.test.ts b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+index 25f24d80ffdc9ad401f7e0176b656c6c0a71018d..2dcf6877ac5aecd26d850eff27b3fb1fb570151c 100644
+--- a/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+@@ -69,7 +69,7 @@ describe("PostHog 개인정보 정제", () => {
+         $set: { nickname: "secret" },
+         nickname: "secret",
+         message: "secret",
+-        utm_source: "secret",
++        $referrer: "https://ad.example/secret",
+         category_id: "1",
+       },
+     });
+@@ -83,6 +83,46 @@ describe("PostHog 개인정보 정제", () => {
+       category_id: "1",
+     });
+   });
++  it("홍보 유입의 캠페인 값과 유입 도메인은 남기고 URL 원문은 제거한다", () => {
++    const result = sanitizePostHogEvent({
++      uuid: "id",
++      event: "$pageview",
++      $set_once: {
++        $initial_utm_source: "instagram",
++        $initial_utm_campaign: "launch",
++        $initial_referring_domain: "m.instagram.com",
++        $initial_referrer: "https://m.instagram.com/p/secret",
++        $initial_current_url: "https://example.com/?code=secret",
++      },
++      properties: {
++        distinct_id: "anon",
++        utm_source: "instagram",
++        utm_medium: "paid",
++        utm_campaign: "launch",
++        $referring_domain: "m.instagram.com",
++        $referrer: "https://m.instagram.com/p/secret",
++        $session_entry_utm_source: "instagram",
++        $session_entry_referring_domain: "m.instagram.com",
++        $session_entry_url: "https://example.com/?code=secret",
++        $session_entry_referrer: "https://m.instagram.com/p/secret",
++      },
++    });
++    expect(JSON.stringify(result)).not.toContain("secret");
++    expect(result?.properties).toEqual({
++      distinct_id: "anon",
++      utm_source: "instagram",
++      utm_medium: "paid",
++      utm_campaign: "launch",
++      $referring_domain: "m.instagram.com",
++      $session_entry_utm_source: "instagram",
++      $session_entry_referring_domain: "m.instagram.com",
++    });
++    expect(result?.$set_once).toEqual({
++      $initial_utm_source: "instagram",
++      $initial_utm_campaign: "launch",
++      $initial_referring_domain: "m.instagram.com",
++    });
++  });
+   it("입력·텍스트·민감 속성·네트워크를 마스킹하고 이미지와 iframe을 차단한다", () => {
+     expect(PRIVATE_REPLAY_CONFIG.maskAllInputs).toBe(true);
+     expect(PRIVATE_REPLAY_CONFIG.maskTextSelector).toBe("*");
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.ts b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+index f5452354356e0c9ff65a2cbd3e8675882203221d..e739cbfec9d0ad6ba6d1d704c65d484fd927ef81 100644
+--- a/FE/src/infrastructure/analytics/posthogPrivacy.ts
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+@@ -81,13 +81,35 @@ const ALLOWED_PROPERTIES = new Set([
+   "outcome",
+ ]);
+ 
++// 홍보 유입 분석용 값이다. 전체 URL과 referrer 원문 대신 캠페인 값과 유입 도메인만 남긴다.
++const CAMPAIGN_KEYS = [
++  "utm_source",
++  "utm_medium",
++  "utm_campaign",
++  "utm_content",
++  "utm_term",
++];
++
++const ATTRIBUTION_PROPERTIES = new Set([
++  ...CAMPAIGN_KEYS,
++  ...CAMPAIGN_KEYS.map((key) => `$session_entry_${key}`),
++  "$referring_domain",
++  "$session_entry_referring_domain",
++]);
++
++const INITIAL_PERSON_PROPERTIES = new Set([
++  ...CAMPAIGN_KEYS.map((key) => `$initial_${key}`),
++  "$initial_referring_domain",
++]);
++
+ export function sanitizePostHogEvent(
+   event: CaptureResult | null,
+ ): CaptureResult | null {
+   if (!event) return null;
+   const properties: Record<string, unknown> = {};
+   for (const [key, value] of Object.entries(event.properties)) {
+-    if (ALLOWED_PROPERTIES.has(key)) properties[key] = value;
++    if (ALLOWED_PROPERTIES.has(key) || ATTRIBUTION_PROPERTIES.has(key))
++      properties[key] = value;
+     if (
+       ["$current_url", "page_location", "page_referrer"].includes(key) &&
+       typeof value === "string"
+@@ -95,12 +117,20 @@ export function sanitizePostHogEvent(
+       properties[key] = sanitizeAnalyticsUrl(value);
+     }
+   }
+-  // SDK가 붙인 초기 유입 URL과 자동 Person 속성도 제거한다.
++  // Person에는 첫 유입 캠페인과 도메인만 남기고 초기 URL·referrer 원문은 제거한다.
++  const initialAttribution = Object.fromEntries(
++    Object.entries(event.$set_once ?? {}).filter(([key]) =>
++      INITIAL_PERSON_PROPERTIES.has(key),
++    ),
++  );
+   return {
+     uuid: event.uuid,
+     event: event.event,
+     timestamp: event.timestamp,
+     properties,
++    ...(Object.keys(initialAttribution).length
++      ? { $set_once: initialAttribution }
++      : {}),
+   };
+ }
+ 
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.test.ts b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+index dfa00245a8c4600a9d8c2c3106fd49140e84c683..4c1a921208028e526b1f1d5bac1b1d00e22b7315 100644
+--- a/FE/src/infrastructure/analytics/posthogProvider.test.ts
++++ b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+@@ -174,6 +174,25 @@ describe("PostHog 사용자 여정", () => {
+     );
+   });
+ 
++  it("비로그인 방문자도 브라우저 단위로 구분해 유입 캠페인과 함께 기록한다", () => {
++    const { sdk, client } = setup();
++    client.setContext({ authState: "guest", pathname: "/" });
++    client.track({
++      name: "page_view",
++      parameters: { page_location: "http://localhost:3000/", page_path: "/" },
++    });
++    const config = sdk.init.mock.calls[0][1] as PostHogConfig;
++    expect(config.persistence).toBe("localStorage");
++    expect(config.person_profiles).toBe("always");
++    expect(config.save_campaign_params).toBe(true);
++    expect(config.save_referrer).toBe(true);
++    expect(sdk.capture).toHaveBeenCalledWith(
++      "$pageview",
++      expect.objectContaining({ auth_state: "guest" }),
++    );
++    expect(sdk.startSessionRecording).toHaveBeenCalled();
++  });
++
+   it("기존 회원이 게스트가 되면 한 번만 reset하고 익명 탐색을 유지한다", () => {
+     const { sdk, client } = setup("bibbidi:user:42");
+     client.setContext({ authState: "guest", pathname: "/login" });
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.ts b/FE/src/infrastructure/analytics/posthogProvider.ts
+index f073b5f80ab81ac4801cf4a449688464b0c9e6a9..f36273f890e18da05d75031f98fc55a25b8341cb 100644
+--- a/FE/src/infrastructure/analytics/posthogProvider.ts
++++ b/FE/src/infrastructure/analytics/posthogProvider.ts
+@@ -67,8 +67,8 @@ export function createPostHogProvider(
+           : "https://us.posthog.com",
+         defaults: "2026-08-30",
+         strict_script_versioning: true,
+-        persistence: "sessionStorage",
+-        person_profiles: "identified_only",
++        persistence: "localStorage",
++        person_profiles: "always",
+         autocapture: false,
+         capture_pageview: false,
+         capture_pageleave: false,
+@@ -83,8 +83,8 @@ export function createPostHogProvider(
+         disable_conversations: true,
+         disable_web_experiments: true,
+         advanced_disable_feature_flags: true,
+-        save_referrer: false,
+-        save_campaign_params: false,
++        save_referrer: true,
++        save_campaign_params: true,
+         disable_capture_url_hashes: true,
+         respect_dnt: true,
+         session_recording: PRIVATE_REPLAY_CONFIG,
+diff --git a/docs/posthog.md b/docs/posthog.md
+index dfa688422c65c3831c0e0181b02225e0088f1fcd..64203a76b3459d0bbcb68a19379ea1cd63b13fe5 100644
+--- a/docs/posthog.md
++++ b/docs/posthog.md
+@@ -27,7 +27,8 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
+ - 기존 회원 이전은 임시 회원을 삭제하고 소셜 식별자를 기존 회원으로 이동한다. 따라서 임시 ID는 identify하지 않으며, 약관 동의와 이전 처리 사이의 로딩으로 익명 ID를 reset하지 않는다.
+ - 로그아웃 성공 이벤트를 기존 ID에 보낸 뒤 reset한다. 명시적 계정 전환·탈퇴 완료도 reset한다. 401/회원 없음으로 세션 무효가 확정되면 기존 회원 식별을 해제한다.
+ - 익명 상태의 reset은 SDK ID를 바꾸지 않는다. 녹화와 일반 이벤트 수집은 중지하되 가입 중 세션 만료 전후의 익명 여정을 연결한다.
+-- SDK 식별 저장소는 `sessionStorage`로 탭마다 분리한다. 한 탭의 SDK ID 갱신이 다른 탭의 진행 중 작업을 덮어쓰지 않는다. OAuth를 같은 탭으로 왕복하면 익명 ID가 유지된다. 새 탭의 익명 방문은 별도 여정이며, 로그인 후 같은 최종 회원으로 연결된다.
++- 1차 목표는 홍보로 들어온 비로그인 방문자를 한 명씩 추적하는 것이다. 그래서 SDK 식별 저장소는 `localStorage`로 두어 같은 브라우저의 재방문과 새 탭을 같은 익명 방문자로 잇고, `person_profiles: "always"`로 익명 방문자도 People에 한 명씩 남긴다. 로그인하면 그동안의 익명 기록이 최종 회원에 합쳐진다. 다른 기기나 브라우저는 로그인 전까지 다른 방문자로 잡힌다.
++- 탭들이 식별 저장소를 공유하므로, 한 탭에서 로그아웃하거나 다른 회원으로 로그인하면 아직 갱신되지 않은 다른 탭의 이벤트가 바뀐 ID로 기록될 수 있다. 이 경우는 드물다고 보고 탭 간 동기화는 넣지 않는다.
+ - 다른 탭에서 로그아웃하거나 계정이 바뀌면, 이 탭은 토큰이 만료돼 401이 날 때 식별을 해제한다. 그 전까지는 이 탭이 실제로 기존 회원으로 요청하므로 기존 회원에 기록된다.
+ - `/auth/:provider`는 페이지뷰·리플레이 대상에서 제외한다. 콜백 실패는 제공자와 고정 사유만 별도 이벤트로 보낸다. 초기 인증 확인 중이어도 이 실패는 익명으로 남긴다.
+ 
+@@ -54,7 +55,7 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
+ 
+ 서버의 208은 state 불일치, 만료, 쿠키 바인딩 실패를 함께 나타낸다. FE에서 구분할 수 없으므로 `state_invalid_or_expired`로 묶는다. 취소는 제공자가 `error=access_denied`로 돌려준 경우다. 제공자 화면에서 돌아오지 않은 사용자는 실패 이벤트가 없고 시작 후 다음 단계가 관측되지 않은 방문으로만 해석한다.
+ 
+-오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
++오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
+ 
+ ## SDK와 리플레이
+ 
+@@ -96,7 +97,7 @@ BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않
+ 
+ 1. 운영은 `BIBBIDI_POSTHOG_ENABLED=false`로 유지한다. 테스트 서버는 별도 개발 프로젝트의 token·host와 `BIBBIDI_APP_ENV=development`, `BIBBIDI_POSTHOG_ENABLED=true`를 빌드 환경에 넣어 먼저 활성화한다. 값이 없거나 키가 없으면 초기화·저장·전송하지 않는다. 빌드 시 주입 값이므로 변경 시 재빌드/재배포가 필요하다.
+ 2. 팀의 테스트 계정으로 이벤트가 실제로 쌓이는지 확인하고 마스킹, 최종 ID 병합, 탈퇴 삭제, 과금 상한을 검증한다. 테스트 서버 검증이 끝난 뒤 운영 활성화 절차를 진행한다.
+-3. 정책 초안에 PostHog 수탁자·US 프로젝트의 실제 이전 국가/시점/방법/목적/항목/기간/거부 방법, 가명 회원 ID에 연결된 행동 및 화면 재구성 정보, sessionStorage 사용과 수집 중단 방법을 추가한다. 연락처 등 미확인 사실은 실제 계약으로 채운다.
++3. 정책 초안에 PostHog 수탁자·US 프로젝트의 실제 이전 국가/시점/방법/목적/항목/기간/거부 방법, 가명 회원 ID에 연결된 행동 및 화면 재구성 정보, localStorage에 방문자 식별자를 두는 것과 수집 중단 방법을 추가한다. 연락처 등 미확인 사실은 실제 계약으로 채운다.
+ 4. 팀 규칙의 일반 변경 7일, 중요 변경 30일 전 공지 중 **이번 변경은 30일을 확보하는 안**으로 서비스 공지를 게시한다. 실제 게시일을 D로 기록하고 D+30일 이후로 시행일을 정한다. 2026-09-26 기존 게시일에서 새 공지 기간을 소급 계산하지 않는다. 정책 승인·게시·동의 방식은 운영 담당자가 확정한다.
+ 5. 기간 경과, 정책 확정, 필요한 동의/거부 처리, 삭제 목록/담당자, 원격 Replay·retention·과금 설정, **Discard client IP data** 활성화와 QA가 모두 완료된 후에만 운영 변수를 true로 바꾼다. 이 변경을 자동 예약하지 않는다.
+ 6. 중단 시 원격 Replay off + ENABLED=false 재배포한다. 신규 수집 중단과 이미 저장된 데이터 삭제는 별도로 확인한다.

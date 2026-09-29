@@ -230,7 +230,7 @@ describe("appRoutes", () => {
 
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
             status: 200,
           }),
         );
@@ -347,7 +347,9 @@ describe("appRoutes", () => {
 
   it("가입 완료 사용자가 온보딩에 직접 접근하면 홈으로 이동한다", async () => {
     installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
     );
     const router = renderRouter(["/onboarding"]);
 
@@ -362,7 +364,7 @@ describe("appRoutes", () => {
   it("진행 표시가 있어도 체크리스트가 있는 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
     beginAccountSetupProgress();
     installFetch(
-      new Response(JSON.stringify({ nickname: "provider-name" }), {
+      new Response(JSON.stringify({ id: 1, nickname: "provider-name" }), {
         status: 200,
       }),
     );
@@ -378,7 +380,9 @@ describe("appRoutes", () => {
 
   it("진행 표시가 없는 가입 완료 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
     installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
     );
     const router = renderRouter(["/onboarding/account"]);
 
@@ -495,7 +499,9 @@ describe("appRoutes", () => {
 
   it("인증 사용자가 플래너에서 기존 일정 대시보드를 본다", async () => {
     installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
     );
     renderRouter(["/planner"]);
 
@@ -515,7 +521,7 @@ describe("appRoutes", () => {
 
           return Promise.resolve(
             currentUserRequestCount === 1
-              ? new Response(JSON.stringify({ nickname: "bibbidi" }), {
+              ? new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
                   status: 200,
                 })
               : new Response(

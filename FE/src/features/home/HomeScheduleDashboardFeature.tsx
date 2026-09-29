@@ -70,7 +70,7 @@ export function HomeScheduleDashboardFeature({
   const { authState, refreshAuth } = useAuth();
   const authScope =
     authState.status === "authenticated"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status;
   const checklistRepository = usePreparationChecklistRepository();
   const [unscheduled, setUnscheduled] =

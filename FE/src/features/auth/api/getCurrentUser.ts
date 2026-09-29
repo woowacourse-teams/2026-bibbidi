@@ -6,6 +6,7 @@ const CURRENT_USER_ENDPOINT = `${apiBaseUrl}/api/users/me`;
 const CURRENT_USER_TIMEOUT_MS = 10_000;
 
 interface CurrentUserResponse {
+  id: number;
   nickname: string;
 }
 
@@ -44,7 +45,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isCurrentUserResponse(value: unknown): value is CurrentUserResponse {
-  return isRecord(value) && typeof value.nickname === "string";
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    Number.isSafeInteger(value.id) &&
+    value.id > 0 &&
+    typeof value.nickname === "string"
+  );
 }
 
 function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
@@ -143,6 +150,7 @@ export async function getCurrentUser(
     }
 
     return {
+      id: body.id,
       nickname: body.nickname,
     };
   } finally {

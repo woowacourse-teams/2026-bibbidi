@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { analytics } from "../../infrastructure/analytics";
 
 import {
   acceptWebAccessToken,
@@ -25,6 +26,16 @@ import { ACCOUNT_SETUP_ERROR_MESSAGE } from "./model/accountSetupError";
 
 const AUTHENTICATION_ERROR_CODES = new Set([201, 204, 205, 206]);
 
+function trackTransferFailure(
+  failureKind: string,
+  outcome: "failed" | "unknown" = "failed",
+) {
+  analytics.track({
+    name: "legacy_transfer_failed",
+    parameters: { failure_kind: failureKind, outcome },
+  });
+}
+
 interface UseLegacyAccountTransferOptions {
   onAuthenticationExpired: () => void;
   onSuccess: () => void;
@@ -49,6 +60,10 @@ export function useLegacyAccountTransfer({
   );
 
   const clearError = () => setErrorMessage(undefined);
+  const completeTransfer = () => {
+    analytics.track({ name: "legacy_transfer_complete", parameters: {} });
+    onSuccess();
+  };
 
   const resetForm = () => {
     setValues((currentValues) => ({
@@ -95,6 +110,7 @@ export function useLegacyAccountTransfer({
   const recoverUncertainTransfer = async (
     previousUserId: string,
     signal: AbortSignal,
+    failureKind: "network" | "timeout",
   ) => {
     try {
       const session = await refreshWebSession();
@@ -106,15 +122,17 @@ export function useLegacyAccountTransfer({
       const refreshedUserId = webUserIdFromAccessToken(session.accessToken);
 
       if (refreshedUserId && refreshedUserId !== previousUserId) {
-        onSuccess();
+        completeTransfer();
         return;
       }
 
       setErrorMessage(
         "계정 이전이 완료되지 않았어요. 입력 정보를 확인하고 다시 시도해 주세요.",
       );
+      trackTransferFailure(failureKind, refreshedUserId ? "failed" : "unknown");
     } catch {
       if (!signal.aborted) {
+        trackTransferFailure(failureKind, "unknown");
         onAuthenticationExpired();
       }
     }
@@ -123,6 +141,7 @@ export function useLegacyAccountTransfer({
   const submit = async () => {
     if (isSubmitting || !isLoginFormValid(values)) {
       if (!isSubmitting) {
+        trackTransferFailure("validation");
         setErrorMessage(LOGIN_FORM_ERROR_MESSAGE);
       }
       return;
@@ -131,6 +150,7 @@ export function useLegacyAccountTransfer({
     const previousUserId = currentWebUserId();
 
     if (!previousUserId) {
+      trackTransferFailure("authentication");
       onAuthenticationExpired();
       return;
     }
@@ -142,6 +162,7 @@ export function useLegacyAccountTransfer({
 
     try {
       const loginValues = toLoginValues(values);
+      analytics.track({ name: "legacy_transfer_submit", parameters: {} });
       const session = await transferLegacyAccount(
         loginValues.nickname,
         loginValues.password,
@@ -152,7 +173,7 @@ export function useLegacyAccountTransfer({
       if (session.termsAgreementRequired) {
         onTermsRequired();
       } else {
-        onSuccess();
+        completeTransfer();
       }
     } catch (error) {
       if (error instanceof AccountSetupRequestAbortedError) {
@@ -160,6 +181,7 @@ export function useLegacyAccountTransfer({
       }
 
       if (error instanceof AccountSetupAuthenticationRequiredError) {
+        trackTransferFailure("authentication");
         onAuthenticationExpired();
         return;
       }
@@ -168,12 +190,27 @@ export function useLegacyAccountTransfer({
         error instanceof AccountSetupNetworkError ||
         error instanceof AccountSetupTimeoutError
       ) {
-        await recoverUncertainTransfer(previousUserId, controller.signal);
-      } else if (
-        !(error instanceof AccountSetupApiError) ||
-        !handleApiError(error)
-      ) {
-        setErrorMessage(ACCOUNT_SETUP_ERROR_MESSAGE);
+        await recoverUncertainTransfer(
+          previousUserId,
+          controller.signal,
+          error instanceof AccountSetupTimeoutError ? "timeout" : "network",
+        );
+      } else {
+        trackTransferFailure(
+          error instanceof AccountSetupApiError
+            ? error.errorCode === 211
+              ? "terms_required"
+              : error.status === 401
+                ? "authentication"
+                : "api"
+            : "unknown",
+        );
+        if (
+          !(error instanceof AccountSetupApiError) ||
+          !handleApiError(error)
+        ) {
+          setErrorMessage(ACCOUNT_SETUP_ERROR_MESSAGE);
+        }
       }
     } finally {
       if (requestControllerRef.current === controller) {
