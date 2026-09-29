@@ -128,6 +128,52 @@ beforeEach(() => {
 });
 
 describe("HomeScheduleDashboardFeature", () => {
+  it("비로그인 사용자에게 안내를 표시하고 개인화 API를 호출하지 않는다", () => {
+    const nearbyRepository = createRepository();
+    const unscheduledRepository = createUnscheduledRepository();
+    const recommendedRepository = createRecommendedRepository();
+    vi.mocked(useAuth).mockReturnValue({
+      authState: { status: "guest" },
+      beginAuthentication: vi.fn(),
+      beginOnboarding: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
+      refreshAuth,
+    });
+
+    render(
+      <HomeScheduleDashboardFeature
+        nearbyRepository={nearbyRepository}
+        recommendedRepository={recommendedRepository}
+        unscheduledRepository={unscheduledRepository}
+      />,
+    );
+
+    expect(
+      screen.getByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요."),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText(
+        "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+      ),
+    ).toHaveLength(2);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(nearbyRepository.getNearbyAppointments).not.toHaveBeenCalled();
+    expect(unscheduledRepository.getUnscheduledTasks).not.toHaveBeenCalled();
+    expect(
+      recommendedRepository.getRecommendedCatalogItems,
+    ).not.toHaveBeenCalled();
+  });
+
   it("Loading에서 API 순서를 유지한 Complete 목록으로 전환한다", async () => {
     let resolveRequest: Parameters<
       ConstructorParameters<

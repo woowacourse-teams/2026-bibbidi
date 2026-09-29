@@ -31,7 +31,10 @@ import {
   UnscheduledTasksRequestAbortedError,
 } from "./repository/unscheduledTasksRepository";
 import { createHomeScheduleDashboardViewModel } from "./view-model/createHomeScheduleDashboardViewModel";
-import { HomeScheduleDashboard } from "./view/HomeScheduleDashboard";
+import {
+  GuestHomeScheduleDashboard,
+  HomeScheduleDashboard,
+} from "./view/HomeScheduleDashboard";
 import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
 
 const initialModel: HomeScheduleDashboardModel = {
@@ -87,6 +90,10 @@ export function HomeScheduleDashboardFeature({
   const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
 
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -130,6 +137,7 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
     getReferenceDate,
     nearbyRepository,
@@ -138,6 +146,10 @@ export function HomeScheduleDashboardFeature({
   ]);
 
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -175,6 +187,7 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
     refreshAuth,
     unscheduledRepository,
@@ -182,6 +195,10 @@ export function HomeScheduleDashboardFeature({
   ]);
 
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -221,6 +238,7 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
     recommendedRepository,
     recommendedRequestRevision,
@@ -276,14 +294,19 @@ export function HomeScheduleDashboardFeature({
   });
 
   const viewModel = createHomeScheduleDashboardViewModel(
-    {
-      ...initialModel,
-      recommended,
-      unscheduled,
-      upcoming,
-    },
+    authState.status === "authenticated"
+      ? {
+          recommended,
+          unscheduled,
+          upcoming,
+        }
+      : initialModel,
     { recommendedTaskAddition },
   );
+
+  if (authState.status === "guest") {
+    return <GuestHomeScheduleDashboard />;
+  }
 
   return (
     <HomeScheduleDashboard

@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate, RouteObject } from "react-router";
 
-import { PlannerAccessGuard } from "../features/auth";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
 import { AccountSetupPage } from "../pages/AccountSetupPage";
@@ -24,13 +23,8 @@ export const appRoutes: RouteObject[] = [
         element: <Navigate replace to="/" />,
       },
       {
-        Component: PlannerAccessGuard,
-        children: [
-          {
-            path: "/planner",
-            Component: PlannerPage,
-          },
-        ],
+        path: "/planner",
+        Component: PlannerPage,
       },
       {
         path: "/checklist",

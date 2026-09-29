@@ -19,23 +19,24 @@ import {
 } from "./createUpcomingScheduleViewModel";
 
 export type HomeScheduleDashboardResultIcon =
-  "alert" | "calendar-check" | "calendar-days" | "calendar-heart";
+  "alert" | "calendar-check" | "calendar-days" | "calendar-heart" | "lock";
 
 export type HomeScheduleDashboardResultTone = "critical" | "neutral";
 
 export interface HomeScheduleDashboardResultViewModel {
-  actionLabel: string;
+  actionLabel?: string;
   actionTo?: string;
-  actionVariant: "button" | "link";
+  actionVariant?: "button" | "link";
   description: string;
   icon: HomeScheduleDashboardResultIcon;
-  isActionDisabled: boolean;
+  isActionDisabled?: boolean;
   title: string;
   tone: HomeScheduleDashboardResultTone;
 }
 
 export interface HomeScheduleDashboardResultSectionViewModel<
-  TStatus extends "empty" | "error" = "empty" | "error",
+  TStatus extends "authentication-required" | "empty" | "error" =
+    "authentication-required" | "empty" | "error",
 > {
   countLabel?: string;
   result: HomeScheduleDashboardResultViewModel;

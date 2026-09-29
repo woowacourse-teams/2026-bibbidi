@@ -67,6 +67,13 @@ function ResultIcon({ icon }: { icon: HomeScheduleDashboardResultIcon }) {
           <path d="M12 18s-3-1.7-3-4a1.8 1.8 0 0 1 3-1.3 1.8 1.8 0 0 1 3 1.3c0 2.3-3 4-3 4Z" />
         </svg>
       );
+    case "lock":
+      return (
+        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+          <rect height="10" rx="2" width="14" x="5" y="11" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3M12 15v2" />
+        </svg>
+      );
     default:
       return assertNever(icon);
   }
@@ -106,26 +113,28 @@ function DashboardResult({
       </span>
       <h3>{viewModel.title}</h3>
       <p>{viewModel.description}</p>
-      {viewModel.actionTo ? (
-        <Link
-          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
-          to={viewModel.actionTo}
-        >
-          {viewModel.actionLabel}
-          <ChevronRightIcon />
-        </Link>
-      ) : (
-        <button
-          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
-          disabled={viewModel.isActionDisabled}
-          onClick={onAction}
-          type="button"
-        >
-          {viewModel.actionVariant === "button" && <RefreshIcon />}
-          {viewModel.actionLabel}
-          {viewModel.actionVariant === "link" && <ChevronRightIcon />}
-        </button>
-      )}
+      {viewModel.actionLabel && viewModel.actionVariant ? (
+        viewModel.actionTo ? (
+          <Link
+            className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+            to={viewModel.actionTo}
+          >
+            {viewModel.actionLabel}
+            <ChevronRightIcon />
+          </Link>
+        ) : (
+          <button
+            className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+            disabled={viewModel.isActionDisabled}
+            onClick={onAction}
+            type="button"
+          >
+            {viewModel.actionVariant === "button" && <RefreshIcon />}
+            {viewModel.actionLabel}
+            {viewModel.actionVariant === "link" && <ChevronRightIcon />}
+          </button>
+        )
+      ) : null}
     </div>
   );
 }
@@ -385,6 +394,64 @@ function RecommendedScheduleSection({
     default:
       return assertNever(viewModel);
   }
+}
+
+const guestUpcomingViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+  {
+    result: {
+      description: "체크리스트에 등록한 일정이 여기에 표시돼요.",
+      icon: "lock",
+      title: "로그인하면 가까운 일정을 확인할 수 있어요.",
+      tone: "neutral",
+    },
+    status: "authentication-required",
+    title: "가까운 일정",
+  };
+
+const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+  {
+    result: {
+      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+      icon: "lock",
+      title: "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
+      tone: "neutral",
+    },
+    status: "authentication-required",
+    title: "일정이 필요한 할 일",
+  };
+
+const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+  {
+    result: {
+      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+      icon: "lock",
+      title: "로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요.",
+      tone: "neutral",
+    },
+    status: "authentication-required",
+    title: "추천 할 일",
+  };
+
+export function GuestHomeScheduleDashboard() {
+  return (
+    <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
+      <div className="home-dashboard-state__top">
+        <DashboardResultSection
+          id="dashboard-upcoming-schedule"
+          viewModel={guestUpcomingViewModel}
+        />
+        <DashboardResultSection
+          id="dashboard-unscheduled-task"
+          viewModel={guestUnscheduledViewModel}
+        />
+      </div>
+      <DashboardResultSection
+        className="home-dashboard-state__section--recommended"
+        id="dashboard-recommended-schedule"
+        viewModel={guestRecommendedViewModel}
+      />
+    </section>
+  );
 }
 
 export function HomeScheduleDashboard({
