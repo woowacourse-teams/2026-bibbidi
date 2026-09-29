@@ -2,7 +2,6 @@ import type {
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
-  HomeScheduleDashboardUpcomingModel,
 } from "../model/homeScheduleDashboard";
 import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
 import {
@@ -13,13 +12,9 @@ import {
   createUnscheduledTaskViewModel,
   UnscheduledTaskViewModel,
 } from "./createUnscheduledTaskViewModel";
-import {
-  createUpcomingScheduleViewModel,
-  UpcomingScheduleViewModel,
-} from "./createUpcomingScheduleViewModel";
 
 export type HomeScheduleDashboardResultIcon =
-  "alert" | "calendar-check" | "calendar-days" | "calendar-heart" | "lock";
+  "alert" | "calendar-check" | "calendar-heart" | "lock";
 
 export type HomeScheduleDashboardResultTone = "critical" | "neutral";
 
@@ -49,14 +44,6 @@ export interface HomeScheduleDashboardLoadingSectionViewModel {
   status: "loading";
 }
 
-export type HomeScheduleDashboardUpcomingViewModel =
-  | HomeScheduleDashboardLoadingSectionViewModel
-  | HomeScheduleDashboardResultSectionViewModel<"empty" | "error">
-  | {
-      content: UpcomingScheduleViewModel;
-      status: "complete";
-    };
-
 export interface HomeScheduleDashboardUnscheduledCompleteViewModel {
   content: UnscheduledTaskViewModel;
   status: "complete";
@@ -80,7 +67,6 @@ export type HomeScheduleDashboardRecommendedViewModel =
 export interface HomeScheduleDashboardViewModel {
   recommended: HomeScheduleDashboardRecommendedViewModel;
   unscheduled: HomeScheduleDashboardUnscheduledViewModel;
-  upcoming: HomeScheduleDashboardUpcomingViewModel;
 }
 
 function createErrorResult(
@@ -96,46 +82,6 @@ function createErrorResult(
     title,
     tone: "critical",
   };
-}
-
-function createUpcomingViewModel(
-  model: HomeScheduleDashboardUpcomingModel,
-): HomeScheduleDashboardUpcomingViewModel {
-  switch (model.status) {
-    case "loading":
-      return {
-        loadingLabel: "가까운 일정을 불러오는 중입니다.",
-        status: model.status,
-      };
-    case "empty":
-      return {
-        result: {
-          actionLabel: "체크리스트 보기",
-          actionTo: "/checklist",
-          actionVariant: "link",
-          description: "일정이 있는 할 일은 여기에 표시돼요",
-          icon: "calendar-days",
-          isActionDisabled: false,
-          title: "예정된 일정이 없어요",
-          tone: "neutral",
-        },
-        status: model.status,
-        title: "가까운 일정",
-      };
-    case "error":
-      return {
-        result: createErrorResult("일정을 불러오지 못했어요", false),
-        status: model.status,
-        title: "가까운 일정",
-      };
-    case "complete":
-      return {
-        content: createUpcomingScheduleViewModel(model.schedules),
-        status: model.status,
-      };
-    default:
-      return assertNever(model);
-  }
 }
 
 function createUnscheduledViewModel(
@@ -245,6 +191,5 @@ export function createHomeScheduleDashboardViewModel(
       recommendedTaskAddition,
     ),
     unscheduled: createUnscheduledViewModel(model.unscheduled),
-    upcoming: createUpcomingViewModel(model.upcoming),
   };
 }

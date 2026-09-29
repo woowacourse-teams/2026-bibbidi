@@ -7,19 +7,18 @@ import {
   HomeScheduleDashboardResultSectionViewModel,
   HomeScheduleDashboardResultViewModel,
   HomeScheduleDashboardUnscheduledViewModel,
-  HomeScheduleDashboardUpcomingViewModel,
   HomeScheduleDashboardViewModel,
 } from "../view-model/createHomeScheduleDashboardViewModel";
 import "./HomeScheduleDashboard.css";
 import { RecommendedSchedule } from "./RecommendedSchedule";
+import { MonthlyCalendar } from "./MonthlyCalendar";
 import { UnscheduledTask } from "./UnscheduledTask";
-import { UpcomingSchedule } from "./UpcomingSchedule";
 
 interface HomeScheduleDashboardProps {
   onAddRecommendedTask: (catalogItemId: number) => void;
   onRetryRecommended: () => void;
   onRetryUnscheduled: () => void;
-  onRetryUpcoming: () => void;
+  referenceDate: string;
   viewModel: HomeScheduleDashboardViewModel;
 }
 
@@ -49,14 +48,6 @@ function ResultIcon({ icon }: { icon: HomeScheduleDashboardResultIcon }) {
           <path d="M7 3v3M17 3v3M4 9h16" />
           <rect height="16" rx="2" width="16" x="4" y="5" />
           <path d="m9 15 2 2 4-4" />
-        </svg>
-      );
-    case "calendar-days":
-      return (
-        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-          <path d="M7 3v3M17 3v3M4 9h16" />
-          <rect height="16" rx="2" width="16" x="4" y="5" />
-          <path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01" />
         </svg>
       );
     case "calendar-heart":
@@ -163,32 +154,12 @@ function DashboardResultSection({
   );
 }
 
-function SkeletonSectionHeader({
-  showAction = true,
-}: {
-  showAction?: boolean;
-}) {
+function SkeletonSectionHeader() {
   return (
     <div className="home-dashboard-loading__section-header">
       <span className="home-dashboard-loading__section-title" />
-      {showAction && (
-        <span className="home-dashboard-loading__section-action" />
-      )}
+      <span className="home-dashboard-loading__section-action" />
     </div>
-  );
-}
-
-function UpcomingScheduleSkeleton() {
-  return (
-    <li className="home-dashboard-loading__upcoming-card">
-      <div className="home-dashboard-loading__upcoming-meta">
-        <span className="home-dashboard-loading__upcoming-date" />
-        <span className="home-dashboard-loading__upcoming-badge" />
-      </div>
-      <span className="home-dashboard-loading__upcoming-title" />
-      <span aria-hidden="true" className="home-dashboard-loading__spacer" />
-      <span className="home-dashboard-loading__upcoming-detail" />
-    </li>
   );
 }
 
@@ -225,26 +196,6 @@ function LoadingStatus({
     <p className="home-dashboard-loading__sr-only" role="status">
       {viewModel.loadingLabel}
     </p>
-  );
-}
-
-function UpcomingScheduleLoading({
-  viewModel,
-}: {
-  viewModel: HomeScheduleDashboardLoadingSectionViewModel;
-}) {
-  return (
-    <section aria-busy="true" className="home-dashboard-loading__section">
-      <LoadingStatus viewModel={viewModel} />
-      <div aria-hidden="true">
-        <SkeletonSectionHeader showAction={false} />
-        <ul className="home-dashboard-loading__upcoming-list">
-          {Array.from({ length: 6 }, (_, index) => (
-            <UpcomingScheduleSkeleton key={index} />
-          ))}
-        </ul>
-      </div>
-    </section>
   );
 }
 
@@ -289,38 +240,6 @@ function RecommendedScheduleLoading({
       </div>
     </section>
   );
-}
-
-function UpcomingScheduleSection({
-  onRetry,
-  viewModel,
-}: {
-  onRetry: () => void;
-  viewModel: HomeScheduleDashboardUpcomingViewModel;
-}) {
-  switch (viewModel.status) {
-    case "loading":
-      return <UpcomingScheduleLoading viewModel={viewModel} />;
-    case "empty":
-      return (
-        <DashboardResultSection
-          id="dashboard-upcoming-schedule"
-          viewModel={viewModel}
-        />
-      );
-    case "error":
-      return (
-        <DashboardResultSection
-          id="dashboard-upcoming-schedule"
-          onAction={onRetry}
-          viewModel={viewModel}
-        />
-      );
-    case "complete":
-      return <UpcomingSchedule viewModel={viewModel.content} />;
-    default:
-      return assertNever(viewModel);
-  }
 }
 
 function UnscheduledTaskSection({
@@ -396,18 +315,6 @@ function RecommendedScheduleSection({
   }
 }
 
-const guestUpcomingViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
-  {
-    result: {
-      description: "체크리스트에 등록한 일정이 여기에 표시돼요.",
-      icon: "lock",
-      title: "로그인하면 가까운 일정을 확인할 수 있어요.",
-      tone: "neutral",
-    },
-    status: "authentication-required",
-    title: "가까운 일정",
-  };
-
 const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
   {
     result: {
@@ -432,24 +339,27 @@ const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"au
     title: "추천 할 일",
   };
 
-export function GuestHomeScheduleDashboard() {
+export function GuestHomeScheduleDashboard({
+  referenceDate,
+}: {
+  referenceDate: string;
+}) {
   return (
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
-        <DashboardResultSection
-          id="dashboard-upcoming-schedule"
-          viewModel={guestUpcomingViewModel}
-        />
-        <DashboardResultSection
-          id="dashboard-unscheduled-task"
-          viewModel={guestUnscheduledViewModel}
-        />
+        <MonthlyCalendar referenceDate={referenceDate} />
+        <div className="home-dashboard-state__side">
+          <DashboardResultSection
+            id="dashboard-unscheduled-task"
+            viewModel={guestUnscheduledViewModel}
+          />
+          <DashboardResultSection
+            className="home-dashboard-state__section--recommended"
+            id="dashboard-recommended-schedule"
+            viewModel={guestRecommendedViewModel}
+          />
+        </div>
       </div>
-      <DashboardResultSection
-        className="home-dashboard-state__section--recommended"
-        id="dashboard-recommended-schedule"
-        viewModel={guestRecommendedViewModel}
-      />
     </section>
   );
 }
@@ -458,26 +368,25 @@ export function HomeScheduleDashboard({
   onAddRecommendedTask,
   onRetryRecommended,
   onRetryUnscheduled,
-  onRetryUpcoming,
+  referenceDate,
   viewModel,
 }: HomeScheduleDashboardProps) {
   return (
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
-        <UpcomingScheduleSection
-          onRetry={onRetryUpcoming}
-          viewModel={viewModel.upcoming}
-        />
-        <UnscheduledTaskSection
-          onRetry={onRetryUnscheduled}
-          viewModel={viewModel.unscheduled}
-        />
+        <MonthlyCalendar referenceDate={referenceDate} />
+        <div className="home-dashboard-state__side">
+          <UnscheduledTaskSection
+            onRetry={onRetryUnscheduled}
+            viewModel={viewModel.unscheduled}
+          />
+          <RecommendedScheduleSection
+            onAddTask={onAddRecommendedTask}
+            onRetry={onRetryRecommended}
+            viewModel={viewModel.recommended}
+          />
+        </div>
       </div>
-      <RecommendedScheduleSection
-        onAddTask={onAddRecommendedTask}
-        onRetry={onRetryRecommended}
-        viewModel={viewModel.recommended}
-      />
     </section>
   );
 }

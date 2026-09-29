@@ -5,7 +5,6 @@ import { useAuth } from "../auth";
 import { usePreparationChecklistRepository } from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import {
-  nearbyAppointmentsRepository,
   recommendedCatalogItemsRepository,
   unscheduledTasksRepository,
 } from "./homeDependencies";
@@ -13,13 +12,7 @@ import {
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
-  HomeScheduleDashboardUpcomingModel,
 } from "./model/homeScheduleDashboard";
-import { NearbyAppointmentsRepository } from "./repository/nearbyAppointmentsRepository";
-import {
-  NearbyAppointmentsAuthenticationRequiredError,
-  NearbyAppointmentsRequestAbortedError,
-} from "./repository/nearbyAppointmentsRepository";
 import {
   RecommendedCatalogItemsAuthenticationRequiredError,
   RecommendedCatalogItemsRepository,
@@ -44,9 +37,6 @@ const initialModel: HomeScheduleDashboardModel = {
   unscheduled: {
     status: "loading",
   },
-  upcoming: {
-    status: "loading",
-  },
 };
 
 function getLocalDate(now = new Date()) {
@@ -59,14 +49,12 @@ function getLocalDate(now = new Date()) {
 
 interface HomeScheduleDashboardFeatureProps {
   getReferenceDate?: () => string;
-  nearbyRepository?: NearbyAppointmentsRepository;
   recommendedRepository?: RecommendedCatalogItemsRepository;
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
 export function HomeScheduleDashboardFeature({
   getReferenceDate = getLocalDate,
-  nearbyRepository = nearbyAppointmentsRepository,
   recommendedRepository = recommendedCatalogItemsRepository,
   unscheduledRepository = unscheduledTasksRepository,
 }: HomeScheduleDashboardFeatureProps) {
@@ -80,71 +68,10 @@ export function HomeScheduleDashboardFeature({
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
     useState<HomeScheduleDashboardRecommendedModel>(initialModel.recommended);
-  const [upcoming, setUpcoming] = useState<HomeScheduleDashboardUpcomingModel>(
-    initialModel.upcoming,
-  );
   const [unscheduledRequestRevision, setUnscheduledRequestRevision] =
     useState(0);
   const [recommendedRequestRevision, setRecommendedRequestRevision] =
     useState(0);
-  const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
-
-  useEffect(() => {
-    if (authState.status !== "authenticated") {
-      return;
-    }
-
-    const controller = new AbortController();
-    let isActive = true;
-
-    nearbyRepository.getNearbyAppointments(controller.signal).then(
-      (schedules) => {
-        if (!isActive) {
-          return;
-        }
-
-        setUpcoming(
-          schedules.length === 0
-            ? { status: "empty" }
-            : {
-                schedules: {
-                  referenceDate: getReferenceDate(),
-                  schedules,
-                },
-                status: "complete",
-              },
-        );
-      },
-      (error: unknown) => {
-        if (
-          !isActive ||
-          error instanceof NearbyAppointmentsRequestAbortedError
-        ) {
-          return;
-        }
-
-        if (error instanceof NearbyAppointmentsAuthenticationRequiredError) {
-          refreshAuth();
-          return;
-        }
-
-        setUpcoming({ status: "error" });
-      },
-    );
-
-    return () => {
-      isActive = false;
-      controller.abort();
-    };
-  }, [
-    authState.status,
-    authScope,
-    getReferenceDate,
-    nearbyRepository,
-    refreshAuth,
-    upcomingRequestRevision,
-  ]);
-
   useEffect(() => {
     if (authState.status !== "authenticated") {
       return;
@@ -245,11 +172,6 @@ export function HomeScheduleDashboardFeature({
     refreshAuth,
   ]);
 
-  const retryUpcoming = useCallback(() => {
-    setUpcoming({ status: "loading" });
-    setUpcomingRequestRevision((revision) => revision + 1);
-  }, []);
-
   const retryUnscheduled = useCallback(() => {
     setUnscheduled({ status: "loading" });
     setUnscheduledRequestRevision((revision) => revision + 1);
@@ -298,14 +220,13 @@ export function HomeScheduleDashboardFeature({
       ? {
           recommended,
           unscheduled,
-          upcoming,
         }
       : initialModel,
     { recommendedTaskAddition },
   );
 
   if (authState.status === "guest") {
-    return <GuestHomeScheduleDashboard />;
+    return <GuestHomeScheduleDashboard referenceDate={getReferenceDate()} />;
   }
 
   return (
@@ -313,7 +234,7 @@ export function HomeScheduleDashboardFeature({
       onAddRecommendedTask={recommendedTaskAddition.add}
       onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
-      onRetryUpcoming={retryUpcoming}
+      referenceDate={getReferenceDate()}
       viewModel={viewModel}
     />
   );
