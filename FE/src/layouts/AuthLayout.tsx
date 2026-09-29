@@ -7,6 +7,7 @@ import "./AuthLayout.css";
 export function AuthLayout() {
   const { authState } = useAuth();
   const { pathname, search } = useLocation();
+  const isLoginPath = pathname === "/login";
   const isOnboardingPath =
     pathname === "/onboarding" || pathname === "/onboarding/account";
 
@@ -33,7 +34,7 @@ export function AuthLayout() {
     <div className="auth-layout">
       <BrandHeader />
 
-      <main className="auth-page">
+      <main className={`auth-page${isLoginPath ? " auth-page--login" : ""}`}>
         {authState.status === "loading" ||
         authState.status === "synchronizing" ? (
           <p role="status">로그인 상태를 확인하고 있습니다.</p>

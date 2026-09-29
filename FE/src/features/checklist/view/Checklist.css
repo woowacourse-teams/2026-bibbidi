@@ -22,7 +22,7 @@
   width: 100%;
   min-height: calc(100dvh - 96px);
   grid-template-columns: minmax(0, 1fr) 480px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .checklist-workspace--detail-open .checklist-workspace__main,
