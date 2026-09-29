@@ -60,7 +60,13 @@ interface HomeScheduleDashboardFeatureProps {
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
+type AuthenticatedAuthState = Extract<
+  ReturnType<typeof useAuth>["authState"],
+  { status: "authenticated" }
+>;
+
 interface CalendarSchedulesState {
+  authentication: AuthenticatedAuthState | null;
   repository: MyChecklistQueryRepository | null;
   schedules: CalendarScheduleModel[];
 }
@@ -77,8 +83,14 @@ export function HomeScheduleDashboardFeature({
       : authState.status;
   const checklistRepository = usePreparationChecklistRepository();
   const myChecklistRepository = useMyChecklistQueryRepository();
+  const authentication =
+    authState.status === "authenticated" ? authState : null;
   const [calendarSchedules, setCalendarSchedules] =
-    useState<CalendarSchedulesState>({ repository: null, schedules: [] });
+    useState<CalendarSchedulesState>({
+      authentication: null,
+      repository: null,
+      schedules: [],
+    });
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
@@ -102,6 +114,7 @@ export function HomeScheduleDashboardFeature({
         }
 
         setCalendarSchedules({
+          authentication,
           repository: myChecklistRepository,
           schedules: checklist.items.flatMap((item) =>
             item.appointments.map((appointment) => ({
@@ -123,6 +136,7 @@ export function HomeScheduleDashboardFeature({
         }
 
         setCalendarSchedules({
+          authentication,
           repository: myChecklistRepository,
           schedules: [],
         });
@@ -133,7 +147,13 @@ export function HomeScheduleDashboardFeature({
       isActive = false;
       controller.abort();
     };
-  }, [authState.status, authScope, myChecklistRepository, refreshAuth]);
+  }, [
+    authState.status,
+    authScope,
+    authentication,
+    myChecklistRepository,
+    refreshAuth,
+  ]);
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -299,7 +319,8 @@ export function HomeScheduleDashboardFeature({
       onRetryUnscheduled={retryUnscheduled}
       referenceDate={getReferenceDate()}
       schedules={
-        authState.status === "authenticated" &&
+        authentication !== null &&
+        calendarSchedules.authentication === authentication &&
         calendarSchedules.repository === myChecklistRepository
           ? calendarSchedules.schedules
           : []

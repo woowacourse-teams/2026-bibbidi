@@ -307,6 +307,81 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(nextChecklistRepository.getChecklist).toHaveBeenCalledOnce();
   });
 
+  it("동일 저장소를 유지하는 인증 재동기화 뒤에도 이전 일정을 다시 표시하지 않는다", async () => {
+    vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [
+        {
+          appointments: [
+            {
+              date: "2026-09-16",
+              endTime: null,
+              id: 91,
+              isDone: false,
+              memo: null,
+              place: null,
+              startTime: null,
+              title: "재동기화 전 일정",
+            },
+          ],
+          categoryId: 1,
+          createdAt: "2026-09-01T09:00:00",
+          id: 10,
+          sourceCatalogItemId: 100,
+          status: "continue",
+          title: "재동기화 전 할 일",
+        },
+      ],
+    });
+    const createDashboard = () => (
+      <HomeScheduleDashboardFeature
+        getReferenceDate={() => "2026-09-16"}
+        recommendedRepository={createRecommendedRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />
+    );
+    const { rerender } = render(createDashboard());
+
+    expect(await screen.findByText("재동기화 전 일정")).toBeTruthy();
+    vi.mocked(myChecklistRepository.getChecklist).mockReturnValue(
+      new Promise(() => undefined),
+    );
+
+    vi.mocked(useAuth).mockReturnValue({
+      authState: {
+        status: "synchronizing",
+        user: { id: 1, nickname: "비비디" },
+      },
+      beginAuthentication: vi.fn(),
+      beginOnboarding: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
+      refreshAuth,
+    });
+    rerender(createDashboard());
+    expect(screen.queryByText("재동기화 전 일정")).toBeNull();
+
+    vi.mocked(useAuth).mockReturnValue({
+      authState: {
+        status: "authenticated",
+        user: { id: 1, nickname: "비비디" },
+      },
+      beginAuthentication: vi.fn(),
+      beginOnboarding: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
+      refreshAuth,
+    });
+    rerender(createDashboard());
+
+    expect(screen.queryByText("재동기화 전 일정")).toBeNull();
+    expect(myChecklistRepository.getChecklist).toHaveBeenCalledTimes(2);
+  });
+
   it("체크리스트 인증 오류에서 세션을 갱신하고 캘린더를 유지한다", async () => {
     vi.mocked(myChecklistRepository.getChecklist).mockRejectedValue(
       new MyChecklistAuthenticationRequiredError(),
