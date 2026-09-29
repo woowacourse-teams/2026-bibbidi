@@ -102,6 +102,15 @@ BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않�
 
 환경변수는 `FE/.env.example` 참고. 웹 프로젝트 token은 공개 수집용이며 Personal API key는 절대로 FE에 넣지 않는다. 처리방침 게시와 공지는 이번 코드 작업에서 수행하지 않는다.
 
+## 캠퍼스 IP 제외
+
+캠퍼스 IP 대역 `39.118.242.0/24`에서 들어온 방문은 이벤트와 녹화를 모두 남기지 않는다(2026-09-29 결정, GA4 내부 트래픽 제외와 같은 대역). PostHog의 녹화 조건과 기능 플래그에는 IP 조건이 없어서 두 겹으로 막는다.
+
+1. CloudFront 함수 `bibbidi-internal-traffic-cookie`를 FE 배포 두 곳(`bibbidi-fe-development`, `bibbidi-fe-production`)의 기본 동작 뷰어 응답에 연결했다. 접속 IP가 캠퍼스 대역이면 `bibbidi_internal=1` 쿠키(하루)를 붙이고, 캠퍼스 밖에서 이 쿠키를 가진 요청이 오면 지운다. FE는 이 쿠키가 있으면 PostHog SDK를 초기화하지 않는다.
+2. PostHog Data pipelines의 Transformation `Drop campus IP (39.118.242.0/24)`가 `$ip`가 이 대역인 이벤트를 수집 단계에서 버린다. **Discard client IP data**가 켜져 있어도 변환 단계에서는 `$ip`를 읽는다. 녹화에는 적용되지 않는다.
+
+S3에 없는 경로(`/planner` 등)는 CloudFront 오류 페이지로 `index.html`을 돌려주는데, 이 응답에는 뷰어 응답 함수가 실행되지 않아 쿠키가 붙지 않는다. 쿠키가 없는 상태로 이런 경로에 바로 들어오고 JS를 브라우저 캐시에서 읽으면 그 방문은 걸러지지 않는다. 캠퍼스 기기가 IPv6로 접속해도 대역 비교에 걸리지 않는다. 대역이 바뀌면 CloudFront 함수, PostHog 변환, GA4 내부 트래픽 규칙을 함께 고친다.
+
 ## 광고 차단과 CloudFront 검토
 
 1차는 공식 수집 호스트를 사용한다. 차단 확장 프로그램이 있으면 이벤트와 녹화가 모두 비어 있을 수 있다. Person에 기록이 없다는 이유만으로 미방문으로 단정하지 않는다. 차단기 사용/미사용 QA와 동등한 동의 조건의 테스트 트래픽으로 영향부터 확인한다.

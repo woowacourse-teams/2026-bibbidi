@@ -41,7 +41,10 @@ function setup(initialId = "anonymous-1", enabled = true) {
   return { sdk, client };
 }
 
-afterEach(() => window.history.replaceState(null, "", "/"));
+afterEach(() => {
+  window.history.replaceState(null, "", "/");
+  document.cookie = "bibbidi_internal=; Max-Age=0";
+});
 
 describe("PostHog 사용자 여정", () => {
   it("익명 세션 종료는 녹화와 수집을 중지하되 온보딩의 SDK ID를 유지한다", () => {
@@ -95,6 +98,15 @@ describe("PostHog 사용자 여정", () => {
     expect(sdk.startSessionRecording).not.toHaveBeenCalled();
     createPostHogProvider({ ...options, token: "" }, sdk).initialize();
     expect(sdk.init).not.toHaveBeenCalled();
+  });
+  it("캠퍼스 IP 표시 쿠키가 있으면 SDK를 초기화하지 않아 이벤트와 녹화를 보내지 않는다", () => {
+    document.cookie = "bibbidi_internal=1";
+    const { sdk, client } = setup();
+    client.setContext({ authState: "guest", pathname: "/" });
+    client.track(page);
+    expect(sdk.init).not.toHaveBeenCalled();
+    expect(sdk.capture).not.toHaveBeenCalled();
+    expect(sdk.startSessionRecording).not.toHaveBeenCalled();
   });
 
   it("약관과 임시 계정의 여정을 익명으로 유지하고 최종 회원에 한 번만 연결한다", () => {
