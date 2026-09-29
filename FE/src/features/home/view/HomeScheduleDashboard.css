@@ -375,6 +375,12 @@
   }
 
   .home-dashboard-state__side
+    > .home-dashboard-loading__section
+    .home-dashboard-loading__section-header {
+    margin-bottom: 12px;
+  }
+
+  .home-dashboard-state__side
     > .home-dashboard-state__section:not(
       .home-dashboard-state__section--recommended
     )

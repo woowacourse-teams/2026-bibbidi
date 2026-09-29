@@ -1,0 +1,2415 @@
+diff --git a/FE/src/app/analytics/AppPageViewTracker.test.tsx b/FE/src/app/analytics/AppPageViewTracker.test.tsx
+index 6fb2be8acc61382e6b6d13accfd0bd686e905496..28518c2e6ee949d6e1bb78792a0c284baa2854fa 100644
+--- a/FE/src/app/analytics/AppPageViewTracker.test.tsx
++++ b/FE/src/app/analytics/AppPageViewTracker.test.tsx
+@@ -54,9 +54,7 @@ describe("AppPageViewTracker", () => {
+       </StrictMode>,
+     );
+ 
+-    expect(
+-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+-    ).toBeTruthy();
++    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
+     expect(analytics.track).toHaveBeenCalledWith({
+       name: "page_view",
+diff --git a/FE/src/app/router.test.tsx b/FE/src/app/router.test.tsx
+index ba1bd64031ccb61e0783e66d9c418dc033284a5e..e2fc9a303922fb521ae26cf15c9b21eefafda9f5 100644
+--- a/FE/src/app/router.test.tsx
++++ b/FE/src/app/router.test.tsx
+@@ -497,7 +497,7 @@ describe("appRoutes", () => {
+     expect(router.state.location.pathname).toBe("/");
+   });
+ 
+-  it("인증 사용자가 플래너에서 기존 일정 대시보드를 본다", async () => {
++  it("인증 사용자가 플래너에서 월간 캘린더를 본다", async () => {
+     installFetch(
+       new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+         status: 200,
+@@ -505,11 +505,16 @@ describe("appRoutes", () => {
+     );
+     renderRouter(["/planner"]);
+ 
+-    expect(
+-      await screen.findByRole("heading", { name: "가까운 일정" }),
+-    ).toBeTruthy();
++    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(screen.getByRole("main", { name: "플래너" })).toBeTruthy();
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(
++      vi
++        .mocked(fetch)
++        .mock.calls.some(
++          ([input]) =>
++            input.toString() === "/api/appointments/me/nearby?limit=6",
++        ),
++    ).toBe(false);
+   });
+ 
+   it("비로그인 사용자가 플래너에 직접 접근하고 개인화 API는 호출하지 않는다", async () => {
+@@ -521,8 +526,11 @@ describe("appRoutes", () => {
+     );
+     const router = renderRouter(["/planner"]);
+ 
++    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(
+-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
++      await screen.findByText(
++        "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
++      ),
+     ).toBeTruthy();
+     expect(router.state.location.pathname).toBe("/planner");
+     expect(
+@@ -576,7 +584,7 @@ describe("appRoutes", () => {
+           );
+         }
+ 
+-        if (url === "/api/appointments/me/nearby?limit=6") {
++        if (url === "/api/checklists/me/unscheduled-items?limit=3") {
+           return Promise.resolve(
+             new Response(
+               JSON.stringify({
+@@ -593,11 +601,12 @@ describe("appRoutes", () => {
+     );
+     const router = renderRouter(["/planner"]);
+ 
++    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
++    await waitFor(() => expect(currentUserRequestCount).toBe(2));
+     expect(
+-      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
++      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
+     ).toBeTruthy();
+     expect(router.state.location.pathname).toBe("/planner");
+     expect(router.state.location.search).toBe("");
+-    expect(currentUserRequestCount).toBe(2);
+   });
+ });
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+index e1f23433bb51286873f8509b49e160dbcb722ccc..a1c72bd345559d83bbf2834d03f985d8675335c9 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+@@ -16,11 +16,6 @@ import {
+ } from "../preparation";
+ import type { ChecklistRepository } from "../preparation";
+ import { HomeScheduleDashboardFeature } from "./HomeScheduleDashboardFeature";
+-import {
+-  NearbyAppointmentsAuthenticationRequiredError,
+-  NearbyAppointmentsRepository,
+-  NearbyAppointmentsRequestAbortedError,
+-} from "./repository/nearbyAppointmentsRepository";
+ import {
+   RecommendedCatalogItemsAuthenticationRequiredError,
+   RecommendedCatalogItemsRepository,
+@@ -81,12 +76,6 @@ const checklistRepository: ChecklistRepository = {
+ 
+ const refreshAuth = vi.fn();
+ 
+-function createRepository(): NearbyAppointmentsRepository {
+-  return {
+-    getNearbyAppointments: vi.fn().mockResolvedValue([]),
+-  };
+-}
+-
+ function createUnscheduledRepository(): UnscheduledTasksRepository {
+   return {
+     getUnscheduledTasks: vi.fn().mockResolvedValue([]),
+@@ -128,8 +117,7 @@ beforeEach(() => {
+ });
+ 
+ describe("HomeScheduleDashboardFeature", () => {
+-  it("비로그인 사용자에게 안내를 표시하고 개인화 API를 호출하지 않는다", () => {
+-    const nearbyRepository = createRepository();
++  it("비로그인 사용자에게 캘린더와 개인화 영역 안내를 표시하고 API를 호출하지 않는다", () => {
+     const unscheduledRepository = createUnscheduledRepository();
+     const recommendedRepository = createRecommendedRepository();
+     vi.mocked(useAuth).mockReturnValue({
+@@ -145,15 +133,12 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={nearbyRepository}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+ 
+-    expect(
+-      screen.getByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+-    ).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(
+       screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
+     ).toBeTruthy();
+@@ -165,187 +150,31 @@ describe("HomeScheduleDashboardFeature", () => {
+         "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+       ),
+     ).toHaveLength(2);
+-    expect(screen.queryByRole("button")).toBeNull();
++    expect(screen.getByRole("button", { name: "오늘" })).toBeTruthy();
+     expect(screen.queryByRole("link")).toBeNull();
+-    expect(nearbyRepository.getNearbyAppointments).not.toHaveBeenCalled();
+     expect(unscheduledRepository.getUnscheduledTasks).not.toHaveBeenCalled();
+     expect(
+       recommendedRepository.getRecommendedCatalogItems,
+     ).not.toHaveBeenCalled();
+   });
+ 
+-  it("Loading에서 API 순서를 유지한 Complete 목록으로 전환한다", async () => {
+-    let resolveRequest: Parameters<
+-      ConstructorParameters<
+-        typeof Promise<
+-          Awaited<
+-            ReturnType<NearbyAppointmentsRepository["getNearbyAppointments"]>
+-          >
+-        >
+-      >[0]
+-    >[0] = () => undefined;
+-    const repository = createRepository();
+-    const unscheduledRepository = createUnscheduledRepository();
+-    vi.mocked(repository.getNearbyAppointments).mockReturnValue(
+-      new Promise((resolve) => {
+-        resolveRequest = resolve;
+-      }),
+-    );
+-
+-    render(
+-      <HomeScheduleDashboardFeature
+-        recommendedRepository={createRecommendedRepository()}
+-        getReferenceDate={() => "2026-09-16"}
+-        nearbyRepository={repository}
+-        unscheduledRepository={unscheduledRepository}
+-      />,
+-    );
+-
+-    expect(screen.getByText("가까운 일정을 불러오는 중입니다.")).toBeTruthy();
+-    expect(
+-      screen.getByText("일정이 필요한 할 일을 불러오는 중입니다."),
+-    ).toBeTruthy();
+-    expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledOnce();
+-
+-    await act(async () => {
+-      resolveRequest([
+-        {
+-          date: "2026-09-20",
+-          id: 2,
+-          place: "  ",
+-          startTime: null,
+-          title: "두 번째 응답",
+-        },
+-        {
+-          date: "2026-09-16",
+-          id: 1,
+-          place: "비비디 웨딩홀",
+-          startTime: "2026-09-16T14:05:00",
+-          title: "첫 번째 날짜",
+-        },
+-      ]);
+-    });
+-
+-    const upcomingSection = screen.getByRole("region", {
+-      name: "가까운 일정",
+-    });
+-    expect(within(upcomingSection).queryByText("2개")).toBeNull();
+-    expect(
+-      within(upcomingSection)
+-        .getAllByRole("heading", { level: 3 })
+-        .map((heading) => heading.textContent),
+-    ).toEqual(["두 번째 응답", "첫 번째 날짜"]);
+-    expect(within(upcomingSection).getAllByText("예정")).toHaveLength(2);
+-    expect(within(upcomingSection).getByText("4일 뒤")).toBeTruthy();
+-    expect(
+-      within(upcomingSection).getByText("시간 미정 · 장소 없음"),
+-    ).toBeTruthy();
+-    expect(
+-      within(upcomingSection).getByText("오후 2:05 · 비비디 웨딩홀"),
+-    ).toBeTruthy();
+-    expect(
+-      screen.getByRole("heading", { name: "일정이 필요한 할 일" }),
+-    ).toBeTruthy();
+-    expect(screen.getByRole("heading", { name: "추천 할 일" })).toBeTruthy();
+-  });
+-
+-  it("빈 응답을 Empty UI로 전환한다", async () => {
+-    render(
+-      <HomeScheduleDashboardFeature
+-        recommendedRepository={createRecommendedRepository()}
+-        getReferenceDate={() => "2026-09-16"}
+-        nearbyRepository={createRepository()}
+-        unscheduledRepository={createUnscheduledRepository()}
+-      />,
+-    );
+-
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+-    expect(
+-      within(screen.getByRole("region", { name: "가까운 일정" })).queryByText(
+-        "0개",
+-      ),
+-    ).toBeNull();
+-    const checklistLink = screen.getByRole("link", {
+-      name: "체크리스트 보기",
+-    });
+-    expect(checklistLink.getAttribute("href")).toBe("/checklist");
+-    fireEvent.click(checklistLink);
+-    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+-      "/checklist",
+-    );
+-  });
+-
+-  it("오류를 Error UI로 전환하고 다시 시도한다", async () => {
+-    const repository = createRepository();
++  it("unmount 시 진행 중인 개인화 요청을 취소한다", () => {
+     const unscheduledRepository = createUnscheduledRepository();
+-    vi.mocked(repository.getNearbyAppointments)
+-      .mockRejectedValueOnce(new Error("서버 내부 메시지"))
+-      .mockResolvedValueOnce([]);
+-
+-    render(
+-      <HomeScheduleDashboardFeature
+-        recommendedRepository={createRecommendedRepository()}
+-        getReferenceDate={() => "2026-09-16"}
+-        nearbyRepository={repository}
+-        unscheduledRepository={unscheduledRepository}
+-      />,
+-    );
+-
+-    expect(await screen.findByText("일정을 불러오지 못했어요")).toBeTruthy();
+-    expect(screen.queryByText("서버 내부 메시지")).toBeNull();
+-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+-
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+-    expect(repository.getNearbyAppointments).toHaveBeenCalledTimes(2);
+-    expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledOnce();
+-  });
+-
+-  it("인증 오류에서 refreshAuth를 호출한다", async () => {
+-    const repository = createRepository();
+-    vi.mocked(repository.getNearbyAppointments).mockRejectedValue(
+-      new NearbyAppointmentsAuthenticationRequiredError(),
+-    );
+-
+-    render(
+-      <HomeScheduleDashboardFeature
+-        recommendedRepository={createRecommendedRepository()}
+-        getReferenceDate={() => "2026-09-16"}
+-        nearbyRepository={repository}
+-        unscheduledRepository={createUnscheduledRepository()}
+-      />,
+-    );
+-
+-    await act(async () => undefined);
+-
+-    expect(refreshAuth).toHaveBeenCalledOnce();
+-    expect(screen.queryByText("일정을 불러오지 못했어요")).toBeNull();
+-  });
+-
+-  it("unmount 시 진행 중인 요청을 취소한다", () => {
+-    const repository = createRepository();
+-    const unscheduledRepository = createUnscheduledRepository();
+-    vi.mocked(repository.getNearbyAppointments).mockReturnValue(
+-      new Promise(() => undefined),
+-    );
+     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockReturnValue(
+       new Promise(() => undefined),
+     );
+     const { unmount } = render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={repository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+-    const signal = vi.mocked(repository.getNearbyAppointments).mock.calls[0][0];
+     const unscheduledSignal = vi.mocked(
+       unscheduledRepository.getUnscheduledTasks,
+     ).mock.calls[0][0];
+ 
+-    expect(signal?.aborted).toBe(false);
+     expect(unscheduledSignal?.aborted).toBe(false);
+     unmount();
+-    expect(signal?.aborted).toBe(true);
+     expect(unscheduledSignal?.aborted).toBe(true);
+   });
+ 
+@@ -354,7 +183,6 @@ describe("HomeScheduleDashboardFeature", () => {
+       createDeferred<
+         Awaited<ReturnType<UnscheduledTasksRepository["getUnscheduledTasks"]>>
+       >();
+-    const nearbyRepository = createRepository();
+     const unscheduledRepository = createUnscheduledRepository();
+     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockReturnValue(
+       deferred.promise,
+@@ -363,7 +191,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+@@ -371,7 +198,7 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(
+       screen.getByText("일정이 필요한 할 일을 불러오는 중입니다."),
+     ).toBeTruthy();
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+ 
+     await act(async () => {
+       deferred.resolve([
+@@ -427,7 +254,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={createRepository()}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+     );
+@@ -451,8 +277,7 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+   });
+ 
+-  it("일정이 필요한 할 일 오류만 재시도하고 가까운 일정 결과를 유지한다", async () => {
+-    const nearbyRepository = createRepository();
++  it("일정이 필요한 할 일 오류만 재시도하고 캘린더를 유지한다", async () => {
+     const unscheduledRepository = createUnscheduledRepository();
+     vi.mocked(unscheduledRepository.getUnscheduledTasks)
+       .mockRejectedValueOnce(new Error("서버 내부 메시지"))
+@@ -461,13 +286,12 @@ describe("HomeScheduleDashboardFeature", () => {
+     render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+ 
+     expect(await screen.findByText("할 일을 불러오지 못했어요")).toBeTruthy();
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(screen.queryByText("서버 내부 메시지")).toBeNull();
+     fireEvent.click(
+       within(
+@@ -478,33 +302,10 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(
+       await screen.findByText("일정이 필요한 할 일이 없어요"),
+     ).toBeTruthy();
+-    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
+-    expect(nearbyRepository.getNearbyAppointments).toHaveBeenCalledOnce();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledTimes(2);
+   });
+ 
+-  it("가까운 일정 오류가 일정이 필요한 할 일의 정상 결과를 숨기지 않는다", async () => {
+-    const nearbyRepository = createRepository();
+-    const unscheduledRepository = createUnscheduledRepository();
+-    vi.mocked(nearbyRepository.getNearbyAppointments).mockRejectedValue(
+-      new Error("일정 서버 오류"),
+-    );
+-    vi.mocked(unscheduledRepository.getUnscheduledTasks).mockResolvedValue([
+-      { category: "웨딩홀", id: 31, status: "prev", title: "웨딩홀 투어" },
+-    ]);
+-
+-    render(
+-      <HomeScheduleDashboardFeature
+-        recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+-        unscheduledRepository={unscheduledRepository}
+-      />,
+-    );
+-
+-    expect(await screen.findByText("일정을 불러오지 못했어요")).toBeTruthy();
+-    expect(await screen.findByText("웨딩홀 투어")).toBeTruthy();
+-  });
+-
+   it("일정이 필요한 할 일 인증 오류에서 refreshAuth를 호출한다", async () => {
+     const unscheduledRepository = createUnscheduledRepository();
+     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockRejectedValue(
+@@ -514,7 +315,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={createRepository()}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+@@ -524,12 +324,8 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(screen.queryByText("할 일을 불러오지 못했어요")).toBeNull();
+   });
+ 
+-  it("호출자 취소는 어느 영역에서도 오류로 표시하지 않는다", async () => {
+-    const nearbyRepository = createRepository();
++  it("일정이 필요한 할 일 호출자 취소는 오류로 표시하지 않는다", async () => {
+     const unscheduledRepository = createUnscheduledRepository();
+-    vi.mocked(nearbyRepository.getNearbyAppointments).mockRejectedValue(
+-      new NearbyAppointmentsRequestAbortedError(),
+-    );
+     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockRejectedValue(
+       new UnscheduledTasksRequestAbortedError(),
+     );
+@@ -537,13 +333,11 @@ describe("HomeScheduleDashboardFeature", () => {
+     render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+     await act(async () => undefined);
+ 
+-    expect(screen.queryByText("일정을 불러오지 못했어요")).toBeNull();
+     expect(screen.queryByText("할 일을 불러오지 못했어요")).toBeNull();
+   });
+ 
+@@ -554,7 +348,6 @@ describe("HomeScheduleDashboardFeature", () => {
+       >();
+     const previousRepository = createUnscheduledRepository();
+     const nextRepository = createUnscheduledRepository();
+-    const nearbyRepository = createRepository();
+     vi.mocked(previousRepository.getUnscheduledTasks).mockReturnValue(
+       previousRequest.promise,
+     );
+@@ -565,7 +358,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     const { rerender } = render(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+         unscheduledRepository={previousRepository}
+       />,
+     );
+@@ -575,7 +367,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     rerender(
+       <HomeScheduleDashboardFeature
+         recommendedRepository={createRecommendedRepository()}
+-        nearbyRepository={nearbyRepository}
+         unscheduledRepository={nextRepository}
+       />,
+     );
+@@ -588,7 +379,6 @@ describe("HomeScheduleDashboardFeature", () => {
+       ]);
+     });
+     expect(screen.queryByText("늦은 응답")).toBeNull();
+-    expect(nearbyRepository.getNearbyAppointments).toHaveBeenCalledOnce();
+   });
+ 
+   it("추천 할 일 Loading에서 API 순서를 유지한 Complete 목록으로 전환한다", async () => {
+@@ -607,14 +397,13 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+     );
+ 
+     expect(screen.getByText("추천 할 일을 불러오는 중입니다.")).toBeTruthy();
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(
+       await screen.findByText("일정이 필요한 할 일이 없어요"),
+     ).toBeTruthy();
+@@ -663,7 +452,6 @@ describe("HomeScheduleDashboardFeature", () => {
+   it("추천 할 일 빈 응답을 Empty UI로 전환한다", async () => {
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={createRecommendedRepository()}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -696,7 +484,6 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -724,7 +511,7 @@ describe("HomeScheduleDashboardFeature", () => {
+         source: "planner_recommendation",
+       },
+     });
+-    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(screen.getByText("일정이 필요한 할 일이 없어요")).toBeTruthy();
+   });
+ 
+@@ -751,7 +538,6 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -776,7 +562,7 @@ describe("HomeScheduleDashboardFeature", () => {
+       expect(checklistRepository.addCatalogItemIds).toHaveBeenCalledTimes(2),
+     );
+     await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
+-    expect(screen.getByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+   });
+ 
+   it("이미 추가된 추천 항목 응답은 공통 준비 항목 성공 이벤트를 중복 전송하지 않는다", async () => {
+@@ -796,7 +582,6 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -830,7 +615,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     );
+     const { unmount } = render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -852,7 +636,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     );
+     const second = render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -893,7 +676,6 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     const result = render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -919,7 +701,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     });
+     result.rerender(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -939,7 +720,6 @@ describe("HomeScheduleDashboardFeature", () => {
+   });
+ 
+   it("추천 영역 오류만 재시도하고 다른 두 영역 결과를 유지한다", async () => {
+-    const nearbyRepository = createRepository();
+     const unscheduledRepository = createUnscheduledRepository();
+     const recommendedRepository = createRecommendedRepository();
+     vi.mocked(recommendedRepository.getRecommendedCatalogItems)
+@@ -948,7 +728,6 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={nearbyRepository}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+@@ -957,7 +736,7 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(
+       await screen.findByText("추천 할 일을 불러오지 못했어요"),
+     ).toBeTruthy();
+-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+     expect(
+       await screen.findByText("일정이 필요한 할 일이 없어요"),
+     ).toBeTruthy();
+@@ -970,20 +749,15 @@ describe("HomeScheduleDashboardFeature", () => {
+     );
+ 
+     expect(await screen.findByText("추천할 일이 없어요")).toBeTruthy();
+-    expect(nearbyRepository.getNearbyAppointments).toHaveBeenCalledOnce();
+     expect(unscheduledRepository.getUnscheduledTasks).toHaveBeenCalledOnce();
+     expect(
+       recommendedRepository.getRecommendedCatalogItems,
+     ).toHaveBeenCalledTimes(2);
+   });
+ 
+-  it("다른 두 영역의 실패가 추천 결과를 가리지 않는다", async () => {
+-    const nearbyRepository = createRepository();
++  it("일정이 필요한 할 일의 실패가 추천 결과와 캘린더를 가리지 않는다", async () => {
+     const unscheduledRepository = createUnscheduledRepository();
+     const recommendedRepository = createRecommendedRepository();
+-    vi.mocked(nearbyRepository.getNearbyAppointments).mockRejectedValue(
+-      new Error("일정 오류"),
+-    );
+     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockRejectedValue(
+       new Error("할 일 오류"),
+     );
+@@ -1001,15 +775,14 @@ describe("HomeScheduleDashboardFeature", () => {
+ 
+     render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={nearbyRepository}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+     );
+ 
+-    expect(await screen.findByText("일정을 불러오지 못했어요")).toBeTruthy();
+     expect(await screen.findByText("할 일을 불러오지 못했어요")).toBeTruthy();
+     expect(await screen.findByText("드레스샵 확정")).toBeTruthy();
++    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+   });
+ 
+   it("추천 인증 오류는 refreshAuth에 연결하고 호출자 취소는 표시하지 않는다", async () => {
+@@ -1021,7 +794,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     );
+     const { rerender } = render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={recommendedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -1036,7 +808,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     );
+     rerender(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={createRepository()}
+         recommendedRepository={abortedRepository}
+         unscheduledRepository={createUnscheduledRepository()}
+       />,
+@@ -1068,12 +839,10 @@ describe("HomeScheduleDashboardFeature", () => {
+         title: "새 응답",
+       },
+     ]);
+-    const nearbyRepository = createRepository();
+     const unscheduledRepository = createUnscheduledRepository();
+ 
+     const { rerender, unmount } = render(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={nearbyRepository}
+         recommendedRepository={previousRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+@@ -1084,7 +853,6 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(previousSignal?.aborted).toBe(false);
+     rerender(
+       <HomeScheduleDashboardFeature
+-        nearbyRepository={nearbyRepository}
+         recommendedRepository={nextRepository}
+         unscheduledRepository={unscheduledRepository}
+       />,
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+index 23b7a41a7760bb786be7176bf2f1a4f6d4410787..18a7c53e3a81fea734066b60c77fc914ee7e575d 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+@@ -5,7 +5,6 @@ import { useAuth } from "../auth";
+ import { usePreparationChecklistRepository } from "../preparation";
+ import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
+ import {
+-  nearbyAppointmentsRepository,
+   recommendedCatalogItemsRepository,
+   unscheduledTasksRepository,
+ } from "./homeDependencies";
+@@ -13,13 +12,7 @@ import {
+   HomeScheduleDashboardModel,
+   HomeScheduleDashboardRecommendedModel,
+   HomeScheduleDashboardUnscheduledModel,
+-  HomeScheduleDashboardUpcomingModel,
+ } from "./model/homeScheduleDashboard";
+-import { NearbyAppointmentsRepository } from "./repository/nearbyAppointmentsRepository";
+-import {
+-  NearbyAppointmentsAuthenticationRequiredError,
+-  NearbyAppointmentsRequestAbortedError,
+-} from "./repository/nearbyAppointmentsRepository";
+ import {
+   RecommendedCatalogItemsAuthenticationRequiredError,
+   RecommendedCatalogItemsRepository,
+@@ -44,9 +37,6 @@ const initialModel: HomeScheduleDashboardModel = {
+   unscheduled: {
+     status: "loading",
+   },
+-  upcoming: {
+-    status: "loading",
+-  },
+ };
+ 
+ function getLocalDate(now = new Date()) {
+@@ -59,14 +49,12 @@ function getLocalDate(now = new Date()) {
+ 
+ interface HomeScheduleDashboardFeatureProps {
+   getReferenceDate?: () => string;
+-  nearbyRepository?: NearbyAppointmentsRepository;
+   recommendedRepository?: RecommendedCatalogItemsRepository;
+   unscheduledRepository?: UnscheduledTasksRepository;
+ }
+ 
+ export function HomeScheduleDashboardFeature({
+   getReferenceDate = getLocalDate,
+-  nearbyRepository = nearbyAppointmentsRepository,
+   recommendedRepository = recommendedCatalogItemsRepository,
+   unscheduledRepository = unscheduledTasksRepository,
+ }: HomeScheduleDashboardFeatureProps) {
+@@ -80,71 +68,10 @@ export function HomeScheduleDashboardFeature({
+     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
+   const [recommended, setRecommended] =
+     useState<HomeScheduleDashboardRecommendedModel>(initialModel.recommended);
+-  const [upcoming, setUpcoming] = useState<HomeScheduleDashboardUpcomingModel>(
+-    initialModel.upcoming,
+-  );
+   const [unscheduledRequestRevision, setUnscheduledRequestRevision] =
+     useState(0);
+   const [recommendedRequestRevision, setRecommendedRequestRevision] =
+     useState(0);
+-  const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
+-
+-  useEffect(() => {
+-    if (authState.status !== "authenticated") {
+-      return;
+-    }
+-
+-    const controller = new AbortController();
+-    let isActive = true;
+-
+-    nearbyRepository.getNearbyAppointments(controller.signal).then(
+-      (schedules) => {
+-        if (!isActive) {
+-          return;
+-        }
+-
+-        setUpcoming(
+-          schedules.length === 0
+-            ? { status: "empty" }
+-            : {
+-                schedules: {
+-                  referenceDate: getReferenceDate(),
+-                  schedules,
+-                },
+-                status: "complete",
+-              },
+-        );
+-      },
+-      (error: unknown) => {
+-        if (
+-          !isActive ||
+-          error instanceof NearbyAppointmentsRequestAbortedError
+-        ) {
+-          return;
+-        }
+-
+-        if (error instanceof NearbyAppointmentsAuthenticationRequiredError) {
+-          refreshAuth();
+-          return;
+-        }
+-
+-        setUpcoming({ status: "error" });
+-      },
+-    );
+-
+-    return () => {
+-      isActive = false;
+-      controller.abort();
+-    };
+-  }, [
+-    authState.status,
+-    authScope,
+-    getReferenceDate,
+-    nearbyRepository,
+-    refreshAuth,
+-    upcomingRequestRevision,
+-  ]);
+-
+   useEffect(() => {
+     if (authState.status !== "authenticated") {
+       return;
+@@ -245,11 +172,6 @@ export function HomeScheduleDashboardFeature({
+     refreshAuth,
+   ]);
+ 
+-  const retryUpcoming = useCallback(() => {
+-    setUpcoming({ status: "loading" });
+-    setUpcomingRequestRevision((revision) => revision + 1);
+-  }, []);
+-
+   const retryUnscheduled = useCallback(() => {
+     setUnscheduled({ status: "loading" });
+     setUnscheduledRequestRevision((revision) => revision + 1);
+@@ -298,14 +220,13 @@ export function HomeScheduleDashboardFeature({
+       ? {
+           recommended,
+           unscheduled,
+-          upcoming,
+         }
+       : initialModel,
+     { recommendedTaskAddition },
+   );
+ 
+   if (authState.status === "guest") {
+-    return <GuestHomeScheduleDashboard />;
++    return <GuestHomeScheduleDashboard referenceDate={getReferenceDate()} />;
+   }
+ 
+   return (
+@@ -313,7 +234,7 @@ export function HomeScheduleDashboardFeature({
+       onAddRecommendedTask={recommendedTaskAddition.add}
+       onRetryRecommended={retryRecommended}
+       onRetryUnscheduled={retryUnscheduled}
+-      onRetryUpcoming={retryUpcoming}
++      referenceDate={getReferenceDate()}
+       viewModel={viewModel}
+     />
+   );
+diff --git a/FE/src/features/home/homeDependencies.ts b/FE/src/features/home/homeDependencies.ts
+index 04e32697695f85e38ae0bfd6ea9f68a22d70e5c4..1bc37e8064c45487882d122f1e7cea23baeeaa05 100644
+--- a/FE/src/features/home/homeDependencies.ts
++++ b/FE/src/features/home/homeDependencies.ts
+@@ -1,14 +1,8 @@
+-import { remoteNearbyAppointmentsDataSource } from "./data-source/remoteNearbyAppointmentsDataSource";
+ import { remoteRecommendedCatalogItemsDataSource } from "./data-source/remoteRecommendedCatalogItemsDataSource";
+ import { remoteUnscheduledTasksDataSource } from "./data-source/remoteUnscheduledTasksDataSource";
+-import { createNearbyAppointmentsRepository } from "./repository/nearbyAppointmentsRepository";
+ import { createRecommendedCatalogItemsRepository } from "./repository/recommendedCatalogItemsRepository";
+ import { createUnscheduledTasksRepository } from "./repository/unscheduledTasksRepository";
+ 
+-export const nearbyAppointmentsRepository = createNearbyAppointmentsRepository(
+-  remoteNearbyAppointmentsDataSource,
+-);
+-
+ export const recommendedCatalogItemsRepository =
+   createRecommendedCatalogItemsRepository(
+     remoteRecommendedCatalogItemsDataSource,
+diff --git a/FE/src/features/home/model/homeScheduleDashboard.ts b/FE/src/features/home/model/homeScheduleDashboard.ts
+index dc3dd11a247c36fd83616899d331a145b8d3ca38..a5a5f0442fb9ee7c22f4ea8e61c3b8cd53a557da 100644
+--- a/FE/src/features/home/model/homeScheduleDashboard.ts
++++ b/FE/src/features/home/model/homeScheduleDashboard.ts
+@@ -1,6 +1,5 @@
+ import { RecommendedCatalogItemListModel } from "./recommendedCatalogItem";
+ import { UnscheduledTaskListModel } from "./unscheduledTask";
+-import { UpcomingScheduleListModel } from "./upcomingSchedule";
+ 
+ export interface HomeScheduleDashboardLoadingSectionModel {
+   status: "loading";
+@@ -14,17 +13,6 @@ export interface HomeScheduleDashboardErrorSectionModel {
+   status: "error";
+ }
+ 
+-export interface HomeScheduleDashboardUpcomingCompleteModel {
+-  schedules: UpcomingScheduleListModel;
+-  status: "complete";
+-}
+-
+-export type HomeScheduleDashboardUpcomingModel =
+-  | HomeScheduleDashboardLoadingSectionModel
+-  | HomeScheduleDashboardEmptySectionModel
+-  | HomeScheduleDashboardErrorSectionModel
+-  | HomeScheduleDashboardUpcomingCompleteModel;
+-
+ export interface HomeScheduleDashboardUnscheduledCompleteModel {
+   status: "complete";
+   tasks: UnscheduledTaskListModel;
+@@ -50,5 +38,4 @@ export type HomeScheduleDashboardRecommendedModel =
+ export interface HomeScheduleDashboardModel {
+   recommended: HomeScheduleDashboardRecommendedModel;
+   unscheduled: HomeScheduleDashboardUnscheduledModel;
+-  upcoming: HomeScheduleDashboardUpcomingModel;
+ }
+diff --git a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+index bd2669de00ecf6d3d8dcdba5bf0c30393e5d7274..888ea4247d92995f86c64baa6449b56d22b9bf45 100644
+--- a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
++++ b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+@@ -2,7 +2,6 @@ import type {
+   HomeScheduleDashboardModel,
+   HomeScheduleDashboardRecommendedModel,
+   HomeScheduleDashboardUnscheduledModel,
+-  HomeScheduleDashboardUpcomingModel,
+ } from "../model/homeScheduleDashboard";
+ import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
+ import {
+@@ -13,13 +12,9 @@ import {
+   createUnscheduledTaskViewModel,
+   UnscheduledTaskViewModel,
+ } from "./createUnscheduledTaskViewModel";
+-import {
+-  createUpcomingScheduleViewModel,
+-  UpcomingScheduleViewModel,
+-} from "./createUpcomingScheduleViewModel";
+ 
+ export type HomeScheduleDashboardResultIcon =
+-  "alert" | "calendar-check" | "calendar-days" | "calendar-heart" | "lock";
++  "alert" | "calendar-check" | "calendar-heart" | "lock";
+ 
+ export type HomeScheduleDashboardResultTone = "critical" | "neutral";
+ 
+@@ -49,14 +44,6 @@ export interface HomeScheduleDashboardLoadingSectionViewModel {
+   status: "loading";
+ }
+ 
+-export type HomeScheduleDashboardUpcomingViewModel =
+-  | HomeScheduleDashboardLoadingSectionViewModel
+-  | HomeScheduleDashboardResultSectionViewModel<"empty" | "error">
+-  | {
+-      content: UpcomingScheduleViewModel;
+-      status: "complete";
+-    };
+-
+ export interface HomeScheduleDashboardUnscheduledCompleteViewModel {
+   content: UnscheduledTaskViewModel;
+   status: "complete";
+@@ -80,7 +67,6 @@ export type HomeScheduleDashboardRecommendedViewModel =
+ export interface HomeScheduleDashboardViewModel {
+   recommended: HomeScheduleDashboardRecommendedViewModel;
+   unscheduled: HomeScheduleDashboardUnscheduledViewModel;
+-  upcoming: HomeScheduleDashboardUpcomingViewModel;
+ }
+ 
+ function createErrorResult(
+@@ -98,46 +84,6 @@ function createErrorResult(
+   };
+ }
+ 
+-function createUpcomingViewModel(
+-  model: HomeScheduleDashboardUpcomingModel,
+-): HomeScheduleDashboardUpcomingViewModel {
+-  switch (model.status) {
+-    case "loading":
+-      return {
+-        loadingLabel: "가까운 일정을 불러오는 중입니다.",
+-        status: model.status,
+-      };
+-    case "empty":
+-      return {
+-        result: {
+-          actionLabel: "체크리스트 보기",
+-          actionTo: "/checklist",
+-          actionVariant: "link",
+-          description: "일정이 있는 할 일은 여기에 표시돼요",
+-          icon: "calendar-days",
+-          isActionDisabled: false,
+-          title: "예정된 일정이 없어요",
+-          tone: "neutral",
+-        },
+-        status: model.status,
+-        title: "가까운 일정",
+-      };
+-    case "error":
+-      return {
+-        result: createErrorResult("일정을 불러오지 못했어요", false),
+-        status: model.status,
+-        title: "가까운 일정",
+-      };
+-    case "complete":
+-      return {
+-        content: createUpcomingScheduleViewModel(model.schedules),
+-        status: model.status,
+-      };
+-    default:
+-      return assertNever(model);
+-  }
+-}
+-
+ function createUnscheduledViewModel(
+   model: HomeScheduleDashboardUnscheduledModel,
+ ): HomeScheduleDashboardUnscheduledViewModel {
+@@ -245,6 +191,5 @@ export function createHomeScheduleDashboardViewModel(
+       recommendedTaskAddition,
+     ),
+     unscheduled: createUnscheduledViewModel(model.unscheduled),
+-    upcoming: createUpcomingViewModel(model.upcoming),
+   };
+ }
+diff --git a/FE/src/features/home/view-model/createUpcomingScheduleViewModel.test.ts b/FE/src/features/home/view-model/createUpcomingScheduleViewModel.test.ts
+deleted file mode 100644
+index acda43af74023a065c74b06e3d8f86fed07ca76d..0000000000000000000000000000000000000000
+--- a/FE/src/features/home/view-model/createUpcomingScheduleViewModel.test.ts
++++ /dev/null
+@@ -1,40 +0,0 @@
+-import { describe, expect, it } from "vitest";
+-
+-import { createUpcomingScheduleViewModel } from "./createUpcomingScheduleViewModel";
+-
+-describe("createUpcomingScheduleViewModel", () => {
+-  it("API 순서를 유지하며 상대 날짜와 일정 표현을 만든다", () => {
+-    const viewModel = createUpcomingScheduleViewModel({
+-      referenceDate: "2026-09-16",
+-      schedules: [
+-        {
+-          date: "2026-09-20",
+-          id: 2,
+-          place: "  ",
+-          startTime: null,
+-          title: "두 번째 응답",
+-        },
+-        {
+-          date: "2026-09-16",
+-          id: 1,
+-          place: "비비디 웨딩홀",
+-          startTime: "2026-09-16T14:05:00",
+-          title: "첫 번째 날짜",
+-        },
+-      ],
+-    });
+-
+-    expect(viewModel).not.toHaveProperty("countLabel");
+-    expect(viewModel.items.map((item) => item.id)).toEqual(["2", "1"]);
+-    expect(viewModel.items[0]).toMatchObject({
+-      detailLabel: "시간 미정 · 장소 없음",
+-      relativeDateLabel: "4일 뒤",
+-      statusLabel: "예정",
+-    });
+-    expect(viewModel.items[1]).toMatchObject({
+-      dateLabel: "9월 16일",
+-      detailLabel: "오후 2:05 · 비비디 웨딩홀",
+-      relativeDateLabel: "오늘",
+-    });
+-  });
+-});
+diff --git a/FE/src/features/home/view-model/createUpcomingScheduleViewModel.ts b/FE/src/features/home/view-model/createUpcomingScheduleViewModel.ts
+deleted file mode 100644
+index 80d1e13e2119a4031cd93c8785ea57a2be7abb20..0000000000000000000000000000000000000000
+--- a/FE/src/features/home/view-model/createUpcomingScheduleViewModel.ts
++++ /dev/null
+@@ -1,98 +0,0 @@
+-import {
+-  UpcomingScheduleListModel,
+-  UpcomingScheduleModel,
+-} from "../model/upcomingSchedule";
+-
+-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+-
+-export interface UpcomingScheduleItemViewModel {
+-  dateTime: string;
+-  dateLabel: string;
+-  detailLabel: string;
+-  id: string;
+-  relativeDateLabel: string;
+-  status: "upcoming";
+-  statusLabel: string;
+-  title: string;
+-}
+-
+-export interface UpcomingScheduleViewModel {
+-  items: UpcomingScheduleItemViewModel[];
+-  title: string;
+-}
+-
+-function parseDateAsUtc(date: string) {
+-  const [year, month, day] = date.split("-").map(Number);
+-
+-  return Date.UTC(year, month - 1, day);
+-}
+-
+-function calculateDaysUntil(referenceDate: string, scheduleDate: string) {
+-  return Math.round(
+-    (parseDateAsUtc(scheduleDate) - parseDateAsUtc(referenceDate)) /
+-      MILLISECONDS_PER_DAY,
+-  );
+-}
+-
+-function formatDate(date: string) {
+-  const [, month, day] = date.split("-").map(Number);
+-
+-  return `${month}월 ${day}일`;
+-}
+-
+-function formatTime(startTime: string | null) {
+-  if (startTime === null) {
+-    return "시간 미정";
+-  }
+-
+-  const [hour, minute] = startTime.slice(11, 16).split(":").map(Number);
+-  const period = hour < 12 ? "오전" : "오후";
+-  const displayHour = hour % 12 || 12;
+-
+-  return `${period} ${displayHour}:${String(minute).padStart(2, "0")}`;
+-}
+-
+-function formatPlace(place: string | null) {
+-  return place === null || place.trim().length === 0 ? "장소 없음" : place;
+-}
+-
+-function formatRelativeDate(daysUntil: number) {
+-  if (daysUntil === 0) {
+-    return "오늘";
+-  }
+-
+-  if (daysUntil < 0) {
+-    return `${Math.abs(daysUntil)}일 전`;
+-  }
+-
+-  return `${daysUntil}일 뒤`;
+-}
+-
+-function createItemViewModel(
+-  schedule: UpcomingScheduleModel,
+-  referenceDate: string,
+-): UpcomingScheduleItemViewModel {
+-  const daysUntil = calculateDaysUntil(referenceDate, schedule.date);
+-
+-  return {
+-    dateTime: schedule.date,
+-    dateLabel: formatDate(schedule.date),
+-    detailLabel: `${formatTime(schedule.startTime)} · ${formatPlace(schedule.place)}`,
+-    id: String(schedule.id),
+-    relativeDateLabel: formatRelativeDate(daysUntil),
+-    status: "upcoming",
+-    statusLabel: "예정",
+-    title: schedule.title,
+-  };
+-}
+-
+-export function createUpcomingScheduleViewModel(
+-  model: UpcomingScheduleListModel,
+-): UpcomingScheduleViewModel {
+-  return {
+-    items: model.schedules.map((schedule) =>
+-      createItemViewModel(schedule, model.referenceDate),
+-    ),
+-    title: "가까운 일정",
+-  };
+-}
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.css b/FE/src/features/home/view/HomeScheduleDashboard.css
+index 59ad46be18845608022c7e4c0e28c959657a7c22..e388a6b051d57589498b31220fd8e6680e28e0c1 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.css
++++ b/FE/src/features/home/view/HomeScheduleDashboard.css
+@@ -18,12 +18,16 @@
+   box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
+ }
+ 
+-.home-dashboard-state__top > .home-dashboard-loading__section {
+-  height: 436px;
++.home-dashboard-loading__recommended {
++  height: var(--home-dashboard-recommended-height);
++  padding: 20px 24px;
++}
++
++.home-dashboard-loading__recommended .home-dashboard-loading__section-header {
++  margin-bottom: 12px;
+ }
+ 
+ .home-dashboard-loading__section-header,
+-.home-dashboard-loading__upcoming-meta,
+ .home-dashboard-loading__recommended-meta {
+   display: flex;
+   align-items: center;
+@@ -37,11 +41,6 @@
+ 
+ .home-dashboard-loading__section-title,
+ .home-dashboard-loading__section-action,
+-.home-dashboard-loading__upcoming-card,
+-.home-dashboard-loading__upcoming-date,
+-.home-dashboard-loading__upcoming-badge,
+-.home-dashboard-loading__upcoming-title,
+-.home-dashboard-loading__upcoming-detail,
+ .home-dashboard-loading__unscheduled-card,
+ .home-dashboard-loading__unscheduled-category,
+ .home-dashboard-loading__unscheduled-title,
+@@ -66,7 +65,6 @@
+   height: 16px;
+ }
+ 
+-.home-dashboard-loading__upcoming-list,
+ .home-dashboard-loading__unscheduled-list,
+ .home-dashboard-loading__recommended-list {
+   padding: 0;
+@@ -74,52 +72,10 @@
+   list-style: none;
+ }
+ 
+-.home-dashboard-loading__upcoming-list {
+-  display: grid;
+-  gap: 12px;
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-}
+-
+-.home-dashboard-loading__upcoming-card {
+-  display: flex;
+-  min-width: 0;
+-  height: 150px;
+-  padding: 16px;
+-  flex-direction: column;
+-  gap: 16px;
+-}
+-
+-.home-dashboard-loading__upcoming-meta {
+-  height: 20px;
+-}
+-
+-.home-dashboard-loading__upcoming-date {
+-  width: 72px;
+-  height: 12px;
+-  border-radius: 6px;
+-}
+-
+-.home-dashboard-loading__upcoming-badge {
+-  width: 48px;
+-  height: 20px;
+-  border-radius: 6px;
+-}
+-
+-.home-dashboard-loading__upcoming-title {
+-  width: 132px;
+-  height: 18px;
+-}
+-
+ .home-dashboard-loading__spacer {
+   flex: 1;
+ }
+ 
+-.home-dashboard-loading__upcoming-detail {
+-  width: 104px;
+-  height: 12px;
+-  border-radius: 6px;
+-}
+-
+ .home-dashboard-loading__unscheduled-list {
+   display: flex;
+   flex-direction: column;
+@@ -161,10 +117,10 @@
+ .home-dashboard-loading__recommended-card {
+   display: flex;
+   min-width: 0;
+-  height: 150px;
+-  padding: 16px;
++  height: 140px;
++  padding: 14px;
+   flex-direction: column;
+-  gap: 14px;
++  gap: 10px;
+ }
+ 
+ .home-dashboard-loading__recommended-meta {
+@@ -195,6 +151,8 @@
+ }
+ 
+ .home-dashboard-state {
++  --home-dashboard-recommended-height: 284px;
++
+   display: flex;
+   width: 100%;
+   flex-direction: column;
+@@ -208,6 +166,13 @@
+   grid-template-columns: minmax(0, 996px) minmax(320px, 420px);
+ }
+ 
++.home-dashboard-state__side {
++  display: flex;
++  min-width: 0;
++  flex-direction: column;
++  gap: 24px;
++}
++
+ .home-dashboard-state__section {
+   min-width: 0;
+   padding: 24px;
+@@ -216,16 +181,9 @@
+   box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
+ }
+ 
+-.home-dashboard-state__top > .home-dashboard-state__section {
+-  height: 436px;
+-}
+-
+ .home-dashboard-state__section--recommended {
+-  height: 280px;
+-}
+-
+-.home-dashboard-state__section--recommended.home-dashboard-state__section--error {
+-  height: 320px;
++  height: var(--home-dashboard-recommended-height);
++  padding: 20px 24px;
+ }
+ 
+ .home-dashboard-state__section-header {
+@@ -237,9 +195,9 @@
+   margin-bottom: 20px;
+ }
+ 
+-.home-dashboard-state__section--recommended.home-dashboard-state__section--empty
++.home-dashboard-state__section--recommended
+   > .home-dashboard-state__section-header {
+-  margin-bottom: 16px;
++  margin-bottom: 12px;
+ }
+ 
+ .home-dashboard-state__section-header h2 {
+@@ -276,12 +234,7 @@
+ }
+ 
+ .home-dashboard-state__section--recommended .home-dashboard-state__result {
+-  height: 184px;
+-}
+-
+-.home-dashboard-state__section--recommended.home-dashboard-state__section--error
+-  .home-dashboard-state__result {
+-  height: 220px;
++  height: 200px;
+ }
+ 
+ .home-dashboard-state__result-asset {
+@@ -320,6 +273,8 @@
+   font-size: 18px;
+   font-weight: 700;
+   line-height: 1.45;
++  text-wrap: balance;
++  word-break: keep-all;
+ }
+ 
+ .home-dashboard-state__result p {
+@@ -375,19 +330,16 @@
+ }
+ 
+ @media (max-width: 1200px) {
+-  .home-dashboard-state__top {
+-    grid-template-columns: minmax(0, 1fr);
++  .home-dashboard-state {
++    --home-dashboard-recommended-height: auto;
+   }
+-}
+ 
+-@media (max-width: 900px) {
+-  .home-dashboard-state__top > .home-dashboard-loading__section,
+-  .home-dashboard-state__top > .home-dashboard-state__section {
+-    height: auto;
++  .home-dashboard-state__top {
++    grid-template-columns: minmax(0, 1fr);
+   }
+ 
+   .home-dashboard-state__section--recommended {
+-    height: auto;
++    padding: 24px;
+   }
+ 
+   .home-dashboard-state__section--recommended .home-dashboard-state__result {
+@@ -395,12 +347,67 @@
+     min-height: 184px;
+   }
+ 
+-  .home-dashboard-state__section--recommended.home-dashboard-state__section--error
++  .home-dashboard-loading__recommended {
++    padding: 24px;
++  }
++}
++
++@media (min-width: 1201px) {
++  .home-dashboard-state__top {
++    align-items: stretch;
++    grid-auto-rows: 660px;
++  }
++
++  .home-dashboard-state__side
++    > .home-dashboard-loading__section:not(
++      .home-dashboard-loading__recommended
++    ),
++  .home-dashboard-state__side
++    > .home-dashboard-state__section:not(
++      .home-dashboard-state__section--recommended
++    ),
++  .home-dashboard-state__side > .unscheduled-task {
++    height: 352px;
++  }
++
++  .home-dashboard-state__side > .home-dashboard-loading__section {
++    padding: 20px;
++  }
++
++  .home-dashboard-state__side
++    > .home-dashboard-state__section:not(
++      .home-dashboard-state__section--recommended
++    )
+     .home-dashboard-state__result {
+-    min-height: 220px;
++    height: 252px;
++  }
++
++  .home-dashboard-state__side .home-dashboard-loading__unscheduled-list {
++    display: grid;
++    height: 268px;
++    gap: 8px;
++    grid-template-rows: repeat(3, minmax(0, 1fr));
++  }
++
++  .home-dashboard-state__side .home-dashboard-loading__unscheduled-card {
++    height: auto;
++    padding: 10px;
++    gap: 8px;
++  }
++
++  .home-dashboard-loading__recommended-list {
++    gap: 8px;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+ 
+-  .home-dashboard-loading__upcoming-list,
++  .home-dashboard-loading__recommended-card {
++    height: 96px;
++    padding: 8px;
++    gap: 6px;
++  }
++}
++
++@media (max-width: 900px) {
+   .home-dashboard-loading__recommended-list {
+     grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+@@ -412,7 +419,6 @@
+     padding: 20px;
+   }
+ 
+-  .home-dashboard-loading__upcoming-list,
+   .home-dashboard-loading__recommended-list {
+     grid-template-columns: minmax(0, 1fr);
+   }
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.tsx b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+index ae4c6907e966e494475c1b41f9bdca547de7db28..06da5e0d7d489d161a8711172f0009f08dafbd18 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.tsx
++++ b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+@@ -7,19 +7,18 @@ import {
+   HomeScheduleDashboardResultSectionViewModel,
+   HomeScheduleDashboardResultViewModel,
+   HomeScheduleDashboardUnscheduledViewModel,
+-  HomeScheduleDashboardUpcomingViewModel,
+   HomeScheduleDashboardViewModel,
+ } from "../view-model/createHomeScheduleDashboardViewModel";
+ import "./HomeScheduleDashboard.css";
+ import { RecommendedSchedule } from "./RecommendedSchedule";
++import { MonthlyCalendar } from "./MonthlyCalendar";
+ import { UnscheduledTask } from "./UnscheduledTask";
+-import { UpcomingSchedule } from "./UpcomingSchedule";
+ 
+ interface HomeScheduleDashboardProps {
+   onAddRecommendedTask: (catalogItemId: number) => void;
+   onRetryRecommended: () => void;
+   onRetryUnscheduled: () => void;
+-  onRetryUpcoming: () => void;
++  referenceDate: string;
+   viewModel: HomeScheduleDashboardViewModel;
+ }
+ 
+@@ -51,14 +50,6 @@ function ResultIcon({ icon }: { icon: HomeScheduleDashboardResultIcon }) {
+           <path d="m9 15 2 2 4-4" />
+         </svg>
+       );
+-    case "calendar-days":
+-      return (
+-        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+-          <path d="M7 3v3M17 3v3M4 9h16" />
+-          <rect height="16" rx="2" width="16" x="4" y="5" />
+-          <path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01" />
+-        </svg>
+-      );
+     case "calendar-heart":
+       return (
+         <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+@@ -163,35 +154,15 @@ function DashboardResultSection({
+   );
+ }
+ 
+-function SkeletonSectionHeader({
+-  showAction = true,
+-}: {
+-  showAction?: boolean;
+-}) {
++function SkeletonSectionHeader() {
+   return (
+     <div className="home-dashboard-loading__section-header">
+       <span className="home-dashboard-loading__section-title" />
+-      {showAction && (
+-        <span className="home-dashboard-loading__section-action" />
+-      )}
++      <span className="home-dashboard-loading__section-action" />
+     </div>
+   );
+ }
+ 
+-function UpcomingScheduleSkeleton() {
+-  return (
+-    <li className="home-dashboard-loading__upcoming-card">
+-      <div className="home-dashboard-loading__upcoming-meta">
+-        <span className="home-dashboard-loading__upcoming-date" />
+-        <span className="home-dashboard-loading__upcoming-badge" />
+-      </div>
+-      <span className="home-dashboard-loading__upcoming-title" />
+-      <span aria-hidden="true" className="home-dashboard-loading__spacer" />
+-      <span className="home-dashboard-loading__upcoming-detail" />
+-    </li>
+-  );
+-}
+-
+ function UnscheduledTaskSkeleton() {
+   return (
+     <li className="home-dashboard-loading__unscheduled-card">
+@@ -228,26 +199,6 @@ function LoadingStatus({
+   );
+ }
+ 
+-function UpcomingScheduleLoading({
+-  viewModel,
+-}: {
+-  viewModel: HomeScheduleDashboardLoadingSectionViewModel;
+-}) {
+-  return (
+-    <section aria-busy="true" className="home-dashboard-loading__section">
+-      <LoadingStatus viewModel={viewModel} />
+-      <div aria-hidden="true">
+-        <SkeletonSectionHeader showAction={false} />
+-        <ul className="home-dashboard-loading__upcoming-list">
+-          {Array.from({ length: 6 }, (_, index) => (
+-            <UpcomingScheduleSkeleton key={index} />
+-          ))}
+-        </ul>
+-      </div>
+-    </section>
+-  );
+-}
+-
+ function UnscheduledTaskLoading({
+   viewModel,
+ }: {
+@@ -291,38 +242,6 @@ function RecommendedScheduleLoading({
+   );
+ }
+ 
+-function UpcomingScheduleSection({
+-  onRetry,
+-  viewModel,
+-}: {
+-  onRetry: () => void;
+-  viewModel: HomeScheduleDashboardUpcomingViewModel;
+-}) {
+-  switch (viewModel.status) {
+-    case "loading":
+-      return <UpcomingScheduleLoading viewModel={viewModel} />;
+-    case "empty":
+-      return (
+-        <DashboardResultSection
+-          id="dashboard-upcoming-schedule"
+-          viewModel={viewModel}
+-        />
+-      );
+-    case "error":
+-      return (
+-        <DashboardResultSection
+-          id="dashboard-upcoming-schedule"
+-          onAction={onRetry}
+-          viewModel={viewModel}
+-        />
+-      );
+-    case "complete":
+-      return <UpcomingSchedule viewModel={viewModel.content} />;
+-    default:
+-      return assertNever(viewModel);
+-  }
+-}
+-
+ function UnscheduledTaskSection({
+   onRetry,
+   viewModel,
+@@ -396,18 +315,6 @@ function RecommendedScheduleSection({
+   }
+ }
+ 
+-const guestUpcomingViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+-  {
+-    result: {
+-      description: "체크리스트에 등록한 일정이 여기에 표시돼요.",
+-      icon: "lock",
+-      title: "로그인하면 가까운 일정을 확인할 수 있어요.",
+-      tone: "neutral",
+-    },
+-    status: "authentication-required",
+-    title: "가까운 일정",
+-  };
+-
+ const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+   {
+     result: {
+@@ -432,24 +339,27 @@ const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"au
+     title: "추천 할 일",
+   };
+ 
+-export function GuestHomeScheduleDashboard() {
++export function GuestHomeScheduleDashboard({
++  referenceDate,
++}: {
++  referenceDate: string;
++}) {
+   return (
+     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
+       <div className="home-dashboard-state__top">
+-        <DashboardResultSection
+-          id="dashboard-upcoming-schedule"
+-          viewModel={guestUpcomingViewModel}
+-        />
+-        <DashboardResultSection
+-          id="dashboard-unscheduled-task"
+-          viewModel={guestUnscheduledViewModel}
+-        />
++        <MonthlyCalendar referenceDate={referenceDate} />
++        <div className="home-dashboard-state__side">
++          <DashboardResultSection
++            id="dashboard-unscheduled-task"
++            viewModel={guestUnscheduledViewModel}
++          />
++          <DashboardResultSection
++            className="home-dashboard-state__section--recommended"
++            id="dashboard-recommended-schedule"
++            viewModel={guestRecommendedViewModel}
++          />
++        </div>
+       </div>
+-      <DashboardResultSection
+-        className="home-dashboard-state__section--recommended"
+-        id="dashboard-recommended-schedule"
+-        viewModel={guestRecommendedViewModel}
+-      />
+     </section>
+   );
+ }
+@@ -458,26 +368,25 @@ export function HomeScheduleDashboard({
+   onAddRecommendedTask,
+   onRetryRecommended,
+   onRetryUnscheduled,
+-  onRetryUpcoming,
++  referenceDate,
+   viewModel,
+ }: HomeScheduleDashboardProps) {
+   return (
+     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
+       <div className="home-dashboard-state__top">
+-        <UpcomingScheduleSection
+-          onRetry={onRetryUpcoming}
+-          viewModel={viewModel.upcoming}
+-        />
+-        <UnscheduledTaskSection
+-          onRetry={onRetryUnscheduled}
+-          viewModel={viewModel.unscheduled}
+-        />
++        <MonthlyCalendar referenceDate={referenceDate} />
++        <div className="home-dashboard-state__side">
++          <UnscheduledTaskSection
++            onRetry={onRetryUnscheduled}
++            viewModel={viewModel.unscheduled}
++          />
++          <RecommendedScheduleSection
++            onAddTask={onAddRecommendedTask}
++            onRetry={onRetryRecommended}
++            viewModel={viewModel.recommended}
++          />
++        </div>
+       </div>
+-      <RecommendedScheduleSection
+-        onAddTask={onAddRecommendedTask}
+-        onRetry={onRetryRecommended}
+-        viewModel={viewModel.recommended}
+-      />
+     </section>
+   );
+ }
+diff --git a/FE/src/features/home/view/MonthlyCalendar.css b/FE/src/features/home/view/MonthlyCalendar.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e21d8dbbb69d0337311c371fe1a662fcc0a0358
+--- /dev/null
++++ b/FE/src/features/home/view/MonthlyCalendar.css
+@@ -0,0 +1,163 @@
++.monthly-calendar {
++  min-width: 0;
++  padding: 24px;
++  border-radius: 12px;
++  background: var(--color-bg-layer-default);
++  box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
++}
++
++.monthly-calendar__header {
++  display: flex;
++  min-height: 44px;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++  margin-bottom: 12px;
++}
++
++.monthly-calendar__header h2,
++.monthly-calendar__header p {
++  margin: 0;
++}
++
++.monthly-calendar__header h2 {
++  color: var(--color-fg-neutral);
++  font-size: 20px;
++  font-weight: 700;
++  line-height: 1.3;
++}
++
++.monthly-calendar__header p {
++  margin-top: 2px;
++  color: var(--color-fg-neutral-muted);
++  font-size: 13px;
++  font-weight: 600;
++  line-height: 1.4;
++}
++
++.monthly-calendar__controls {
++  display: flex;
++  align-items: center;
++  gap: 4px;
++}
++
++.monthly-calendar__controls button {
++  display: grid;
++  min-width: 36px;
++  height: 36px;
++  place-items: center;
++  padding: 0;
++  border: 0;
++  border-radius: 8px;
++  background: transparent;
++  color: var(--color-fg-neutral);
++  cursor: pointer;
++  font: inherit;
++}
++
++.monthly-calendar__controls button:hover {
++  background: var(--color-bg-neutral-weak);
++}
++
++.monthly-calendar__controls button:focus-visible {
++  outline: 2px solid var(--color-stroke-focus-ring);
++  outline-offset: 2px;
++}
++
++.monthly-calendar__controls svg {
++  width: 18px;
++  height: 18px;
++  stroke: currentcolor;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++  stroke-width: 1.8;
++}
++
++.monthly-calendar__controls .monthly-calendar__today-button {
++  width: auto;
++  padding: 0 10px;
++  box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
++  font-size: 13px;
++  font-weight: 700;
++}
++
++.monthly-calendar__grid {
++  width: 100%;
++  border-collapse: collapse;
++  table-layout: fixed;
++}
++
++.monthly-calendar__grid caption {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  padding: 0;
++  border: 0;
++  margin: -1px;
++  clip-path: inset(50%);
++  overflow: hidden;
++  white-space: nowrap;
++}
++
++.monthly-calendar__grid th {
++  height: 28px;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++  font-weight: 600;
++}
++
++.monthly-calendar__grid th:first-child,
++.monthly-calendar__grid td:first-child:not(.monthly-calendar__day--outside) {
++  color: var(--color-fg-critical);
++}
++
++.monthly-calendar__grid td {
++  height: 48px;
++  padding: 2px;
++  color: var(--color-fg-neutral);
++  font-size: 13px;
++  text-align: center;
++}
++
++.monthly-calendar__grid time {
++  display: inline-grid;
++  width: 32px;
++  height: 32px;
++  place-items: center;
++  border-radius: 50%;
++}
++
++.monthly-calendar__grid .monthly-calendar__day--outside {
++  color: var(--color-fg-placeholder);
++}
++
++.monthly-calendar__grid .monthly-calendar__day--today time {
++  background: var(--color-bg-brand-solid);
++  color: var(--color-fg-on-brand);
++  font-weight: 700;
++}
++
++@media (max-width: 600px) {
++  .monthly-calendar {
++    padding: 20px;
++  }
++
++  .monthly-calendar__header {
++    align-items: flex-start;
++  }
++
++  .monthly-calendar__grid td {
++    height: 64px;
++  }
++
++  .monthly-calendar__grid time {
++    width: 30px;
++    height: 30px;
++  }
++}
++
++@media (min-width: 601px) {
++  .monthly-calendar__grid td {
++    height: 88px;
++  }
++}
+diff --git a/FE/src/features/home/view/MonthlyCalendar.test.tsx b/FE/src/features/home/view/MonthlyCalendar.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..68755b32442edfaa14caec882b10e57cfc174c9d
+--- /dev/null
++++ b/FE/src/features/home/view/MonthlyCalendar.test.tsx
+@@ -0,0 +1,45 @@
++import { fireEvent, render, screen, within } from "@testing-library/react";
++import { describe, expect, it } from "vitest";
++
++import { MonthlyCalendar } from "./MonthlyCalendar";
++
++describe("MonthlyCalendar", () => {
++  it("일요일 시작 6주 그리드에 앞뒤 달 날짜와 오늘을 표시한다", () => {
++    render(<MonthlyCalendar referenceDate="2026-09-16" />);
++
++    const calendar = screen.getByRole("table", { name: "2026년 9월 달력" });
++    expect(within(calendar).getAllByRole("columnheader")).toHaveLength(7);
++    expect(within(calendar).getAllByRole("cell")).toHaveLength(42);
++    expect(within(calendar).getAllByRole("columnheader")[0].textContent).toBe(
++      "일",
++    );
++    expect(screen.getByLabelText("2026년 8월 30일")).toBeTruthy();
++    expect(screen.getByLabelText("2026년 10월 10일")).toBeTruthy();
++
++    const today = screen.getByLabelText("2026년 9월 16일, 오늘");
++    expect(today.getAttribute("aria-current")).toBe("date");
++    expect(today.closest("td")?.className).toContain(
++      "monthly-calendar__day--today",
++    );
++    expect(
++      screen.getByLabelText("2026년 8월 30일").closest("td")?.className,
++    ).toContain("monthly-calendar__day--outside");
++    expect(within(calendar).queryByRole("button")).toBeNull();
++  });
++
++  it("이전 달과 다음 달을 탐색하고 오늘이 속한 달로 돌아온다", () => {
++    render(<MonthlyCalendar referenceDate="2026-09-16" />);
++
++    fireEvent.click(screen.getByRole("button", { name: "다음 달" }));
++    expect(
++      screen.getByRole("table", { name: "2026년 10월 달력" }),
++    ).toBeTruthy();
++
++    fireEvent.click(screen.getByRole("button", { name: "이전 달" }));
++    fireEvent.click(screen.getByRole("button", { name: "이전 달" }));
++    expect(screen.getByRole("table", { name: "2026년 8월 달력" })).toBeTruthy();
++
++    fireEvent.click(screen.getByRole("button", { name: "오늘" }));
++    expect(screen.getByRole("table", { name: "2026년 9월 달력" })).toBeTruthy();
++  });
++});
+diff --git a/FE/src/features/home/view/MonthlyCalendar.tsx b/FE/src/features/home/view/MonthlyCalendar.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..ceb9d1520e0568b99ba92a1571f7498ee1f7e3d0
+--- /dev/null
++++ b/FE/src/features/home/view/MonthlyCalendar.tsx
+@@ -0,0 +1,141 @@
++import { useMemo, useState } from "react";
++
++import "./MonthlyCalendar.css";
++
++const DAYS_OF_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
++const CALENDAR_CELL_COUNT = 42;
++
++interface MonthlyCalendarProps {
++  referenceDate: string;
++}
++
++function parseLocalDate(value: string) {
++  const [year, month, day] = value.split("-").map(Number);
++  return new Date(year, month - 1, day);
++}
++
++function formatDateTime(date: Date) {
++  const year = date.getFullYear();
++  const month = String(date.getMonth() + 1).padStart(2, "0");
++  const day = String(date.getDate()).padStart(2, "0");
++  return `${year}-${month}-${day}`;
++}
++
++function isSameDate(left: Date, right: Date) {
++  return (
++    left.getFullYear() === right.getFullYear() &&
++    left.getMonth() === right.getMonth() &&
++    left.getDate() === right.getDate()
++  );
++}
++
++function CalendarArrowIcon({ direction }: { direction: "left" | "right" }) {
++  return (
++    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
++      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
++    </svg>
++  );
++}
++
++export function MonthlyCalendar({ referenceDate }: MonthlyCalendarProps) {
++  const today = useMemo(() => parseLocalDate(referenceDate), [referenceDate]);
++  const [visibleMonth, setVisibleMonth] = useState(
++    () => new Date(today.getFullYear(), today.getMonth(), 1),
++  );
++  const year = visibleMonth.getFullYear();
++  const month = visibleMonth.getMonth();
++  const cells = Array.from({ length: CALENDAR_CELL_COUNT }, (_, index) => {
++    const firstDay = new Date(year, month, 1).getDay();
++    return new Date(year, month, index - firstDay + 1);
++  });
++
++  const moveMonth = (offset: number) => {
++    setVisibleMonth(
++      (current) =>
++        new Date(current.getFullYear(), current.getMonth() + offset, 1),
++    );
++  };
++
++  return (
++    <section
++      aria-labelledby="monthly-calendar-title"
++      className="monthly-calendar"
++    >
++      <header className="monthly-calendar__header">
++        <div>
++          <h2 id="monthly-calendar-title">캘린더</h2>
++          <p aria-live="polite">{`${year}년 ${month + 1}월`}</p>
++        </div>
++        <div aria-label="월 이동" className="monthly-calendar__controls">
++          <button
++            aria-label="이전 달"
++            onClick={() => moveMonth(-1)}
++            type="button"
++          >
++            <CalendarArrowIcon direction="left" />
++          </button>
++          <button
++            className="monthly-calendar__today-button"
++            onClick={() =>
++              setVisibleMonth(
++                new Date(today.getFullYear(), today.getMonth(), 1),
++              )
++            }
++            type="button"
++          >
++            오늘
++          </button>
++          <button
++            aria-label="다음 달"
++            onClick={() => moveMonth(1)}
++            type="button"
++          >
++            <CalendarArrowIcon direction="right" />
++          </button>
++        </div>
++      </header>
++
++      <table className="monthly-calendar__grid">
++        <caption>{`${year}년 ${month + 1}월 달력`}</caption>
++        <thead>
++          <tr>
++            {DAYS_OF_WEEK.map((day) => (
++              <th key={day} scope="col">
++                {day}
++              </th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {Array.from({ length: 6 }, (_, weekIndex) => (
++            <tr key={weekIndex}>
++              {cells.slice(weekIndex * 7, weekIndex * 7 + 7).map((date) => {
++                const isCurrentMonth = date.getMonth() === month;
++                const isToday = isSameDate(date, today);
++                return (
++                  <td
++                    className={[
++                      !isCurrentMonth && "monthly-calendar__day--outside",
++                      isToday && "monthly-calendar__day--today",
++                    ]
++                      .filter(Boolean)
++                      .join(" ")}
++                    key={formatDateTime(date)}
++                  >
++                    <time
++                      aria-current={isToday ? "date" : undefined}
++                      aria-label={`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일${isToday ? ", 오늘" : ""}`}
++                      dateTime={formatDateTime(date)}
++                    >
++                      {date.getDate()}
++                    </time>
++                  </td>
++                );
++              })}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </section>
++  );
++}
+diff --git a/FE/src/features/home/view/RecommendedSchedule.css b/FE/src/features/home/view/RecommendedSchedule.css
+index bf9b77b8bdb7119d93679589c3b44df873500262..f6fda077b55b7bc31b75d24f85df59fdaa0447bc 100644
+--- a/FE/src/features/home/view/RecommendedSchedule.css
++++ b/FE/src/features/home/view/RecommendedSchedule.css
+@@ -1,6 +1,7 @@
+ .recommended-schedule {
+   width: 100%;
+-  padding: 24px;
++  height: var(--home-dashboard-recommended-height, auto);
++  padding: 20px 24px;
+   border-radius: 12px;
+   background: var(--color-bg-layer-default);
+   box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
+@@ -11,7 +12,7 @@
+   align-items: center;
+   justify-content: space-between;
+   gap: 16px;
+-  margin-bottom: 20px;
++  margin-bottom: 12px;
+ }
+ 
+ .recommended-schedule__header h2 {
+@@ -65,8 +66,8 @@
+ .recommended-schedule-card {
+   display: flex;
+   min-width: 0;
+-  min-height: 150px;
+-  padding: 16px;
++  min-height: 140px;
++  padding: 14px;
+   border-radius: 10px;
+   background: var(--color-bg-neutral-weak);
+   flex-direction: column;
+@@ -143,11 +144,32 @@
+ }
+ 
+ @media (max-width: 900px) {
++  .recommended-schedule {
++    padding: 24px;
++  }
++
+   .recommended-schedule__list {
+     grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+ }
+ 
++@media (min-width: 1201px) {
++  .home-dashboard-state__side .recommended-schedule__list {
++    gap: 8px;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++
++  .home-dashboard-state__side .recommended-schedule-card {
++    min-height: 96px;
++    padding: 8px 10px;
++    gap: 4px;
++  }
++
++  .home-dashboard-state__side .recommended-schedule-card__body p {
++    display: none;
++  }
++}
++
+ @media (max-width: 600px) {
+   .recommended-schedule {
+     padding: 20px;
+diff --git a/FE/src/features/home/view/UnscheduledTask.css b/FE/src/features/home/view/UnscheduledTask.css
+index d634e1d39a356ee26f873babb19e29935700d781..cded547df7ecc8f939d0c24827fc9c7940ee5235 100644
+--- a/FE/src/features/home/view/UnscheduledTask.css
++++ b/FE/src/features/home/view/UnscheduledTask.css
+@@ -1,7 +1,6 @@
+ .unscheduled-task {
+   display: flex;
+   width: min(100%, 420px);
+-  height: 436px;
+   padding: 24px;
+   border: 1px solid var(--color-stroke-neutral-weak);
+   border-radius: 12px;
+@@ -143,6 +142,43 @@
+   stroke-width: 1.7;
+ }
+ 
++@media (min-width: 1201px) {
++  .home-dashboard-state__side .unscheduled-task {
++    padding: 20px;
++    gap: 12px;
++  }
++
++  .unscheduled-task__list,
++  .unscheduled-task-card {
++    flex: 1;
++  }
++
++  .home-dashboard-state__side .unscheduled-task-card {
++    display: grid;
++    min-height: 0;
++    padding: 10px;
++    gap: 6px 10px;
++    grid-template-areas:
++      "top top"
++      "title action";
++    grid-template-columns: minmax(0, 1fr) auto;
++  }
++
++  .home-dashboard-state__side .unscheduled-task-card__top {
++    grid-area: top;
++  }
++
++  .home-dashboard-state__side .unscheduled-task-card__title {
++    align-self: center;
++    grid-area: title;
++  }
++
++  .home-dashboard-state__side .unscheduled-task-card__add-schedule {
++    align-self: center;
++    grid-area: action;
++  }
++}
++
+ @media (max-width: 600px) {
+   .unscheduled-task {
+     height: auto;
+diff --git a/FE/src/features/home/view/UpcomingSchedule.css b/FE/src/features/home/view/UpcomingSchedule.css
+deleted file mode 100644
+index 62a46886cb8adfb251fd5030dcc61499d2d4d736..0000000000000000000000000000000000000000
+--- a/FE/src/features/home/view/UpcomingSchedule.css
++++ /dev/null
+@@ -1,151 +0,0 @@
+-.upcoming-schedule {
+-  width: min(100%, 996px);
+-  height: 436px;
+-  padding: 24px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 12px;
+-  background: var(--color-bg-layer-default);
+-}
+-
+-.upcoming-schedule__header {
+-  margin-bottom: 20px;
+-}
+-
+-.upcoming-schedule__header h2 {
+-  margin: 0;
+-  color: var(--color-fg-neutral);
+-  font-size: 20px;
+-  font-weight: 700;
+-  line-height: 1.3;
+-}
+-
+-.upcoming-schedule__list {
+-  display: grid;
+-  padding: 0;
+-  margin: 0;
+-  gap: 12px;
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-  list-style: none;
+-}
+-
+-.upcoming-schedule-card {
+-  display: flex;
+-  min-width: 0;
+-  min-height: 174px;
+-  padding: 16px;
+-  border: 1px solid transparent;
+-  border-radius: 10px;
+-  background: var(--color-bg-neutral-weak);
+-  flex-direction: column;
+-  justify-content: space-between;
+-  gap: 12px;
+-}
+-
+-.upcoming-schedule-card__top,
+-.upcoming-schedule-card__date-group,
+-.upcoming-schedule-card__detail {
+-  display: flex;
+-  align-items: center;
+-}
+-
+-.upcoming-schedule-card__top {
+-  min-width: 0;
+-  justify-content: space-between;
+-  gap: 8px;
+-}
+-
+-.upcoming-schedule-card__date-group {
+-  min-width: 0;
+-  gap: 7px;
+-}
+-
+-.upcoming-schedule-card__relative-date {
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 12px;
+-  font-weight: 700;
+-  white-space: nowrap;
+-}
+-
+-.upcoming-schedule-card__date {
+-  color: var(--color-fg-neutral);
+-  font-size: 13px;
+-  font-weight: 600;
+-  white-space: nowrap;
+-}
+-
+-.upcoming-schedule-card__status {
+-  flex: none;
+-  padding: 4px 7px;
+-  border-radius: 4px;
+-  font-size: 11px;
+-  font-weight: 600;
+-  line-height: 1.4;
+-}
+-
+-.upcoming-schedule-card__status--upcoming {
+-  background: var(--color-bg-neutral-weak);
+-  color: var(--color-fg-neutral-muted);
+-}
+-
+-.upcoming-schedule-card__title {
+-  margin: 0;
+-  color: var(--color-fg-neutral);
+-  font-size: 16px;
+-  font-weight: 700;
+-  line-height: 1.3;
+-}
+-
+-.upcoming-schedule-card__detail {
+-  min-width: 0;
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 12px;
+-  font-weight: 500;
+-  gap: 7px;
+-}
+-
+-.upcoming-schedule-card__detail span {
+-  overflow: hidden;
+-  text-overflow: ellipsis;
+-  white-space: nowrap;
+-}
+-
+-.upcoming-schedule-card__clock {
+-  width: 15px;
+-  height: 15px;
+-  flex: none;
+-  stroke: currentColor;
+-  stroke-linecap: round;
+-  stroke-linejoin: round;
+-  stroke-width: 1.7;
+-}
+-
+-@media (hover: hover) {
+-  .upcoming-schedule-card:hover {
+-    border-color: var(--color-stroke-brand-solid);
+-    background: var(--color-bg-brand-weak);
+-  }
+-
+-  .upcoming-schedule-card:hover .upcoming-schedule-card__relative-date {
+-    color: var(--color-fg-neutral);
+-  }
+-}
+-
+-@media (max-width: 900px) {
+-  .upcoming-schedule {
+-    height: auto;
+-  }
+-
+-  .upcoming-schedule__list {
+-    grid-template-columns: repeat(2, minmax(0, 1fr));
+-  }
+-}
+-
+-@media (max-width: 600px) {
+-  .upcoming-schedule {
+-    padding: 20px;
+-  }
+-
+-  .upcoming-schedule__list {
+-    grid-template-columns: minmax(0, 1fr);
+-  }
+-}
+diff --git a/FE/src/features/home/view/UpcomingSchedule.tsx b/FE/src/features/home/view/UpcomingSchedule.tsx
+deleted file mode 100644
+index a45b6ffbd9f5cd33c4683b7c228a80e33f8c7aa9..0000000000000000000000000000000000000000
+--- a/FE/src/features/home/view/UpcomingSchedule.tsx
++++ /dev/null
+@@ -1,65 +0,0 @@
+-import { UpcomingScheduleViewModel } from "../view-model/createUpcomingScheduleViewModel";
+-import "./UpcomingSchedule.css";
+-
+-interface UpcomingScheduleProps {
+-  viewModel: UpcomingScheduleViewModel;
+-}
+-
+-function ClockIcon() {
+-  return (
+-    <svg
+-      aria-hidden="true"
+-      className="upcoming-schedule-card__clock"
+-      fill="none"
+-      viewBox="0 0 24 24"
+-    >
+-      <circle cx="12" cy="12" r="8.5" />
+-      <path d="M12 7.5v5l3.25 2" />
+-    </svg>
+-  );
+-}
+-
+-export function UpcomingSchedule({ viewModel }: UpcomingScheduleProps) {
+-  return (
+-    <section
+-      aria-labelledby="upcoming-schedule-title"
+-      className="upcoming-schedule"
+-    >
+-      <header className="upcoming-schedule__header">
+-        <h2 id="upcoming-schedule-title">{viewModel.title}</h2>
+-      </header>
+-
+-      <ul className="upcoming-schedule__list">
+-        {viewModel.items.map((item) => (
+-          <li className="upcoming-schedule-card" key={item.id}>
+-            <div className="upcoming-schedule-card__top">
+-              <div className="upcoming-schedule-card__date-group">
+-                <span className="upcoming-schedule-card__relative-date">
+-                  {item.relativeDateLabel}
+-                </span>
+-                <time
+-                  className="upcoming-schedule-card__date"
+-                  dateTime={item.dateTime}
+-                >
+-                  {item.dateLabel}
+-                </time>
+-              </div>
+-              <span
+-                className={`upcoming-schedule-card__status upcoming-schedule-card__status--${item.status}`}
+-              >
+-                {item.statusLabel}
+-              </span>
+-            </div>
+-
+-            <h3 className="upcoming-schedule-card__title">{item.title}</h3>
+-
+-            <div className="upcoming-schedule-card__detail">
+-              <ClockIcon />
+-              <span>{item.detailLabel}</span>
+-            </div>
+-          </li>
+-        ))}
+-      </ul>
+-    </section>
+-  );
+-}
