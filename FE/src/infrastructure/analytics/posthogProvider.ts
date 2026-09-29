@@ -27,6 +27,11 @@ type PostHogSdk = Pick<
   | "stopSessionRecording"
 >;
 const MEMBER_PREFIX = "bibbidi:user:";
+// CloudFront 함수(bibbidi-internal-traffic-cookie)가 캠퍼스 IP 응답에 붙이는 쿠키
+const INTERNAL_TRAFFIC_COOKIE = "bibbidi_internal=1";
+
+const isInternalTraffic = () =>
+  document.cookie.split("; ").includes(INTERNAL_TRAFFIC_COOKIE);
 
 export function createPostHogProvider(
   options: PostHogOptions,
@@ -60,7 +65,13 @@ export function createPostHogProvider(
 
   return {
     initialize() {
-      if (initialized || !options.enabled || !options.token) return;
+      if (
+        initialized ||
+        !options.enabled ||
+        !options.token ||
+        isInternalTraffic()
+      )
+        return;
       sdk.init(options.token, {
         api_host: options.host,
         ui_host: options.host.includes("eu.")
