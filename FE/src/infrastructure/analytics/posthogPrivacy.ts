@@ -81,13 +81,35 @@ const ALLOWED_PROPERTIES = new Set([
   "outcome",
 ]);
 
+// 홍보 유입 분석용 값이다. 전체 URL과 referrer 원문 대신 캠페인 값과 유입 도메인만 남긴다.
+const CAMPAIGN_KEYS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "utm_term",
+];
+
+const ATTRIBUTION_PROPERTIES = new Set([
+  ...CAMPAIGN_KEYS,
+  ...CAMPAIGN_KEYS.map((key) => `$session_entry_${key}`),
+  "$referring_domain",
+  "$session_entry_referring_domain",
+]);
+
+const INITIAL_PERSON_PROPERTIES = new Set([
+  ...CAMPAIGN_KEYS.map((key) => `$initial_${key}`),
+  "$initial_referring_domain",
+]);
+
 export function sanitizePostHogEvent(
   event: CaptureResult | null,
 ): CaptureResult | null {
   if (!event) return null;
   const properties: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(event.properties)) {
-    if (ALLOWED_PROPERTIES.has(key)) properties[key] = value;
+    if (ALLOWED_PROPERTIES.has(key) || ATTRIBUTION_PROPERTIES.has(key))
+      properties[key] = value;
     if (
       ["$current_url", "page_location", "page_referrer"].includes(key) &&
       typeof value === "string"
@@ -95,12 +117,20 @@ export function sanitizePostHogEvent(
       properties[key] = sanitizeAnalyticsUrl(value);
     }
   }
-  // SDK가 붙인 초기 유입 URL과 자동 Person 속성도 제거한다.
+  // Person에는 첫 유입 캠페인과 도메인만 남기고 초기 URL·referrer 원문은 제거한다.
+  const initialAttribution = Object.fromEntries(
+    Object.entries(event.$set_once ?? {}).filter(([key]) =>
+      INITIAL_PERSON_PROPERTIES.has(key),
+    ),
+  );
   return {
     uuid: event.uuid,
     event: event.event,
     timestamp: event.timestamp,
     properties,
+    ...(Object.keys(initialAttribution).length
+      ? { $set_once: initialAttribution }
+      : {}),
   };
 }
 

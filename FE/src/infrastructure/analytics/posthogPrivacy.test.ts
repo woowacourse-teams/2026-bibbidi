@@ -69,7 +69,7 @@ describe("PostHog 개인정보 정제", () => {
         $set: { nickname: "secret" },
         nickname: "secret",
         message: "secret",
-        utm_source: "secret",
+        $referrer: "https://ad.example/secret",
         category_id: "1",
       },
     });
@@ -81,6 +81,46 @@ describe("PostHog 개인정보 정제", () => {
       $session_id: "session",
       $current_url: "https://example.com/checklist",
       category_id: "1",
+    });
+  });
+  it("홍보 유입의 캠페인 값과 유입 도메인은 남기고 URL 원문은 제거한다", () => {
+    const result = sanitizePostHogEvent({
+      uuid: "id",
+      event: "$pageview",
+      $set_once: {
+        $initial_utm_source: "instagram",
+        $initial_utm_campaign: "launch",
+        $initial_referring_domain: "m.instagram.com",
+        $initial_referrer: "https://m.instagram.com/p/secret",
+        $initial_current_url: "https://example.com/?code=secret",
+      },
+      properties: {
+        distinct_id: "anon",
+        utm_source: "instagram",
+        utm_medium: "paid",
+        utm_campaign: "launch",
+        $referring_domain: "m.instagram.com",
+        $referrer: "https://m.instagram.com/p/secret",
+        $session_entry_utm_source: "instagram",
+        $session_entry_referring_domain: "m.instagram.com",
+        $session_entry_url: "https://example.com/?code=secret",
+        $session_entry_referrer: "https://m.instagram.com/p/secret",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("secret");
+    expect(result?.properties).toEqual({
+      distinct_id: "anon",
+      utm_source: "instagram",
+      utm_medium: "paid",
+      utm_campaign: "launch",
+      $referring_domain: "m.instagram.com",
+      $session_entry_utm_source: "instagram",
+      $session_entry_referring_domain: "m.instagram.com",
+    });
+    expect(result?.$set_once).toEqual({
+      $initial_utm_source: "instagram",
+      $initial_utm_campaign: "launch",
+      $initial_referring_domain: "m.instagram.com",
     });
   });
   it("입력·텍스트·민감 속성·네트워크를 마스킹하고 이미지와 iframe을 차단한다", () => {

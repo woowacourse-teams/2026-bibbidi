@@ -174,6 +174,25 @@ describe("PostHog 사용자 여정", () => {
     );
   });
 
+  it("비로그인 방문자도 브라우저 단위로 구분해 유입 캠페인과 함께 기록한다", () => {
+    const { sdk, client } = setup();
+    client.setContext({ authState: "guest", pathname: "/" });
+    client.track({
+      name: "page_view",
+      parameters: { page_location: "http://localhost:3000/", page_path: "/" },
+    });
+    const config = sdk.init.mock.calls[0][1] as PostHogConfig;
+    expect(config.persistence).toBe("localStorage");
+    expect(config.person_profiles).toBe("always");
+    expect(config.save_campaign_params).toBe(true);
+    expect(config.save_referrer).toBe(true);
+    expect(sdk.capture).toHaveBeenCalledWith(
+      "$pageview",
+      expect.objectContaining({ auth_state: "guest" }),
+    );
+    expect(sdk.startSessionRecording).toHaveBeenCalled();
+  });
+
   it("기존 회원이 게스트가 되면 한 번만 reset하고 익명 탐색을 유지한다", () => {
     const { sdk, client } = setup("bibbidi:user:42");
     client.setContext({ authState: "guest", pathname: "/login" });
