@@ -55,7 +55,7 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 
 서버의 208은 state 불일치, 만료, 쿠키 바인딩 실패를 함께 나타낸다. FE에서 구분할 수 없으므로 `state_invalid_or_expired`로 묶는다. 취소는 제공자가 `error=access_denied`로 돌려준 경우다. 제공자 화면에서 돌아오지 않은 사용자는 실패 이벤트가 없고 시작 후 다음 단계가 관측되지 않은 방문으로만 해석한다.
 
-오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
+오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. Web analytics의 경로 표에 쓰는 `$pathname`·`$session_entry_pathname`도 공개 경로일 때만 남기고, `$host`는 그대로 둔다. `environment`와 `app_version`은 SDK 공통 속성으로 등록해 `$identify` 같은 SDK 이벤트에도 붙인다. PostHog의 테스트 계정 필터는 `environment ≠ development`로 두어 테스트 서버 기록을 뺀다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
 
 ## SDK와 리플레이
 
@@ -79,11 +79,11 @@ PostHog Cloud **US 리전** (`https://us.i.posthog.com`, 관리 UI `https://us.p
 
 BE의 `DELETE /api/users/me`는 재인증 deleteGrant를 검증한 뒤 회원을 삭제한다. FE에 탈퇴 UI는 아직 없다. FE에는 탈퇴 API 연결 코드도 없다. 탈퇴 UI를 구현할 때 성공 후 `analytics.reset()`을 호출하고 인증을 종료해야 하며 deleteGrant를 분석에 넣지 않는다. 다른 기기에서 탈퇴한 회원은 다음 인증 재확인/만료에서 수집을 중단한다.
 
-BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않는다. 따라서 **신뢰 가능한 탈퇴 목록과 담당자가 준비되기 전에는 운영 수집을 켜지 않는다.** FE 이벤트만으로 삭제 대상을 만들면 광고 차단·종료 시 누락되므로 금지한다.
+BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않는다. 탈퇴 목록과 삭제 담당자는 운영 수집과 별개로 후속 작업에서 마련한다. FE 이벤트만으로 삭제 대상을 만들면 광고 차단·종료 시 누락되므로 금지한다.
 
 운영 절차:
 
-1. BE 담당자가 탈퇴 트랜잭션 성공 후 확인 가능한 회원 ID 목록을 제공한다. 현재 서비스에 이 기록이 없으므로 별도 서버 작업 또는 수동 탈퇴 접수 과정으로 누락 없는 목록을 확보해야 한다. 목록 마련은 운영 활성화 차단 조건이다.
+1. BE 담당자가 탈퇴 트랜잭션 성공 후 확인 가능한 회원 ID 목록을 제공한다. 현재 서비스에 이 기록이 없으므로 별도 서버 작업 또는 수동 탈퇴 접수 과정으로 누락 없는 목록을 확보해야 한다.
 2. 지정 담당자가 탈퇴 당일, 늦어도 24시간 내 `bibbidi:user:{id}`를 People에서 찾는다. PostHog Person UUID와 병합된 익명 ID를 확인한다. 관리 키는 FE/Issue/로그에 넣지 않는다.
 3. People의 Delete person에서 **이벤트와 녹화도 삭제**하도록 선택한다. API를 쓰면 US 관리 API(`https://us.posthog.com`)의 `/api/projects/{project_id}/persons/{person_uuid}/?delete_events=true&delete_recordings=true`에 DELETE한다. 숫자 회원 ID를 Person UUID 자리에 넣지 않는다.
 4. 삭제는 비동기다. 요청 성공만으로 완료 처리하지 않고 해당 Person·이벤트·녹화 조회와 삭제 작업 상태를 재확인한다. 실패 시 재시도하고 미완료 요청을 매일 점검한다. 최초 24시간 내 접수 목표와 실제 영구 삭제 완료 시각을 구분해 기록한다.
@@ -93,16 +93,14 @@ BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않�
 
 ## 처리방침과 배포 순서
 
-2026-09-26 처리방침에는 GA4(미국), Grafana Cloud(일본), Discord(미국)만 기재되어 있다. 기존 고지를 PostHog까지 포함한 동의로 취급하지 않는다.
+2026-09-26 처리방침에는 GA4(미국), Grafana Cloud(일본), Discord(미국)만 기재되어 있다. PostHog 수탁자와 방문자 식별자 저장은 아직 방침에 없다.
 
-1. 운영은 `BIBBIDI_POSTHOG_ENABLED=false`로 유지한다. 테스트 서버는 별도 개발 프로젝트의 token·host와 `BIBBIDI_APP_ENV=development`, `BIBBIDI_POSTHOG_ENABLED=true`를 빌드 환경에 넣어 먼저 활성화한다. 값이 없거나 키가 없으면 초기화·저장·전송하지 않는다. 빌드 시 주입 값이므로 변경 시 재빌드/재배포가 필요하다.
-2. 팀의 테스트 계정으로 이벤트가 실제로 쌓이는지 확인하고 마스킹, 최종 ID 병합, 탈퇴 삭제, 과금 상한을 검증한다. 테스트 서버 검증이 끝난 뒤 운영 활성화 절차를 진행한다.
-3. 정책 초안에 PostHog 수탁자·US 프로젝트의 실제 이전 국가/시점/방법/목적/항목/기간/거부 방법, 가명 회원 ID에 연결된 행동 및 화면 재구성 정보, localStorage에 방문자 식별자를 두는 것과 수집 중단 방법을 추가한다. 연락처 등 미확인 사실은 실제 계약으로 채운다.
-4. 팀 규칙의 일반 변경 7일, 중요 변경 30일 전 공지 중 **이번 변경은 30일을 확보하는 안**으로 서비스 공지를 게시한다. 실제 게시일을 D로 기록하고 D+30일 이후로 시행일을 정한다. 2026-09-26 기존 게시일에서 새 공지 기간을 소급 계산하지 않는다. 정책 승인·게시·동의 방식은 운영 담당자가 확정한다.
-5. 기간 경과, 정책 확정, 필요한 동의/거부 처리, 삭제 목록/담당자, 원격 Replay·retention·과금 설정, **Discard client IP data** 활성화와 QA가 모두 완료된 후에만 운영 변수를 true로 바꾼다. 이 변경을 자동 예약하지 않는다.
-6. 중단 시 원격 Replay off + ENABLED=false 재배포한다. 신규 수집 중단과 이미 저장된 데이터 삭제는 별도로 확인한다.
+1. 테스트 서버와 운영은 PostHog 프로젝트 하나를 함께 쓴다. 두 CodeBuild 환경에 `BIBBIDI_POSTHOG_ENABLED=true`, `BIBBIDI_POSTHOG_PROJECT_TOKEN`, `BIBBIDI_POSTHOG_HOST`를 넣는다. 테스트 서버는 `BIBBIDI_APP_ENV=development`를 넣고, 운영은 비워 두면 `production`이 들어간다.
+2. 값이 없거나 키가 없으면 초기화·저장·전송하지 않고 빌드는 성공한다. 배포 후 PostHog 이벤트 화면에서 `environment = production` 이벤트가 들어오는지 확인한다. 빌드 시 주입 값이라 변경 시 재빌드·재배포가 필요하다.
+3. 운영 수집은 처리방침 개정보다 먼저 켠다(2026-09-29 결정). 처리방침 개정은 후속 작업이다. 3번 위탁·국외 이전에 PostHog Inc.(미국)와 수집 항목(회원 ID, 행동 이벤트, 마스킹된 화면 녹화, 브라우저·기기, 유입 경로)·보관 기간을, 5번 자동 수집 장치에 localStorage 방문자 식별자와 거부 방법을 추가한다. 팀 규칙(일반 7일, 중요 30일 전)에 따라 서비스 공지를 게시한다.
+4. 중단 시 원격 Replay off + ENABLED=false 재배포한다. 신규 수집 중단과 이미 저장된 데이터 삭제는 별도로 확인한다.
 
-환경변수는 `FE/.env.example` 참고. 웹 프로젝트 token은 공개 수집용이며 Personal API key는 절대로 FE에 넣지 않는다. 운영 키/계정 생성·정책 게시·공지·활성화는 이번 코드 작업에서 수행하지 않는다.
+환경변수는 `FE/.env.example` 참고. 웹 프로젝트 token은 공개 수집용이며 Personal API key는 절대로 FE에 넣지 않는다. 처리방침 게시와 공지는 이번 코드 작업에서 수행하지 않는다.
 
 ## 광고 차단과 CloudFront 검토
 

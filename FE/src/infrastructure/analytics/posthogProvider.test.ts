@@ -31,6 +31,7 @@ function setup(initialId = "anonymous-1", enabled = true) {
       id = "anonymous-2";
     }),
     get_distinct_id: vi.fn(() => id),
+    register: vi.fn(),
     startSessionRecording: vi.fn(),
     stopSessionRecording: vi.fn(),
   };
@@ -191,6 +192,10 @@ describe("PostHog 사용자 여정", () => {
       expect.objectContaining({ auth_state: "guest" }),
     );
     expect(sdk.startSessionRecording).toHaveBeenCalled();
+    expect(sdk.register).toHaveBeenCalledWith({
+      environment: "test",
+      app_version: "test-sha",
+    });
   });
 
   it("기존 회원이 게스트가 되면 한 번만 reset하고 익명 탐색을 유지한다", () => {

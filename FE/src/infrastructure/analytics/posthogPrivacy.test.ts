@@ -123,6 +123,23 @@ describe("PostHog 개인정보 정제", () => {
       $initial_referring_domain: "m.instagram.com",
     });
   });
+  it("경로 집계용 속성은 공개 경로만 남기고 콜백 경로는 제거한다", () => {
+    const result = sanitizePostHogEvent({
+      uuid: "id",
+      event: "$pageview",
+      properties: {
+        $host: "dev.bibbidi.kr",
+        $pathname: "/checklist/",
+        $session_entry_host: "dev.bibbidi.kr",
+        $session_entry_pathname: "/auth/kakao",
+      },
+    });
+    expect(result?.properties).toEqual({
+      $host: "dev.bibbidi.kr",
+      $pathname: "/checklist",
+      $session_entry_host: "dev.bibbidi.kr",
+    });
+  });
   it("입력·텍스트·민감 속성·네트워크를 마스킹하고 이미지와 iframe을 차단한다", () => {
     expect(PRIVATE_REPLAY_CONFIG.maskAllInputs).toBe(true);
     expect(PRIVATE_REPLAY_CONFIG.maskTextSelector).toBe("*");

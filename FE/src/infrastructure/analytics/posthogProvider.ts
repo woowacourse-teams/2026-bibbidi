@@ -22,6 +22,7 @@ type PostHogSdk = Pick<
   | "identify"
   | "reset"
   | "get_distinct_id"
+  | "register"
   | "startSessionRecording"
   | "stopSessionRecording"
 >;
@@ -99,6 +100,11 @@ export function createPostHogProvider(
           return sanitizePostHogEvent(event);
         },
       });
+      // $identify 같은 SDK 이벤트에도 붙여 테스트 서버 기록을 환경으로 걸러낸다.
+      sdk.register({
+        environment: options.environment,
+        app_version: options.appVersion,
+      });
       initialized = true;
     },
     setContext(nextContext) {
@@ -151,8 +157,6 @@ export function createPostHogProvider(
         return;
       const properties = {
         ...event.parameters,
-        environment: options.environment,
-        app_version: options.appVersion,
         auth_state: isCallbackEvent ? "anonymous_callback" : context.authState,
         ...(event.name === "page_view"
           ? { $current_url: event.parameters.page_location }
