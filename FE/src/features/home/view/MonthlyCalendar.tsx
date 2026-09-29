@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { CalendarScheduleModel } from "../model/homeScheduleDashboard";
 import "./MonthlyCalendar.css";
 
 const DAYS_OF_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
@@ -7,6 +8,7 @@ const CALENDAR_CELL_COUNT = 42;
 
 interface MonthlyCalendarProps {
   referenceDate: string;
+  schedules?: readonly CalendarScheduleModel[];
 }
 
 function parseLocalDate(value: string) {
@@ -37,8 +39,22 @@ function CalendarArrowIcon({ direction }: { direction: "left" | "right" }) {
   );
 }
 
-export function MonthlyCalendar({ referenceDate }: MonthlyCalendarProps) {
+export function MonthlyCalendar({
+  referenceDate,
+  schedules = [],
+}: MonthlyCalendarProps) {
   const today = useMemo(() => parseLocalDate(referenceDate), [referenceDate]);
+  const schedulesByDate = useMemo(() => {
+    const groupedSchedules = new Map<string, CalendarScheduleModel[]>();
+
+    for (const schedule of schedules) {
+      const currentSchedules = groupedSchedules.get(schedule.date) ?? [];
+      currentSchedules.push(schedule);
+      groupedSchedules.set(schedule.date, currentSchedules);
+    }
+
+    return groupedSchedules;
+  }, [schedules]);
   const [visibleMonth, setVisibleMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
@@ -112,6 +128,11 @@ export function MonthlyCalendar({ referenceDate }: MonthlyCalendarProps) {
               {cells.slice(weekIndex * 7, weekIndex * 7 + 7).map((date) => {
                 const isCurrentMonth = date.getMonth() === month;
                 const isToday = isSameDate(date, today);
+                const dateTime = formatDateTime(date);
+                const dateSchedules = schedulesByDate.get(dateTime) ?? [];
+                const visibleSchedules = dateSchedules.slice(0, 2);
+                const remainingScheduleCount =
+                  dateSchedules.length - visibleSchedules.length;
                 return (
                   <td
                     className={[
@@ -120,15 +141,38 @@ export function MonthlyCalendar({ referenceDate }: MonthlyCalendarProps) {
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    key={formatDateTime(date)}
+                    key={dateTime}
                   >
                     <time
                       aria-current={isToday ? "date" : undefined}
                       aria-label={`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일${isToday ? ", 오늘" : ""}`}
-                      dateTime={formatDateTime(date)}
+                      dateTime={dateTime}
                     >
                       {date.getDate()}
                     </time>
+                    {visibleSchedules.length > 0 && (
+                      <ul
+                        aria-label={`${date.getMonth() + 1}월 ${date.getDate()}일 일정`}
+                        className="monthly-calendar__schedules"
+                      >
+                        {visibleSchedules.map((schedule) => (
+                          <li key={schedule.id}>
+                            <span
+                              aria-hidden="true"
+                              className="monthly-calendar__schedule-dot"
+                            />
+                            <span className="monthly-calendar__schedule-title">
+                              {schedule.title}
+                            </span>
+                          </li>
+                        ))}
+                        {remainingScheduleCount > 0 && (
+                          <li className="monthly-calendar__schedule-more">
+                            +{remainingScheduleCount}
+                          </li>
+                        )}
+                      </ul>
+                    )}
                   </td>
                 );
               })}

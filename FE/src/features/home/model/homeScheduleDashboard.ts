@@ -1,6 +1,12 @@
 import { RecommendedCatalogItemListModel } from "./recommendedCatalogItem";
 import { UnscheduledTaskListModel } from "./unscheduledTask";
 
+export interface CalendarScheduleModel {
+  date: string;
+  id: number;
+  title: string;
+}
+
 export interface HomeScheduleDashboardLoadingSectionModel {
   status: "loading";
 }

@@ -11,6 +11,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "../auth";
 import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistRequestAbortedError,
+  useMyChecklistQueryRepository,
+} from "../checklist";
+import type { MyChecklistQueryRepository } from "../checklist";
+import {
   PreparationAuthenticationRequiredError,
   usePreparationChecklistRepository,
 } from "../preparation";
@@ -35,6 +41,11 @@ vi.mock("../../infrastructure/analytics", () => ({
 
 vi.mock("../auth", () => ({
   useAuth: vi.fn(),
+}));
+vi.mock("../checklist", () => ({
+  MyChecklistAuthenticationRequiredError: class extends Error {},
+  MyChecklistRequestAbortedError: class extends Error {},
+  useMyChecklistQueryRepository: vi.fn(),
 }));
 vi.mock("../preparation", () => ({
   PreparationAuthenticationRequiredError: class extends Error {},
@@ -73,6 +84,9 @@ const checklistRepository: ChecklistRepository = {
   addCatalogItemIds: vi.fn().mockResolvedValue([]),
   getCatalogItemIds: vi.fn().mockResolvedValue([]),
 };
+const myChecklistRepository = {
+  getChecklist: vi.fn(),
+} as unknown as MyChecklistQueryRepository;
 
 const refreshAuth = vi.fn();
 
@@ -101,6 +115,12 @@ beforeEach(() => {
   vi.mocked(usePreparationChecklistRepository).mockReturnValue(
     checklistRepository,
   );
+  vi.mocked(useMyChecklistQueryRepository).mockReturnValue(
+    myChecklistRepository,
+  );
+  vi.mocked(myChecklistRepository.getChecklist)
+    .mockReset()
+    .mockResolvedValue({ exists: true, items: [] });
   vi.mocked(checklistRepository.addCatalogItemIds)
     .mockReset()
     .mockResolvedValue([]);
@@ -156,11 +176,138 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(
       recommendedRepository.getRecommendedCatalogItems,
     ).not.toHaveBeenCalled();
+    expect(myChecklistRepository.getChecklist).not.toHaveBeenCalled();
   });
 
-  it("unmount 시 진행 중인 개인화 요청을 취소한다", () => {
+  it("로그인 사용자의 체크리스트 일정을 해당 날짜에 표시한다", async () => {
+    vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [
+        {
+          appointments: [
+            {
+              date: "2026-09-16",
+              endTime: null,
+              id: 91,
+              isDone: false,
+              memo: null,
+              place: "비비디 웨딩홀",
+              startTime: "2026-09-16T14:00:00",
+              title: "웨딩홀 상담",
+            },
+          ],
+          categoryId: 1,
+          createdAt: "2026-09-01T09:00:00",
+          id: 10,
+          sourceCatalogItemId: 100,
+          status: "continue",
+          title: "웨딩홀 알아보기",
+        },
+      ],
+    });
+
+    render(
+      <HomeScheduleDashboardFeature
+        getReferenceDate={() => "2026-09-16"}
+        recommendedRepository={createRecommendedRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    const dateCell = screen
+      .getByLabelText("2026년 9월 16일, 오늘")
+      .closest("td");
+
+    expect(await within(dateCell!).findByText("웨딩홀 상담")).toBeTruthy();
+    expect(myChecklistRepository.getChecklist).toHaveBeenCalledWith(
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("로그인 사용자가 바뀌면 이전 사용자의 일정을 즉시 숨긴다", async () => {
+    vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
+      exists: true,
+      items: [
+        {
+          appointments: [
+            {
+              date: "2026-09-16",
+              endTime: null,
+              id: 91,
+              isDone: false,
+              memo: null,
+              place: null,
+              startTime: null,
+              title: "첫 사용자 일정",
+            },
+          ],
+          categoryId: 1,
+          createdAt: "2026-09-01T09:00:00",
+          id: 10,
+          sourceCatalogItemId: 100,
+          status: "continue",
+          title: "첫 사용자 할 일",
+        },
+      ],
+    });
+    const nextChecklistRepository = {
+      getChecklist: vi.fn().mockReturnValue(new Promise(() => undefined)),
+    } as unknown as MyChecklistQueryRepository;
+    const createDashboard = () => (
+      <HomeScheduleDashboardFeature
+        getReferenceDate={() => "2026-09-16"}
+        recommendedRepository={createRecommendedRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />
+    );
+    const { rerender } = render(createDashboard());
+
+    expect(await screen.findByText("첫 사용자 일정")).toBeTruthy();
+
+    vi.mocked(useAuth).mockReturnValue({
+      authState: {
+        status: "authenticated",
+        user: { id: 2, nickname: "새 사용자" },
+      },
+      beginAuthentication: vi.fn(),
+      beginOnboarding: vi.fn(),
+      completeAuthentication: vi.fn(),
+      endAuthentication: vi.fn(),
+      failAuthentication: vi.fn(),
+      requireAccountSetup: vi.fn(),
+      refreshAuth,
+    });
+    vi.mocked(useMyChecklistQueryRepository).mockReturnValue(
+      nextChecklistRepository,
+    );
+    rerender(createDashboard());
+
+    expect(screen.queryByText("첫 사용자 일정")).toBeNull();
+    expect(nextChecklistRepository.getChecklist).toHaveBeenCalledOnce();
+  });
+
+  it("체크리스트 인증 오류에서 세션을 갱신하고 캘린더를 유지한다", async () => {
+    vi.mocked(myChecklistRepository.getChecklist).mockRejectedValue(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+
+    render(
+      <HomeScheduleDashboardFeature
+        recommendedRepository={createRecommendedRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+
+    await waitFor(() => expect(refreshAuth).toHaveBeenCalledOnce());
+    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
+  });
+
+  it("unmount 시 진행 중인 개인화와 체크리스트 요청을 취소한다", () => {
     const unscheduledRepository = createUnscheduledRepository();
     vi.mocked(unscheduledRepository.getUnscheduledTasks).mockReturnValue(
+      new Promise(() => undefined),
+    );
+    vi.mocked(myChecklistRepository.getChecklist).mockReturnValue(
       new Promise(() => undefined),
     );
     const { unmount } = render(
@@ -172,10 +319,31 @@ describe("HomeScheduleDashboardFeature", () => {
     const unscheduledSignal = vi.mocked(
       unscheduledRepository.getUnscheduledTasks,
     ).mock.calls[0][0];
+    const checklistSignal = vi.mocked(myChecklistRepository.getChecklist).mock
+      .calls[0][0];
 
     expect(unscheduledSignal?.aborted).toBe(false);
+    expect(checklistSignal?.aborted).toBe(false);
     unmount();
     expect(unscheduledSignal?.aborted).toBe(true);
+    expect(checklistSignal?.aborted).toBe(true);
+  });
+
+  it("체크리스트 호출자 취소는 인증 상태를 갱신하지 않는다", async () => {
+    vi.mocked(myChecklistRepository.getChecklist).mockRejectedValue(
+      new MyChecklistRequestAbortedError(),
+    );
+
+    render(
+      <HomeScheduleDashboardFeature
+        recommendedRepository={createRecommendedRepository()}
+        unscheduledRepository={createUnscheduledRepository()}
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(refreshAuth).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
   });
 
   it("일정이 필요한 할 일의 Loading에서 API 순서와 상태 라벨을 유지한 Complete 목록으로 전환한다", async () => {

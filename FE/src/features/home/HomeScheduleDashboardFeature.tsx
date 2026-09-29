@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
+import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistRequestAbortedError,
+  useMyChecklistQueryRepository,
+} from "../checklist";
 import { usePreparationChecklistRepository } from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import {
@@ -9,6 +14,7 @@ import {
   unscheduledTasksRepository,
 } from "./homeDependencies";
 import {
+  CalendarScheduleModel,
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
@@ -53,6 +59,11 @@ interface HomeScheduleDashboardFeatureProps {
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
+interface CalendarSchedulesState {
+  authScope: string;
+  schedules: CalendarScheduleModel[];
+}
+
 export function HomeScheduleDashboardFeature({
   getReferenceDate = getLocalDate,
   recommendedRepository = recommendedCatalogItemsRepository,
@@ -64,6 +75,9 @@ export function HomeScheduleDashboardFeature({
       ? `authenticated:${authState.user.id}`
       : authState.status;
   const checklistRepository = usePreparationChecklistRepository();
+  const myChecklistRepository = useMyChecklistQueryRepository();
+  const [calendarSchedules, setCalendarSchedules] =
+    useState<CalendarSchedulesState>({ authScope: "", schedules: [] });
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
@@ -72,6 +86,51 @@ export function HomeScheduleDashboardFeature({
     useState(0);
   const [recommendedRequestRevision, setRecommendedRequestRevision] =
     useState(0);
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    myChecklistRepository.getChecklist(controller.signal).then(
+      (checklist) => {
+        if (!isActive) {
+          return;
+        }
+
+        setCalendarSchedules({
+          authScope,
+          schedules: checklist.items.flatMap((item) =>
+            item.appointments.map((appointment) => ({
+              date: appointment.date,
+              id: appointment.id,
+              title: appointment.title,
+            })),
+          ),
+        });
+      },
+      (error: unknown) => {
+        if (!isActive || error instanceof MyChecklistRequestAbortedError) {
+          return;
+        }
+
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
+          refreshAuth();
+          return;
+        }
+
+        setCalendarSchedules({ authScope, schedules: [] });
+      },
+    );
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [authState.status, authScope, myChecklistRepository, refreshAuth]);
+
   useEffect(() => {
     if (authState.status !== "authenticated") {
       return;
@@ -235,6 +294,11 @@ export function HomeScheduleDashboardFeature({
       onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
       referenceDate={getReferenceDate()}
+      schedules={
+        calendarSchedules.authScope === authScope
+          ? calendarSchedules.schedules
+          : []
+      }
       viewModel={viewModel}
     />
   );
