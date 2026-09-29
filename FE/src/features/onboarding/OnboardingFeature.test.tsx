@@ -12,6 +12,7 @@ import {
   resetWebAuthSessionForTest,
 } from "../../infrastructure/auth/webSessionManager";
 import { OnboardingFeature } from "./OnboardingFeature";
+import { analytics } from "../../infrastructure/analytics";
 
 const requiredTerms = [
   {
@@ -47,12 +48,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   resetWebAuthSessionForTest();
   vi.unstubAllGlobals();
 });
 
 describe("OnboardingFeature", () => {
   it("약관 전문과 전체 동의를 제공하고 동의 후 새 토큰을 반영한다", async () => {
+    const track = vi.spyOn(analytics, "track");
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
@@ -98,6 +101,10 @@ describe("OnboardingFeature", () => {
     fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: "onboarding_terms_complete",
+      parameters: {},
+    });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/users/me/terms-agreement");
     expect(fetchMock.mock.calls[1]?.[1]).toEqual(

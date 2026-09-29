@@ -31,6 +31,8 @@ describe("AppPageViewTracker", () => {
     );
     const analytics: AnalyticsClient = {
       initialize: vi.fn(),
+      setContext: vi.fn(),
+      reset: vi.fn(),
       track: vi.fn(),
     };
     const router = createMemoryRouter(appRoutes, {

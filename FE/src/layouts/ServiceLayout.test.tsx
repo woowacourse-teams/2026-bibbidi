@@ -23,6 +23,8 @@ const analyticsMocks = vi.hoisted(() => ({
 vi.mock("../infrastructure/analytics", () => ({
   analytics: {
     initialize: vi.fn(),
+    setContext: vi.fn(),
+    reset: vi.fn(),
     track: analyticsMocks.track,
   },
 }));
@@ -111,7 +113,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -283,7 +287,9 @@ describe("ServiceLayout", () => {
 
     await act(async () => {
       resolveCurrentUser(
-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+          status: 200,
+        }),
       );
     });
 
@@ -323,7 +329,7 @@ describe("ServiceLayout", () => {
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
     installLegacyWebSessionFetch(
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
+        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
           status: 200,
         }),
       ),
@@ -363,7 +369,7 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
             status: 200,
           }),
         );
@@ -517,7 +523,7 @@ describe("ServiceLayout", () => {
         currentUserRequests += 1;
         return Promise.resolve(
           currentUserRequests === 1
-            ? new Response(JSON.stringify({ nickname: "비비디" }), {
+            ? new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
                 status: 200,
               })
             : new Response(
@@ -555,7 +561,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -606,7 +614,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -673,7 +683,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -819,7 +831,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -928,7 +940,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -1035,7 +1047,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -1137,7 +1149,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );

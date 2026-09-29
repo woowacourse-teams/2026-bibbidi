@@ -271,6 +271,11 @@ export function useChecklistAppointmentCreation({
     isOpen: isCurrentContext && isOpen,
     open: (source = "checklist") => {
       if (isAuthenticated && checklistItemId !== null) {
+        if (!isOpen)
+          analytics.track({
+            name: "appointment_form_view",
+            parameters: { source },
+          });
         sourceRef.current = source;
         setIsOpen(true);
       }
@@ -291,8 +296,18 @@ export function useChecklistAppointmentCreation({
       const firstError = getFirstAppointmentErrorField(nextErrors);
 
       if (firstError) {
+        analytics.track({
+          name: "appointment_create_failed",
+          parameters: { source: sourceRef.current, failure_kind: "validation" },
+        });
         return firstError;
       }
+
+      if (!needsRefreshRef.current)
+        analytics.track({
+          name: "appointment_submit",
+          parameters: { source: sourceRef.current },
+        });
 
       const requestGeneration = requestGenerationRef.current + 1;
       requestGenerationRef.current = requestGeneration;
@@ -337,9 +352,22 @@ export function useChecklistAppointmentCreation({
           !requestController.signal.aborted &&
           !(error instanceof MyChecklistRequestAbortedError)
         ) {
+          const wasRefreshing = needsRefreshRef.current;
           needsRefreshRef.current =
             error instanceof AppointmentCreationError &&
             error.reason === "refresh-failed";
+          if (!wasRefreshing && !needsRefreshRef.current) {
+            analytics.track({
+              name: "appointment_create_failed",
+              parameters: {
+                source: sourceRef.current,
+                failure_kind:
+                  error instanceof AppointmentCreationError
+                    ? error.reason
+                    : "unknown",
+              },
+            });
+          }
           setSubmissionState({
             message:
               error instanceof AppointmentCreationError

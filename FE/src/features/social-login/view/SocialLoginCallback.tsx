@@ -1,4 +1,9 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { analytics } from "../../../infrastructure/analytics";
+import {
+  createSocialLoginEvent,
+  socialLoginFailureKind,
+} from "../analytics/socialLoginAnalytics";
 
 import { completeSocialLogin, SocialLoginApiError } from "../api/socialLogin";
 import {
@@ -41,13 +46,28 @@ export function SocialLoginCallback({
   const hasRequestedRef = useRef(false);
 
   useEffect(() => {
-    if (hasRequestedRef.current || params.status === "invalid" || !canRequest) {
+    if (hasRequestedRef.current) {
       return;
     }
     hasRequestedRef.current = true;
+    if (params.status === "invalid" || !canRequest) {
+      const cancelled =
+        new URLSearchParams(search).get("error") === "access_denied";
+      analytics.track(
+        createSocialLoginEvent("social_login_callback_failed", provider, {
+          failure_kind: cancelled ? "cancelled" : "invalid_callback",
+        }),
+      );
+      return;
+    }
 
     completeSocialLogin(provider, params.code, params.state)
       .then((session) => {
+        analytics.track(
+          createSocialLoginEvent("social_login_callback_complete", provider, {
+            terms_required: session.termsAgreementRequired,
+          }),
+        );
         onSuccess?.(session);
         setCallbackState({
           status: "success",
@@ -55,6 +75,11 @@ export function SocialLoginCallback({
         });
       })
       .catch((error: unknown) => {
+        analytics.track(
+          createSocialLoginEvent("social_login_callback_failed", provider, {
+            failure_kind: socialLoginFailureKind(error),
+          }),
+        );
         setCallbackState({
           status: "failure",
           message:
@@ -63,7 +88,7 @@ export function SocialLoginCallback({
               : INVALID_CALLBACK_MESSAGE,
         });
       });
-  }, [canRequest, onSuccess, params, provider]);
+  }, [canRequest, onSuccess, params, provider, search]);
 
   if (callbackState.status === "pending") {
     return (

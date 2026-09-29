@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 
 import loginCouplePreview from "../../../assets/login-couple-preview.png";
+import { analytics } from "../../../infrastructure/analytics";
+import {
+  createSocialLoginEvent,
+  socialLoginFailureKind,
+} from "../analytics/socialLoginAnalytics";
 import { startSocialAuthorization } from "../api/socialLogin";
 import { isConnectedSocialProvider } from "../model/socialLogin";
 import "./SocialLoginForm.css";
@@ -80,10 +85,16 @@ export function SocialLoginForm() {
     }
 
     setIsSocialRedirecting(true);
+    analytics.track(createSocialLoginEvent("social_login_start", provider.id));
     setSocialLoginNotice(`${provider.label} 로그인 화면으로 이동하고 있어요.`);
     startSocialAuthorization(provider.id)
       .then((authorizationUri) => window.location.assign(authorizationUri))
-      .catch(() => {
+      .catch((error: unknown) => {
+        analytics.track(
+          createSocialLoginEvent("social_login_start_failed", provider.id, {
+            failure_kind: socialLoginFailureKind(error),
+          }),
+        );
         setIsSocialRedirecting(false);
         setSocialLoginNotice(
           `${provider.label} 로그인을 시작하지 못했어요. 다시 시도해 주세요.`,

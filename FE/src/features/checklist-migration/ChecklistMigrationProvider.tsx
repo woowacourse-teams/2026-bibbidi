@@ -32,7 +32,7 @@ export function ChecklistMigrationProvider({
     authState.status === "authenticated" ||
     authState.status === "synchronizing" ||
     authState.status === "accountSetupRequired"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status;
 
   return (

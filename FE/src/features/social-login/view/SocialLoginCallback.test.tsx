@@ -3,8 +3,10 @@ import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SocialLoginCallback } from "./SocialLoginCallback";
+import { analytics } from "../../../infrastructure/analytics";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -30,6 +32,39 @@ function jsonResponse(body: unknown, status: number) {
 }
 
 describe("SocialLoginCallback", () => {
+  it.each([
+    ["?error=access_denied&error_description=secret", "cancelled"],
+    ["?code=secret", "invalid_callback"],
+  ])("콜백 입력 %s의 고정 실패 분류만 한 번 보낸다", async (search, kind) => {
+    const track = vi.spyOn(analytics, "track");
+    renderCallback("kakao", search);
+    await screen.findByRole("alert");
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: "social_login_callback_failed",
+      parameters: { provider: "kakao", failure_kind: kind },
+    });
+  });
+
+  it("208의 state 오류/만료를 구분할 수 있는 범위에서만 계측한다", async () => {
+    const track = vi.spyOn(analytics, "track");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ errorCode: 208, message: "secret" }, 401),
+        ),
+    );
+    renderCallback("google", "?code=secret&state=secret");
+    await screen.findByRole("alert");
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: "social_login_callback_failed",
+      parameters: {
+        provider: "google",
+        failure_kind: "state_invalid_or_expired",
+      },
+    });
+  });
   it("돌아온 code와 state를 서버에 한 번만 보낸다", async () => {
     const fetchMock = vi
       .fn()

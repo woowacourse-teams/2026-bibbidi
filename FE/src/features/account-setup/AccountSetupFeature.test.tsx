@@ -10,6 +10,7 @@ import {
 import { MyChecklistProvider } from "../checklist";
 import { AccountSetupFeature } from "./AccountSetupFeature";
 import { clearAccountSetupProgress } from "./model/accountSetupProgress";
+import { analytics } from "../../infrastructure/analytics";
 
 function accessToken(userId: string): string {
   const payload = btoa(
@@ -69,12 +70,113 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   resetWebAuthSessionForTest();
   clearAccountSetupProgress();
   vi.unstubAllGlobals();
 });
 
 describe("AccountSetupFeature", () => {
+  it("입력 검증을 통과하지 못하면 이전 제출 이벤트를 보내지 않는다", () => {
+    const track = vi.spyOn(analytics, "track");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    renderFeature();
+    selectLegacyAccount();
+    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
+    expect(track).toHaveBeenCalledWith({
+      name: "legacy_transfer_failed",
+      parameters: { failure_kind: "validation", outcome: "failed" },
+    });
+    expect(track).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "legacy_transfer_submit" }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("현재 회원 ID가 없으면 이전 제출 이벤트를 보내지 않는다", () => {
+    const track = vi.spyOn(analytics, "track");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { props } = renderFeature();
+    selectLegacyAccount();
+    fillLegacyAccount();
+    clearWebAccessToken();
+    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
+    expect(props.onAuthenticationExpired).toHaveBeenCalledOnce();
+    expect(track).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "legacy_transfer_submit" }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it.each([
+    { refreshedId: "10", outcome: "failed" },
+    { refreshedId: "", outcome: "unknown" },
+  ])(
+    "이전 응답 유실 후 회원 ID '$refreshedId'의 결과를 $outcome으로 기록한다",
+    async ({ refreshedId, outcome }) => {
+      const track = vi.spyOn(analytics, "track");
+      const fetchMock = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError("network failed"))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            accessToken: accessToken(refreshedId),
+            termsAgreementRequired: false,
+          }),
+        );
+      vi.stubGlobal("fetch", fetchMock);
+      renderFeature();
+      selectLegacyAccount();
+      fillLegacyAccount();
+      fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
+      await waitFor(() =>
+        expect(track).toHaveBeenCalledWith({
+          name: "legacy_transfer_failed",
+          parameters: { failure_kind: "network", outcome },
+        }),
+      );
+      const submitIndex = track.mock.calls.findIndex(
+        ([event]) => event.name === "legacy_transfer_submit",
+      );
+      expect(submitIndex).toBeGreaterThanOrEqual(0);
+      expect(
+        track.mock.calls.filter(
+          ([event]) => event.name === "legacy_transfer_submit",
+        ),
+      ).toHaveLength(1);
+      expect(track.mock.invocationCallOrder[submitIndex]).toBeLessThan(
+        fetchMock.mock.invocationCallOrder[0],
+      );
+    },
+  );
+  it("기존 회원 선택과 이전 실패를 입력 원문 없이 기록한다", async () => {
+    const track = vi.spyOn(analytics, "track");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ errorCode: 202, message: "secret" }, 401),
+        ),
+    );
+    renderFeature();
+    selectLegacyAccount();
+    fillLegacyAccount();
+    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
+    await waitFor(() =>
+      expect(track).toHaveBeenCalledWith({
+        name: "legacy_transfer_failed",
+        parameters: { failure_kind: "authentication", outcome: "failed" },
+      }),
+    );
+    expect(track).toHaveBeenCalledWith({
+      name: "account_setup_choice",
+      parameters: { choice: "legacy" },
+    });
+    expect(JSON.stringify(track.mock.calls)).not.toMatch(
+      /기존회원|bibbidi1234|secret/,
+    );
+  });
   it("기존 계정 입력을 선택하고 이전 선택으로 돌아간다", () => {
     const { unmount } = renderFeature();
 

@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { CurrentUserApiError, getCurrentUser } from "./api/getCurrentUser";
+import { analytics } from "../../infrastructure/analytics";
 import {
   clearWebAccessToken,
   hasWebAccessToken,
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     () =>
       subscribeAuthenticationRequired(() => {
         invalidateCurrentUserRequest();
+        analytics.reset();
         setAuthState({ status: "guest" });
       }),
     [invalidateCurrentUserRequest],
@@ -154,7 +156,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthState((currentState) => {
       if (
         currentState.status !== "synchronizing" ||
-        currentState.user.nickname !== user.nickname
+        currentState.user.id !== user.id
       ) {
         return currentState;
       }
@@ -167,7 +169,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthState((currentState) => {
       if (
         currentState.status !== "synchronizing" ||
-        currentState.user.nickname !== user.nickname
+        currentState.user.id !== user.id
       ) {
         return currentState;
       }
@@ -180,7 +182,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthState((currentState) => {
       if (
         currentState.status !== "synchronizing" ||
-        currentState.user.nickname !== user.nickname
+        currentState.user.id !== user.id
       ) {
         return currentState;
       }
@@ -192,6 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const endAuthentication = useCallback(() => {
     invalidateCurrentUserRequest();
     clearWebAccessToken();
+    analytics.reset();
     setAuthState({ status: "guest" });
   }, [invalidateCurrentUserRequest]);
 

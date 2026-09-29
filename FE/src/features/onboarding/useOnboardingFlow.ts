@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { analytics } from "../../infrastructure/analytics";
 
 import { acceptWebAccessToken, refreshWebSession } from "../auth";
 import { WebSessionExpiredError } from "../../infrastructure/auth/webSessionApi";
@@ -257,6 +258,7 @@ export function useOnboardingFlow({
       }
 
       if (termsWereAgreed && !controller.signal.aborted) {
+        analytics.track({ name: "onboarding_terms_complete", parameters: {} });
         onSuccess();
       }
     } finally {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { analytics } from "../../infrastructure/analytics";
 
 import {
   clearAccountSetupChoice,
@@ -23,12 +24,24 @@ export function useAccountSetupFlow({
   const [choice, setChoice] = useState(readAccountSetupChoice);
   const legacyAccount = useLegacyAccountTransfer({
     onAuthenticationExpired,
-    onSuccess,
+    onSuccess: () => {
+      analytics.track({
+        name: "account_setup_complete",
+        parameters: { choice: "legacy" },
+      });
+      onSuccess();
+    },
     onTermsRequired,
   });
   const newAccount = useNewAccountStart({
     onAuthenticationExpired,
-    onSuccess,
+    onSuccess: () => {
+      analytics.track({
+        name: "account_setup_complete",
+        parameters: { choice: "new" },
+      });
+      onSuccess();
+    },
   });
   const isSubmitting = legacyAccount.isSubmitting || newAccount.isSubmitting;
 
@@ -38,6 +51,10 @@ export function useAccountSetupFlow({
     }
 
     saveAccountSetupChoice(nextChoice);
+    analytics.track({
+      name: "account_setup_choice",
+      parameters: { choice: nextChoice },
+    });
     setChoice(nextChoice);
     legacyAccount.clearError();
     newAccount.clearError();

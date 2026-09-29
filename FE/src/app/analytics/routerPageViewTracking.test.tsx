@@ -24,6 +24,8 @@ const routes: RouteObject[] = [
 function createAnalyticsMock(): AnalyticsClient {
   return {
     initialize: vi.fn(),
+    setContext: vi.fn(),
+    reset: vi.fn(),
     track: vi.fn(),
   };
 }
@@ -142,6 +144,8 @@ describe("startRouterPageViewTracking", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/"] });
     const analytics: AnalyticsClient = {
       initialize: vi.fn(),
+      setContext: vi.fn(),
+      reset: vi.fn(),
       track: vi.fn(() => {
         throw new Error("Analytics 전송 실패");
       }),

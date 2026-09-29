@@ -73,7 +73,9 @@ describe("AuthProvider", () => {
         ),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+          status: 200,
+        }),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -146,7 +148,7 @@ describe("AuthProvider", () => {
         .fn()
         .mockResolvedValueOnce(expiredWebSessionResponse())
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
             status: 200,
           }),
         ),
@@ -224,7 +226,7 @@ describe("AuthProvider", () => {
       )
       .mockResolvedValueOnce(expiredWebSessionResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
+        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
           status: 200,
         }),
       );
@@ -273,7 +275,7 @@ describe("AuthProvider", () => {
 
     await act(async () => {
       resolveCurrentUser(
-        new Response(JSON.stringify({ nickname: "이전 사용자" }), {
+        new Response(JSON.stringify({ id: 1, nickname: "이전 사용자" }), {
           status: 200,
         }),
       );
@@ -288,7 +290,9 @@ describe("AuthProvider", () => {
       .fn()
       .mockResolvedValueOnce(expiredWebSessionResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+          status: 200,
+        }),
       )
       .mockImplementationOnce(() => new Promise<Response>(() => undefined));
     vi.stubGlobal("fetch", fetchMock);
