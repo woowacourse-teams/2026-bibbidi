@@ -1,20 +1,8 @@
-import {
-  MouseEvent,
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 
 import { AppHeaderSummaryFeature } from "../features/app-header";
-import {
-  createLoginPath,
-  LoginRequiredDialog,
-  PLANNER_RETURN_PATH,
-  useAuth,
-  useLogout,
-} from "../features/auth";
+import { useAuth, useLogout } from "../features/auth";
 import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
@@ -30,23 +18,6 @@ export function ServiceLayout() {
   }, [endAuthentication, navigate]);
   const logout = useLogout({ onSuccess: handleLogoutSuccess });
   const contentRef = useRef<HTMLDivElement>(null);
-  const [plannerDialogTrigger, setPlannerDialogTrigger] =
-    useState<HTMLAnchorElement | null>(null);
-  const isPlannerLoginDialogOpen = plannerDialogTrigger !== null;
-
-  const handlePlannerNavigation = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (authState.status === "authenticated") {
-      return;
-    }
-
-    event.preventDefault();
-
-    if (authState.status === "guest") {
-      setPlannerDialogTrigger(event.currentTarget);
-    }
-  };
-
-  const closePlannerLoginDialog = () => setPlannerDialogTrigger(null);
 
   useLayoutEffect(() => {
     if (contentRef.current) {
@@ -64,13 +35,8 @@ export function ServiceLayout() {
 
   return (
     <div className="service-layout">
-      <div
-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
-        className="service-layout__header"
-        inert={isPlannerLoginDialogOpen ? true : undefined}
-      >
+      <div className="service-layout__header">
         <AppHeader
-          onPlannerNavigation={handlePlannerNavigation}
           user={
             authState.status === "authenticated"
               ? {
@@ -93,34 +59,17 @@ export function ServiceLayout() {
       </div>
 
       <div
-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
         className="service-layout__content"
         data-page-scroll-container
-        inert={isPlannerLoginDialogOpen ? true : undefined}
         ref={contentRef}
       >
         <Outlet />
       </div>
 
-      <div
-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
-        className="service-layout__mobile-dock"
-        inert={isPlannerLoginDialogOpen ? true : undefined}
-      >
-        <AppBottomNavigation onPlannerNavigation={handlePlannerNavigation} />
+      <div className="service-layout__mobile-dock">
+        <AppBottomNavigation />
         <FeedbackFeature />
       </div>
-
-      {isPlannerLoginDialogOpen ? (
-        <LoginRequiredDialog
-          onClose={closePlannerLoginDialog}
-          onLogin={() => {
-            closePlannerLoginDialog();
-            navigate(createLoginPath(PLANNER_RETURN_PATH));
-          }}
-          returnFocusTo={plannerDialogTrigger}
-        />
-      ) : null}
     </div>
   );
 }

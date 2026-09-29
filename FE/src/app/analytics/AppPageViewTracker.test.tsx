@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("AppPageViewTracker", () => {
-  it("보호 경로의 인증 리다이렉트가 끝난 로그인 화면만 측정한다", async () => {
+  it("비로그인 사용자도 플래너 화면을 한 번만 측정한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -55,17 +55,17 @@ describe("AppPageViewTracker", () => {
     );
 
     expect(
-      await screen.findByRole("region", { name: "소셜 로그인" }),
+      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
     ).toBeTruthy();
     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",
       parameters: {
-        page_location: "https://bibbidi.example/login",
-        page_path: "/login",
+        page_location: "https://bibbidi.example/planner",
+        page_path: "/planner",
         page_referrer: "",
-        page_title: "로그인",
-        screen_name: "login",
+        page_title: "플래너",
+        screen_name: "planner",
       },
     });
   });
