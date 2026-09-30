@@ -1,0 +1,45 @@
+diff --git a/.github/workflows/backend-common-cd.yml b/.github/workflows/backend-common-cd.yml
+index 8f5ca18a0a79a3115e708c9f365b2bbbd08e7e83..38defd2a13f27053f5ae2b01b188c3581d732cca 100644
+--- a/.github/workflows/backend-common-cd.yml
++++ b/.github/workflows/backend-common-cd.yml
+@@ -154,6 +154,7 @@ jobs:
+         run: |
+           set -euo pipefail
+           cd /opt/bibbidi/app
++          export ALLOY_CONFIG_SHA=$(sha256sum "$ALLOY_CONFIG_PATH" | cut -c1-16)
+ 
+           PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
+ 
+@@ -172,6 +173,19 @@ jobs:
+           docker exec nginx nginx -t
+           docker exec nginx nginx -s reload
+ 
++          ALLOY_HEALTH=unknown
++          for _ in $(seq 1 60); do
++            ALLOY_HEALTH=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' alloy 2>/dev/null || true)
++            if [ "$ALLOY_HEALTH" = "healthy" ]; then
++              break
++            fi
++            sleep 1
++          done
++          if [ "$ALLOY_HEALTH" != "healthy" ]; then
++            echo "::warning::Alloy did not become healthy within 60 seconds (status: ${ALLOY_HEALTH:-unknown})"
++            docker compose logs --tail=100 alloy || true
++          fi
++
+           if ! curl \
+             --fail \
+             --silent \
+diff --git a/BE/compose.prod.yml b/BE/compose.prod.yml
+index 796f0607798bba7b2751c06e27504c55347f25a6..d2e64d404860c2e88e3649d664725f49f4eb337e 100644
+--- a/BE/compose.prod.yml
++++ b/BE/compose.prod.yml
+@@ -59,6 +59,8 @@ services:
+     image: grafana/alloy:v1.11.0
+     container_name: alloy
+     restart: unless-stopped
++    labels:
++      - "kr.bibbidi.alloy-config-sha=${ALLOY_CONFIG_SHA:-unset}"
+     env_file:
+       - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
+     command:

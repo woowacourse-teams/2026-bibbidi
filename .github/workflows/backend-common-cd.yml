@@ -154,6 +154,7 @@ jobs:
         run: |
           set -euo pipefail
           cd /opt/bibbidi/app
+          export ALLOY_CONFIG_SHA=$(sha256sum "$ALLOY_CONFIG_PATH" | cut -c1-16)
 
           PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
 
@@ -171,6 +172,19 @@ jobs:
           docker compose up -d backend nginx alloy dockerproxy
           docker exec nginx nginx -t
           docker exec nginx nginx -s reload
+
+          ALLOY_HEALTH=unknown
+          for _ in $(seq 1 60); do
+            ALLOY_HEALTH=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' alloy 2>/dev/null || true)
+            if [ "$ALLOY_HEALTH" = "healthy" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ALLOY_HEALTH" != "healthy" ]; then
+            echo "::warning::Alloy did not become healthy within 60 seconds (status: ${ALLOY_HEALTH:-unknown})"
+            docker compose logs --tail=100 alloy || true
+          fi
 
           if ! curl \
             --fail \
