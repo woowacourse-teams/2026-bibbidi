@@ -27,6 +27,11 @@ createRoot(rootElement).render(
       <ChecklistMigrationProvider>
         <AppPageViewTracker
           analytics={analytics}
+          landingPage={{
+            pathname: window.location.pathname,
+            search: window.location.search,
+            referrer: document.referrer,
+          }}
           origin={window.location.origin}
           router={router}
         >

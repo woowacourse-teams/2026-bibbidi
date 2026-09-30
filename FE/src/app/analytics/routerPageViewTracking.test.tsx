@@ -9,7 +9,12 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { AnalyticsClient } from "../../infrastructure/analytics";
-import { startRouterPageViewTracking } from "./routerPageViewTracking";
+import {
+  createRouterPageViewTrackingState,
+  startRouterPageViewTracking,
+  trackPageView,
+  type RouterPageViewTrackingState,
+} from "./routerPageViewTracking";
 
 const routes: RouteObject[] = [
   { path: "/", element: <h1>준비 목록</h1> },
@@ -30,13 +35,18 @@ function createAnalyticsMock(): AnalyticsClient {
   };
 }
 
-function renderTrackedRouter(initialEntries: string[], initialIndex?: number) {
+function renderTrackedRouter(
+  initialEntries: string[],
+  initialIndex?: number,
+  trackingState?: RouterPageViewTrackingState,
+) {
   const router = createMemoryRouter(routes, { initialEntries, initialIndex });
   const analytics = createAnalyticsMock();
   const unsubscribe = startRouterPageViewTracking(
     router,
     analytics,
     "https://bibbidi.example",
+    trackingState,
   );
 
   render(
@@ -149,6 +159,75 @@ describe("startRouterPageViewTracking", () => {
         screen_name: "checklist",
       },
     });
+  });
+
+  it("UTM 링크로 들어오면 첫 페이지뷰에만 원래 쿼리와 외부 referrer를 붙인다", async () => {
+    const utmQuery =
+      "?utm_source=threads&utm_medium=social&utm_campaign=bibbidi_promo&utm_content=post_02";
+    const { analytics, router } = renderTrackedRouter(
+      [`/${utmQuery}`],
+      undefined,
+      createRouterPageViewTrackingState({
+        pathname: "/",
+        search: utmQuery,
+        referrer: "https://www.threads.com/",
+      }),
+    );
+
+    await act(async () => router.navigate("/calendar"));
+
+    expect(
+      vi
+        .mocked(analytics.track)
+        .mock.calls.map(([event]) => [
+          event.parameters.page_location,
+          event.parameters.page_referrer,
+        ]),
+    ).toEqual([
+      [`https://bibbidi.example/${utmQuery}`, "https://www.threads.com/"],
+      ["https://bibbidi.example/calendar", "https://bibbidi.example/"],
+    ]);
+  });
+
+  it("소셜 로그인 콜백으로 들어오면 code·state와 제공자 referrer를 보내지 않는다", () => {
+    const { analytics } = renderTrackedRouter(
+      ["/"],
+      undefined,
+      createRouterPageViewTrackingState({
+        pathname: "/auth/kakao",
+        search: "?code=authorization-code&state=login-state",
+        referrer: "https://kauth.kakao.com/",
+      }),
+    );
+
+    expect(analytics.track).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        parameters: expect.objectContaining({
+          page_location: "https://bibbidi.example/",
+          page_referrer: "",
+        }),
+      }),
+    );
+  });
+
+  it("로그인 사용자가 바뀌어 다시 측정해도 첫 진입 정보는 다시 붙이지 않는다", () => {
+    const analytics = createAnalyticsMock();
+    const trackingState = createRouterPageViewTrackingState({
+      pathname: "/",
+      search: "?utm_source=instagram",
+      referrer: "https://l.instagram.com/",
+    });
+
+    trackPageView("/", analytics, "https://bibbidi.example", trackingState);
+    trackingState.lastTrackedPagePath = null;
+    trackPageView("/", analytics, "https://bibbidi.example", trackingState);
+
+    expect(vi.mocked(analytics.track).mock.lastCall?.[0].parameters).toEqual(
+      expect.objectContaining({
+        page_location: "https://bibbidi.example/",
+        page_referrer: "",
+      }),
+    );
   });
 
   it("Analytics 오류를 라우터 이동에서 격리한다", async () => {

@@ -54,4 +54,26 @@ describe("createPageViewEvent", () => {
       }).parameters.page_referrer,
     ).toBe("");
   });
+
+  it("첫 진입 주소의 쿼리와 외부 referrer를 GA 기본 수집처럼 그대로 담는다", () => {
+    expect(
+      createPageViewEvent({
+        origin: "https://bibbidi.example",
+        pagePath: "/",
+        referrerPath: null,
+        landingPage: {
+          pathname: "/",
+          search:
+            "?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+          referrer: "https://l.instagram.com/",
+        },
+      }).parameters,
+    ).toEqual(
+      expect.objectContaining({
+        page_location:
+          "https://bibbidi.example/?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+        page_referrer: "https://l.instagram.com/",
+      }),
+    );
+  });
 });
