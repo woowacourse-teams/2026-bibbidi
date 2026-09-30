@@ -5,6 +5,10 @@ const PAGE_DEFINITIONS = {
     pageTitle: "준비 목록",
     screenName: "preparation_catalog",
   },
+  "/preparation": {
+    pageTitle: "준비 목록",
+    screenName: "preparation_catalog",
+  },
   "/calendar": {
     pageTitle: "캘린더",
     screenName: "calendar",

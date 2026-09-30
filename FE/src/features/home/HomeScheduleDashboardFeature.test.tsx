@@ -495,11 +495,13 @@ describe("HomeScheduleDashboardFeature", () => {
       within(section)
         .getByRole("link", { name: "로드맵에서 할 일 찾기" })
         .getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     fireEvent.click(
       within(section).getByRole("link", { name: "로드맵에서 할 일 찾기" }),
     );
-    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/preparation",
+    );
     const addLinks = within(section).getAllByRole("link", {
       name: "일정 추가",
     });
@@ -534,11 +536,13 @@ describe("HomeScheduleDashboardFeature", () => {
       screen
         .getByRole("link", { name: "로드맵에서 할 일 찾기" })
         .getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     fireEvent.click(
       screen.getByRole("link", { name: "로드맵에서 할 일 찾기" }),
     );
-    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/preparation",
+    );
   });
 
   it("일정이 필요한 할 일 오류만 재시도하고 캘린더를 유지한다", async () => {
@@ -708,9 +712,11 @@ describe("HomeScheduleDashboardFeature", () => {
       within(section)
         .getByRole("link", { name: "로드맵 보기" })
         .getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     fireEvent.click(within(section).getByRole("link", { name: "로드맵 보기" }));
-    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/preparation",
+    );
   });
 
   it("추천 할 일 빈 응답을 Empty UI로 전환한다", async () => {
@@ -725,9 +731,11 @@ describe("HomeScheduleDashboardFeature", () => {
     expect(screen.getByRole("region", { name: "추천 할 일" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "로드맵 보기" }).getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     fireEvent.click(screen.getByRole("link", { name: "로드맵 보기" }));
-    expect(screen.getByTestId("dashboard-location").textContent).toBe("/");
+    expect(screen.getByTestId("dashboard-location").textContent).toBe(
+      "/preparation",
+    );
   });
 
   it("추천 항목을 저장소로 추가하고 체크리스트 캐시 흐름을 거쳐 추천 목록만 갱신한다", async () => {

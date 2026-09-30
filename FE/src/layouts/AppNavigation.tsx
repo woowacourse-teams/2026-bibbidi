@@ -3,7 +3,7 @@ export const appNavigationItems = [
     icon: "home",
     label: "로드맵",
     showInDesktopHeader: true,
-    to: "/",
+    to: "/preparation",
   },
   {
     icon: "checklist",
@@ -20,6 +20,10 @@ export const appNavigationItems = [
 ] as const;
 
 export type AppNavigationIconName = (typeof appNavigationItems)[number]["icon"];
+
+export function isAppNavigationItemActive(pathname: string, to: string) {
+  return pathname === to || (pathname === "/" && to === "/preparation");
+}
 
 export function AppNavigationIcon({ icon }: { icon: AppNavigationIconName }) {
   switch (icon) {

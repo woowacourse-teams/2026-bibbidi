@@ -45,7 +45,10 @@ export function RecommendedSchedule({
     >
       <header className="recommended-schedule__header">
         <h2 id="recommended-schedule-title">{viewModel.title}</h2>
-        <Link className="recommended-schedule__catalog-action" to="/">
+        <Link
+          className="recommended-schedule__catalog-action"
+          to="/preparation"
+        >
           {viewModel.catalogActionLabel}
           <ChevronRightIcon />
         </Link>

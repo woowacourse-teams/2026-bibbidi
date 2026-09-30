@@ -17,7 +17,7 @@ const routes: RouteObject[] = [
   { path: "/checklist", element: <h1>체크리스트</h1> },
   { path: "/login", element: <h1>로그인</h1> },
   { path: "/signup", element: <Navigate replace to="/login" /> },
-  { path: "/preparation", element: <Navigate replace to="/" /> },
+  { path: "/preparation", element: <h1>준비 목록</h1> },
   { path: "*", element: <Navigate replace to="/" /> },
 ];
 
@@ -98,7 +98,18 @@ describe("startRouterPageViewTracking", () => {
     });
   });
 
-  it.each(["/preparation", "/unknown?taskId=secret"])(
+  it("준비 목록 경로를 별도 화면으로 측정한다", () => {
+    const { analytics, router } = renderTrackedRouter(["/preparation"]);
+
+    expect(router.state.location.pathname).toBe("/preparation");
+    expect(analytics.track).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        parameters: expect.objectContaining({ page_path: "/preparation" }),
+      }),
+    );
+  });
+
+  it.each(["/unknown?taskId=secret"])(
     "리다이렉트 경로 %s 대신 최종 루트 화면만 측정한다",
     async (initialEntry) => {
       const { analytics, router } = renderTrackedRouter([initialEntry]);
