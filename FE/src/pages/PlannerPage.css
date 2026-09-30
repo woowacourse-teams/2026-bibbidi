@@ -16,6 +16,12 @@
   gap: 24px;
 }
 
+@media (min-width: 1201px) {
+  .planner-page__content {
+    padding-bottom: clamp(16px, calc(100dvh - 768px), 52px);
+  }
+}
+
 @media (max-width: 760px) {
   .planner-page__content {
     width: min(calc(100% - 32px), 1440px);
