@@ -11,7 +11,6 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # limit 제한은 차후 사용 패턴에 따라 변경되어야 합니다.
     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
     limit_req_status 429;
@@ -145,8 +144,30 @@ http {
             return 404;
         }
 
+        location ^~ /swagger-ui {
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+            deny all;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location = /docs/openapi3.yaml {
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+            deny all;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         location ^~ /h2-console {
-            allow ${H2_CONSOLE_ALLOWED_IP};
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
             deny all;
 
             add_header Strict-Transport-Security "max-age=31536000" always;
