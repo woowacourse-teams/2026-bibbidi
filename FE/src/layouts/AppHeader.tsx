@@ -1,4 +1,4 @@
-import { MouseEventHandler, ReactNode } from "react";
+import { ReactNode } from "react";
 import { NavLink } from "react-router";
 
 import "./AppHeader.css";
@@ -23,11 +23,10 @@ interface PendingUser {
 }
 
 interface AppHeaderProps {
-  onPlannerNavigation?: MouseEventHandler<HTMLAnchorElement>;
   user: AuthenticatedUser | GuestUser | PendingUser;
 }
 
-export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
+export function AppHeader({ user }: AppHeaderProps) {
   return (
     <header className="app-header">
       <div className="app-header__inner">
@@ -42,9 +41,6 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
                   className="app-header__navigation-item"
                   end={item.to === "/"}
                   key={item.to}
-                  onClick={
-                    item.to === "/planner" ? onPlannerNavigation : undefined
-                  }
                   to={item.to}
                 >
                   {item.label}

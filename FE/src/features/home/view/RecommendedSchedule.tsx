@@ -25,7 +25,7 @@ function PlusIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="recommended-schedule-card__plus"
+      className="recommended-schedule-item__plus"
       fill="none"
       viewBox="0 0 24 24"
     >
@@ -53,18 +53,22 @@ export function RecommendedSchedule({
 
       <ul className="recommended-schedule__list">
         {viewModel.items.map((item) => (
-          <li className="recommended-schedule-card" key={item.catalogItemId}>
-            <div className="recommended-schedule-card__top">
-              <span>{item.categoryLabel}</span>
+          <li className="recommended-schedule-item" key={item.catalogItemId}>
+            <div className="recommended-schedule-item__badges">
+              <span className="recommended-schedule-item__category">
+                {item.categoryLabel}
+              </span>
+              <span className="recommended-schedule-item__step">
+                {item.stepName}
+              </span>
             </div>
 
-            <div className="recommended-schedule-card__body">
+            <div className="recommended-schedule-item__body">
               <h3>{item.title}</h3>
-              <p>{item.stepName}</p>
             </div>
 
             <button
-              className="recommended-schedule-card__add-task"
+              className="recommended-schedule-item__add-task"
               disabled={item.isAddActionDisabled}
               onClick={() => onAddTask(item.catalogItemId)}
               type="button"
@@ -73,7 +77,7 @@ export function RecommendedSchedule({
               {item.addActionLabel}
             </button>
             {item.additionErrorMessage && (
-              <p className="recommended-schedule-card__error" role="alert">
+              <p className="recommended-schedule-item__error" role="alert">
                 {item.additionErrorMessage}
               </p>
             )}

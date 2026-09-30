@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { analytics } from "../../infrastructure/analytics";
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
-import { createPlannerAppointmentStartEvent } from "./analytics/checklistAnalytics";
+import { createCalendarAppointmentStartEvent } from "./analytics/checklistAnalytics";
 import {
   useChecklistCommandRepository,
   useChecklistCacheRepository,
@@ -115,7 +115,7 @@ export function ChecklistFeature({
         : undefined;
   const sessionIdentity =
     authState.status === "authenticated" || authState.status === "synchronizing"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status === "guest"
         ? "guest"
         : undefined;
@@ -516,8 +516,8 @@ export function ChecklistFeature({
     }
 
     openedAppointmentRequestRef.current = location.key;
-    appointmentCreation.open("planner");
-    analytics.track(createPlannerAppointmentStartEvent());
+    appointmentCreation.open("calendar");
+    analytics.track(createCalendarAppointmentStartEvent());
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);

@@ -5,8 +5,8 @@ import { createPageViewEvent, normalizePagePath } from "./pageView";
 describe("normalizePagePath", () => {
   it.each([
     ["/", "/"],
-    ["/planner", "/planner"],
-    ["/planner/", "/planner"],
+    ["/calendar", "/calendar"],
+    ["/calendar/", "/calendar"],
     ["/checklist", "/checklist"],
     ["/login", "/login"],
   ] as const)(
@@ -16,12 +16,15 @@ describe("normalizePagePath", () => {
     },
   );
 
-  it.each(["/preparation", "/signup", "/unknown", "/checklist/task-123"])(
-    "리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다",
-    (pathname) => {
-      expect(normalizePagePath(pathname)).toBeNull();
-    },
-  );
+  it.each([
+    "/preparation",
+    "/planner",
+    "/signup",
+    "/unknown",
+    "/checklist/task-123",
+  ])("리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다", (pathname) => {
+    expect(normalizePagePath(pathname)).toBeNull();
+  });
 });
 
 describe("createPageViewEvent", () => {
@@ -30,14 +33,14 @@ describe("createPageViewEvent", () => {
       createPageViewEvent({
         origin: "https://bibbidi.example",
         pagePath: "/checklist",
-        referrerPath: "/planner",
+        referrerPath: "/calendar",
       }),
     ).toEqual({
       name: "page_view",
       parameters: {
         page_location: "https://bibbidi.example/checklist",
         page_path: "/checklist",
-        page_referrer: "https://bibbidi.example/planner",
+        page_referrer: "https://bibbidi.example/calendar",
         page_title: "체크리스트",
         screen_name: "checklist",
       },

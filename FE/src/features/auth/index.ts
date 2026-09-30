@@ -9,10 +9,4 @@ export {
 } from "../../infrastructure/auth/webSessionManager";
 export { createLogoutEvent } from "./analytics/authAnalytics";
 export { useLogout } from "./useLogout";
-export { LoginRequiredDialog } from "./LoginRequiredDialog";
-export { PlannerAccessGuard } from "./PlannerAccessGuard";
-export {
-  createLoginPath,
-  getSafeLoginReturnPath,
-  PLANNER_RETURN_PATH,
-} from "./model/loginReturnPath";
+export { getSafeLoginReturnPath } from "./model/loginReturnPath";

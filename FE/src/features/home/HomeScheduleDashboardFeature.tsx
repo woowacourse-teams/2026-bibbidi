@@ -2,24 +2,24 @@ import { useCallback, useEffect, useState } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
+import {
+  MyChecklistAuthenticationRequiredError,
+  type MyChecklistQueryRepository,
+  MyChecklistRequestAbortedError,
+  useMyChecklistQueryRepository,
+} from "../checklist";
 import { usePreparationChecklistRepository } from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import {
-  nearbyAppointmentsRepository,
   recommendedCatalogItemsRepository,
   unscheduledTasksRepository,
 } from "./homeDependencies";
 import {
+  CalendarScheduleModel,
   HomeScheduleDashboardModel,
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
-  HomeScheduleDashboardUpcomingModel,
 } from "./model/homeScheduleDashboard";
-import { NearbyAppointmentsRepository } from "./repository/nearbyAppointmentsRepository";
-import {
-  NearbyAppointmentsAuthenticationRequiredError,
-  NearbyAppointmentsRequestAbortedError,
-} from "./repository/nearbyAppointmentsRepository";
 import {
   RecommendedCatalogItemsAuthenticationRequiredError,
   RecommendedCatalogItemsRepository,
@@ -31,7 +31,10 @@ import {
   UnscheduledTasksRequestAbortedError,
 } from "./repository/unscheduledTasksRepository";
 import { createHomeScheduleDashboardViewModel } from "./view-model/createHomeScheduleDashboardViewModel";
-import { HomeScheduleDashboard } from "./view/HomeScheduleDashboard";
+import {
+  GuestHomeScheduleDashboard,
+  HomeScheduleDashboard,
+} from "./view/HomeScheduleDashboard";
 import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
 
 const initialModel: HomeScheduleDashboardModel = {
@@ -39,9 +42,6 @@ const initialModel: HomeScheduleDashboardModel = {
     status: "loading",
   },
   unscheduled: {
-    status: "loading",
-  },
-  upcoming: {
     status: "loading",
   },
 };
@@ -56,72 +56,90 @@ function getLocalDate(now = new Date()) {
 
 interface HomeScheduleDashboardFeatureProps {
   getReferenceDate?: () => string;
-  nearbyRepository?: NearbyAppointmentsRepository;
   recommendedRepository?: RecommendedCatalogItemsRepository;
   unscheduledRepository?: UnscheduledTasksRepository;
 }
 
+type AuthenticatedAuthState = Extract<
+  ReturnType<typeof useAuth>["authState"],
+  { status: "authenticated" }
+>;
+
+interface CalendarSchedulesState {
+  authentication: AuthenticatedAuthState | null;
+  repository: MyChecklistQueryRepository | null;
+  schedules: CalendarScheduleModel[];
+}
+
 export function HomeScheduleDashboardFeature({
   getReferenceDate = getLocalDate,
-  nearbyRepository = nearbyAppointmentsRepository,
   recommendedRepository = recommendedCatalogItemsRepository,
   unscheduledRepository = unscheduledTasksRepository,
 }: HomeScheduleDashboardFeatureProps) {
   const { authState, refreshAuth } = useAuth();
   const authScope =
     authState.status === "authenticated"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status;
   const checklistRepository = usePreparationChecklistRepository();
+  const myChecklistRepository = useMyChecklistQueryRepository();
+  const authentication =
+    authState.status === "authenticated" ? authState : null;
+  const [calendarSchedules, setCalendarSchedules] =
+    useState<CalendarSchedulesState>({
+      authentication: null,
+      repository: null,
+      schedules: [],
+    });
   const [unscheduled, setUnscheduled] =
     useState<HomeScheduleDashboardUnscheduledModel>(initialModel.unscheduled);
   const [recommended, setRecommended] =
     useState<HomeScheduleDashboardRecommendedModel>(initialModel.recommended);
-  const [upcoming, setUpcoming] = useState<HomeScheduleDashboardUpcomingModel>(
-    initialModel.upcoming,
-  );
   const [unscheduledRequestRevision, setUnscheduledRequestRevision] =
     useState(0);
   const [recommendedRequestRevision, setRecommendedRequestRevision] =
     useState(0);
-  const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
-
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
-    nearbyRepository.getNearbyAppointments(controller.signal).then(
-      (schedules) => {
+    myChecklistRepository.getChecklist(controller.signal).then(
+      (checklist) => {
         if (!isActive) {
           return;
         }
 
-        setUpcoming(
-          schedules.length === 0
-            ? { status: "empty" }
-            : {
-                schedules: {
-                  referenceDate: getReferenceDate(),
-                  schedules,
-                },
-                status: "complete",
-              },
-        );
+        setCalendarSchedules({
+          authentication,
+          repository: myChecklistRepository,
+          schedules: checklist.items.flatMap((item) =>
+            item.appointments.map((appointment) => ({
+              date: appointment.date,
+              id: appointment.id,
+              title: appointment.title,
+            })),
+          ),
+        });
       },
       (error: unknown) => {
-        if (
-          !isActive ||
-          error instanceof NearbyAppointmentsRequestAbortedError
-        ) {
+        if (!isActive || error instanceof MyChecklistRequestAbortedError) {
           return;
         }
 
-        if (error instanceof NearbyAppointmentsAuthenticationRequiredError) {
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
           refreshAuth();
           return;
         }
 
-        setUpcoming({ status: "error" });
+        setCalendarSchedules({
+          authentication,
+          repository: myChecklistRepository,
+          schedules: [],
+        });
       },
     );
 
@@ -130,14 +148,18 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
-    getReferenceDate,
-    nearbyRepository,
+    authentication,
+    myChecklistRepository,
     refreshAuth,
-    upcomingRequestRevision,
   ]);
 
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -175,6 +197,7 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
     refreshAuth,
     unscheduledRepository,
@@ -182,6 +205,10 @@ export function HomeScheduleDashboardFeature({
   ]);
 
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -221,16 +248,12 @@ export function HomeScheduleDashboardFeature({
       controller.abort();
     };
   }, [
+    authState.status,
     authScope,
     recommendedRepository,
     recommendedRequestRevision,
     refreshAuth,
   ]);
-
-  const retryUpcoming = useCallback(() => {
-    setUpcoming({ status: "loading" });
-    setUpcomingRequestRevision((revision) => revision + 1);
-  }, []);
 
   const retryUnscheduled = useCallback(() => {
     setUnscheduled({ status: "loading" });
@@ -257,7 +280,7 @@ export function HomeScheduleDashboardFeature({
             categoryName: item.category,
             itemCount,
             phase: item.phase,
-            source: "planner_recommendation",
+            source: "calendar_recommendation",
           }),
         );
       }
@@ -276,21 +299,32 @@ export function HomeScheduleDashboardFeature({
   });
 
   const viewModel = createHomeScheduleDashboardViewModel(
-    {
-      ...initialModel,
-      recommended,
-      unscheduled,
-      upcoming,
-    },
+    authState.status === "authenticated"
+      ? {
+          recommended,
+          unscheduled,
+        }
+      : initialModel,
     { recommendedTaskAddition },
   );
+
+  if (authState.status === "guest") {
+    return <GuestHomeScheduleDashboard referenceDate={getReferenceDate()} />;
+  }
 
   return (
     <HomeScheduleDashboard
       onAddRecommendedTask={recommendedTaskAddition.add}
       onRetryRecommended={retryRecommended}
       onRetryUnscheduled={retryUnscheduled}
-      onRetryUpcoming={retryUpcoming}
+      referenceDate={getReferenceDate()}
+      schedules={
+        authentication !== null &&
+        calendarSchedules.authentication === authentication &&
+        calendarSchedules.repository === myChecklistRepository
+          ? calendarSchedules.schedules
+          : []
+      }
       viewModel={viewModel}
     />
   );

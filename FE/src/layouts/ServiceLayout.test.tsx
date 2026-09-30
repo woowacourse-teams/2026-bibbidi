@@ -23,6 +23,8 @@ const analyticsMocks = vi.hoisted(() => ({
 vi.mock("../infrastructure/analytics", () => ({
   analytics: {
     initialize: vi.fn(),
+    setContext: vi.fn(),
+    reset: vi.fn(),
     track: analyticsMocks.track,
   },
 }));
@@ -111,7 +113,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -283,14 +287,16 @@ describe("ServiceLayout", () => {
 
     await act(async () => {
       resolveCurrentUser(
-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+          status: 200,
+        }),
       );
     });
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
   });
 
-  it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
+  it("인증 확인 중에도 캘린더 링크로 이동한다", () => {
     installLegacyWebSessionFetch(vi.fn(() => new Promise(() => undefined)));
 
     renderServiceLayout(
@@ -304,26 +310,36 @@ describe("ServiceLayout", () => {
             </>
           }
         />
-        <Route path="/planner" element={<div>플래너 화면</div>} />
+        <Route
+          path="/calendar"
+          element={
+            <>
+              <div>캘린더 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
       </>,
     );
 
     fireEvent.click(
       within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
         "link",
-        { name: "플래너" },
+        { name: "캘린더" },
       ),
     );
 
-    expect(screen.getByTestId("service-location").textContent).toBe("/");
-    expect(screen.queryByText("플래너 화면")).toBeNull();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/calendar",
+    );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
     installLegacyWebSessionFetch(
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
+        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
           status: 200,
         }),
       ),
@@ -363,7 +379,7 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
             status: 200,
           }),
         );
@@ -425,7 +441,7 @@ describe("ServiceLayout", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("비로그인 플래너 링크는 이동 없이 로그인 안내를 열고 배경을 비활성화한다", async () => {
+  it("비로그인 캘린더 링크는 로그인 안내 없이 캘린더로 이동한다", async () => {
     installLegacyWebSessionFetch(
       vi
         .fn()
@@ -437,7 +453,7 @@ describe("ServiceLayout", () => {
         ),
     );
 
-    const { container } = renderServiceLayout(
+    renderServiceLayout(
       <>
         <Route
           path="/"
@@ -448,66 +464,31 @@ describe("ServiceLayout", () => {
             </>
           }
         />
-        <Route path="/login" element={<LocationDisplay />} />
+        <Route
+          path="/calendar"
+          element={
+            <>
+              <div>캘린더 화면</div>
+              <LocationDisplay />
+            </>
+          }
+        />
       </>,
     );
     const desktopNavigation = await screen.findByRole("navigation", {
       name: "주요 메뉴",
     });
-    const plannerLink = within(desktopNavigation).getByRole("link", {
-      name: "플래너",
+    const calendarLink = within(desktopNavigation).getByRole("link", {
+      name: "캘린더",
     });
 
-    fireEvent.click(plannerLink);
-
-    expect(screen.getByTestId("service-location").textContent).toBe("/");
-    expect(
-      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
-    ).toBeTruthy();
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "취소" }),
-    );
-    expect(
-      container.querySelector(".service-layout__header")?.hasAttribute("inert"),
-    ).toBe(true);
-    expect(
-      container
-        .querySelector(".service-layout__header")
-        ?.getAttribute("aria-hidden"),
-    ).toBe("true");
-    expect(
-      container
-        .querySelector(".service-layout__content")
-        ?.hasAttribute("inert"),
-    ).toBe(true);
-    expect(
-      container
-        .querySelector(".service-layout__content")
-        ?.getAttribute("aria-hidden"),
-    ).toBe("true");
-    expect(
-      container
-        .querySelector(".service-layout__mobile-dock")
-        ?.hasAttribute("inert"),
-    ).toBe(true);
-    expect(
-      container
-        .querySelector(".service-layout__mobile-dock")
-        ?.getAttribute("aria-hidden"),
-    ).toBe("true");
-
-    fireEvent.click(screen.getByRole("button", { name: "취소" }));
-    await waitFor(() => expect(document.activeElement).toBe(plannerLink));
-
-    const mobilePlannerLink = within(
-      screen.getByRole("navigation", { name: "하단 메뉴" }),
-    ).getByRole("link", { name: "플래너" });
-    fireEvent.click(mobilePlannerLink);
-    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+    fireEvent.click(calendarLink);
 
     expect(screen.getByTestId("service-location").textContent).toBe(
-      "/login?returnTo=%2Fplanner",
+      "/calendar",
     );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("체크리스트 인증 만료 시 로그인 상태를 다시 확인한다", async () => {
@@ -517,7 +498,7 @@ describe("ServiceLayout", () => {
         currentUserRequests += 1;
         return Promise.resolve(
           currentUserRequests === 1
-            ? new Response(JSON.stringify({ nickname: "비비디" }), {
+            ? new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
                 status: 200,
               })
             : new Response(
@@ -555,7 +536,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -606,7 +589,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -673,7 +658,9 @@ describe("ServiceLayout", () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
         );
       }
 
@@ -819,7 +806,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -928,7 +915,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -1035,7 +1022,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );
@@ -1137,7 +1124,7 @@ describe("ServiceLayout", () => {
       .mockImplementation((url: string, init?: RequestInit) => {
         if (url === "/api/users/me") {
           return Promise.resolve(
-            new Response(JSON.stringify({ nickname: "비비디" }), {
+            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
               status: 200,
             }),
           );

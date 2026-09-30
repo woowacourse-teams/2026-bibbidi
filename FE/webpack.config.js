@@ -25,6 +25,7 @@ module.exports = (_environment, arguments_) => {
   const apiProxyTarget = process.env.BIBBIDI_API_PROXY_TARGET;
   const googleAnalyticsMeasurementId =
     process.env.BIBBIDI_GA_MEASUREMENT_ID ?? "";
+  const posthogEnabled = process.env.BIBBIDI_POSTHOG_ENABLED === "true";
 
   if (!isProduction && !apiProxyTarget) {
     throw new Error("BIBBIDI_API_PROXY_TARGET 환경변수가 필요합니다.");
@@ -45,6 +46,8 @@ module.exports = (_environment, arguments_) => {
 
     resolve: {
       extensions: [".tsx", ".ts", ".js"],
+      // 비활성 배포에는 초기화뿐 아니라 SDK 코드 자체도 포함하지 않는다.
+      alias: posthogEnabled ? {} : { "posthog-js$": false },
     },
 
     module: {
@@ -79,6 +82,22 @@ module.exports = (_environment, arguments_) => {
         minify: isProduction,
       }),
       new webpack.DefinePlugin({
+        __BIBBIDI_POSTHOG_ENABLED__: JSON.stringify(posthogEnabled),
+        __BIBBIDI_POSTHOG_PROJECT_TOKEN__: JSON.stringify(
+          process.env.BIBBIDI_POSTHOG_PROJECT_TOKEN ?? "",
+        ),
+        __BIBBIDI_POSTHOG_HOST__: JSON.stringify(
+          process.env.BIBBIDI_POSTHOG_HOST ?? "https://us.i.posthog.com",
+        ),
+        __BIBBIDI_APP_ENV__: JSON.stringify(
+          process.env.BIBBIDI_APP_ENV ??
+            (isProduction ? "production" : "development"),
+        ),
+        __BIBBIDI_APP_VERSION__: JSON.stringify(
+          process.env.BIBBIDI_APP_VERSION ??
+            process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ??
+            "unknown",
+        ),
         __BIBBIDI_API_BASE_URL__: JSON.stringify(apiBaseUrl),
         __BIBBIDI_GA_MEASUREMENT_ID__: JSON.stringify(
           googleAnalyticsMeasurementId,

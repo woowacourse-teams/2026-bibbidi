@@ -230,7 +230,7 @@ describe("appRoutes", () => {
 
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ nickname: "비비디" }), {
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
             status: 200,
           }),
         );
@@ -347,7 +347,9 @@ describe("appRoutes", () => {
 
   it("가입 완료 사용자가 온보딩에 직접 접근하면 홈으로 이동한다", async () => {
     installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
     );
     const router = renderRouter(["/onboarding"]);
 
@@ -362,7 +364,7 @@ describe("appRoutes", () => {
   it("진행 표시가 있어도 체크리스트가 있는 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
     beginAccountSetupProgress();
     installFetch(
-      new Response(JSON.stringify({ nickname: "provider-name" }), {
+      new Response(JSON.stringify({ id: 1, nickname: "provider-name" }), {
         status: 200,
       }),
     );
@@ -378,7 +380,9 @@ describe("appRoutes", () => {
 
   it("진행 표시가 없는 가입 완료 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
     installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
     );
     const router = renderRouter(["/onboarding/account"]);
 
@@ -476,37 +480,76 @@ describe("appRoutes", () => {
     ).toBeTruthy();
   });
 
-  it("알 수 없는 경로를 루트로 이동시킨다", async () => {
+  it.each(["/unknown", "/planner"])(
+    "지원하지 않는 경로 %s를 루트로 이동시킨다",
+    async (initialEntry) => {
+      installFetch(
+        new Response(
+          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+          { status: 401 },
+        ),
+      );
+      const router = renderRouter([initialEntry]);
+
+      expect(
+        await screen.findByRole("heading", {
+          name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        }),
+      ).toBeTruthy();
+      expect(router.state.location.pathname).toBe("/");
+    },
+  );
+
+  it("인증 사용자가 캘린더에서 월간 캘린더를 본다", async () => {
+    installFetch(
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+        status: 200,
+      }),
+    );
+    renderRouter(["/calendar"]);
+
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    expect(screen.getByRole("main", { name: "캘린더" })).toBeTruthy();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([input]) =>
+            input.toString() === "/api/appointments/me/nearby?limit=6",
+        ),
+    ).toBe(false);
+  });
+
+  it("비로그인 사용자가 캘린더에 직접 접근하고 개인화 API는 호출하지 않는다", async () => {
     installFetch(
       new Response(
         JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
         { status: 401 },
       ),
     );
-    const router = renderRouter(["/unknown"]);
+    const router = renderRouter(["/calendar"]);
 
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     expect(
-      await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
-      }),
+      await screen.findByText(
+        "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
+      ),
     ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/calendar");
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([input]) =>
+          [
+            "/api/appointments/me/nearby?limit=6",
+            "/api/checklists/me/unscheduled-items?limit=2",
+            "/api/checklists/me/recommended-catalog-items?limit=4",
+          ].includes(input.toString()),
+        ),
+    ).toBe(false);
   });
 
-  it("인증 사용자가 플래너에서 기존 일정 대시보드를 본다", async () => {
-    installFetch(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
-    );
-    renderRouter(["/planner"]);
-
-    expect(
-      await screen.findByRole("heading", { name: "가까운 일정" }),
-    ).toBeTruthy();
-    expect(screen.getByRole("main", { name: "플래너" })).toBeTruthy();
-    expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
-  });
-
-  it("플래너 조회 중 로그인 세션이 사라지면 로그인 화면으로 이동한다", async () => {
+  it("캘린더 조회 중 로그인 세션이 사라지면 현재 페이지의 비로그인 안내로 전환한다", async () => {
     let currentUserRequestCount = 0;
     installLegacyWebSessionFetch(
       vi.fn().mockImplementation((url: string) => {
@@ -515,7 +558,7 @@ describe("appRoutes", () => {
 
           return Promise.resolve(
             currentUserRequestCount === 1
-              ? new Response(JSON.stringify({ nickname: "bibbidi" }), {
+              ? new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
                   status: 200,
                 })
               : new Response(
@@ -544,7 +587,7 @@ describe("appRoutes", () => {
           );
         }
 
-        if (url === "/api/appointments/me/nearby?limit=6") {
+        if (url === "/api/checklists/me/unscheduled-items?limit=2") {
           return Promise.resolve(
             new Response(
               JSON.stringify({
@@ -559,13 +602,14 @@ describe("appRoutes", () => {
         return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
       }),
     );
-    const router = renderRouter(["/planner"]);
+    const router = renderRouter(["/calendar"]);
 
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    await waitFor(() => expect(currentUserRequestCount).toBe(2));
     expect(
-      await screen.findByRole("region", { name: "소셜 로그인" }),
+      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
     ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/login");
-    expect(router.state.location.search).toBe("?returnTo=%2Fplanner");
-    expect(currentUserRequestCount).toBe(2);
+    expect(router.state.location.pathname).toBe("/calendar");
+    expect(router.state.location.search).toBe("");
   });
 });

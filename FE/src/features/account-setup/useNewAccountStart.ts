@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { analytics } from "../../infrastructure/analytics";
 
 import {
   MyChecklistAuthenticationRequiredError,
@@ -36,6 +37,10 @@ export function useNewAccountStart({
     }
 
     const controller = new AbortController();
+    analytics.track({
+      name: "account_setup_choice",
+      parameters: { choice: "new" },
+    });
     requestControllerRef.current = controller;
     setIsSubmitting(true);
     clearError();

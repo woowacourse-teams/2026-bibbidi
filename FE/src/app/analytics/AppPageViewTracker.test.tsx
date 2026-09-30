@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("AppPageViewTracker", () => {
-  it("보호 경로의 인증 리다이렉트가 끝난 로그인 화면만 측정한다", async () => {
+  it("비로그인 사용자도 캘린더 화면을 한 번만 측정한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -31,10 +31,12 @@ describe("AppPageViewTracker", () => {
     );
     const analytics: AnalyticsClient = {
       initialize: vi.fn(),
+      setContext: vi.fn(),
+      reset: vi.fn(),
       track: vi.fn(),
     };
     const router = createMemoryRouter(appRoutes, {
-      initialEntries: ["/planner?taskId=private"],
+      initialEntries: ["/calendar?taskId=private"],
     });
 
     render(
@@ -52,18 +54,16 @@ describe("AppPageViewTracker", () => {
       </StrictMode>,
     );
 
-    expect(
-      await screen.findByRole("region", { name: "소셜 로그인" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",
       parameters: {
-        page_location: "https://bibbidi.example/login",
-        page_path: "/login",
+        page_location: "https://bibbidi.example/calendar",
+        page_path: "/calendar",
         page_referrer: "",
-        page_title: "로그인",
-        screen_name: "login",
+        page_title: "캘린더",
+        screen_name: "calendar",
       },
     });
   });

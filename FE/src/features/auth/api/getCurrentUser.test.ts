@@ -20,13 +20,14 @@ afterEach(() => {
 describe("getCurrentUser", () => {
   it("세션 쿠키를 포함해 현재 사용자를 조회한다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ nickname: "bibbidi" }), {
+      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
         status: 200,
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(getCurrentUser()).resolves.toEqual({
+      id: 1,
       nickname: "bibbidi",
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/users/me", {

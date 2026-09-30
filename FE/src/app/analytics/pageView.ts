@@ -5,9 +5,9 @@ const PAGE_DEFINITIONS = {
     pageTitle: "준비 목록",
     screenName: "preparation_catalog",
   },
-  "/planner": {
-    pageTitle: "플래너",
-    screenName: "planner",
+  "/calendar": {
+    pageTitle: "캘린더",
+    screenName: "calendar",
   },
   "/checklist": {
     pageTitle: "체크리스트",
@@ -16,6 +16,11 @@ const PAGE_DEFINITIONS = {
   "/login": {
     pageTitle: "로그인",
     screenName: "login",
+  },
+  "/onboarding": { pageTitle: "약관 동의", screenName: "onboarding_terms" },
+  "/onboarding/account": {
+    pageTitle: "계정 선택",
+    screenName: "onboarding_account",
   },
 } as const;
 

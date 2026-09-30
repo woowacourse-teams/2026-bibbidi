@@ -1,0 +1,4606 @@
+diff --git a/FE/.env.example b/FE/.env.example
+new file mode 100644
+index 0000000000000000000000000000000000000000..dadbe00e840d969461d8243ae2b8ffadee9b2c5a
+--- /dev/null
++++ b/FE/.env.example
+@@ -0,0 +1,11 @@
++BIBBIDI_API_BASE_URL=
++BIBBIDI_API_PROXY_TARGET=http://localhost:8080
++FE_SERVICE_URL=http://localhost:3000
++BIBBIDI_GA_MEASUREMENT_ID=
++
++# 공지 기간·개발 프로젝트 QA·탈퇴 삭제 절차 완료 전 운영에서 켜지 않는다.
++BIBBIDI_POSTHOG_ENABLED=false
++BIBBIDI_POSTHOG_PROJECT_TOKEN=
++BIBBIDI_POSTHOG_HOST=https://us.i.posthog.com
++BIBBIDI_APP_ENV=development
++BIBBIDI_APP_VERSION=local
+diff --git a/FE/package.json b/FE/package.json
+index 76223fa8b74d8efebb284c93eff547c44d00b930..5c52dfd4d9f4fec12366651f629fd8cffdafc392 100644
+--- a/FE/package.json
++++ b/FE/package.json
+@@ -19,6 +19,7 @@
+     "build": "pnpm typecheck && webpack --mode production"
+   },
+   "dependencies": {
++    "posthog-js": "1.434.15",
+     "react": "19.2.3",
+     "react-dom": "19.2.3",
+     "react-router": "7.13.1"
+diff --git a/FE/src/app/analytics/AppPageViewTracker.test.tsx b/FE/src/app/analytics/AppPageViewTracker.test.tsx
+index 4ecf9a3474a871e474175d4b68d41595a99c1af4..6fb2be8acc61382e6b6d13accfd0bd686e905496 100644
+--- a/FE/src/app/analytics/AppPageViewTracker.test.tsx
++++ b/FE/src/app/analytics/AppPageViewTracker.test.tsx
+@@ -14,7 +14,7 @@ afterEach(() => {
+ });
+ 
+ describe("AppPageViewTracker", () => {
+-  it("보호 경로의 인증 리다이렉트가 끝난 로그인 화면만 측정한다", async () => {
++  it("비로그인 사용자도 플래너 화면을 한 번만 측정한다", async () => {
+     vi.stubGlobal(
+       "fetch",
+       vi.fn(() =>
+@@ -31,6 +31,8 @@ describe("AppPageViewTracker", () => {
+     );
+     const analytics: AnalyticsClient = {
+       initialize: vi.fn(),
++      setContext: vi.fn(),
++      reset: vi.fn(),
+       track: vi.fn(),
+     };
+     const router = createMemoryRouter(appRoutes, {
+@@ -53,17 +55,17 @@ describe("AppPageViewTracker", () => {
+     );
+ 
+     expect(
+-      await screen.findByRole("region", { name: "소셜 로그인" }),
++      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+     ).toBeTruthy();
+     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
+     expect(analytics.track).toHaveBeenCalledWith({
+       name: "page_view",
+       parameters: {
+-        page_location: "https://bibbidi.example/login",
+-        page_path: "/login",
++        page_location: "https://bibbidi.example/planner",
++        page_path: "/planner",
+         page_referrer: "",
+-        page_title: "로그인",
+-        screen_name: "login",
++        page_title: "플래너",
++        screen_name: "planner",
+       },
+     });
+   });
+diff --git a/FE/src/app/analytics/AppPageViewTracker.tsx b/FE/src/app/analytics/AppPageViewTracker.tsx
+index 5e171e77d2292480453b6a93f7546d44fc270983..f39a67f8bc9a503531d3afeee74d9703341d752a 100644
+--- a/FE/src/app/analytics/AppPageViewTracker.tsx
++++ b/FE/src/app/analytics/AppPageViewTracker.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useRef } from "react";
++import { useEffect, useLayoutEffect, useRef } from "react";
+ 
+ import { useAuth } from "../../features/auth";
+ import type { AnalyticsClient } from "../../infrastructure/analytics";
+@@ -21,8 +21,42 @@ export function AppPageViewTracker({
+ }: AppPageViewTrackerProps) {
+   const { authState } = useAuth();
+   const trackingState = useRef(createRouterPageViewTrackingState());
++  const previousMemberId = useRef<number | undefined>(undefined);
+   const isAppRouteSettled =
+-    authState.status === "authenticated" || authState.status === "guest";
++    authState.status === "authenticated" ||
++    authState.status === "guest" ||
++    authState.status === "onboardingRequired" ||
++    authState.status === "accountSetupRequired";
++
++  useLayoutEffect(() => {
++    if (isAppRouteSettled) {
++      const memberId =
++        authState.status === "authenticated" ? authState.user.id : undefined;
++      if (
++        previousMemberId.current !== undefined &&
++        previousMemberId.current !== memberId
++      ) {
++        trackingState.current.lastTrackedPagePath = null;
++      }
++      previousMemberId.current = memberId;
++    }
++    const synchronizeContext = () =>
++      analytics.setContext({
++        authState: authState.status,
++        pathname: router.state.location.pathname,
++        userId:
++          authState.status === "authenticated" ? authState.user.id : undefined,
++      });
++    synchronizeContext();
++    const unsubscribeContext = router.subscribe(synchronizeContext);
++    return () => {
++      unsubscribeContext();
++      analytics.setContext({
++        authState: "loading",
++        pathname: router.state.location.pathname,
++      });
++    };
++  }, [analytics, authState, isAppRouteSettled, router]);
+ 
+   useEffect(() => {
+     if (!isAppRouteSettled) {
+@@ -35,7 +69,7 @@ export function AppPageViewTracker({
+       origin,
+       trackingState.current,
+     );
+-  }, [analytics, isAppRouteSettled, origin, router]);
++  }, [analytics, authState, isAppRouteSettled, origin, router]);
+ 
+   return null;
+ }
+diff --git a/FE/src/app/analytics/onboardingPageView.test.tsx b/FE/src/app/analytics/onboardingPageView.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca93f4937ea64db78a9a8454e901032250e17845
+--- /dev/null
++++ b/FE/src/app/analytics/onboardingPageView.test.tsx
+@@ -0,0 +1,88 @@
++import { act, render } from "@testing-library/react";
++import { StrictMode } from "react";
++import { createMemoryRouter } from "react-router";
++import { describe, expect, it, vi } from "vitest";
++import type { AuthState } from "../../features/auth/model/auth";
++import { AppPageViewTracker } from "./AppPageViewTracker";
++
++const auth = vi.hoisted(() => ({ state: { status: "loading" } as AuthState }));
++vi.mock("../../features/auth", () => ({
++  useAuth: () => ({ authState: auth.state }),
++}));
++
++describe("온보딩 페이지 계측", () => {
++  it("StrictMode에서도 약관·계정 선택을 각각 한 번 측정하고 임시 회원 ID를 전달하지 않는다", async () => {
++    const analytics = {
++      initialize: vi.fn(),
++      setContext: vi.fn(),
++      reset: vi.fn(),
++      track: vi.fn(),
++    };
++    const router = createMemoryRouter([{ path: "*", element: null }], {
++      initialEntries: ["/onboarding?private=secret"],
++    });
++    auth.state = { status: "onboardingRequired" };
++    const element = () => (
++      <StrictMode>
++        <AppPageViewTracker
++          analytics={analytics}
++          origin="https://example.com"
++          router={router}
++        />
++      </StrictMode>
++    );
++    const view = render(element());
++    expect(analytics.track).toHaveBeenCalledOnce();
++    expect(analytics.track).toHaveBeenLastCalledWith(
++      expect.objectContaining({
++        parameters: expect.objectContaining({ page_path: "/onboarding" }),
++      }),
++    );
++    auth.state = {
++      status: "accountSetupRequired",
++      user: { id: 999, nickname: "private" },
++    };
++    await act(async () => {
++      await router.navigate("/onboarding/account");
++    });
++    view.rerender(element());
++    expect(analytics.track).toHaveBeenCalledTimes(2);
++    expect(analytics.setContext).toHaveBeenLastCalledWith({
++      authState: "accountSetupRequired",
++      pathname: "/onboarding/account",
++      userId: undefined,
++    });
++    auth.state = {
++      status: "authenticated",
++      user: { id: 42, nickname: "private" },
++    };
++    view.rerender(element());
++    expect(analytics.setContext).toHaveBeenLastCalledWith({
++      authState: "authenticated",
++      pathname: "/onboarding/account",
++      userId: 42,
++    });
++    expect(JSON.stringify(analytics.track.mock.calls)).not.toContain("secret");
++  });
++
++  it("OAuth 콜백은 온보딩 상태여도 페이지뷰로 보내지 않는다", () => {
++    const analytics = {
++      initialize: vi.fn(),
++      setContext: vi.fn(),
++      reset: vi.fn(),
++      track: vi.fn(),
++    };
++    auth.state = { status: "onboardingRequired" };
++    const router = createMemoryRouter([{ path: "*", element: null }], {
++      initialEntries: ["/auth/kakao?code=secret&state=secret"],
++    });
++    render(
++      <AppPageViewTracker
++        analytics={analytics}
++        origin="https://example.com"
++        router={router}
++      />,
++    );
++    expect(analytics.track).not.toHaveBeenCalled();
++  });
++});
+diff --git a/FE/src/app/analytics/pageView.ts b/FE/src/app/analytics/pageView.ts
+index 1b36aa68402b45a70ff7d2cf6cc041f2a8bba07c..fdfac90e4caf2c208c266ad79c731a838aaaebf2 100644
+--- a/FE/src/app/analytics/pageView.ts
++++ b/FE/src/app/analytics/pageView.ts
+@@ -17,6 +17,11 @@ const PAGE_DEFINITIONS = {
+     pageTitle: "로그인",
+     screenName: "login",
+   },
++  "/onboarding": { pageTitle: "약관 동의", screenName: "onboarding_terms" },
++  "/onboarding/account": {
++    pageTitle: "계정 선택",
++    screenName: "onboarding_account",
++  },
+ } as const;
+ 
+ export type PagePath = keyof typeof PAGE_DEFINITIONS;
+diff --git a/FE/src/app/analytics/routerPageViewTracking.test.tsx b/FE/src/app/analytics/routerPageViewTracking.test.tsx
+index 6b46c96930906c9be4b443561dad2a446dc70ca7..6a08b852a3775b909302707ed2e79f520a177f3a 100644
+--- a/FE/src/app/analytics/routerPageViewTracking.test.tsx
++++ b/FE/src/app/analytics/routerPageViewTracking.test.tsx
+@@ -24,6 +24,8 @@ const routes: RouteObject[] = [
+ function createAnalyticsMock(): AnalyticsClient {
+   return {
+     initialize: vi.fn(),
++    setContext: vi.fn(),
++    reset: vi.fn(),
+     track: vi.fn(),
+   };
+ }
+@@ -142,6 +144,8 @@ describe("startRouterPageViewTracking", () => {
+     const router = createMemoryRouter(routes, { initialEntries: ["/"] });
+     const analytics: AnalyticsClient = {
+       initialize: vi.fn(),
++      setContext: vi.fn(),
++      reset: vi.fn(),
+       track: vi.fn(() => {
+         throw new Error("Analytics 전송 실패");
+       }),
+diff --git a/FE/src/app/router.test.tsx b/FE/src/app/router.test.tsx
+index d2a63efbea6270edb3304d44793b85b8bb9ae827..ba1bd64031ccb61e0783e66d9c418dc033284a5e 100644
+--- a/FE/src/app/router.test.tsx
++++ b/FE/src/app/router.test.tsx
+@@ -230,7 +230,7 @@ describe("appRoutes", () => {
+ 
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+             status: 200,
+           }),
+         );
+@@ -347,7 +347,9 @@ describe("appRoutes", () => {
+ 
+   it("가입 완료 사용자가 온보딩에 직접 접근하면 홈으로 이동한다", async () => {
+     installFetch(
+-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
++      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
++        status: 200,
++      }),
+     );
+     const router = renderRouter(["/onboarding"]);
+ 
+@@ -362,7 +364,7 @@ describe("appRoutes", () => {
+   it("진행 표시가 있어도 체크리스트가 있는 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
+     beginAccountSetupProgress();
+     installFetch(
+-      new Response(JSON.stringify({ nickname: "provider-name" }), {
++      new Response(JSON.stringify({ id: 1, nickname: "provider-name" }), {
+         status: 200,
+       }),
+     );
+@@ -378,7 +380,9 @@ describe("appRoutes", () => {
+ 
+   it("진행 표시가 없는 가입 완료 사용자는 계정 선택 주소에서 홈으로 이동한다", async () => {
+     installFetch(
+-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
++      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
++        status: 200,
++      }),
+     );
+     const router = renderRouter(["/onboarding/account"]);
+ 
+@@ -495,7 +499,9 @@ describe("appRoutes", () => {
+ 
+   it("인증 사용자가 플래너에서 기존 일정 대시보드를 본다", async () => {
+     installFetch(
+-      new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
++      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
++        status: 200,
++      }),
+     );
+     renderRouter(["/planner"]);
+ 
+@@ -506,7 +512,33 @@ describe("appRoutes", () => {
+     expect(await screen.findByText("예정된 일정이 없어요")).toBeTruthy();
+   });
+ 
+-  it("플래너 조회 중 로그인 세션이 사라지면 로그인 화면으로 이동한다", async () => {
++  it("비로그인 사용자가 플래너에 직접 접근하고 개인화 API는 호출하지 않는다", async () => {
++    installFetch(
++      new Response(
++        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
++        { status: 401 },
++      ),
++    );
++    const router = renderRouter(["/planner"]);
++
++    expect(
++      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
++    ).toBeTruthy();
++    expect(router.state.location.pathname).toBe("/planner");
++    expect(
++      vi
++        .mocked(fetch)
++        .mock.calls.some(([input]) =>
++          [
++            "/api/appointments/me/nearby?limit=6",
++            "/api/checklists/me/unscheduled-items?limit=3",
++            "/api/checklists/me/recommended-catalog-items?limit=4",
++          ].includes(input.toString()),
++        ),
++    ).toBe(false);
++  });
++
++  it("플래너 조회 중 로그인 세션이 사라지면 현재 페이지의 비로그인 안내로 전환한다", async () => {
+     let currentUserRequestCount = 0;
+     installLegacyWebSessionFetch(
+       vi.fn().mockImplementation((url: string) => {
+@@ -515,7 +547,7 @@ describe("appRoutes", () => {
+ 
+           return Promise.resolve(
+             currentUserRequestCount === 1
+-              ? new Response(JSON.stringify({ nickname: "bibbidi" }), {
++              ? new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+                   status: 200,
+                 })
+               : new Response(
+@@ -562,10 +594,10 @@ describe("appRoutes", () => {
+     const router = renderRouter(["/planner"]);
+ 
+     expect(
+-      await screen.findByRole("region", { name: "소셜 로그인" }),
++      await screen.findByText("로그인하면 가까운 일정을 확인할 수 있어요."),
+     ).toBeTruthy();
+-    expect(router.state.location.pathname).toBe("/login");
+-    expect(router.state.location.search).toBe("?returnTo=%2Fplanner");
++    expect(router.state.location.pathname).toBe("/planner");
++    expect(router.state.location.search).toBe("");
+     expect(currentUserRequestCount).toBe(2);
+   });
+ });
+diff --git a/FE/src/app/router.tsx b/FE/src/app/router.tsx
+index a6d968c6dd83c7c5aeec868dfac4ecc89dfa30e3..2ea10892f510dc08e72ee662923440e5ec9984e6 100644
+--- a/FE/src/app/router.tsx
++++ b/FE/src/app/router.tsx
+@@ -1,6 +1,5 @@
+ import { createBrowserRouter, Navigate, RouteObject } from "react-router";
+ 
+-import { PlannerAccessGuard } from "../features/auth";
+ import { AuthLayout } from "../layouts/AuthLayout";
+ import { ServiceLayout } from "../layouts/ServiceLayout";
+ import { AccountSetupPage } from "../pages/AccountSetupPage";
+@@ -24,13 +23,8 @@ export const appRoutes: RouteObject[] = [
+         element: <Navigate replace to="/" />,
+       },
+       {
+-        Component: PlannerAccessGuard,
+-        children: [
+-          {
+-            path: "/planner",
+-            Component: PlannerPage,
+-          },
+-        ],
++        path: "/planner",
++        Component: PlannerPage,
+       },
+       {
+         path: "/checklist",
+diff --git a/FE/src/features/account-setup/AccountSetupFeature.test.tsx b/FE/src/features/account-setup/AccountSetupFeature.test.tsx
+index 40356552015a595b9bdaf7c8f1f1a4582743f03a..35700447bb3f7cccd8fd430b126bd95ae5980e31 100644
+--- a/FE/src/features/account-setup/AccountSetupFeature.test.tsx
++++ b/FE/src/features/account-setup/AccountSetupFeature.test.tsx
+@@ -10,6 +10,7 @@ import {
+ import { MyChecklistProvider } from "../checklist";
+ import { AccountSetupFeature } from "./AccountSetupFeature";
+ import { clearAccountSetupProgress } from "./model/accountSetupProgress";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ function accessToken(userId: string): string {
+   const payload = btoa(
+@@ -69,12 +70,113 @@ beforeEach(() => {
+ });
+ 
+ afterEach(() => {
++  vi.restoreAllMocks();
+   resetWebAuthSessionForTest();
+   clearAccountSetupProgress();
+   vi.unstubAllGlobals();
+ });
+ 
+ describe("AccountSetupFeature", () => {
++  it("입력 검증을 통과하지 못하면 이전 제출 이벤트를 보내지 않는다", () => {
++    const track = vi.spyOn(analytics, "track");
++    const fetchMock = vi.fn();
++    vi.stubGlobal("fetch", fetchMock);
++    renderFeature();
++    selectLegacyAccount();
++    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
++    expect(track).toHaveBeenCalledWith({
++      name: "legacy_transfer_failed",
++      parameters: { failure_kind: "validation", outcome: "failed" },
++    });
++    expect(track).not.toHaveBeenCalledWith(
++      expect.objectContaining({ name: "legacy_transfer_submit" }),
++    );
++    expect(fetchMock).not.toHaveBeenCalled();
++  });
++  it("현재 회원 ID가 없으면 이전 제출 이벤트를 보내지 않는다", () => {
++    const track = vi.spyOn(analytics, "track");
++    const fetchMock = vi.fn();
++    vi.stubGlobal("fetch", fetchMock);
++    const { props } = renderFeature();
++    selectLegacyAccount();
++    fillLegacyAccount();
++    clearWebAccessToken();
++    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
++    expect(props.onAuthenticationExpired).toHaveBeenCalledOnce();
++    expect(track).not.toHaveBeenCalledWith(
++      expect.objectContaining({ name: "legacy_transfer_submit" }),
++    );
++    expect(fetchMock).not.toHaveBeenCalled();
++  });
++  it.each([
++    { refreshedId: "10", outcome: "failed" },
++    { refreshedId: "", outcome: "unknown" },
++  ])(
++    "이전 응답 유실 후 회원 ID '$refreshedId'의 결과를 $outcome으로 기록한다",
++    async ({ refreshedId, outcome }) => {
++      const track = vi.spyOn(analytics, "track");
++      const fetchMock = vi
++        .fn()
++        .mockRejectedValueOnce(new TypeError("network failed"))
++        .mockResolvedValueOnce(
++          jsonResponse({
++            accessToken: accessToken(refreshedId),
++            termsAgreementRequired: false,
++          }),
++        );
++      vi.stubGlobal("fetch", fetchMock);
++      renderFeature();
++      selectLegacyAccount();
++      fillLegacyAccount();
++      fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
++      await waitFor(() =>
++        expect(track).toHaveBeenCalledWith({
++          name: "legacy_transfer_failed",
++          parameters: { failure_kind: "network", outcome },
++        }),
++      );
++      const submitIndex = track.mock.calls.findIndex(
++        ([event]) => event.name === "legacy_transfer_submit",
++      );
++      expect(submitIndex).toBeGreaterThanOrEqual(0);
++      expect(
++        track.mock.calls.filter(
++          ([event]) => event.name === "legacy_transfer_submit",
++        ),
++      ).toHaveLength(1);
++      expect(track.mock.invocationCallOrder[submitIndex]).toBeLessThan(
++        fetchMock.mock.invocationCallOrder[0],
++      );
++    },
++  );
++  it("기존 회원 선택과 이전 실패를 입력 원문 없이 기록한다", async () => {
++    const track = vi.spyOn(analytics, "track");
++    vi.stubGlobal(
++      "fetch",
++      vi
++        .fn()
++        .mockResolvedValue(
++          jsonResponse({ errorCode: 202, message: "secret" }, 401),
++        ),
++    );
++    renderFeature();
++    selectLegacyAccount();
++    fillLegacyAccount();
++    fireEvent.submit(screen.getByLabelText("기존 닉네임").closest("form")!);
++    await waitFor(() =>
++      expect(track).toHaveBeenCalledWith({
++        name: "legacy_transfer_failed",
++        parameters: { failure_kind: "authentication", outcome: "failed" },
++      }),
++    );
++    expect(track).toHaveBeenCalledWith({
++      name: "account_setup_choice",
++      parameters: { choice: "legacy" },
++    });
++    expect(JSON.stringify(track.mock.calls)).not.toMatch(
++      /기존회원|bibbidi1234|secret/,
++    );
++  });
+   it("기존 계정 입력을 선택하고 이전 선택으로 돌아간다", () => {
+     const { unmount } = renderFeature();
+ 
+diff --git a/FE/src/features/account-setup/useAccountSetupFlow.ts b/FE/src/features/account-setup/useAccountSetupFlow.ts
+index e869fffefd33ceaa68704f00582c7edf16e44e90..d3611a1ff3b5e703de0b4977a231a20017c6324e 100644
+--- a/FE/src/features/account-setup/useAccountSetupFlow.ts
++++ b/FE/src/features/account-setup/useAccountSetupFlow.ts
+@@ -1,4 +1,5 @@
+ import { useState } from "react";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ import {
+   clearAccountSetupChoice,
+@@ -23,12 +24,24 @@ export function useAccountSetupFlow({
+   const [choice, setChoice] = useState(readAccountSetupChoice);
+   const legacyAccount = useLegacyAccountTransfer({
+     onAuthenticationExpired,
+-    onSuccess,
++    onSuccess: () => {
++      analytics.track({
++        name: "account_setup_complete",
++        parameters: { choice: "legacy" },
++      });
++      onSuccess();
++    },
+     onTermsRequired,
+   });
+   const newAccount = useNewAccountStart({
+     onAuthenticationExpired,
+-    onSuccess,
++    onSuccess: () => {
++      analytics.track({
++        name: "account_setup_complete",
++        parameters: { choice: "new" },
++      });
++      onSuccess();
++    },
+   });
+   const isSubmitting = legacyAccount.isSubmitting || newAccount.isSubmitting;
+ 
+@@ -38,6 +51,10 @@ export function useAccountSetupFlow({
+     }
+ 
+     saveAccountSetupChoice(nextChoice);
++    analytics.track({
++      name: "account_setup_choice",
++      parameters: { choice: nextChoice },
++    });
+     setChoice(nextChoice);
+     legacyAccount.clearError();
+     newAccount.clearError();
+diff --git a/FE/src/features/account-setup/useLegacyAccountTransfer.ts b/FE/src/features/account-setup/useLegacyAccountTransfer.ts
+index ff4c0fc6fd88c260a4235d3855241ac150d1f458..e06b89772bae37129015e2802ec75b43a7a6a0e1 100644
+--- a/FE/src/features/account-setup/useLegacyAccountTransfer.ts
++++ b/FE/src/features/account-setup/useLegacyAccountTransfer.ts
+@@ -1,4 +1,5 @@
+ import { useEffect, useRef, useState } from "react";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ import {
+   acceptWebAccessToken,
+@@ -25,6 +26,16 @@ import { ACCOUNT_SETUP_ERROR_MESSAGE } from "./model/accountSetupError";
+ 
+ const AUTHENTICATION_ERROR_CODES = new Set([201, 204, 205, 206]);
+ 
++function trackTransferFailure(
++  failureKind: string,
++  outcome: "failed" | "unknown" = "failed",
++) {
++  analytics.track({
++    name: "legacy_transfer_failed",
++    parameters: { failure_kind: failureKind, outcome },
++  });
++}
++
+ interface UseLegacyAccountTransferOptions {
+   onAuthenticationExpired: () => void;
+   onSuccess: () => void;
+@@ -49,6 +60,10 @@ export function useLegacyAccountTransfer({
+   );
+ 
+   const clearError = () => setErrorMessage(undefined);
++  const completeTransfer = () => {
++    analytics.track({ name: "legacy_transfer_complete", parameters: {} });
++    onSuccess();
++  };
+ 
+   const resetForm = () => {
+     setValues((currentValues) => ({
+@@ -95,6 +110,7 @@ export function useLegacyAccountTransfer({
+   const recoverUncertainTransfer = async (
+     previousUserId: string,
+     signal: AbortSignal,
++    failureKind: "network" | "timeout",
+   ) => {
+     try {
+       const session = await refreshWebSession();
+@@ -106,15 +122,17 @@ export function useLegacyAccountTransfer({
+       const refreshedUserId = webUserIdFromAccessToken(session.accessToken);
+ 
+       if (refreshedUserId && refreshedUserId !== previousUserId) {
+-        onSuccess();
++        completeTransfer();
+         return;
+       }
+ 
+       setErrorMessage(
+         "계정 이전이 완료되지 않았어요. 입력 정보를 확인하고 다시 시도해 주세요.",
+       );
++      trackTransferFailure(failureKind, refreshedUserId ? "failed" : "unknown");
+     } catch {
+       if (!signal.aborted) {
++        trackTransferFailure(failureKind, "unknown");
+         onAuthenticationExpired();
+       }
+     }
+@@ -123,6 +141,7 @@ export function useLegacyAccountTransfer({
+   const submit = async () => {
+     if (isSubmitting || !isLoginFormValid(values)) {
+       if (!isSubmitting) {
++        trackTransferFailure("validation");
+         setErrorMessage(LOGIN_FORM_ERROR_MESSAGE);
+       }
+       return;
+@@ -131,6 +150,7 @@ export function useLegacyAccountTransfer({
+     const previousUserId = currentWebUserId();
+ 
+     if (!previousUserId) {
++      trackTransferFailure("authentication");
+       onAuthenticationExpired();
+       return;
+     }
+@@ -142,6 +162,7 @@ export function useLegacyAccountTransfer({
+ 
+     try {
+       const loginValues = toLoginValues(values);
++      analytics.track({ name: "legacy_transfer_submit", parameters: {} });
+       const session = await transferLegacyAccount(
+         loginValues.nickname,
+         loginValues.password,
+@@ -152,7 +173,7 @@ export function useLegacyAccountTransfer({
+       if (session.termsAgreementRequired) {
+         onTermsRequired();
+       } else {
+-        onSuccess();
++        completeTransfer();
+       }
+     } catch (error) {
+       if (error instanceof AccountSetupRequestAbortedError) {
+@@ -160,6 +181,7 @@ export function useLegacyAccountTransfer({
+       }
+ 
+       if (error instanceof AccountSetupAuthenticationRequiredError) {
++        trackTransferFailure("authentication");
+         onAuthenticationExpired();
+         return;
+       }
+@@ -168,12 +190,27 @@ export function useLegacyAccountTransfer({
+         error instanceof AccountSetupNetworkError ||
+         error instanceof AccountSetupTimeoutError
+       ) {
+-        await recoverUncertainTransfer(previousUserId, controller.signal);
+-      } else if (
+-        !(error instanceof AccountSetupApiError) ||
+-        !handleApiError(error)
+-      ) {
+-        setErrorMessage(ACCOUNT_SETUP_ERROR_MESSAGE);
++        await recoverUncertainTransfer(
++          previousUserId,
++          controller.signal,
++          error instanceof AccountSetupTimeoutError ? "timeout" : "network",
++        );
++      } else {
++        trackTransferFailure(
++          error instanceof AccountSetupApiError
++            ? error.errorCode === 211
++              ? "terms_required"
++              : error.status === 401
++                ? "authentication"
++                : "api"
++            : "unknown",
++        );
++        if (
++          !(error instanceof AccountSetupApiError) ||
++          !handleApiError(error)
++        ) {
++          setErrorMessage(ACCOUNT_SETUP_ERROR_MESSAGE);
++        }
+       }
+     } finally {
+       if (requestControllerRef.current === controller) {
+diff --git a/FE/src/features/account-setup/useNewAccountStart.ts b/FE/src/features/account-setup/useNewAccountStart.ts
+index d940fe8d705c7b8a24a6f0a03a7c31348d4b5229..0b1000a7fc379a0a4ef66e87121deb015f5b6596 100644
+--- a/FE/src/features/account-setup/useNewAccountStart.ts
++++ b/FE/src/features/account-setup/useNewAccountStart.ts
+@@ -1,4 +1,5 @@
+ import { useEffect, useRef, useState } from "react";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ import {
+   MyChecklistAuthenticationRequiredError,
+@@ -36,6 +37,10 @@ export function useNewAccountStart({
+     }
+ 
+     const controller = new AbortController();
++    analytics.track({
++      name: "account_setup_choice",
++      parameters: { choice: "new" },
++    });
+     requestControllerRef.current = controller;
+     setIsSubmitting(true);
+     clearError();
+diff --git a/FE/src/features/auth/AuthProvider.test.tsx b/FE/src/features/auth/AuthProvider.test.tsx
+index 92d2e3db57773fc322def9994e5ec96db74661ac..b1832f686fece8037d36a40215571c5053193406 100644
+--- a/FE/src/features/auth/AuthProvider.test.tsx
++++ b/FE/src/features/auth/AuthProvider.test.tsx
+@@ -73,7 +73,9 @@ describe("AuthProvider", () => {
+         ),
+       )
+       .mockResolvedValueOnce(
+-        new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
++        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
++          status: 200,
++        }),
+       );
+     vi.stubGlobal("fetch", fetchMock);
+ 
+@@ -146,7 +148,7 @@ describe("AuthProvider", () => {
+         .fn()
+         .mockResolvedValueOnce(expiredWebSessionResponse())
+         .mockResolvedValueOnce(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+             status: 200,
+           }),
+         ),
+@@ -224,7 +226,7 @@ describe("AuthProvider", () => {
+       )
+       .mockResolvedValueOnce(expiredWebSessionResponse())
+       .mockResolvedValueOnce(
+-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
++        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+           status: 200,
+         }),
+       );
+@@ -273,7 +275,7 @@ describe("AuthProvider", () => {
+ 
+     await act(async () => {
+       resolveCurrentUser(
+-        new Response(JSON.stringify({ nickname: "이전 사용자" }), {
++        new Response(JSON.stringify({ id: 1, nickname: "이전 사용자" }), {
+           status: 200,
+         }),
+       );
+@@ -288,7 +290,9 @@ describe("AuthProvider", () => {
+       .fn()
+       .mockResolvedValueOnce(expiredWebSessionResponse())
+       .mockResolvedValueOnce(
+-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++          status: 200,
++        }),
+       )
+       .mockImplementationOnce(() => new Promise<Response>(() => undefined));
+     vi.stubGlobal("fetch", fetchMock);
+diff --git a/FE/src/features/auth/AuthProvider.tsx b/FE/src/features/auth/AuthProvider.tsx
+index fc214f076a6c526f991867f8ef9dd768005ab6e8..e20e44a4177b3bd815fe484bc280b06fefec90f2 100644
+--- a/FE/src/features/auth/AuthProvider.tsx
++++ b/FE/src/features/auth/AuthProvider.tsx
+@@ -10,6 +10,7 @@ import {
+ } from "react";
+ 
+ import { CurrentUserApiError, getCurrentUser } from "./api/getCurrentUser";
++import { analytics } from "../../infrastructure/analytics";
+ import {
+   clearWebAccessToken,
+   hasWebAccessToken,
+@@ -132,6 +133,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
+     () =>
+       subscribeAuthenticationRequired(() => {
+         invalidateCurrentUserRequest();
++        analytics.reset();
+         setAuthState({ status: "guest" });
+       }),
+     [invalidateCurrentUserRequest],
+@@ -154,7 +156,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
+     setAuthState((currentState) => {
+       if (
+         currentState.status !== "synchronizing" ||
+-        currentState.user.nickname !== user.nickname
++        currentState.user.id !== user.id
+       ) {
+         return currentState;
+       }
+@@ -167,7 +169,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
+     setAuthState((currentState) => {
+       if (
+         currentState.status !== "synchronizing" ||
+-        currentState.user.nickname !== user.nickname
++        currentState.user.id !== user.id
+       ) {
+         return currentState;
+       }
+@@ -180,7 +182,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
+     setAuthState((currentState) => {
+       if (
+         currentState.status !== "synchronizing" ||
+-        currentState.user.nickname !== user.nickname
++        currentState.user.id !== user.id
+       ) {
+         return currentState;
+       }
+@@ -192,6 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
+   const endAuthentication = useCallback(() => {
+     invalidateCurrentUserRequest();
+     clearWebAccessToken();
++    analytics.reset();
+     setAuthState({ status: "guest" });
+   }, [invalidateCurrentUserRequest]);
+ 
+diff --git a/FE/src/features/auth/LoginRequiredDialog.css b/FE/src/features/auth/LoginRequiredDialog.css
+deleted file mode 100644
+index 0895ff4068fb97fe6672390720f7eb623a61ef36..0000000000000000000000000000000000000000
+--- a/FE/src/features/auth/LoginRequiredDialog.css
++++ /dev/null
+@@ -1,79 +0,0 @@
+-.login-required-dialog__backdrop {
+-  position: fixed;
+-  z-index: 100;
+-  inset: 0;
+-  display: grid;
+-  padding: 24px;
+-  background: rgb(0 0 0 / 40%);
+-  place-items: center;
+-}
+-
+-.login-required-dialog {
+-  display: flex;
+-  width: min(440px, 100%);
+-  flex-direction: column;
+-  gap: 24px;
+-  padding: 24px;
+-  border-radius: 16px;
+-  background: var(--color-bg-layer-default);
+-  box-shadow: 0 16px 48px rgb(54 56 61 / 24%);
+-}
+-
+-.login-required-dialog__header {
+-  display: flex;
+-  flex-direction: column;
+-  gap: 8px;
+-}
+-
+-.login-required-dialog h2,
+-.login-required-dialog p {
+-  margin: 0;
+-  line-height: 1.5;
+-}
+-
+-.login-required-dialog h2 {
+-  font-size: 17px;
+-}
+-
+-.login-required-dialog p {
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 14px;
+-  white-space: pre-line;
+-}
+-
+-.login-required-dialog__actions {
+-  display: grid;
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
+-  gap: 8px;
+-}
+-
+-.login-required-dialog__actions button {
+-  min-height: 48px;
+-  border: 0;
+-  border-radius: 10px;
+-  background: var(--color-bg-neutral-weak);
+-  color: var(--color-fg-neutral);
+-  cursor: pointer;
+-  font-weight: 700;
+-}
+-
+-.login-required-dialog__actions button:last-child {
+-  background: var(--color-bg-brand-solid);
+-  color: var(--color-fg-on-brand);
+-}
+-
+-.login-required-dialog__actions button:focus-visible {
+-  outline: 3px solid var(--color-stroke-focus-ring);
+-  outline-offset: 2px;
+-}
+-
+-@media (max-width: 760px) {
+-  .login-required-dialog__backdrop {
+-    padding: 16px;
+-  }
+-
+-  .login-required-dialog {
+-    padding: 20px;
+-    border-radius: 14px;
+-  }
+-}
+diff --git a/FE/src/features/auth/LoginRequiredDialog.test.tsx b/FE/src/features/auth/LoginRequiredDialog.test.tsx
+deleted file mode 100644
+index 28712405ae092f1ba275c473ffd6653fac308d49..0000000000000000000000000000000000000000
+--- a/FE/src/features/auth/LoginRequiredDialog.test.tsx
++++ /dev/null
+@@ -1,108 +0,0 @@
+-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+-import { StrictMode, useState } from "react";
+-import { describe, expect, it, vi } from "vitest";
+-
+-import { LoginRequiredDialog } from "./LoginRequiredDialog";
+-
+-function DialogHarness({ onLogin = vi.fn() }: { onLogin?: () => void }) {
+-  const [isOpen, setIsOpen] = useState(false);
+-  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
+-
+-  return (
+-    <>
+-      <button
+-        onClick={(event) => {
+-          setTrigger(event.currentTarget);
+-          setIsOpen(true);
+-        }}
+-        type="button"
+-      >
+-        플래너 열기
+-      </button>
+-      {isOpen ? (
+-        <LoginRequiredDialog
+-          onClose={() => setIsOpen(false)}
+-          onLogin={onLogin}
+-          returnFocusTo={trigger}
+-        />
+-      ) : null}
+-    </>
+-  );
+-}
+-
+-describe("LoginRequiredDialog", () => {
+-  it("안내와 동작을 제공하고 열릴 때 취소 버튼으로 포커스를 이동한다", () => {
+-    const onLogin = vi.fn();
+-    render(<DialogHarness onLogin={onLogin} />);
+-
+-    fireEvent.click(screen.getByRole("button", { name: "플래너 열기" }));
+-
+-    expect(
+-      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+-    ).toBeTruthy();
+-    expect(screen.getByRole("dialog").querySelector("p")?.textContent).toBe(
+-      "플래너를 이용하려면 로그인이 필요해요.\n로그인하고 나만의 일정과 준비 현황을 확인해 보세요.",
+-    );
+-    expect(document.activeElement).toBe(
+-      screen.getByRole("button", { name: "취소" }),
+-    );
+-
+-    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+-    expect(onLogin).toHaveBeenCalledOnce();
+-  });
+-
+-  it("Tab과 Shift+Tab 포커스를 다이얼로그 안에 가둔다", () => {
+-    render(<DialogHarness />);
+-    fireEvent.click(screen.getByRole("button", { name: "플래너 열기" }));
+-
+-    const cancelButton = screen.getByRole("button", { name: "취소" });
+-    const loginButton = screen.getByRole("button", { name: "로그인" });
+-    loginButton.focus();
+-    fireEvent.keyDown(loginButton, { key: "Tab" });
+-    expect(document.activeElement).toBe(cancelButton);
+-
+-    fireEvent.keyDown(cancelButton, { key: "Tab", shiftKey: true });
+-    expect(document.activeElement).toBe(loginButton);
+-  });
+-
+-  it("StrictMode의 effect 재실행 중에도 다이얼로그 포커스를 유지한다", async () => {
+-    render(
+-      <StrictMode>
+-        <DialogHarness />
+-      </StrictMode>,
+-    );
+-    fireEvent.click(screen.getByRole("button", { name: "플래너 열기" }));
+-
+-    await waitFor(() =>
+-      expect(document.activeElement).toBe(
+-        screen.getByRole("button", { name: "취소" }),
+-      ),
+-    );
+-  });
+-
+-  it.each(["cancel", "escape", "backdrop"] as const)(
+-    "%s 동작으로 닫고 트리거에 포커스를 복원한다",
+-    async (closeMethod) => {
+-      const { container } = render(<DialogHarness />);
+-      const trigger = screen.getByRole("button", { name: "플래너 열기" });
+-      fireEvent.click(trigger);
+-
+-      if (closeMethod === "cancel") {
+-        fireEvent.click(screen.getByRole("button", { name: "취소" }));
+-      } else if (closeMethod === "escape") {
+-        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+-      } else {
+-        const backdrop = container.querySelector<HTMLElement>(
+-          ".login-required-dialog__backdrop",
+-        );
+-        expect(backdrop).not.toBeNull();
+-        if (backdrop) {
+-          fireEvent.mouseDown(backdrop);
+-        }
+-      }
+-
+-      expect(screen.queryByRole("dialog")).toBeNull();
+-      await waitFor(() => expect(document.activeElement).toBe(trigger));
+-    },
+-  );
+-});
+diff --git a/FE/src/features/auth/LoginRequiredDialog.tsx b/FE/src/features/auth/LoginRequiredDialog.tsx
+deleted file mode 100644
+index e3cced7afeb9e310d433faa6887bf2b8de607177..0000000000000000000000000000000000000000
+--- a/FE/src/features/auth/LoginRequiredDialog.tsx
++++ /dev/null
+@@ -1,135 +0,0 @@
+-import { useEffect, useId, useRef } from "react";
+-
+-import "./LoginRequiredDialog.css";
+-
+-interface LoginRequiredDialogProps {
+-  onClose: () => void;
+-  onLogin: () => void;
+-  returnFocusTo: HTMLElement | null;
+-}
+-
+-const focusableSelector = [
+-  "button",
+-  "[href]",
+-  "input",
+-  "select",
+-  "textarea",
+-  "[tabindex]",
+-].join(",");
+-
+-function getFocusableElements(container: HTMLElement) {
+-  return Array.from(
+-    container.querySelectorAll<HTMLElement>(focusableSelector),
+-  ).filter((element) => !element.matches(":disabled") && element.tabIndex >= 0);
+-}
+-
+-export function LoginRequiredDialog({
+-  onClose,
+-  onLogin,
+-  returnFocusTo,
+-}: LoginRequiredDialogProps) {
+-  const backdropRef = useRef<HTMLDivElement>(null);
+-  const dialogRef = useRef<HTMLDivElement>(null);
+-  const titleId = useId();
+-  const descriptionId = useId();
+-
+-  useEffect(() => {
+-    const dialog = dialogRef.current;
+-    if (dialog) {
+-      getFocusableElements(dialog)[0]?.focus();
+-    }
+-
+-    return () => {
+-      if (returnFocusTo?.isConnected) {
+-        queueMicrotask(() => {
+-          if (!dialog?.isConnected && returnFocusTo.isConnected) {
+-            returnFocusTo.focus();
+-          }
+-        });
+-      }
+-    };
+-  }, [returnFocusTo]);
+-
+-  useEffect(() => {
+-    const backdrop = backdropRef.current;
+-    const dialog = dialogRef.current;
+-
+-    if (!backdrop || !dialog) {
+-      return;
+-    }
+-
+-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+-      if (event.key === "Escape") {
+-        event.preventDefault();
+-        event.stopPropagation();
+-        onClose();
+-        return;
+-      }
+-
+-      if (event.key !== "Tab") {
+-        return;
+-      }
+-
+-      const focusableElements = getFocusableElements(dialog);
+-      const firstElement = focusableElements[0];
+-      const lastElement = focusableElements.at(-1);
+-
+-      if (!firstElement || !lastElement) {
+-        event.preventDefault();
+-        return;
+-      }
+-
+-      if (event.shiftKey && document.activeElement === firstElement) {
+-        event.preventDefault();
+-        lastElement.focus();
+-      } else if (!event.shiftKey && document.activeElement === lastElement) {
+-        event.preventDefault();
+-        firstElement.focus();
+-      }
+-    };
+-    const handleBackdropMouseDown = (event: globalThis.MouseEvent) => {
+-      if (event.target === backdrop) {
+-        onClose();
+-      }
+-    };
+-
+-    dialog.addEventListener("keydown", handleKeyDown);
+-    backdrop.addEventListener("mousedown", handleBackdropMouseDown);
+-
+-    return () => {
+-      dialog.removeEventListener("keydown", handleKeyDown);
+-      backdrop.removeEventListener("mousedown", handleBackdropMouseDown);
+-    };
+-  }, [onClose]);
+-
+-  return (
+-    <div className="login-required-dialog__backdrop" ref={backdropRef}>
+-      <div
+-        aria-describedby={descriptionId}
+-        aria-labelledby={titleId}
+-        aria-modal="true"
+-        className="login-required-dialog"
+-        ref={dialogRef}
+-        role="dialog"
+-      >
+-        <div className="login-required-dialog__header">
+-          <h2 id={titleId}>로그인이 필요해요</h2>
+-          <p id={descriptionId}>
+-            플래너를 이용하려면 로그인이 필요해요.
+-            {"\n"}
+-            로그인하고 나만의 일정과 준비 현황을 확인해 보세요.
+-          </p>
+-        </div>
+-
+-        <div className="login-required-dialog__actions">
+-          <button onClick={onClose} type="button">
+-            취소
+-          </button>
+-          <button onClick={onLogin} type="button">
+-            로그인
+-          </button>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/FE/src/features/auth/PlannerAccessGuard.test.tsx b/FE/src/features/auth/PlannerAccessGuard.test.tsx
+deleted file mode 100644
+index 4011651b5900ba80099987c4092e4059386304b4..0000000000000000000000000000000000000000
+--- a/FE/src/features/auth/PlannerAccessGuard.test.tsx
++++ /dev/null
+@@ -1,159 +0,0 @@
+-import { fireEvent, render, screen } from "@testing-library/react";
+-import { ReactNode } from "react";
+-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-
+-import { ChecklistMigrationProvider } from "../checklist-migration";
+-import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
+-import { AuthProvider, useAuth } from "./AuthProvider";
+-import { PlannerAccessGuard } from "./PlannerAccessGuard";
+-
+-function LocationView() {
+-  const location = useLocation();
+-
+-  return <p>{`${location.pathname}${location.search}`}</p>;
+-}
+-
+-function ExpiringPlanner() {
+-  const { refreshAuth } = useAuth();
+-
+-  return (
+-    <button onClick={refreshAuth} type="button">
+-      세션 다시 확인
+-    </button>
+-  );
+-}
+-
+-function renderPlanner(content: ReactNode = <h1>플래너 대시보드</h1>) {
+-  return render(
+-    <AuthProvider>
+-      <ChecklistMigrationProvider>
+-        <MemoryRouter initialEntries={["/planner"]}>
+-          <Routes>
+-            <Route element={<PlannerAccessGuard />}>
+-              <Route path="/planner" element={content} />
+-            </Route>
+-            <Route path="/login" element={<LocationView />} />
+-          </Routes>
+-        </MemoryRouter>
+-      </ChecklistMigrationProvider>
+-    </AuthProvider>,
+-  );
+-}
+-
+-beforeEach(() => {
+-  resetWebAuthSessionForTest();
+-  vi.stubGlobal("localStorage", {
+-    getItem: vi.fn().mockReturnValue(null),
+-    removeItem: vi.fn(),
+-    setItem: vi.fn(),
+-  });
+-});
+-
+-afterEach(() => {
+-  resetWebAuthSessionForTest();
+-  vi.unstubAllGlobals();
+-});
+-
+-function expiredWebSessionResponse() {
+-  return new Response(
+-    JSON.stringify({
+-      errorCode: 206,
+-      message: "로그인 상태를 유지할 수 없습니다.",
+-    }),
+-    { status: 401 },
+-  );
+-}
+-
+-describe("PlannerAccessGuard", () => {
+-  it("인증 확인 중에는 플래너 접근자를 리다이렉트하지 않고 로딩 상태를 표시한다", () => {
+-    vi.stubGlobal(
+-      "fetch",
+-      vi.fn(() => new Promise(() => undefined)),
+-    );
+-
+-    renderPlanner();
+-
+-    expect(screen.getByRole("status").textContent).toBe(
+-      "로그인 상태를 확인하고 있습니다.",
+-    );
+-    expect(
+-      screen.queryByRole("heading", { name: "플래너 대시보드" }),
+-    ).toBeNull();
+-  });
+-
+-  it("인증 사용자는 플래너를 표시한다", async () => {
+-    vi.stubGlobal(
+-      "fetch",
+-      vi
+-        .fn()
+-        .mockResolvedValueOnce(expiredWebSessionResponse())
+-        .mockResolvedValueOnce(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+-            status: 200,
+-          }),
+-        )
+-        .mockResolvedValueOnce(
+-          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+-        ),
+-    );
+-
+-    renderPlanner();
+-
+-    expect(
+-      await screen.findByRole("heading", { name: "플래너 대시보드" }),
+-    ).toBeTruthy();
+-  });
+-
+-  it("비로그인 사용자는 안전한 플래너 복귀 정보를 유지해 로그인으로 보낸다", async () => {
+-    vi.stubGlobal(
+-      "fetch",
+-      vi.fn().mockImplementation(() =>
+-        Promise.resolve(
+-          new Response(
+-            JSON.stringify({
+-              errorCode: 201,
+-              message: "로그인이 필요합니다.",
+-            }),
+-            { status: 401 },
+-          ),
+-        ),
+-      ),
+-    );
+-
+-    renderPlanner();
+-
+-    expect(await screen.findByText("/login?returnTo=%2Fplanner")).toBeTruthy();
+-  });
+-
+-  it("플래너 이용 중 세션이 사라지면 같은 로그인 접근 제어를 적용한다", async () => {
+-    vi.stubGlobal(
+-      "fetch",
+-      vi
+-        .fn()
+-        .mockResolvedValueOnce(expiredWebSessionResponse())
+-        .mockResolvedValueOnce(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
+-            status: 200,
+-          }),
+-        )
+-        .mockResolvedValueOnce(
+-          new Response(JSON.stringify({ id: 1, items: [] }), { status: 200 }),
+-        )
+-        .mockResolvedValueOnce(expiredWebSessionResponse())
+-        .mockResolvedValueOnce(
+-          new Response(
+-            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+-            { status: 401 },
+-          ),
+-        ),
+-    );
+-
+-    renderPlanner(<ExpiringPlanner />);
+-    fireEvent.click(
+-      await screen.findByRole("button", { name: "세션 다시 확인" }),
+-    );
+-
+-    expect(await screen.findByText("/login?returnTo=%2Fplanner")).toBeTruthy();
+-  });
+-});
+diff --git a/FE/src/features/auth/PlannerAccessGuard.tsx b/FE/src/features/auth/PlannerAccessGuard.tsx
+deleted file mode 100644
+index 9af4998d22cffd2bffb809e87d94a134101a62fc..0000000000000000000000000000000000000000
+--- a/FE/src/features/auth/PlannerAccessGuard.tsx
++++ /dev/null
+@@ -1,26 +0,0 @@
+-import { Navigate, Outlet } from "react-router";
+-
+-import { useAuth } from "./AuthProvider";
+-import { createLoginPath, PLANNER_RETURN_PATH } from "./model/loginReturnPath";
+-
+-export function PlannerAccessGuard() {
+-  const { authState } = useAuth();
+-
+-  if (authState.status === "loading" || authState.status === "synchronizing") {
+-    return (
+-      <main aria-label="플래너">
+-        <p role="status">로그인 상태를 확인하고 있습니다.</p>
+-      </main>
+-    );
+-  }
+-
+-  if (authState.status === "guest") {
+-    return <Navigate replace to={createLoginPath(PLANNER_RETURN_PATH)} />;
+-  }
+-
+-  if (authState.status === "authenticated") {
+-    return <Outlet />;
+-  }
+-
+-  return null;
+-}
+diff --git a/FE/src/features/auth/api/getCurrentUser.test.ts b/FE/src/features/auth/api/getCurrentUser.test.ts
+index 2cf68ddb76b99d3962def2dbd6cba26412961499..6ed28aa487679bd2ac33010fae4db5e2ddc81f0c 100644
+--- a/FE/src/features/auth/api/getCurrentUser.test.ts
++++ b/FE/src/features/auth/api/getCurrentUser.test.ts
+@@ -20,13 +20,14 @@ afterEach(() => {
+ describe("getCurrentUser", () => {
+   it("세션 쿠키를 포함해 현재 사용자를 조회한다", async () => {
+     const fetchMock = vi.fn().mockResolvedValue(
+-      new Response(JSON.stringify({ nickname: "bibbidi" }), {
++      new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+         status: 200,
+       }),
+     );
+     vi.stubGlobal("fetch", fetchMock);
+ 
+     await expect(getCurrentUser()).resolves.toEqual({
++      id: 1,
+       nickname: "bibbidi",
+     });
+     expect(fetchMock).toHaveBeenCalledWith("/api/users/me", {
+diff --git a/FE/src/features/auth/api/getCurrentUser.ts b/FE/src/features/auth/api/getCurrentUser.ts
+index f2a911891b982f5dffa6429e67c8e93a179570b0..5c1af774186995078e3b84d7705047d9fa4fc681 100644
+--- a/FE/src/features/auth/api/getCurrentUser.ts
++++ b/FE/src/features/auth/api/getCurrentUser.ts
+@@ -6,6 +6,7 @@ const CURRENT_USER_ENDPOINT = `${apiBaseUrl}/api/users/me`;
+ const CURRENT_USER_TIMEOUT_MS = 10_000;
+ 
+ interface CurrentUserResponse {
++  id: number;
+   nickname: string;
+ }
+ 
+@@ -44,7 +45,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
+ }
+ 
+ function isCurrentUserResponse(value: unknown): value is CurrentUserResponse {
+-  return isRecord(value) && typeof value.nickname === "string";
++  return (
++    isRecord(value) &&
++    typeof value.id === "number" &&
++    Number.isSafeInteger(value.id) &&
++    value.id > 0 &&
++    typeof value.nickname === "string"
++  );
+ }
+ 
+ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
+@@ -143,6 +150,7 @@ export async function getCurrentUser(
+     }
+ 
+     return {
++      id: body.id,
+       nickname: body.nickname,
+     };
+   } finally {
+diff --git a/FE/src/features/auth/index.ts b/FE/src/features/auth/index.ts
+index 976f358fe9d8f45019b7d330fec109213f01d23a..70f4becba64b3042dafdb74e13bdd48dbee3835d 100644
+--- a/FE/src/features/auth/index.ts
++++ b/FE/src/features/auth/index.ts
+@@ -9,10 +9,4 @@ export {
+ } from "../../infrastructure/auth/webSessionManager";
+ export { createLogoutEvent } from "./analytics/authAnalytics";
+ export { useLogout } from "./useLogout";
+-export { LoginRequiredDialog } from "./LoginRequiredDialog";
+-export { PlannerAccessGuard } from "./PlannerAccessGuard";
+-export {
+-  createLoginPath,
+-  getSafeLoginReturnPath,
+-  PLANNER_RETURN_PATH,
+-} from "./model/loginReturnPath";
++export { getSafeLoginReturnPath } from "./model/loginReturnPath";
+diff --git a/FE/src/features/auth/model/auth.ts b/FE/src/features/auth/model/auth.ts
+index a6c3e439b3b6eb6669f4809c415aced4280ccf3c..eb3afe723a920456b4b401a9391b4bfd357ec7f0 100644
+--- a/FE/src/features/auth/model/auth.ts
++++ b/FE/src/features/auth/model/auth.ts
+@@ -1,4 +1,5 @@
+ export interface CurrentUser {
++  id: number;
+   nickname: string;
+ }
+ 
+diff --git a/FE/src/features/auth/model/loginReturnPath.test.ts b/FE/src/features/auth/model/loginReturnPath.test.ts
+index 3388875cf24dcc4b3c7622999bab29fee533c858..67b2ba35d28f5633d39f33e7fbb5422246e06b2e 100644
+--- a/FE/src/features/auth/model/loginReturnPath.test.ts
++++ b/FE/src/features/auth/model/loginReturnPath.test.ts
+@@ -1,18 +1,8 @@
+ import { describe, expect, it } from "vitest";
+ 
+-import {
+-  createLoginPath,
+-  getSafeLoginReturnPath,
+-  PLANNER_RETURN_PATH,
+-} from "./loginReturnPath";
++import { getSafeLoginReturnPath } from "./loginReturnPath";
+ 
+ describe("loginReturnPath", () => {
+-  it("플래너 복귀 경로를 로그인 URL로 직렬화한다", () => {
+-    expect(createLoginPath(PLANNER_RETURN_PATH)).toBe(
+-      "/login?returnTo=%2Fplanner",
+-    );
+-  });
+-
+   it("허용한 내부 플래너 경로만 복귀 경로로 사용한다", () => {
+     expect(getSafeLoginReturnPath("?returnTo=%2Fplanner")).toBe("/planner");
+     expect(getSafeLoginReturnPath("?returnTo=https%3A%2F%2Fevil.example")).toBe(
+diff --git a/FE/src/features/auth/model/loginReturnPath.ts b/FE/src/features/auth/model/loginReturnPath.ts
+index 6c742763eafda9dcb65986dca621a49146f53a1a..57fe96648123669bcc4f7855dea1e6918c372564 100644
+--- a/FE/src/features/auth/model/loginReturnPath.ts
++++ b/FE/src/features/auth/model/loginReturnPath.ts
+@@ -1,15 +1,9 @@
+-export const PLANNER_RETURN_PATH = "/planner";
++const PLANNER_RETURN_PATH = "/planner";
+ 
+-export type LoginReturnPath = typeof PLANNER_RETURN_PATH;
++type LoginReturnPath = typeof PLANNER_RETURN_PATH;
+ 
+ export function getSafeLoginReturnPath(search: string): LoginReturnPath | null {
+   const returnTo = new URLSearchParams(search).get("returnTo");
+ 
+   return returnTo === PLANNER_RETURN_PATH ? PLANNER_RETURN_PATH : null;
+ }
+-
+-export function createLoginPath(returnTo: LoginReturnPath) {
+-  const search = new URLSearchParams({ returnTo });
+-
+-  return `/login?${search.toString()}`;
+-}
+diff --git a/FE/src/features/auth/useLogout.ts b/FE/src/features/auth/useLogout.ts
+index 8fb17b8cd6e33c1430b0bc061ce63c4965237d6d..8c3d6668aabb12078a78cccb3c089482ba724854 100644
+--- a/FE/src/features/auth/useLogout.ts
++++ b/FE/src/features/auth/useLogout.ts
+@@ -42,8 +42,8 @@ export function useLogout({ onSuccess }: UseLogoutOptions) {
+       await logout(controller.signal);
+ 
+       if (isMountedRef.current && !controller.signal.aborted) {
+-        onSuccess();
+         analytics.track(createLogoutEvent());
++        onSuccess();
+       }
+     } catch (error) {
+       if (
+diff --git a/FE/src/features/checklist-migration/ChecklistMigrationProvider.test.tsx b/FE/src/features/checklist-migration/ChecklistMigrationProvider.test.tsx
+index 08619a8e6839949f97c941d87963eac6ac924ca9..dabc3e9d4acd2e6e53fc2c86b9d388b822bd25d0 100644
+--- a/FE/src/features/checklist-migration/ChecklistMigrationProvider.test.tsx
++++ b/FE/src/features/checklist-migration/ChecklistMigrationProvider.test.tsx
+@@ -77,7 +77,7 @@ function AuthSessionSwitch() {
+           `:${authState.user.nickname}`}
+       </p>
+       <button
+-        onClick={() => beginAuthentication({ nickname: "second" })}
++        onClick={() => beginAuthentication({ id: 2, nickname: "second" })}
+         type="button"
+       >
+         사용자 변경
+@@ -103,7 +103,7 @@ describe("ChecklistMigrationProvider", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+               status: 200,
+             }),
+           );
+@@ -170,7 +170,7 @@ describe("ChecklistMigrationProvider", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+             status: 200,
+           }),
+         );
+@@ -200,7 +200,7 @@ describe("ChecklistMigrationProvider", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+             status: 200,
+           }),
+         );
+@@ -233,7 +233,7 @@ describe("ChecklistMigrationProvider", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+             status: 200,
+           }),
+         );
+@@ -265,7 +265,7 @@ describe("ChecklistMigrationProvider", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "bibbidi" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+             status: 200,
+           }),
+         );
+@@ -292,7 +292,9 @@ describe("ChecklistMigrationProvider", () => {
+     const fetchMock = vi
+       .fn()
+       .mockResolvedValueOnce(
+-        new Response(JSON.stringify({ nickname: "bibbidi" }), { status: 200 }),
++        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
++          status: 200,
++        }),
+       )
+       .mockResolvedValueOnce(
+         new Response(
+@@ -323,7 +325,7 @@ describe("ChecklistMigrationProvider", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+               status: 200,
+             }),
+           );
+@@ -387,7 +389,7 @@ describe("ChecklistMigrationProvider", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "bibbidi" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+               status: 200,
+             }),
+           );
+@@ -431,7 +433,7 @@ describe("ChecklistMigrationProvider", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "first" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "first" }), {
+               status: 200,
+             }),
+           );
+diff --git a/FE/src/features/checklist-migration/ChecklistMigrationProvider.tsx b/FE/src/features/checklist-migration/ChecklistMigrationProvider.tsx
+index 4f60a8a6f3a7e00df7155994b9d29b580bd444b8..dd4ec8a3ddf2b8a5a94c37984cb8d03e9b87f017 100644
+--- a/FE/src/features/checklist-migration/ChecklistMigrationProvider.tsx
++++ b/FE/src/features/checklist-migration/ChecklistMigrationProvider.tsx
+@@ -32,7 +32,7 @@ export function ChecklistMigrationProvider({
+     authState.status === "authenticated" ||
+     authState.status === "synchronizing" ||
+     authState.status === "accountSetupRequired"
+-      ? `authenticated:${authState.user.nickname}`
++      ? `authenticated:${authState.user.id}`
+       : authState.status;
+ 
+   return (
+diff --git a/FE/src/features/checklist/ChecklistFeature.test.tsx b/FE/src/features/checklist/ChecklistFeature.test.tsx
+index 75bee023969176358ae7e8d8dd8ac4103b506a34..11ff3c15b1189fc7e6aac2f209f80555a2ea4bf9 100644
+--- a/FE/src/features/checklist/ChecklistFeature.test.tsx
++++ b/FE/src/features/checklist/ChecklistFeature.test.tsx
+@@ -16,11 +16,11 @@ import { installMatchMedia } from "../../test/matchMedia";
+ 
+ const authMocks = vi.hoisted(() => ({
+   authState: { status: "guest" } as
+-    | { status: "authenticated"; user: { nickname: string } }
++    | { status: "authenticated"; user: { id: number; nickname: string } }
+     | { status: "error" }
+     | { status: "guest" }
+     | { status: "loading" }
+-    | { status: "synchronizing"; user: { nickname: string } },
++    | { status: "synchronizing"; user: { id: number; nickname: string } },
+   refreshAuth: vi.fn(),
+ }));
+ const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+@@ -263,7 +263,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+ 
+     authMocks.authState = {
+       status: "synchronizing",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+@@ -303,7 +303,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue({
+       categories: [
+@@ -545,7 +545,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("로그인 사용자는 같은 일정 추가 진입점에서 데스크톱 입력 패널을 연다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -589,7 +589,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("검증을 통과한 일정 값을 로컬 날짜·시간 문자열로 submit 경계에 전달한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -664,7 +664,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("생성 성공 후 기존 체크리스트 revision으로 상세 목록과 대표 날짜를 갱신한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -737,7 +737,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("401은 refreshAuth로 연결하고 내부 메시지를 입력 UI에 표시하지 않는다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -764,7 +764,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("생성 후 체크리스트 재조회에서 401이면 인증을 갱신하고 POST를 반복하지 않는다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -792,7 +792,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("생성 후 조회만 실패하면 입력을 유지하고 재시도에서 POST를 반복하지 않는다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -832,7 +832,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("일정 입력 오류를 각 필드에 연결하고 첫 오류 입력으로 초점을 이동한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -886,7 +886,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("제출 중 상태를 입력 View에 전달해 취소와 중복 저장을 막는다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -952,7 +952,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("제출 실패 시 alert와 별도의 오류 요약에 초점을 이동하고 입력을 유지한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -999,7 +999,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("일정 입력 취소 시 draft를 버리고 진입점으로 초점을 복원한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1028,7 +1028,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("일정 입력 중 다른 할 일을 선택하면 새 선택 항목의 초점을 유지하고 draft를 버린다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     const checklist = createAuthenticatedChecklist();
+     checklist.categories[0].items.push({
+@@ -1077,7 +1077,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1125,7 +1125,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1154,7 +1154,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("실제 생성 명령을 연결하고 성공 후 작성 상태와 URL을 초기화한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1256,7 +1256,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("생성 실패 시 작성값과 패널을 유지하고 오류를 지운 뒤 재시도한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1298,7 +1298,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("생성 인증 오류를 refreshAuth에 연결하고 인증 확인 중 draft와 URL을 유지한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1324,7 +1324,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+@@ -1339,7 +1339,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("인증 사용자가 바뀌면 이전 작성 세션과 addTask URL을 초기화한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "first" },
++      user: { id: 1, nickname: "first" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1356,7 +1356,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "second" },
++      user: { id: 2, nickname: "second" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+@@ -1373,7 +1373,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
+   it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1651,7 +1651,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+   it("플래너 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1665,7 +1665,11 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+     await waitFor(() =>
+       expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
+     );
+-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "planner_appointment_start",
++      ),
++    ).toHaveLength(1);
+     expect(analyticsMocks.track).toHaveBeenCalledWith({
+       name: "planner_appointment_start",
+       parameters: { entry_type: "unscheduled_task", source: "planner" },
+@@ -1681,13 +1685,17 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+     expect(
+       await screen.findByRole("complementary", { name: "일정 추가" }),
+     ).toBeTruthy();
+-    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "planner_appointment_start",
++      ),
++    ).toHaveLength(2);
+   });
+ 
+   it("플래너에서 연 일정 입력을 취소한 뒤 뒤로 가면 플래너로 돌아간다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1712,7 +1720,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1748,7 +1756,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+   it("존재하지 않는 플래너 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -1839,7 +1847,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
+   it("일정 수정 중 캐시 revision이 바뀌어도 새 조회 전까지 입력을 유지한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     const checklist = createAuthenticatedChecklist();
+     checklist.categories[0].items[0].appointments = [
+@@ -1927,7 +1935,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
+   it("인증 오류를 refreshAuth 흐름에 연결한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockRejectedValue(
+       new ChecklistQueryAuthenticationRequiredError(),
+@@ -1982,7 +1990,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+@@ -2001,7 +2009,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
+   it("인증 대상의 Repository가 바뀌면 이전 요청을 취소한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "first" },
++      user: { id: 1, nickname: "first" },
+     };
+     let firstSignal: AbortSignal | undefined;
+     const firstGetChecklist = vi.fn(
+@@ -2016,7 +2024,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "second" },
++      user: { id: 2, nickname: "second" },
+     };
+     const secondGetChecklist = vi
+       .fn()
+@@ -2082,7 +2090,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
+   beforeEach(() => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getChecklist.mockResolvedValue(
+       createAuthenticatedChecklist(),
+@@ -2137,7 +2145,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+@@ -2233,7 +2241,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     view.rerender(<ChecklistFeatureTestApp />);
+ 
+diff --git a/FE/src/features/checklist/ChecklistFeature.tsx b/FE/src/features/checklist/ChecklistFeature.tsx
+index 7e231200127bbffc07a575200e1f8af3c77307d0..21f4c29797c6d29fa859e30e1eda59c93d96dcf3 100644
+--- a/FE/src/features/checklist/ChecklistFeature.tsx
++++ b/FE/src/features/checklist/ChecklistFeature.tsx
+@@ -115,7 +115,7 @@ export function ChecklistFeature({
+         : undefined;
+   const sessionIdentity =
+     authState.status === "authenticated" || authState.status === "synchronizing"
+-      ? `authenticated:${authState.user.nickname}`
++      ? `authenticated:${authState.user.id}`
+       : authState.status === "guest"
+         ? "guest"
+         : undefined;
+diff --git a/FE/src/features/checklist/useChecklistAppointmentCreation.test.tsx b/FE/src/features/checklist/useChecklistAppointmentCreation.test.tsx
+index 320d1f705e10f596d3893b5327dfcfa440939587..15e456220cde4d1cc402c1373892536e519bdcf0 100644
+--- a/FE/src/features/checklist/useChecklistAppointmentCreation.test.tsx
++++ b/FE/src/features/checklist/useChecklistAppointmentCreation.test.tsx
+@@ -61,6 +61,40 @@ async function submit() {
+ }
+ 
+ describe("useChecklistAppointmentCreation", () => {
++  it("검증을 통과한 실제 저장 시도에서 submit을 한 번 기록한다", async () => {
++    const onSubmit = vi.fn().mockResolvedValue(true);
++    render(<Harness onSubmit={onSubmit} />);
++    withController(() => {
++      controller.open();
++      controller.changeTitle("상담");
++      controller.changeDate("2026-09-20");
++    });
++    await submit();
++    expect(onSubmit).toHaveBeenCalledOnce();
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "appointment_submit",
++      ),
++    ).toEqual([
++      [{ name: "appointment_submit", parameters: { source: "checklist" } }],
++    ]);
++    expect(analyticsMocks.track.mock.invocationCallOrder[1]).toBeLessThan(
++      onSubmit.mock.invocationCallOrder[0],
++    );
++  });
++  it("일정 폼 조회와 제출 후 검증 실패를 원문 없이 계측한다", async () => {
++    render(<Harness onSubmit={vi.fn()} />);
++    withController(controller.open);
++    withController(controller.open);
++    await submit();
++    expect(analyticsMocks.track.mock.calls.map(([event]) => event)).toEqual([
++      { name: "appointment_form_view", parameters: { source: "checklist" } },
++      {
++        name: "appointment_create_failed",
++        parameters: { source: "checklist", failure_kind: "validation" },
++      },
++    ]);
++  });
+   it("필수값, 길이, 유효한 날짜와 시간 순서를 검증하고 첫 오류를 반환한다", async () => {
+     render(<Harness onSubmit={vi.fn()} />);
+     withController(controller.open);
+@@ -145,7 +179,11 @@ describe("useChecklistAppointmentCreation", () => {
+     );
+     expect(controller.isOpen).toBe(false);
+     expect(controller.draft.title).toBe("");
+-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "appointment_create",
++      ),
++    ).toHaveLength(1);
+     expect(analyticsMocks.track).toHaveBeenCalledWith({
+       name: "appointment_create",
+       parameters: { creation_type: "checklist_item", source: "checklist" },
+@@ -181,14 +219,20 @@ describe("useChecklistAppointmentCreation", () => {
+     withController(controller.cancel);
+     expect(onSubmit).toHaveBeenCalledOnce();
+     expect(controller.isOpen).toBe(true);
+-    expect(analyticsMocks.track).not.toHaveBeenCalled();
++    expect(analyticsMocks.track).not.toHaveBeenCalledWith(
++      expect.objectContaining({ name: "appointment_create" }),
++    );
+ 
+     await act(async () => {
+       resolveSubmission?.(true);
+       await firstSubmission;
+     });
+     expect(controller.isOpen).toBe(false);
+-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "appointment_create",
++      ),
++    ).toHaveLength(1);
+   });
+ 
+   it("플래너에서 연 일정 생성의 고정 유입 위치를 보존한다", async () => {
+@@ -221,7 +265,9 @@ describe("useChecklistAppointmentCreation", () => {
+       controller.changeDate("2026-09-20");
+     });
+     await submit();
+-    expect(analyticsMocks.track).not.toHaveBeenCalled();
++    expect(analyticsMocks.track).not.toHaveBeenCalledWith(
++      expect.objectContaining({ name: "appointment_create" }),
++    );
+     expect(controller.isOpen).toBe(true);
+     expect(controller.draft.title).toBe("상담");
+     expect(controller.submissionState).toEqual({
+@@ -232,8 +278,15 @@ describe("useChecklistAppointmentCreation", () => {
+     await submit();
+     expect(onSubmit).toHaveBeenCalledTimes(2);
+     expect(onSubmit.mock.calls[0][0]).toEqual(onSubmit.mock.calls[1][0]);
++    expect(JSON.stringify(analyticsMocks.track.mock.calls)).not.toContain(
++      "internal secret",
++    );
+     expect(controller.isOpen).toBe(false);
+-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
++    expect(
++      analyticsMocks.track.mock.calls.filter(
++        ([event]) => event.name === "appointment_create",
++      ),
++    ).toHaveLength(1);
+   });
+ 
+   it("취소 후 재열기와 인증 대상·체크리스트 항목 변경 시 draft를 정리한다", async () => {
+@@ -324,7 +377,9 @@ describe("useChecklistAppointmentCreation", () => {
+       await submission;
+     });
+     expect(onSubmit).toHaveBeenCalledOnce();
+-    expect(analyticsMocks.track).not.toHaveBeenCalled();
++    expect(analyticsMocks.track).not.toHaveBeenCalledWith(
++      expect.objectContaining({ name: "appointment_create" }),
++    );
+   });
+ 
+   it.each([
+diff --git a/FE/src/features/checklist/useChecklistAppointmentCreation.ts b/FE/src/features/checklist/useChecklistAppointmentCreation.ts
+index 0796b7377d063c93e4dd58928e45477122d28f91..42fbbc5bb31a0900fd35fa7f5a39902e1ed3daed 100644
+--- a/FE/src/features/checklist/useChecklistAppointmentCreation.ts
++++ b/FE/src/features/checklist/useChecklistAppointmentCreation.ts
+@@ -271,6 +271,11 @@ export function useChecklistAppointmentCreation({
+     isOpen: isCurrentContext && isOpen,
+     open: (source = "checklist") => {
+       if (isAuthenticated && checklistItemId !== null) {
++        if (!isOpen)
++          analytics.track({
++            name: "appointment_form_view",
++            parameters: { source },
++          });
+         sourceRef.current = source;
+         setIsOpen(true);
+       }
+@@ -291,9 +296,19 @@ export function useChecklistAppointmentCreation({
+       const firstError = getFirstAppointmentErrorField(nextErrors);
+ 
+       if (firstError) {
++        analytics.track({
++          name: "appointment_create_failed",
++          parameters: { source: sourceRef.current, failure_kind: "validation" },
++        });
+         return firstError;
+       }
+ 
++      if (!needsRefreshRef.current)
++        analytics.track({
++          name: "appointment_submit",
++          parameters: { source: sourceRef.current },
++        });
++
+       const requestGeneration = requestGenerationRef.current + 1;
+       requestGenerationRef.current = requestGeneration;
+       const requestController = new AbortController();
+@@ -337,9 +352,22 @@ export function useChecklistAppointmentCreation({
+           !requestController.signal.aborted &&
+           !(error instanceof MyChecklistRequestAbortedError)
+         ) {
++          const wasRefreshing = needsRefreshRef.current;
+           needsRefreshRef.current =
+             error instanceof AppointmentCreationError &&
+             error.reason === "refresh-failed";
++          if (!wasRefreshing && !needsRefreshRef.current) {
++            analytics.track({
++              name: "appointment_create_failed",
++              parameters: {
++                source: sourceRef.current,
++                failure_kind:
++                  error instanceof AppointmentCreationError
++                    ? error.reason
++                    : "unknown",
++              },
++            });
++          }
+           setSubmissionState({
+             message:
+               error instanceof AppointmentCreationError
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+index 6e98a64ea977054dc18adf42d38ac7fc5f39613b..e1f23433bb51286873f8509b49e160dbcb722ccc 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+@@ -116,7 +116,7 @@ beforeEach(() => {
+     .mockReset()
+     .mockResolvedValue([]);
+   vi.mocked(useAuth).mockReturnValue({
+-    authState: { status: "authenticated", user: { nickname: "비비디" } },
++    authState: { status: "authenticated", user: { id: 1, nickname: "비비디" } },
+     beginAuthentication: vi.fn(),
+     beginOnboarding: vi.fn(),
+     completeAuthentication: vi.fn(),
+@@ -128,6 +128,52 @@ beforeEach(() => {
+ });
+ 
+ describe("HomeScheduleDashboardFeature", () => {
++  it("비로그인 사용자에게 안내를 표시하고 개인화 API를 호출하지 않는다", () => {
++    const nearbyRepository = createRepository();
++    const unscheduledRepository = createUnscheduledRepository();
++    const recommendedRepository = createRecommendedRepository();
++    vi.mocked(useAuth).mockReturnValue({
++      authState: { status: "guest" },
++      beginAuthentication: vi.fn(),
++      beginOnboarding: vi.fn(),
++      completeAuthentication: vi.fn(),
++      endAuthentication: vi.fn(),
++      failAuthentication: vi.fn(),
++      requireAccountSetup: vi.fn(),
++      refreshAuth,
++    });
++
++    render(
++      <HomeScheduleDashboardFeature
++        nearbyRepository={nearbyRepository}
++        recommendedRepository={recommendedRepository}
++        unscheduledRepository={unscheduledRepository}
++      />,
++    );
++
++    expect(
++      screen.getByText("로그인하면 가까운 일정을 확인할 수 있어요."),
++    ).toBeTruthy();
++    expect(
++      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
++    ).toBeTruthy();
++    expect(
++      screen.getByText("로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요."),
++    ).toBeTruthy();
++    expect(
++      screen.getAllByText(
++        "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
++      ),
++    ).toHaveLength(2);
++    expect(screen.queryByRole("button")).toBeNull();
++    expect(screen.queryByRole("link")).toBeNull();
++    expect(nearbyRepository.getNearbyAppointments).not.toHaveBeenCalled();
++    expect(unscheduledRepository.getUnscheduledTasks).not.toHaveBeenCalled();
++    expect(
++      recommendedRepository.getRecommendedCatalogItems,
++    ).not.toHaveBeenCalled();
++  });
++
+   it("Loading에서 API 순서를 유지한 Complete 목록으로 전환한다", async () => {
+     let resolveRequest: Parameters<
+       ConstructorParameters<
+@@ -859,7 +905,10 @@ describe("HomeScheduleDashboardFeature", () => {
+       .calls[0][2];
+ 
+     vi.mocked(useAuth).mockReturnValue({
+-      authState: { status: "authenticated", user: { nickname: "새 사용자" } },
++      authState: {
++        status: "authenticated",
++        user: { id: 2, nickname: "새 사용자" },
++      },
+       beginAuthentication: vi.fn(),
+       beginOnboarding: vi.fn(),
+       completeAuthentication: vi.fn(),
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+index fb3555bf9b686492813bd49cda3cab6358275c68..23b7a41a7760bb786be7176bf2f1a4f6d4410787 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+@@ -31,7 +31,10 @@ import {
+   UnscheduledTasksRequestAbortedError,
+ } from "./repository/unscheduledTasksRepository";
+ import { createHomeScheduleDashboardViewModel } from "./view-model/createHomeScheduleDashboardViewModel";
+-import { HomeScheduleDashboard } from "./view/HomeScheduleDashboard";
++import {
++  GuestHomeScheduleDashboard,
++  HomeScheduleDashboard,
++} from "./view/HomeScheduleDashboard";
+ import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
+ 
+ const initialModel: HomeScheduleDashboardModel = {
+@@ -70,7 +73,7 @@ export function HomeScheduleDashboardFeature({
+   const { authState, refreshAuth } = useAuth();
+   const authScope =
+     authState.status === "authenticated"
+-      ? `authenticated:${authState.user.nickname}`
++      ? `authenticated:${authState.user.id}`
+       : authState.status;
+   const checklistRepository = usePreparationChecklistRepository();
+   const [unscheduled, setUnscheduled] =
+@@ -87,6 +90,10 @@ export function HomeScheduleDashboardFeature({
+   const [upcomingRequestRevision, setUpcomingRequestRevision] = useState(0);
+ 
+   useEffect(() => {
++    if (authState.status !== "authenticated") {
++      return;
++    }
++
+     const controller = new AbortController();
+     let isActive = true;
+ 
+@@ -130,6 +137,7 @@ export function HomeScheduleDashboardFeature({
+       controller.abort();
+     };
+   }, [
++    authState.status,
+     authScope,
+     getReferenceDate,
+     nearbyRepository,
+@@ -138,6 +146,10 @@ export function HomeScheduleDashboardFeature({
+   ]);
+ 
+   useEffect(() => {
++    if (authState.status !== "authenticated") {
++      return;
++    }
++
+     const controller = new AbortController();
+     let isActive = true;
+ 
+@@ -175,6 +187,7 @@ export function HomeScheduleDashboardFeature({
+       controller.abort();
+     };
+   }, [
++    authState.status,
+     authScope,
+     refreshAuth,
+     unscheduledRepository,
+@@ -182,6 +195,10 @@ export function HomeScheduleDashboardFeature({
+   ]);
+ 
+   useEffect(() => {
++    if (authState.status !== "authenticated") {
++      return;
++    }
++
+     const controller = new AbortController();
+     let isActive = true;
+ 
+@@ -221,6 +238,7 @@ export function HomeScheduleDashboardFeature({
+       controller.abort();
+     };
+   }, [
++    authState.status,
+     authScope,
+     recommendedRepository,
+     recommendedRequestRevision,
+@@ -276,15 +294,20 @@ export function HomeScheduleDashboardFeature({
+   });
+ 
+   const viewModel = createHomeScheduleDashboardViewModel(
+-    {
+-      ...initialModel,
+-      recommended,
+-      unscheduled,
+-      upcoming,
+-    },
++    authState.status === "authenticated"
++      ? {
++          recommended,
++          unscheduled,
++          upcoming,
++        }
++      : initialModel,
+     { recommendedTaskAddition },
+   );
+ 
++  if (authState.status === "guest") {
++    return <GuestHomeScheduleDashboard />;
++  }
++
+   return (
+     <HomeScheduleDashboard
+       onAddRecommendedTask={recommendedTaskAddition.add}
+diff --git a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+index 5e6ac239f7c2a5f1421376bce71d065b5c9ab852..bd2669de00ecf6d3d8dcdba5bf0c30393e5d7274 100644
+--- a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
++++ b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+@@ -19,23 +19,24 @@ import {
+ } from "./createUpcomingScheduleViewModel";
+ 
+ export type HomeScheduleDashboardResultIcon =
+-  "alert" | "calendar-check" | "calendar-days" | "calendar-heart";
++  "alert" | "calendar-check" | "calendar-days" | "calendar-heart" | "lock";
+ 
+ export type HomeScheduleDashboardResultTone = "critical" | "neutral";
+ 
+ export interface HomeScheduleDashboardResultViewModel {
+-  actionLabel: string;
++  actionLabel?: string;
+   actionTo?: string;
+-  actionVariant: "button" | "link";
++  actionVariant?: "button" | "link";
+   description: string;
+   icon: HomeScheduleDashboardResultIcon;
+-  isActionDisabled: boolean;
++  isActionDisabled?: boolean;
+   title: string;
+   tone: HomeScheduleDashboardResultTone;
+ }
+ 
+ export interface HomeScheduleDashboardResultSectionViewModel<
+-  TStatus extends "empty" | "error" = "empty" | "error",
++  TStatus extends "authentication-required" | "empty" | "error" =
++    "authentication-required" | "empty" | "error",
+ > {
+   countLabel?: string;
+   result: HomeScheduleDashboardResultViewModel;
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.tsx b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+index 013680fbd2c4b356e65757037bbb30feb722f893..ae4c6907e966e494475c1b41f9bdca547de7db28 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.tsx
++++ b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+@@ -67,6 +67,13 @@ function ResultIcon({ icon }: { icon: HomeScheduleDashboardResultIcon }) {
+           <path d="M12 18s-3-1.7-3-4a1.8 1.8 0 0 1 3-1.3 1.8 1.8 0 0 1 3 1.3c0 2.3-3 4-3 4Z" />
+         </svg>
+       );
++    case "lock":
++      return (
++        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
++          <rect height="10" rx="2" width="14" x="5" y="11" />
++          <path d="M8 11V8a4 4 0 0 1 8 0v3M12 15v2" />
++        </svg>
++      );
+     default:
+       return assertNever(icon);
+   }
+@@ -106,26 +113,28 @@ function DashboardResult({
+       </span>
+       <h3>{viewModel.title}</h3>
+       <p>{viewModel.description}</p>
+-      {viewModel.actionTo ? (
+-        <Link
+-          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+-          to={viewModel.actionTo}
+-        >
+-          {viewModel.actionLabel}
+-          <ChevronRightIcon />
+-        </Link>
+-      ) : (
+-        <button
+-          className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
+-          disabled={viewModel.isActionDisabled}
+-          onClick={onAction}
+-          type="button"
+-        >
+-          {viewModel.actionVariant === "button" && <RefreshIcon />}
+-          {viewModel.actionLabel}
+-          {viewModel.actionVariant === "link" && <ChevronRightIcon />}
+-        </button>
+-      )}
++      {viewModel.actionLabel && viewModel.actionVariant ? (
++        viewModel.actionTo ? (
++          <Link
++            className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
++            to={viewModel.actionTo}
++          >
++            {viewModel.actionLabel}
++            <ChevronRightIcon />
++          </Link>
++        ) : (
++          <button
++            className={`home-dashboard-state__result-action home-dashboard-state__result-action--${viewModel.actionVariant}`}
++            disabled={viewModel.isActionDisabled}
++            onClick={onAction}
++            type="button"
++          >
++            {viewModel.actionVariant === "button" && <RefreshIcon />}
++            {viewModel.actionLabel}
++            {viewModel.actionVariant === "link" && <ChevronRightIcon />}
++          </button>
++        )
++      ) : null}
+     </div>
+   );
+ }
+@@ -387,6 +396,64 @@ function RecommendedScheduleSection({
+   }
+ }
+ 
++const guestUpcomingViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
++  {
++    result: {
++      description: "체크리스트에 등록한 일정이 여기에 표시돼요.",
++      icon: "lock",
++      title: "로그인하면 가까운 일정을 확인할 수 있어요.",
++      tone: "neutral",
++    },
++    status: "authentication-required",
++    title: "가까운 일정",
++  };
++
++const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
++  {
++    result: {
++      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
++      icon: "lock",
++      title: "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
++      tone: "neutral",
++    },
++    status: "authentication-required",
++    title: "일정이 필요한 할 일",
++  };
++
++const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
++  {
++    result: {
++      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
++      icon: "lock",
++      title: "로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요.",
++      tone: "neutral",
++    },
++    status: "authentication-required",
++    title: "추천 할 일",
++  };
++
++export function GuestHomeScheduleDashboard() {
++  return (
++    <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
++      <div className="home-dashboard-state__top">
++        <DashboardResultSection
++          id="dashboard-upcoming-schedule"
++          viewModel={guestUpcomingViewModel}
++        />
++        <DashboardResultSection
++          id="dashboard-unscheduled-task"
++          viewModel={guestUnscheduledViewModel}
++        />
++      </div>
++      <DashboardResultSection
++        className="home-dashboard-state__section--recommended"
++        id="dashboard-recommended-schedule"
++        viewModel={guestRecommendedViewModel}
++      />
++    </section>
++  );
++}
++
+ export function HomeScheduleDashboard({
+   onAddRecommendedTask,
+   onRetryRecommended,
+diff --git a/FE/src/features/onboarding/OnboardingFeature.test.tsx b/FE/src/features/onboarding/OnboardingFeature.test.tsx
+index f57fba427ea7ce5d1fe35e1906a245a5871f24a1..7c09e767e728f414b25af743659a1c9484d589f4 100644
+--- a/FE/src/features/onboarding/OnboardingFeature.test.tsx
++++ b/FE/src/features/onboarding/OnboardingFeature.test.tsx
+@@ -12,6 +12,7 @@ import {
+   resetWebAuthSessionForTest,
+ } from "../../infrastructure/auth/webSessionManager";
+ import { OnboardingFeature } from "./OnboardingFeature";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ const requiredTerms = [
+   {
+@@ -47,12 +48,14 @@ beforeEach(() => {
+ });
+ 
+ afterEach(() => {
++  vi.restoreAllMocks();
+   resetWebAuthSessionForTest();
+   vi.unstubAllGlobals();
+ });
+ 
+ describe("OnboardingFeature", () => {
+   it("약관 전문과 전체 동의를 제공하고 동의 후 새 토큰을 반영한다", async () => {
++    const track = vi.spyOn(analytics, "track");
+     const onSuccess = vi.fn();
+     const fetchMock = vi
+       .fn()
+@@ -98,6 +101,10 @@ describe("OnboardingFeature", () => {
+     fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
+ 
+     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
++    expect(track).toHaveBeenCalledExactlyOnceWith({
++      name: "onboarding_terms_complete",
++      parameters: {},
++    });
+     expect(fetchMock).toHaveBeenCalledTimes(2);
+     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/users/me/terms-agreement");
+     expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+diff --git a/FE/src/features/onboarding/useOnboardingFlow.ts b/FE/src/features/onboarding/useOnboardingFlow.ts
+index 43d3e6c81e075a85f8be9d0e7e20b16c9289b346..c676ff217659d43f336840c7a705b0116a8b196c 100644
+--- a/FE/src/features/onboarding/useOnboardingFlow.ts
++++ b/FE/src/features/onboarding/useOnboardingFlow.ts
+@@ -1,4 +1,5 @@
+ import { useCallback, useEffect, useRef, useState } from "react";
++import { analytics } from "../../infrastructure/analytics";
+ 
+ import { acceptWebAccessToken, refreshWebSession } from "../auth";
+ import { WebSessionExpiredError } from "../../infrastructure/auth/webSessionApi";
+@@ -257,6 +258,7 @@ export function useOnboardingFlow({
+       }
+ 
+       if (termsWereAgreed && !controller.signal.aborted) {
++        analytics.track({ name: "onboarding_terms_complete", parameters: {} });
+         onSuccess();
+       }
+     } finally {
+diff --git a/FE/src/features/social-login/analytics/socialLoginAnalytics.ts b/FE/src/features/social-login/analytics/socialLoginAnalytics.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..aa1b7bf1ad3154a6df2db0c33382ce52383175aa
+--- /dev/null
++++ b/FE/src/features/social-login/analytics/socialLoginAnalytics.ts
+@@ -0,0 +1,32 @@
++import type { AnalyticsEvent } from "../../../infrastructure/analytics";
++import {
++  SocialLoginApiError,
++  SocialLoginNetworkError,
++  SocialLoginTimeoutError,
++} from "../api/socialLogin";
++
++export function socialLoginFailureKind(error: unknown): string {
++  if (error instanceof SocialLoginNetworkError) return "network";
++  if (error instanceof SocialLoginTimeoutError) return "timeout";
++  if (error instanceof SocialLoginApiError)
++    return error.errorCode === 208 ? "state_invalid_or_expired" : "api";
++  return "unknown";
++}
++
++export function createSocialLoginEvent(
++  name:
++    | "social_login_start"
++    | "social_login_start_failed"
++    | "social_login_callback_failed"
++    | "social_login_callback_complete",
++  provider: string,
++  parameters: { failure_kind?: string; terms_required?: boolean } = {},
++): AnalyticsEvent {
++  return {
++    name,
++    parameters: {
++      provider: ["kakao", "google"].includes(provider) ? provider : "unknown",
++      ...parameters,
++    },
++  };
++}
+diff --git a/FE/src/features/social-login/view/SocialLoginCallback.test.tsx b/FE/src/features/social-login/view/SocialLoginCallback.test.tsx
+index ba791b5af2119e761d2edb56bf67b080677ed2ec..f8edd13b5a99994322f3d7d57aab0d16c743028a 100644
+--- a/FE/src/features/social-login/view/SocialLoginCallback.test.tsx
++++ b/FE/src/features/social-login/view/SocialLoginCallback.test.tsx
+@@ -3,8 +3,10 @@ import { StrictMode } from "react";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+ import { SocialLoginCallback } from "./SocialLoginCallback";
++import { analytics } from "../../../infrastructure/analytics";
+ 
+ afterEach(() => {
++  vi.restoreAllMocks();
+   vi.unstubAllGlobals();
+ });
+ 
+@@ -30,6 +32,39 @@ function jsonResponse(body: unknown, status: number) {
+ }
+ 
+ describe("SocialLoginCallback", () => {
++  it.each([
++    ["?error=access_denied&error_description=secret", "cancelled"],
++    ["?code=secret", "invalid_callback"],
++  ])("콜백 입력 %s의 고정 실패 분류만 한 번 보낸다", async (search, kind) => {
++    const track = vi.spyOn(analytics, "track");
++    renderCallback("kakao", search);
++    await screen.findByRole("alert");
++    expect(track).toHaveBeenCalledExactlyOnceWith({
++      name: "social_login_callback_failed",
++      parameters: { provider: "kakao", failure_kind: kind },
++    });
++  });
++
++  it("208의 state 오류/만료를 구분할 수 있는 범위에서만 계측한다", async () => {
++    const track = vi.spyOn(analytics, "track");
++    vi.stubGlobal(
++      "fetch",
++      vi
++        .fn()
++        .mockResolvedValue(
++          jsonResponse({ errorCode: 208, message: "secret" }, 401),
++        ),
++    );
++    renderCallback("google", "?code=secret&state=secret");
++    await screen.findByRole("alert");
++    expect(track).toHaveBeenCalledExactlyOnceWith({
++      name: "social_login_callback_failed",
++      parameters: {
++        provider: "google",
++        failure_kind: "state_invalid_or_expired",
++      },
++    });
++  });
+   it("돌아온 code와 state를 서버에 한 번만 보낸다", async () => {
+     const fetchMock = vi
+       .fn()
+diff --git a/FE/src/features/social-login/view/SocialLoginCallback.tsx b/FE/src/features/social-login/view/SocialLoginCallback.tsx
+index 3b0a0f3e56d02290539905a9e06c0e44f7a7232e..9dabf2f1852ac0077865f59f3da7f278c90def49 100644
+--- a/FE/src/features/social-login/view/SocialLoginCallback.tsx
++++ b/FE/src/features/social-login/view/SocialLoginCallback.tsx
+@@ -1,4 +1,9 @@
+ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
++import { analytics } from "../../../infrastructure/analytics";
++import {
++  createSocialLoginEvent,
++  socialLoginFailureKind,
++} from "../analytics/socialLoginAnalytics";
+ 
+ import { completeSocialLogin, SocialLoginApiError } from "../api/socialLogin";
+ import {
+@@ -41,13 +46,28 @@ export function SocialLoginCallback({
+   const hasRequestedRef = useRef(false);
+ 
+   useEffect(() => {
+-    if (hasRequestedRef.current || params.status === "invalid" || !canRequest) {
++    if (hasRequestedRef.current) {
+       return;
+     }
+     hasRequestedRef.current = true;
++    if (params.status === "invalid" || !canRequest) {
++      const cancelled =
++        new URLSearchParams(search).get("error") === "access_denied";
++      analytics.track(
++        createSocialLoginEvent("social_login_callback_failed", provider, {
++          failure_kind: cancelled ? "cancelled" : "invalid_callback",
++        }),
++      );
++      return;
++    }
+ 
+     completeSocialLogin(provider, params.code, params.state)
+       .then((session) => {
++        analytics.track(
++          createSocialLoginEvent("social_login_callback_complete", provider, {
++            terms_required: session.termsAgreementRequired,
++          }),
++        );
+         onSuccess?.(session);
+         setCallbackState({
+           status: "success",
+@@ -55,6 +75,11 @@ export function SocialLoginCallback({
+         });
+       })
+       .catch((error: unknown) => {
++        analytics.track(
++          createSocialLoginEvent("social_login_callback_failed", provider, {
++            failure_kind: socialLoginFailureKind(error),
++          }),
++        );
+         setCallbackState({
+           status: "failure",
+           message:
+@@ -63,7 +88,7 @@ export function SocialLoginCallback({
+               : INVALID_CALLBACK_MESSAGE,
+         });
+       });
+-  }, [canRequest, onSuccess, params, provider]);
++  }, [canRequest, onSuccess, params, provider, search]);
+ 
+   if (callbackState.status === "pending") {
+     return (
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.tsx b/FE/src/features/social-login/view/SocialLoginForm.tsx
+index 01ab4d6ed5b3cb586430c18c4f7c8331f487cad2..dd36232c85f55283636aacd982d18405c0191cad 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.tsx
++++ b/FE/src/features/social-login/view/SocialLoginForm.tsx
+@@ -1,6 +1,11 @@
+ import { useEffect, useState } from "react";
+ 
+ import loginCouplePreview from "../../../assets/login-couple-preview.png";
++import { analytics } from "../../../infrastructure/analytics";
++import {
++  createSocialLoginEvent,
++  socialLoginFailureKind,
++} from "../analytics/socialLoginAnalytics";
+ import { startSocialAuthorization } from "../api/socialLogin";
+ import { isConnectedSocialProvider } from "../model/socialLogin";
+ import "./SocialLoginForm.css";
+@@ -80,10 +85,16 @@ export function SocialLoginForm() {
+     }
+ 
+     setIsSocialRedirecting(true);
++    analytics.track(createSocialLoginEvent("social_login_start", provider.id));
+     setSocialLoginNotice(`${provider.label} 로그인 화면으로 이동하고 있어요.`);
+     startSocialAuthorization(provider.id)
+       .then((authorizationUri) => window.location.assign(authorizationUri))
+-      .catch(() => {
++      .catch((error: unknown) => {
++        analytics.track(
++          createSocialLoginEvent("social_login_start_failed", provider.id, {
++            failure_kind: socialLoginFailureKind(error),
++          }),
++        );
+         setIsSocialRedirecting(false);
+         setSocialLoginNotice(
+           `${provider.label} 로그인을 시작하지 못했어요. 다시 시도해 주세요.`,
+diff --git a/FE/src/infrastructure/analytics/analytics.ts b/FE/src/infrastructure/analytics/analytics.ts
+index 33df1693dd75f07c558236beb6d2dd496739c0ef..2f0d9076cb41742d43137a2897b4c146959b9248 100644
+--- a/FE/src/infrastructure/analytics/analytics.ts
++++ b/FE/src/infrastructure/analytics/analytics.ts
+@@ -8,11 +8,28 @@ export interface AnalyticsEvent {
+ export interface AnalyticsProvider {
+   initialize: () => void;
+   track: (event: AnalyticsEvent) => void;
++  setContext?: (context: AnalyticsContext) => void;
++  reset?: () => void;
++}
++
++export interface AnalyticsContext {
++  authState:
++    | "loading"
++    | "guest"
++    | "onboardingRequired"
++    | "accountSetupRequired"
++    | "synchronizing"
++    | "authenticated"
++    | "error";
++  pathname: string;
++  userId?: number;
+ }
+ 
+ export interface AnalyticsClient {
+   initialize: () => void;
+   track: (event: AnalyticsEvent) => void;
++  setContext: (context: AnalyticsContext) => void;
++  reset: () => void;
+ }
+ 
+ function runSafely(action: () => void) {
+@@ -37,5 +54,15 @@ export function createAnalyticsClient(
+         runSafely(() => provider.track(event));
+       }
+     },
++    setContext(context) {
++      for (const provider of providers) {
++        runSafely(() => provider.setContext?.(context));
++      }
++    },
++    reset() {
++      for (const provider of providers) {
++        runSafely(() => provider.reset?.());
++      }
++    },
+   };
+ }
+diff --git a/FE/src/infrastructure/analytics/googleAnalyticsProvider.test.ts b/FE/src/infrastructure/analytics/googleAnalyticsProvider.test.ts
+index 23c9071d0c1f0a7ed951a6aadfcd2c2e97486dfd..e73664da34e34e2f10a1908ac1b2b01c5f985fa5 100644
+--- a/FE/src/infrastructure/analytics/googleAnalyticsProvider.test.ts
++++ b/FE/src/infrastructure/analytics/googleAnalyticsProvider.test.ts
+@@ -4,6 +4,34 @@ import { createGoogleAnalyticsProvider } from "./googleAnalyticsProvider";
+ describe("createGoogleAnalyticsProvider", () => {
+   afterEach(() => {
+     vi.unstubAllGlobals();
++    window.history.replaceState(null, "", "/");
++  });
++
++  it("콜백 이벤트에 GA의 원본 OAuth URL을 사용하지 않는다", () => {
++    window.history.replaceState(
++      null,
++      "",
++      "/auth/google?code=secret&state=secret",
++    );
++    const googleTag = vi.fn();
++    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
++    provider.initialize();
++    provider.track({
++      name: "social_login_callback_failed",
++      parameters: { provider: "google", failure_kind: "cancelled" },
++    });
++    expect(googleTag).toHaveBeenLastCalledWith(
++      "event",
++      "social_login_callback_failed",
++      {
++        provider: "google",
++        failure_kind: "cancelled",
++        page_location: "http://localhost:3000/auth/callback",
++        page_referrer: "",
++        page_title: "소셜 로그인 결과",
++      },
++    );
++    expect(JSON.stringify(googleTag.mock.calls)).not.toContain("secret");
+   });
+ 
+   it("Google Tag를 한 번만 초기화하고 이벤트를 전달한다", () => {
+diff --git a/FE/src/infrastructure/analytics/googleAnalyticsProvider.ts b/FE/src/infrastructure/analytics/googleAnalyticsProvider.ts
+index c20b517a164da2a736920049059b5217845e4c14..330e8494fd07a79dcdafa5e876062ffc4d64b995 100644
+--- a/FE/src/infrastructure/analytics/googleAnalyticsProvider.ts
++++ b/FE/src/infrastructure/analytics/googleAnalyticsProvider.ts
+@@ -66,6 +66,16 @@ export function createGoogleAnalyticsProvider(
+       googleTag("config", measurementId, { send_page_view: false });
+     },
+     track(event: AnalyticsEvent) {
++      if (event.name.startsWith("social_login_callback_")) {
++        // 콜백 첫 로드에는 page_view가 없으므로 GA 기본 URL에 code/state가 붙지 않게 한다.
++        googleTag?.("event", event.name, {
++          ...event.parameters,
++          page_location: `${window.location.origin}/auth/callback`,
++          page_referrer: "",
++          page_title: "소셜 로그인 결과",
++        });
++        return;
++      }
+       const pageContext = createPageContext(event);
+ 
+       if (pageContext) {
+diff --git a/FE/src/infrastructure/analytics/index.ts b/FE/src/infrastructure/analytics/index.ts
+index 00cff8a4108e0b9890d3887905ffb481a197e819..5659e5531f2dfc8e2cc02eb7e9b1bc32729e5b84 100644
+--- a/FE/src/infrastructure/analytics/index.ts
++++ b/FE/src/infrastructure/analytics/index.ts
+@@ -1,5 +1,6 @@
+ import { createAnalyticsClient } from "./analytics";
+ import { createGoogleAnalyticsProvider } from "./googleAnalyticsProvider";
++import { createPostHogProvider } from "./posthogProvider";
+ 
+ const googleAnalyticsMeasurementId =
+   typeof __BIBBIDI_GA_MEASUREMENT_ID__ === "string"
+@@ -10,6 +11,21 @@ const providers = googleAnalyticsMeasurementId
+   ? [createGoogleAnalyticsProvider(googleAnalyticsMeasurementId)]
+   : [];
+ 
++if (
++  typeof __BIBBIDI_POSTHOG_ENABLED__ !== "undefined" &&
++  __BIBBIDI_POSTHOG_ENABLED__
++) {
++  providers.push(
++    createPostHogProvider({
++      enabled: true,
++      token: __BIBBIDI_POSTHOG_PROJECT_TOKEN__,
++      host: __BIBBIDI_POSTHOG_HOST__,
++      environment: __BIBBIDI_APP_ENV__,
++      appVersion: __BIBBIDI_APP_VERSION__,
++    }),
++  );
++}
++
+ export const analytics = createAnalyticsClient(providers);
+ 
+ export type { AnalyticsClient, AnalyticsEvent } from "./analytics";
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.test.ts b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d91df07d68c93751bbeaba591db7e22f6d204c0a
+--- /dev/null
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+@@ -0,0 +1,179 @@
++import { describe, expect, it } from "vitest";
++import { createPreparationItemAddEvent } from "../../features/preparation/analytics/preparationAnalytics";
++import { createPageViewEvent } from "../../app/analytics/pageView";
++import {
++  PRIVATE_REPLAY_CONFIG,
++  sanitizeAnalyticsUrl,
++  sanitizePostHogEvent,
++} from "./posthogPrivacy";
++
++describe("PostHog 개인정보 정제", () => {
++  it("준비 추천의 카탈로그 이름과 단계를 보존한다", () => {
++    const event = createPreparationItemAddEvent({
++      source: "planner_recommendation",
++      categoryName: "예식장",
++      itemCount: 2,
++      phase: 1,
++    });
++    expect(
++      sanitizePostHogEvent({
++        uuid: "test",
++        event: event.name,
++        properties: event.parameters,
++      })?.properties,
++    ).toEqual(event.parameters);
++  });
++  it("페이지 정의에 지정된 고정 제목을 포함해 기존 페이지 속성을 보존한다", () => {
++    const event = createPageViewEvent({
++      origin: "https://example.com",
++      pagePath: "/planner",
++      referrerPath: "/",
++    });
++    expect(
++      sanitizePostHogEvent({
++        uuid: "test",
++        event: event.name,
++        properties: event.parameters,
++      })?.properties,
++    ).toEqual(event.parameters);
++  });
++  it.each([
++    "https://example.com/auth/kakao?code=secret&state=secret",
++    "https://example.com/users/123",
++    "javascript:secret",
++    "secret",
++  ])("수집하지 않는 URL %s를 제거한다", (url) => {
++    expect(sanitizeAnalyticsUrl(url)).toBe("");
++  });
++  it("일반 화면의 쿼리와 해시도 제거한다", () => {
++    expect(
++      sanitizeAnalyticsUrl(
++        "https://example.com/onboarding/account?code=secret#secret",
++      ),
++    ).toBe("https://example.com/onboarding/account");
++  });
++  it("자동 초기 유입, referrer, Person 속성과 임의의 원문 속성을 제거한다", () => {
++    const result = sanitizePostHogEvent({
++      uuid: "id",
++      event: "$identify",
++      $set: { email: "secret" },
++      $set_once: { $initial_current_url: "secret" },
++      properties: {
++        token: "public-token",
++        distinct_id: "bibbidi:user:42",
++        $anon_distinct_id: "anon",
++        $session_id: "session",
++        $current_url: "https://example.com/checklist?title=secret#secret",
++        $initial_referrer: "secret",
++        $session_entry_url: "secret",
++        $set: { nickname: "secret" },
++        nickname: "secret",
++        message: "secret",
++        $referrer: "https://ad.example/secret",
++        category_id: "1",
++      },
++    });
++    expect(JSON.stringify(result)).not.toContain("secret");
++    expect(result?.properties).toEqual({
++      token: "public-token",
++      distinct_id: "bibbidi:user:42",
++      $anon_distinct_id: "anon",
++      $session_id: "session",
++      $current_url: "https://example.com/checklist",
++      category_id: "1",
++    });
++  });
++  it("홍보 유입의 캠페인 값과 유입 도메인은 남기고 URL 원문은 제거한다", () => {
++    const result = sanitizePostHogEvent({
++      uuid: "id",
++      event: "$pageview",
++      $set_once: {
++        $initial_utm_source: "instagram",
++        $initial_utm_campaign: "launch",
++        $initial_referring_domain: "m.instagram.com",
++        $initial_referrer: "https://m.instagram.com/p/secret",
++        $initial_current_url: "https://example.com/?code=secret",
++      },
++      properties: {
++        distinct_id: "anon",
++        utm_source: "instagram",
++        utm_medium: "paid",
++        utm_campaign: "launch",
++        $referring_domain: "m.instagram.com",
++        $referrer: "https://m.instagram.com/p/secret",
++        $session_entry_utm_source: "instagram",
++        $session_entry_referring_domain: "m.instagram.com",
++        $session_entry_url: "https://example.com/?code=secret",
++        $session_entry_referrer: "https://m.instagram.com/p/secret",
++      },
++    });
++    expect(JSON.stringify(result)).not.toContain("secret");
++    expect(result?.properties).toEqual({
++      distinct_id: "anon",
++      utm_source: "instagram",
++      utm_medium: "paid",
++      utm_campaign: "launch",
++      $referring_domain: "m.instagram.com",
++      $session_entry_utm_source: "instagram",
++      $session_entry_referring_domain: "m.instagram.com",
++    });
++    expect(result?.$set_once).toEqual({
++      $initial_utm_source: "instagram",
++      $initial_utm_campaign: "launch",
++      $initial_referring_domain: "m.instagram.com",
++    });
++  });
++  it("경로 집계용 속성은 공개 경로만 남기고 콜백 경로는 제거한다", () => {
++    const result = sanitizePostHogEvent({
++      uuid: "id",
++      event: "$pageview",
++      properties: {
++        $host: "dev.bibbidi.kr",
++        $pathname: "/checklist/",
++        $session_entry_host: "dev.bibbidi.kr",
++        $session_entry_pathname: "/auth/kakao",
++      },
++    });
++    expect(result?.properties).toEqual({
++      $host: "dev.bibbidi.kr",
++      $pathname: "/checklist",
++      $session_entry_host: "dev.bibbidi.kr",
++    });
++  });
++  it("입력·텍스트·민감 속성·네트워크를 마스킹하고 이미지와 iframe을 차단한다", () => {
++    expect(PRIVATE_REPLAY_CONFIG.maskAllInputs).toBe(true);
++    expect(PRIVATE_REPLAY_CONFIG.maskTextSelector).toBe("*");
++    for (const name of [
++      "title",
++      "aria-label",
++      "value",
++      "href",
++      "src",
++      "data-title",
++      "style",
++    ]) {
++      expect(PRIVATE_REPLAY_CONFIG.maskAttributeFn?.(name, "secret")).toBe(
++        "[masked]",
++      );
++    }
++    expect(
++      PRIVATE_REPLAY_CONFIG.maskAttributeFn?.("class", "checklist-card"),
++    ).toBe("checklist-card");
++    expect(PRIVATE_REPLAY_CONFIG.blockSelector).toContain("iframe");
++    const mask = PRIVATE_REPLAY_CONFIG.maskCapturedNetworkRequestFn;
++    const timing = { duration: 0, startTime: 0, entryType: "navigation" };
++    expect(
++      mask?.({ ...timing, name: "https://example.com/auth/kakao?code=secret" }),
++    ).toBeNull();
++    expect(
++      mask?.({ ...timing, name: "https://example.com/?code=secret" }),
++    ).toEqual({ ...timing, name: "https://example.com/" });
++    expect(
++      mask?.({
++        ...timing,
++        name: "https://example.com/api/users/me",
++        method: "GET",
++      }),
++    ).toBeNull();
++  });
++});
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.ts b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..905a7ec94bb870703b09a2605808ddfcbeb6766e
+--- /dev/null
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+@@ -0,0 +1,166 @@
++import type { CaptureResult, PostHogConfig } from "posthog-js";
++
++// 경로에 개인 식별자나 OAuth 결과를 넣지 않는다. 새 화면은 검토 후 추가한다.
++const PUBLIC_PATHS = new Set([
++  "/",
++  "/login",
++  "/planner",
++  "/checklist",
++  "/onboarding",
++  "/onboarding/account",
++]);
++
++export function analyticsPagePath(pathname: string): string | null {
++  const path = pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
++  return PUBLIC_PATHS.has(path) ? path : null;
++}
++
++export function sanitizeAnalyticsUrl(value: string): string {
++  try {
++    const url = new URL(value);
++    const path = analyticsPagePath(url.pathname);
++    return path && ["https:", "http:"].includes(url.protocol)
++      ? `${url.origin}${path}`
++      : "";
++  } catch {
++    return "";
++  }
++}
++
++const ALLOWED_PROPERTIES = new Set([
++  "token",
++  "distinct_id",
++  "$device_id",
++  "$anon_distinct_id",
++  "$user_id",
++  "$session_id",
++  "$window_id",
++  "$time",
++  "$lib",
++  "$lib_version",
++  "$insert_id",
++  "$is_identified",
++  "$process_person_profile",
++  "$browser",
++  "$browser_version",
++  "$os",
++  "$os_version",
++  "$device_type",
++  "$screen_height",
++  "$screen_width",
++  "$viewport_height",
++  "$viewport_width",
++  "$snapshot_data",
++  "$snapshot_bytes",
++  "$snapshot_host",
++  "environment",
++  "app_version",
++  "auth_state",
++  "page_path",
++  "page_title",
++  "screen_name",
++  "source",
++  "category_id",
++  "category_name",
++  "phase",
++  "previous_category_id",
++  "initial_category_id",
++  "step_id",
++  "step_order",
++  "item_count",
++  "item_id",
++  "direction",
++  "input_method",
++  "action",
++  "entry_type",
++  "creation_type",
++  "provider",
++  "failure_kind",
++  "terms_required",
++  "choice",
++  "outcome",
++]);
++
++// 홍보 유입 분석용 값이다. 전체 URL과 referrer 원문 대신 캠페인 값과 유입 도메인만 남긴다.
++const CAMPAIGN_KEYS = [
++  "utm_source",
++  "utm_medium",
++  "utm_campaign",
++  "utm_content",
++  "utm_term",
++];
++
++const ATTRIBUTION_PROPERTIES = new Set([
++  ...CAMPAIGN_KEYS,
++  ...CAMPAIGN_KEYS.map((key) => `$session_entry_${key}`),
++  "$referring_domain",
++  "$session_entry_referring_domain",
++  "$host",
++  "$session_entry_host",
++]);
++
++// Web analytics의 경로 표는 이 속성으로 집계한다. 공개 경로만 남기고 콜백 경로는 버린다.
++const PATH_PROPERTIES = new Set(["$pathname", "$session_entry_pathname"]);
++
++const INITIAL_PERSON_PROPERTIES = new Set([
++  ...CAMPAIGN_KEYS.map((key) => `$initial_${key}`),
++  "$initial_referring_domain",
++]);
++
++export function sanitizePostHogEvent(
++  event: CaptureResult | null,
++): CaptureResult | null {
++  if (!event) return null;
++  const properties: Record<string, unknown> = {};
++  for (const [key, value] of Object.entries(event.properties)) {
++    if (ALLOWED_PROPERTIES.has(key) || ATTRIBUTION_PROPERTIES.has(key))
++      properties[key] = value;
++    if (PATH_PROPERTIES.has(key) && typeof value === "string") {
++      const path = analyticsPagePath(value);
++      if (path) properties[key] = path;
++    }
++    if (
++      ["$current_url", "page_location", "page_referrer"].includes(key) &&
++      typeof value === "string"
++    ) {
++      properties[key] = sanitizeAnalyticsUrl(value);
++    }
++  }
++  // Person에는 첫 유입 캠페인과 도메인만 남기고 초기 URL·referrer 원문은 제거한다.
++  const initialAttribution = Object.fromEntries(
++    Object.entries(event.$set_once ?? {}).filter(([key]) =>
++      INITIAL_PERSON_PROPERTIES.has(key),
++    ),
++  );
++  return {
++    uuid: event.uuid,
++    event: event.event,
++    timestamp: event.timestamp,
++    properties,
++    ...(Object.keys(initialAttribution).length
++      ? { $set_once: initialAttribution }
++      : {}),
++  };
++}
++
++export const PRIVATE_REPLAY_CONFIG: PostHogConfig["session_recording"] = {
++  maskAllInputs: true,
++  maskTextSelector: "*",
++  blockSelector: "img, svg, video, audio, iframe, canvas, .ph-no-capture",
++  maskAttributeFn: (name, value) =>
++    // _cssText는 rrweb이 생성한 스타일시트이며 사용자가 입력하는 DOM 속성이 아니다.
++    ["class", "type", "role", "_cssText"].includes(name) ? value : "[masked]",
++  maskCapturedNetworkRequestFn: (request) => {
++    // method가 없는 rrweb 페이지 URL도 이 콜백을 거친다. 네트워크 요청은 기록하지 않는다.
++    if (request.method) return null;
++    const name = sanitizeAnalyticsUrl(request.name);
++    return name ? { ...request, name } : null;
++  },
++  recordHeaders: false,
++  recordBody: false,
++  streamNetworkBody: false,
++  captureJsonLd: false,
++  captureCanvas: { recordCanvas: false },
++  recordCrossOriginIframes: false,
++  collectFonts: false,
++};
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.test.ts b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..17467afad7d88c21cb32103d790adef7aeb27fb3
+--- /dev/null
++++ b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+@@ -0,0 +1,268 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import type { PostHogConfig } from "posthog-js";
++
++import { createAnalyticsClient } from "./analytics";
++import { createPostHogProvider } from "./posthogProvider";
++
++const options = {
++  enabled: true,
++  token: "test-project",
++  host: "https://us.i.posthog.com",
++  environment: "test",
++  appVersion: "test-sha",
++};
++const page = {
++  name: "page_view",
++  parameters: {
++    page_location: "http://localhost:3000/onboarding?secret=hidden",
++    page_path: "/onboarding",
++  },
++};
++
++function setup(initialId = "anonymous-1", enabled = true) {
++  let id = initialId;
++  const sdk = {
++    init: vi.fn(),
++    capture: vi.fn(),
++    identify: vi.fn((next: string) => {
++      id = next;
++    }),
++    reset: vi.fn(() => {
++      id = "anonymous-2";
++    }),
++    get_distinct_id: vi.fn(() => id),
++    register: vi.fn(),
++    startSessionRecording: vi.fn(),
++    stopSessionRecording: vi.fn(),
++  };
++  const provider = createPostHogProvider({ ...options, enabled }, sdk);
++  const client = createAnalyticsClient([provider]);
++  client.initialize();
++  return { sdk, client };
++}
++
++afterEach(() => window.history.replaceState(null, "", "/"));
++
++describe("PostHog 사용자 여정", () => {
++  it("익명 세션 종료는 녹화와 수집을 중지하되 온보딩의 SDK ID를 유지한다", () => {
++    const { sdk, client } = setup();
++    client.setContext({
++      authState: "onboardingRequired",
++      pathname: "/onboarding",
++    });
++    client.reset();
++    client.track(page);
++    expect(sdk.stopSessionRecording).toHaveBeenCalledOnce();
++    expect(sdk.reset).not.toHaveBeenCalled();
++    expect(sdk.get_distinct_id()).toBe("anonymous-1");
++    expect(sdk.capture).not.toHaveBeenCalled();
++    client.setContext({ authState: "guest", pathname: "/login" });
++    expect(sdk.get_distinct_id()).toBe("anonymous-1");
++  });
++  it("회원 세션 종료는 SDK ID를 초기화한다", () => {
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    client.reset();
++    expect(sdk.stopSessionRecording).toHaveBeenCalledOnce();
++    expect(sdk.reset).toHaveBeenCalledExactlyOnceWith(true);
++    expect(sdk.get_distinct_id()).toBe("anonymous-2");
++  });
++  it("회원 식별에 실패하면 이전 회원으로 후속 이벤트를 보내지 않는다", () => {
++    const { sdk, client } = setup();
++    sdk.identify.mockImplementation(() => {
++      throw new Error("SDK failure");
++    });
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    client.track(page);
++    expect(sdk.capture).not.toHaveBeenCalled();
++    expect(sdk.startSessionRecording).not.toHaveBeenCalled();
++  });
++  it("비활성 또는 키 누락이면 SDK를 초기화하지 않는다", () => {
++    const { sdk, client } = setup("anonymous", false);
++    client.setContext({ authState: "guest", pathname: "/" });
++    client.track(page);
++    client.reset();
++    expect(sdk.init).not.toHaveBeenCalled();
++    expect(sdk.capture).not.toHaveBeenCalled();
++    expect(sdk.startSessionRecording).not.toHaveBeenCalled();
++    createPostHogProvider({ ...options, token: "" }, sdk).initialize();
++    expect(sdk.init).not.toHaveBeenCalled();
++  });
++
++  it("약관과 임시 계정의 여정을 익명으로 유지하고 최종 회원에 한 번만 연결한다", () => {
++    const { sdk, client } = setup();
++    client.setContext({
++      authState: "onboardingRequired",
++      pathname: "/onboarding",
++    });
++    client.track(page);
++    client.setContext({
++      authState: "synchronizing",
++      pathname: "/onboarding/account",
++      userId: 999,
++    });
++    client.setContext({
++      authState: "accountSetupRequired",
++      pathname: "/onboarding/account",
++      userId: 999,
++    });
++    client.track({ name: "legacy_transfer_complete", parameters: {} });
++    expect(sdk.identify).not.toHaveBeenCalled();
++    expect(sdk.reset).not.toHaveBeenCalled();
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    expect(sdk.identify).toHaveBeenCalledExactlyOnceWith("bibbidi:user:42");
++    expect(sdk.reset).not.toHaveBeenCalled();
++    expect(sdk.capture).toHaveBeenCalledWith(
++      "legacy_transfer_complete",
++      expect.objectContaining({ auth_state: "accountSetupRequired" }),
++    );
++  });
++
++  it("인증 확인 실패로 회원 ID를 지우거나 수집을 계속하지 않는다", () => {
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    client.setContext({ authState: "error", pathname: "/" });
++    client.track(page);
++    expect(sdk.capture).not.toHaveBeenCalled();
++    expect(sdk.reset).not.toHaveBeenCalled();
++    expect(sdk.stopSessionRecording).toHaveBeenCalledOnce();
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    expect(sdk.startSessionRecording).toHaveBeenCalledTimes(2);
++  });
++
++  it("같은 회원 새로고침은 유지하고 다른 회원으로 전환하면 reset 후 identify한다", () => {
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    expect(sdk.identify).not.toHaveBeenCalled();
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 84,
++    });
++    expect(sdk.reset).toHaveBeenCalledExactlyOnceWith(true);
++    expect(sdk.identify).toHaveBeenCalledExactlyOnceWith("bibbidi:user:84");
++    expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
++      sdk.identify.mock.invocationCallOrder[0],
++    );
++  });
++
++  it("비로그인 방문자도 브라우저 단위로 구분해 유입 캠페인과 함께 기록한다", () => {
++    const { sdk, client } = setup();
++    client.setContext({ authState: "guest", pathname: "/" });
++    client.track({
++      name: "page_view",
++      parameters: { page_location: "http://localhost:3000/", page_path: "/" },
++    });
++    const config = sdk.init.mock.calls[0][1] as PostHogConfig;
++    expect(config.persistence).toBe("localStorage");
++    expect(config.person_profiles).toBe("always");
++    expect(config.save_campaign_params).toBe(true);
++    expect(config.save_referrer).toBe(true);
++    expect(sdk.capture).toHaveBeenCalledWith(
++      "$pageview",
++      expect.objectContaining({ auth_state: "guest" }),
++    );
++    expect(sdk.startSessionRecording).toHaveBeenCalled();
++    expect(sdk.register).toHaveBeenCalledWith({
++      environment: "test",
++      app_version: "test-sha",
++    });
++  });
++
++  it("기존 회원이 게스트가 되면 한 번만 reset하고 익명 탐색을 유지한다", () => {
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({ authState: "guest", pathname: "/login" });
++    client.setContext({ authState: "guest", pathname: "/" });
++    expect(sdk.reset).toHaveBeenCalledOnce();
++  });
++
++  it("로그아웃은 이전 회원의 이벤트 이후 reset하고 늦은 이벤트는 버린다", () => {
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({
++      authState: "authenticated",
++      pathname: "/",
++      userId: 42,
++    });
++    client.track({ name: "logout", parameters: {} });
++    client.reset();
++    client.track({ name: "appointment_create", parameters: {} });
++    expect(sdk.capture).toHaveBeenCalledOnce();
++    expect(sdk.capture.mock.invocationCallOrder[0]).toBeLessThan(
++      sdk.reset.mock.invocationCallOrder[0],
++    );
++  });
++
++  it("콜백은 녹화하지 않고 인증 확인 중에도 정제된 실패만 익명으로 기록한다", () => {
++    window.history.replaceState(
++      null,
++      "",
++      "/auth/kakao?code=secret&state=secret",
++    );
++    const { sdk, client } = setup("bibbidi:user:42");
++    client.setContext({ authState: "loading", pathname: "/auth/kakao" });
++    client.track(page);
++    client.track({
++      name: "social_login_callback_failed",
++      parameters: { provider: "kakao", failure_kind: "cancelled" },
++    });
++    expect(sdk.capture).toHaveBeenCalledOnce();
++    expect(sdk.reset).toHaveBeenCalledOnce();
++    expect(sdk.startSessionRecording).not.toHaveBeenCalled();
++    const config = sdk.init.mock.calls[0][1] as PostHogConfig;
++    const beforeSend = config.before_send;
++    if (typeof beforeSend !== "function")
++      throw new Error("before_send missing");
++    expect(
++      beforeSend({ event: "$snapshot", uuid: "test", properties: {} }),
++    ).toBeNull();
++    expect(config.disable_session_recording).toBe(true);
++  });
++
++  it("SDK 장애가 기존 GA나 제품 호출을 막지 않는다", () => {
++    const { sdk } = setup();
++    sdk.init.mockImplementation(() => {
++      throw new Error("blocked SDK");
++    });
++    const ga = { initialize: vi.fn(), track: vi.fn() };
++    const client = createAnalyticsClient([
++      createPostHogProvider(options, sdk),
++      ga,
++    ]);
++    expect(() => {
++      client.initialize();
++      client.setContext({ authState: "guest", pathname: "/" });
++      client.track(page);
++      client.reset();
++    }).not.toThrow();
++    expect(ga.track).toHaveBeenCalledWith(page);
++  });
++});
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.ts b/FE/src/infrastructure/analytics/posthogProvider.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..4870939280e5482f779f0e1ac353080d52e8ab6b
+--- /dev/null
++++ b/FE/src/infrastructure/analytics/posthogProvider.ts
+@@ -0,0 +1,183 @@
++import posthog, { type PostHog } from "posthog-js";
++
++import type { AnalyticsContext, AnalyticsProvider } from "./analytics";
++import {
++  analyticsPagePath,
++  PRIVATE_REPLAY_CONFIG,
++  sanitizePostHogEvent,
++} from "./posthogPrivacy";
++
++interface PostHogOptions {
++  enabled: boolean;
++  token: string;
++  host: string;
++  environment: string;
++  appVersion: string;
++}
++
++type PostHogSdk = Pick<
++  PostHog,
++  | "init"
++  | "capture"
++  | "identify"
++  | "reset"
++  | "get_distinct_id"
++  | "register"
++  | "startSessionRecording"
++  | "stopSessionRecording"
++>;
++const MEMBER_PREFIX = "bibbidi:user:";
++
++export function createPostHogProvider(
++  options: PostHogOptions,
++  sdk: PostHogSdk = posthog,
++): AnalyticsProvider {
++  let initialized = false;
++  let recording = false;
++  let identityReady = false;
++  let context: AnalyticsContext = { authState: "loading", pathname: "/" };
++
++  const stopRecording = () => {
++    if (recording) sdk.stopSessionRecording();
++    recording = false;
++  };
++  const reset = () => {
++    identityReady = false;
++    if (!initialized) return;
++    stopRecording();
++    sdk.reset(true);
++  };
++  const ensureAnonymous = () => {
++    if (sdk.get_distinct_id()?.startsWith(MEMBER_PREFIX)) reset();
++  };
++  const isSettled = () =>
++    [
++      "guest",
++      "onboardingRequired",
++      "accountSetupRequired",
++      "authenticated",
++    ].includes(context.authState);
++
++  return {
++    initialize() {
++      if (initialized || !options.enabled || !options.token) return;
++      sdk.init(options.token, {
++        api_host: options.host,
++        ui_host: options.host.includes("eu.")
++          ? "https://eu.posthog.com"
++          : "https://us.posthog.com",
++        defaults: "2026-08-30",
++        strict_script_versioning: true,
++        persistence: "localStorage",
++        person_profiles: "always",
++        autocapture: false,
++        capture_pageview: false,
++        capture_pageleave: false,
++        capture_dead_clicks: false,
++        capture_heatmaps: false,
++        capture_performance: false,
++        capture_exceptions: false,
++        enable_recording_console_log: false,
++        disable_session_recording: true,
++        disable_surveys: true,
++        disable_product_tours: true,
++        disable_conversations: true,
++        disable_web_experiments: true,
++        advanced_disable_feature_flags: true,
++        save_referrer: true,
++        save_campaign_params: true,
++        disable_capture_url_hashes: true,
++        respect_dnt: true,
++        session_recording: PRIVATE_REPLAY_CONFIG,
++        before_send: (event) => {
++          if (
++            event?.event === "$snapshot" &&
++            (!identityReady ||
++              !isSettled() ||
++              !analyticsPagePath(window.location.pathname))
++          )
++            return null;
++          return sanitizePostHogEvent(event);
++        },
++      });
++      // $identify 같은 SDK 이벤트에도 붙여 테스트 서버 기록을 환경으로 걸러낸다.
++      sdk.register({
++        environment: options.environment,
++        app_version: options.appVersion,
++      });
++      initialized = true;
++    },
++    setContext(nextContext) {
++      identityReady = false;
++      context = nextContext;
++      if (!initialized) return;
++      if (!isSettled()) {
++        stopRecording();
++        return;
++      }
++      if (context.authState === "authenticated") {
++        if (
++          !Number.isSafeInteger(context.userId) ||
++          (context.userId ?? 0) <= 0
++        ) {
++          stopRecording();
++          return;
++        }
++        const memberId = `${MEMBER_PREFIX}${context.userId}`;
++        const previousId = sdk.get_distinct_id();
++        if (previousId?.startsWith(MEMBER_PREFIX) && previousId !== memberId)
++          reset();
++        if (sdk.get_distinct_id() !== memberId) sdk.identify(memberId);
++      } else {
++        ensureAnonymous();
++      }
++      identityReady = true;
++      if (!analyticsPagePath(context.pathname)) stopRecording();
++      else if (!recording) {
++        sdk.startSessionRecording();
++        recording = true;
++      }
++    },
++    track(event) {
++      if (!initialized) return;
++      const isCallbackEvent = event.name.startsWith("social_login_callback_");
++      if (isCallbackEvent) {
++        ensureAnonymous();
++      } else if (
++        !identityReady ||
++        !isSettled() ||
++        !analyticsPagePath(context.pathname)
++      ) {
++        return;
++      }
++      if (
++        context.authState === "authenticated" &&
++        (!Number.isSafeInteger(context.userId) || (context.userId ?? 0) <= 0)
++      )
++        return;
++      const properties = {
++        ...event.parameters,
++        auth_state: isCallbackEvent ? "anonymous_callback" : context.authState,
++        ...(event.name === "page_view"
++          ? { $current_url: event.parameters.page_location }
++          : {}),
++      };
++      sdk.capture(
++        event.name === "page_view" ? "$pageview" : event.name,
++        properties,
++      );
++      if (event.name === "page_view" && !recording) {
++        sdk.startSessionRecording();
++        recording = true;
++      }
++    },
++    reset() {
++      identityReady = false;
++      if (initialized) {
++        stopRecording();
++        ensureAnonymous();
++      }
++      context = { authState: "loading", pathname: context.pathname };
++    },
++  };
++}
+diff --git a/FE/src/layouts/AppBottomNavigation.tsx b/FE/src/layouts/AppBottomNavigation.tsx
+index 85c55fb58346e9ba890f557b7633cccf27b61741..5f5149061a076579eb24cf19b4541c25b11c166f 100644
+--- a/FE/src/layouts/AppBottomNavigation.tsx
++++ b/FE/src/layouts/AppBottomNavigation.tsx
+@@ -1,16 +1,9 @@
+-import { MouseEventHandler } from "react";
+ import { NavLink } from "react-router";
+ 
+ import "./AppBottomNavigation.css";
+ import { AppNavigationIcon, appNavigationItems } from "./AppNavigation";
+ 
+-interface AppBottomNavigationProps {
+-  onPlannerNavigation?: MouseEventHandler<HTMLAnchorElement>;
+-}
+-
+-export function AppBottomNavigation({
+-  onPlannerNavigation,
+-}: AppBottomNavigationProps) {
++export function AppBottomNavigation() {
+   return (
+     <nav aria-label="하단 메뉴" className="app-bottom-navigation">
+       {appNavigationItems.map((item) => (
+@@ -18,7 +11,6 @@ export function AppBottomNavigation({
+           className="app-bottom-navigation__item"
+           end={item.to === "/"}
+           key={item.to}
+-          onClick={item.to === "/planner" ? onPlannerNavigation : undefined}
+           to={item.to}
+         >
+           <AppNavigationIcon icon={item.icon} />
+diff --git a/FE/src/layouts/AppHeader.tsx b/FE/src/layouts/AppHeader.tsx
+index 6615f8e4c34965ebc14ee8a82e193f93aae4cbda..78138ca4746c3559169451965c84a81c6484cbfb 100644
+--- a/FE/src/layouts/AppHeader.tsx
++++ b/FE/src/layouts/AppHeader.tsx
+@@ -1,4 +1,4 @@
+-import { MouseEventHandler, ReactNode } from "react";
++import { ReactNode } from "react";
+ import { NavLink } from "react-router";
+ 
+ import "./AppHeader.css";
+@@ -23,11 +23,10 @@ interface PendingUser {
+ }
+ 
+ interface AppHeaderProps {
+-  onPlannerNavigation?: MouseEventHandler<HTMLAnchorElement>;
+   user: AuthenticatedUser | GuestUser | PendingUser;
+ }
+ 
+-export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
++export function AppHeader({ user }: AppHeaderProps) {
+   return (
+     <header className="app-header">
+       <div className="app-header__inner">
+@@ -42,9 +41,6 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
+                   className="app-header__navigation-item"
+                   end={item.to === "/"}
+                   key={item.to}
+-                  onClick={
+-                    item.to === "/planner" ? onPlannerNavigation : undefined
+-                  }
+                   to={item.to}
+                 >
+                   {item.label}
+diff --git a/FE/src/layouts/AuthLayout.test.tsx b/FE/src/layouts/AuthLayout.test.tsx
+index 7547fdd47488442dbc6fbc6bcf79eab88557dfaf..d3f9ab5f965273612e99def55ca5dc76f21159de 100644
+--- a/FE/src/layouts/AuthLayout.test.tsx
++++ b/FE/src/layouts/AuthLayout.test.tsx
+@@ -28,7 +28,7 @@ describe("AuthLayout", () => {
+             ? new Response(JSON.stringify({ id: 1, items: [] }), {
+                 status: 200,
+               })
+-            : new Response(JSON.stringify({ nickname: "bibbidi" }), {
++            : new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+                 status: 200,
+               }),
+         ),
+diff --git a/FE/src/layouts/ServiceLayout.test.tsx b/FE/src/layouts/ServiceLayout.test.tsx
+index 749fecbdb2c092c94c69e432e770890a804a15ac..0ec5eced7b839225d2c2d37dffd7f6567167087f 100644
+--- a/FE/src/layouts/ServiceLayout.test.tsx
++++ b/FE/src/layouts/ServiceLayout.test.tsx
+@@ -23,6 +23,8 @@ const analyticsMocks = vi.hoisted(() => ({
+ vi.mock("../infrastructure/analytics", () => ({
+   analytics: {
+     initialize: vi.fn(),
++    setContext: vi.fn(),
++    reset: vi.fn(),
+     track: analyticsMocks.track,
+   },
+ }));
+@@ -111,7 +113,9 @@ describe("ServiceLayout", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++            status: 200,
++          }),
+         );
+       }
+ 
+@@ -283,14 +287,16 @@ describe("ServiceLayout", () => {
+ 
+     await act(async () => {
+       resolveCurrentUser(
+-        new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++          status: 200,
++        }),
+       );
+     });
+ 
+     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
+   });
+ 
+-  it("인증 확인 중에는 플래너 링크가 현재 경로를 벗어나지 않는다", () => {
++  it("인증 확인 중에도 플래너 링크로 이동한다", () => {
+     installLegacyWebSessionFetch(vi.fn(() => new Promise(() => undefined)));
+ 
+     renderServiceLayout(
+@@ -304,7 +310,15 @@ describe("ServiceLayout", () => {
+             </>
+           }
+         />
+-        <Route path="/planner" element={<div>플래너 화면</div>} />
++        <Route
++          path="/planner"
++          element={
++            <>
++              <div>플래너 화면</div>
++              <LocationDisplay />
++            </>
++          }
++        />
+       </>,
+     );
+ 
+@@ -315,15 +329,15 @@ describe("ServiceLayout", () => {
+       ),
+     );
+ 
+-    expect(screen.getByTestId("service-location").textContent).toBe("/");
+-    expect(screen.queryByText("플래너 화면")).toBeNull();
++    expect(screen.getByTestId("service-location").textContent).toBe("/planner");
++    expect(screen.getByText("플래너 화면")).toBeTruthy();
+     expect(screen.queryByRole("dialog")).toBeNull();
+   });
+ 
+   it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
+     installLegacyWebSessionFetch(
+       vi.fn().mockResolvedValue(
+-        new Response(JSON.stringify({ nickname: "bibbidi" }), {
++        new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+           status: 200,
+         }),
+       ),
+@@ -363,7 +377,7 @@ describe("ServiceLayout", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), {
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+             status: 200,
+           }),
+         );
+@@ -425,7 +439,7 @@ describe("ServiceLayout", () => {
+     expect(fetchMock).toHaveBeenCalledOnce();
+   });
+ 
+-  it("비로그인 플래너 링크는 이동 없이 로그인 안내를 열고 배경을 비활성화한다", async () => {
++  it("비로그인 플래너 링크는 로그인 안내 없이 플래너로 이동한다", async () => {
+     installLegacyWebSessionFetch(
+       vi
+         .fn()
+@@ -437,7 +451,7 @@ describe("ServiceLayout", () => {
+         ),
+     );
+ 
+-    const { container } = renderServiceLayout(
++    renderServiceLayout(
+       <>
+         <Route
+           path="/"
+@@ -448,7 +462,15 @@ describe("ServiceLayout", () => {
+             </>
+           }
+         />
+-        <Route path="/login" element={<LocationDisplay />} />
++        <Route
++          path="/planner"
++          element={
++            <>
++              <div>플래너 화면</div>
++              <LocationDisplay />
++            </>
++          }
++        />
+       </>,
+     );
+     const desktopNavigation = await screen.findByRole("navigation", {
+@@ -460,54 +482,9 @@ describe("ServiceLayout", () => {
+ 
+     fireEvent.click(plannerLink);
+ 
+-    expect(screen.getByTestId("service-location").textContent).toBe("/");
+-    expect(
+-      screen.getByRole("dialog", { name: "로그인이 필요해요" }),
+-    ).toBeTruthy();
+-    expect(document.activeElement).toBe(
+-      screen.getByRole("button", { name: "취소" }),
+-    );
+-    expect(
+-      container.querySelector(".service-layout__header")?.hasAttribute("inert"),
+-    ).toBe(true);
+-    expect(
+-      container
+-        .querySelector(".service-layout__header")
+-        ?.getAttribute("aria-hidden"),
+-    ).toBe("true");
+-    expect(
+-      container
+-        .querySelector(".service-layout__content")
+-        ?.hasAttribute("inert"),
+-    ).toBe(true);
+-    expect(
+-      container
+-        .querySelector(".service-layout__content")
+-        ?.getAttribute("aria-hidden"),
+-    ).toBe("true");
+-    expect(
+-      container
+-        .querySelector(".service-layout__mobile-dock")
+-        ?.hasAttribute("inert"),
+-    ).toBe(true);
+-    expect(
+-      container
+-        .querySelector(".service-layout__mobile-dock")
+-        ?.getAttribute("aria-hidden"),
+-    ).toBe("true");
+-
+-    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+-    await waitFor(() => expect(document.activeElement).toBe(plannerLink));
+-
+-    const mobilePlannerLink = within(
+-      screen.getByRole("navigation", { name: "하단 메뉴" }),
+-    ).getByRole("link", { name: "플래너" });
+-    fireEvent.click(mobilePlannerLink);
+-    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+-
+-    expect(screen.getByTestId("service-location").textContent).toBe(
+-      "/login?returnTo=%2Fplanner",
+-    );
++    expect(screen.getByTestId("service-location").textContent).toBe("/planner");
++    expect(screen.getByText("플래너 화면")).toBeTruthy();
++    expect(screen.queryByRole("dialog")).toBeNull();
+   });
+ 
+   it("체크리스트 인증 만료 시 로그인 상태를 다시 확인한다", async () => {
+@@ -517,7 +494,7 @@ describe("ServiceLayout", () => {
+         currentUserRequests += 1;
+         return Promise.resolve(
+           currentUserRequests === 1
+-            ? new Response(JSON.stringify({ nickname: "비비디" }), {
++            ? new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+                 status: 200,
+               })
+             : new Response(
+@@ -555,7 +532,9 @@ describe("ServiceLayout", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++            status: 200,
++          }),
+         );
+       }
+ 
+@@ -606,7 +585,9 @@ describe("ServiceLayout", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++            status: 200,
++          }),
+         );
+       }
+ 
+@@ -673,7 +654,9 @@ describe("ServiceLayout", () => {
+     const fetchMock = vi.fn().mockImplementation((url: string) => {
+       if (url === "/api/users/me") {
+         return Promise.resolve(
+-          new Response(JSON.stringify({ nickname: "비비디" }), { status: 200 }),
++          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
++            status: 200,
++          }),
+         );
+       }
+ 
+@@ -819,7 +802,7 @@ describe("ServiceLayout", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "비비디" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+               status: 200,
+             }),
+           );
+@@ -928,7 +911,7 @@ describe("ServiceLayout", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "비비디" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+               status: 200,
+             }),
+           );
+@@ -1035,7 +1018,7 @@ describe("ServiceLayout", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "비비디" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+               status: 200,
+             }),
+           );
+@@ -1137,7 +1120,7 @@ describe("ServiceLayout", () => {
+       .mockImplementation((url: string, init?: RequestInit) => {
+         if (url === "/api/users/me") {
+           return Promise.resolve(
+-            new Response(JSON.stringify({ nickname: "비비디" }), {
++            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+               status: 200,
+             }),
+           );
+diff --git a/FE/src/layouts/ServiceLayout.tsx b/FE/src/layouts/ServiceLayout.tsx
+index 583efebcadd68d038c99cd845466c615c658e743..9734160178705f3dbb78fb87203c7ded2285fba4 100644
+--- a/FE/src/layouts/ServiceLayout.tsx
++++ b/FE/src/layouts/ServiceLayout.tsx
+@@ -1,20 +1,8 @@
+-import {
+-  MouseEvent,
+-  useCallback,
+-  useLayoutEffect,
+-  useRef,
+-  useState,
+-} from "react";
++import { useCallback, useLayoutEffect, useRef } from "react";
+ import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
+ 
+ import { AppHeaderSummaryFeature } from "../features/app-header";
+-import {
+-  createLoginPath,
+-  LoginRequiredDialog,
+-  PLANNER_RETURN_PATH,
+-  useAuth,
+-  useLogout,
+-} from "../features/auth";
++import { useAuth, useLogout } from "../features/auth";
+ import { FeedbackFeature } from "../features/feedback";
+ import { AppBottomNavigation } from "./AppBottomNavigation";
+ import { AppHeader } from "./AppHeader";
+@@ -30,23 +18,6 @@ export function ServiceLayout() {
+   }, [endAuthentication, navigate]);
+   const logout = useLogout({ onSuccess: handleLogoutSuccess });
+   const contentRef = useRef<HTMLDivElement>(null);
+-  const [plannerDialogTrigger, setPlannerDialogTrigger] =
+-    useState<HTMLAnchorElement | null>(null);
+-  const isPlannerLoginDialogOpen = plannerDialogTrigger !== null;
+-
+-  const handlePlannerNavigation = (event: MouseEvent<HTMLAnchorElement>) => {
+-    if (authState.status === "authenticated") {
+-      return;
+-    }
+-
+-    event.preventDefault();
+-
+-    if (authState.status === "guest") {
+-      setPlannerDialogTrigger(event.currentTarget);
+-    }
+-  };
+-
+-  const closePlannerLoginDialog = () => setPlannerDialogTrigger(null);
+ 
+   useLayoutEffect(() => {
+     if (contentRef.current) {
+@@ -64,13 +35,8 @@ export function ServiceLayout() {
+ 
+   return (
+     <div className="service-layout">
+-      <div
+-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
+-        className="service-layout__header"
+-        inert={isPlannerLoginDialogOpen ? true : undefined}
+-      >
++      <div className="service-layout__header">
+         <AppHeader
+-          onPlannerNavigation={handlePlannerNavigation}
+           user={
+             authState.status === "authenticated"
+               ? {
+@@ -93,34 +59,17 @@ export function ServiceLayout() {
+       </div>
+ 
+       <div
+-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
+         className="service-layout__content"
+         data-page-scroll-container
+-        inert={isPlannerLoginDialogOpen ? true : undefined}
+         ref={contentRef}
+       >
+         <Outlet />
+       </div>
+ 
+-      <div
+-        aria-hidden={isPlannerLoginDialogOpen ? true : undefined}
+-        className="service-layout__mobile-dock"
+-        inert={isPlannerLoginDialogOpen ? true : undefined}
+-      >
+-        <AppBottomNavigation onPlannerNavigation={handlePlannerNavigation} />
++      <div className="service-layout__mobile-dock">
++        <AppBottomNavigation />
+         <FeedbackFeature />
+       </div>
+-
+-      {isPlannerLoginDialogOpen ? (
+-        <LoginRequiredDialog
+-          onClose={closePlannerLoginDialog}
+-          onLogin={() => {
+-            closePlannerLoginDialog();
+-            navigate(createLoginPath(PLANNER_RETURN_PATH));
+-          }}
+-          returnFocusTo={plannerDialogTrigger}
+-        />
+-      ) : null}
+     </div>
+   );
+ }
+diff --git a/FE/src/types/environment.d.ts b/FE/src/types/environment.d.ts
+index d39646f7b4c253ea60b68bbc80df0004b876c6ce..4235a1bd061331cf9dfb8f24f9d56491de04e3ff 100644
+--- a/FE/src/types/environment.d.ts
++++ b/FE/src/types/environment.d.ts
+@@ -1,2 +1,7 @@
+ declare const __BIBBIDI_API_BASE_URL__: string;
+ declare const __BIBBIDI_GA_MEASUREMENT_ID__: string;
++declare const __BIBBIDI_POSTHOG_ENABLED__: boolean;
++declare const __BIBBIDI_POSTHOG_PROJECT_TOKEN__: string;
++declare const __BIBBIDI_POSTHOG_HOST__: string;
++declare const __BIBBIDI_APP_ENV__: string;
++declare const __BIBBIDI_APP_VERSION__: string;
+diff --git a/FE/webpack.config.js b/FE/webpack.config.js
+index e7cbb567e38f9b87b4b9d12ea2b6042ba864eae5..e8b6bdf9c43da4804900e54564964d94980c0e28 100644
+--- a/FE/webpack.config.js
++++ b/FE/webpack.config.js
+@@ -25,6 +25,7 @@ module.exports = (_environment, arguments_) => {
+   const apiProxyTarget = process.env.BIBBIDI_API_PROXY_TARGET;
+   const googleAnalyticsMeasurementId =
+     process.env.BIBBIDI_GA_MEASUREMENT_ID ?? "";
++  const posthogEnabled = process.env.BIBBIDI_POSTHOG_ENABLED === "true";
+ 
+   if (!isProduction && !apiProxyTarget) {
+     throw new Error("BIBBIDI_API_PROXY_TARGET 환경변수가 필요합니다.");
+@@ -45,6 +46,8 @@ module.exports = (_environment, arguments_) => {
+ 
+     resolve: {
+       extensions: [".tsx", ".ts", ".js"],
++      // 비활성 배포에는 초기화뿐 아니라 SDK 코드 자체도 포함하지 않는다.
++      alias: posthogEnabled ? {} : { "posthog-js$": false },
+     },
+ 
+     module: {
+@@ -79,6 +82,22 @@ module.exports = (_environment, arguments_) => {
+         minify: isProduction,
+       }),
+       new webpack.DefinePlugin({
++        __BIBBIDI_POSTHOG_ENABLED__: JSON.stringify(posthogEnabled),
++        __BIBBIDI_POSTHOG_PROJECT_TOKEN__: JSON.stringify(
++          process.env.BIBBIDI_POSTHOG_PROJECT_TOKEN ?? "",
++        ),
++        __BIBBIDI_POSTHOG_HOST__: JSON.stringify(
++          process.env.BIBBIDI_POSTHOG_HOST ?? "https://us.i.posthog.com",
++        ),
++        __BIBBIDI_APP_ENV__: JSON.stringify(
++          process.env.BIBBIDI_APP_ENV ??
++            (isProduction ? "production" : "development"),
++        ),
++        __BIBBIDI_APP_VERSION__: JSON.stringify(
++          process.env.BIBBIDI_APP_VERSION ??
++            process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ??
++            "unknown",
++        ),
+         __BIBBIDI_API_BASE_URL__: JSON.stringify(apiBaseUrl),
+         __BIBBIDI_GA_MEASUREMENT_ID__: JSON.stringify(
+           googleAnalyticsMeasurementId,
+diff --git a/docs/posthog.md b/docs/posthog.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ca8b9d2709c2a29a76378c3217573002c14c3b3
+--- /dev/null
++++ b/docs/posthog.md
+@@ -0,0 +1,124 @@
++# PostHog 사용자 여정 계측 설계와 운영 절차
++
++Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 2026-09-29 수정.
++FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
++
++## 목적과 범위
++
++회원 `bibbidi:user:{id}`의 방문별 이벤트 순서와 마스킹된 리플레이를 함께 본다. GA는 유지하고 기존 AnalyticsProvider에 PostHog를 추가한다. SDK의 distinct ID와 session ID를 사용한다. 브라우저 분석은 감사 로그나 정확한 업무 처리 건수의 원장이 아니다.
++
++카카오·구글 로그인만 연결되어 있고 Apple은 준비 중이다. `/signup`은 `/login`으로 리다이렉트한다. 기존 `login`, `sign_up` 이벤트는 없으며 재사용 대상으로 간주하지 않는다. 로그인 콜백 응답에는 `accessToken`, `termsAgreementRequired`만 있다. 식별에 사용하는 회원 ID는 `/api/users/me`의 `id`다.
++
++## 회원 식별과 페이지
++
++```text
++/login → 제공자 → /auth/:provider → /onboarding → /onboarding/account
++   익명           녹화 제외          익명              익명
++                                            new 또는 legacy 처리
++                                                ↓
++                            /me 조회 + 체크리스트 조정 완료(authenticated)
++                                                ↓
++                               identify(bibbidi:user:{최종 id})
++```
++
++- `loading`, `synchronizing`, `error`: 일반 이벤트와 녹화를 보류한다. 네트워크 오류만으로 reset하지 않는다.
++- `guest`, `onboardingRequired`, `accountSetupRequired`: 익명으로 수집한다. `/onboarding`, `/onboarding/account`를 페이지 정의에 추가한다.
++- `authenticated`에서만 `/me.id`로 identify한다. 닉네임·이메일·JWT sub를 식별이나 Person 속성으로 보내지 않는다.
++- 기존 회원 이전은 임시 회원을 삭제하고 소셜 식별자를 기존 회원으로 이동한다. 따라서 임시 ID는 identify하지 않으며, 약관 동의와 이전 처리 사이의 로딩으로 익명 ID를 reset하지 않는다.
++- 로그아웃 성공 이벤트를 기존 ID에 보낸 뒤 reset한다. 명시적 계정 전환·탈퇴 완료도 reset한다. 401/회원 없음으로 세션 무효가 확정되면 기존 회원 식별을 해제한다.
++- 익명 상태의 reset은 SDK ID를 바꾸지 않는다. 녹화와 일반 이벤트 수집은 중지하되 가입 중 세션 만료 전후의 익명 여정을 연결한다.
++- 1차 목표는 홍보로 들어온 비로그인 방문자를 한 명씩 추적하는 것이다. 그래서 SDK 식별 저장소는 `localStorage`로 두어 같은 브라우저의 재방문과 새 탭을 같은 익명 방문자로 잇고, `person_profiles: "always"`로 익명 방문자도 People에 한 명씩 남긴다. 로그인하면 그동안의 익명 기록이 최종 회원에 합쳐진다. 다른 기기나 브라우저는 로그인 전까지 다른 방문자로 잡힌다.
++- 탭들이 식별 저장소를 공유하므로, 한 탭에서 로그아웃하거나 다른 회원으로 로그인하면 아직 갱신되지 않은 다른 탭의 이벤트가 바뀐 ID로 기록될 수 있다. 이 경우는 드물다고 보고 탭 간 동기화는 넣지 않는다.
++- 다른 탭에서 로그아웃하거나 계정이 바뀌면, 이 탭은 토큰이 만료돼 401이 날 때 식별을 해제한다. 그 전까지는 이 탭이 실제로 기존 회원으로 요청하므로 기존 회원에 기록된다.
++- `/auth/:provider`는 페이지뷰·리플레이 대상에서 제외한다. 콜백 실패는 제공자와 고정 사유만 별도 이벤트로 보낸다. 초기 인증 확인 중이어도 이 실패는 익명으로 남긴다.
++
++## 이벤트 계약
++
++`page_view`만 PostHog의 `$pageview`로 매핑한다. 기존 GA 이벤트 이름과 의미는 유지한다.
++
++| 이벤트 | 발생 지점 / 속성 |
++| --- | --- |
++| 기존 preparation, checklist, planner, appointment_create, logout, feedback_submit | 기존 명시적 계측 재사용. login/sign_up은 제외 |
++| social_login_start | 연결된 제공자 버튼으로 인가 시작, provider=kakao/google |
++| social_login_start_failed | 인가 URL 요청 실패, provider, failure_kind=network/timeout/api/unknown |
++| social_login_callback_failed | callback 오류, provider=kakao/google/unknown, failure_kind=cancelled/invalid_callback/state_invalid_or_expired/network/timeout/api/unknown |
++| social_login_callback_complete | 콜백 API 성공, provider, terms_required. 로그인 완료와 구분 |
++| onboarding_terms_complete | 약관 동의 성공 또는 응답 유실 후 성공 확인 |
++| account_setup_choice | 사용자가 new/legacy를 선택한 시점, choice |
++| legacy_transfer_submit | 검증 통과 후 이전 요청 직전 |
++| legacy_transfer_failed | validation/authentication/terms_required/network/timeout/api/unknown. 네트워크 응답 유실 후 성공 여부가 불명확하면 outcome=unknown |
++| legacy_transfer_complete | 이전 성공 또는 응답 유실 후 성공 확인. 아직 익명 |
++| account_setup_complete | 새 계정 생성/기존 회원 이전 완료, choice |
++| appointment_form_view | 일정 폼 닫힘→열림, source=checklist/planner |
++| appointment_submit | 검증 통과 후 실제 저장 시도, source. 목록 재조회만 하는 재시도는 제외 |
++| appointment_create_failed | 입력 검증/저장 실패. 저장 후 목록 재조회 실패는 제외 |
++
++서버의 208은 state 불일치, 만료, 쿠키 바인딩 실패를 함께 나타낸다. FE에서 구분할 수 없으므로 `state_invalid_or_expired`로 묶는다. 취소는 제공자가 `error=access_denied`로 돌려준 경우다. 제공자 화면에서 돌아오지 않은 사용자는 실패 이벤트가 없고 시작 후 다음 단계가 관측되지 않은 방문으로만 해석한다.
++
++오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. Web analytics의 경로 표에 쓰는 `$pathname`·`$session_entry_pathname`도 공개 경로일 때만 남기고, `$host`는 그대로 둔다. `environment`와 `app_version`은 SDK 공통 속성으로 등록해 `$identify` 같은 SDK 이벤트에도 붙인다. PostHog의 테스트 계정 필터는 `environment ≠ development`로 두어 테스트 서버 기록을 뺀다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
++
++## SDK와 리플레이
++
++공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 성능, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 실험 수집을 끈다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
++
++입력 전체와 DOM 텍스트 전체를 마스킹한다. DOM 속성은 CSS class/고정 구조 속성 및 rrweb이 생성한 스타일시트 `_cssText` 외에는 마스킹하고 이미지·SVG·미디어·iframe·canvas를 차단한다. 녹화는 레이아웃·클릭·스크롤과 이벤트를 함께 보는 용도다. 자유 입력을 저장한 뒤 카드에 표시되는 텍스트도 마스킹 대상이다. URL 정제는 일반 이벤트와 replay URL 각각에 적용한다. 쿼리·해시, 초기 유입 URL, referrer, 캠페인 파라미터와 자동 Person 속성이 우회해서 남지 않게 허용 목록으로 제한한다. GA로 전달하는 콜백 이벤트도 원본 주소 대신 고정 경로 `/auth/callback`을 사용한다.
++
++인증 상태와 경로가 허용될 때만 녹화를 시작한다. 콜백 진입과 인증 재확인 시 중지한다. 원격 프로젝트에서도 녹화 제외 URL(URL blocklist)에 `.*/auth/.*`를 추가한다. PostHog는 정규식 앞뒤에 `^`·`$`를 붙여 전체 URL과 비교하므로 `/auth/.*`만 넣으면 콜백 URL에 걸리지 않는다. SDK/원격 설정 변경 시 payload와 실제 재생을 다시 검증한다.
++
++인증 전환·녹화 중지 때 아직 전송되지 않은 마지막 녹화 버퍼가 폐기될 수 있다. 종료 지점은 명시적 이벤트와 함께 판단한다. 잘못된 회원이나 콜백에 귀속되는 영상보다 일부 영상 누락을 허용하는 선택이다. SDK 외부 recorder도 고정 버전만 로드하며 지원되지 않으면 원격 최신 버전으로 자동 대체하지 않는다.
++
++## 비용과 보관
++
++PostHog Cloud **US 리전** (`https://us.i.posthog.com`, 관리 UI `https://us.posthog.com`)을 사용한다. 처리방침에 이미 미국(GA4, Discord)이 이전 국가로 있어 이전 국가는 늘지 않고 수탁자만 추가된다. 리전은 프로젝트 생성 뒤 바꿀 수 없으므로 프로젝트를 만들 때 US로 선택하고, 계약상 수탁자 연락처·하위처리자는 [DPA](https://posthog.com/dpa)와 [subprocessors](https://posthog.com/subprocessors)로 확정한다. US 프로젝트에 EU 수집 호스트를 섞지 않는다.
++
++제품별 월 과금 상한을 $0으로 설정한다. 조사 시 무료량은 분석 월 100만 이벤트, 녹화 월 5천 세션이다. 처음에는 녹화율 100%, 최소 녹화 시간 필터 없음으로 시작하고 일주일 수집량으로 조정한다. 상한 초과·광고 차단·네트워크 실패로 누락될 수 있으므로 모든 회원의 모든 행동을 보장하지 않는다. [가격](https://posthog.com/pricing)
++
++수집한 제품 이벤트는 최대 1년, 리플레이는 무료 플랜의 1개월을 기준으로 운영한다. 실제 프로젝트의 retention 설정과 계약을 활성화 전 확인한다. 과금 변경으로 보관 기간을 자동 연장하지 않는다. 식별된 Person은 탈퇴 시 아래 절차로 삭제한다. SDK의 익명 식별 저장은 탭 세션 동안 유지한다. 향후 더 짧은 이벤트 보관이 필요하면 실제 설정 지원 여부 또는 별도 정기 삭제 절차를 먼저 검증한다.
++
++## 탈퇴 데이터 삭제
++
++BE의 `DELETE /api/users/me`는 재인증 deleteGrant를 검증한 뒤 회원을 삭제한다. FE에 탈퇴 UI는 아직 없다. FE에는 탈퇴 API 연결 코드도 없다. 탈퇴 UI를 구현할 때 성공 후 `analytics.reset()`을 호출하고 인증을 종료해야 하며 deleteGrant를 분석에 넣지 않는다. 다른 기기에서 탈퇴한 회원은 다음 인증 재확인/만료에서 수집을 중단한다.
++
++BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않는다. 탈퇴 목록과 삭제 담당자는 운영 수집과 별개로 후속 작업에서 마련한다. FE 이벤트만으로 삭제 대상을 만들면 광고 차단·종료 시 누락되므로 금지한다.
++
++운영 절차:
++
++1. BE 담당자가 탈퇴 트랜잭션 성공 후 확인 가능한 회원 ID 목록을 제공한다. 현재 서비스에 이 기록이 없으므로 별도 서버 작업 또는 수동 탈퇴 접수 과정으로 누락 없는 목록을 확보해야 한다.
++2. 지정 담당자가 탈퇴 당일, 늦어도 24시간 내 `bibbidi:user:{id}`를 People에서 찾는다. PostHog Person UUID와 병합된 익명 ID를 확인한다. 관리 키는 FE/Issue/로그에 넣지 않는다.
++3. People의 Delete person에서 **이벤트와 녹화도 삭제**하도록 선택한다. API를 쓰면 US 관리 API(`https://us.posthog.com`)의 `/api/projects/{project_id}/persons/{person_uuid}/?delete_events=true&delete_recordings=true`에 DELETE한다. 숫자 회원 ID를 Person UUID 자리에 넣지 않는다.
++4. 삭제는 비동기다. 요청 성공만으로 완료 처리하지 않고 해당 Person·이벤트·녹화 조회와 삭제 작업 상태를 재확인한다. 실패 시 재시도하고 미완료 요청을 매일 점검한다. 최초 24시간 내 접수 목표와 실제 영구 삭제 완료 시각을 구분해 기록한다.
++5. 감사 기록에는 회원 ID, 요청/검증 시각, 담당자, 결과만 최소한으로 두고 내부 보관 정책에 따른다. 탈퇴 회원 ID를 재사용하지 않는다. 이미 탈퇴한 회원의 늦은 이벤트가 재생성되지 않는지도 확인한다.
++
++한 번도 identify하지 않은 익명 방문은 회원 ID로 역조회할 수 없으므로 회원 탈퇴 목록으로 삭제를 보장할 수 없다. 이 경우 보관 만료, 또는 당사자가 제공한 익명 식별자로 별도 삭제한다. [People 삭제](https://posthog.com/docs/data/persons), [데이터 삭제](https://posthog.com/docs/privacy/data-storage)
++
++## 처리방침과 배포 순서
++
++2026-09-26 처리방침에는 GA4(미국), Grafana Cloud(일본), Discord(미국)만 기재되어 있다. PostHog 수탁자와 방문자 식별자 저장은 아직 방침에 없다.
++
++1. 테스트 서버와 운영은 PostHog 프로젝트 하나를 함께 쓴다. 두 CodeBuild 환경에 `BIBBIDI_POSTHOG_ENABLED=true`, `BIBBIDI_POSTHOG_PROJECT_TOKEN`, `BIBBIDI_POSTHOG_HOST`를 넣는다. 테스트 서버는 `BIBBIDI_APP_ENV=development`를 넣고, 운영은 비워 두면 `production`이 들어간다.
++2. 값이 없거나 키가 없으면 초기화·저장·전송하지 않고 빌드는 성공한다. 배포 후 PostHog 이벤트 화면에서 `environment = production` 이벤트가 들어오는지 확인한다. 빌드 시 주입 값이라 변경 시 재빌드·재배포가 필요하다.
++3. 운영 수집은 처리방침 개정보다 먼저 켠다(2026-09-29 결정). 처리방침 개정은 후속 작업이다. 3번 위탁·국외 이전에 PostHog Inc.(미국)와 수집 항목(회원 ID, 행동 이벤트, 마스킹된 화면 녹화, 브라우저·기기, 유입 경로)·보관 기간을, 5번 자동 수집 장치에 localStorage 방문자 식별자와 거부 방법을 추가한다. 팀 규칙(일반 7일, 중요 30일 전)에 따라 서비스 공지를 게시한다.
++4. 중단 시 원격 Replay off + ENABLED=false 재배포한다. 신규 수집 중단과 이미 저장된 데이터 삭제는 별도로 확인한다.
++
++환경변수는 `FE/.env.example` 참고. 웹 프로젝트 token은 공개 수집용이며 Personal API key는 절대로 FE에 넣지 않는다. 처리방침 게시와 공지는 이번 코드 작업에서 수행하지 않는다.
++
++## 광고 차단과 CloudFront 검토
++
++1차는 공식 수집 호스트를 사용한다. 차단 확장 프로그램이 있으면 이벤트와 녹화가 모두 비어 있을 수 있다. Person에 기록이 없다는 이유만으로 미방문으로 단정하지 않는다. 차단기 사용/미사용 QA와 동등한 동의 조건의 테스트 트래픽으로 영향부터 확인한다.
++
++필요하면 CloudFront의 별도 수집 경로를 US ingestion/asset origin으로 프록시한다. POST·OPTIONS, query 전달, 캐시 비활성(수집/flags), 압축/본문 크기, upstream Host/TLS, SDK asset 경로, CORS와 CSP를 검증해야 한다. API 인증 쿠키·Authorization은 upstream에 전달하지 않고 CDN access log에도 쿼리/개인정보를 남기지 않는다. 별도 IaC Issue로 구현하며 장애 시 제품 요청과 분리한다. 프록시도 광고 차단을 완전히 없애지 못하고 명시적 수집 거부를 우회하는 수단으로 사용하지 않는다. [공식 프록시 문서](https://posthog.com/docs/advanced/proxy)
++
++## 대시보드와 QA
++
++- People에서 `bibbidi:user:{id}` 검색 → 세션별 Events → Recordings. 세션 기준으로 소셜 시작/약관/계정 선택/완료, 일정 폼/제출/성공을 각각 분석한다.
++- 세션의 마지막 화면·행동과 실패 사유를 확인한다. 최소 30분 비활성 방문만 이탈 후보로 보고 종료 시각·떠난 이유를 단정하지 않는다. 긴 OAuth 왕복은 세션이 나뉠 수 있으므로 회원 전환 퍼널과 방문 퍼널을 구분한다.
++- 자동 검증: 비활성 초기화, SDK 오류 격리, 온보딩 페이지뷰, 임시 회원 미식별, 계정 변경/reset, URL/속성 마스킹, 콜백 실패 분류, 명시적 실패 이벤트.
++- 실제 개발 프로젝트에서 **Discard client IP data** 설정이 켜져 있고 수신 데이터에 IP가 저장되지 않는지 확인한다.
++- 실제 개발 프로젝트 QA: 같은 탭 게스트→약관→new/legacy→최종 Person 병합, 새로고침/다른 탭/탈퇴, Safari/모바일, 차단기, StrictMode 중복, 일정 저장 후 목록 조회 실패.
++- 비밀 테스트 문자열을 입력·저장하고 Network payload와 실제 녹화에서 제목/메모/닉네임/비밀번호/code/state/referrer/DOM 속성에 남지 않는지 확인한다. 자동 테스트만으로 실제 수신·리플레이를 검증했다고 판단하지 않는다.
++
++## 구현 책임과 변경 범위
++
++기존 analytics 계층은 SDK 설정·정제·식별·장애 격리를 맡고, 앱 tracker는 인증/경로 전환 순서를 조정한다. 각 feature는 실제 사용자 행동과 API 결과에서 고정 이벤트를 만든다. PostHog 자체 서버·DB/outbox·새 범용 이벤트 버스는 추가하지 않는다. SDK는 현재 의존성으로 대체할 수 없는 리플레이 기능에 필요하다.
++
++여러 인증 기능에 계측을 넣어 권장 파일 수를 초과하지만 하나의 사용자 여정과 개인정보 경계를 함께 검증해야 하므로 Issue 하나에서 구현한다. 리뷰는 (1) SDK/마스킹/식별, (2) 행동 이벤트/운영 문서 순으로 볼 수 있다. 별도 커밋·푸시는 요청받기 전 수행하지 않는다.
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index cf104c8082f6d6855d9544ffe4361bb2a13aa6fe..1b84480b232f4f973b4edc58fc8893d78f4f5cc8 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -104,6 +104,9 @@ importers:
+ 
+   FE:
+     dependencies:
++      posthog-js:
++        specifier: 1.434.15
++        version: 1.434.15(@types/react@19.2.18)(react@19.2.3)
+       react:
+         specifier: 19.2.3
+         version: 19.2.3
+@@ -1186,6 +1189,15 @@ packages:
+     resolution: {integrity: sha512-C2Xj8FZ0uHWeCXXqX5B4/gVFQmtSkiuOolzAgutjTfseNOHT3pUjljDZsTSxXFGgio54bCzVFqmEOUrIVk8RDA==}
+     engines: {node: '>=20.0.0'}
+ 
++  '@posthog/browser-common@0.9.0':
++    resolution: {integrity: sha512-EWoVzs1vVY7ihpn8yOjj3jyjriHUEEMVSBNL/TW3hk09fTriWRe76vJXrRg0G0yjTYxHmtlSkNn4mOV24ZEzzA==}
++
++  '@posthog/core@1.55.2':
++    resolution: {integrity: sha512-2mYxGbDmTLUs096VbcZqSWo0lrI48/BrX65r54NynxxFq409BOx9w73HxOAtOKZ1vblkdV6/GxQTe7KDcIQidg==}
++
++  '@posthog/types@1.412.4':
++    resolution: {integrity: sha512-Q7lV9O9TbLngjOYw1ucm3bS3tn48xb1B4ZQdDy8gv7yfKe99hCTeWYG4xZ36nJM80VxpTF9TriiJt5hngDOkBg==}
++
+   '@radix-ui/primitive@1.1.7':
+     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
+ 
+@@ -1709,6 +1721,9 @@ packages:
+   '@types/serve-static@2.2.0':
+     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
+ 
++  '@types/trusted-types@2.0.7':
++    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
++
+   '@types/ws@8.18.1':
+     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+ 
+@@ -2453,6 +2468,9 @@ packages:
+     resolution: {integrity: sha512-XGpFGbMLHwSt74YLTKho7Ib242qi6O8MSX+sRokV4oz7iKXvQWGYZthjIhjRGMxjzVkAubBO512dKGYcefmX3Q==}
+     engines: {node: '>=6.4.0'}
+ 
++  core-js@3.50.0:
++    resolution: {integrity: sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==}
++
+   cross-fetch@3.2.0:
+     resolution: {integrity: sha512-Q+xVJLoGOeIMXZmbUK4HYk+69cQH6LudR0Vu/pRm2YlU/hDV9CiS0gKUMaWY5f2NeUH9C1nV3bsTlCo0FsTV1Q==}
+ 
+@@ -2629,6 +2647,9 @@ packages:
+     resolution: {integrity: sha512-GrwoxYN+uWlzO8uhUXRl0P+kHE4GtVPfYzVLcUxPL7KNdHKj66vvlhiweIHqYYXWlw+T8iLMp42Lm67ghw4WMQ==}
+     engines: {node: '>= 4'}
+ 
++  dompurify@3.4.16:
++    resolution: {integrity: sha512-sqo+pNp3qRhCIpbgRi1y8Tgk27Bo2Ry7w0dC1NBeNTdZChWjz9Xb/KOoZbRP/R6pQZ80Qw8YhXw13hWWBbMRnQ==}
++
+   domutils@2.8.0:
+     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
+ 
+@@ -3140,6 +3161,9 @@ packages:
+   fetch-nodeshim@0.4.10:
+     resolution: {integrity: sha512-m6I8ALe4L4XpdETy7MJZWs6L1IVMbjs99bwbpIKphxX+0CTns4IKDWJY0LWfr4YsFjfg+z1TjzTMU8lKl8rG0w==}
+ 
++  fflate@0.4.9:
++    resolution: {integrity: sha512-zdxgIEddhfsyCaWpJ2SdXEP8ZMrKJ6+5jl4OupODcywU0IhRk6gdXuVGcPICyfx2H97hVK7xmJtRLPjkxAX8Vw==}
++
+   file-entry-cache@8.0.0:
+     resolution: {integrity: sha512-XXTUwCvisa5oacNGRP9SfNtYBNAMi+RPwBFmblZEF7N7swHYQS6/Zfk7SRwx4D5j3CH211YNRco1DEMNVfZCnQ==}
+     engines: {node: '>=16.0.0'}
+@@ -4351,10 +4375,29 @@ packages:
+     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
+     engines: {node: ^10 || ^12 || >=14}
+ 
++  posthog-js@1.434.15:
++    resolution: {integrity: sha512-ZfBkNrQiFr1Q43G3dR0USzTRdfx+6gKPebyoWDmKnLUhG3yRgYjLH914J6ifEDRnH+RaGOx7rsWKxKcvaSJXHg==}
++    peerDependencies:
++      '@types/react': '>=16.8.0'
++      react: '>=16.8.0'
++    peerDependenciesMeta:
++      '@types/react':
++        optional: true
++      react:
++        optional: true
++
+   powershell-utils@0.1.0:
+     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
+     engines: {node: '>=20'}
+ 
++  preact@10.29.8:
++    resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==}
++    peerDependencies:
++      preact-render-to-string: '>=5'
++    peerDependenciesMeta:
++      preact-render-to-string:
++        optional: true
++
+   prelude-ls@1.2.1:
+     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
+     engines: {node: '>= 0.8.0'}
+@@ -4415,6 +4458,9 @@ packages:
+     resolution: {integrity: sha512-O9gl3zCl5h5blw1KGUzQKhA5oUXSl8rwUIM5o0S3nCXMliSvy5Dzx7/DJcI+SwgICv+IneSZwhBh1oSyEHA71A==}
+     engines: {node: '>=0.6'}
+ 
++  query-selector-shadow-dom@1.0.1:
++    resolution: {integrity: sha512-lT5yCqEBgfoMYpf3F2xQRK7zEr1rhIIZuceDK6+xRkJQ4NMbHTwXqk4NkwDwQMNqXgG9r9fyHnzwNVs6zV5KRw==}
++
+   query-string@7.1.3:
+     resolution: {integrity: sha512-hh2WYhq4fi8+b+/2Kg9CEge4fDPvHS534aOOvOZeQ3+Vf2mCFsaFBYj0i+iXcAq6I9Vzp5fjMFBlONvayDC1qg==}
+     engines: {node: '>=6'}
+@@ -5334,6 +5380,12 @@ packages:
+   wcwidth@1.0.1:
+     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
+ 
++  web-vitals@6.2.1:
++    resolution: {integrity: sha512-rLcLXA2sx6+9dE88NHFubwTtGxpK4yYBLj6qHPdFoCaLr0cXGb4efOqtKLlm4loGA4OEKHIQKMKzZkKyOh5ctw==}
++
++  web-vitals@6.2.2:
++    resolution: {integrity: sha512-oto5x6dLEgrRqfcWed+pZEUb2q6ikbFmqF54CRDhI/QGbn+qxC49b4C4OkbH+kb9C3a8shpFD3SgR9kRcs80ZQ==}
++
+   webidl-conversions@3.0.1:
+     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
+ 
+@@ -6927,6 +6979,17 @@ snapshots:
+       tslib: 2.8.1
+       tsyringe: 4.10.0
+ 
++  '@posthog/browser-common@0.9.0':
++    dependencies:
++      '@posthog/core': 1.55.2
++      '@posthog/types': 1.412.4
++
++  '@posthog/core@1.55.2':
++    dependencies:
++      '@posthog/types': 1.412.4
++
++  '@posthog/types@1.412.4': {}
++
+   '@radix-ui/primitive@1.1.7': {}
+ 
+   '@radix-ui/react-collection@1.1.15(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+@@ -7449,6 +7512,9 @@ snapshots:
+       '@types/http-errors': 2.0.5
+       '@types/node': 26.2.0
+ 
++  '@types/trusted-types@2.0.7':
++    optional: true
++
+   '@types/ws@8.18.1':
+     dependencies:
+       '@types/node': 26.2.0
+@@ -8325,6 +8391,8 @@ snapshots:
+     dependencies:
+       browserslist: 4.28.8
+ 
++  core-js@3.50.0: {}
++
+   cross-fetch@3.2.0:
+     dependencies:
+       node-fetch: 2.7.0
+@@ -8496,6 +8564,10 @@ snapshots:
+     dependencies:
+       domelementtype: 2.3.0
+ 
++  dompurify@3.4.16:
++    optionalDependencies:
++      '@types/trusted-types': 2.0.7
++
+   domutils@2.8.0:
+     dependencies:
+       dom-serializer: 1.4.1
+@@ -9275,6 +9347,8 @@ snapshots:
+ 
+   fetch-nodeshim@0.4.10: {}
+ 
++  fflate@0.4.9: {}
++
+   file-entry-cache@8.0.0:
+     dependencies:
+       flat-cache: 4.0.1
+@@ -10554,8 +10628,28 @@ snapshots:
+       picocolors: 1.1.1
+       source-map-js: 1.2.1
+ 
++  posthog-js@1.434.15(@types/react@19.2.18)(react@19.2.3):
++    dependencies:
++      '@posthog/browser-common': 0.9.0
++      '@posthog/core': 1.55.2
++      '@posthog/types': 1.412.4
++      core-js: 3.50.0
++      dompurify: 3.4.16
++      fflate: 0.4.9
++      preact: 10.29.8
++      query-selector-shadow-dom: 1.0.1
++      web-vitals: 6.2.2
++      web-vitals-soft-navs: web-vitals@6.2.1
++    optionalDependencies:
++      '@types/react': 19.2.18
++      react: 19.2.3
++    transitivePeerDependencies:
++      - preact-render-to-string
++
+   powershell-utils@0.1.0: {}
+ 
++  preact@10.29.8: {}
++
+   prelude-ls@1.2.1: {}
+ 
+   prettier@3.9.6: {}
+@@ -10618,6 +10712,8 @@ snapshots:
+       es-define-property: 1.0.1
+       side-channel: 1.1.1
+ 
++  query-selector-shadow-dom@1.0.1: {}
++
+   query-string@7.1.3:
+     dependencies:
+       decode-uri-component: 0.2.2
+@@ -11618,6 +11714,10 @@ snapshots:
+     dependencies:
+       defaults: 1.0.4
+ 
++  web-vitals@6.2.1: {}
++
++  web-vitals@6.2.2: {}
++
+   webidl-conversions@3.0.1: {}
+ 
+   webidl-conversions@8.0.1: {}
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 5297d3b70b4d47f840fa29114bb022542f1cc824..bd7260aed1ed2c94995907e03488de16d1bd2da4 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -8,6 +8,7 @@ nodeLinker: hoisted
+ 
+ allowBuilds:
+   '@swc/core': true
++  core-js: false
+   esbuild: true
+   unrs-resolver: true
