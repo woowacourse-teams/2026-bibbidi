@@ -539,7 +539,7 @@ describe("appRoutes", () => {
         .mock.calls.some(([input]) =>
           [
             "/api/appointments/me/nearby?limit=6",
-            "/api/checklists/me/unscheduled-items?limit=3",
+            "/api/checklists/me/unscheduled-items?limit=2",
             "/api/checklists/me/recommended-catalog-items?limit=4",
           ].includes(input.toString()),
         ),
@@ -584,7 +584,7 @@ describe("appRoutes", () => {
           );
         }
 
-        if (url === "/api/checklists/me/unscheduled-items?limit=3") {
+        if (url === "/api/checklists/me/unscheduled-items?limit=2") {
           return Promise.resolve(
             new Response(
               JSON.stringify({
