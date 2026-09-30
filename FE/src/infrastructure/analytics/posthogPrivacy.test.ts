@@ -10,7 +10,7 @@ import {
 describe("PostHog 개인정보 정제", () => {
   it("준비 추천의 카탈로그 이름과 단계를 보존한다", () => {
     const event = createPreparationItemAddEvent({
-      source: "planner_recommendation",
+      source: "calendar_recommendation",
       categoryName: "예식장",
       itemCount: 2,
       phase: 1,
@@ -26,7 +26,7 @@ describe("PostHog 개인정보 정제", () => {
   it("페이지 정의에 지정된 고정 제목을 포함해 기존 페이지 속성을 보존한다", () => {
     const event = createPageViewEvent({
       origin: "https://example.com",
-      pagePath: "/planner",
+      pagePath: "/calendar",
       referrerPath: "/",
     });
     expect(
@@ -39,6 +39,7 @@ describe("PostHog 개인정보 정제", () => {
   });
   it.each([
     "https://example.com/auth/kakao?code=secret&state=secret",
+    "https://example.com/planner",
     "https://example.com/users/123",
     "javascript:secret",
     "secret",

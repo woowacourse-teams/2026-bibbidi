@@ -135,7 +135,7 @@ describe("AppHeader", () => {
     expect(onLogout).toHaveBeenCalledOnce();
   });
 
-  it("하단 메뉴를 로드맵, 체크리스트, 플래너 순서로 표시한다", () => {
+  it("하단 메뉴를 로드맵, 체크리스트, 캘린더 순서로 표시한다", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppBottomNavigation />
@@ -145,7 +145,7 @@ describe("AppHeader", () => {
     const links = screen.getByRole("navigation", { name: "하단 메뉴" });
     expect(
       Array.from(links.querySelectorAll("a"), (link) => link.textContent),
-    ).toEqual(["로드맵", "체크리스트", "플래너"]);
+    ).toEqual(["로드맵", "체크리스트", "캘린더"]);
     expect(
       screen.getByRole("link", { name: "로드맵" }).getAttribute("href"),
     ).toBe("/");
@@ -173,7 +173,7 @@ describe("AppHeader", () => {
     expect(desktopLinks).toEqual([
       ["로드맵", "/"],
       ["체크리스트", "/checklist"],
-      ["플래너", "/planner"],
+      ["캘린더", "/calendar"],
     ]);
     expect(screen.queryByRole("link", { name: "준비 목록" })).toBeNull();
   });

@@ -4,7 +4,7 @@ import type { CaptureResult, PostHogConfig } from "posthog-js";
 const PUBLIC_PATHS = new Set([
   "/",
   "/login",
-  "/planner",
+  "/calendar",
   "/checklist",
   "/onboarding",
   "/onboarding/account",

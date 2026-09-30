@@ -77,7 +77,7 @@ describe("createGoogleAnalyticsProvider", () => {
       parameters: {
         page_location: "https://bibbidi.example/checklist",
         page_path: "/checklist",
-        page_referrer: "https://bibbidi.example/planner",
+        page_referrer: "https://bibbidi.example/calendar",
         page_title: "체크리스트",
         screen_name: "checklist",
       },
@@ -88,13 +88,13 @@ describe("createGoogleAnalyticsProvider", () => {
 
     expect(googleTag).toHaveBeenNthCalledWith(3, "set", {
       page_location: "https://bibbidi.example/checklist",
-      page_referrer: "https://bibbidi.example/planner",
+      page_referrer: "https://bibbidi.example/calendar",
       page_title: "체크리스트",
     });
     expect(googleTag).toHaveBeenNthCalledWith(4, "event", "page_view", {
       page_location: "https://bibbidi.example/checklist",
       page_path: "/checklist",
-      page_referrer: "https://bibbidi.example/planner",
+      page_referrer: "https://bibbidi.example/calendar",
       page_title: "체크리스트",
       screen_name: "checklist",
     });

@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("AppPageViewTracker", () => {
-  it("비로그인 사용자도 플래너 화면을 한 번만 측정한다", async () => {
+  it("비로그인 사용자도 캘린더 화면을 한 번만 측정한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -36,7 +36,7 @@ describe("AppPageViewTracker", () => {
       track: vi.fn(),
     };
     const router = createMemoryRouter(appRoutes, {
-      initialEntries: ["/planner?taskId=private"],
+      initialEntries: ["/calendar?taskId=private"],
     });
 
     render(
@@ -59,11 +59,11 @@ describe("AppPageViewTracker", () => {
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",
       parameters: {
-        page_location: "https://bibbidi.example/planner",
-        page_path: "/planner",
+        page_location: "https://bibbidi.example/calendar",
+        page_path: "/calendar",
         page_referrer: "",
-        page_title: "플래너",
-        screen_name: "planner",
+        page_title: "캘린더",
+        screen_name: "calendar",
       },
     });
   });

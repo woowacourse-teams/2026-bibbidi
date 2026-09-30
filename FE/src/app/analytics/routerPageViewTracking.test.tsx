@@ -13,7 +13,7 @@ import { startRouterPageViewTracking } from "./routerPageViewTracking";
 
 const routes: RouteObject[] = [
   { path: "/", element: <h1>준비 목록</h1> },
-  { path: "/planner", element: <h1>플래너</h1> },
+  { path: "/calendar", element: <h1>캘린더</h1> },
   { path: "/checklist", element: <h1>체크리스트</h1> },
   { path: "/login", element: <h1>로그인</h1> },
   { path: "/signup", element: <Navigate replace to="/login" /> },
@@ -66,9 +66,9 @@ describe("startRouterPageViewTracking", () => {
   });
 
   it("SPA 이동과 뒤로 가기 및 앞으로 가기를 각각 측정한다", async () => {
-    const { analytics, router } = renderTrackedRouter(["/", "/planner"], 0);
+    const { analytics, router } = renderTrackedRouter(["/", "/calendar"], 0);
 
-    await act(async () => router.navigate("/planner"));
+    await act(async () => router.navigate("/calendar"));
     await act(async () => router.navigate(-1));
     await act(async () => router.navigate(1));
 
@@ -77,7 +77,7 @@ describe("startRouterPageViewTracking", () => {
       vi
         .mocked(analytics.track)
         .mock.calls.map(([event]) => event.parameters.page_path),
-    ).toEqual(["/", "/planner", "/", "/planner"]);
+    ).toEqual(["/", "/calendar", "/", "/calendar"]);
   });
 
   it("회원가입 주소는 로그인 화면으로 이동한 뒤 로그인만 측정한다", async () => {
@@ -122,7 +122,7 @@ describe("startRouterPageViewTracking", () => {
     ]);
 
     await act(async () =>
-      router.navigate("/checklist?taskId=item-99&returnTo=%2Fplanner", {
+      router.navigate("/checklist?taskId=item-99&returnTo=%2Fcalendar", {
         replace: true,
       }),
     );
@@ -157,16 +157,16 @@ describe("startRouterPageViewTracking", () => {
     render(<RouterProvider router={router} />);
 
     await expect(
-      act(async () => router.navigate("/planner")),
+      act(async () => router.navigate("/calendar")),
     ).resolves.toBeUndefined();
-    expect(screen.getByRole("heading", { name: "플래너" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
   });
 
   it("구독 해제 뒤에는 페이지뷰를 보내지 않는다", async () => {
     const { analytics, router, unsubscribe } = renderTrackedRouter(["/"]);
 
     unsubscribe();
-    await act(async () => router.navigate("/planner"));
+    await act(async () => router.navigate("/calendar"));
 
     expect(analytics.track).toHaveBeenCalledOnce();
   });

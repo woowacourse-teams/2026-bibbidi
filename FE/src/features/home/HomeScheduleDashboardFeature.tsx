@@ -280,7 +280,7 @@ export function HomeScheduleDashboardFeature({
             categoryName: item.category,
             itemCount,
             phase: item.phase,
-            source: "planner_recommendation",
+            source: "calendar_recommendation",
           }),
         );
       }

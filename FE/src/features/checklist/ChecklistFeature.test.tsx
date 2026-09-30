@@ -1648,7 +1648,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
   });
 
-  it("플래너 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
+  it("캘린더 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { id: 1, nickname: "bibbidi" },
@@ -1667,12 +1667,12 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
     expect(
       analyticsMocks.track.mock.calls.filter(
-        ([event]) => event.name === "planner_appointment_start",
+        ([event]) => event.name === "calendar_appointment_start",
       ),
     ).toHaveLength(1);
     expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "planner_appointment_start",
-      parameters: { entry_type: "unscheduled_task", source: "planner" },
+      name: "calendar_appointment_start",
+      parameters: { entry_type: "unscheduled_task", source: "calendar" },
     });
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(
@@ -1687,12 +1687,12 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     ).toBeTruthy();
     expect(
       analyticsMocks.track.mock.calls.filter(
-        ([event]) => event.name === "planner_appointment_start",
+        ([event]) => event.name === "calendar_appointment_start",
       ),
     ).toHaveLength(2);
   });
 
-  it("플래너에서 연 일정 입력을 취소한 뒤 뒤로 가면 플래너로 돌아간다", async () => {
+  it("캘린더에서 연 일정 입력을 취소한 뒤 뒤로 가면 캘린더로 돌아간다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { id: 1, nickname: "bibbidi" },
@@ -1701,7 +1701,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       createAuthenticatedChecklist(),
     );
     renderChecklistFeature([
-      "/planner",
+      "/calendar",
       "/checklist?taskId=checklist-item-500&addAppointment=true",
     ]);
 
@@ -1713,10 +1713,10 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
-    expect(getCurrentUrl()).toBe("/planner");
+    expect(getCurrentUrl()).toBe("/calendar");
   });
 
-  it("모바일에서 자동 일정 입력을 닫고 상세 뒤로 가기를 누르면 플래너로 돌아간다", async () => {
+  it("모바일에서 자동 일정 입력을 닫고 상세 뒤로 가기를 누르면 캘린더로 돌아간다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     authMocks.authState = {
       status: "authenticated",
@@ -1726,7 +1726,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       createAuthenticatedChecklist(),
     );
     renderChecklistFeature([
-      "/planner",
+      "/calendar",
       {
         pathname: "/checklist",
         search: "?taskId=checklist-item-500&addAppointment=true",
@@ -1750,10 +1750,10 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     });
     closeMobileTaskDetail(detailSheet);
 
-    expect(getCurrentUrl()).toBe("/planner");
+    expect(getCurrentUrl()).toBe("/calendar");
   });
 
-  it("존재하지 않는 플래너 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
+  it("존재하지 않는 캘린더 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
     authMocks.authState = {
       status: "authenticated",
       user: { id: 1, nickname: "bibbidi" },

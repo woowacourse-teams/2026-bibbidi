@@ -5,9 +5,9 @@ const PAGE_DEFINITIONS = {
     pageTitle: "준비 목록",
     screenName: "preparation_catalog",
   },
-  "/planner": {
-    pageTitle: "플래너",
-    screenName: "planner",
+  "/calendar": {
+    pageTitle: "캘린더",
+    screenName: "calendar",
   },
   "/checklist": {
     pageTitle: "체크리스트",

@@ -6,7 +6,7 @@ import { AccountSetupPage } from "../pages/AccountSetupPage";
 import { ChecklistPage } from "../pages/ChecklistPage";
 import { LoginPage } from "../pages/LoginPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
-import { PlannerPage } from "../pages/PlannerPage";
+import { CalendarPage } from "../pages/CalendarPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
@@ -23,8 +23,8 @@ export const appRoutes: RouteObject[] = [
         element: <Navigate replace to="/" />,
       },
       {
-        path: "/planner",
-        Component: PlannerPage,
+        path: "/calendar",
+        Component: CalendarPage,
       },
       {
         path: "/checklist",

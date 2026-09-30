@@ -38,7 +38,7 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 
 | 이벤트 | 발생 지점 / 속성 |
 | --- | --- |
-| 기존 preparation, checklist, planner, appointment_create, logout, feedback_submit | 기존 명시적 계측 재사용. login/sign_up은 제외 |
+| 기존 preparation, checklist, calendar, appointment_create, logout, feedback_submit | 기존 명시적 계측 재사용. login/sign_up은 제외 |
 | social_login_start | 연결된 제공자 버튼으로 인가 시작, provider=kakao/google |
 | social_login_start_failed | 인가 URL 요청 실패, provider, failure_kind=network/timeout/api/unknown |
 | social_login_callback_failed | callback 오류, provider=kakao/google/unknown, failure_kind=cancelled/invalid_callback/state_invalid_or_expired/network/timeout/api/unknown |
@@ -49,7 +49,7 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 | legacy_transfer_failed | validation/authentication/terms_required/network/timeout/api/unknown. 네트워크 응답 유실 후 성공 여부가 불명확하면 outcome=unknown |
 | legacy_transfer_complete | 이전 성공 또는 응답 유실 후 성공 확인. 아직 익명 |
 | account_setup_complete | 새 계정 생성/기존 회원 이전 완료, choice |
-| appointment_form_view | 일정 폼 닫힘→열림, source=checklist/planner |
+| appointment_form_view | 일정 폼 닫힘→열림, source=checklist/calendar |
 | appointment_submit | 검증 통과 후 실제 저장 시도, source. 목록 재조회만 하는 재시도는 제외 |
 | appointment_create_failed | 입력 검증/저장 실패. 저장 후 목록 재조회 실패는 제외 |
 
@@ -109,7 +109,7 @@ BE 서버의 PostHog 삭제 자동 호출은 이번 범위에 포함하지 않�
 1. CloudFront 함수 `bibbidi-internal-traffic-cookie`를 FE 배포 두 곳(`bibbidi-fe-development`, `bibbidi-fe-production`)의 기본 동작 뷰어 응답에 연결했다. 접속 IP가 캠퍼스 대역이면 `bibbidi_internal=1` 쿠키(하루)를 붙이고, 캠퍼스 밖에서 이 쿠키를 가진 요청이 오면 지운다. FE는 이 쿠키가 있으면 PostHog SDK를 초기화하지 않는다.
 2. PostHog Data pipelines의 Transformation `Drop campus IP (39.118.242.0/24)`가 `$ip`가 이 대역인 이벤트를 수집 단계에서 버린다. **Discard client IP data**가 켜져 있어도 변환 단계에서는 `$ip`를 읽는다. 녹화에는 적용되지 않는다.
 
-S3에 없는 경로(`/planner` 등)는 CloudFront 오류 페이지로 `index.html`을 돌려주는데, 이 응답에는 뷰어 응답 함수가 실행되지 않아 쿠키가 붙지 않는다. 쿠키가 없는 상태로 이런 경로에 바로 들어오고 JS를 브라우저 캐시에서 읽으면 그 방문은 걸러지지 않는다. 캠퍼스 기기가 IPv6로 접속해도 대역 비교에 걸리지 않는다. 대역이 바뀌면 CloudFront 함수, PostHog 변환, GA4 내부 트래픽 규칙을 함께 고친다.
+S3에 없는 경로(`/calendar` 등)는 CloudFront 오류 페이지로 `index.html`을 돌려주는데, 이 응답에는 뷰어 응답 함수가 실행되지 않아 쿠키가 붙지 않는다. 쿠키가 없는 상태로 이런 경로에 바로 들어오고 JS를 브라우저 캐시에서 읽으면 그 방문은 걸러지지 않는다. 캠퍼스 기기가 IPv6로 접속해도 대역 비교에 걸리지 않는다. 대역이 바뀌면 CloudFront 함수, PostHog 변환, GA4 내부 트래픽 규칙을 함께 고친다.
 
 ## 광고 차단과 CloudFront 검토
 

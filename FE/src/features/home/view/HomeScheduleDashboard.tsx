@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { useIsMobileLayout } from "../../../shared/responsive";
 import {
   HomeScheduleDashboardLoadingSectionViewModel,
   HomeScheduleDashboardRecommendedViewModel,
@@ -29,6 +31,11 @@ interface DashboardResultSectionProps {
   id: string;
   onAction?: () => void;
   viewModel: HomeScheduleDashboardResultSectionViewModel;
+}
+
+interface DashboardSideProps {
+  recommended: ReactNode;
+  unscheduled: ReactNode;
 }
 
 function assertNever(value: never): never {
@@ -319,6 +326,26 @@ function RecommendedScheduleSection({
   }
 }
 
+function DashboardSide({ recommended, unscheduled }: DashboardSideProps) {
+  const isMobileLayout = useIsMobileLayout();
+
+  return (
+    <div className="home-dashboard-state__side">
+      {isMobileLayout ? (
+        <>
+          {recommended}
+          {unscheduled}
+        </>
+      ) : (
+        <>
+          {unscheduled}
+          {recommended}
+        </>
+      )}
+    </div>
+  );
+}
+
 const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
   {
     result: {
@@ -352,17 +379,21 @@ export function GuestHomeScheduleDashboard({
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
         <MonthlyCalendar referenceDate={referenceDate} />
-        <div className="home-dashboard-state__side">
-          <DashboardResultSection
-            id="dashboard-unscheduled-task"
-            viewModel={guestUnscheduledViewModel}
-          />
-          <DashboardResultSection
-            className="home-dashboard-state__section--recommended"
-            id="dashboard-recommended-schedule"
-            viewModel={guestRecommendedViewModel}
-          />
-        </div>
+        <DashboardSide
+          recommended={
+            <DashboardResultSection
+              className="home-dashboard-state__section--recommended"
+              id="dashboard-recommended-schedule"
+              viewModel={guestRecommendedViewModel}
+            />
+          }
+          unscheduled={
+            <DashboardResultSection
+              id="dashboard-unscheduled-task"
+              viewModel={guestUnscheduledViewModel}
+            />
+          }
+        />
       </div>
     </section>
   );
@@ -380,17 +411,21 @@ export function HomeScheduleDashboard({
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
       <div className="home-dashboard-state__top">
         <MonthlyCalendar referenceDate={referenceDate} schedules={schedules} />
-        <div className="home-dashboard-state__side">
-          <UnscheduledTaskSection
-            onRetry={onRetryUnscheduled}
-            viewModel={viewModel.unscheduled}
-          />
-          <RecommendedScheduleSection
-            onAddTask={onAddRecommendedTask}
-            onRetry={onRetryRecommended}
-            viewModel={viewModel.recommended}
-          />
-        </div>
+        <DashboardSide
+          recommended={
+            <RecommendedScheduleSection
+              onAddTask={onAddRecommendedTask}
+              onRetry={onRetryRecommended}
+              viewModel={viewModel.recommended}
+            />
+          }
+          unscheduled={
+            <UnscheduledTaskSection
+              onRetry={onRetryUnscheduled}
+              viewModel={viewModel.unscheduled}
+            />
+          }
+        />
       </div>
     </section>
   );
