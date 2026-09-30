@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "../../features/auth";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
+import type { LandingPage } from "./pageView";
 import {
   createRouterPageViewTrackingState,
   startRouterPageViewTracking,
@@ -23,6 +24,7 @@ export const HomeEntryPageViewContext = createContext<(() => void) | null>(
 interface AppPageViewTrackerProps {
   analytics: AnalyticsClient;
   children?: ReactNode;
+  landingPage?: LandingPage;
   origin: string;
   router: SubscribableRouter;
 }
@@ -30,11 +32,12 @@ interface AppPageViewTrackerProps {
 export function AppPageViewTracker({
   analytics,
   children,
+  landingPage,
   origin,
   router,
 }: AppPageViewTrackerProps) {
   const { authState } = useAuth();
-  const trackingState = useRef(createRouterPageViewTrackingState());
+  const trackingState = useRef(createRouterPageViewTrackingState(landingPage));
   const previousMemberId = useRef<number | undefined>(undefined);
   const isAppRouteSettled =
     authState.status === "authenticated" ||
