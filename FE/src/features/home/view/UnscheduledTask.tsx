@@ -11,7 +11,7 @@ function CalendarPlusIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="unscheduled-task-card__calendar-icon"
+      className="unscheduled-task-item__calendar-icon"
       fill="none"
       viewBox="0 0 24 24"
     >
@@ -51,22 +51,22 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
 
       <ul className="unscheduled-task__list">
         {viewModel.items.map((item) => (
-          <li className="unscheduled-task-card" key={item.id}>
-            <div className="unscheduled-task-card__top">
-              <span className="unscheduled-task-card__category">
+          <li className="unscheduled-task-item" key={item.id}>
+            <div className="unscheduled-task-item__badges">
+              <span className="unscheduled-task-item__category">
                 {item.categoryLabel}
               </span>
-              <span className="unscheduled-task-card__status">
+              <span className="unscheduled-task-item__status">
                 <span
                   aria-hidden="true"
-                  className="unscheduled-task-card__status-dot"
+                  className="unscheduled-task-item__status-dot"
                 />
                 {item.statusLabel}
               </span>
             </div>
-            <h3 className="unscheduled-task-card__title">{item.title}</h3>
+            <h3 className="unscheduled-task-item__title">{item.title}</h3>
             <Link
-              className="unscheduled-task-card__add-schedule"
+              className="unscheduled-task-item__add-schedule"
               state={{ checklistDetailDepth: 1 }}
               to={`/checklist?taskId=checklist-item-${item.id}&addAppointment=true`}
             >

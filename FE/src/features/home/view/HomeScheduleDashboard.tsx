@@ -167,8 +167,11 @@ function SkeletonSectionHeader() {
 
 function UnscheduledTaskSkeleton() {
   return (
-    <li className="home-dashboard-loading__unscheduled-card">
-      <span className="home-dashboard-loading__unscheduled-category" />
+    <li className="home-dashboard-loading__unscheduled-item">
+      <div className="home-dashboard-loading__unscheduled-badges">
+        <span className="home-dashboard-loading__unscheduled-category" />
+        <span className="home-dashboard-loading__unscheduled-status" />
+      </div>
       <span className="home-dashboard-loading__unscheduled-title" />
       <span className="home-dashboard-loading__unscheduled-action" />
     </li>
@@ -177,13 +180,12 @@ function UnscheduledTaskSkeleton() {
 
 function RecommendedScheduleSkeleton() {
   return (
-    <li className="home-dashboard-loading__recommended-card">
+    <li className="home-dashboard-loading__recommended-item">
       <div className="home-dashboard-loading__recommended-meta">
         <span className="home-dashboard-loading__recommended-category" />
+        <span className="home-dashboard-loading__recommended-step" />
       </div>
       <span className="home-dashboard-loading__recommended-title" />
-      <span className="home-dashboard-loading__recommended-description" />
-      <span aria-hidden="true" className="home-dashboard-loading__spacer" />
       <span className="home-dashboard-loading__recommended-action" />
     </li>
   );
@@ -235,7 +237,7 @@ function RecommendedScheduleLoading({
       <div aria-hidden="true">
         <SkeletonSectionHeader />
         <ul className="home-dashboard-loading__recommended-list">
-          {Array.from({ length: 4 }, (_, index) => (
+          {Array.from({ length: 2 }, (_, index) => (
             <RecommendedScheduleSkeleton key={index} />
           ))}
         </ul>

@@ -13,6 +13,11 @@ describe("MonthlyCalendar", () => {
     expect(within(calendar).getAllByRole("columnheader")[0].textContent).toBe(
       "일",
     );
+    expect(
+      screen.getByText(
+        "체크리스트에서 일정을 추가하면 캘린더에서 확인할 수 있어요.",
+      ),
+    ).toBeTruthy();
     expect(screen.getByLabelText("2026년 8월 30일")).toBeTruthy();
     expect(screen.getByLabelText("2026년 10월 10일")).toBeTruthy();
 
