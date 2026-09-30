@@ -79,7 +79,12 @@ export function MonthlyCalendar({
     >
       <header className="monthly-calendar__header">
         <div>
-          <h2 id="monthly-calendar-title">캘린더</h2>
+          <div className="monthly-calendar__title">
+            <h2 id="monthly-calendar-title">캘린더</h2>
+            <span>
+              체크리스트에서 일정을 추가하면 캘린더에서 확인할 수 있어요.
+            </span>
+          </div>
           <p aria-live="polite">{`${year}년 ${month + 1}월`}</p>
         </div>
         <div aria-label="월 이동" className="monthly-calendar__controls">
