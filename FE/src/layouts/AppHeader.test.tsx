@@ -148,7 +148,7 @@ describe("AppHeader", () => {
     ).toEqual(["로드맵", "체크리스트", "캘린더"]);
     expect(
       screen.getByRole("link", { name: "로드맵" }).getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     expect(
       screen.getByRole("link", { name: "로드맵" }).getAttribute("aria-current"),
     ).toBe("page");
@@ -171,7 +171,7 @@ describe("AppHeader", () => {
       (link) => [link.textContent, link.getAttribute("href")],
     );
     expect(desktopLinks).toEqual([
-      ["로드맵", "/"],
+      ["로드맵", "/preparation"],
       ["체크리스트", "/checklist"],
       ["캘린더", "/calendar"],
     ]);

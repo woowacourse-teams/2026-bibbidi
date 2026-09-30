@@ -2,6 +2,10 @@ import posthog, { type PostHog } from "posthog-js";
 
 import type { AnalyticsContext, AnalyticsProvider } from "./analytics";
 import {
+  HOME_ENTRY_EXPERIMENT_KEY,
+  type HomeEntryVariant,
+} from "./homeEntryExperiment";
+import {
   analyticsPagePath,
   PRIVATE_REPLAY_CONFIG,
   sanitizePostHogEvent,
@@ -23,9 +27,12 @@ type PostHogSdk = Pick<
   | "reset"
   | "get_distinct_id"
   | "register"
+  | "onFeatureFlags"
+  | "getFeatureFlag"
   | "startSessionRecording"
   | "stopSessionRecording"
 >;
+const FLAG_WAIT_MS = 2000;
 const MEMBER_PREFIX = "bibbidi:user:";
 // CloudFront 함수(bibbidi-internal-traffic-cookie)가 캠퍼스 IP 응답에 붙이는 쿠키
 const INTERNAL_TRAFFIC_COOKIE = "bibbidi_internal=1";
@@ -36,7 +43,9 @@ const isInternalTraffic = () =>
 export function createPostHogProvider(
   options: PostHogOptions,
   sdk: PostHogSdk = posthog,
-): AnalyticsProvider {
+): AnalyticsProvider & {
+  resolveHomeEntryVariant: () => Promise<HomeEntryVariant>;
+} {
   let initialized = false;
   let recording = false;
   let identityReady = false;
@@ -94,7 +103,7 @@ export function createPostHogProvider(
         disable_product_tours: true,
         disable_conversations: true,
         disable_web_experiments: true,
-        advanced_disable_feature_flags: true,
+        advanced_disable_feature_flags: false,
         save_referrer: true,
         save_campaign_params: true,
         disable_capture_url_hashes: true,
@@ -189,6 +198,48 @@ export function createPostHogProvider(
         ensureAnonymous();
       }
       context = { authState: "loading", pathname: context.pathname };
+    },
+    resolveHomeEntryVariant() {
+      if (!initialized || !identityReady || !isSettled()) {
+        return Promise.resolve("control");
+      }
+
+      return new Promise<HomeEntryVariant>((resolve) => {
+        let resolved = false;
+        let unsubscribe: (() => void) | undefined;
+        const finish = (variant: HomeEntryVariant) => {
+          if (resolved) return;
+          resolved = true;
+          window.clearTimeout(timeout);
+          unsubscribe?.();
+          resolve(variant);
+        };
+        const timeout = window.setTimeout(
+          () => finish("control"),
+          FLAG_WAIT_MS,
+        );
+
+        try {
+          unsubscribe = sdk.onFeatureFlags((_flags, _variants, context) => {
+            if (context?.errorsLoading) {
+              finish("control");
+              return;
+            }
+            try {
+              finish(
+                sdk.getFeatureFlag(HOME_ENTRY_EXPERIMENT_KEY) === "test"
+                  ? "test"
+                  : "control",
+              );
+            } catch {
+              finish("control");
+            }
+          });
+          if (resolved) unsubscribe();
+        } catch {
+          finish("control");
+        }
+      });
     },
   };
 }

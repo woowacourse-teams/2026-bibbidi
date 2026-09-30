@@ -17,11 +17,17 @@ import {
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { installLegacyWebSessionFetch } from "../test/webAuth";
+import { resolveHomeEntryVariant } from "../infrastructure/analytics";
 import {
   hasWebAccessToken,
   resetWebAuthSessionForTest,
 } from "../infrastructure/auth/webSessionManager";
 import { appRoutes } from "./router";
+
+vi.mock("../infrastructure/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../infrastructure/analytics")>()),
+  resolveHomeEntryVariant: vi.fn().mockResolvedValue("control"),
+}));
 
 function installFetch(currentUserResponse: Response) {
   installLegacyWebSessionFetch(
@@ -79,6 +85,7 @@ function renderRouter(initialEntries: string[], initialIndex?: number) {
 }
 
 beforeEach(() => {
+  vi.mocked(resolveHomeEntryVariant).mockReset().mockResolvedValue("control");
   resetWebAuthSessionForTest();
   clearAccountSetupProgress();
   vi.stubGlobal("localStorage", {
@@ -457,7 +464,41 @@ describe("appRoutes", () => {
     expect(screen.getByRole("main", { name: "준비 목록" })).toBeTruthy();
   });
 
-  it("이전 준비 목록 경로를 루트로 replace 리다이렉트한다", async () => {
+  it("실험군은 루트에서 캘린더로 이동하고 로드맵에 접근할 수 있다", async () => {
+    vi.mocked(resolveHomeEntryVariant).mockResolvedValue("test");
+    installFetch(
+      new Response(
+        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+        { status: 401 },
+      ),
+    );
+    const router = renderRouter(["/"]);
+
+    expect(await screen.findByRole("main", { name: "캘린더" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/calendar");
+    expect(screen.queryByRole("main", { name: "준비 목록" })).toBeNull();
+
+    fireEvent.click(screen.getAllByRole("link", { name: "로드맵" })[0]);
+    expect(await screen.findByRole("main", { name: "준비 목록" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/preparation");
+  });
+
+  it("카테고리로 연결된 루트 주소는 실험군이어도 준비 목록을 연다", async () => {
+    vi.mocked(resolveHomeEntryVariant).mockResolvedValue("test");
+    installFetch(
+      new Response(
+        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+        { status: 401 },
+      ),
+    );
+    const router = renderRouter(["/?categoryId=1"]);
+
+    expect(await screen.findByRole("main", { name: "준비 목록" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/");
+    expect(vi.mocked(resolveHomeEntryVariant)).not.toHaveBeenCalled();
+  });
+
+  it("준비 목록 경로는 첫 화면 실험과 별개로 로드맵을 보여준다", async () => {
     installFetch(
       new Response(
         JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
@@ -471,7 +512,7 @@ describe("appRoutes", () => {
         name: "로드맵에서 필요한 일만, 내 체크리스트에",
       }),
     ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/preparation");
 
     await act(async () => router.navigate(-1));
 

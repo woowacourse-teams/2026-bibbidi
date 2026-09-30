@@ -5,6 +5,7 @@ import { createPageViewEvent, normalizePagePath } from "./pageView";
 describe("normalizePagePath", () => {
   it.each([
     ["/", "/"],
+    ["/preparation", "/preparation"],
     ["/calendar", "/calendar"],
     ["/calendar/", "/calendar"],
     ["/checklist", "/checklist"],
@@ -16,15 +17,12 @@ describe("normalizePagePath", () => {
     },
   );
 
-  it.each([
-    "/preparation",
-    "/planner",
-    "/signup",
-    "/unknown",
-    "/checklist/task-123",
-  ])("리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다", (pathname) => {
-    expect(normalizePagePath(pathname)).toBeNull();
-  });
+  it.each(["/planner", "/signup", "/unknown", "/checklist/task-123"])(
+    "리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다",
+    (pathname) => {
+      expect(normalizePagePath(pathname)).toBeNull();
+    },
+  );
 });
 
 describe("createPageViewEvent", () => {

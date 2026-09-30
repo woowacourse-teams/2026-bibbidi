@@ -25,12 +25,13 @@ createRoot(rootElement).render(
   <StrictMode>
     <AuthProvider>
       <ChecklistMigrationProvider>
-        <RouterProvider router={router} />
         <AppPageViewTracker
           analytics={analytics}
           origin={window.location.origin}
           router={router}
-        />
+        >
+          <RouterProvider router={router} />
+        </AppPageViewTracker>
       </ChecklistMigrationProvider>
     </AuthProvider>
   </StrictMode>,

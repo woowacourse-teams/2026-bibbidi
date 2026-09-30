@@ -43,7 +43,7 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
     >
       <header className="unscheduled-task__header">
         <h2 id="unscheduled-task-title">{viewModel.title}</h2>
-        <Link className="unscheduled-task__roadmap-action" to="/">
+        <Link className="unscheduled-task__roadmap-action" to="/preparation">
           {viewModel.roadmapActionLabel}
           <ChevronRightIcon />
         </Link>

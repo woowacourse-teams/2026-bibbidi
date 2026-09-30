@@ -59,7 +59,14 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 
 ## SDK와 리플레이
 
-공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 성능, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 실험 수집을 끈다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
+공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 성능, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 자동 웹 실험을 끈다. 첫 화면 실험에 필요한 기능 플래그는 사용한다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
+
+## 첫 화면 A/B 실험 (#324)
+
+- `/` 진입 시 PostHog 다변량 기능 플래그 `home-entry-calendar`를 읽는다. `control`은 기존 준비 목록을, `test`는 `/calendar`를 첫 화면으로 보여준다. `/preparation`은 실험군과 관계없이 준비 목록을 연다. 카테고리로 연결된 기존 `/?categoryId=...` 링크도 준비 목록을 연다.
+- [PostHog 실험](https://us.posthog.com/project/632848/experiments/469553)은 `Draft`로 만들었다. 기능 플래그 키는 `home-entry-calendar`, 변형은 `control`/`test` 각 50%, 릴리스 조건은 전체 사용자 100%다. 개발 서버에서 두 변형과 노출 이벤트를 확인한 뒤 실험을 시작한다. 플래그가 없거나 조회가 실패하면 기존 준비 목록을 보여준다. 브라우저에서는 별도로 50:50 난수를 만들지 않는다.
+- PostHog의 1차 지표는 실험 노출 후 7일 안의 `preparation_item_add` 전환율, 2차 지표는 같은 기간의 `preparation_category_select` 전환율로 설정했다. 일정 생성(`appointment_create`)과 이탈은 후속 분석 대상으로 둔다. 실험 분석에는 PostHog의 변형 노출을 기준으로 사용한다. GA 페이지뷰만으로 실험군을 구분하지 않는다. 테스트 서버 이벤트는 `environment = development`로 분리한다.
+- PostHog 실험 생성 시 인증 전환 후에도 변형을 유지하는 옵션을 켰다. 실제 로그인 흐름에서 변형이 바뀌지 않는지 QA한다. 키나 변형 이름을 바꾸면 FE 코드를 함께 변경해야 한다.
 
 입력 전체와 DOM 텍스트 전체를 마스킹한다. DOM 속성은 CSS class/고정 구조 속성 및 rrweb이 생성한 스타일시트 `_cssText` 외에는 마스킹하고 이미지·SVG·미디어·iframe·canvas를 차단한다. 녹화는 레이아웃·클릭·스크롤과 이벤트를 함께 보는 용도다. 자유 입력을 저장한 뒤 카드에 표시되는 텍스트도 마스킹 대상이다. URL 정제는 일반 이벤트와 replay URL 각각에 적용한다. 쿼리·해시, 초기 유입 URL, referrer, 캠페인 파라미터와 자동 Person 속성이 우회해서 남지 않게 허용 목록으로 제한한다. GA로 전달하는 콜백 이벤트도 원본 주소 대신 고정 경로 `/auth/callback`을 사용한다.
 

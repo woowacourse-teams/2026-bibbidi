@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PostHogConfig } from "posthog-js";
+import type { PostHog, PostHogConfig } from "posthog-js";
 
 import { createAnalyticsClient } from "./analytics";
 import { createPostHogProvider } from "./posthogProvider";
@@ -32,13 +32,17 @@ function setup(initialId = "anonymous-1", enabled = true) {
     }),
     get_distinct_id: vi.fn(() => id),
     register: vi.fn(),
+    onFeatureFlags: vi.fn<
+      (callback: Parameters<PostHog["onFeatureFlags"]>[0]) => () => void
+    >(() => () => {}),
+    getFeatureFlag: vi.fn(() => "control"),
     startSessionRecording: vi.fn(),
     stopSessionRecording: vi.fn(),
   };
   const provider = createPostHogProvider({ ...options, enabled }, sdk);
   const client = createAnalyticsClient([provider]);
   client.initialize();
-  return { sdk, client };
+  return { sdk, client, provider };
 }
 
 afterEach(() => {
@@ -47,6 +51,46 @@ afterEach(() => {
 });
 
 describe("PostHog 사용자 여정", () => {
+  it("첫 화면 실험군을 읽고 SDK 플래그 노출을 기록하게 한다", async () => {
+    const { sdk, client, provider } = setup();
+    sdk.onFeatureFlags.mockImplementation((callback) => {
+      callback(["home-entry-calendar"], {}, { errorsLoading: false });
+      return () => {};
+    });
+    sdk.getFeatureFlag.mockReturnValue("test");
+    client.setContext({ authState: "guest", pathname: "/" });
+
+    expect(await provider.resolveHomeEntryVariant()).toBe("test");
+    expect(sdk.getFeatureFlag).toHaveBeenCalledExactlyOnceWith(
+      "home-entry-calendar",
+    );
+    const config = sdk.init.mock.calls[0][1] as PostHogConfig;
+    expect(config.advanced_disable_feature_flags).toBe(false);
+    expect(config.disable_web_experiments).toBe(true);
+  });
+
+  it("플래그 조회를 사용할 수 없으면 기존 로드맵을 선택한다", async () => {
+    const { sdk } = setup("anonymous", false);
+    const provider = createPostHogProvider({ ...options, enabled: false }, sdk);
+    expect(await provider.resolveHomeEntryVariant()).toBe("control");
+    expect(sdk.onFeatureFlags).not.toHaveBeenCalled();
+  });
+
+  it("플래그 응답이 지연되면 기존 로드맵으로 돌아간다", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, provider } = setup();
+      client.setContext({ authState: "guest", pathname: "/" });
+
+      const variant = provider.resolveHomeEntryVariant();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(await variant).toBe("control");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("익명 세션 종료는 녹화와 수집을 중지하되 온보딩의 SDK ID를 유지한다", () => {
     const { sdk, client } = setup();
     client.setContext({
