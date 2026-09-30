@@ -26,7 +26,11 @@ describe("HomeScheduleDashboard", () => {
   it("모바일에서는 캘린더, 추천 할 일, 일정이 필요한 할 일 순서로 표시한다", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
 
-    render(<GuestHomeScheduleDashboard referenceDate="2026-09-30" />);
+    render(
+      <MemoryRouter>
+        <GuestHomeScheduleDashboard referenceDate="2026-09-30" />
+      </MemoryRouter>,
+    );
 
     expect(getSectionHeadings()).toEqual([
       "캘린더",
