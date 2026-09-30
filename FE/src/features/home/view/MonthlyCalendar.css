@@ -260,6 +260,13 @@
   }
 }
 
+@media (max-width: 760px) {
+  .monthly-calendar__controls .monthly-calendar__today-button {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
 @media (min-width: 601px) {
   .monthly-calendar__grid td {
     height: 88px;

@@ -235,10 +235,10 @@ describe("useChecklistAppointmentCreation", () => {
     ).toHaveLength(1);
   });
 
-  it("플래너에서 연 일정 생성의 고정 유입 위치를 보존한다", async () => {
+  it("캘린더에서 연 일정 생성의 고정 유입 위치를 보존한다", async () => {
     render(<Harness onSubmit={vi.fn().mockResolvedValue(true)} />);
     withController(() => {
-      controller.open("planner");
+      controller.open("calendar");
       controller.changeTitle("전송하면 안 되는 일정 제목");
       controller.changeDate("2026-09-01");
       controller.changePlace("전송하면 안 되는 장소");
@@ -249,7 +249,7 @@ describe("useChecklistAppointmentCreation", () => {
 
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "appointment_create",
-      parameters: { creation_type: "checklist_item", source: "planner" },
+      parameters: { creation_type: "checklist_item", source: "calendar" },
     });
   });
 

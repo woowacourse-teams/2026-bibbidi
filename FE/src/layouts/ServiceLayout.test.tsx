@@ -296,7 +296,7 @@ describe("ServiceLayout", () => {
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
   });
 
-  it("인증 확인 중에도 플래너 링크로 이동한다", () => {
+  it("인증 확인 중에도 캘린더 링크로 이동한다", () => {
     installLegacyWebSessionFetch(vi.fn(() => new Promise(() => undefined)));
 
     renderServiceLayout(
@@ -311,10 +311,10 @@ describe("ServiceLayout", () => {
           }
         />
         <Route
-          path="/planner"
+          path="/calendar"
           element={
             <>
-              <div>플래너 화면</div>
+              <div>캘린더 화면</div>
               <LocationDisplay />
             </>
           }
@@ -325,12 +325,14 @@ describe("ServiceLayout", () => {
     fireEvent.click(
       within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
         "link",
-        { name: "플래너" },
+        { name: "캘린더" },
       ),
     );
 
-    expect(screen.getByTestId("service-location").textContent).toBe("/planner");
-    expect(screen.getByText("플래너 화면")).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/calendar",
+    );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -439,7 +441,7 @@ describe("ServiceLayout", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("비로그인 플래너 링크는 로그인 안내 없이 플래너로 이동한다", async () => {
+  it("비로그인 캘린더 링크는 로그인 안내 없이 캘린더로 이동한다", async () => {
     installLegacyWebSessionFetch(
       vi
         .fn()
@@ -463,10 +465,10 @@ describe("ServiceLayout", () => {
           }
         />
         <Route
-          path="/planner"
+          path="/calendar"
           element={
             <>
-              <div>플래너 화면</div>
+              <div>캘린더 화면</div>
               <LocationDisplay />
             </>
           }
@@ -476,14 +478,16 @@ describe("ServiceLayout", () => {
     const desktopNavigation = await screen.findByRole("navigation", {
       name: "주요 메뉴",
     });
-    const plannerLink = within(desktopNavigation).getByRole("link", {
-      name: "플래너",
+    const calendarLink = within(desktopNavigation).getByRole("link", {
+      name: "캘린더",
     });
 
-    fireEvent.click(plannerLink);
+    fireEvent.click(calendarLink);
 
-    expect(screen.getByTestId("service-location").textContent).toBe("/planner");
-    expect(screen.getByText("플래너 화면")).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/calendar",
+    );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

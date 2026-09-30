@@ -61,7 +61,7 @@ function LocationProbe() {
 
 function render(ui: Parameters<typeof rtlRender>[0]) {
   const result = rtlRender(
-    <MemoryRouter initialEntries={["/planner"]}>
+    <MemoryRouter initialEntries={["/calendar"]}>
       {ui}
       <LocationProbe />
     </MemoryRouter>,
@@ -71,7 +71,7 @@ function render(ui: Parameters<typeof rtlRender>[0]) {
     ...result,
     rerender(nextUi: Parameters<typeof rtlRender>[0]) {
       result.rerender(
-        <MemoryRouter initialEntries={["/planner"]}>
+        <MemoryRouter initialEntries={["/calendar"]}>
           {nextUi}
           <LocationProbe />
         </MemoryRouter>,
@@ -772,7 +772,7 @@ describe("HomeScheduleDashboardFeature", () => {
         category_name: "웨딩홀",
         item_count: 1,
         phase: 1,
-        source: "planner_recommendation",
+        source: "calendar_recommendation",
       },
     });
     expect(screen.getByRole("heading", { name: "캘린더" })).toBeTruthy();
