@@ -1,32 +1,54 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 
 import { useAuth } from "../../features/auth";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
+import type { LandingPage } from "./pageView";
 import {
   createRouterPageViewTrackingState,
   startRouterPageViewTracking,
+  trackPageView,
   type SubscribableRouter,
 } from "./routerPageViewTracking";
 
+export const HomeEntryPageViewContext = createContext<(() => void) | null>(
+  null,
+);
+
 interface AppPageViewTrackerProps {
   analytics: AnalyticsClient;
+  children?: ReactNode;
+  landingPage?: LandingPage;
   origin: string;
   router: SubscribableRouter;
 }
 
 export function AppPageViewTracker({
   analytics,
+  children,
+  landingPage,
   origin,
   router,
 }: AppPageViewTrackerProps) {
   const { authState } = useAuth();
-  const trackingState = useRef(createRouterPageViewTrackingState());
+  const trackingState = useRef(createRouterPageViewTrackingState(landingPage));
   const previousMemberId = useRef<number | undefined>(undefined);
   const isAppRouteSettled =
     authState.status === "authenticated" ||
     authState.status === "guest" ||
     authState.status === "onboardingRequired" ||
     authState.status === "accountSetupRequired";
+
+  const trackHomeEntryPageView = useCallback(() => {
+    if (router.state.location.pathname !== "/" || !isAppRouteSettled) return;
+    trackPageView("/", analytics, origin, trackingState.current);
+  }, [analytics, isAppRouteSettled, origin, router]);
 
   useLayoutEffect(() => {
     if (isAppRouteSettled) {
@@ -68,8 +90,13 @@ export function AppPageViewTracker({
       analytics,
       origin,
       trackingState.current,
+      true,
     );
   }, [analytics, authState, isAppRouteSettled, origin, router]);
 
-  return null;
+  return (
+    <HomeEntryPageViewContext.Provider value={trackHomeEntryPageView}>
+      {children}
+    </HomeEntryPageViewContext.Provider>
+  );
 }

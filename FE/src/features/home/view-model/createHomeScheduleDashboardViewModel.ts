@@ -97,7 +97,7 @@ function createUnscheduledViewModel(
       return {
         result: {
           actionLabel: "로드맵에서 할 일 찾기",
-          actionTo: "/",
+          actionTo: "/preparation",
           actionVariant: "link",
           description: "진행 중인 할 일의 일정을 모두 정했어요",
           icon: "calendar-check",
@@ -139,7 +139,7 @@ function createRecommendedViewModel(
         countLabel: "0개",
         result: {
           actionLabel: "로드맵 보기",
-          actionTo: "/",
+          actionTo: "/preparation",
           actionVariant: "link",
           description: "새로 추가할 로드맵의 할 일이 없어요",
           icon: "calendar-heart",

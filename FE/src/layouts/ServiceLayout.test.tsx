@@ -350,9 +350,9 @@ describe("ServiceLayout", () => {
         <Route path="/" element={<div>홈 화면</div>} />
         <Route path="/preparation" element={<div>준비 목록 화면</div>} />
       </>,
-      ["/preparation"],
+      ["/"],
     );
-    await screen.findByText("준비 목록 화면");
+    await screen.findByText("홈 화면");
     const content = container.querySelector<HTMLElement>(
       ".service-layout__content",
     );
@@ -371,7 +371,7 @@ describe("ServiceLayout", () => {
       ),
     );
 
-    expect(screen.getByText("홈 화면")).toBeTruthy();
+    expect(screen.getByText("준비 목록 화면")).toBeTruthy();
     expect(content.scrollTop).toBe(0);
   });
 

@@ -5,6 +5,7 @@ import { createPageViewEvent, normalizePagePath } from "./pageView";
 describe("normalizePagePath", () => {
   it.each([
     ["/", "/"],
+    ["/preparation", "/preparation"],
     ["/calendar", "/calendar"],
     ["/calendar/", "/calendar"],
     ["/checklist", "/checklist"],
@@ -16,15 +17,12 @@ describe("normalizePagePath", () => {
     },
   );
 
-  it.each([
-    "/preparation",
-    "/planner",
-    "/signup",
-    "/unknown",
-    "/checklist/task-123",
-  ])("리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다", (pathname) => {
-    expect(normalizePagePath(pathname)).toBeNull();
-  });
+  it.each(["/planner", "/signup", "/unknown", "/checklist/task-123"])(
+    "리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다",
+    (pathname) => {
+      expect(normalizePagePath(pathname)).toBeNull();
+    },
+  );
 });
 
 describe("createPageViewEvent", () => {
@@ -55,5 +53,27 @@ describe("createPageViewEvent", () => {
         referrerPath: null,
       }).parameters.page_referrer,
     ).toBe("");
+  });
+
+  it("첫 진입 주소의 쿼리와 외부 referrer를 GA 기본 수집처럼 그대로 담는다", () => {
+    expect(
+      createPageViewEvent({
+        origin: "https://bibbidi.example",
+        pagePath: "/",
+        referrerPath: null,
+        landingPage: {
+          pathname: "/",
+          search:
+            "?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+          referrer: "https://l.instagram.com/",
+        },
+      }).parameters,
+    ).toEqual(
+      expect.objectContaining({
+        page_location:
+          "https://bibbidi.example/?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+        page_referrer: "https://l.instagram.com/",
+      }),
+    );
   });
 });

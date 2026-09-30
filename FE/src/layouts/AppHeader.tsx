@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
-import { NavLink } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 
 import "./AppHeader.css";
 import { HeaderBrandLink } from "./HeaderBrandLink";
-import { appNavigationItems } from "./AppNavigation";
+import { appNavigationItems, isAppNavigationItemActive } from "./AppNavigation";
 
 interface AuthenticatedUser {
   kind: "authenticated";
@@ -27,6 +27,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ user }: AppHeaderProps) {
+  const { pathname } = useLocation();
   return (
     <header className="app-header">
       <div className="app-header__inner">
@@ -37,14 +38,18 @@ export function AppHeader({ user }: AppHeaderProps) {
             {appNavigationItems
               .filter((item) => item.showInDesktopHeader)
               .map((item) => (
-                <NavLink
+                <Link
+                  aria-current={
+                    isAppNavigationItemActive(pathname, item.to)
+                      ? "page"
+                      : undefined
+                  }
                   className="app-header__navigation-item"
-                  end={item.to === "/"}
                   key={item.to}
                   to={item.to}
                 >
                   {item.label}
-                </NavLink>
+                </Link>
               ))}
           </nav>
         </div>

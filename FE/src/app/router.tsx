@@ -7,6 +7,7 @@ import { ChecklistPage } from "../pages/ChecklistPage";
 import { LoginPage } from "../pages/LoginPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { CalendarPage } from "../pages/CalendarPage";
+import { HomeEntryPage } from "../pages/HomeEntryPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
@@ -16,11 +17,11 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: "/",
-        Component: PreparationCatalogPage,
+        Component: HomeEntryPage,
       },
       {
         path: "/preparation",
-        element: <Navigate replace to="/" />,
+        Component: PreparationCatalogPage,
       },
       {
         path: "/calendar",
