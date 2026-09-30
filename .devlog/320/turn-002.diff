@@ -1,0 +1,56 @@
+diff --git a/.github/workflows/backend-common-cd.yml b/.github/workflows/backend-common-cd.yml
+index a173f7b2c54de105a8f1f944436d3e0564310793..8f5ca18a0a79a3115e708c9f365b2bbbd08e7e83 100644
+--- a/.github/workflows/backend-common-cd.yml
++++ b/.github/workflows/backend-common-cd.yml
+@@ -133,12 +133,12 @@ jobs:
+           set -a
+           . /opt/bibbidi/app/.env.nginx
+           set +a
+-          test -n "$H2_CONSOLE_ALLOWED_IP"
+-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${H2_CONSOLE_ALLOWED_IP}' \
++          test -n "$ONLY_DEVELOPER_ALLOWED_IP"
++          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${ONLY_DEVELOPER_ALLOWED_IP}' \
+             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
+             > /opt/bibbidi/app/infra/nginx/nginx.conf
+           test -s /opt/bibbidi/app/infra/nginx/nginx.conf
+-          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT|H2_CONSOLE_ALLOWED_IP)\}' \
++          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT|ONLY_DEVELOPER_ALLOWED_IP)\}' \
+             /opt/bibbidi/app/infra/nginx/nginx.conf
+ 
+       - name: nginx 기동을 위한 TLS 인증서 초기화
+diff --git a/Infra/nginx/nginx.conf.template b/Infra/nginx/nginx.conf.template
+index 637b5922e66589045f62a82e036fef87d02da6ba..2ca28dc0e7e1be84657fb70cb3d8f2d271a9dd74 100644
+--- a/Infra/nginx/nginx.conf.template
++++ b/Infra/nginx/nginx.conf.template
+@@ -145,8 +145,30 @@ http {
+             return 404;
+         }
+ 
++        location ^~ /swagger-ui {
++            allow ${ONLY_DEVELOPER_ALLOWED_IP};
++            deny all;
++
++            proxy_pass http://backend:8080;
++            proxy_set_header Host $host;
++            proxy_set_header X-Real-IP $remote_addr;
++            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
++            proxy_set_header X-Forwarded-Proto $scheme;
++        }
++
++        location = /docs/openapi3.yaml {
++            allow ${ONLY_DEVELOPER_ALLOWED_IP};
++            deny all;
++
++            proxy_pass http://backend:8080;
++            proxy_set_header Host $host;
++            proxy_set_header X-Real-IP $remote_addr;
++            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
++            proxy_set_header X-Forwarded-Proto $scheme;
++        }
++
+         location ^~ /h2-console {
+-            allow ${H2_CONSOLE_ALLOWED_IP};
++            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+             deny all;
+ 
+             add_header Strict-Transport-Security "max-age=31536000" always;
