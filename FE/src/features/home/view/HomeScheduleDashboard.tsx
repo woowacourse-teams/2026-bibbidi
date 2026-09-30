@@ -349,6 +349,9 @@ function DashboardSide({ recommended, unscheduled }: DashboardSideProps) {
 const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
   {
     result: {
+      actionLabel: "로드맵에서 할 일 찾기",
+      actionTo: "/preparation",
+      actionVariant: "link",
       description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
       icon: "lock",
       title: "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
@@ -361,6 +364,9 @@ const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"au
 const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
   {
     result: {
+      actionLabel: "로드맵에서 할 일 찾기",
+      actionTo: "/preparation",
+      actionVariant: "link",
       description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
       icon: "lock",
       title: "로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요.",

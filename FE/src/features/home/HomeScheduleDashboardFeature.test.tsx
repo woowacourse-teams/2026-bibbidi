@@ -171,13 +171,46 @@ describe("HomeScheduleDashboardFeature", () => {
       ),
     ).toHaveLength(2);
     expect(screen.getByRole("button", { name: "오늘" })).toBeTruthy();
-    expect(screen.queryByRole("link")).toBeNull();
     expect(unscheduledRepository.getUnscheduledTasks).not.toHaveBeenCalled();
     expect(
       recommendedRepository.getRecommendedCatalogItems,
     ).not.toHaveBeenCalled();
     expect(myChecklistRepository.getChecklist).not.toHaveBeenCalled();
   });
+
+  it.each(["일정이 필요한 할 일", "추천 할 일"])(
+    "비로그인 사용자는 %s 잠금 카드의 링크로 로드맵에 이동한다",
+    (sectionName) => {
+      vi.mocked(useAuth).mockReturnValue({
+        authState: { status: "guest" },
+        beginAuthentication: vi.fn(),
+        beginOnboarding: vi.fn(),
+        completeAuthentication: vi.fn(),
+        endAuthentication: vi.fn(),
+        failAuthentication: vi.fn(),
+        requireAccountSetup: vi.fn(),
+        refreshAuth,
+      });
+
+      render(
+        <HomeScheduleDashboardFeature
+          recommendedRepository={createRecommendedRepository()}
+          unscheduledRepository={createUnscheduledRepository()}
+        />,
+      );
+
+      const section = screen.getByRole("region", { name: sectionName });
+      const link = within(section).getByRole("link", {
+        name: "로드맵에서 할 일 찾기",
+      });
+
+      expect(link.getAttribute("href")).toBe("/preparation");
+      fireEvent.click(link);
+      expect(screen.getByTestId("dashboard-location").textContent).toBe(
+        "/preparation",
+      );
+    },
+  );
 
   it("로그인 사용자의 체크리스트 일정을 해당 날짜에 표시한다", async () => {
     vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
