@@ -36,6 +36,7 @@ function setup(initialId = "anonymous-1", enabled = true) {
       (callback: Parameters<PostHog["onFeatureFlags"]>[0]) => () => void
     >(() => () => {}),
     getFeatureFlag: vi.fn(() => "control"),
+    featureFlags: { ensureFlagsLoaded: vi.fn() },
     startSessionRecording: vi.fn(),
     stopSessionRecording: vi.fn(),
   };
@@ -67,6 +68,24 @@ describe("PostHog 사용자 여정", () => {
     const config = sdk.init.mock.calls[0][1] as PostHogConfig;
     expect(config.advanced_disable_feature_flags).toBe(false);
     expect(config.disable_web_experiments).toBe(true);
+    expect(sdk.featureFlags.ensureFlagsLoaded).not.toHaveBeenCalled();
+  });
+
+  it("첫 방문처럼 플래그를 아직 받지 않았으면 바로 요청한다", async () => {
+    const { sdk, client, provider } = setup();
+    let notify: Parameters<PostHog["onFeatureFlags"]>[0] = () => {};
+    sdk.onFeatureFlags.mockImplementation((callback) => {
+      notify = callback;
+      return () => {};
+    });
+    sdk.featureFlags.ensureFlagsLoaded.mockImplementation(() =>
+      notify(["home-entry-calendar"], {}, { errorsLoading: false }),
+    );
+    sdk.getFeatureFlag.mockReturnValue("test");
+    client.setContext({ authState: "guest", pathname: "/" });
+
+    expect(await provider.resolveHomeEntryVariant()).toBe("test");
+    expect(sdk.featureFlags.ensureFlagsLoaded).toHaveBeenCalledOnce();
   });
 
   it("플래그 조회를 사용할 수 없으면 기존 로드맵을 선택한다", async () => {

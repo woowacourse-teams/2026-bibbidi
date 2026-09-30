@@ -31,7 +31,9 @@ type PostHogSdk = Pick<
   | "getFeatureFlag"
   | "startSessionRecording"
   | "stopSessionRecording"
->;
+> & {
+  featureFlags: Pick<PostHog["featureFlags"], "ensureFlagsLoaded">;
+};
 const FLAG_WAIT_MS = 2000;
 const MEMBER_PREFIX = "bibbidi:user:";
 // CloudFront 함수(bibbidi-internal-traffic-cookie)가 캠퍼스 IP 응답에 붙이는 쿠키
@@ -236,6 +238,8 @@ export function createPostHogProvider(
             }
           });
           if (resolved) unsubscribe();
+          // 첫 방문 익명 사용자는 SDK가 원격 설정을 받은 뒤에야 플래그를 요청해 대기 시간을 넘긴다.
+          else sdk.featureFlags.ensureFlagsLoaded();
         } catch {
           finish("control");
         }
