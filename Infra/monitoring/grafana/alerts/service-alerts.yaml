@@ -11,6 +11,12 @@ apiVersion: 1
 #                          dashboards and log-to-trace links, not by alert rules)
 # Do not point rules at grafanacloud-usage, -usage-insights, or
 # -alert-state-history: those describe Grafana Cloud itself, not this service.
+#
+# Last synced with Grafana Cloud: 2026-09-30
+#   - Every rule watches production only (deployment_environment_name).
+#     bibbidi-instance-down is written in its target state; see its comment.
+#   - Lines marked "verify" were written from the change log, not from a Grafana
+#     export. Compare them with the live rule when you next export.
 groups:
   - orgId: 1
     name: bibbidi-service-symptoms
@@ -29,11 +35,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "3"
         labels: {severity: warning, service: bibbidi, symptom: api-errors}
+        notification_settings: {receiver: discord-normal-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5..", deployment_environment_name="production"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{deployment_environment_name="production"}[5m])), 1)'
               instant: true
               refId: A
           - refId: C
@@ -56,11 +63,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "3"
         labels: {severity: critical, service: bibbidi, symptom: api-errors}
+        notification_settings: {receiver: discord-severity-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)'
+              expr: 'sum(rate(http_server_requests_seconds_count{status=~"5..", deployment_environment_name="production"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{deployment_environment_name="production"}[5m])), 1)'
               instant: true
               refId: A
           - refId: C
@@ -83,11 +91,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "5"
         labels: {severity: warning, service: bibbidi, symptom: latency}
+        notification_settings: {receiver: discord-normal-error}
         data:
           - refId: A
             relativeTimeRange: {from: 600, to: 0}
             model:
-              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))'
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name="production"}[5m])))'
               instant: true
               refId: A
           - refId: C
@@ -115,11 +124,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "12"
         labels: {severity: warning, service: bibbidi, symptom: database-pool}
+        notification_settings: {receiver: discord-normal-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'max(hikaricp_connections_pending)'
+              expr: 'max(hikaricp_connections_pending{deployment_environment_name="production"})'
               instant: true
               refId: A
           - refId: C
@@ -142,11 +152,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "12"
         labels: {severity: critical, service: bibbidi, symptom: database-pool}
+        notification_settings: {receiver: discord-severity-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'max(hikaricp_connections_pending)'
+              expr: 'max(hikaricp_connections_pending{deployment_environment_name="production"})'
               instant: true
               refId: A
           - refId: C
@@ -169,11 +180,12 @@ groups:
           dashboard_uid: bibbidi-observability
           panel_id: "7"
         labels: {severity: warning, service: bibbidi, symptom: jvm-memory}
+        notification_settings: {receiver: discord-normal-error}
         data:
           - refId: A
             relativeTimeRange: {from: 600, to: 0}
             model:
-              expr: 'sum(jvm_memory_used_bytes{area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{area="heap"}), 1)'
+              expr: 'sum(jvm_memory_used_bytes{area="heap", deployment_environment_name="production"}) / clamp_min(sum(jvm_memory_max_bytes{area="heap", deployment_environment_name="production"}), 1)'
               instant: true
               refId: A
           - refId: C
@@ -184,6 +196,9 @@ groups:
               conditions: [{evaluator: {params: [0.85], type: gt}, operator: {type: and}, query: {params: [A]}, reducer: {params: [], type: last}, type: query}]
               refId: C
 
+      # Target state. Change the live rule only after production `up` carries
+      # deployment_environment_name (Alloy scrape target label). noDataState is
+      # Alerting, so switching the query earlier fires a false critical alert.
       - uid: bibbidi-instance-down
         title: Bibbidi Backend scrape target is down
         condition: C
@@ -195,11 +210,12 @@ groups:
           description: "The Backend target is down or unreachable. Check the backend and Alloy containers, Docker Network, and Actuator access policy."
           dashboard_uid: bibbidi-observability
         labels: {severity: critical, service: bibbidi, symptom: target-down}
+        notification_settings: {receiver: discord-severity-error}
         data:
           - refId: A
             relativeTimeRange: {from: 120, to: 0}
             model:
-              expr: 'min(up{job=~".*bibbidi.*"})'
+              expr: 'min(up{job=~".*bibbidi.*", deployment_environment_name="production"})'
               instant: true
               refId: A
           - refId: C
@@ -220,7 +236,10 @@ groups:
       # failing scheduled job, a swallowed error - still raises an alert.
       #
       # Labels come from Alloy: job="bibbidi" is set by loki.source.docker, and
-      # severity_text by loki.process.normalize (stage.labels).
+      # deployment_environment_name by discovery.relabel.docker_logs.
+      # The error rule uses detected_level (set by Grafana Cloud from the log line)
+      # because severity_text only carries info/warn: Spring's ECS logs write the
+      # level to log.level, which stage.labels does not read.
       - uid: bibbidi-error-log-spike
         title: Bibbidi error log volume is elevated
         condition: C
@@ -229,14 +248,16 @@ groups:
         execErrState: Error
         annotations:
           summary: "More than 10 ERROR or FATAL log lines in 5 minutes"
-          description: "The backend is logging errors at an unusual rate. Open Loki with {job=\"bibbidi\", severity_text=~\"(?i)error|fatal\"} and follow the traceId in the structured metadata into Tempo."
+          description: "The backend is logging errors at an unusual rate. Open Loki with {job=\"bibbidi\", deployment_environment_name=\"production\"} | detected_level=~\"(?i)error|fatal\" and follow the traceId in the structured metadata into Tempo."
           dashboard_uid: bibbidi-observability
         labels: {severity: warning, service: bibbidi, symptom: error-logs}
+        notification_settings: {receiver: discord-normal-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'sum(count_over_time({job="bibbidi", severity_text=~"(?i)error|fatal"}[5m]))'
+              # verify: detected_level filter syntax
+              expr: 'sum(count_over_time({job="bibbidi", deployment_environment_name="production"} | detected_level=~"(?i)error|fatal" [5m]))'
               queryType: range
               refId: A
           - refId: B
@@ -265,11 +286,12 @@ groups:
           description: "Nginx itself is answering 5xx. A 502 or 504 here usually means the backend container is down, restarting, or slower than the 30s proxy_read_timeout - the application metrics may show nothing at all."
           dashboard_uid: bibbidi-observability
         labels: {severity: critical, service: bibbidi, symptom: gateway-errors}
+        notification_settings: {receiver: discord-severity-error}
         data:
           - refId: A
             relativeTimeRange: {from: 300, to: 0}
             model:
-              expr: 'sum(count_over_time({job="bibbidi", compose_service="nginx"} | json | http_response_status_code >= 500 [5m]))'
+              expr: 'sum(count_over_time({job="bibbidi", compose_service="nginx", deployment_environment_name="production"} | json | http_response_status_code >= 500 [5m]))'
               queryType: range
               refId: A
           - refId: B
@@ -285,4 +307,74 @@ groups:
               expression: B
               type: threshold
               conditions: [{evaluator: {params: [10], type: gt}, operator: {type: and}, query: {params: [B]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-auth-5xx-critical
+        title: Login/session API is failing
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "More than 5 5xx responses on /api/auth in 5 minutes"
+          description: "Login or session renewal is failing in production. Check the Kakao/Google OAuth responses, JWT and session settings, and the refresh_sessions table."
+          dashboard_uid: bibbidi-observability
+        labels: {severity: critical, service: bibbidi, symptom: auth-errors}  # verify: symptom
+        notification_settings: {receiver: discord-severity-error}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            model:
+              # verify: query text
+              expr: 'sum(count_over_time({job="bibbidi", compose_service="nginx", deployment_environment_name="production"} | json | url_path=~"/api/auth/.*" | http_response_status_code >= 500 [5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: reduce
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions: [{evaluator: {params: [5], type: gt}, operator: {type: and}, query: {params: [B]}, reducer: {params: [], type: last}, type: query}]
+              refId: C
+
+      - uid: bibbidi-checklist-5xx-critical
+        title: Checklist API is failing
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "More than 5 5xx responses on /api/checklists in 5 minutes"
+          description: "The checklist API is failing in production. Open the error logs, follow the traceId into Tempo, and check database health."
+          dashboard_uid: bibbidi-observability
+        labels: {severity: critical, service: bibbidi, symptom: checklist-errors}  # verify: symptom
+        notification_settings: {receiver: discord-severity-error}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            model:
+              # verify: query text
+              expr: 'sum(count_over_time({job="bibbidi", compose_service="nginx", deployment_environment_name="production"} | json | url_path=~"/api/checklists/.*" | http_response_status_code >= 500 [5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: reduce
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions: [{evaluator: {params: [5], type: gt}, operator: {type: and}, query: {params: [B]}, reducer: {params: [], type: last}, type: query}]
               refId: C
