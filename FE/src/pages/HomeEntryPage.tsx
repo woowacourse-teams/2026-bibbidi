@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router";
 
 import { useAuth } from "../features/auth";
+import { HomeEntryPageViewContext } from "../app/analytics/AppPageViewTracker";
 import {
   resolveHomeEntryVariant,
   type HomeEntryVariant,
@@ -13,6 +14,7 @@ export function HomeEntryPage() {
   const [searchParams] = useSearchParams();
   const [variant, setVariant] = useState<HomeEntryVariant | null>(null);
   const hasCategoryLink = searchParams.has("categoryId");
+  const trackHomeEntryPageView = useContext(HomeEntryPageViewContext);
 
   useEffect(() => {
     if (hasCategoryLink) return;
@@ -33,6 +35,17 @@ export function HomeEntryPage() {
       active = false;
     };
   }, [authState.status, hasCategoryLink]);
+
+  useEffect(() => {
+    if (
+      (hasCategoryLink || variant === "control") &&
+      authState.status !== "loading" &&
+      authState.status !== "synchronizing" &&
+      authState.status !== "error"
+    ) {
+      trackHomeEntryPageView?.();
+    }
+  }, [authState.status, hasCategoryLink, trackHomeEntryPageView, variant]);
 
   if (
     hasCategoryLink ||

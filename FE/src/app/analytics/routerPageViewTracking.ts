@@ -28,11 +28,30 @@ export function createRouterPageViewTrackingState(): RouterPageViewTrackingState
   return { lastTrackedPagePath: null };
 }
 
+export function trackPageView(
+  pagePath: PagePath,
+  analytics: AnalyticsClient,
+  origin: string,
+  trackingState: RouterPageViewTrackingState,
+) {
+  if (pagePath === trackingState.lastTrackedPagePath) return;
+
+  const referrerPath = trackingState.lastTrackedPagePath;
+  trackingState.lastTrackedPagePath = pagePath;
+
+  try {
+    analytics.track(createPageViewEvent({ origin, pagePath, referrerPath }));
+  } catch {
+    // 계측 오류는 화면 이동에서 격리한다.
+  }
+}
+
 export function startRouterPageViewTracking(
   router: SubscribableRouter,
   analytics: AnalyticsClient,
   origin: string,
   trackingState = createRouterPageViewTrackingState(),
+  deferHomeEntry = false,
 ) {
   const trackRouterState = (state: RouterStateSnapshot) => {
     if (!state.initialized || state.navigation.state !== "idle") {
@@ -41,18 +60,8 @@ export function startRouterPageViewTracking(
 
     const pagePath = normalizePagePath(state.location.pathname);
 
-    if (!pagePath || pagePath === trackingState.lastTrackedPagePath) {
-      return;
-    }
-
-    const referrerPath = trackingState.lastTrackedPagePath;
-    trackingState.lastTrackedPagePath = pagePath;
-
-    try {
-      analytics.track(createPageViewEvent({ origin, pagePath, referrerPath }));
-    } catch {
-      // 라우터 구독과 이벤트 생성 오류도 제품 탐색 흐름에서 격리한다.
-    }
+    if (!pagePath || (deferHomeEntry && pagePath === "/")) return;
+    trackPageView(pagePath, analytics, origin, trackingState);
   };
 
   const unsubscribe = router.subscribe(trackRouterState);
