@@ -1,0 +1,364 @@
+diff --git a/.github/be-cd-jobs/alloy-environment-cli.ts b/.github/be-cd-jobs/alloy-environment-cli.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5696f1d93472b3d277ddc32fb17c9336fa47306c
+--- /dev/null
++++ b/.github/be-cd-jobs/alloy-environment-cli.ts
+@@ -0,0 +1,31 @@
++import { readFile } from "node:fs/promises";
++import { pathToFileURL } from "node:url";
++import { extractDeclaredNames, extractRequiredNames, findUndeclaredNames } from "./alloy-environment.ts";
++
++const ALLOY_SERVICE = "alloy";
++
++export async function main(argv: string[] = process.argv.slice(2)) {
++  try {
++    const [configPath, ...composePaths] = argv;
++    if (!configPath || composePaths.length === 0) {
++      throw new Error("사용법: alloy-environment-cli.ts <config.alloy> <compose 파일...>");
++    }
++
++    const required = extractRequiredNames(await readFile(configPath, "utf8"));
++    for (const composePath of composePaths) {
++      const declared = extractDeclaredNames(await readFile(composePath, "utf8"), ALLOY_SERVICE);
++      const undeclared = findUndeclaredNames(required, declared);
++      if (undeclared.length > 0) {
++        throw new Error(`${composePath}의 ${ALLOY_SERVICE}.environment에 선언되지 않은 환경변수: ${undeclared.join(", ")}`);
++      }
++    }
++    console.log(`Alloy 환경변수 ${required.length}개가 모두 선언되어 있습니다.`);
++  } catch (error) {
++    const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
++    console.error(`::error title=Alloy 환경변수 검증 실패::${message}`);
++    process.exitCode = 1;
++  }
++}
++
++const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
++if (entrypoint === import.meta.url) await main();
+diff --git a/.github/be-cd-jobs/alloy-environment.test.ts b/.github/be-cd-jobs/alloy-environment.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d74eae11fa21aaecc13debd4169eac8a08edd141
+--- /dev/null
++++ b/.github/be-cd-jobs/alloy-environment.test.ts
+@@ -0,0 +1,58 @@
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import test from "node:test";
++import { extractDeclaredNames, extractRequiredNames, findUndeclaredNames } from "./alloy-environment.ts";
++
++const compose = `services:
++  backend:
++    environment:
++      SPRING_PROFILES_ACTIVE: prod
++  alloy:
++    image: grafana/alloy:v1.11.0
++    environment:
++      # 주석은 무시한다
++      DOCKER_HOST_URL: tcp://dockerproxy:2375
++      GRAFANA_CLOUD_OTLP_URL: \${GRAFANA_CLOUD_OTLP_URL:?required}
++    volumes:
++      - ./config.alloy:/etc/alloy/config.alloy:ro
++  nginx:
++    environment:
++      NGINX_ONLY: "1"
++`;
++
++test("config.alloy가 읽는 환경변수 이름을 중복 없이 뽑는다", () => {
++  const config = `
++    url = sys.env("GRAFANA_CLOUD_OTLP_URL")
++    host = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
++    again = sys.env( "GRAFANA_CLOUD_OTLP_URL" )
++  `;
++
++  assert.deepEqual(extractRequiredNames(config), ["GRAFANA_CLOUD_OTLP_URL", "DOCKER_HOST_URL"]);
++});
++
++test("compose에서 지정한 서비스의 environment 키만 뽑는다", () => {
++  assert.deepEqual(extractDeclaredNames(compose, "alloy"), ["DOCKER_HOST_URL", "GRAFANA_CLOUD_OTLP_URL"]);
++});
++
++test("environment가 없는 서비스는 빈 목록이다", () => {
++  assert.deepEqual(extractDeclaredNames(compose, "missing"), []);
++});
++
++test("선언되지 않은 이름만 골라낸다", () => {
++  assert.deepEqual(findUndeclaredNames(["A", "B", "C"], ["A", "C"]), ["B"]);
++});
++
++test("모두 선언되어 있으면 빈 목록이다", () => {
++  assert.deepEqual(findUndeclaredNames(["A"], ["A", "B"]), []);
++});
++
++test("저장소의 config.alloy가 읽는 이름은 운영·로컬 compose의 alloy.environment에 모두 선언되어 있다", () => {
++  const config = readFileSync(new URL("../../Infra/monitoring/alloy/config.alloy", import.meta.url), "utf8");
++
++  for (const composeFile of ["compose.prod.yml", "compose.local.yml"]) {
++    const composeText = readFileSync(new URL(`../../BE/${composeFile}`, import.meta.url), "utf8");
++    const undeclared = findUndeclaredNames(extractRequiredNames(config), extractDeclaredNames(composeText, "alloy"));
++
++    assert.deepEqual(undeclared, [], `${composeFile}에 선언되지 않은 환경변수: ${undeclared.join(", ")}`);
++  }
++});
+diff --git a/.github/be-cd-jobs/alloy-environment.ts b/.github/be-cd-jobs/alloy-environment.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..75d0276cdcfd11e901d4c90d0fac00e9304efa60
+--- /dev/null
++++ b/.github/be-cd-jobs/alloy-environment.ts
+@@ -0,0 +1,46 @@
++const SYS_ENV_PATTERN = /sys\.env\(\s*"([^"]+)"\s*\)/g;
++const SERVICE_INDENT = 2;
++const SECTION_INDENT = 4;
++const KEY_INDENT = 6;
++
++export function extractRequiredNames(alloyConfig: string): string[] {
++  const names = new Set<string>();
++  for (const match of alloyConfig.matchAll(SYS_ENV_PATTERN)) names.add(match[1]);
++  return [...names];
++}
++
++export function extractDeclaredNames(composeText: string, service: string): string[] {
++  const names: string[] = [];
++  let inService = false;
++  let inEnvironment = false;
++
++  for (const line of composeText.split(/\r?\n/)) {
++    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
++
++    const indent = line.length - line.trimStart().length;
++    const content = line.trim();
++
++    if (indent <= SERVICE_INDENT) {
++      inService = indent === SERVICE_INDENT && content === `${service}:`;
++      inEnvironment = false;
++      continue;
++    }
++    if (!inService) continue;
++
++    if (indent === SECTION_INDENT) {
++      inEnvironment = content === "environment:";
++      continue;
++    }
++    if (inEnvironment && indent === KEY_INDENT) {
++      const key = content.split(":")[0];
++      if (key) names.push(key);
++    }
++  }
++
++  return names;
++}
++
++export function findUndeclaredNames(required: string[], declared: string[]): string[] {
++  const declaredNames = new Set(declared);
++  return required.filter((name) => !declaredNames.has(name));
++}
+diff --git a/.github/workflows/backend-common-cd.yml b/.github/workflows/backend-common-cd.yml
+index 38defd2a13f27053f5ae2b01b188c3581d732cca..f8efdee9698721c10803b26d07806f9bb1610b30 100644
+--- a/.github/workflows/backend-common-cd.yml
++++ b/.github/workflows/backend-common-cd.yml
+@@ -103,6 +103,31 @@ jobs:
+       - name: 커밋 SHA 태그의 배포 이미지 존재 확인
+         run: docker manifest inspect "${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}" >/dev/null
+ 
++      - name: Node.js 버전을 24.19.0으로 설정
++        uses: actions/setup-node@v6
++        with:
++          node-version: 24.19.0
++
++      - name: Alloy 설정이 읽는 환경변수가 compose에 선언되어 있는지 확인
++        run: >
++          node --experimental-strip-types .github/be-cd-jobs/alloy-environment-cli.ts
++          Infra/monitoring/alloy/config.alloy BE/compose.prod.yml
++
++      - name: Alloy 설정 문법과 참조 검증
++        env:
++          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
++        run: |
++          set -euo pipefail
++          test -n "$ALLOY_ENV_CONTENT"
++          ALLOY_VALIDATE_ENV_FILE=$(mktemp)
++          trap 'rm -f "$ALLOY_VALIDATE_ENV_FILE"' EXIT
++          printf '%s\n' "$ALLOY_ENV_CONTENT" > "$ALLOY_VALIDATE_ENV_FILE"
++          docker run --rm \
++            --env-file "$ALLOY_VALIDATE_ENV_FILE" \
++            -e DEPLOYMENT_ENVIRONMENT_NAME=validate \
++            -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
++            grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
++
+       - name: Compose와 nginx·Alloy·환경 파일 설치
+         env:
+           SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+@@ -155,6 +180,9 @@ jobs:
+           set -euo pipefail
+           cd /opt/bibbidi/app
+           export ALLOY_CONFIG_SHA=$(sha256sum "$ALLOY_CONFIG_PATH" | cut -c1-16)
++          set -a
++          . "$ALLOY_ENV_FILE"
++          set +a
+ 
+           PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
+ 
+@@ -174,6 +202,7 @@ jobs:
+           docker exec nginx nginx -s reload
+ 
+           ALLOY_HEALTH=unknown
++          ALLOY_FAILED=false
+           for _ in $(seq 1 60); do
+             ALLOY_HEALTH=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' alloy 2>/dev/null || true)
+             if [ "$ALLOY_HEALTH" = "healthy" ]; then
+@@ -182,8 +211,9 @@ jobs:
+             sleep 1
+           done
+           if [ "$ALLOY_HEALTH" != "healthy" ]; then
+-            echo "::warning::Alloy did not become healthy within 60 seconds (status: ${ALLOY_HEALTH:-unknown})"
++            echo "::error::Alloy did not become healthy within 60 seconds (status: ${ALLOY_HEALTH:-unknown})"
+             docker compose logs --tail=100 alloy || true
++            ALLOY_FAILED=true
+           fi
+ 
+           if ! curl \
+@@ -207,6 +237,10 @@ jobs:
+             exit 1
+           fi
+ 
++          if [ "$ALLOY_FAILED" = "true" ]; then
++            exit 1
++          fi
++
+       - name: Let's Encrypt TLS 인증서 발급 또는 갱신
+         id: tls_issue
+         continue-on-error: true
+diff --git a/BE/build.gradle b/BE/build.gradle
+index 378111699b366691760f795a3f38e42992f02dc0..4f23f00d42086f51e1b4918f9c18db646ef10278 100644
+--- a/BE/build.gradle
++++ b/BE/build.gradle
+@@ -40,8 +40,7 @@ dependencies {
+     implementation 'com.github.ben-manes.caffeine:caffeine'
+     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+-    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
++    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+     implementation 'org.bouncycastle:bcprov-jdk18on:1.85.2'
+     compileOnly 'org.projectlombok:lombok'
+     runtimeOnly 'com.mysql:mysql-connector-j'
+diff --git a/BE/compose.local.yml b/BE/compose.local.yml
+index 42b6b538caa50ca1a7d86e93574f724eca96d2f1..420db82e26e0a2fdece09ed84e9e8703b638ea4b 100644
+--- a/BE/compose.local.yml
++++ b/BE/compose.local.yml
+@@ -73,14 +73,24 @@ services:
+     image: grafana/alloy:v1.11.0
+     container_name: bibbidi-alloy-local
+     restart: unless-stopped
+-    env_file:
+-      - ../Infra/monitoring/.env.alloy
+     command:
+       - run
+       - /etc/alloy/config.alloy
+       - --server.http.listen-addr=0.0.0.0:12345
+       - --storage.path=/var/lib/alloy/data
+       - --stability.level=experimental
++    environment:
++      DOCKER_HOST_URL: ${DOCKER_HOST_URL:-}
++      DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-}
++      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:-}
++      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER:-}
++      GRAFANA_CLOUD_PROM_API_KEY: ${GRAFANA_CLOUD_PROM_API_KEY:-}
++      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:-}
++      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:-}
++      GRAFANA_CLOUD_LOKI_API_KEY: ${GRAFANA_CLOUD_LOKI_API_KEY:-}
++      GRAFANA_CLOUD_OTLP_URL: ${GRAFANA_CLOUD_OTLP_URL:-}
++      GRAFANA_CLOUD_OTLP_USER: ${GRAFANA_CLOUD_OTLP_USER:-}
++      GRAFANA_CLOUD_OTLP_API_KEY: ${GRAFANA_CLOUD_OTLP_API_KEY:-}
+     volumes:
+       - ../Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+       - /var/run/docker.sock:/var/run/docker.sock:ro
+diff --git a/BE/compose.prod.yml b/BE/compose.prod.yml
+index d2e64d404860c2e88e3649d664725f49f4eb337e..3319881872ca875f537d1c538e459f4542a9f556 100644
+--- a/BE/compose.prod.yml
++++ b/BE/compose.prod.yml
+@@ -61,8 +61,6 @@ services:
+     restart: unless-stopped
+     labels:
+       - "kr.bibbidi.alloy-config-sha=${ALLOY_CONFIG_SHA:-unset}"
+-    env_file:
+-      - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
+     command:
+       - run
+       - /etc/alloy/config.alloy
+@@ -72,6 +70,15 @@ services:
+     environment:
+       DOCKER_HOST_URL: tcp://dockerproxy:2375
+       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
++      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:?GRAFANA_CLOUD_PROM_URL is required}
++      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER:?GRAFANA_CLOUD_PROM_USER is required}
++      GRAFANA_CLOUD_PROM_API_KEY: ${GRAFANA_CLOUD_PROM_API_KEY:?GRAFANA_CLOUD_PROM_API_KEY is required}
++      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:?GRAFANA_CLOUD_LOKI_URL is required}
++      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:?GRAFANA_CLOUD_LOKI_USER is required}
++      GRAFANA_CLOUD_LOKI_API_KEY: ${GRAFANA_CLOUD_LOKI_API_KEY:?GRAFANA_CLOUD_LOKI_API_KEY is required}
++      GRAFANA_CLOUD_OTLP_URL: ${GRAFANA_CLOUD_OTLP_URL:?GRAFANA_CLOUD_OTLP_URL is required}
++      GRAFANA_CLOUD_OTLP_USER: ${GRAFANA_CLOUD_OTLP_USER:?GRAFANA_CLOUD_OTLP_USER is required}
++      GRAFANA_CLOUD_OTLP_API_KEY: ${GRAFANA_CLOUD_OTLP_API_KEY:?GRAFANA_CLOUD_OTLP_API_KEY is required}
+     depends_on:
+       - dockerproxy
+     volumes:
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index 2e2608eae27319533e92202e85d409a7a7f9e6f3..774ec841914391b027bd9c6cfbed6a9de94549e2 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -121,9 +121,19 @@ management:
+   tracing:
+     sampling:
+       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+-  otlp:
++  opentelemetry:
+     tracing:
+-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}
++      export:
++        otlp:
++          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}/v1/traces
++  otlp:
++    metrics:
++      export:
++        enabled: false
++  logging:
++    export:
++      otlp:
++        enabled: false
+ 
+ logging:
+   structured:
+diff --git a/Infra/monitoring/alloy/config.alloy b/Infra/monitoring/alloy/config.alloy
+index f6d81920800a482777da33e1aa80295e516a3b13..3d7ca759e621b2be34ffad0aabd72f07d2769f75 100644
+--- a/Infra/monitoring/alloy/config.alloy
++++ b/Infra/monitoring/alloy/config.alloy
+@@ -207,27 +207,7 @@ otelcol.exporter.otlphttp "grafana_cloud" {
+   }
+ }
+ 
+-otelcol.receiver.otlp "otlp_receiver" {
+-  grpc {
+-    endpoint = "0.0.0.0:4317"
+-  }
+-  http {
+-    endpoint = "0.0.0.0:4318"
+-  }
+-
+-  output {
+-    traces = [otelcol.exporter.otlp.grafanacloud.input,]
+-  }
+-}
+-
+-otelcol.exporter.otlp "grafanacloud" {
+-  client {
+-    endpoint = "tempo-prod-20-prod-ap-northeast-0.grafana.net:443"
+-    auth = otelcol.auth.basic.grafanacloud.handler
+-  }
+-}
+-
+-otelcol.auth.basic "grafanacloud" {
++otelcol.auth.basic "grafana_cloud" {
+   username = sys.env("GRAFANA_CLOUD_OTLP_USER")
+   password = sys.env("GRAFANA_CLOUD_OTLP_API_KEY")
+-}
+\ No newline at end of file
++}
