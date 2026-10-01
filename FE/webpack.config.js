@@ -149,7 +149,7 @@ module.exports = (_environment, arguments_) => {
               },
               sourcemaps: {
                 assets: "./dist/assets/**/*.js",
-                filesToDeleteAfterUpload: "./dist/assets/**/*.js.map",
+                filesToDeleteAfterUpload: "./dist/assets/**/*.map",
               },
             }),
           ]
