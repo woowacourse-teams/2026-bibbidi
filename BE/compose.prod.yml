@@ -59,6 +59,8 @@ services:
     image: grafana/alloy:v1.11.0
     container_name: alloy
     restart: unless-stopped
+    labels:
+      - "kr.bibbidi.alloy-config-sha=${ALLOY_CONFIG_SHA:-unset}"
     env_file:
       - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
     command:

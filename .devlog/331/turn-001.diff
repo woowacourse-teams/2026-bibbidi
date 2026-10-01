@@ -1,0 +1,59 @@
+diff --git a/Infra/monitoring/alloy/config.alloy b/Infra/monitoring/alloy/config.alloy
+index 65d8bcdf24ff1653c9d02a5f8dc0cf872002b3ae..3d7ca759e621b2be34ffad0aabd72f07d2769f75 100644
+--- a/Infra/monitoring/alloy/config.alloy
++++ b/Infra/monitoring/alloy/config.alloy
+@@ -5,7 +5,8 @@ logging {
+ 
+ prometheus.scrape "bibbidi_backend" {
+   targets = [{
+-    __address__ = "backend:8080",
++    __address__                     = "backend:8080",
++    deployment_environment_name    = sys.env("DEPLOYMENT_ENVIRONMENT_NAME"),
+   }]
+ 
+   scrape_interval = "15s"
+@@ -138,7 +139,44 @@ otelcol.receiver.otlp "application" {
+ 
+   output {
+     logs    = [otelcol.processor.batch.logs.input]
+-    traces  = [otelcol.processor.batch.traces.input]
++    traces  = [otelcol.processor.tail_sampling.traces.input]
++  }
++}
++
++otelcol.processor.tail_sampling "traces" {
++  decision_wait = "10s"
++  num_traces    = 5000
++
++  // 에러 트레이스는 전부 보존
++  policy {
++    name = "keep-errors"
++    type = "status_code"
++    status_code {
++      status_codes = ["ERROR"]
++    }
++  }
++
++  // Spring 관측 규약의 서버 에러 표시도 보존 (span 상태가 ERROR로 안 잡히는 5xx 대비)
++  policy {
++    name = "keep-server-errors"
++    type = "string_attribute"
++    string_attribute {
++      key    = "outcome"
++      values = ["SERVER_ERROR"]
++    }
++  }
++
++  // 나머지는 10%
++  policy {
++    name = "sample-rest"
++    type = "probabilistic"
++    probabilistic {
++      sampling_percentage = 10
++    }
++  }
++
++  output {
++    traces = [otelcol.processor.batch.traces.input]
+   }
+ }
