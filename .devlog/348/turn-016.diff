@@ -1,0 +1,28 @@
+diff --git a/.github/workflows/backend-common-cd.yml b/.github/workflows/backend-common-cd.yml
+index f8efdee9698721c10803b26d07806f9bb1610b30..c88bef70852967cded5a563ea8990e3878ec6bef 100644
+--- a/.github/workflows/backend-common-cd.yml
++++ b/.github/workflows/backend-common-cd.yml
+@@ -114,19 +114,10 @@ jobs:
+           Infra/monitoring/alloy/config.alloy BE/compose.prod.yml
+ 
+       - name: Alloy 설정 문법과 참조 검증
+-        env:
+-          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+-        run: |
+-          set -euo pipefail
+-          test -n "$ALLOY_ENV_CONTENT"
+-          ALLOY_VALIDATE_ENV_FILE=$(mktemp)
+-          trap 'rm -f "$ALLOY_VALIDATE_ENV_FILE"' EXIT
+-          printf '%s\n' "$ALLOY_ENV_CONTENT" > "$ALLOY_VALIDATE_ENV_FILE"
+-          docker run --rm \
+-            --env-file "$ALLOY_VALIDATE_ENV_FILE" \
+-            -e DEPLOYMENT_ENVIRONMENT_NAME=validate \
+-            -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
+-            grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
++        run: >
++          docker run --rm
++          -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro"
++          grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
+ 
+       - name: Compose와 nginx·Alloy·환경 파일 설치
+         env:

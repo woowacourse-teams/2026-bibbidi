@@ -61,8 +61,6 @@ services:
     restart: unless-stopped
     labels:
       - "kr.bibbidi.alloy-config-sha=${ALLOY_CONFIG_SHA:-unset}"
-    env_file:
-      - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
     command:
       - run
       - /etc/alloy/config.alloy
@@ -72,6 +70,15 @@ services:
     environment:
       DOCKER_HOST_URL: tcp://dockerproxy:2375
       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:?GRAFANA_CLOUD_PROM_URL is required}
+      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER:?GRAFANA_CLOUD_PROM_USER is required}
+      GRAFANA_CLOUD_PROM_API_KEY: ${GRAFANA_CLOUD_PROM_API_KEY:?GRAFANA_CLOUD_PROM_API_KEY is required}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:?GRAFANA_CLOUD_LOKI_URL is required}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:?GRAFANA_CLOUD_LOKI_USER is required}
+      GRAFANA_CLOUD_LOKI_API_KEY: ${GRAFANA_CLOUD_LOKI_API_KEY:?GRAFANA_CLOUD_LOKI_API_KEY is required}
+      GRAFANA_CLOUD_OTLP_URL: ${GRAFANA_CLOUD_OTLP_URL:?GRAFANA_CLOUD_OTLP_URL is required}
+      GRAFANA_CLOUD_OTLP_USER: ${GRAFANA_CLOUD_OTLP_USER:?GRAFANA_CLOUD_OTLP_USER is required}
+      GRAFANA_CLOUD_OTLP_API_KEY: ${GRAFANA_CLOUD_OTLP_API_KEY:?GRAFANA_CLOUD_OTLP_API_KEY is required}
     depends_on:
       - dockerproxy
     volumes:
