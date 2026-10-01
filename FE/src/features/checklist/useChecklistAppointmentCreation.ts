@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import {
+  addErrorAction,
+  reportHandledError,
+} from "../../infrastructure/error-tracking";
+import {
   AppointmentCreationSource,
   createAppointmentCreateEvent,
 } from "./analytics/checklistAnalytics";
@@ -308,6 +312,7 @@ export function useChecklistAppointmentCreation({
           name: "appointment_submit",
           parameters: { source: sourceRef.current },
         });
+      addErrorAction("appointment.create");
 
       const requestGeneration = requestGenerationRef.current + 1;
       requestGenerationRef.current = requestGeneration;
@@ -356,6 +361,22 @@ export function useChecklistAppointmentCreation({
           needsRefreshRef.current =
             error instanceof AppointmentCreationError &&
             error.reason === "refresh-failed";
+          if (
+            !(error instanceof AppointmentCreationError) ||
+            !["invalid-request", "item-not-found", "forbidden"].includes(
+              error.reason,
+            )
+          ) {
+            reportHandledError(error, {
+              feature: "calendar",
+              operation: "appointment_create",
+              failureKind:
+                error instanceof AppointmentCreationError
+                  ? error.reason
+                  : "unknown",
+              level: needsRefreshRef.current ? "warning" : "error",
+            });
+          }
           if (!wasRefreshing && !needsRefreshRef.current) {
             analytics.track({
               name: "appointment_create_failed",

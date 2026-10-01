@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "../../features/auth";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
+import { setErrorContext } from "../../infrastructure/error-tracking";
 import type { LandingPage } from "./pageView";
 import {
   createRouterPageViewTrackingState,
@@ -62,18 +63,25 @@ export function AppPageViewTracker({
       }
       previousMemberId.current = memberId;
     }
-    const synchronizeContext = () =>
-      analytics.setContext({
+    const synchronizeContext = () => {
+      const context = {
         authState: authState.status,
         pathname: router.state.location.pathname,
         userId:
           authState.status === "authenticated" ? authState.user.id : undefined,
-      });
+      };
+      analytics.setContext(context);
+      setErrorContext(context);
+    };
     synchronizeContext();
     const unsubscribeContext = router.subscribe(synchronizeContext);
     return () => {
       unsubscribeContext();
       analytics.setContext({
+        authState: "loading",
+        pathname: router.state.location.pathname,
+      });
+      setErrorContext({
         authState: "loading",
         pathname: router.state.location.pathname,
       });

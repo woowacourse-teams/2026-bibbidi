@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
+import { reportHandledError } from "../../infrastructure/error-tracking";
 import { useAuth } from "../auth";
 import {
   MyChecklistAuthenticationRequiredError,
@@ -135,6 +136,11 @@ export function HomeScheduleDashboardFeature({
           return;
         }
 
+        reportHandledError(error, {
+          feature: "calendar",
+          operation: "load_schedules",
+          level: "warning",
+        });
         setCalendarSchedules({
           authentication,
           repository: myChecklistRepository,
