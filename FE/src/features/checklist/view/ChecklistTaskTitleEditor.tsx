@@ -273,6 +273,7 @@ export function ChecklistTaskTitleEditor({
           onKeyDown={handleMenuKeyDown}
           ref={menuRef}
           role="menu"
+          tabIndex={-1}
         >
           <button
             onClick={startEditing}
