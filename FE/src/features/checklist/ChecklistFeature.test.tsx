@@ -2166,6 +2166,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "할 일 제목 수정" }),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "  청첩장 문구 확정  " } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -2230,6 +2231,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "할 일 제목 수정" }),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "로그인 만료 후 유지" } });
     fireEvent.keyDown(input, { key: "Enter" });
