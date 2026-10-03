@@ -1,0 +1,231 @@
+diff --git a/FE/src/features/checklist/view/ChecklistTaskDetailContent.css b/FE/src/features/checklist/view/ChecklistTaskDetailContent.css
+index a72bc68d88d944afd7f51a7b81ef6a9bbb1735e0..628a4c563543c91becf0b05d928763c61da8bb8d 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskDetailContent.css
++++ b/FE/src/features/checklist/view/ChecklistTaskDetailContent.css
+@@ -90,25 +90,6 @@
+   text-align: right;
+ }
+ 
+-.checklist-detail-content__delete-item {
+-  align-self: flex-end;
+-  min-height: 36px;
+-  padding: 0 12px;
+-  border: 1px solid var(--color-stroke-danger);
+-  border-radius: 6px;
+-  background: transparent;
+-  color: var(--color-fg-danger);
+-  cursor: pointer;
+-  font: inherit;
+-  font-size: 13px;
+-  font-weight: 700;
+-}
+-
+-.checklist-detail-content__delete-item:focus-visible {
+-  outline: 3px solid var(--color-stroke-focus-ring);
+-  outline-offset: 2px;
+-}
+-
+ .checklist-detail-content__task-status {
+   display: inline-flex;
+   min-width: 64px;
+diff --git a/FE/src/features/checklist/view/ChecklistTaskDetailContent.tsx b/FE/src/features/checklist/view/ChecklistTaskDetailContent.tsx
+index c1c56e71885e86fdfbf4c22c9e8a10c86e7ac139..b12369f1c10da1304ff9c3128db55d0087dd382d 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskDetailContent.tsx
++++ b/FE/src/features/checklist/view/ChecklistTaskDetailContent.tsx
+@@ -275,17 +275,6 @@ export function ChecklistTaskDetailContent({
+             </dd>
+           </div>
+         </dl>
+-        {editing?.requestDelete &&
+-        task.checklistItemId !== null &&
+-        task.checklistItemStatus !== "done" ? (
+-          <button
+-            className="checklist-detail-content__delete-item"
+-            onClick={() => editing.requestDelete?.(task.checklistItemId!)}
+-            type="button"
+-          >
+-            할 일 삭제
+-          </button>
+-        ) : null}
+       </section>
+ 
+       <section aria-labelledby={`${task.id}-appointments-title`}>
+diff --git a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
+index b0b9431d1e5420d05bf24ef002a0b98239026a4c..5c0828bc0cbd5cc30ac189ee128e069f4129fb08 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
++++ b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
+@@ -47,6 +47,42 @@
+   height: 18px;
+ }
+ 
++.checklist-title-editor__menu {
++  position: absolute;
++  z-index: 20;
++  top: 34px;
++  left: 0;
++  display: grid;
++  min-width: 112px;
++  overflow: hidden;
++  padding: 4px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 8px;
++  background: var(--color-bg-layer-default);
++  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
++}
++
++.checklist-title-editor__menu button {
++  padding: 8px 10px;
++  border: 0;
++  border-radius: 6px;
++  background: transparent;
++  color: var(--color-fg-neutral);
++  cursor: pointer;
++  font: inherit;
++  text-align: left;
++}
++
++.checklist-title-editor__menu button:hover,
++.checklist-title-editor__menu button:focus-visible {
++  background: var(--color-bg-neutral-weak);
++  outline: none;
++}
++
++.checklist-title-editor__menu .checklist-title-editor__menu-delete {
++  color: var(--color-fg-danger);
++}
++
+ .checklist-title-editor__form {
+   display: flex;
+   min-width: 0;
+diff --git a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
+index 53a687c28ece37d59ea771e7dab6d25a13be00c9..a1dd8728ca7eea210b320c234a28f22f62d6cb2c 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
++++ b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
+@@ -33,7 +33,11 @@ export function ChecklistTaskTitleEditor({
+   titleId,
+ }: ChecklistTaskTitleEditorProps) {
+   const [validationMessage, setValidationMessage] = useState<string>();
++  const [isMenuOpen, setIsMenuOpen] = useState(false);
++  const menuRef = useRef<HTMLDivElement>(null);
+   const editButtonRef = useRef<HTMLButtonElement>(null);
++  const titleMenuItemRef = useRef<HTMLButtonElement>(null);
++  const deleteMenuItemRef = useRef<HTMLButtonElement>(null);
+   const inputRef = useRef<HTMLInputElement>(null);
+   const isSubmittingRef = useRef(false);
+   const shouldRestoreFocusRef = useRef(false);
+@@ -68,6 +72,23 @@ export function ChecklistTaskTitleEditor({
+     }
+   }, [isEditing]);
+ 
++  useEffect(() => {
++    if (!isMenuOpen) return;
++
++    titleMenuItemRef.current?.focus();
++    const handlePointerDown = (event: PointerEvent) => {
++      if (
++        event.target instanceof Node &&
++        !menuRef.current?.contains(event.target) &&
++        event.target !== editButtonRef.current
++      ) {
++        setIsMenuOpen(false);
++      }
++    };
++    document.addEventListener("pointerdown", handlePointerDown);
++    return () => document.removeEventListener("pointerdown", handlePointerDown);
++  }, [isMenuOpen]);
++
+   if (!task.isEditable || itemId === null || !editing) {
+     return <h2 id={titleId}>{task.title}</h2>;
+   }
+@@ -85,10 +106,39 @@ export function ChecklistTaskTitleEditor({
+   };
+ 
+   const startEditing = () => {
++    setIsMenuOpen(false);
+     editing.startTitleEditing(itemId, task.title);
+     clearErrors();
+   };
+ 
++  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
++    if (event.key === "Escape") {
++      event.preventDefault();
++      event.stopPropagation();
++      setIsMenuOpen(false);
++      editButtonRef.current?.focus();
++      return;
++    }
++
++    const items = [titleMenuItemRef.current, deleteMenuItemRef.current].filter(
++      (item): item is HTMLButtonElement => item !== null,
++    );
++    const currentIndex = items.indexOf(
++      document.activeElement as HTMLButtonElement,
++    );
++    let nextIndex: number | null = null;
++    if (event.key === "ArrowDown")
++      nextIndex = (Math.max(0, currentIndex) + 1) % items.length;
++    if (event.key === "ArrowUp")
++      nextIndex = (currentIndex <= 0 ? items.length : currentIndex) - 1;
++    if (event.key === "Home") nextIndex = 0;
++    if (event.key === "End") nextIndex = items.length - 1;
++    if (nextIndex !== null) {
++      event.preventDefault();
++      items[nextIndex]?.focus();
++    }
++  };
++
+   const submit = async () => {
+     if (isSaving || isSubmittingRef.current) {
+       return;
+@@ -204,15 +254,50 @@ export function ChecklistTaskTitleEditor({
+   return (
+     <div className="checklist-title-editor checklist-title-editor--read">
+       <button
++        aria-controls={`${task.id}-task-menu`}
++        aria-expanded={isMenuOpen}
++        aria-haspopup="menu"
+         aria-label="할 일 제목 수정"
+         className="checklist-title-editor__edit"
+         disabled={isSaving}
+-        onClick={startEditing}
++        onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
+         ref={editButtonRef}
+         type="button"
+       >
+         <MoreIcon />
+       </button>
++      {isMenuOpen ? (
++        <div
++          className="checklist-title-editor__menu"
++          id={`${task.id}-task-menu`}
++          onKeyDown={handleMenuKeyDown}
++          ref={menuRef}
++          role="menu"
++        >
++          <button
++            onClick={startEditing}
++            ref={titleMenuItemRef}
++            role="menuitem"
++            type="button"
++          >
++            제목 변경
++          </button>
++          {editing.requestDelete && task.checklistItemStatus !== "done" ? (
++            <button
++              className="checklist-title-editor__menu-delete"
++              onClick={() => {
++                setIsMenuOpen(false);
++                editing.requestDelete?.(itemId);
++              }}
++              ref={deleteMenuItemRef}
++              role="menuitem"
++              type="button"
++            >
++              삭제
++            </button>
++          ) : null}
++        </div>
++      ) : null}
+       <h2 id={titleId}>{task.title}</h2>
+     </div>
+   );

@@ -1337,6 +1337,7 @@ describe("Checklist 할 일 편집", () => {
     expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
     expect(screen.getByRole("textbox", { name: "할 일 제목" })).toBeTruthy();
   });
@@ -1520,7 +1521,7 @@ describe("Checklist 할 일 편집", () => {
     expect(changeCategory).not.toHaveBeenCalled();
   });
 
-  it("연필 버튼으로 제목을 선택한 인라인 입력을 열고 Enter로 trim한 제목을 한 번 저장한다", async () => {
+  it("더보기 메뉴에서 제목 변경을 선택하면 인라인 입력을 열고 Enter로 trim한 제목을 한 번 저장한다", async () => {
     let resolveChange: (value: boolean) => void = () => undefined;
     const changeTitle = vi.fn().mockReturnValue(
       new Promise<boolean>((resolve) => {
@@ -1530,6 +1531,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     expect(document.activeElement).toBe(input);
     expect((input as HTMLInputElement).selectionStart).toBe(0);
@@ -1558,6 +1560,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
 
     fireEvent.change(input, { target: { value: "   " } });
@@ -1589,6 +1592,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "실패 후 유지할 제목" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -1626,6 +1630,9 @@ describe("Checklist 할 일 편집", () => {
     });
     fireEvent.click(
       within(detailPage).getByRole("button", { name: "할 일 제목 수정" }),
+    );
+    fireEvent.click(
+      within(detailPage).getByRole("menuitem", { name: "제목 변경" }),
     );
     const input = within(detailPage).getByRole("textbox", {
       name: "할 일 제목",

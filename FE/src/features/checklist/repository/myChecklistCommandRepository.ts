@@ -56,6 +56,7 @@ export interface MyChecklistCommandRepository {
     request: AppointmentCreationRequest,
     signal?: AbortSignal,
   ): Promise<void>;
+  deleteItem?(itemId: number, signal?: AbortSignal): Promise<void>;
   deleteAppointment(appointmentId: number, signal?: AbortSignal): Promise<void>;
   changeItemCategory(
     itemId: number,
@@ -521,6 +522,45 @@ export function createMyChecklistCommandRepository(
         );
       } catch (error) {
         throwAppointmentManagementError(error);
+      }
+    },
+    async deleteItem(itemId, signal) {
+      try {
+        if (!dataSource.deleteChecklistItem) {
+          throw new ChecklistItemChangeError("unknown");
+        }
+        await dataSource.deleteChecklistItem(itemId, signal);
+        const removed = queryRepository.applyItemRemoval?.(itemId) ?? false;
+        if (!removed) {
+          throw new ChecklistItemChangeError("unknown");
+        }
+      } catch (error) {
+        if (
+          error instanceof RemoteChecklistItemChangeApiError &&
+          (error.status === 401 || error.errorCode === 201)
+        ) {
+          throw new MyChecklistAuthenticationRequiredError({ cause: error });
+        }
+
+        if (error instanceof RemoteChecklistItemChangeRequestAbortedError) {
+          throw new MyChecklistRequestAbortedError({ cause: error });
+        }
+
+        if (error instanceof ChecklistItemChangeError) {
+          throw error;
+        }
+
+        if (error instanceof RemoteChecklistItemChangeApiError) {
+          throw new ChecklistItemChangeError(
+            getChecklistItemChangeFailureReason(error),
+            getSafeMutationMessage(error),
+            { cause: error },
+          );
+        }
+
+        throw new ChecklistItemChangeError("unknown", undefined, {
+          cause: error,
+        });
       }
     },
     changeItemCategory(itemId, categoryId, signal) {

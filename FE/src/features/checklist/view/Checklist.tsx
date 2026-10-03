@@ -172,6 +172,22 @@ export function Checklist({
     statusFeedback.kind === "status"
       ? statusFeedback.errorMessage
       : undefined;
+  const itemDeletionId = selectedTaskContext?.task.checklistItemId ?? null;
+  const isItemDeletionOpen =
+    itemDeletionId !== null &&
+    itemEditing?.deletionConfirmation === itemDeletionId;
+  const isItemDeletionPending =
+    isItemDeletionOpen &&
+    statusFeedback?.status === "pending" &&
+    statusFeedback.itemId === itemDeletionId &&
+    statusFeedback.kind === "delete";
+  const itemDeletionError =
+    isItemDeletionOpen &&
+    statusFeedback?.status === "error" &&
+    statusFeedback.itemId === itemDeletionId &&
+    statusFeedback.kind === "delete"
+      ? statusFeedback.errorMessage
+      : undefined;
 
   useEffect(() => {
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
@@ -361,7 +377,8 @@ export function Checklist({
           isMobileForegroundOpen ||
           isLoginRequiredOpen ||
           isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen
+          isAppointmentDeletionOpen ||
+          isItemDeletionOpen
             ? true
             : undefined
         }
@@ -370,7 +387,8 @@ export function Checklist({
           isMobileForegroundOpen ||
           isLoginRequiredOpen ||
           isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen
+          isAppointmentDeletionOpen ||
+          isItemDeletionOpen
             ? true
             : undefined
         }
@@ -781,6 +799,51 @@ export function Checklist({
               : appointmentManagement.cancelDelete
           }
           title="이 일정을 삭제할까요?"
+          variant="critical"
+        />
+      ) : null}
+      {isItemDeletionOpen &&
+      itemEditing?.cancelDelete &&
+      itemEditing.confirmDelete ? (
+        <ChecklistModalDialog
+          actions={
+            <>
+              <button
+                disabled={isItemDeletionPending}
+                onClick={() => itemEditing.cancelDelete?.()}
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                aria-busy={isItemDeletionPending}
+                disabled={isItemDeletionPending}
+                onClick={() => void itemEditing.confirmDelete?.()}
+                type="button"
+              >
+                {isItemDeletionPending ? "삭제 중" : "삭제"}
+              </button>
+            </>
+          }
+          description={
+            <>
+              삭제한 할 일과 연결된 일정은 다시 복구할 수 없어요.
+              {itemDeletionError ? (
+                <p role="alert">{itemDeletionError}</p>
+              ) : null}
+            </>
+          }
+          onBackdropPress={
+            isItemDeletionPending
+              ? undefined
+              : () => itemEditing.cancelDelete?.()
+          }
+          onEscape={
+            isItemDeletionPending
+              ? undefined
+              : () => itemEditing.cancelDelete?.()
+          }
+          title="이 할 일을 삭제할까요?"
           variant="critical"
         />
       ) : null}

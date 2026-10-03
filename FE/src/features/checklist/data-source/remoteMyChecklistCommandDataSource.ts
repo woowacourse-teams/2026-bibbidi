@@ -36,6 +36,7 @@ export interface RemoteMyChecklistCommandDataSource {
     request: AppointmentCreationRequest,
     signal?: AbortSignal,
   ): Promise<AppointmentCreationResponse>;
+  deleteChecklistItem?(itemId: number, signal?: AbortSignal): Promise<void>;
   deleteAppointment(appointmentId: number, signal?: AbortSignal): Promise<void>;
   changeChecklistItemCategory(
     itemId: number,
@@ -688,6 +689,70 @@ async function hasRemainingAppointments(
   }
 }
 
+async function deleteChecklistItem(
+  itemId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const controller = new AbortController();
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, CHECKLIST_COMMAND_TIMEOUT_MS);
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
+
+  try {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(
+        `${CHECKLIST_ITEM_ENDPOINT}/${itemId}`,
+        {
+          credentials: "include",
+          method: "DELETE",
+          signal: controller.signal,
+        },
+      );
+    } catch (error) {
+      throw toChecklistItemChangeRequestError(error, didTimeout, signal);
+    }
+
+    if (didTimeout || signal?.aborted) {
+      throw toChecklistItemChangeRequestError(
+        new DOMException("aborted", "AbortError"),
+        didTimeout,
+        signal,
+      );
+    }
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = undefined;
+      }
+      throw new RemoteChecklistItemChangeApiError(
+        isApiErrorResponse(body) ? body.errorCode : 0,
+        response.status,
+        isApiErrorResponse(body) ? body.message : undefined,
+      );
+    }
+
+    if (response.status !== 204) {
+      throw new RemoteChecklistItemChangeContractError();
+    }
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
+  }
+}
+
 export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSource =
   {
     changeAppointmentCompletion:
@@ -697,6 +762,7 @@ export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSou
     changeChecklistItemTitle,
     createChecklist,
     createAppointment: createRemoteAppointment,
+    deleteChecklistItem,
     createCustomChecklistItem,
     hasRemainingAppointments,
     deleteAppointment: remoteAppointmentManagementDataSource.deleteAppointment,
