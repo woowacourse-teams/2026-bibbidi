@@ -549,7 +549,9 @@ describe("appRoutes", () => {
     );
     renderRouter(["/calendar"]);
 
-    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "내 준비 일정" }),
+    ).toBeTruthy();
     expect(screen.getByRole("main", { name: "캘린더" })).toBeTruthy();
     expect(
       vi
@@ -570,11 +572,11 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/calendar"]);
 
-    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
     expect(
-      await screen.findByText(
-        "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
-      ),
+      await screen.findByRole("heading", { name: "내 준비 일정" }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText(/로그인하면 담은 할 일에 날짜를 정하고/),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/calendar");
     expect(
@@ -628,7 +630,7 @@ describe("appRoutes", () => {
           );
         }
 
-        if (url === "/api/checklists/me/unscheduled-items?limit=2") {
+        if (url === "/api/checklists/me/recommended-catalog-items?limit=2") {
           return Promise.resolve(
             new Response(
               JSON.stringify({
@@ -645,10 +647,12 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/calendar"]);
 
-    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "내 준비 일정" }),
+    ).toBeTruthy();
     await waitFor(() => expect(currentUserRequestCount).toBe(2));
     expect(
-      screen.getByText("로그인하면 일정이 필요한 할 일을 확인할 수 있어요."),
+      await screen.findByText(/로그인하면 담은 할 일에 날짜를 정하고/),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/calendar");
     expect(router.state.location.search).toBe("");

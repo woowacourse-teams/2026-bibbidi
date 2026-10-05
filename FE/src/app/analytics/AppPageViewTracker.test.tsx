@@ -118,7 +118,9 @@ describe("AppPageViewTracker", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByRole("heading", { name: "캘린더" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "내 준비 일정" }),
+    ).toBeTruthy();
     await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
     expect(analytics.track).toHaveBeenCalledWith({
       name: "page_view",

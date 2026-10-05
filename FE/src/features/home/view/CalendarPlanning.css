@@ -1,0 +1,373 @@
+.calendar-planning {
+  --calendar-heading-background: color-mix(
+    in srgb,
+    var(--color-bg-brand-weak) 34%,
+    var(--color-bg-layer-default)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--color-fg-neutral);
+}
+.calendar-planning__heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.calendar-planning__heading h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.calendar-planning__heading p {
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.calendar-planning__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 32%);
+  border: 1px solid var(--color-stroke-neutral);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg-layer-default);
+}
+.calendar-planning__main,
+.calendar-planning__side {
+  min-width: 0;
+}
+.calendar-planning__side {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--color-stroke-neutral);
+}
+.calendar-planning .monthly-calendar {
+  padding: 24px;
+  border-radius: 0;
+  box-shadow: none;
+}
+.calendar-planning .monthly-calendar__grid td {
+  height: clamp(90px, calc((100dvh - 320px) / 6), 112px);
+}
+.calendar-planning .monthly-calendar__header {
+  justify-content: flex-start;
+  gap: 20px;
+}
+.calendar-planning .monthly-calendar__grid td {
+  font-size: 16px;
+}
+.calendar-planning .monthly-calendar__grid th {
+  font-size: 14px;
+}
+.calendar-planning .monthly-calendar__grid time {
+  font-weight: 700;
+  width: 36px;
+  height: 36px;
+}
+.calendar-planning .monthly-calendar__today-button {
+  font-size: 15px;
+}
+.calendar-planning .recommended-schedule-item__body h3 {
+  font-size: 15px;
+}
+.calendar-planning .recommended-schedule-item__category {
+  font-size: 12px;
+  font-weight: 400;
+}
+.calendar-planning__card,
+.calendar-planning .recommended-schedule {
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  height: auto;
+  background: transparent;
+}
+.calendar-planning__side > :not(:first-child) {
+  border-top: 1px solid var(--color-stroke-neutral);
+}
+.calendar-planning__card > header,
+.calendar-planning .recommended-schedule__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 60px;
+  padding: 12px 20px;
+  margin: 0;
+  background: var(--calendar-heading-background);
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+.calendar-planning__card h2,
+.calendar-planning .recommended-schedule__header h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.calendar-planning__card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.calendar-planning__card h2 span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-brand);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.calendar-planning a {
+  color: var(--color-fg-brand);
+  text-decoration: none;
+}
+.calendar-planning__card > header a,
+.calendar-planning .recommended-schedule__catalog-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.calendar-planning__empty,
+.calendar-planning__card > p,
+.calendar-planning__skeleton {
+  margin: 0;
+  padding: 20px;
+}
+.calendar-planning__empty p,
+.calendar-planning__card > p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--color-fg-neutral-muted);
+}
+.calendar-planning__empty p + p {
+  margin-top: 8px;
+  font-size: 15px;
+}
+.calendar-planning__tasks {
+  list-style: none;
+  padding: 0 20px 16px;
+  margin: 0;
+}
+.calendar-planning__tasks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+.calendar-planning__tasks li:last-child {
+  border-bottom: 0;
+}
+.calendar-planning__tasks li > div {
+  min-width: 0;
+}
+.calendar-planning__tasks small {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.calendar-planning__tasks h3 {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.calendar-planning__tasks button,
+.calendar-planning__feedback button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-stroke-brand-weak);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg-brand);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.calendar-planning__tasks button svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.calendar-planning__card > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px 12px;
+  font-size: 13px;
+}
+.calendar-planning :is(a, button):focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 3px;
+}
+.calendar-planning__feedback {
+  padding: 20px;
+  background: var(--calendar-heading-background);
+  font-size: 14px;
+}
+.calendar-planning__feedback p {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.calendar-planning__feedback > span {
+  display: block;
+  margin-bottom: 8px;
+}
+.calendar-planning__skeleton {
+  min-height: 80px;
+  background: var(--color-bg-neutral-weak);
+}
+.calendar-planning__skeleton p,
+.calendar-planning__loading {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+}
+.calendar-planning__loading {
+  margin: 0;
+  padding: 0 24px 20px;
+}
+.calendar-planning .recommended-schedule__list {
+  padding: 0 20px;
+}
+.calendar-planning .recommended-schedule-item,
+.calendar-planning .recommended-schedule-item:first-child,
+.calendar-planning .recommended-schedule-item:last-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "category action" "title action" "error error";
+  align-items: center;
+  justify-content: initial;
+  min-height: 0;
+  padding: 12px 0;
+  gap: 8px 12px;
+}
+.calendar-planning .recommended-schedule-item__badges {
+  grid-area: category;
+  justify-content: flex-start;
+}
+.calendar-planning .recommended-schedule-item__body {
+  grid-area: title;
+  padding: 0;
+}
+.calendar-planning .recommended-schedule-item__body h3 {
+  white-space: normal;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.calendar-planning .recommended-schedule-item__add-task {
+  grid-area: action;
+  width: auto;
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.calendar-planning .recommended-schedule-item__error {
+  grid-area: error;
+}
+.calendar-planning .recommended-schedule-item__add-task:not(:disabled):hover,
+.calendar-planning__tasks button:hover {
+  background: var(--calendar-heading-background);
+}
+@media (max-width: 760px) {
+  .calendar-planning {
+    gap: 20px;
+  }
+  .calendar-planning__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .calendar-planning__side {
+    border-left: 0;
+    border-top: 1px solid var(--color-stroke-neutral);
+  }
+  .calendar-planning__heading h1 {
+    font-size: 24px;
+  }
+  .calendar-planning .monthly-calendar {
+    padding: 20px 12px;
+  }
+  .calendar-planning .monthly-calendar__grid td {
+    height: 48px;
+  }
+  .calendar-planning__card > header,
+  .calendar-planning .recommended-schedule__header {
+    padding: 12px 16px;
+  }
+  .calendar-planning__card h2,
+  .calendar-planning .recommended-schedule__header h2 {
+    font-size: 17px;
+  }
+  .calendar-planning__empty,
+  .calendar-planning__card > p,
+  .calendar-planning__skeleton {
+    padding: 20px 16px;
+  }
+  .calendar-planning__tasks {
+    padding: 0 16px 16px;
+  }
+  .calendar-planning .recommended-schedule__list {
+    padding: 0 16px;
+  }
+  .calendar-planning .recommended-schedule-item__add-task {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .calendar-planning__card > header a,
+  .calendar-planning .recommended-schedule__catalog-action {
+    font-size: 14px;
+  }
+  .calendar-planning .monthly-calendar__header {
+    gap: 12px;
+  }
+  .calendar-planning .monthly-calendar__grid time {
+    width: 32px;
+    height: 32px;
+  }
+}
+.calendar-planning__date-dialog {
+  padding: 0;
+  width: min(480px, calc(100vw - 32px));
+  max-height: 90dvh;
+  border: 1px solid var(--color-stroke-neutral);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+}
+.calendar-planning__date-dialog::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
+.calendar-planning__date-dialog .checklist-appointment-creation {
+  position: static;
+  height: min(720px, 85dvh);
+  border: 0;
+}
+
+.calendar-planning .checklist-dialog__actions .calendar-planning__login-action {
+  display: grid;
+  min-height: 48px;
+  border-radius: 10px;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+  font-weight: 700;
+  place-items: center;
+}
