@@ -171,7 +171,11 @@
   gap: 5px;
   padding: 0 6px;
   border-radius: 4px;
-  background: var(--color-bg-brand-weak);
+  background: color-mix(
+    in srgb,
+    var(--color-bg-brand-solid) 18%,
+    var(--color-bg-layer-default)
+  );
   color: var(--color-fg-brand);
   font-size: 11px;
   font-weight: 600;
@@ -269,6 +273,135 @@
 
 @media (min-width: 601px) {
   .monthly-calendar__grid td {
-    height: 88px;
+    height: 78px;
   }
+}
+
+.monthly-calendar__date-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+.monthly-calendar__date-button:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 1px;
+}
+.monthly-calendar__grid
+  .monthly-calendar__day--selected:not(.monthly-calendar__day--today)
+  time {
+  background: color-mix(
+    in srgb,
+    var(--color-bg-brand-solid) 14%,
+    var(--color-bg-layer-default)
+  );
+  color: var(--color-fg-brand);
+  box-shadow: inset 0 0 0 1px var(--color-stroke-brand-solid);
+}
+.monthly-calendar__schedules a {
+  color: inherit;
+  text-decoration: none;
+}
+.monthly-calendar__selected {
+  padding-top: 20px;
+  margin-top: 16px;
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+}
+.monthly-calendar__selected header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.monthly-calendar__selected h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.monthly-calendar__selected header span,
+.monthly-calendar__selected p {
+  color: var(--color-fg-neutral-muted);
+  font-size: 13px;
+}
+.monthly-calendar__selected ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.monthly-calendar__selected li button {
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  text-decoration: none;
+}
+.monthly-calendar__selected li span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  flex: none;
+}
+.monthly-calendar__selected li small {
+  margin-left: auto;
+  color: var(--color-fg-brand);
+  flex: none;
+}
+@media (max-width: 600px) {
+  .monthly-calendar__header {
+    gap: 8px;
+  }
+  .monthly-calendar__grid td {
+    height: 56px;
+  }
+  .monthly-calendar__date-button {
+    min-width: 0;
+    width: 100%;
+  }
+  .monthly-calendar__selected li button {
+    flex-wrap: wrap;
+    padding: 6px 0;
+  }
+}
+
+@media (min-width: 601px) {
+  .monthly-calendar--empty .monthly-calendar__grid td {
+    height: 56px;
+  }
+}
+
+.monthly-calendar__schedules .monthly-calendar__schedule-more {
+  height: 12px;
+  line-height: 12px;
+  font-size: 10px;
+}
+
+@media (max-width: 600px) {
+  .monthly-calendar--empty .monthly-calendar__grid td {
+    height: 44px;
+  }
+}
+
+button.monthly-calendar__schedule-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.monthly-calendar__schedule-title:focus-visible,
+.monthly-calendar__selected li button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
 }

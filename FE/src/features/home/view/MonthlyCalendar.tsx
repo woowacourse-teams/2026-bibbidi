@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { CalendarScheduleDetail } from "./CalendarScheduleDetail";
+import { useIsMobileLayout } from "../../../shared/responsive";
 
 import { CalendarScheduleModel } from "../model/homeScheduleDashboard";
 import "./MonthlyCalendar.css";
@@ -7,8 +10,12 @@ const DAYS_OF_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const CALENDAR_CELL_COUNT = 42;
 
 interface MonthlyCalendarProps {
+  monthTitleOnly?: boolean;
   referenceDate: string;
   schedules?: readonly CalendarScheduleModel[];
+  focusDate?: string;
+  focusDateRevision?: number;
+  schedulesStatus?: "loading" | "error" | "complete";
 }
 
 function parseLocalDate(value: string) {
@@ -41,8 +48,13 @@ function CalendarArrowIcon({ direction }: { direction: "left" | "right" }) {
 
 export function MonthlyCalendar({
   referenceDate,
+  monthTitleOnly = false,
   schedules = [],
+  focusDate,
+  focusDateRevision,
+  schedulesStatus = "complete",
 }: MonthlyCalendarProps) {
+  const isMobileLayout = useIsMobileLayout();
   const today = useMemo(() => parseLocalDate(referenceDate), [referenceDate]);
   const schedulesByDate = useMemo(() => {
     const groupedSchedules = new Map<string, CalendarScheduleModel[]>();
@@ -58,6 +70,26 @@ export function MonthlyCalendar({
   const [visibleMonth, setVisibleMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
+  const [selectedDate, setSelectedDate] = useState(referenceDate);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
+    null,
+  );
+  const selectedSchedule = schedules.find(
+    (schedule) => schedule.id === selectedScheduleId,
+  );
+  useEffect(() => {
+    if (!focusDate) return;
+    const date = parseLocalDate(focusDate);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setSelectedDate(focusDate);
+      setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    });
+    return () => {
+      active = false;
+    };
+  }, [focusDate, focusDateRevision]);
   const year = visibleMonth.getFullYear();
   const month = visibleMonth.getMonth();
   const cells = Array.from({ length: CALENDAR_CELL_COUNT }, (_, index) => {
@@ -75,17 +107,18 @@ export function MonthlyCalendar({
   return (
     <section
       aria-labelledby="monthly-calendar-title"
-      className="monthly-calendar"
+      className={`monthly-calendar${schedules.length === 0 ? " monthly-calendar--empty" : ""}`}
     >
       <header className="monthly-calendar__header">
         <div>
           <div className="monthly-calendar__title">
-            <h2 id="monthly-calendar-title">캘린더</h2>
-            <span>
-              체크리스트에서 일정을 추가하면 캘린더에서 확인할 수 있어요.
-            </span>
+            <h2 id="monthly-calendar-title" aria-live="polite">
+              {monthTitleOnly ? `${year}년 ${month + 1}월` : "캘린더"}
+            </h2>
           </div>
-          <p aria-live="polite">{`${year}년 ${month + 1}월`}</p>
+          {!monthTitleOnly && (
+            <p aria-live="polite">{`${year}년 ${month + 1}월`}</p>
+          )}
         </div>
         <div aria-label="월 이동" className="monthly-calendar__controls">
           <button
@@ -97,11 +130,12 @@ export function MonthlyCalendar({
           </button>
           <button
             className="monthly-calendar__today-button"
-            onClick={() =>
+            onClick={() => {
               setVisibleMonth(
                 new Date(today.getFullYear(), today.getMonth(), 1),
-              )
-            }
+              );
+              setSelectedDate(referenceDate);
+            }}
             type="button"
           >
             오늘
@@ -135,7 +169,7 @@ export function MonthlyCalendar({
                 const isToday = isSameDate(date, today);
                 const dateTime = formatDateTime(date);
                 const dateSchedules = schedulesByDate.get(dateTime) ?? [];
-                const visibleSchedules = dateSchedules.slice(0, 2);
+                const visibleSchedules = dateSchedules.slice(0, 1);
                 const remainingScheduleCount =
                   dateSchedules.length - visibleSchedules.length;
                 return (
@@ -143,18 +177,33 @@ export function MonthlyCalendar({
                     className={[
                       !isCurrentMonth && "monthly-calendar__day--outside",
                       isToday && "monthly-calendar__day--today",
+                      selectedDate === dateTime &&
+                        "monthly-calendar__day--selected",
                     ]
                       .filter(Boolean)
                       .join(" ")}
                     key={dateTime}
                   >
-                    <time
-                      aria-current={isToday ? "date" : undefined}
-                      aria-label={`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일${isToday ? ", 오늘" : ""}`}
-                      dateTime={dateTime}
+                    <button
+                      type="button"
+                      className="monthly-calendar__date-button"
+                      aria-pressed={selectedDate === dateTime}
+                      onClick={() => {
+                        setSelectedDate(dateTime);
+                        if (!isCurrentMonth)
+                          setVisibleMonth(
+                            new Date(date.getFullYear(), date.getMonth(), 1),
+                          );
+                      }}
                     >
-                      {date.getDate()}
-                    </time>
+                      <time
+                        aria-current={isToday ? "date" : undefined}
+                        aria-label={`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일${isToday ? ", 오늘" : ""}`}
+                        dateTime={dateTime}
+                      >
+                        {date.getDate()}
+                      </time>
+                    </button>
                     {visibleSchedules.length > 0 && (
                       <ul
                         aria-label={`${date.getMonth() + 1}월 ${date.getDate()}일 일정`}
@@ -166,14 +215,28 @@ export function MonthlyCalendar({
                               aria-hidden="true"
                               className="monthly-calendar__schedule-dot"
                             />
-                            <span className="monthly-calendar__schedule-title">
-                              {schedule.title}
-                            </span>
+                            {!isMobileLayout ? (
+                              <button
+                                type="button"
+                                className="monthly-calendar__schedule-title"
+                                onClick={() =>
+                                  setSelectedScheduleId(schedule.id)
+                                }
+                                title={schedule.title}
+                              >
+                                {schedule.startTime?.slice(11, 16)}{" "}
+                                {schedule.title}
+                              </button>
+                            ) : (
+                              <span className="monthly-calendar__schedule-title">
+                                {schedule.title}
+                              </span>
+                            )}
                           </li>
                         ))}
                         {remainingScheduleCount > 0 && (
                           <li className="monthly-calendar__schedule-more">
-                            +{remainingScheduleCount}
+                            +{remainingScheduleCount}개
                           </li>
                         )}
                       </ul>
@@ -185,6 +248,52 @@ export function MonthlyCalendar({
           ))}
         </tbody>
       </table>
+      {(schedulesByDate.get(selectedDate) ?? []).length > 0 && (
+        <section
+          className="monthly-calendar__selected"
+          aria-labelledby="selected-date-title"
+        >
+          <header>
+            <h3 id="selected-date-title">
+              {Number(selectedDate.slice(5, 7))}월{" "}
+              {Number(selectedDate.slice(8, 10))}일 일정
+            </h3>
+            {schedulesStatus === "complete" && (
+              <span>{(schedulesByDate.get(selectedDate) ?? []).length}개</span>
+            )}
+          </header>
+          {schedulesStatus === "loading" ? (
+            <p role="status">일정을 불러오는 중이에요.</p>
+          ) : schedulesStatus === "error" ? (
+            <p>일정을 확인하지 못했어요.</p>
+          ) : (schedulesByDate.get(selectedDate) ?? []).length === 0 ? (
+            <p>이 날짜에 등록된 일정이 없어요.</p>
+          ) : (
+            <ul>
+              {(schedulesByDate.get(selectedDate) ?? []).map((schedule) => (
+                <li key={schedule.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedScheduleId(schedule.id)}
+                  >
+                    <span>
+                      {schedule.startTime?.slice(11, 16) || "시간 미정"}
+                    </span>
+                    <strong>{schedule.title}</strong>
+                    <small>일정 보기 ›</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+      {selectedSchedule && (
+        <CalendarScheduleDetail
+          schedule={selectedSchedule}
+          onClose={() => setSelectedScheduleId(null)}
+        />
+      )}
     </section>
   );
 }
