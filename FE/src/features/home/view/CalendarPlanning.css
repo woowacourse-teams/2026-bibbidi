@@ -48,7 +48,8 @@
   box-shadow: none;
 }
 .calendar-planning .monthly-calendar__grid td {
-  height: clamp(90px, calc((100dvh - 320px) / 6), 112px);
+  /* 상단 메뉴·제목·달력 헤더와 하단 여백을 제외하고 6주를 배치한다. */
+  height: clamp(60px, calc((100dvh - 364px) / 6), 112px);
 }
 .calendar-planning .monthly-calendar__header {
   justify-content: flex-start;
