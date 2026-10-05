@@ -224,3 +224,10 @@
     padding: 20px;
   }
 }
+
+.recommended-schedule__description {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-fg-neutral-muted);
+  line-height: 1.6;
+}

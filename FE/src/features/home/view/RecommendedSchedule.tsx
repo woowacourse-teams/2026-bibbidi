@@ -4,6 +4,7 @@ import { RecommendedScheduleViewModel } from "../view-model/createRecommendedSch
 import "./RecommendedSchedule.css";
 
 interface RecommendedScheduleProps {
+  compact?: boolean;
   onAddTask: (catalogItemId: number) => void;
   viewModel: RecommendedScheduleViewModel;
 }
@@ -37,6 +38,7 @@ function PlusIcon() {
 export function RecommendedSchedule({
   onAddTask,
   viewModel,
+  compact = false,
 }: RecommendedScheduleProps) {
   return (
     <section
@@ -49,11 +51,16 @@ export function RecommendedSchedule({
           className="recommended-schedule__catalog-action"
           to="/preparation"
         >
-          {viewModel.catalogActionLabel}
+          로드맵 전체 보기
           <ChevronRightIcon />
         </Link>
       </header>
 
+      {!compact && (
+        <p className="recommended-schedule__description">
+          아직 담지 않은 로드맵 항목 중 추가하면 좋은 준비예요.
+        </p>
+      )}
       <ul className="recommended-schedule__list">
         {viewModel.items.map((item) => (
           <li className="recommended-schedule-item" key={item.catalogItemId}>
@@ -61,9 +68,11 @@ export function RecommendedSchedule({
               <span className="recommended-schedule-item__category">
                 {item.categoryLabel}
               </span>
-              <span className="recommended-schedule-item__step">
-                {item.stepName}
-              </span>
+              {!compact && (
+                <span className="recommended-schedule-item__step">
+                  {item.stepName}
+                </span>
+              )}
             </div>
 
             <div className="recommended-schedule-item__body">
@@ -73,10 +82,11 @@ export function RecommendedSchedule({
             <button
               className="recommended-schedule-item__add-task"
               disabled={item.isAddActionDisabled}
+              aria-busy={item.addActionLabel === "추가 중..."}
               onClick={() => onAddTask(item.catalogItemId)}
               type="button"
             >
-              <PlusIcon />
+              {item.addActionLabel === "내 할 일에 추가" && <PlusIcon />}
               {item.addActionLabel}
             </button>
             {item.additionErrorMessage && (
