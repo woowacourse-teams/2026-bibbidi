@@ -5,6 +5,7 @@ import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
 import {
   ChecklistQueryAuthenticationRequiredError,
+  ChecklistQueryRequestAbortedError,
   ChecklistQueryModel,
   ChecklistQueryItemModel,
   useChecklistQueryRepository,
@@ -18,6 +19,7 @@ import { recommendedCatalogItemsRepository } from "./homeDependencies";
 import {
   RecommendedCatalogItemsRepository,
   RecommendedCatalogItemsAuthenticationRequiredError,
+  RecommendedCatalogItemsRequestAbortedError,
 } from "./repository/recommendedCatalogItemsRepository";
 import { RecommendedCatalogItemModel } from "./model/recommendedCatalogItem";
 import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
@@ -112,7 +114,11 @@ function CalendarPlanning({
           setChecklist({ status: "complete", data });
       },
       (error) => {
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted ||
+          error instanceof ChecklistQueryRequestAbortedError
+        )
+          return;
         if (error instanceof ChecklistQueryAuthenticationRequiredError)
           refreshAuth();
         setChecklist({ status: "error" });
@@ -130,7 +136,11 @@ function CalendarPlanning({
           setRecommended({ status: "complete", data });
       },
       (error) => {
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted ||
+          error instanceof RecommendedCatalogItemsRequestAbortedError
+        )
+          return;
         if (error instanceof RecommendedCatalogItemsAuthenticationRequiredError)
           refreshAuth();
         setRecommended({ status: "error" });
@@ -359,7 +369,7 @@ function CalendarPlanning({
               onAdded={refreshChecklist}
             />
           ) : recommended.status === "complete" &&
-            checklist.status === "complete" &&
+            checklist.status !== "loading" &&
             remainingRecommendations.length > 0 ? (
             <RecommendedSchedule
               compact
@@ -383,14 +393,13 @@ function CalendarPlanning({
                 <div className="calendar-planning__skeleton">
                   <p role="status">추천 할 일을 불러오는 중</p>
                 </div>
-              ) : recommended.status === "error" ||
-                checklist.status === "error" ? (
+              ) : recommended.status === "error" ? (
                 <p role="alert">
                   추천 대상을 확인하지 못했어요.{" "}
                   <button
                     type="button"
                     onClick={() => {
-                      refreshChecklist();
+                      setRecommended({ status: "loading" });
                       setRecommendationRevision((value) => value + 1);
                     }}
                   >
