@@ -96,8 +96,8 @@ xcodebuild -project APP/iosApp/iosApp.xcodeproj \
 ./APP/gradlew -p APP :shared:linkDebugFrameworkIosArm64 :shared:linkDebugFrameworkIosSimulatorArm64
 ```
 
-공통 테스트 의존성과 Android host test 구성이 준비되어 있습니다. 현재 비즈니스 로직과 테스트 사례는 없으며,
-인증 상태 구현 #241과 CI #247에서 실제 테스트를 추가합니다.
+공통 모듈의 앱 이름 계약, Android에서 공통 모듈 접근, iOS 앱 실행 후 공통 앱 이름 표시를 테스트합니다.
+인증 상태와 시나리오 테스트는 #241에서 확장합니다.
 iOS 타깃은 `iosArm64`, `iosSimulatorArm64`, `iosX64`입니다.
 Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니다.
 
@@ -116,8 +116,42 @@ Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니�
 - 기존 Android Release AAB 워크플로는 KMP 전환 중 job을 항상 건너뛰도록 중지했습니다.
   #240에서 새 `androidApp` 경로·서명·릴리스 브랜치 조건을 연결합니다.
   SDK 액션의 옛 `tools` 패키지 설치 오류도 그때 수정합니다. GitHub Secrets 자체는 변경하지 않았습니다.
-- #247에서 shared·Android·iOS PR CI를 추가합니다.
+- shared·Android·iOS PR CI는 `.github/workflows/app-ci.yml`에서 실행합니다.
 - 환경별 빌드·서명(#240), 인증(#241–#243), WebView(#244–#245)는 최소 틀에 포함하지 않습니다.
 
 추적: [#239](https://github.com/woowacourse-teams/2026-bibbidi/issues/239),
 [#211](https://github.com/woowacourse-teams/2026-bibbidi/issues/211).
+
+## APP CI
+
+`dev-app`·`release-app` 대상 PR에서 `APP/**` 또는 APP CI workflow가 바뀌면 다음 check를 실행합니다.
+`dev-app` push에서도 실행해 기본 캐시를 생성하며, Actions에서 수동 재실행도 가능합니다.
+
+| Check | 검사 |
+| --- | --- |
+| Shared tests | `:shared:testAndroidHostTest`로 commonTest 실행 |
+| Android tests | `:androidApp:testDebugUnitTest` |
+| Android build | `:androidApp:assembleDebug` |
+| iOS tests | `:shared:iosSimulatorArm64Test`와 Xcode 앱 실행 UI 테스트 |
+| iOS build | 서명 없는 Simulator Debug 앱 빌드 |
+
+GitHub 브랜치 보호의 필수 검사에는 위 다섯 check를 등록합니다. 경로 필터로 건너뛴 workflow는
+필수 검사가 pending으로 남을 수 있으므로, APP 브랜치에서 APP과 무관한 PR을 병합할 때 이 점을 고려하세요.
+Workflow 파일만으로 브랜치 보호 설정이 바뀌지는 않습니다.
+
+JDK 25와 Android SDK 36을 사용하며, iOS는 ARM64 `xcode-27` runner에서 Xcode 27.0과
+iPhone 18 Pro / iOS 27.0 Simulator를 사용합니다. 이 runner는 GitHub의 public preview입니다.
+Gradle·Kotlin/Native 캐시는 PR에서 읽기만 하며, push·수동 실행에서 갱신합니다.
+Kotlin/Native 캐시는 OS·CPU·Xcode·Kotlin/Gradle 설정으로 구분하고 다운로드한 도구·의존성만 보관합니다.
+서명·OAuth secret 없이 fork PR에서도 실행하며, 같은 PR의 새 실행은 이전 실행을 취소합니다.
+실패한 테스트 보고서와 Xcode 결과는 Actions Artifacts에 7일 보관합니다.
+
+로컬에서 CI와 같은 Gradle 검사를 실행하려면:
+
+```bash
+./APP/gradlew -p APP :shared:testAndroidHostTest :androidApp:testDebugUnitTest :androidApp:assembleDebug
+./APP/gradlew -p APP :shared:iosSimulatorArm64Test
+xcodebuild -project APP/iosApp/iosApp.xcodeproj -scheme Bibbidi -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
+  -derivedDataPath APP/iosApp/build/DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+```
