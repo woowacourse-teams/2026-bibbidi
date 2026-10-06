@@ -70,19 +70,12 @@ services:
     environment:
       DOCKER_HOST_URL: tcp://dockerproxy:2375
       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
-      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:?GRAFANA_CLOUD_PROM_URL is required}
-      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER:?GRAFANA_CLOUD_PROM_USER is required}
-      GRAFANA_CLOUD_PROM_API_KEY: ${GRAFANA_CLOUD_PROM_API_KEY:?GRAFANA_CLOUD_PROM_API_KEY is required}
-      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:?GRAFANA_CLOUD_LOKI_URL is required}
-      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:?GRAFANA_CLOUD_LOKI_USER is required}
-      GRAFANA_CLOUD_LOKI_API_KEY: ${GRAFANA_CLOUD_LOKI_API_KEY:?GRAFANA_CLOUD_LOKI_API_KEY is required}
-      GRAFANA_CLOUD_OTLP_URL: ${GRAFANA_CLOUD_OTLP_URL:?GRAFANA_CLOUD_OTLP_URL is required}
-      GRAFANA_CLOUD_OTLP_USER: ${GRAFANA_CLOUD_OTLP_USER:?GRAFANA_CLOUD_OTLP_USER is required}
-      GRAFANA_CLOUD_OTLP_API_KEY: ${GRAFANA_CLOUD_OTLP_API_KEY:?GRAFANA_CLOUD_OTLP_API_KEY is required}
+      MONITORING_INGEST_TOKEN: ${MONITORING_INGEST_TOKEN:?MONITORING_INGEST_TOKEN is required}
+      SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}
     depends_on:
       - dockerproxy
     volumes:
-      - ${ALLOY_CONFIG_PATH:-./infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - ${ALLOY_CONFIG_PATH:-./Infra/monitoring/grafana/alloy/config.alloy}:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy/data
     networks:
       - bibbidi-observability
