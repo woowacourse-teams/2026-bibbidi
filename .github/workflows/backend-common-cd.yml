@@ -111,7 +111,7 @@ jobs:
       - name: Alloy 설정 문법과 참조 검증
         run: >
           docker run --rm
-          -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro"
+          -v "$PWD/Infra/monitoring/grafana/alloy/config.alloy:/etc/alloy/config.alloy:ro"
           grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
 
       - name: Compose와 nginx·Alloy·환경 파일 설치
