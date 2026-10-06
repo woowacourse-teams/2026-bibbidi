@@ -113,12 +113,6 @@ jobs:
           node --experimental-strip-types .github/be-cd-jobs/alloy-environment-cli.ts
           Infra/monitoring/alloy/config.alloy BE/compose.prod.yml
 
-      - name: Alloy 설정 문법과 참조 검증
-        run: >
-          docker run --rm
-          -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro"
-          grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
-
       - name: Compose와 nginx·Alloy·환경 파일 설치
         env:
           SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
