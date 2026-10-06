@@ -71,6 +71,7 @@ services:
       DOCKER_HOST_URL: tcp://dockerproxy:2375
       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
       MONITORING_INGEST_TOKEN: ${MONITORING_INGEST_TOKEN:?MONITORING_INGEST_TOKEN is required}
+      SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}
     depends_on:
       - dockerproxy
     volumes:

@@ -46,6 +46,11 @@ discovery.relabel "docker_logs" {
     target_label = "deployment_environment_name"
     replacement  = sys.env("DEPLOYMENT_ENVIRONMENT_NAME")
   }
+
+  rule {
+    target_label = "service_instance_id"
+    replacement  = sys.env("SERVICE_INSTANCE_ID")
+  }
 }
 
 loki.source.docker "containers" {
