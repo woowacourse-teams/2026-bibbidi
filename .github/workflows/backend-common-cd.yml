@@ -128,7 +128,7 @@ jobs:
           install -d -m 0755 /opt/bibbidi/app/infra/nginx
           install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
           install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
-          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/monitoring/grafana/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
           umask 077
           printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
