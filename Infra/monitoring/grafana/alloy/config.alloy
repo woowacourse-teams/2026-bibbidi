@@ -61,17 +61,29 @@ loki.source.docker "containers" {
 }
 
 loki.process "normalize" {
+  stage.match {
+    selector = "{service_name=\"dockerproxy\"}"
+    action   = "drop"
+  }
+
   stage.json {
     expressions = {
-      level    = "log.level || \"log.level\" || level",
-      trace_id = "traceId || \"trace.id\" || trace.id",
-      span_id  = "spanId || \"span.id\" || span.id",
+      level      = "log.level || \"log.level\" || level",
+      scope_name = "log.logger || \"log.logger\"",
+      trace_id   = "traceId || \"trace.id\" || trace.id",
+      span_id    = "spanId || \"span.id\" || span.id",
     }
+  }
+
+  stage.drop {
+    source     = "level"
+    expression = "(?i)^(trace|debug)$"
   }
 
   stage.structured_metadata {
     values = {
       severity_text = "level",
+      scope_name    = "scope_name",
       trace_id      = "trace_id",
       span_id       = "span_id",
     }
@@ -108,31 +120,22 @@ otelcol.receiver.otlp "application" {
   }
 
   output {
-    logs   = [otelcol.processor.batch.default.input]
-    traces = [otelcol.processor.batch.default.input]
+    traces = [otelcol.processor.batch.traces.input]
   }
 }
 
-otelcol.processor.batch "default" {
+otelcol.processor.batch "traces" {
   timeout             = "5s"
   send_batch_size     = 512
   send_batch_max_size = 2048
 
   output {
-    logs   = [otelcol.exporter.otlphttp.loki.input]
     traces = [otelcol.exporter.otlphttp.tempo.input]
   }
 }
 
 otelcol.auth.bearer "monitoring" {
   token = sys.env("MONITORING_INGEST_TOKEN")
-}
-
-otelcol.exporter.otlphttp "loki" {
-  client {
-    endpoint = "https://monitoring.bibbidi.kr/loki/otlp"
-    auth     = otelcol.auth.bearer.monitoring.handler
-  }
 }
 
 otelcol.exporter.otlphttp "tempo" {
