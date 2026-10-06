@@ -16,9 +16,9 @@
   gap: 24px;
 }
 
-@media (min-width: 1201px) {
+@media (min-width: 761px) {
   .calendar-page__content {
-    padding-bottom: clamp(16px, calc(100dvh - 768px), 52px);
+    padding-bottom: 24px;
   }
 }
 

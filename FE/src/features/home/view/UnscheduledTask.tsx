@@ -7,7 +7,7 @@ interface UnscheduledTaskProps {
   viewModel: UnscheduledTaskViewModel;
 }
 
-function CalendarPlusIcon() {
+export function CalendarPlusIcon() {
   return (
     <svg
       aria-hidden="true"
