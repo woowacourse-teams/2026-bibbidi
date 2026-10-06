@@ -32,6 +32,7 @@ kotlin {
 }
 
 dependencies {
+    testImplementation(libs.kotlin.test.junit)
     implementation(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

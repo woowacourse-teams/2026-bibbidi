@@ -1,0 +1,133 @@
+name: App CI
+
+on:
+  pull_request:
+    branches: [dev-app, release-app]
+    paths:
+      - APP/**
+      - .github/workflows/app-ci.yml
+  push:
+    branches: [dev-app]
+    paths:
+      - APP/**
+      - .github/workflows/app-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Shared tests
+            tasks: ':shared:testAndroidHostTest'
+          - name: Android tests
+            tasks: ':androidApp:testDebugUnitTest'
+          - name: Android build
+            tasks: ':androidApp:assembleDebug'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Install Android SDK packages
+        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-36' 'build-tools;36.0.0'"
+      - name: Run Gradle checks
+        working-directory: APP
+        env:
+          GRADLE_TASKS: ${{ matrix.tasks }}
+        run: ./gradlew --no-daemon --stacktrace $GRADLE_TASKS
+      - name: Upload test reports
+        if: ${{ !cancelled() && matrix.name != 'Android build' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-reports
+          path: |
+            APP/**/build/reports/tests/
+            APP/**/build/test-results/
+          retention-days: 7
+
+  ios:
+    name: iOS ${{ matrix.check }}
+    runs-on: xcode-27
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [tests, build]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Restore Kotlin/Native dependencies
+        id: konan
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.konan/dependencies
+            ~/.konan/kotlin-native-prebuilt-*
+          key: konan-${{ runner.os }}-${{ runner.arch }}-xcode27-${{ hashFiles('APP/gradle/libs.versions.toml', 'APP/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Run shared tests on iOS Simulator
+        if: matrix.check == 'tests'
+        working-directory: APP
+        run: ./gradlew --no-daemon --stacktrace :shared:iosSimulatorArm64Test
+      - name: Build iOS Simulator app
+        if: matrix.check == 'build'
+        run: >-
+          xcodebuild -project APP/iosApp/iosApp.xcodeproj
+          -scheme Bibbidi -configuration Debug -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath APP/iosApp/build/DerivedData
+          CODE_SIGNING_ALLOWED=NO build
+      - name: Run iOS app launch test
+        if: matrix.check == 'tests'
+        run: >-
+          xcodebuild -project APP/iosApp/iosApp.xcodeproj
+          -scheme Bibbidi -configuration Debug
+          -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
+          -derivedDataPath APP/iosApp/build/DerivedData
+          -resultBundlePath APP/iosApp/build/TestResults.xcresult
+          -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+      - name: Save Kotlin/Native dependencies from trusted branch
+        if: success() && github.event_name != 'pull_request' && steps.konan.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.konan/dependencies
+            ~/.konan/kotlin-native-prebuilt-*
+          key: ${{ steps.konan.outputs.cache-primary-key }}
+      - name: Upload iOS test reports
+        if: ${{ !cancelled() && matrix.check == 'tests' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-test-reports
+          path: |
+            APP/shared/build/reports/tests/
+            APP/shared/build/test-results/
+            APP/iosApp/build/TestResults.xcresult
+          retention-days: 7
