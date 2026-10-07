@@ -37,8 +37,13 @@ overrides:
     compaction:
       block_retention: 120h # 5일
     metrics_generator:
-      processors: ["span-metrics", "service-graphs"]   # 요청 지표 + 서비스 관계도
+      processors: ["span-metrics", "service-graphs"]
       generate_native_histograms: classic
+      processor:
+        span_metrics:
+          dimensions: ["deployment.environment.name"]
+        service_graphs:
+          dimensions: ["deployment.environment.name"]
 
 usage_report:
   reporting_enabled: false

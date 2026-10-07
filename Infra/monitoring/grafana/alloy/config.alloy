@@ -68,7 +68,7 @@ loki.process "normalize" {
 
   stage.json {
     expressions = {
-      level      = "log.level || \"log.level\" || level",
+      level      = "log.level || \"log.level\" || level || severity_text",
       scope_name = "log.logger || \"log.logger\"",
       trace_id   = "traceId || \"trace.id\" || trace.id",
       span_id    = "spanId || \"span.id\" || span.id",

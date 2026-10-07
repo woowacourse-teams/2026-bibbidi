@@ -74,3 +74,12 @@ datasources:
       streamingEnabled:
         search: true
         metrics: true
+
+  - name: CloudWatch
+    uid: cloudwatch
+    type: cloudwatch
+    access: proxy
+    editable: false
+    jsonData:
+      authType: default
+      defaultRegion: ap-northeast-2

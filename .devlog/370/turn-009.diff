@@ -1,0 +1,35 @@
+diff --git a/Infra/monitoring/grafana/alloy/config.alloy b/Infra/monitoring/grafana/alloy/config.alloy
+index 8769e47ffa6dae03938462eada9a07f0656a71e1..03bef4c567976c684316479062e676c35ae00083 100644
+--- a/Infra/monitoring/grafana/alloy/config.alloy
++++ b/Infra/monitoring/grafana/alloy/config.alloy
+@@ -68,7 +68,7 @@ loki.process "normalize" {
+ 
+   stage.json {
+     expressions = {
+-      level      = "log.level || \"log.level\" || level",
++      level      = "log.level || \"log.level\" || level || severity_text",
+       scope_name = "log.logger || \"log.logger\"",
+       trace_id   = "traceId || \"trace.id\" || trace.id",
+       span_id    = "spanId || \"span.id\" || span.id",
+diff --git a/Infra/monitoring/grafana/datasources.yaml b/Infra/monitoring/grafana/datasources.yaml
+index 73865642c8dd11e4644f373b9ec5403aa5efe292..2ae7852cf2d567815271170960c61767e5ce7288 100644
+--- a/Infra/monitoring/grafana/datasources.yaml
++++ b/Infra/monitoring/grafana/datasources.yaml
+@@ -82,4 +82,4 @@ datasources:
+     editable: false
+     jsonData:
+       authType: default
+-      defaultRegion: ap-northeast-2
+\ No newline at end of file
++      defaultRegion: ap-northeast-2
+diff --git a/Infra/monitoring/grafana/tempo/tempo.yaml b/Infra/monitoring/grafana/tempo/tempo.yaml
+index 0d1255cce6aaefb6714f530dbe614e2ba261775d..d48e3588c8f4c800e674a00a6a541b7b47d75fea 100644
+--- a/Infra/monitoring/grafana/tempo/tempo.yaml
++++ b/Infra/monitoring/grafana/tempo/tempo.yaml
+@@ -46,4 +46,4 @@ overrides:
+           dimensions: ["deployment.environment.name"]
+ 
+ usage_report:
+-  reporting_enabled: false
+\ No newline at end of file
++  reporting_enabled: false
