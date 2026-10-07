@@ -5,7 +5,7 @@ logging {
 
 prometheus.scrape "bibbidi_backend" {
   targets = [{
-    __address__                 = "backend:8080",
+    __address__                 = "backend:8081",
     deployment_environment_name = sys.env("DEPLOYMENT_ENVIRONMENT_NAME"),
   }]
 

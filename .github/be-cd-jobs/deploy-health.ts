@@ -114,7 +114,7 @@ export async function verifyDeployment(dependencies: Dependencies = {}): Promise
         "2",
         "--retry-connrefused",
         "--retry-all-errors",
-        "http://127.0.0.1:8080/actuator/health",
+        "http://127.0.0.1:8081/actuator/health",
       ],
       { quiet: true, showStderr: true },
     );
