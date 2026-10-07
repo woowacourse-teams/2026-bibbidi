@@ -5,7 +5,7 @@ logging {
 
 prometheus.scrape "bibbidi_backend" {
   targets = [{
-    __address__                 = "backend:8080",
+    __address__                 = "backend:8081",
     deployment_environment_name = sys.env("DEPLOYMENT_ENVIRONMENT_NAME"),
   }]
 
@@ -68,7 +68,7 @@ loki.process "normalize" {
 
   stage.json {
     expressions = {
-      level      = "log.level || \"log.level\" || level",
+      level      = "log.level || \"log.level\" || level || severity_text",
       scope_name = "log.logger || \"log.logger\"",
       trace_id   = "traceId || \"trace.id\" || trace.id",
       span_id    = "spanId || \"span.id\" || span.id",
