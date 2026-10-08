@@ -1,0 +1,291 @@
+diff --git a/FE/src/app/analytics/AppPageViewTracker.tsx b/FE/src/app/analytics/AppPageViewTracker.tsx
+index 2ec0e8238d19ca1a79da322ca4fea262d950a77f..0478eb9238ff78ffcef78838dfc195c1c0d4005e 100644
+--- a/FE/src/app/analytics/AppPageViewTracker.tsx
++++ b/FE/src/app/analytics/AppPageViewTracker.tsx
+@@ -9,6 +9,7 @@ import {
+ 
+ import { useAuth } from "../../features/auth";
+ import type { AnalyticsClient } from "../../infrastructure/analytics";
++import type { LandingPage } from "./pageView";
+ import {
+   createRouterPageViewTrackingState,
+   startRouterPageViewTracking,
+@@ -23,6 +24,7 @@ export const HomeEntryPageViewContext = createContext<(() => void) | null>(
+ interface AppPageViewTrackerProps {
+   analytics: AnalyticsClient;
+   children?: ReactNode;
++  landingPage?: LandingPage;
+   origin: string;
+   router: SubscribableRouter;
+ }
+@@ -30,11 +32,12 @@ interface AppPageViewTrackerProps {
+ export function AppPageViewTracker({
+   analytics,
+   children,
++  landingPage,
+   origin,
+   router,
+ }: AppPageViewTrackerProps) {
+   const { authState } = useAuth();
+-  const trackingState = useRef(createRouterPageViewTrackingState());
++  const trackingState = useRef(createRouterPageViewTrackingState(landingPage));
+   const previousMemberId = useRef<number | undefined>(undefined);
+   const isAppRouteSettled =
+     authState.status === "authenticated" ||
+diff --git a/FE/src/app/analytics/pageView.test.ts b/FE/src/app/analytics/pageView.test.ts
+index e625abfe0e71905fa9998b69f5c2736127196cd8..78d5ad1233ebff4fcdc77378ea6e1dd975cf02d2 100644
+--- a/FE/src/app/analytics/pageView.test.ts
++++ b/FE/src/app/analytics/pageView.test.ts
+@@ -54,4 +54,26 @@ describe("createPageViewEvent", () => {
+       }).parameters.page_referrer,
+     ).toBe("");
+   });
++
++  it("첫 진입 주소의 쿼리와 외부 referrer를 GA 기본 수집처럼 그대로 담는다", () => {
++    expect(
++      createPageViewEvent({
++        origin: "https://bibbidi.example",
++        pagePath: "/",
++        referrerPath: null,
++        landingPage: {
++          pathname: "/",
++          search:
++            "?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
++          referrer: "https://l.instagram.com/",
++        },
++      }).parameters,
++    ).toEqual(
++      expect.objectContaining({
++        page_location:
++          "https://bibbidi.example/?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
++        page_referrer: "https://l.instagram.com/",
++      }),
++    );
++  });
+ });
+diff --git a/FE/src/app/analytics/pageView.ts b/FE/src/app/analytics/pageView.ts
+index 3bb240501f9b7d28ec80243154ed041be2d93d7b..435e89ed06adc2b1748a6cb5467cab9a110d6c32 100644
+--- a/FE/src/app/analytics/pageView.ts
++++ b/FE/src/app/analytics/pageView.ts
+@@ -54,27 +54,36 @@ function createPageLocation(origin: string, pagePath: PagePath) {
+   return new URL(pagePath, normalizedOrigin).href;
+ }
+ 
++// 앱을 처음 불러온 주소다. GA는 첫 페이지뷰의 쿼리(UTM)와 referrer로 유입 채널을 정한다.
++export interface LandingPage {
++  pathname: string;
++  search: string;
++  referrer: string;
++}
++
+ interface CreatePageViewEventParameters {
+   origin: string;
+   pagePath: PagePath;
+   referrerPath: PagePath | null;
++  landingPage?: LandingPage | null;
+ }
+ 
+ export function createPageViewEvent({
+   origin,
+   pagePath,
+   referrerPath,
++  landingPage = null,
+ }: CreatePageViewEventParameters): AnalyticsEvent {
+   const pageDefinition = PAGE_DEFINITIONS[pagePath];
+ 
+   return {
+     name: "page_view",
+     parameters: {
+-      page_location: createPageLocation(origin, pagePath),
++      page_location: `${createPageLocation(origin, pagePath)}${landingPage?.search ?? ""}`,
+       page_path: pagePath,
+       page_referrer: referrerPath
+         ? createPageLocation(origin, referrerPath)
+-        : "",
++        : (landingPage?.referrer ?? ""),
+       page_title: pageDefinition.pageTitle,
+       screen_name: pageDefinition.screenName,
+     },
+diff --git a/FE/src/app/analytics/routerPageViewTracking.test.tsx b/FE/src/app/analytics/routerPageViewTracking.test.tsx
+index 20194fdb2f5596d8d83c24f65d52fdbbc94d4de8..6933327988dc59f22d671ef6f59873719a22216d 100644
+--- a/FE/src/app/analytics/routerPageViewTracking.test.tsx
++++ b/FE/src/app/analytics/routerPageViewTracking.test.tsx
+@@ -9,7 +9,12 @@ import {
+ import { describe, expect, it, vi } from "vitest";
+ 
+ import type { AnalyticsClient } from "../../infrastructure/analytics";
+-import { startRouterPageViewTracking } from "./routerPageViewTracking";
++import {
++  createRouterPageViewTrackingState,
++  startRouterPageViewTracking,
++  trackPageView,
++  type RouterPageViewTrackingState,
++} from "./routerPageViewTracking";
+ 
+ const routes: RouteObject[] = [
+   { path: "/", element: <h1>준비 목록</h1> },
+@@ -30,13 +35,18 @@ function createAnalyticsMock(): AnalyticsClient {
+   };
+ }
+ 
+-function renderTrackedRouter(initialEntries: string[], initialIndex?: number) {
++function renderTrackedRouter(
++  initialEntries: string[],
++  initialIndex?: number,
++  trackingState?: RouterPageViewTrackingState,
++) {
+   const router = createMemoryRouter(routes, { initialEntries, initialIndex });
+   const analytics = createAnalyticsMock();
+   const unsubscribe = startRouterPageViewTracking(
+     router,
+     analytics,
+     "https://bibbidi.example",
++    trackingState,
+   );
+ 
+   render(
+@@ -151,6 +161,75 @@ describe("startRouterPageViewTracking", () => {
+     });
+   });
+ 
++  it("UTM 링크로 들어오면 첫 페이지뷰에만 원래 쿼리와 외부 referrer를 붙인다", async () => {
++    const utmQuery =
++      "?utm_source=threads&utm_medium=social&utm_campaign=bibbidi_promo&utm_content=post_02";
++    const { analytics, router } = renderTrackedRouter(
++      [`/${utmQuery}`],
++      undefined,
++      createRouterPageViewTrackingState({
++        pathname: "/",
++        search: utmQuery,
++        referrer: "https://www.threads.com/",
++      }),
++    );
++
++    await act(async () => router.navigate("/calendar"));
++
++    expect(
++      vi
++        .mocked(analytics.track)
++        .mock.calls.map(([event]) => [
++          event.parameters.page_location,
++          event.parameters.page_referrer,
++        ]),
++    ).toEqual([
++      [`https://bibbidi.example/${utmQuery}`, "https://www.threads.com/"],
++      ["https://bibbidi.example/calendar", "https://bibbidi.example/"],
++    ]);
++  });
++
++  it("소셜 로그인 콜백으로 들어오면 code·state와 제공자 referrer를 보내지 않는다", () => {
++    const { analytics } = renderTrackedRouter(
++      ["/"],
++      undefined,
++      createRouterPageViewTrackingState({
++        pathname: "/auth/kakao",
++        search: "?code=authorization-code&state=login-state",
++        referrer: "https://kauth.kakao.com/",
++      }),
++    );
++
++    expect(analytics.track).toHaveBeenCalledExactlyOnceWith(
++      expect.objectContaining({
++        parameters: expect.objectContaining({
++          page_location: "https://bibbidi.example/",
++          page_referrer: "",
++        }),
++      }),
++    );
++  });
++
++  it("로그인 사용자가 바뀌어 다시 측정해도 첫 진입 정보는 다시 붙이지 않는다", () => {
++    const analytics = createAnalyticsMock();
++    const trackingState = createRouterPageViewTrackingState({
++      pathname: "/",
++      search: "?utm_source=instagram",
++      referrer: "https://l.instagram.com/",
++    });
++
++    trackPageView("/", analytics, "https://bibbidi.example", trackingState);
++    trackingState.lastTrackedPagePath = null;
++    trackPageView("/", analytics, "https://bibbidi.example", trackingState);
++
++    expect(vi.mocked(analytics.track).mock.lastCall?.[0].parameters).toEqual(
++      expect.objectContaining({
++        page_location: "https://bibbidi.example/",
++        page_referrer: "",
++      }),
++    );
++  });
++
+   it("Analytics 오류를 라우터 이동에서 격리한다", async () => {
+     const router = createMemoryRouter(routes, { initialEntries: ["/"] });
+     const analytics: AnalyticsClient = {
+diff --git a/FE/src/app/analytics/routerPageViewTracking.ts b/FE/src/app/analytics/routerPageViewTracking.ts
+index d0364d79654b7d0265088c326004b198c6ab7431..0b2c4803d143d1cac2ffbb7335db30ca3770cca7 100644
+--- a/FE/src/app/analytics/routerPageViewTracking.ts
++++ b/FE/src/app/analytics/routerPageViewTracking.ts
+@@ -2,6 +2,7 @@ import type { AnalyticsClient } from "../../infrastructure/analytics";
+ import {
+   createPageViewEvent,
+   normalizePagePath,
++  type LandingPage,
+   type PagePath,
+ } from "./pageView";
+ 
+@@ -22,10 +23,21 @@ export interface SubscribableRouter {
+ 
+ export interface RouterPageViewTrackingState {
+   lastTrackedPagePath: PagePath | null;
++  landingPage: LandingPage | null;
+ }
+ 
+-export function createRouterPageViewTrackingState(): RouterPageViewTrackingState {
+-  return { lastTrackedPagePath: null };
++export function createRouterPageViewTrackingState(
++  landingPage?: LandingPage,
++): RouterPageViewTrackingState {
++  // 소셜 로그인 콜백처럼 측정하지 않는 주소로 들어오면 code·state와 제공자 referrer를 보내지 않는다.
++  const isTrackedLanding =
++    landingPage !== undefined &&
++    normalizePagePath(landingPage.pathname) !== null;
++
++  return {
++    lastTrackedPagePath: null,
++    landingPage: isTrackedLanding ? landingPage : null,
++  };
+ }
+ 
+ export function trackPageView(
+@@ -37,10 +49,15 @@ export function trackPageView(
+   if (pagePath === trackingState.lastTrackedPagePath) return;
+ 
+   const referrerPath = trackingState.lastTrackedPagePath;
++  const landingPage = trackingState.landingPage;
+   trackingState.lastTrackedPagePath = pagePath;
++  // 유입 채널은 첫 페이지뷰로만 정하므로, 이후 페이지뷰에는 다시 붙이지 않는다.
++  trackingState.landingPage = null;
+ 
+   try {
+-    analytics.track(createPageViewEvent({ origin, pagePath, referrerPath }));
++    analytics.track(
++      createPageViewEvent({ origin, pagePath, referrerPath, landingPage }),
++    );
+   } catch {
+     // 계측 오류는 화면 이동에서 격리한다.
+   }
+diff --git a/FE/src/index.tsx b/FE/src/index.tsx
+index 3e18d421a85140c883a3ed36990a337a39d3960f..e2f4d18eefb72c530602e6d20a61fa724e0eaadc 100644
+--- a/FE/src/index.tsx
++++ b/FE/src/index.tsx
+@@ -27,6 +27,11 @@ createRoot(rootElement).render(
+       <ChecklistMigrationProvider>
+         <AppPageViewTracker
+           analytics={analytics}
++          landingPage={{
++            pathname: window.location.pathname,
++            search: window.location.search,
++            referrer: document.referrer,
++          }}
+           origin={window.location.origin}
+           router={router}
+         >

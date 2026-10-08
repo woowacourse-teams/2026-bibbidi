@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const RECOMMENDED_CATALOG_ITEMS_ENDPOINT = `${apiBaseUrl}/api/checklists/me/recommended-catalog-items`;
 const RECOMMENDED_CATALOG_ITEMS_REQUEST_TIMEOUT_MS = 10_000;
@@ -151,7 +153,7 @@ async function getRecommendedCatalogItems(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${RECOMMENDED_CATALOG_ITEMS_ENDPOINT}?limit=${encodeURIComponent(limit)}`,
         {
           credentials: "include",

@@ -37,6 +37,7 @@ describe("AppHeaderSummaryRepository", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 1,
           sourceCatalogItemId: 101,
           status: "done",
@@ -45,6 +46,7 @@ describe("AppHeaderSummaryRepository", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:01:00",
           id: 2,
           sourceCatalogItemId: 102,
           status: "continue",
@@ -53,6 +55,7 @@ describe("AppHeaderSummaryRepository", () => {
         {
           appointments: [],
           categoryId: 1,
+          createdAt: "2026-09-23T09:02:00",
           id: 3,
           sourceCatalogItemId: null,
           status: "done",

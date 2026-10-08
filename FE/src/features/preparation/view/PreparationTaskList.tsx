@@ -8,6 +8,7 @@ interface PreparationTaskListProps {
   addingCatalogItemIds?: readonly string[];
   canAddTasks?: boolean;
   density?: PreparationTaskListDensity;
+  emptyDescription?: string;
   isScrollable?: boolean;
   onTaskAdd?: (catalogItemId: string) => void;
   tasks: PreparationStepTaskViewModel[];
@@ -16,8 +17,9 @@ interface PreparationTaskListProps {
 
 function PreparationTaskEmptyState({
   density,
+  emptyDescription,
   variant,
-}: Pick<PreparationTaskListProps, "density" | "variant">) {
+}: Pick<PreparationTaskListProps, "density" | "emptyDescription" | "variant">) {
   const message =
     variant === "available"
       ? {
@@ -40,7 +42,7 @@ function PreparationTaskEmptyState({
         </svg>
       </span>
       <h3>{message.title}</h3>
-      <p>{message.description}</p>
+      <p>{emptyDescription ?? message.description}</p>
     </div>
   );
 }
@@ -49,13 +51,20 @@ export function PreparationTaskList({
   addingCatalogItemIds = [],
   canAddTasks = false,
   density = "regular",
+  emptyDescription,
   isScrollable = false,
   onTaskAdd,
   tasks,
   variant,
 }: PreparationTaskListProps) {
   if (tasks.length === 0) {
-    return <PreparationTaskEmptyState density={density} variant={variant} />;
+    return (
+      <PreparationTaskEmptyState
+        density={density}
+        emptyDescription={emptyDescription}
+        variant={variant}
+      />
+    );
   }
 
   return (

@@ -1,0 +1,13 @@
+diff --git a/FE/webpack.config.js b/FE/webpack.config.js
+index e2b652763e3ec9020e7862ba8371b6d61dd873f8..4ef278aba0bd8f0f16c83a9f668b837d2a6ee2dd 100644
+--- a/FE/webpack.config.js
++++ b/FE/webpack.config.js
+@@ -149,7 +149,7 @@ module.exports = (_environment, arguments_) => {
+               },
+               sourcemaps: {
+                 assets: "./dist/assets/**/*.js",
+-                filesToDeleteAfterUpload: "./dist/assets/**/*.js.map",
++                filesToDeleteAfterUpload: "./dist/assets/**/*.map",
+               },
+             }),
+           ]

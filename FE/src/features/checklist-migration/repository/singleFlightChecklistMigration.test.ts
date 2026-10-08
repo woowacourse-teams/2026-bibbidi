@@ -1,17 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MyChecklistModel } from "../../checklist";
 import {
   ChecklistMigrationRepository,
   ChecklistMigrationRequestAbortedError,
 } from "./checklistMigrationRepository";
 import { createSingleFlightChecklistMigration } from "./singleFlightChecklistMigration";
 
+const CHECKLIST: MyChecklistModel = { exists: true, items: [] };
+
 function createDeferredRepository() {
   let resolveMigration: (() => void) | undefined;
   let underlyingSignal: AbortSignal | undefined;
   const repository: ChecklistMigrationRepository = {
     migrate: vi.fn(
-      (signal) =>
+      (_initialChecklist, signal) =>
         new Promise<void>((resolve, reject) => {
           resolveMigration = resolve;
           underlyingSignal = signal;
@@ -34,8 +37,8 @@ describe("createSingleFlightChecklistMigration", () => {
     const deferred = createDeferredRepository();
     const migration = createSingleFlightChecklistMigration(deferred.repository);
 
-    const first = migration.migrate();
-    const second = migration.migrate();
+    const first = migration.migrate(CHECKLIST);
+    const second = migration.migrate(CHECKLIST);
 
     expect(deferred.repository.migrate).toHaveBeenCalledOnce();
     deferred.resolve();
@@ -51,8 +54,8 @@ describe("createSingleFlightChecklistMigration", () => {
     };
     const migration = createSingleFlightChecklistMigration(repository);
 
-    await migration.migrate();
-    await migration.migrate();
+    await migration.migrate(CHECKLIST);
+    await migration.migrate(CHECKLIST);
 
     expect(repository.migrate).toHaveBeenCalledTimes(2);
   });
@@ -63,8 +66,8 @@ describe("createSingleFlightChecklistMigration", () => {
     const firstController = new AbortController();
     const secondController = new AbortController();
 
-    const first = migration.migrate(firstController.signal);
-    const second = migration.migrate(secondController.signal);
+    const first = migration.migrate(CHECKLIST, firstController.signal);
+    const second = migration.migrate(CHECKLIST, secondController.signal);
     firstController.abort();
 
     await expect(first).rejects.toBeInstanceOf(
@@ -81,7 +84,7 @@ describe("createSingleFlightChecklistMigration", () => {
     const migration = createSingleFlightChecklistMigration(deferred.repository);
     const controller = new AbortController();
 
-    const result = migration.migrate(controller.signal);
+    const result = migration.migrate(CHECKLIST, controller.signal);
     controller.abort();
 
     await expect(result).rejects.toBeInstanceOf(
@@ -96,9 +99,9 @@ describe("createSingleFlightChecklistMigration", () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(migration.migrate(controller.signal)).rejects.toBeInstanceOf(
-      ChecklistMigrationRequestAbortedError,
-    );
+    await expect(
+      migration.migrate(CHECKLIST, controller.signal),
+    ).rejects.toBeInstanceOf(ChecklistMigrationRequestAbortedError);
     expect(deferred.repository.migrate).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,59 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index e42490417d12824473aa7be18d2dc7e080344da2..589ab2d5109cbb95a774c30b94616d91ef924581 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -127,8 +127,9 @@
+ 
+ .social-login-form__account-guide {
+   display: grid;
+-  width: 100%;
++  width: min(calc(100vw - 24px), 352px);
+   flex: none;
++  align-self: center;
+   align-items: center;
+   grid-template-columns: 36px 1fr;
+   gap: 12px;
+@@ -172,6 +173,10 @@
+   font-weight: 700;
+ }
+ 
++.social-login-form__guide-copy > span {
++  white-space: nowrap;
++}
++
+ .social-login-form__notice {
+   margin: 12px 0 0;
+   color: var(--color-fg-neutral-muted);
+@@ -189,6 +194,20 @@
+   .social-login-form__headline {
+     font-size: clamp(23px, 7.2vw, 28px);
+   }
++
++  .social-login-form__account-guide {
++    grid-template-columns: 32px 1fr;
++    gap: 8px;
++  }
++
++  .social-login-form__guide-icon {
++    width: 32px;
++    height: 32px;
++  }
++
++  .social-login-form__guide-copy > span {
++    font-size: 12px;
++  }
+ }
+ 
+ @media (max-width: 360px) {
+diff --git a/FE/src/layouts/AuthLayout.css b/FE/src/layouts/AuthLayout.css
+index a1acdd4f6a52e3b79b6fdb74d875feb8d3bc11dc..de283f013848c99a198c312323f708590f539443 100644
+--- a/FE/src/layouts/AuthLayout.css
++++ b/FE/src/layouts/AuthLayout.css
+@@ -28,6 +28,6 @@
+   .auth-page--login {
+     align-items: stretch;
+     padding-bottom: calc(18px + env(safe-area-inset-bottom));
+-    padding-top: 72px;
++    padding-top: clamp(56px, 9dvh, 80px);
+   }
+ }

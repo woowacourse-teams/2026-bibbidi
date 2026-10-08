@@ -5,9 +5,13 @@ const PAGE_DEFINITIONS = {
     pageTitle: "준비 목록",
     screenName: "preparation_catalog",
   },
-  "/planner": {
-    pageTitle: "플래너",
-    screenName: "planner",
+  "/preparation": {
+    pageTitle: "준비 목록",
+    screenName: "preparation_catalog",
+  },
+  "/calendar": {
+    pageTitle: "캘린더",
+    screenName: "calendar",
   },
   "/checklist": {
     pageTitle: "체크리스트",
@@ -17,9 +21,10 @@ const PAGE_DEFINITIONS = {
     pageTitle: "로그인",
     screenName: "login",
   },
-  "/signup": {
-    pageTitle: "회원가입",
-    screenName: "signup",
+  "/onboarding": { pageTitle: "약관 동의", screenName: "onboarding_terms" },
+  "/onboarding/account": {
+    pageTitle: "계정 선택",
+    screenName: "onboarding_account",
   },
 } as const;
 
@@ -49,27 +54,36 @@ function createPageLocation(origin: string, pagePath: PagePath) {
   return new URL(pagePath, normalizedOrigin).href;
 }
 
+// 앱을 처음 불러온 주소다. GA는 첫 페이지뷰의 쿼리(UTM)와 referrer로 유입 채널을 정한다.
+export interface LandingPage {
+  pathname: string;
+  search: string;
+  referrer: string;
+}
+
 interface CreatePageViewEventParameters {
   origin: string;
   pagePath: PagePath;
   referrerPath: PagePath | null;
+  landingPage?: LandingPage | null;
 }
 
 export function createPageViewEvent({
   origin,
   pagePath,
   referrerPath,
+  landingPage = null,
 }: CreatePageViewEventParameters): AnalyticsEvent {
   const pageDefinition = PAGE_DEFINITIONS[pagePath];
 
   return {
     name: "page_view",
     parameters: {
-      page_location: createPageLocation(origin, pagePath),
+      page_location: `${createPageLocation(origin, pagePath)}${landingPage?.search ?? ""}`,
       page_path: pagePath,
       page_referrer: referrerPath
         ? createPageLocation(origin, referrerPath)
-        : "",
+        : (landingPage?.referrer ?? ""),
       page_title: pageDefinition.pageTitle,
       screen_name: pageDefinition.screenName,
     },

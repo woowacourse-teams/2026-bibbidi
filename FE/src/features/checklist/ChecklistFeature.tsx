@@ -4,14 +4,18 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { analytics } from "../../infrastructure/analytics";
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAuth } from "../auth";
-import { createPlannerAppointmentStartEvent } from "./analytics/checklistAnalytics";
+import { createCalendarAppointmentStartEvent } from "./analytics/checklistAnalytics";
 import {
   useChecklistCommandRepository,
   useChecklistCacheRepository,
   useChecklistQueryRepository,
   useChecklistRevision,
 } from "./checklistQueryDependencies";
-import { ChecklistAudience, ChecklistQueryModel } from "./model/checklistQuery";
+import {
+  ChecklistAudience,
+  ChecklistQueryModel,
+  getChecklistCategoryItems,
+} from "./model/checklistQuery";
 import {
   ChecklistQueryAuthenticationRequiredError,
   ChecklistQueryRequestAbortedError,
@@ -111,7 +115,7 @@ export function ChecklistFeature({
         : undefined;
   const sessionIdentity =
     authState.status === "authenticated" || authState.status === "synchronizing"
-      ? `authenticated:${authState.user.nickname}`
+      ? `authenticated:${authState.user.id}`
       : authState.status === "guest"
         ? "guest"
         : undefined;
@@ -190,10 +194,10 @@ export function ChecklistFeature({
     },
     [audience, setRequestState],
   );
-  const selectedCategoryId =
+  const selectedTaskCategoryId =
     requestState.status === "success"
       ? requestState.checklist.categories
-          .flatMap((category) => category.items)
+          .flatMap(getChecklistCategoryItems)
           .find((item) => item.id === selectedTaskId)?.categoryId
       : null;
   const itemEditing = useChecklistItemEditing(
@@ -202,7 +206,7 @@ export function ChecklistFeature({
     audience,
     selectedChecklistItemId,
     handleRefreshFailed,
-    selectedCategoryId,
+    selectedTaskCategoryId,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,
@@ -210,6 +214,11 @@ export function ChecklistFeature({
     audience,
     sessionIdentity,
   );
+  const revealCustomRequestRef = useRef(0);
+  const [revealCustomCategory, setRevealCustomCategory] = useState<{
+    categoryId: string;
+    requestId: number;
+  } | null>(null);
   const [loginRequiredReason, setLoginRequiredReason] =
     useState<LoginRequiredReason | null>(null);
   const latestRequestIdRef = useRef(0);
@@ -237,7 +246,19 @@ export function ChecklistFeature({
   const taskCreation = useChecklistTaskCreation({
     isOpen: audience === "authenticated" && isTaskCreationOpen,
     onOpenChange: updateTaskCreation,
-    onSubmit: taskCreationCommand.submit,
+    onSubmit: async (input) => {
+      const didSucceed = await taskCreationCommand.submit(input);
+
+      if (didSucceed) {
+        revealCustomRequestRef.current += 1;
+        setRevealCustomCategory({
+          categoryId: input.categoryId,
+          requestId: revealCustomRequestRef.current,
+        });
+      }
+
+      return didSucceed;
+    },
     sessionIdentity,
     submissionState: taskCreationCommand.submissionState,
   });
@@ -246,7 +267,7 @@ export function ChecklistFeature({
     requestState.audience === audience &&
     requestState.sessionIdentity === sessionIdentity &&
     requestState.checklist.categories.some((category) =>
-      category.items.some(
+      getChecklistCategoryItems(category).some(
         (item) =>
           item.id === selectedTaskId &&
           item.checklistItemId === selectedChecklistItemId,
@@ -450,7 +471,9 @@ export function ChecklistFeature({
     const selectedTaskExists =
       requestState.status === "success" &&
       requestState.checklist.categories.some((category) =>
-        category.items.some((item) => item.id === selectedTaskId),
+        getChecklistCategoryItems(category).some(
+          (item) => item.id === selectedTaskId,
+        ),
       );
 
     if (!selectedTaskExists) {
@@ -493,8 +516,8 @@ export function ChecklistFeature({
     }
 
     openedAppointmentRequestRef.current = location.key;
-    appointmentCreation.open("planner");
-    analytics.track(createPlannerAppointmentStartEvent());
+    appointmentCreation.open("calendar");
+    analytics.track(createCalendarAppointmentStartEvent());
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -605,11 +628,15 @@ export function ChecklistFeature({
       }}
       onRequestScheduleCreation={requestScheduleCreation}
       onSelectTask={selectTask}
+      onVisitPreparation={(categoryId) => {
+        navigate(`/?categoryId=${encodeURIComponent(categoryId)}`);
+      }}
       onVisitLogin={() => {
         setLoginRequiredReason(null);
         navigate("/login");
       }}
       selectedTaskId={selectedTaskId}
+      revealCustomCategory={revealCustomCategory}
       taskCreation={taskCreation}
     />
   );
