@@ -134,6 +134,33 @@ describe("준비 로드맵 보기 전환", () => {
     await screen.findByText(/내 할 일 0개 · 완료 0개/);
   });
 
+  it("각 카드에 완료 상태와 일정을 조회용으로 표시하고 변경 뒤 갱신한다", async () => {
+    mocks.getChecklist.mockResolvedValue({
+      categories: [
+        {
+          ...checklist.categories[0],
+          customItems: [{ ...item(2, "우리만의 준비", true), status: "done" }],
+        },
+      ],
+    });
+    const { rerender } = render(<PreparationRoadmapFeature />);
+    const card = await screen.findByRole("article", { name: "내가 추가한 일" });
+    expect(within(card).getByText("내 할 일 1개 · 완료 1개")).toBeTruthy();
+    expect(within(card).getByText("완료 · 일정 없음")).toBeTruthy();
+    expect(within(card).queryByRole("checkbox")).toBeNull();
+    expect(within(card).queryByRole("button")).toBeNull();
+    mocks.getChecklist.mockResolvedValue(checklist);
+    mocks.revision += 1;
+    rerender(<PreparationRoadmapFeature />);
+    const refreshedCard = await screen.findByRole("article", {
+      name: "내가 추가한 일",
+    });
+    expect(
+      within(refreshedCard).getByText("내 할 일 1개 · 완료 0개"),
+    ).toBeTruthy();
+    expect(within(refreshedCard).getByText("예정 · 일정 없음")).toBeTruthy();
+  });
+
   it("전체 단계의 준비 현황은 체크리스트 변경 뒤 다시 조회한다", async () => {
     const { rerender } = render(<PreparationRoadmapFeature />);
     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
@@ -152,15 +179,16 @@ describe("준비 로드맵 보기 전환", () => {
     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
     const cards = screen.getByRole("list", { name: "내 할 일이 있는 단계" });
     expect(
-      within(cards).queryByRole("button", { name: /예식 형태 결정/ }),
+      within(cards).queryByRole("article", { name: "예식 형태 결정" }),
     ).toBeNull();
     expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
     expect(screen.queryByText("웨딩홀 견적 비교")).toBeNull();
-    fireEvent.click(
-      within(cards).getByRole("button", { name: /내가 추가한 일/ }),
-    );
-    expect(screen.getByText("우리만의 준비")).toBeTruthy();
-    expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
+    expect(
+      within(
+        within(cards).getByRole("article", { name: "내가 추가한 일" }),
+      ).getByText("우리만의 준비"),
+    ).toBeTruthy();
+    expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
   });
 
   it("빈 카테고리에서 전체 단계로 전환하며 카테고리를 유지한다", async () => {

@@ -1,0 +1,207 @@
+.personal-roadmap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0 32px 28px;
+  overflow-y: auto;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.personal-roadmap > section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.personal-roadmap__categories {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  background: transparent;
+}
+
+.personal-roadmap__categories button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 10px 24px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.personal-roadmap__categories button[aria-pressed="true"] {
+  border-bottom-color: var(--color-stroke-brand-solid);
+  color: var(--color-fg-brand);
+  font-weight: 700;
+}
+
+.personal-roadmap__cards {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-height: 280px;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding: 4px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.personal-roadmap__cards::-webkit-scrollbar {
+  display: none;
+}
+
+.personal-roadmap__cards > li {
+  display: flex;
+  flex: 0 0 min(360px, 85%);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.personal-roadmap__card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+}
+
+.personal-roadmap__card--current {
+  border-color: var(--color-stroke-brand-solid);
+}
+
+.personal-roadmap__card-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.personal-roadmap__number {
+  color: var(--color-fg-brand);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.personal-roadmap__card-header h3 {
+  margin: 10px 0 6px;
+  color: var(--color-fg-neutral);
+  font-size: 17px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.personal-roadmap__card-header p,
+.personal-roadmap__task-meta {
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.personal-roadmap__tasks {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 16px 0 0;
+  margin: 0;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.personal-roadmap__task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 24px;
+}
+
+.personal-roadmap__task > div {
+  min-width: 0;
+}
+
+.personal-roadmap__task-title {
+  margin: 0 0 4px;
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.personal-roadmap__status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  border: 1px solid var(--color-stroke-neutral);
+  border-radius: 4px;
+}
+
+.personal-roadmap__status--complete {
+  border-color: var(--color-stroke-brand-solid);
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+
+.personal-roadmap__status svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.personal-roadmap :is(ol, ul):focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: -3px;
+}
+
+@media (max-width: 760px) {
+  .personal-roadmap {
+    padding: 0 16px 16px;
+  }
+
+  .personal-roadmap__cards {
+    gap: 12px;
+  }
+
+  .personal-roadmap__cards > li {
+    flex-basis: min(300px, 85%);
+  }
+
+  .personal-roadmap__card {
+    padding: 16px;
+  }
+
+  .personal-roadmap__categories {
+    justify-content: flex-start;
+  }
+
+  .personal-roadmap__categories button {
+    padding: 10px 18px;
+  }
+}

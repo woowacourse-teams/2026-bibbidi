@@ -144,25 +144,6 @@
   outline-offset: -3px;
 }
 
-.personal-roadmap {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  padding: 0 32px 28px;
-  max-width: 1440px;
-  margin: 0 auto;
-}
-
-.personal-roadmap > section {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.personal-roadmap__categories,
 .preparation-roadmap .preparation-roadmap__categories {
   display: flex;
   flex: none;
@@ -172,7 +153,6 @@
   background: transparent;
 }
 
-.personal-roadmap__categories button,
 .preparation-roadmap .preparation-roadmap__category {
   display: flex;
   flex: none;
@@ -192,71 +172,10 @@
   white-space: nowrap;
 }
 
-.personal-roadmap__categories button[aria-pressed="true"],
 .preparation-roadmap .preparation-roadmap__category--current {
   border-bottom-color: var(--color-stroke-brand-solid);
   color: var(--color-fg-brand);
   font-weight: 700;
-}
-
-.personal-roadmap__cards {
-  display: flex;
-  flex: none;
-  gap: 16px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  padding: 4px 0 16px;
-  list-style: none;
-}
-
-.personal-roadmap__cards li {
-  flex: 0 0 min(260px, 80%);
-  scroll-snap-align: start;
-}
-
-.personal-roadmap__cards button {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  min-height: 160px;
-  padding: 20px;
-  border: 1px solid var(--color-stroke-neutral-weak);
-  border-radius: 14px;
-  background: var(--color-bg-layer-default);
-  color: var(--color-fg-neutral);
-  font: inherit;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-
-.personal-roadmap__cards button[aria-pressed="true"],
-.personal-roadmap__cards button:hover {
-  border-color: var(--color-stroke-brand-solid);
-  background: var(--color-bg-brand-weak);
-}
-
-.personal-roadmap__number {
-  color: var(--color-fg-brand);
-  font-size: 20px;
-}
-
-.personal-roadmap__detail {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  padding: 20px;
-  border: 1px solid var(--color-stroke-neutral-weak);
-  border-radius: 14px;
-  background: var(--color-bg-layer-default);
-}
-
-.personal-roadmap__detail h2 {
-  margin-top: 0;
-  color: var(--color-fg-neutral);
-  font-size: 20px;
 }
 
 @media (max-width: 760px) {
@@ -272,16 +191,10 @@
     font-size: 13px;
   }
 
-  .personal-roadmap {
-    padding: 0 16px 16px;
-  }
-
-  .personal-roadmap__categories,
   .preparation-roadmap .preparation-roadmap__categories {
     justify-content: flex-start;
   }
 
-  .personal-roadmap__categories button,
   .preparation-roadmap .preparation-roadmap__category {
     padding: 10px 18px;
   }
