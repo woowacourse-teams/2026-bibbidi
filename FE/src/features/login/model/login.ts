@@ -8,10 +8,6 @@ export interface LoginValues {
   password: string;
 }
 
-export interface LoginResult {
-  nickname: string;
-}
-
 export type LoginFormField = keyof LoginFormValues;
 
 export const LOGIN_FORM_ERROR_MESSAGE = "닉네임 또는 비밀번호를 확인해 주세요.";

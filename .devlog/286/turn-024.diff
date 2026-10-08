@@ -1,0 +1,158 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index ace28fce2b475af1861f5cc91d63e18bc119de39..e42490417d12824473aa7be18d2dc7e080344da2 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -1,12 +1,14 @@
+ .social-login-form {
+   display: flex;
+   width: min(100%, 440px);
++  min-height: 100%;
+   flex-direction: column;
+-  padding: 0 44px 112px;
++  justify-content: space-between;
++  padding: 0 44px;
+ }
+ 
+ .social-login-form__intro {
+-  margin-bottom: 128px;
++  flex: none;
+ }
+ 
+ .social-login-form__headline {
+@@ -36,6 +38,10 @@
+   gap: 12px;
+ }
+ 
++.social-login-form__actions {
++  flex: none;
++}
++
+ .social-login-form__button {
+   display: flex;
+   width: 100%;
+@@ -120,22 +126,17 @@
+ }
+ 
+ .social-login-form__account-guide {
+-  position: fixed;
+-  z-index: 1;
+-  bottom: calc(12px + env(safe-area-inset-bottom));
+-  left: 50%;
+   display: grid;
+-  width: min(calc(100% - 48px), 352px);
++  width: 100%;
++  flex: none;
+   align-items: center;
+   grid-template-columns: 36px 1fr;
+   gap: 12px;
+-  border-top: 1px solid var(--color-stroke-neutral-weak);
+   background: var(--color-bg-layer-basement);
+   color: var(--color-fg-neutral-muted);
+   font-size: 14px;
+   line-height: 1.55;
+-  padding: 16px 2px 0;
+-  transform: translateX(-50%);
++  padding: 0 2px;
+ }
+ 
+ .social-login-form__guide-icon {
+@@ -182,11 +183,7 @@
+ 
+ @media (max-width: 520px) {
+   .social-login-form {
+-    padding: 0 24px 112px;
+-  }
+-
+-  .social-login-form__intro {
+-    margin-bottom: 120px;
++    padding: 0 24px;
+   }
+ 
+   .social-login-form__headline {
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.tsx b/FE/src/features/social-login/view/SocialLoginForm.tsx
+index 849a1dcda1ab6f4fca01e655693f95f803fc312b..a018f45e6d271bdabb70e314982da8282c6fd622 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.tsx
++++ b/FE/src/features/social-login/view/SocialLoginForm.tsx
+@@ -99,21 +99,29 @@ export function SocialLoginForm() {
+         </h1>
+       </header>
+ 
+-      <div className="social-login-form__buttons">
+-        {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
+-          <button
+-            className={`social-login-form__button social-login-form__button--${provider.id}`}
+-            disabled={isSocialRedirecting}
+-            key={provider.id}
+-            onClick={() => handleSocialLogin(provider)}
+-            type="button"
+-          >
+-            <span className="social-login-form__icon">
+-              <SocialProviderIcon provider={provider.id} />
+-            </span>
+-            <span>{provider.label}로 계속하기</span>
+-          </button>
+-        ))}
++      <div className="social-login-form__actions">
++        <div className="social-login-form__buttons">
++          {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
++            <button
++              className={`social-login-form__button social-login-form__button--${provider.id}`}
++              disabled={isSocialRedirecting}
++              key={provider.id}
++              onClick={() => handleSocialLogin(provider)}
++              type="button"
++            >
++              <span className="social-login-form__icon">
++                <SocialProviderIcon provider={provider.id} />
++              </span>
++              <span>{provider.label}로 계속하기</span>
++            </button>
++          ))}
++        </div>
++
++        {socialLoginNotice && (
++          <p className="social-login-form__notice" role="status">
++            {socialLoginNotice}
++          </p>
++        )}
+       </div>
+ 
+       <aside
+@@ -132,12 +140,6 @@ export function SocialLoginForm() {
+           <span>소셜 로그인 후 기존 계정과 연동할 수 있어요.</span>
+         </span>
+       </aside>
+-
+-      {socialLoginNotice && (
+-        <p className="social-login-form__notice" role="status">
+-          {socialLoginNotice}
+-        </p>
+-      )}
+     </section>
+   );
+ }
+diff --git a/FE/src/layouts/AuthLayout.css b/FE/src/layouts/AuthLayout.css
+index 9a65a90d8407501b5bbd2c55ccf4d86cfaa9a605..a1acdd4f6a52e3b79b6fdb74d875feb8d3bc11dc 100644
+--- a/FE/src/layouts/AuthLayout.css
++++ b/FE/src/layouts/AuthLayout.css
+@@ -14,7 +14,8 @@
+ }
+ 
+ .auth-page--login {
+-  align-items: start;
++  align-items: stretch;
++  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+   padding-top: 128px;
+ }
+ 
+@@ -25,6 +26,8 @@
+   }
+ 
+   .auth-page--login {
++    align-items: stretch;
++    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+     padding-top: 72px;
+   }
+-}
+\ No newline at end of file
++}

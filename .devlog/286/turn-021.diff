@@ -1,0 +1,21 @@
+diff --git a/FE/src/layouts/AuthLayout.css b/FE/src/layouts/AuthLayout.css
+index 39706aafccb2def72a6dd86c43432f2592eb4a32..71e168b2faf5e76655794de8048d3087e817f10d 100644
+--- a/FE/src/layouts/AuthLayout.css
++++ b/FE/src/layouts/AuthLayout.css
+@@ -15,7 +15,7 @@
+ 
+ .auth-page--login {
+   align-items: start;
+-  padding-top: 48px;
++  padding-top: 128px;
+ }
+ 
+ @media (max-width: 760px) {
+@@ -25,6 +25,6 @@
+   }
+ 
+   .auth-page--login {
+-    padding-top: 48px;
++    padding-top: 128px;
+   }
+ }

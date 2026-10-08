@@ -1,0 +1,29 @@
+.calendar-page {
+  display: flex;
+  min-width: 320px;
+  flex-direction: column;
+  background: var(--color-bg-layer-basement);
+  color: var(--color-fg-neutral);
+}
+
+.calendar-page__content {
+  display: flex;
+  width: min(calc(100% - 48px), 1440px);
+  flex: 1;
+  margin: 0 auto;
+  padding: 24px 0 52px;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 761px) {
+  .calendar-page__content {
+    padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .calendar-page__content {
+    width: min(calc(100% - 32px), 1440px);
+  }
+}

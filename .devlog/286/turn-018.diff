@@ -1,0 +1,39 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index a34e3c5d3785239f6c0176a4c1f7e749becb441d..5cfd7438ce9de01e51ad998a228f0ddb49d20c53 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -2,13 +2,6 @@
+   display: flex;
+   width: min(100%, 440px);
+   flex-direction: column;
+-  border: 1px solid
+-    color-mix(in srgb, var(--color-stroke-brand-weak) 72%, white);
+-  border-radius: 24px;
+-  background: var(--color-bg-layer-default);
+-  box-shadow:
+-    0 24px 64px rgb(103 75 55 / 10%),
+-    0 4px 16px rgb(103 75 55 / 6%);
+   padding: 48px 44px 40px;
+ }
+ 
+@@ -184,9 +177,6 @@
+ @media (max-width: 520px) {
+   .social-login-form {
+     margin-top: clamp(20px, 6vh, 48px);
+-    border-color: var(--color-stroke-neutral-weak);
+-    border-radius: 18px;
+-    box-shadow: 0 10px 28px rgb(103 75 55 / 8%);
+     padding: 36px 24px 32px;
+   }
+ 
+@@ -201,10 +191,6 @@
+ 
+ @media (max-width: 360px) {
+   .social-login-form {
+-    border-right: 0;
+-    border-left: 0;
+-    border-radius: 0;
+-    box-shadow: none;
+     padding-right: 20px;
+     padding-left: 20px;
+   }

@@ -23,6 +23,7 @@ export interface MyChecklistQueryRepository {
     appointment: MyChecklistAppointmentModel,
   ): boolean;
   applyItemCategoryUpdate(itemId: number, categoryId: number): boolean;
+  applyItemRemoval?(itemId: number): boolean;
   applyItemTitleUpdate(itemId: number, title: string): boolean;
   getChecklist(signal?: AbortSignal): Promise<MyChecklistModel>;
   getRevision(): number;
@@ -385,6 +386,19 @@ export function createMyChecklistQueryRepository(
     },
     applyItemCategoryUpdate(itemId, categoryId) {
       return applyItemUpdate(itemId, (item) => ({ ...item, categoryId }));
+    },
+    applyItemRemoval(itemId) {
+      if (!cachedResult) {
+        return false;
+      }
+
+      const nextItems = cachedResult.items.filter((item) => item.id !== itemId);
+      if (nextItems.length === cachedResult.items.length) {
+        return false;
+      }
+
+      setCachedResult({ ...cachedResult, items: nextItems });
+      return true;
     },
     applyItemTitleUpdate(itemId, title) {
       return applyItemUpdate(itemId, (item) => ({ ...item, title }));

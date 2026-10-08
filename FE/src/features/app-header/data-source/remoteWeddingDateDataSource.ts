@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import { isValidWeddingDate } from "../model/weddingDate";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
@@ -104,7 +105,7 @@ async function requestWeddingDate(
   try {
     let response: Response;
     try {
-      response = await fetch(WEDDING_DATE_ENDPOINT, {
+      response = await authenticatedFetch(WEDDING_DATE_ENDPOINT, {
         credentials: "include",
         method,
         ...(method === "PUT"

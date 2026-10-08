@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -206,7 +208,7 @@ export async function createRemoteAppointment(
   try {
     let response: Response;
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${apiBaseUrl}/api/checklist-items/${checklistItemId}/appointments`,
         {
           body: JSON.stringify({
