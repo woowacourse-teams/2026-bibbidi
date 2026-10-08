@@ -108,15 +108,10 @@ jobs:
         with:
           node-version: 24.19.0
 
-      - name: Alloy 설정이 읽는 환경변수가 compose에 선언되어 있는지 확인
-        run: >
-          node --experimental-strip-types .github/be-cd-jobs/alloy-environment-cli.ts
-          Infra/monitoring/alloy/config.alloy BE/compose.prod.yml
-
       - name: Alloy 설정 문법과 참조 검증
         run: >
           docker run --rm
-          -v "$PWD/Infra/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro"
+          -v "$PWD/Infra/monitoring/grafana/alloy/config.alloy:/etc/alloy/config.alloy:ro"
           grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
 
       - name: Compose와 nginx·Alloy·환경 파일 설치
@@ -133,7 +128,7 @@ jobs:
           install -d -m 0755 /opt/bibbidi/app/infra/nginx
           install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
           install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
-          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/monitoring/grafana/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
           umask 077
           printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
@@ -150,7 +145,14 @@ jobs:
           . /opt/bibbidi/app/.env.nginx
           set +a
           test -n "$ONLY_DEVELOPER_ALLOWED_IP"
-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${ONLY_DEVELOPER_ALLOWED_IP}' \
+          if [ '${{ inputs.deployment-name }}' = production ]; then
+            export NGINX_API_RATE_LIMIT='limit_req zone=per_ip_api burst=60 nodelay;'
+            export NGINX_API_CONN_LIMIT='limit_conn per_ip_conn 40;'
+          else
+            export NGINX_API_RATE_LIMIT=''
+            export NGINX_API_CONN_LIMIT=''
+          fi
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${ONLY_DEVELOPER_ALLOWED_IP} ${NGINX_API_RATE_LIMIT} ${NGINX_API_CONN_LIMIT}' \
             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
             > /opt/bibbidi/app/infra/nginx/nginx.conf
           test -s /opt/bibbidi/app/infra/nginx/nginx.conf
@@ -176,15 +178,7 @@ jobs:
           set +a
 
           PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
-
-          rollback() {
-            if [ -z "$PREVIOUS_IMAGE" ]; then
-              echo "::error::deploy failed and no previous image is available to roll back to"
-              return
-            fi
-            echo "::error::deploy failed - rolling back backend to $PREVIOUS_IMAGE"
-            IMAGE_TAG="${PREVIOUS_IMAGE##*:}" docker compose up -d --force-recreate backend || true
-          }
+          export PREVIOUS_IMAGE
 
           docker compose config >/dev/null
           docker compose pull backend nginx alloy dockerproxy
@@ -192,45 +186,7 @@ jobs:
           docker exec nginx nginx -t
           docker exec nginx nginx -s reload
 
-          ALLOY_HEALTH=unknown
-          ALLOY_FAILED=false
-          for _ in $(seq 1 60); do
-            ALLOY_HEALTH=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' alloy 2>/dev/null || true)
-            if [ "$ALLOY_HEALTH" = "healthy" ]; then
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ALLOY_HEALTH" != "healthy" ]; then
-            echo "::error::Alloy did not become healthy within 60 seconds (status: ${ALLOY_HEALTH:-unknown})"
-            docker compose logs --tail=100 alloy || true
-            ALLOY_FAILED=true
-          fi
-
-          if ! curl \
-            --fail \
-            --silent \
-            --show-error \
-            --retry 60 \
-            --retry-delay 2 \
-            --retry-connrefused \
-            --retry-all-errors \
-            http://127.0.0.1:8080/actuator/health \
-            | grep --quiet '"status":"UP"'; then
-            docker compose logs --tail=200 backend nginx alloy
-            rollback
-            exit 1
-          fi
-
-          if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
-            docker compose logs --tail=200 nginx alloy
-            rollback
-            exit 1
-          fi
-
-          if [ "$ALLOY_FAILED" = "true" ]; then
-            exit 1
-          fi
+          node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/deploy-health.ts"
 
       - name: Let's Encrypt TLS 인증서 발급 또는 갱신
         id: tls_issue

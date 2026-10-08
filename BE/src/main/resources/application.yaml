@@ -1,6 +1,8 @@
 spring:
   application:
     name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   jpa:
     open-in-view: false
@@ -9,6 +11,9 @@ spring:
   sql:
     init:
       mode: never
+
+server:
+  shutdown: graceful
 
 discord:
   url:
@@ -106,6 +111,8 @@ auth:
       - /docs/**
 
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
