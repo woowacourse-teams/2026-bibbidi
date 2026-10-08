@@ -9,8 +9,19 @@
 .preparation-catalog-page > main {
   display: flex;
   flex: 1;
+  min-height: 0;
 }
 
 .preparation-catalog-page > main > * {
   flex: 1;
+}
+
+.service-layout__content:has(> .preparation-catalog-page) {
+  overflow: hidden;
+}
+
+.service-layout .service-layout__content > .preparation-catalog-page {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }

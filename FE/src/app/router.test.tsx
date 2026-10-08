@@ -311,7 +311,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -362,7 +362,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -379,7 +379,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -395,7 +395,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -458,7 +458,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 · 전체 단계",
       }),
     ).toBeTruthy();
     expect(screen.getByRole("main", { name: "준비 목록" })).toBeTruthy();
@@ -509,7 +509,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 · 전체 단계",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/preparation");
@@ -534,7 +534,7 @@ describe("appRoutes", () => {
 
       expect(
         await screen.findByRole("heading", {
-          name: "로드맵에서 필요한 일만, 내 체크리스트에",
+          name: "첫 번째 카테고리 · 전체 단계",
         }),
       ).toBeTruthy();
       expect(router.state.location.pathname).toBe("/");

@@ -190,13 +190,6 @@ describe("createPreparationRoadmapViewModel", () => {
       title: "step-1 제목",
     });
     expect(viewModel.selectedStepDetail).toEqual({
-      allTasks: [
-        {
-          id: "step-1-task",
-          isEssential: false,
-          title: "step-1 할 일",
-        },
-      ],
       checklistTasks: [],
       description: "step-1 상세 설명",
       detailTasks: [
@@ -206,10 +199,7 @@ describe("createPreparationRoadmapViewModel", () => {
           title: "step-1 할 일",
         },
       ],
-      numberLabel: "01",
-      title: "step-1 제목",
     });
-    expect(viewModel.title).toBe("준비 로드맵");
   });
 
   it("체크리스트 포함 여부와 필수 여부를 단계 상세 표시 데이터로 변환한다", () => {
@@ -243,7 +233,10 @@ describe("createPreparationRoadmapViewModel", () => {
       },
     ]);
     expect(
-      viewModel.selectedStepDetail.allTasks.map((task) => task.id),
+      [
+        ...viewModel.selectedStepDetail.checklistTasks,
+        ...viewModel.selectedStepDetail.detailTasks,
+      ].map((task) => task.id),
     ).toEqual(["included-essential-task", "detail-task"]);
     expect(viewModel.selectedStepDetail.detailTasks).toEqual([
       {
