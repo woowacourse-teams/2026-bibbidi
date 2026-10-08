@@ -189,7 +189,8 @@ public class ChecklistService {
                 categoryId,
                 title,
                 null,
-                ChecklistItemStatus.PREV
+                ChecklistItemStatus.PREV,
+                null
         );
         ChecklistItem saved = checklistRepository.saveItem(checklist, checklistItem);
 
@@ -315,7 +316,8 @@ public class ChecklistService {
                         catalogItem.categoryId(),
                         catalogItem.title(),
                         catalogItem.id(),
-                        ChecklistItemStatus.PREV
+                        ChecklistItemStatus.PREV,
+                        null
                 ))
                 .toList();
     }

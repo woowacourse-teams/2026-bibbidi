@@ -1,0 +1,54 @@
+auth_enabled: false # 조직 구분 OFF
+
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3100           # 로그 수신·조회·/ready·/metrics 창구
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9096           # 내부 통신
+  log_level: warn                  
+
+common:
+  instance_addr: 127.0.0.1         
+  path_prefix: /var/lib/loki       
+  storage:
+    filesystem:
+      chunks_directory: /var/lib/loki/chunks   # 로그 본문 묶음(청크) 저장 위치
+      rules_directory: /var/lib/loki/rules     # 사용 X
+  replication_factor: 1            
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-10-01             
+      store: tsdb                  
+      object_store: filesystem     
+      schema: v13                  # 구조화 메타데이터·OTLP 수신에 필요
+      index:
+        prefix: index_
+        period: 24h                
+
+query_range:
+  cache_results: true
+  results_cache: # 조회 결과 메모리 캐싱 -> 기본 전략 : 
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+
+limits_config:
+  retention_period: 336h           # 보존 14일
+
+compactor:
+  working_directory: /var/lib/loki/compactor
+  compaction_interval: 10m         # 10분마다 작은 색인 파일을 합침
+  retention_enabled: true          # 없으면 보존 기간이 지나도 삭제 안 됨
+  retention_delete_delay: 2h       # 삭제 표시 후 2시간 뒤 실제 삭제
+  delete_request_store: filesystem # 삭제 요청 기록 위치 (보존 기능을 켜면 필수)
+
+pattern_ingester:
+  enabled: false # 패턴 자동 추출 OFF
+
+analytics:
+  reporting_enabled: false         # Grafana labs 로 사용 데이터 전송 OFF

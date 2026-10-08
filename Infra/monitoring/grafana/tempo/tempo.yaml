@@ -1,0 +1,49 @@
+stream_over_http_enabled: true
+
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3200
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9095
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: "127.0.0.1:4318"
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo                
+  storage:
+    path: /var/tempo/generator/wal # 전송 전 임시 기록(복구용)
+    remote_write:
+      - url: http://127.0.0.1:9090/api/v1/write   # Prometheus 주소
+        send_exemplars: true       # 그래프의 점에서 해당 트레이스로 이동 가능
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  defaults:
+    compaction:
+      block_retention: 120h # 5일
+    metrics_generator:
+      processors: ["span-metrics", "service-graphs"]
+      generate_native_histograms: classic
+      processor:
+        span_metrics:
+          dimensions: ["deployment.environment.name"]
+        service_graphs:
+          dimensions: ["deployment.environment.name"]
+
+usage_report:
+  reporting_enabled: false

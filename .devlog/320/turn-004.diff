@@ -1,0 +1,12 @@
+diff --git a/Infra/nginx/nginx.conf.template b/Infra/nginx/nginx.conf.template
+index 2ca28dc0e7e1be84657fb70cb3d8f2d271a9dd74..c5e86a6078856c7e4a363beabef5d21b1cc8d245 100644
+--- a/Infra/nginx/nginx.conf.template
++++ b/Infra/nginx/nginx.conf.template
+@@ -11,7 +11,6 @@ http {
+     include /etc/nginx/mime.types;
+     default_type application/octet-stream;
+ 
+-    # limit 제한은 차후 사용 패턴에 따라 변경되어야 합니다.
+     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
+     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
+     limit_req_status 429;

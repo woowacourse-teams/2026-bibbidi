@@ -1,0 +1,267 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+index 7a323d3b6d047e7256a71614b96861a5fab8c56a..e93a7f1a1381300787b8770b9bf087ff08a34119 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+@@ -7,7 +7,6 @@ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+ import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
+-import com.bibbidi.wedding.common.domain.UserStatus;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+@@ -22,9 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
+  *
+  * <p>기존 회원을 남기고 소셜 로그인으로 새로 생긴 회원을 지운다. 기존 회원이 쓰던 체크리스트를 그대로 쓰게 하기 위해서다.
+  * 옮긴 뒤에는 기존 회원의 비밀번호를 지워서 같은 닉네임과 비밀번호로 다시 옮길 수 없게 한다.
+- *
+- * <p>약관에 동의하기 전인 회원만 옮길 수 있다. 가입을 마친 회원은 그동안 만든 데이터가 있을 수 있는데,
+- * 옮기면 그 회원을 지우면서 데이터도 함께 지워지기 때문이다.
+  */
+ @Service
+ @Transactional
+@@ -56,13 +52,6 @@ public class LegacyAccountTransferService {
+             String password,
+             ClientType clientType
+     ) {
+-        UserResult currentUser = userService.findCurrentUserInfo(currentUserId);
+-        if (currentUser.status() == UserStatus.ACTIVE) {
+-            throw new BusinessException(
+-                    ClientError.INVALID_REQUEST,
+-                    "가입을 마친 회원은 기존 회원을 옮겨 올 수 없습니다. userId=" + currentUserId
+-            );
+-        }
+         SocialIdentity socialIdentity = socialIdentityRepository.findByUserId(currentUserId)
+                 .orElseThrow(() -> new BusinessException(
+                         ClientError.INVALID_REQUEST,
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
+index 383957238a86b5de10d6427de8eabc4749e52318..3395eb85f1be72291d8a4509523f0626ec0749c4 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
+@@ -20,6 +20,8 @@ import com.bibbidi.wedding.auth.service.SocialUserRegistrationService;
+ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+ import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
+ import com.bibbidi.wedding.support.BibbidiIntegrationTest;
++import com.bibbidi.wedding.user.service.UserResult;
++import com.bibbidi.wedding.user.service.UserService;
+ import com.epages.restdocs.apispec.ResourceSnippetParameters;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+@@ -47,25 +49,35 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     @Autowired
+     private SessionIssueService sessionIssueService;
+ 
+-    private UserAuthInfo pendingUser;
++    @Autowired
++    private UserService userService;
++
++    private UserAuthInfo socialUser;
+ 
+     @BeforeEach
+     void setUp() {
+-        pendingUser = socialUserRegistrationService.findOrCreate(new VerifiedOidcUser(
++        UserAuthInfo created = socialUserRegistrationService.findOrCreate(new VerifiedOidcUser(
+                 SocialProvider.KAKAO,
+                 "social-user-1",
+                 "새회원",
+                 "new@bibbidi.kr"));
++        UserResult active = userService.activate(created.userId());
++        socialUser = new UserAuthInfo(
++                active.id(),
++                active.status(),
++                active.role(),
++                active.nickname(),
++                active.email());
+     }
+ 
+     @Test
+     @DisplayName("웹은 기존 회원의 access token을 본문으로 받고 refresh token은 쿠키로 받는다")
+     void shouldGiveLegacyUserSessionOnWeb() throws Exception {
+-        IssuedSession pendingSession = sessionIssueService.issueForNewFamily(pendingUser, ClientType.WEB);
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.WEB);
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(LEGACY_NICKNAME, LEGACY_PASSWORD);
+ 
+         MvcResult result = mockMvc.perform(post("/api/auth/web/legacy-account-transfer")
+-                        .header(AUTHORIZATION, "Bearer " + pendingSession.accessToken())
++                        .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+                 .andExpect(status().isCreated())
+@@ -80,7 +92,7 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+                                 .description("비밀번호로 가입했던 회원의 닉네임과 비밀번호를 확인하고, "
+                                         + "지금 로그인한 소셜 계정을 그 회원에게 잇습니다. "
+                                         + "소셜 로그인으로 새로 생긴 회원은 지우고 기존 회원의 세션을 새로 발급합니다. "
+-                                        + "약관에 동의하기 전인 회원만 부를 수 있습니다. refresh token은 쿠키로 내려갑니다.")
++                                        + "refresh token은 쿠키로 내려갑니다.")
+                                 .requestSchema(schema("LegacyAccountTransferRequest"))
+                                 .responseSchema(schema("BibbidiSessionResponse"))
+                                 .requestHeaders(headerWithName(AUTHORIZATION)
+@@ -108,11 +120,11 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     @Test
+     @DisplayName("네이티브는 기존 회원의 두 token을 모두 본문으로 받는다")
+     void shouldGiveLegacyUserTokensOnNative() throws Exception {
+-        IssuedSession pendingSession = sessionIssueService.issueForNewFamily(pendingUser, ClientType.NATIVE);
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.NATIVE);
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(LEGACY_NICKNAME, LEGACY_PASSWORD);
+ 
+         MvcResult result = mockMvc.perform(post("/api/auth/native/legacy-account-transfer")
+-                        .header(AUTHORIZATION, "Bearer " + pendingSession.accessToken())
++                        .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+                 .andExpect(status().isCreated())
+@@ -151,11 +163,11 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     @Test
+     @DisplayName("기존 회원의 비밀번호가 틀리면 인증 실패로 응답한다")
+     void shouldRejectWrongPassword() throws Exception {
+-        IssuedSession pendingSession = sessionIssueService.issueForNewFamily(pendingUser, ClientType.WEB);
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.WEB);
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(LEGACY_NICKNAME, "wrong-password");
+ 
+         mockMvc.perform(post("/api/auth/web/legacy-account-transfer")
+-                        .header(AUTHORIZATION, "Bearer " + pendingSession.accessToken())
++                        .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+                 .andExpect(status().isUnauthorized())
+@@ -165,11 +177,11 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     @Test
+     @DisplayName("닉네임이 비어 있으면 요청을 거절한다")
+     void shouldRejectBlankNickname() throws Exception {
+-        IssuedSession pendingSession = sessionIssueService.issueForNewFamily(pendingUser, ClientType.WEB);
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.WEB);
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(" ", LEGACY_PASSWORD);
+ 
+         mockMvc.perform(post("/api/auth/web/legacy-account-transfer")
+-                        .header(AUTHORIZATION, "Bearer " + pendingSession.accessToken())
++                        .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+                 .andExpect(status().isBadRequest())
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+index ca4faa3f2d87be7e87619b3b77c41f2d2e9a0fec..319d4c0081f6d904d54bb363e92c879ced99c38a 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+@@ -12,6 +12,7 @@ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
++import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+ import org.junit.jupiter.api.BeforeEach;
+@@ -54,12 +55,12 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Autowired
+     private BibbidiTokenParser bibbidiTokenParser;
+ 
+-    private UserAuthInfo pendingUser;
++    private UserAuthInfo socialUser;
+     private Long legacyUserId;
+ 
+     @BeforeEach
+     void setUp() {
+-        pendingUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
++        socialUser = signUp(KAKAO_USER);
+         PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();
+         legacyUserId = legacyAccount.userId();
+     }
+@@ -67,7 +68,7 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Test
+     @DisplayName("옮긴 뒤 같은 소셜 계정으로 로그인하면 기존 회원으로 로그인된다")
+     void shouldLoginAsLegacyUserAfterTransfer() {
+-        legacyAccountTransferService.transfer(pendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
+ 
+         UserAuthInfo loggedIn = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+ 
+@@ -78,7 +79,7 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @DisplayName("옮기면 기존 회원의 세션을 새로 발급한다")
+     void shouldIssueLegacyUserSession() {
+         IssuedSession session = legacyAccountTransferService.transfer(
+-                pendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
++                socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
+ 
+         BibbidiTokenClaims claims = bibbidiTokenParser.parseAccessToken(session.accessToken());
+ 
+@@ -88,16 +89,16 @@ class LegacyAccountTransferServiceIntegrationTest {
+ 
+     @Test
+     @DisplayName("옮기면 소셜 로그인으로 새로 생긴 회원과 그 세션을 지운다")
+-    void shouldDeletePendingUserAndItsSessions() {
+-        IssuedSession pendingSession = sessionIssueService.issueForNewFamily(pendingUser, ClientType.WEB);
++    void shouldDeleteSocialUserAndItsSessions() {
++        IssuedSession socialSession = sessionIssueService.issueForNewFamily(socialUser, ClientType.WEB);
+ 
+-        legacyAccountTransferService.transfer(pendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
+ 
+-        assertThatThrownBy(() -> userService.findCurrentUserInfo(pendingUser.userId()))
++        assertThatThrownBy(() -> userService.findCurrentUserInfo(socialUser.userId()))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.USER_NOT_FOUND);
+-        assertThatThrownBy(() -> sessionRefreshService.refresh(pendingSession.refreshToken(), ClientType.WEB))
++        assertThatThrownBy(() -> sessionRefreshService.refresh(socialSession.refreshToken(), ClientType.WEB))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.REFRESH_SESSION_INVALID);
+@@ -106,11 +107,11 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Test
+     @DisplayName("한 번 옮긴 기존 회원은 같은 닉네임과 비밀번호로 다시 옮길 수 없다")
+     void shouldRejectSecondTransferOfSameLegacyUser() {
+-        legacyAccountTransferService.transfer(pendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
+-        UserAuthInfo otherPendingUser = socialUserRegistrationService.findOrCreate(GOOGLE_USER);
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB);
++        UserAuthInfo otherSocialUser = signUp(GOOGLE_USER);
+ 
+         assertThatThrownBy(() -> legacyAccountTransferService.transfer(
+-                otherPendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB))
++                otherSocialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+@@ -120,13 +121,13 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @DisplayName("비밀번호가 틀리면 아무것도 옮기지 않는다")
+     void shouldKeepEverythingWhenPasswordIsWrong() {
+         assertThatThrownBy(() -> legacyAccountTransferService.transfer(
+-                pendingUser.userId(), LEGACY_NICKNAME, "wrong-password", ClientType.WEB))
++                socialUser.userId(), LEGACY_NICKNAME, "wrong-password", ClientType.WEB))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+ 
+         UserAuthInfo loggedIn = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+-        assertThat(loggedIn.userId()).isEqualTo(pendingUser.userId());
++        assertThat(loggedIn.userId()).isEqualTo(socialUser.userId());
+         assertThat(userService.findPasswordLoginInfo(LEGACY_NICKNAME)).isPresent();
+     }
+ 
+@@ -134,22 +135,16 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @DisplayName("비밀번호로 가입한 회원 중에 닉네임이 없으면 인증에 실패한다")
+     void shouldRejectUnknownNickname() {
+         assertThatThrownBy(() -> legacyAccountTransferService.transfer(
+-                pendingUser.userId(), "없는회원", LEGACY_PASSWORD, ClientType.WEB))
++                socialUser.userId(), "없는회원", LEGACY_PASSWORD, ClientType.WEB))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.AUTHENTICATION_FAILED);
+     }
+ 
+-    @Test
+-    @DisplayName("약관 동의까지 마친 회원은 기존 회원을 옮겨 올 수 없다")
+-    void shouldRejectTransferToActiveUser() {
+-        userService.activate(pendingUser.userId());
+-
+-        assertThatThrownBy(() -> legacyAccountTransferService.transfer(
+-                pendingUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD, ClientType.WEB))
+-                .isInstanceOf(BusinessException.class)
+-                .extracting(exception -> ((BusinessException) exception).clientError())
+-                .isEqualTo(ClientError.INVALID_REQUEST);
+-        assertThat(userService.findPasswordLoginInfo(LEGACY_NICKNAME)).isPresent();
++    /** 소셜 로그인으로 회원이 생기고 약관 동의까지 마친 상태를 만든다. */
++    private UserAuthInfo signUp(VerifiedOidcUser socialAccount) {
++        UserAuthInfo created = socialUserRegistrationService.findOrCreate(socialAccount);
++        UserResult active = userService.activate(created.userId());
++        return new UserAuthInfo(active.id(), active.status(), active.role(), active.nickname(), active.email());
+     }
+ }

@@ -1,0 +1,20 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+index f2ed298da4ddd496af5dd3a1af34a09e13f70060..5e39544fb9e18ecf0ab4026cce9a16c7cfd8dd08 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/service/UserService.java
+@@ -47,9 +47,12 @@ public class UserService {
+ 
+     @Transactional
+     public void copyTermsAgreement(Long fromUserId, Long toUserId) {
+-        User agreedUser = userRepository.findById(fromUserId);
+-        User user = userRepository.findById(toUserId);
+-        userRepository.update(user.agreeToTerms(agreedUser.termsVersion(), agreedUser.termsAgreedAt()));
++        User fromUser = userRepository.findById(fromUserId);
++        String termsVersion = fromUser.termsVersion();
++        LocalDateTime termsAgreedAt = fromUser.termsAgreedAt();
++        User toUser = userRepository.findById(toUserId);
++        User agreedUser = toUser.agreeToTerms(termsVersion, termsAgreedAt);
++        userRepository.update(agreedUser);
+     }
+ 
+     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
