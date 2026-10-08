@@ -1,0 +1,131 @@
+diff --git a/packages/development-logger/src/hook.ts b/packages/development-logger/src/hook.ts
+index adbc4c53d5b8ab74016ae6146a714dbd0e6a7b93..1d00a20e78d78be9efa3c104c895501b182a6ec9 100644
+--- a/packages/development-logger/src/hook.ts
++++ b/packages/development-logger/src/hook.ts
+@@ -299,7 +299,13 @@ function onPreToolUse(root: string, config: LoggerConfig, payload: HookPayload,
+       }
+       const typeLabel = expectedTypeLabel(gitMetadata(root).branch, config);
+       issueTypeLabel(issueData, config, typeLabel);
+-      const prepared = preparePullRequest({ root, config, state });
++      const baseBranch = argumentValues(commandFromToolInput(toolInput), 'base', 'B')[0];
++      const prepared = preparePullRequest({
++        root,
++        config: baseBranch ? { ...config, defaultBaseBranch: baseBranch } : config,
++        state,
++        issueData,
++      });
+       const dirty = gitMetadata(root).status;
+       if (dirty) return denyWith(`커밋하지 않은 변경이 있어 PR을 만들 수 없습니다:\n${dirty}`);
+       return allow(updatePullRequestInput(toolInput, prepared.bodyPath, typeLabel, config));
+diff --git a/packages/development-logger/src/lifecycle.ts b/packages/development-logger/src/lifecycle.ts
+index af9fb3913c3d3751ffd50a080b419aba1e49bccb..d0b0e6e27b20dbea5c2136e87dffecb83c9c92a9 100644
+--- a/packages/development-logger/src/lifecycle.ts
++++ b/packages/development-logger/src/lifecycle.ts
+@@ -250,7 +250,7 @@ function handleCommit(action: string, context: Context): string {
+ }
+ 
+ function handlePullRequest(action: string, context: Context): string {
+-  const { args, root, config, state, mark } = context;
++  const { args, root, config, state, mark, services } = context;
+   const issue = state.issue as number;
+ 
+   if (action === 'plan') {
+@@ -265,7 +265,14 @@ function handlePullRequest(action: string, context: Context): string {
+     if (!hasEvent(readEvents(root, issue), 'PR_REQUESTED')) {
+       appendEvent(root, issue, { type: 'PR_REQUESTED', issue, ...mark });
+     }
+-    const prepared = preparePullRequest({ root, config, state, requireTracked: false });
++    const baseBranch = valueOf(args, '--base');
++    const prepared = preparePullRequest({
++      root,
++      config: baseBranch ? { ...config, defaultBaseBranch: baseBranch } : config,
++      state,
++      requireTracked: false,
++      issueData: services.getIssue(root, config.repository, issue),
++    });
+     saveState(root, state);
+     return prepared.bodyPath;
+   }
+diff --git a/packages/development-logger/src/pr.ts b/packages/development-logger/src/pr.ts
+index dad25285afccc786878eb2182543f7ae08eebe83..f7df4ed9a29c1be8c3df7baab4dd62435d209147 100644
+--- a/packages/development-logger/src/pr.ts
++++ b/packages/development-logger/src/pr.ts
+@@ -183,17 +183,18 @@ function assertDevlogCommitted(root: string, issue: number): void {
+   }
+ }
+ 
+-export function preparePullRequest({ root, config, state, requireTracked = true }: {
++export function preparePullRequest({ root, config, state, requireTracked = true, issueData: suppliedIssueData }: {
+   root: string;
+   config: LoggerConfig;
+   state: SessionState;
+   requireTracked?: boolean;
++  issueData?: IssueData;
+ }): PreparedPullRequest {
+   const issue = state.issue as number;
+   const events = readEvents(root, issue);
+   const { adrRequired } = assertPullRequestEvents(events);
+ 
+-  const issueData = getIssue(root, config.repository, issue);
++  const issueData = suppliedIssueData ?? getIssue(root, config.repository, issue);
+   if (adrRequired && !hasInitialAdr(issueData.body)) {
+     throw new Error('Issue 본문에 ADR(결정, 이유, 근거, 검증)이 없습니다. ADR이 필요 없다고 정했다면 `adr skip`으로 기록해 주세요.');
+   }
+diff --git a/packages/development-logger/test/hook-lifecycle.test.ts b/packages/development-logger/test/hook-lifecycle.test.ts
+index 16b670db97eef6bc2f2f9b0c191f4f6caa107528..20c6e8acb87a2ff041eab91f0a35b87134f96cfc 100644
+--- a/packages/development-logger/test/hook-lifecycle.test.ts
++++ b/packages/development-logger/test/hook-lifecycle.test.ts
+@@ -417,6 +417,53 @@ test('GitHub MCP로 PR을 만들면 gh pr create를 쓰도록 막는다', () =>
+   }
+ });
+ 
++test('APP PR은 명시한 base를 기준으로 검증하고 기본 base는 유지한다', () => {
++  const root = setupRepository();
++  const session = 'app-pr-base-session';
++  const issue = { ...issueWithoutAdr(), labels: [{ name: 'type: chore' }] };
++  const options = { agent: 'claude', cwd: root, services: { getIssue: () => issue } };
++  try {
++    const config = JSON.parse(readFileSync(join(root, '.devlogger.json'), 'utf8'));
++    config.pullRequestTemplate = 'pr-template.md';
++    config.validation = [{ key: 'be-test', paths: ['BE/'], commands: ['BE/gradlew test'] }];
++    writeFileSync(join(root, '.devlogger.json'), JSON.stringify(config));
++    writeFileSync(join(root, 'pr-template.md'), '## 관련 Issue\n');
++    run('git', ['add', '.'], { cwd: root });
++    run('git', ['commit', '-m', 'validation setup'], { cwd: root });
++    run('git', ['checkout', '-b', 'dev-app'], { cwd: root });
++    mkdirSync(join(root, 'BE'));
++    writeFileSync(join(root, 'BE', 'existing.txt'), 'already integrated\n');
++    run('git', ['add', '.'], { cwd: root });
++    run('git', ['commit', '-m', 'existing BE change'], { cwd: root });
++    run('git', ['checkout', '-b', 'chore/106'], { cwd: root });
++
++    startSession(options, session);
++    preToolUse(options, session, 'Edit', { file_path: 'tracked.txt' });
++    writeFileSync(join(root, 'tracked.txt'), 'APP work\n');
++    stop(options, session, '1');
++    runLifecycle(['commit', 'explain', '--session', session, '--text', 'APP work'], root, options.services);
++    prompt(options, session, '2', '커밋해');
++    runLifecycle(['commit', 'confirm', '--session', session], root, options.services);
++    run('git', ['add', '.'], { cwd: root });
++    run('git', ['commit', '-m', 'APP work with log'], { cwd: root });
++    runLifecycle(['pr', 'plan', '--session', session, '--summary', 'APP work'], root, options.services);
++
++    const fallback = preToolUse(options, session, 'Bash', { command: 'gh pr create' });
++    assert.equal(fallback.permissionDecision, 'deny');
++    assert.match(String(fallback.permissionDecisionReason), /be-test/);
++    for (const baseOption of ['--base dev-app', '-B dev-app']) {
++      const allowed = preToolUse(options, session, 'Bash', { command: `gh pr create ${baseOption}` });
++      assert.equal(allowed.permissionDecision, 'allow');
++    }
++    assert.throws(() => runLifecycle(['pr', 'prepare', '--session', session], root, options.services), /be-test/);
++    const bodyPath = runLifecycle(['pr', 'prepare', '--session', session, '--base', 'dev-app'], root, options.services);
++    assert.match(String(bodyPath), /pr-body-106\.md$/);
++    assert.equal(JSON.parse(readFileSync(join(root, '.devlogger.json'), 'utf8')).defaultBaseBranch, 'release-be');
++  } finally {
++    removeDirectory(root);
++  }
++});
++
+ test('Agent의 Issue 생성은 Type Label을 정확히 하나 요구한다', () => {
+   const root = setupRepository();
+   const options = { agent: 'codex', cwd: root };
