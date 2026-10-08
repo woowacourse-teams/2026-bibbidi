@@ -1,5 +1,4 @@
 packages:
-  - APP
   - FE
   - .github/ai-review
   - packages/*
@@ -12,17 +11,3 @@ allowBuilds:
   core-js: false
   esbuild: true
   unrs-resolver: true
-
-minimumReleaseAgeExclude:
-  - '@expo/cli@57.0.16'
-  - '@expo/config@57.0.8'
-  - '@expo/fingerprint@0.20.8'
-  - '@expo/inline-modules@0.1.6'
-  - '@expo/log-box@57.0.3'
-  - expo-asset@57.0.12
-  - expo-constants@57.0.12
-  - expo@57.0.14
-  - '@expo/metro-runtime@57.0.11'
-  - expo-build-properties@57.0.12
-  - expo-router@57.0.14
-  - expo-splash-screen@57.0.7

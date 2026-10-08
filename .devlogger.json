@@ -46,19 +46,19 @@
       "commands": ["pnpm --filter bibbidi-fe build", "pnpm web:build"]
     },
     {
-      "key": "app-lint",
+      "key": "app-metadata",
       "paths": ["APP/"],
-      "commands": ["pnpm --filter @bibbidi/app lint"]
+      "commands": ["APP/gradlew -p APP :shared:compileCommonMainKotlinMetadata"]
     },
     {
-      "key": "app-typecheck",
+      "key": "app-android-build",
       "paths": ["APP/"],
-      "commands": ["pnpm --filter @bibbidi/app typecheck", "pnpm app:typecheck"]
+      "commands": ["APP/gradlew -p APP :androidApp:assembleDebug"]
     },
     {
-      "key": "app-build-web",
+      "key": "app-ios-framework",
       "paths": ["APP/"],
-      "commands": ["pnpm --filter @bibbidi/app build:web"]
+      "commands": ["APP/gradlew -p APP :shared:linkDebugFrameworkIosSimulatorArm64"]
     }
   ]
 }
