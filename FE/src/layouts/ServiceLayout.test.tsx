@@ -556,8 +556,8 @@ describe("ServiceLayout", () => {
             JSON.stringify({
               id: 1,
               items: [
-                createChecklistItem(10, 101, "done"),
-                createChecklistItem(11, 102),
+                createChecklistItem(10, 1001, "done"),
+                createChecklistItem(11, 1002),
               ],
             }),
             { status: 200 },
@@ -576,7 +576,7 @@ describe("ServiceLayout", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(await screen.findByText("50%")).toBeTruthy();
@@ -876,6 +876,10 @@ describe("ServiceLayout", () => {
       name: "결혼 준비 현황",
     });
     expect(await within(headerSummary).findByText("1/1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "전체 단계" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "01 준비 단계" }),
+    );
     expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
     fireEvent.click(
       await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
