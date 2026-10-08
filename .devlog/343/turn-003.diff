@@ -1,0 +1,299 @@
+diff --git a/.github/be-cd-jobs/cli.ts b/.github/be-cd-jobs/cli.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f215e7eb6eb4c183b167ecf841bf089c046b1382
+--- /dev/null
++++ b/.github/be-cd-jobs/cli.ts
+@@ -0,0 +1,45 @@
++import { appendFile } from "node:fs/promises";
++import { pathToFileURL } from "node:url";
++import { decideImage } from "./image-decision.ts";
++import { fetchPullRequestsOfCommit, isCommitOnBranch } from "./release-source-client.ts";
++
++const requiredEnvironment = ["GITHUB_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_OUTPUT"] as const;
++
++type ReleaseEnvironment = Record<(typeof requiredEnvironment)[number], string>;
++
++export function validateEnvironment(environment: NodeJS.ProcessEnv): ReleaseEnvironment {
++  const missing = requiredEnvironment.filter((name) => !environment[name]?.trim());
++  if (missing.length > 0) throw new Error(`필수 환경변수가 없습니다: ${missing.join(", ")}`);
++
++  return environment as ReleaseEnvironment;
++}
++
++export async function main(environment: NodeJS.ProcessEnv = process.env) {
++  try {
++    const values = validateEnvironment(environment);
++    const decision = await decideImage({
++      releaseSha: values.GITHUB_SHA,
++      repository: values.GITHUB_REPOSITORY,
++      pullRequests: await fetchPullRequestsOfCommit({
++        repository: values.GITHUB_REPOSITORY,
++        sha: values.GITHUB_SHA,
++        token: values.GITHUB_TOKEN,
++      }),
++      isDevelopmentCommit: (sha) => isCommitOnBranch(sha, "dev-be"),
++    });
++
++    await appendFile(
++      values.GITHUB_OUTPUT,
++      `build-image=${decision.buildImage}\nimage-tag=${decision.imageTag}\n`,
++      "utf8",
++    );
++    console.log(`운영 이미지 태그: ${decision.imageTag} (빌드 필요: ${decision.buildImage})`);
++  } catch (error) {
++    const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
++    console.error(`::error title=운영 이미지 결정 실패::${message}`);
++    process.exitCode = 1;
++  }
++}
++
++const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
++if (entrypoint === import.meta.url) await main();
+diff --git a/.github/be-cd-jobs/image-decision.test.ts b/.github/be-cd-jobs/image-decision.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..139996d008d552fd73a69a1d12a9653eda721cc9
+--- /dev/null
++++ b/.github/be-cd-jobs/image-decision.test.ts
+@@ -0,0 +1,61 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { decideImage, type MergedPullRequest } from "./image-decision.ts";
++
++const repository = "owner/repository";
++const releaseSha = "release-sha";
++
++const promotion: MergedPullRequest = {
++  baseBranch: "release-be",
++  headBranch: "dev-be",
++  headSha: "dev-tip-sha",
++  headRepository: repository,
++  labels: [],
++};
++
++const hotfix: MergedPullRequest = {
++  baseBranch: "release-be",
++  headBranch: "hotfix/301",
++  headSha: "hotfix-sha",
++  headRepository: repository,
++  labels: ["type: hotfix"],
++};
++
++const decide = (pullRequests: MergedPullRequest[], isDevelopmentCommit = true) =>
++  decideImage({
++    releaseSha,
++    repository,
++    pullRequests,
++    isDevelopmentCommit: async () => isDevelopmentCommit,
++  });
++
++test("dev-be 승격 PR은 PR의 마지막 커밋 이미지를 재사용한다", async () => {
++  assert.deepEqual(await decide([promotion]), { buildImage: false, imageTag: "dev-tip-sha" });
++});
++
++test("승격 PR의 마지막 커밋이 dev-be에 없으면 거부한다", async () => {
++  await assert.rejects(() => decide([promotion], false), /dev-be에 없습니다/);
++});
++
++test("다른 저장소의 dev-be 브랜치는 승격으로 보지 않는다", async () => {
++  await assert.rejects(
++    () => decide([{ ...promotion, headRepository: "fork/repository" }]),
++    /승격 PR도 승인된 hotfix PR도 없는/,
++  );
++});
++
++test("승인된 hotfix PR은 release-be 커밋으로 이미지를 새로 빌드한다", async () => {
++  assert.deepEqual(await decide([hotfix]), { buildImage: true, imageTag: releaseSha });
++});
++
++test("hotfix 라벨이 없으면 거부한다", async () => {
++  await assert.rejects(() => decide([{ ...hotfix, labels: [] }]), /승격 PR도 승인된 hotfix PR도 없는/);
++});
++
++test("release-be 대상이 아닌 PR만 연결되어 있으면 거부한다", async () => {
++  await assert.rejects(() => decide([{ ...promotion, baseBranch: "main" }]), /승격 PR도 승인된 hotfix PR도 없는/);
++});
++
++test("연결된 PR이 없으면 거부한다", async () => {
++  await assert.rejects(() => decide([]), /승격 PR도 승인된 hotfix PR도 없는/);
++});
+diff --git a/.github/be-cd-jobs/image-decision.ts b/.github/be-cd-jobs/image-decision.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2ebd5a4985652e02c75ef71e9fce659b9be8827
+--- /dev/null
++++ b/.github/be-cd-jobs/image-decision.ts
+@@ -0,0 +1,50 @@
++export type MergedPullRequest = {
++  baseBranch: string;
++  headBranch: string;
++  headSha: string;
++  headRepository: string;
++  labels: string[];
++};
++
++export type ImageDecision = {
++  buildImage: boolean;
++  imageTag: string;
++};
++
++type ImageDecisionInput = {
++  releaseSha: string;
++  repository: string;
++  pullRequests: MergedPullRequest[];
++  isDevelopmentCommit: (sha: string) => Promise<boolean>;
++};
++
++const RELEASE_BRANCH = "release-be";
++const DEVELOPMENT_BRANCH = "dev-be";
++const HOTFIX_BRANCH_PREFIX = "hotfix/";
++const HOTFIX_LABEL = "type: hotfix";
++
++export async function decideImage({
++  releaseSha,
++  repository,
++  pullRequests,
++  isDevelopmentCommit,
++}: ImageDecisionInput): Promise<ImageDecision> {
++  const releasePullRequests = pullRequests.filter((pullRequest) => pullRequest.baseBranch === RELEASE_BRANCH);
++
++  const promotion = releasePullRequests.find(
++    (pullRequest) => pullRequest.headBranch === DEVELOPMENT_BRANCH && pullRequest.headRepository === repository,
++  );
++  if (promotion) {
++    if (!(await isDevelopmentCommit(promotion.headSha))) {
++      throw new Error("승격 PR의 마지막 커밋이 dev-be에 없습니다. 운영 배포를 거부합니다.");
++    }
++    return { buildImage: false, imageTag: promotion.headSha };
++  }
++
++  const hotfix = releasePullRequests.find(
++    (pullRequest) => pullRequest.headBranch.startsWith(HOTFIX_BRANCH_PREFIX) && pullRequest.labels.includes(HOTFIX_LABEL),
++  );
++  if (hotfix) return { buildImage: true, imageTag: releaseSha };
++
++  throw new Error("release-be에 dev-be 승격 PR도 승인된 hotfix PR도 없는 커밋입니다.");
++}
+diff --git a/.github/be-cd-jobs/package.json b/.github/be-cd-jobs/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e986b24bbae58b2e6d308a8186e3347e92314fe4
+--- /dev/null
++++ b/.github/be-cd-jobs/package.json
+@@ -0,0 +1,4 @@
++{
++  "private": true,
++  "type": "module"
++}
+diff --git a/.github/be-cd-jobs/release-source-client.ts b/.github/be-cd-jobs/release-source-client.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff1450e9ed24ab45d4cc71732d3c70d823cdc82f
+--- /dev/null
++++ b/.github/be-cd-jobs/release-source-client.ts
+@@ -0,0 +1,55 @@
++import { execFile } from "node:child_process";
++import { promisify } from "node:util";
++import type { MergedPullRequest } from "./image-decision.ts";
++
++const execFileAsync = promisify(execFile);
++
++type PullRequestResponse = {
++  base: { ref: string };
++  head: { ref: string; sha: string; repo: { full_name: string } | null };
++  labels: { name: string }[];
++};
++
++type PullRequestSourceRequest = {
++  repository: string;
++  sha: string;
++  token: string;
++};
++
++export async function fetchPullRequestsOfCommit({
++  repository,
++  sha,
++  token,
++}: PullRequestSourceRequest): Promise<MergedPullRequest[]> {
++  const response = await fetch(`https://api.github.com/repos/${repository}/commits/${sha}/pulls`, {
++    headers: {
++      Accept: "application/vnd.github+json",
++      Authorization: `Bearer ${token}`,
++      "X-GitHub-Api-Version": "2022-11-28",
++    },
++  });
++
++  if (!response.ok) {
++    throw new Error(`커밋에 연결된 PR 조회에 실패했습니다. (상태 코드: ${response.status})`);
++  }
++
++  const pullRequests = (await response.json()) as PullRequestResponse[];
++  return pullRequests.map((pullRequest) => ({
++    baseBranch: pullRequest.base.ref,
++    headBranch: pullRequest.head.ref,
++    headSha: pullRequest.head.sha,
++    headRepository: pullRequest.head.repo?.full_name ?? "",
++    labels: pullRequest.labels.map((label) => label.name),
++  }));
++}
++
++export async function isCommitOnBranch(sha: string, branch: string): Promise<boolean> {
++  await execFileAsync("git", ["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`]);
++
++  try {
++    await execFileAsync("git", ["merge-base", "--is-ancestor", sha, `origin/${branch}`]);
++    return true;
++  } catch {
++    return false;
++  }
++}
+diff --git a/.github/workflows/backend-prod-cd.yml b/.github/workflows/backend-prod-cd.yml
+index bcf4598b990ece152b71a3539a810ad892e248ce..fcdc7f1a6bd7e8e9aca0f5e17c65923d17c1928f 100644
+--- a/.github/workflows/backend-prod-cd.yml
++++ b/.github/workflows/backend-prod-cd.yml
+@@ -30,38 +30,19 @@ jobs:
+         with:
+           fetch-depth: 0
+ 
+-      - name: dev-be 또는 release-be hotfix 에서 배포할 이미지 결정
+-        id: resolve
+-        env:
+-          GH_TOKEN: ${{ github.token }}
+-        run: |
+-          set -euo pipefail
+-
+-          parent_count=$(git rev-list --parents -n 1 "$GITHUB_SHA" | awk '{print NF - 1}')
+-          if [ "$parent_count" -eq 2 ]; then
+-            promoted_sha=$(git rev-parse "$GITHUB_SHA^2")
+-            git fetch origin dev-be:refs/remotes/origin/dev-be
+-            if ! git merge-base --is-ancestor "$promoted_sha" origin/dev-be; then
+-              echo "::error::The second parent is not a commit from dev-be. Refusing production deployment."
+-              exit 1
+-            fi
+-            echo "build-image=false" >> "$GITHUB_OUTPUT"
+-            echo "image-tag=$promoted_sha" >> "$GITHUB_OUTPUT"
+-            exit 0
+-          fi
+-
+-          pull_request=$(gh api \
+-            -H "Accept: application/vnd.github+json" \
+-            "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+-            --jq 'map(select(.base.ref == "release-be" and (.head.ref | startswith("hotfix/")) and any(.labels[]; .name == "type: hotfix"))) | first')
++      - name: Node.js 버전을 24.19.0으로 설정
++        uses: actions/setup-node@v6
++        with:
++          node-version: 24.19.0
+ 
+-          if [ -z "$pull_request" ] || [ "$pull_request" = "null" ]; then
+-            echo "::error::release-be contains neither a dev-be merge nor an approved hotfix PR."
+-            exit 1
+-          fi
++      - name: 운영 이미지 판별 로직 테스트 실행
++        run: node --experimental-strip-types --test .github/be-cd-jobs/*.test.ts
+ 
+-          echo "build-image=true" >> "$GITHUB_OUTPUT"
+-          echo "image-tag=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
++      - name: dev-be 승격 또는 release-be hotfix 에서 배포할 이미지 결정
++        id: resolve
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++        run: node --experimental-strip-types .github/be-cd-jobs/cli.ts
+ 
+   deploy:
+     needs: resolve-image

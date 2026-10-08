@@ -1,0 +1,134 @@
+diff --git a/Infra/monitoring/README.md b/Infra/monitoring/README.md
+index c6e8b27c1217f35dea90ef1755f6a3b0f0dd66f8..b4938598bb9a25642608e5c0d4c4ca5be154e962 100644
+--- a/Infra/monitoring/README.md
++++ b/Infra/monitoring/README.md
+@@ -1,25 +1,28 @@
+ # 비비디 모니터링 운영
+ 
+-`grafana/`에는 Prometheus, Loki, Tempo, Grafana 데이터소스, Alloy 설정이 있다. `systemd/`에는 모니터링 서버의 서비스 설정이 있다. 앱 서버의 Alloy 설정은 CD가 배포하지만 이 디렉터리의 모니터링 서버 설정은 직접 설치해야 한다.
++`grafana/`에는 Prometheus, Loki, Tempo, Grafana 데이터소스, Alloy 설정이 있다. 앱 서버의 Alloy 설정은 CD가 배포하지만 이 디렉터리의 모니터링 서버 설정은 직접 설치해야 한다.
+ 
+ ## 모니터링 서버 설정 적용
+ 
+-모니터링 서버에서 설치 경로와 현재 유닛을 확인한 뒤 아래 파일을 대응하는 위치에 설치한다. 설정에는 비밀 값을 넣지 않는다.
++모니터링 서버에서 설치 경로를 확인한 뒤 아래 파일을 대응하는 위치에 설치한다. 설정에는 비밀 값을 넣지 않는다.
+ 
+ | 저장소 파일 | 서버 위치 |
+ | --- | --- |
+ | `grafana/prometheus/prometheus.yaml` | `/etc/prometheus/prometheus.yml` |
+-| `grafana/loki/loki.yaml` | Loki 서비스가 사용하는 설정 경로 |
+-| `grafana/tempo/tempo.yaml` | Tempo 서비스가 사용하는 설정 경로 |
++| `grafana/loki/loki.yaml` | `/etc/loki/config.yml` |
++| `grafana/tempo/tempo.yaml` | `/etc/tempo/config.yml` |
+ | `grafana/datasources.yaml` | Grafana provisioning 데이터소스 경로 |
+-| `systemd/prometheus.service` | `/etc/systemd/system/prometheus.service` |
+-| `systemd/loki.service.d/override.conf` | `/etc/systemd/system/loki.service.d/override.conf` |
+-| `systemd/tempo.service.d/override.conf` | `/etc/systemd/system/tempo.service.d/override.conf` |
+-| `systemd/grafana-server.service.d/override.conf` | `/etc/systemd/system/grafana-server.service.d/override.conf` |
+ 
+-설치 전 `systemctl cat prometheus loki tempo grafana-server`로 실제 서비스 이름과 실행 경로를 확인한다. 특히 Prometheus 유닛의 바이너리 경로(`/usr/local/bin/prometheus`)와 데이터 경로(`/var/lib/prometheus`)가 서버와 일치해야 한다. 적용 후 `systemctl daemon-reload`와 각 서비스 재시작을 수행하고 `systemctl status` 및 각 서비스 `/metrics`를 확인한다. Loki 설정은 조회 결과 캐시를 사용한다.
++적용 후 해당 서비스를 재시작하고 `systemctl status` 및 각 서비스 `/ready`(Grafana는 `/api/health`)를 확인한다. Loki 설정은 조회 결과 캐시를 사용한다.
+ 
+-Grafana override는 GitHub OAuth 값을 `/etc/grafana/github-oauth.env`에서 읽는다. 이 파일은 비밀이라 저장소에 두지 않으므로 서버를 새로 만들 때 직접 만든다(소유자 `root:root`, 권한 `600`). 저장소의 systemd 파일은 운영 서버에서 그대로 복사한 것이다. 서버에서 바꾸면 이 파일도 같이 갱신한다.
++## 모니터링 서버 서비스 설정
++
++systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리한다. 현재 값은 서버에서 `systemctl cat prometheus loki tempo grafana-server`로 확인한다.
++
++- Prometheus: `/etc/systemd/system/prometheus.service` (바이너리 직접 설치)
++- Loki, Tempo, Grafana: 패키지 유닛 위에 `/etc/systemd/system/<서비스>.service.d/override.conf`로 덮어쓴다. 수정은 `sudo systemctl edit <서비스>`로 한다.
++- 공통으로 `GOMEMLIMIT`(Go GC 목표, MemoryMax보다 낮게), `MemoryMax`(cgroup 하드 상한), `Restart=on-failure`, `RestartSec=5s`, `LimitNOFILE=65536`을 둔다.
++- Grafana override는 GitHub OAuth 값을 `/etc/grafana/github-oauth.env`에서 읽는다. 비밀 파일이라 서버를 새로 만들 때 직접 만든다(소유자 `root:root`, 권한 `600`).
+ 
+ ## 앱 서버 점검
+ 
+@@ -160,7 +163,7 @@ Grafana에서 CloudWatch 지표를 보려면 모니터링 EC2의 인스턴스 
+ 
+ 아래 항목은 저장소에서 자동 적용되지 않는다. 처음 구성하거나 서버를 다시 만들 때 순서대로 확인한다.
+ 
+-- [ ] 모니터링 서버에 `grafana/`, `systemd/` 설정 설치 후 `systemctl daemon-reload`와 서비스 재시작
++- [ ] 모니터링 서버에 `grafana/` 설정 설치, systemd 서비스 설정 확인 후 서비스 재시작
+ - [ ] AWS 상태 검사 1~5단계, SNS 테스트 메시지로 Discord 수신 확인
+ - [ ] Grafana CloudWatch 데이터소스(6단계)
+ - [ ] Grafana 연락처: Discord, Grafana Cloud IRM. 각 연락처의 **Test** 버튼으로 수신 확인
+diff --git a/Infra/monitoring/systemd/grafana-server.service.d/override.conf b/Infra/monitoring/systemd/grafana-server.service.d/override.conf
+deleted file mode 100644
+index 3553dc233975c50a57677f44cc158da714487a8a..0000000000000000000000000000000000000000
+--- a/Infra/monitoring/systemd/grafana-server.service.d/override.conf
++++ /dev/null
+@@ -1,18 +0,0 @@
+-[Service]
+-# 외부가 아닌 서버 내부(127.0.0.1)에서만 접속 허용. 나중에 nginx가 443으로 앞에서 받음
+-Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
+-# Grafana Labs로 사용 통계 전송 끄기
+-Environment=GF_ANALYTICS_REPORTING_ENABLED=false
+-# Grafana 본체 / 플러그인 새 버전 확인 요청 끄기 (외부 호출 줄이기)
+-Environment=GF_ANALYTICS_CHECK_FOR_UPDATES=false
+-Environment=GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+-# Go 런타임에게 "240MiB 근처면 GC를 더 열심히 해라"라고 알려주는 소프트 한도
+-Environment=GOMEMLIMIT=320MiB
+-# 커널이 강제하는 하드 한도. 넘으면 OOM kill → Restart 정책으로 재시작
+-MemoryMax=400M
+-Environment=GF_PLUGINS_DISABLE_PLUGINS=grafana-postgresql-datasource,mssql,influxdb,elasticsearch,opentsdb,stackdriver,jaeger,zipkin,grafana-pyroscope-datasource,grafana-pyroscope-app
+-Environment=GF_SERVER_ROOT_URL=https://monitoring.bibbidi.kr/
+-Environment=GF_SECURITY_COOKIE_SECURE=true
+-EnvironmentFile=/etc/grafana/github-oauth.env
+-RestartSec=5s
+-LimitNOFILE=65536
+diff --git a/Infra/monitoring/systemd/loki.service.d/override.conf b/Infra/monitoring/systemd/loki.service.d/override.conf
+deleted file mode 100644
+index 5ec4e2eb78dfe87533a73869dd16cb93379f7e3c..0000000000000000000000000000000000000000
+--- a/Infra/monitoring/systemd/loki.service.d/override.conf
++++ /dev/null
+@@ -1,6 +0,0 @@
+-[Service]
+-Environment=GOMEMLIMIT=300MiB
+-MemoryMax=384M
+-Restart=on-failure
+-RestartSec=5s
+-LimitNOFILE=65536
+diff --git a/Infra/monitoring/systemd/prometheus.service b/Infra/monitoring/systemd/prometheus.service
+deleted file mode 100644
+index dbea6a5654dff36a276b514d9a4b9224ddb9c871..0000000000000000000000000000000000000000
+--- a/Infra/monitoring/systemd/prometheus.service
++++ /dev/null
+@@ -1,28 +0,0 @@
+-[Unit]
+-Description=Prometheus
+-Wants=network-online.target
+-After=network-online.target
+-
+-[Service]
+-User=prometheus
+-Group=prometheus
+-ExecStart=/usr/local/bin/prometheus \
+-  --config.file=/etc/prometheus/prometheus.yml \
+-  --storage.tsdb.path=/var/lib/prometheus \
+-  --storage.tsdb.retention.time=30d \
+-  --storage.tsdb.retention.size=8GB \
+-  --web.listen-address=127.0.0.1:9090 \
+-  --web.enable-remote-write-receiver \
+-  --enable-feature=exemplar-storage
+-ExecReload=/bin/kill -HUP $MAINPID
+-Environment=GOMEMLIMIT=320MiB
+-MemoryMax=400M
+-Restart=on-failure
+-RestartSec=5s
+-LimitNOFILE=65536
+-NoNewPrivileges=true
+-ProtectSystem=full
+-ProtectHome=true
+-
+-[Install]
+-WantedBy=multi-user.target
+diff --git a/Infra/monitoring/systemd/tempo.service.d/override.conf b/Infra/monitoring/systemd/tempo.service.d/override.conf
+deleted file mode 100644
+index 5ec4e2eb78dfe87533a73869dd16cb93379f7e3c..0000000000000000000000000000000000000000
+--- a/Infra/monitoring/systemd/tempo.service.d/override.conf
++++ /dev/null
+@@ -1,6 +0,0 @@
+-[Service]
+-Environment=GOMEMLIMIT=300MiB
+-MemoryMax=384M
+-Restart=on-failure
+-RestartSec=5s
+-LimitNOFILE=65536

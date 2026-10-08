@@ -1,0 +1,146 @@
+logging {
+  level  = "info"
+  format = "json"
+}
+
+prometheus.scrape "bibbidi_backend" {
+  targets = [{
+    __address__                 = "backend:8081",
+    deployment_environment_name = sys.env("DEPLOYMENT_ENVIRONMENT_NAME"),
+  }]
+
+  scrape_interval = "15s"
+  metrics_path    = "/actuator/prometheus"
+  sample_limit    = 5000
+  forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url          = "https://monitoring.bibbidi.kr/prometheus/api/v1/write"
+    bearer_token = sys.env("MONITORING_INGEST_TOKEN")
+
+    queue_config {
+      capacity             = 10000
+      max_shards           = 2
+      max_samples_per_send = 500
+      batch_send_deadline  = "5s"
+    }
+  }
+}
+
+discovery.docker "containers" {
+  host = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
+}
+
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.*)"
+    target_label  = "service_name"
+  }
+
+  rule {
+    target_label = "deployment_environment_name"
+    replacement  = sys.env("DEPLOYMENT_ENVIRONMENT_NAME")
+  }
+
+  rule {
+    target_label = "service_instance_id"
+    replacement  = sys.env("SERVICE_INSTANCE_ID")
+  }
+}
+
+loki.source.docker "containers" {
+  host          = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.docker_logs.rules
+  forward_to    = [loki.process.normalize.receiver]
+}
+
+loki.process "normalize" {
+  stage.match {
+    selector = "{service_name=\"dockerproxy\"}"
+    action   = "drop"
+  }
+
+  stage.json {
+    expressions = {
+      level      = "log.level || \"log.level\" || level || severity_text",
+      scope_name = "log.logger || \"log.logger\"",
+      trace_id   = "traceId || \"trace.id\" || trace.id",
+      span_id    = "spanId || \"span.id\" || span.id",
+    }
+  }
+
+  stage.drop {
+    source     = "level"
+    expression = "(?i)^(trace|debug)$"
+  }
+
+  stage.structured_metadata {
+    values = {
+      severity_text = "level",
+      scope_name    = "scope_name",
+      trace_id      = "trace_id",
+      span_id       = "span_id",
+    }
+  }
+
+  stage.replace {
+    expression = "(?i)(?:access[_ -]?token|refresh[_ -]?token|authorization|cookie|password|passwd)=([^ &\",]+)"
+    replace    = "[REDACTED]"
+  }
+
+  stage.replace {
+    expression = "(?i)\"(?:access[_ -]?token|refresh[_ -]?token|authorization|cookie|password|passwd)\"[[:space:]]*:[[:space:]]*\"([^\"]*)\""
+    replace    = "[REDACTED]"
+  }
+
+  stage.replace {
+    expression = "(?i)(?:bearer|basic)[[:space:]]+([A-Za-z0-9._~+/=-]{8,})"
+    replace    = "[REDACTED]"
+  }
+
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url          = "https://monitoring.bibbidi.kr/loki/api/v1/push"
+    bearer_token = sys.env("MONITORING_INGEST_TOKEN")
+  }
+}
+
+otelcol.receiver.otlp "application" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.traces.input]
+  }
+}
+
+otelcol.processor.batch "traces" {
+  timeout             = "5s"
+  send_batch_size     = 512
+  send_batch_max_size = 2048
+
+  output {
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+otelcol.auth.bearer "monitoring" {
+  token = sys.env("MONITORING_INGEST_TOKEN")
+}
+
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "https://monitoring.bibbidi.kr/tempo"
+    auth     = otelcol.auth.bearer.monitoring.handler
+  }
+}

@@ -1,0 +1,504 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferController.java b/BE/src/main/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferController.java
+index db9966dc625a68154a6b6f1062dd1cdfdadacc90..5868485bc6ea55d256dde76ce312721d687d3c8a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferController.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferController.java
+@@ -28,7 +28,7 @@ public class LegacyAccountTransferController {
+         this.authCookieFactory = authCookieFactory;
+     }
+ 
+-    @PostMapping("/api/auth/web/legacy-account-transfer")
++    @PostMapping("/api/users/me/legacy-account-transfer")
+     @ResponseStatus(HttpStatus.CREATED)
+     public BibbidiSessionResponse transfer(
+             @AuthenticationPrincipal(expression = "userId") Long currentUserId,
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialIdentity.java b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialIdentity.java
+index 635d0e09c68472451fdd10ea975d52256f31d43e..8c7e3e5dbbebeb4f02d9d03c0f1ed7e65a4d05f6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialIdentity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/domain/SocialIdentity.java
+@@ -13,8 +13,4 @@ public record SocialIdentity(
+     public static SocialIdentity link(Long userId, SocialProvider provider, String providerUserId) {
+         return new SocialIdentity(null, userId, provider, providerUserId);
+     }
+-
+-    public SocialIdentity moveTo(Long userId) {
+-        return new SocialIdentity(id, userId, provider, providerUserId);
+-    }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java b/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java
+deleted file mode 100644
+index 5ff654689660fc5d000dfc00aa2e0c0b4efac3c2..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/password/Argon2PasswordHasher.java
++++ /dev/null
+@@ -1,31 +0,0 @@
+-package com.bibbidi.wedding.auth.password;
+-
+-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+-import org.springframework.security.crypto.password.PasswordEncoder;
+-import org.springframework.stereotype.Component;
+-
+-@Component
+-public class Argon2PasswordHasher {
+-
+-    private static final int SALT_LENGTH = 16;
+-    private static final int HASH_LENGTH = 32;
+-    private static final int PARALLELISM = 1;
+-    private static final int MEMORY_KIB = 19 * 1024;
+-    private static final int ITERATIONS = 2;
+-
+-    private final PasswordEncoder passwordEncoder;
+-
+-    public Argon2PasswordHasher() {
+-        passwordEncoder = new Argon2PasswordEncoder(
+-                SALT_LENGTH,
+-                HASH_LENGTH,
+-                PARALLELISM,
+-                MEMORY_KIB,
+-                ITERATIONS
+-        );
+-    }
+-
+-    public boolean matches(String rawPassword, String passwordHash) {
+-        return passwordEncoder.matches(rawPassword, passwordHash);
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java
+index 9fd1d71f5843d575758e13930b6874bfc538fe11..9ab2cdd537ce84cbaab3984a3f5f4f94640e84de 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/persistence/JpaSocialIdentityRepository.java
+@@ -12,7 +12,9 @@ public interface JpaSocialIdentityRepository extends JpaRepository<JpaSocialIden
+     Optional<JpaSocialIdentityEntity> findByProviderAndProviderUserId(
+             SocialProvider provider, String providerUserId);
+ 
+-    Optional<JpaSocialIdentityEntity> findByUserId(Long userId);
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("UPDATE JpaSocialIdentityEntity identity SET identity.userId = :newUserId WHERE identity.userId = :userId")
++    int changeUserId(@Param("userId") Long userId, @Param("newUserId") Long newUserId);
+ 
+     @Modifying(flushAutomatically = true, clearAutomatically = true)
+     @Query("DELETE FROM JpaSocialIdentityEntity identity WHERE identity.userId = :userId")
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/repository/SocialIdentityRepository.java b/BE/src/main/java/com/bibbidi/wedding/auth/repository/SocialIdentityRepository.java
+index 18bbebcd2f919cd5fc7bcfea94cdacdf9c48cfae..5ca997476c89c1911a85851a8151b251c1824867 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/repository/SocialIdentityRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/repository/SocialIdentityRepository.java
+@@ -44,8 +44,8 @@ public class SocialIdentityRepository {
+                 .map(authMapper::toDomain);
+     }
+ 
+-    public Optional<SocialIdentity> findByUserId(Long userId) {
+-        return jpaSocialIdentityRepository.findByUserId(userId).map(authMapper::toDomain);
++    public int changeUserId(Long userId, Long newUserId) {
++        return jpaSocialIdentityRepository.changeUserId(userId, newUserId);
+     }
+ 
+     public int deleteByUserId(Long userId) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+index a79d20e8985ee66d7538319dbf89edaefb946463..1f0d15569756a8c3c6370ccf9afbd1a0eb7026c9 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferService.java
+@@ -1,8 +1,6 @@
+ package com.bibbidi.wedding.auth.service;
+ 
+ import com.bibbidi.wedding.auth.domain.ClientType;
+-import com.bibbidi.wedding.auth.domain.SocialIdentity;
+-import com.bibbidi.wedding.auth.password.Argon2PasswordHasher;
+ import com.bibbidi.wedding.auth.repository.SocialIdentityRepository;
+ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+ import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
+@@ -11,6 +9,8 @@ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserResult;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
++import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
++import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -18,33 +18,30 @@ import org.springframework.transaction.annotation.Transactional;
+ @Transactional
+ public class LegacyAccountTransferService {
+ 
++    private final PasswordEncoder passwordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+     private final UserService userService;
+-    private final Argon2PasswordHasher passwordHasher;
+     private final SocialIdentityRepository socialIdentityRepository;
+     private final SessionIssueService sessionIssueService;
+ 
+     public LegacyAccountTransferService(
+             UserService userService,
+-            Argon2PasswordHasher passwordHasher,
+             SocialIdentityRepository socialIdentityRepository,
+             SessionIssueService sessionIssueService
+     ) {
+         this.userService = userService;
+-        this.passwordHasher = passwordHasher;
+         this.socialIdentityRepository = socialIdentityRepository;
+         this.sessionIssueService = sessionIssueService;
+     }
+ 
+     public IssuedSession transfer(Long currentUserId, String nickname, String password) {
+         PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(nickname)
+-                .filter(account -> passwordHasher.matches(password, account.passwordHash()))
++                .filter(account -> passwordEncoder.matches(password, account.passwordHash()))
+                 .orElseThrow(() -> new BusinessException(
+                         ClientError.AUTHENTICATION_FAILED,
+                         "기존 회원의 닉네임이나 비밀번호가 맞지 않습니다. userId=" + currentUserId
+                 ));
+ 
+-        SocialIdentity socialIdentity = socialIdentityRepository.findByUserId(currentUserId).orElseThrow();
+-        socialIdentityRepository.save(socialIdentity.moveTo(legacyAccount.userId()));
++        socialIdentityRepository.changeUserId(currentUserId, legacyAccount.userId());
+         userService.removePassword(legacyAccount.userId());
+         userService.delete(currentUserId);
+ 
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+index 8b9bcfbc9737d2e6c8bfbc815ba1d6fbf86f95fa..f17410e9fe32f767ad679ca8b5763c82a11de6b6 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserEntity.java
+@@ -46,7 +46,7 @@ public class JpaUserEntity extends BaseTimeEntity {
+     @Column(name = "wedding_date")
+     private LocalDate weddingDate;
+ 
+-    @Column(name = "password_hash")
++    @Column(name = "password_hash", insertable = false, updatable = false)
+     private String passwordHash;
+ 
+     protected JpaUserEntity() {
+@@ -60,8 +60,7 @@ public class JpaUserEntity extends BaseTimeEntity {
+             String email,
+             String termsVersion,
+             LocalDateTime termsAgreedAt,
+-            LocalDate weddingDate,
+-            String passwordHash
++            LocalDate weddingDate
+     ) {
+         this.id = id;
+         this.nickname = nickname;
+@@ -71,7 +70,6 @@ public class JpaUserEntity extends BaseTimeEntity {
+         this.termsVersion = termsVersion;
+         this.termsAgreedAt = termsAgreedAt;
+         this.weddingDate = weddingDate;
+-        this.passwordHash = passwordHash;
+     }
+ 
+     public JpaUserEntity(
+@@ -82,7 +80,7 @@ public class JpaUserEntity extends BaseTimeEntity {
+             String email,
+             LocalDate weddingDate
+     ) {
+-        this(id, nickname, status, role, email, null, null, weddingDate, null);
++        this(id, nickname, status, role, email, null, null, weddingDate);
+     }
+ 
+     public Long id() {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+index 171410b1adcb66e4b87abdade96c10f2044ba31e..8d4b9d4b46138fb5bf27908be23967a7e152b598 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/persistence/JpaUserRepository.java
+@@ -16,6 +16,10 @@ public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
+ 
+     Optional<JpaUserEntity> findByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+ 
++    @Modifying(flushAutomatically = true, clearAutomatically = true)
++    @Query("UPDATE JpaUserEntity user SET user.passwordHash = NULL WHERE user.id = :userId")
++    int removePasswordHashByUserId(@Param("userId") Long userId);
++
+     @Modifying(flushAutomatically = true, clearAutomatically = true)
+     @Query("DELETE FROM JpaUserEntity user WHERE user.id = :userId")
+     int deleteByUserId(@Param("userId") Long userId);
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
+index 9613c1c7b47d1f91f4a9711a6385706fb0309f56..abb756338a4ffd77eaee270f72947888f5918e51 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserMapper.java
+@@ -9,10 +9,10 @@ import org.springframework.stereotype.Component;
+ public class UserMapper {
+ 
+     public JpaUserEntity toEntity(User user) {
+-        return toEntity(user, null, null);
++        return toEntity(user, null);
+     }
+ 
+-    public JpaUserEntity toEntity(User user, LocalDate weddingDate, String passwordHash) {
++    public JpaUserEntity toEntity(User user, LocalDate weddingDate) {
+         return new JpaUserEntity(
+                 user.id(),
+                 user.nickname(),
+@@ -21,8 +21,7 @@ public class UserMapper {
+                 user.email(),
+                 user.termsVersion(),
+                 user.termsAgreedAt(),
+-                weddingDate,
+-                passwordHash);
++                weddingDate);
+     }
+ 
+     public User toDomain(JpaUserEntity entity) {
+diff --git a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+index d4a0bbae8959317f67d9bbd2a95ff7e0c9a049d6..4cea1de7512fd8565d3857521e8c95005359592c 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
++++ b/BE/src/main/java/com/bibbidi/wedding/user/repository/UserRepository.java
+@@ -41,7 +41,7 @@ public class UserRepository {
+     public User update(User user) {
+         JpaUserEntity currentEntity = getJpaUserEntity(user.id());
+         JpaUserEntity saved = jpaUserRepository.saveAndFlush(
+-                userMapper.toEntity(user, currentEntity.weddingDate(), currentEntity.passwordHash()));
++                userMapper.toEntity(user, currentEntity.weddingDate()));
+         return userMapper.toDomain(saved);
+     }
+ 
+@@ -58,8 +58,8 @@ public class UserRepository {
+ 
+     public WeddingDate saveWeddingDate(WeddingDate weddingDate) {
+         JpaUserEntity currentEntity = getJpaUserEntity(weddingDate.userId());
+-        JpaUserEntity saved = jpaUserRepository.saveAndFlush(userMapper.toEntity(
+-                userMapper.toDomain(currentEntity), weddingDate.date(), currentEntity.passwordHash()));
++        JpaUserEntity saved = jpaUserRepository.saveAndFlush(
++                userMapper.toEntity(userMapper.toDomain(currentEntity), weddingDate.date()));
+         return new WeddingDate(saved.id(), saved.weddingDate());
+     }
+ 
+@@ -68,10 +68,8 @@ public class UserRepository {
+                 .map(entity -> new PasswordLoginInfo(entity.id(), entity.passwordHash()));
+     }
+ 
+-    public void removePasswordHash(Long userId) {
+-        JpaUserEntity currentEntity = getJpaUserEntity(userId);
+-        jpaUserRepository.saveAndFlush(userMapper.toEntity(
+-                userMapper.toDomain(currentEntity), currentEntity.weddingDate(), null));
++    public int removePasswordHash(Long userId) {
++        return jpaUserRepository.removePasswordHashByUserId(userId);
+     }
+ 
+     public int deleteById(Long userId) {
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index af6bf292c3e79b6a35368d0b9f86847e3b27b1d6..2e2608eae27319533e92202e85d409a7a7f9e6f3 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -92,7 +92,6 @@ auth:
+     permit-pending-user:
+       - /api/auth/native/handoff-codes
+       - /api/auth/delete-grants/**
+-      - /api/auth/web/legacy-account-transfer
+     permit-all:
+       - /api/auth/**
+       - /api/catalog
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
+index 347e736ae4b9dc408f8e25167c711d65cf40d13c..9dae6f5e5c6b8013d4813cbaa944e2abedfcefac 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/controller/LegacyAccountTransferControllerIntegrationTest.java
+@@ -76,7 +76,7 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     void shouldGiveLegacyUserSession() throws Exception {
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(LEGACY_NICKNAME, LEGACY_PASSWORD);
+ 
+-        MvcResult result = mockMvc.perform(post("/api/auth/web/legacy-account-transfer")
++        MvcResult result = mockMvc.perform(post("/api/users/me/legacy-account-transfer")
+                         .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+@@ -84,7 +84,7 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                 .andExpect(jsonPath("$.termsAgreementRequired").value(false))
+                 .andDo(document(
+-                        "auth-web-legacy-account-transfer",
++                        "auth-legacy-account-transfer",
+                         resource(ResourceSnippetParameters.builder()
+                                 .tag("Auth")
+                                 .summary("기존 회원 옮기기")
+@@ -121,7 +121,7 @@ class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationT
+     void shouldRejectWrongPassword() throws Exception {
+         LegacyAccountTransferRequest request = new LegacyAccountTransferRequest(LEGACY_NICKNAME, "wrong-password");
+ 
+-        mockMvc.perform(post("/api/auth/web/legacy-account-transfer")
++        mockMvc.perform(post("/api/users/me/legacy-account-transfer")
+                         .header(AUTHORIZATION, "Bearer " + socialSession.accessToken())
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(request)))
+diff --git a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+index f35abacdce170030b1012423859144d382a2cc9f..0e77751ab3d5f4f9bceb8c5ab67cd624633a1119 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/auth/service/LegacyAccountTransferServiceIntegrationTest.java
+@@ -10,7 +10,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
+ import com.bibbidi.wedding.common.exception.ClientError;
+ import com.bibbidi.wedding.user.service.UserService;
+ import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+-import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+@@ -28,9 +27,9 @@ class LegacyAccountTransferServiceIntegrationTest {
+     private static final String LEGACY_NICKNAME = "기존회원";
+     private static final String LEGACY_PASSWORD = "bibbidi1234";
+     private static final VerifiedOidcUser KAKAO_USER = new VerifiedOidcUser(
+-            SocialProvider.KAKAO, "social-user-1", "새회원", "new@bibbidi.kr");
++            SocialProvider.KAKAO, "social-user-1", LEGACY_NICKNAME, "new@bibbidi.kr");
+     private static final VerifiedOidcUser GOOGLE_USER = new VerifiedOidcUser(
+-            SocialProvider.GOOGLE, "social-user-2", "다른회원", "other@bibbidi.kr");
++            SocialProvider.GOOGLE, "social-user-2", LEGACY_NICKNAME, "other@bibbidi.kr");
+ 
+     @Autowired
+     private LegacyAccountTransferService legacyAccountTransferService;
+@@ -41,33 +40,17 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Autowired
+     private UserService userService;
+ 
+-    private Long socialUserId;
+-    private Long legacyUserId;
+-
+-    @BeforeEach
+-    void setUp() {
+-        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+-        socialUserId = socialUser.userId();
++    @Test
++    @DisplayName("옮기면 소셜 계정이 기존 회원으로 로그인되고 새로 생긴 회원은 지워진다")
++    void shouldMoveSocialAccountToLegacyUser() {
+         PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();
+-        legacyUserId = legacyAccount.userId();
+-    }
++        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+ 
+-    @Test
+-    @DisplayName("옮긴 뒤 같은 소셜 계정으로 로그인하면 기존 회원으로 로그인된다")
+-    void shouldLoginAsLegacyUserAfterTransfer() {
+-        legacyAccountTransferService.transfer(socialUserId, LEGACY_NICKNAME, LEGACY_PASSWORD);
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
+ 
+         UserAuthInfo loggedIn = socialUserRegistrationService.findOrCreate(KAKAO_USER);
+-
+-        assertThat(loggedIn.userId()).isEqualTo(legacyUserId);
+-    }
+-
+-    @Test
+-    @DisplayName("옮기면 소셜 로그인으로 새로 생긴 회원을 지운다")
+-    void shouldDeleteSocialUser() {
+-        legacyAccountTransferService.transfer(socialUserId, LEGACY_NICKNAME, LEGACY_PASSWORD);
+-
+-        assertThatThrownBy(() -> userService.findCurrentUserInfo(socialUserId))
++        assertThat(loggedIn.userId()).isEqualTo(legacyAccount.userId());
++        assertThatThrownBy(() -> userService.findCurrentUserInfo(socialUser.userId()))
+                 .isInstanceOf(BusinessException.class)
+                 .extracting(exception -> ((BusinessException) exception).clientError())
+                 .isEqualTo(ClientError.USER_NOT_FOUND);
+@@ -76,7 +59,8 @@ class LegacyAccountTransferServiceIntegrationTest {
+     @Test
+     @DisplayName("한 번 옮긴 기존 회원은 같은 닉네임과 비밀번호로 다시 옮길 수 없다")
+     void shouldRejectSecondTransferOfSameLegacyUser() {
+-        legacyAccountTransferService.transfer(socialUserId, LEGACY_NICKNAME, LEGACY_PASSWORD);
++        UserAuthInfo socialUser = socialUserRegistrationService.findOrCreate(KAKAO_USER);
++        legacyAccountTransferService.transfer(socialUser.userId(), LEGACY_NICKNAME, LEGACY_PASSWORD);
+         UserAuthInfo otherSocialUser = socialUserRegistrationService.findOrCreate(GOOGLE_USER);
+ 
+         assertThatThrownBy(() -> legacyAccountTransferService.transfer(
+diff --git a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+index 407bffc937cdec28fe1f48d858a6b9e0f1756d35..4a15b529d45c7d8f3008507fb2ce6ea70799a754 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/user/repository/UserRepositoryIntegrationTest.java
+@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
+ import com.bibbidi.wedding.common.domain.UserStatus;
+ import com.bibbidi.wedding.user.domain.User;
+ import com.bibbidi.wedding.user.domain.WeddingDate;
+-import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+ import org.junit.jupiter.api.DisplayName;
+@@ -13,7 +12,6 @@ import org.junit.jupiter.api.Test;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.boot.test.context.SpringBootTest;
+ import org.springframework.test.context.ActiveProfiles;
+-import org.springframework.test.context.jdbc.Sql;
+ import org.springframework.transaction.annotation.Transactional;
+ import org.springframework.jdbc.core.JdbcTemplate;
+ 
+@@ -152,16 +150,4 @@ class UserRepositoryIntegrationTest {
+         assertThat(deleted).isOne();
+         assertThat(userRepository.existsByNickname("current")).isFalse();
+     }
+-
+-    @Test
+-    @Sql("/legacy-account-fixture.sql")
+-    @DisplayName("닉네임이 같은 소셜 회원이 있어도 비밀번호로 가입한 회원만 찾는다")
+-    void shouldFindOnlyPasswordLoginUserByNickname() {
+-        User socialUser = userRepository.create(User.pending("기존회원", "social@bibbidi.kr"));
+-
+-        PasswordLoginInfo found = userRepository.findPasswordLoginInfo("기존회원").orElseThrow();
+-
+-        assertThat(found.userId()).isNotEqualTo(socialUser.id());
+-        assertThat(found.passwordHash()).isNotBlank();
+-    }
+ }
+diff --git a/BE/src/test/resources/application-test.yaml b/BE/src/test/resources/application-test.yaml
+index 0d501c51b22b7cdb32d933df0029027e6923ea96..f59900abb9f6f2de9141afb239aab16d4c383d89 100644
+--- a/BE/src/test/resources/application-test.yaml
++++ b/BE/src/test/resources/application-test.yaml
+@@ -38,7 +38,6 @@ auth:
+     permit-pending-user:
+       - /api/auth/native/handoff-codes
+       - /api/auth/delete-grants/**
+-      - /api/auth/web/legacy-account-transfer
+     permit-all:
+       - /api/auth/**
+       - /api/catalog
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index cf104c8082f6d6855d9544ffe4361bb2a13aa6fe..d0fabd2fc9eba0629a0ba94b419284d2cf9488f1 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8,12 +8,6 @@ importers:
+ 
+   .: {}
+ 
+-  .github/ai-review:
+-    dependencies:
+-      js-yaml:
+-        specifier: 4.1.0
+-        version: 4.1.0
+-
+   APP:
+     dependencies:
+       '@expo/ui':
+@@ -3662,10 +3656,6 @@ packages:
+   js-tokens@4.0.0:
+     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
+ 
+-  js-yaml@4.1.0:
+-    resolution: {integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==}
+-    hasBin: true
+-
+   js-yaml@4.3.1:
+     resolution: {integrity: sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==}
+     hasBin: true
+@@ -6662,7 +6652,7 @@ snapshots:
+       '@jest/schemas': 29.6.3
+       '@types/istanbul-lib-coverage': 2.0.6
+       '@types/istanbul-reports': 3.0.4
+-      '@types/node': 26.2.0
++      '@types/node': 24.9.2
+       '@types/yargs': 17.0.35
+       chalk: 4.1.2
+ 
+@@ -9780,7 +9770,7 @@ snapshots:
+   jest-util@29.7.0:
+     dependencies:
+       '@jest/types': 29.6.3
+-      '@types/node': 26.2.0
++      '@types/node': 24.9.2
+       chalk: 4.1.2
+       ci-info: 3.9.0
+       graceful-fs: 4.2.11
+@@ -9803,7 +9793,7 @@ snapshots:
+ 
+   jest-worker@29.7.0:
+     dependencies:
+-      '@types/node': 26.2.0
++      '@types/node': 24.9.2
+       jest-util: 29.7.0
+       merge-stream: 2.0.0
+       supports-color: 8.1.1
+@@ -9812,10 +9802,6 @@ snapshots:
+ 
+   js-tokens@4.0.0: {}
+ 
+-  js-yaml@4.1.0:
+-    dependencies:
+-      argparse: 2.0.1
+-
+   js-yaml@4.3.1:
+     dependencies:
+       argparse: 2.0.1

@@ -1,13 +1,13 @@
 package com.bibbidi.wedding.user.service;
 
 import com.bibbidi.wedding.checklist.service.ChecklistService;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import com.bibbidi.wedding.user.repository.UserRepository;
+import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
 import java.time.LocalDate;
-import org.springframework.dao.DataIntegrityViolationException;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,18 +24,44 @@ public class UserService {
     }
 
     @Transactional
-    public UserResult createUser(String nickname, String passwordHash) {
-        try {
-            User user = new User(null, nickname, passwordHash);
-            User savedUser = userRepository.create(user);
+    public UserResult createPendingUser(String nickname, String email) {
+        User savedUser = userRepository.create(User.pending(nickname, email));
+        return UserResult.from(savedUser);
+    }
 
-            return UserResult.from(savedUser);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
-            );
+    @Transactional
+    public UserResult activate(Long currentUserId) {
+        User user = userRepository.findById(currentUserId);
+        if (user.isActive()) {
+            return UserResult.from(user);
         }
+        return UserResult.from(userRepository.update(user.activate()));
+    }
+
+    @Transactional
+    public UserResult agreeToTerms(Long currentUserId, String termsVersion) {
+        User user = userRepository.findById(currentUserId);
+        return UserResult.from(userRepository.update(
+                user.agreeToTerms(termsVersion, LocalDateTime.now())));
+    }
+
+    @Transactional
+    public void copyTermsAgreement(Long fromUserId, Long toUserId) {
+        User fromUser = userRepository.findById(fromUserId);
+        String termsVersion = fromUser.termsVersion();
+        LocalDateTime termsAgreedAt = fromUser.termsAgreedAt();
+        User toUser = userRepository.findById(toUserId);
+        User agreedUser = toUser.agreeToTerms(termsVersion, termsAgreedAt);
+        userRepository.update(agreedUser);
+    }
+
+    @Transactional
+    public void copyEmail(Long fromUserId, Long toUserId) {
+        User fromUser = userRepository.findById(fromUserId);
+        String email = fromUser.email();
+        User toUser = userRepository.findById(toUserId);
+        User emailChangedUser = toUser.changeEmail(email);
+        userRepository.update(emailChangedUser);
     }
 
     public NicknameAvailabilityResult checkNicknameAvailability(String nickname) {
@@ -43,24 +69,13 @@ public class UserService {
         return new NicknameAvailabilityResult(nickname, isAvailableNickname);
     }
 
-    public UserAuthenticationInfo findAuthenticationInfo(String nickname) {
-        User user = userRepository.findByNickname(nickname);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findAuthenticationInfo(Long userId) {
-        User user = userRepository.findById(userId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
-    public UserAuthenticationInfo findCurrentUserAuthenticationInfo(Long currentUserId) {
-        User user = userRepository.findById(currentUserId);
-        return new UserAuthenticationInfo(user.id(), user.nickname(), user.passwordHash());
-    }
-
     public UserResult findCurrentUserInfo(Long currentUserId) {
         User user = userRepository.findById(currentUserId);
         return UserResult.from(user);
+    }
+
+    public Optional<PasswordLoginInfo> findPasswordLoginInfo(String nickname) {
+        return userRepository.findPasswordLoginInfo(nickname);
     }
 
     public WeddingDateResult findWeddingDate(Long currentUserId) {
@@ -77,10 +92,8 @@ public class UserService {
     }
 
     @Transactional
-    public void changePasswordHash(Long currentUserId, String passwordHash) {
-        User user = userRepository.findById(currentUserId);
-        User changedUser = user.changePasswordHash(passwordHash);
-        userRepository.update(changedUser);
+    public void removePassword(Long userId) {
+        userRepository.removePasswordHash(userId);
     }
 
     @Transactional
@@ -97,15 +110,8 @@ public class UserService {
             return UserResult.from(user);
         }
 
-        try {
-            User changedUser = user.changeNickname(nickname);
-            User savedUser = userRepository.update(changedUser);
-            return UserResult.from(savedUser);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(
-                    ClientError.DUPLICATE_NICKNAME,
-                    "이미 사용 중인 닉네임입니다. nickname=" + nickname
-            );
-        }
+        User changedUser = user.changeNickname(nickname);
+        User savedUser = userRepository.update(changedUser);
+        return UserResult.from(savedUser);
     }
 }
