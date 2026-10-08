@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppointmentCreationError } from "./model/appointmentCreation";
 import {
   ChecklistAppointmentCreationController,
   ChecklistAppointmentCreationInput,
@@ -9,13 +10,20 @@ import {
 } from "./useChecklistAppointmentCreation";
 
 const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+const errorTrackingMocks = vi.hoisted(() => ({
+  addErrorAction: vi.fn(),
+  reportHandledError: vi.fn(),
+}));
 
 vi.mock("../../infrastructure/analytics", () => ({
   analytics: { initialize: vi.fn(), track: analyticsMocks.track },
 }));
+vi.mock("../../infrastructure/error-tracking", () => errorTrackingMocks);
 
 beforeEach(() => {
   analyticsMocks.track.mockReset();
+  errorTrackingMocks.addErrorAction.mockReset();
+  errorTrackingMocks.reportHandledError.mockReset();
 });
 
 let controller: ChecklistAppointmentCreationController;
@@ -94,6 +102,7 @@ describe("useChecklistAppointmentCreation", () => {
         parameters: { source: "checklist", failure_kind: "validation" },
       },
     ]);
+    expect(errorTrackingMocks.reportHandledError).not.toHaveBeenCalled();
   });
   it("필수값, 길이, 유효한 날짜와 시간 순서를 검증하고 첫 오류를 반환한다", async () => {
     render(<Harness onSubmit={vi.fn()} />);
@@ -265,6 +274,18 @@ describe("useChecklistAppointmentCreation", () => {
       controller.changeDate("2026-09-20");
     });
     await submit();
+    expect(errorTrackingMocks.addErrorAction).toHaveBeenCalledWith(
+      "appointment.create",
+    );
+    expect(errorTrackingMocks.reportHandledError).toHaveBeenCalledWith(
+      expect.any(Error),
+      {
+        feature: "calendar",
+        operation: "appointment_create",
+        failureKind: "unknown",
+        level: "error",
+      },
+    );
     expect(analyticsMocks.track).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: "appointment_create" }),
     );
@@ -287,6 +308,24 @@ describe("useChecklistAppointmentCreation", () => {
         ([event]) => event.name === "appointment_create",
       ),
     ).toHaveLength(1);
+  });
+
+  it("예상한 권한 거부는 오류로 보고하지 않는다", async () => {
+    render(
+      <Harness
+        onSubmit={vi
+          .fn()
+          .mockRejectedValue(new AppointmentCreationError("forbidden"))}
+      />,
+    );
+    withController(() => {
+      controller.open();
+      controller.changeTitle("상담");
+      controller.changeDate("2026-09-20");
+    });
+
+    await submit();
+    expect(errorTrackingMocks.reportHandledError).not.toHaveBeenCalled();
   });
 
   it("취소 후 재열기와 인증 대상·체크리스트 항목 변경 시 draft를 정리한다", async () => {

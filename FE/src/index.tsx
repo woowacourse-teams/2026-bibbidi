@@ -8,10 +8,15 @@ import { AuthProvider } from "./features/auth";
 import { ChecklistMigrationProvider } from "./features/checklist-migration";
 import { analytics } from "./infrastructure/analytics";
 import { preventLinkDrag } from "./infrastructure/browser/preventLinkDrag";
+import {
+  initializeErrorTracking,
+  reportHandledError,
+} from "./infrastructure/error-tracking";
 import "./styles/colors.css";
 import "./index.css";
 
 document.addEventListener("dragstart", preventLinkDrag);
+initializeErrorTracking();
 
 const rootElement = document.getElementById("root");
 
@@ -21,7 +26,20 @@ if (!rootElement) {
 
 analytics.initialize();
 
-createRoot(rootElement).render(
+createRoot(rootElement, {
+  onCaughtError: (error) =>
+    reportHandledError(error, {
+      feature: "app",
+      operation: "render",
+      level: "fatal",
+    }),
+  onUncaughtError: (error) =>
+    reportHandledError(error, {
+      feature: "app",
+      operation: "render",
+      level: "fatal",
+    }),
+}).render(
   <StrictMode>
     <AuthProvider>
       <ChecklistMigrationProvider>

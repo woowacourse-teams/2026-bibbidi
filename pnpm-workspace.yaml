@@ -7,6 +7,7 @@ packages:
 nodeLinker: hoisted
 
 allowBuilds:
+  '@sentry/cli': true
   '@swc/core': true
   core-js: false
   esbuild: true

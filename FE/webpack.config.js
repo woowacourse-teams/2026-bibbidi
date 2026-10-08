@@ -2,6 +2,7 @@ const path = require("path");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const { sentryWebpackPlugin } = require("@sentry/webpack-plugin");
 const webpack = require("webpack");
 
 require("dotenv").config({
@@ -26,15 +27,41 @@ module.exports = (_environment, arguments_) => {
   const googleAnalyticsMeasurementId =
     process.env.BIBBIDI_GA_MEASUREMENT_ID ?? "";
   const posthogEnabled = process.env.BIBBIDI_POSTHOG_ENABLED === "true";
+  const sentryEnabled =
+    isProduction && process.env.BIBBIDI_SENTRY_ENABLED === "true";
+  const sentryDsn = process.env.BIBBIDI_SENTRY_DSN ?? "";
+  const appEnvironment =
+    process.env.BIBBIDI_APP_ENV ??
+    (isProduction ? "production" : "development");
+  const appVersion =
+    process.env.BIBBIDI_APP_VERSION ??
+    process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ??
+    "unknown";
 
   if (!isProduction && !apiProxyTarget) {
     throw new Error("BIBBIDI_API_PROXY_TARGET 환경변수가 필요합니다.");
+  }
+  if (
+    sentryEnabled &&
+    (!sentryDsn ||
+      !process.env.SENTRY_ORG ||
+      !process.env.SENTRY_PROJECT ||
+      !process.env.SENTRY_AUTH_TOKEN ||
+      appVersion === "unknown")
+  ) {
+    throw new Error(
+      "Sentry 배포 설정(DSN, 조직, 프로젝트, 인증 토큰, 버전)이 필요합니다.",
+    );
   }
 
   return {
     mode: isProduction ? "production" : "development",
     entry: "./src/index.tsx",
-    devtool: isProduction ? false : "eval-cheap-module-source-map",
+    devtool: isProduction
+      ? sentryEnabled
+        ? "hidden-source-map"
+        : false
+      : "eval-cheap-module-source-map",
 
     output: {
       path: path.resolve(__dirname, "dist"),
@@ -47,7 +74,10 @@ module.exports = (_environment, arguments_) => {
     resolve: {
       extensions: [".tsx", ".ts", ".js"],
       // 비활성 배포에는 초기화뿐 아니라 SDK 코드 자체도 포함하지 않는다.
-      alias: posthogEnabled ? {} : { "posthog-js$": false },
+      alias: {
+        ...(posthogEnabled ? {} : { "posthog-js$": false }),
+        ...(sentryEnabled ? {} : { "@sentry/react$": false }),
+      },
     },
 
     module: {
@@ -89,15 +119,10 @@ module.exports = (_environment, arguments_) => {
         __BIBBIDI_POSTHOG_HOST__: JSON.stringify(
           process.env.BIBBIDI_POSTHOG_HOST ?? "https://us.i.posthog.com",
         ),
-        __BIBBIDI_APP_ENV__: JSON.stringify(
-          process.env.BIBBIDI_APP_ENV ??
-            (isProduction ? "production" : "development"),
-        ),
-        __BIBBIDI_APP_VERSION__: JSON.stringify(
-          process.env.BIBBIDI_APP_VERSION ??
-            process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ??
-            "unknown",
-        ),
+        __BIBBIDI_SENTRY_ENABLED__: JSON.stringify(sentryEnabled),
+        __BIBBIDI_SENTRY_DSN__: JSON.stringify(sentryDsn),
+        __BIBBIDI_APP_ENV__: JSON.stringify(appEnvironment),
+        __BIBBIDI_APP_VERSION__: JSON.stringify(appVersion),
         __BIBBIDI_API_BASE_URL__: JSON.stringify(apiBaseUrl),
         __BIBBIDI_GA_MEASUREMENT_ID__: JSON.stringify(
           googleAnalyticsMeasurementId,
@@ -108,6 +133,24 @@ module.exports = (_environment, arguments_) => {
             new MiniCssExtractPlugin({
               filename: "assets/[name].[contenthash:8].css",
               chunkFilename: "assets/[name].[contenthash:8].chunk.css",
+            }),
+          ]
+        : []),
+      ...(sentryEnabled
+        ? [
+            sentryWebpackPlugin({
+              org: process.env.SENTRY_ORG,
+              project: process.env.SENTRY_PROJECT,
+              authToken: process.env.SENTRY_AUTH_TOKEN,
+              telemetry: false,
+              release: {
+                name: appVersion,
+                inject: false,
+              },
+              sourcemaps: {
+                assets: "./dist/assets/**/*.js",
+                filesToDeleteAfterUpload: "./dist/assets/**/*.map",
+              },
             }),
           ]
         : []),

@@ -836,6 +836,7 @@
     left: 50%;
     width: 2px;
     height: 16px;
+    transform: none;
   }
 
   .preparation-roadmap__step:last-child::before,

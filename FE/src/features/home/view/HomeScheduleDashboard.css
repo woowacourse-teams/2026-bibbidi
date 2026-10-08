@@ -200,6 +200,91 @@
   gap: 24px;
 }
 
+.home-dashboard-guest__top {
+  align-items: stretch;
+  grid-auto-rows: auto;
+}
+
+.home-dashboard-guest__introduction {
+  display: flex;
+  min-width: 0;
+  padding: 20px 24px;
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+  box-shadow: inset 0 0 0 1px var(--color-stroke-neutral);
+  flex-direction: column;
+}
+
+.home-dashboard-guest__side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.home-dashboard-guest__recommendations {
+  min-width: 0;
+}
+
+.home-dashboard-guest__recommendations .recommended-schedule {
+  height: auto;
+}
+
+.home-dashboard-guest__recommendations .recommended-schedule-item__add-task {
+  min-height: 44px;
+}
+
+.home-dashboard-guest__recommendations
+  .recommended-schedule-item__add-task:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.home-dashboard-guest__instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 0 0 18px;
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 15px;
+  line-height: 1.65;
+  word-break: keep-all;
+  list-style: disc;
+}
+
+.home-dashboard-guest__instructions li {
+  padding-left: 4px;
+}
+
+.home-dashboard-guest__introduction a:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.home-dashboard-guest__introduction .home-dashboard-state__section-header {
+  height: auto;
+  min-height: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.home-dashboard-guest__introduction .home-dashboard-state__result-action {
+  height: auto;
+}
+
+.home-dashboard-guest__introduction .home-dashboard-state__section-header,
+.home-dashboard-guest__recommendations .recommended-schedule__header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.home-dashboard-guest__introduction h2 {
+  overflow: visible;
+  white-space: normal;
+}
+
 .home-dashboard-state__section {
   min-width: 0;
   padding: 24px;
@@ -366,6 +451,14 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .home-dashboard-guest__top {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  }
+
+  .home-dashboard-guest__introduction {
+    padding: 24px;
+  }
+
   .home-dashboard-state__section--recommended {
     padding: 24px;
   }
@@ -384,6 +477,11 @@
   .home-dashboard-state__top {
     align-items: stretch;
     grid-auto-rows: 672px;
+  }
+
+  .home-dashboard-guest__top {
+    align-items: stretch;
+    grid-auto-rows: auto;
   }
 
   .home-dashboard-state__side
@@ -498,9 +596,42 @@
   }
 }
 
+@media (min-width: 761px) {
+  .home-dashboard-guest__top > .monthly-calendar {
+    height: 100%;
+  }
+
+  .home-dashboard-guest__side > .home-dashboard-guest__introduction {
+    height: 264px;
+    flex: none;
+  }
+
+  .home-dashboard-guest__side > .home-dashboard-guest__recommendations {
+    min-height: 384px;
+    flex: 1;
+  }
+
+  .home-dashboard-guest__side .recommended-schedule,
+  .home-dashboard-guest__side
+    .home-dashboard-guest__recommendations
+    > .home-dashboard-state__section {
+    height: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-dashboard-guest__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 600px) {
   .home-dashboard-loading__section,
   .home-dashboard-state__section {
+    padding: 20px;
+  }
+
+  .home-dashboard-guest__introduction {
     padding: 20px;
   }
 }

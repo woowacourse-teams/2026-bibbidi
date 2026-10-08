@@ -12,6 +12,10 @@ import {
 import { CurrentUserApiError, getCurrentUser } from "./api/getCurrentUser";
 import { analytics } from "../../infrastructure/analytics";
 import {
+  clearErrorUser,
+  reportHandledError,
+} from "../../infrastructure/error-tracking";
+import {
   clearWebAccessToken,
   hasWebAccessToken,
   refreshWebSession,
@@ -117,6 +121,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        reportHandledError(error, {
+          feature: "auth",
+          operation: "synchronize",
+          level: "fatal",
+        });
         setAuthState({ status: "error" });
       });
 
@@ -134,6 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscribeAuthenticationRequired(() => {
         invalidateCurrentUserRequest();
         analytics.reset();
+        clearErrorUser();
         setAuthState({ status: "guest" });
       }),
     [invalidateCurrentUserRequest],
@@ -195,6 +205,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     invalidateCurrentUserRequest();
     clearWebAccessToken();
     analytics.reset();
+    clearErrorUser();
     setAuthState({ status: "guest" });
   }, [invalidateCurrentUserRequest]);
 

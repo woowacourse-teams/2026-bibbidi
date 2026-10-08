@@ -346,60 +346,62 @@ function DashboardSide({ recommended, unscheduled }: DashboardSideProps) {
   );
 }
 
-const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
-  {
-    result: {
-      actionLabel: "로드맵에서 할 일 찾기",
-      actionTo: "/preparation",
-      actionVariant: "link",
-      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
-      icon: "lock",
-      title: "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
-      tone: "neutral",
-    },
-    status: "authentication-required",
-    title: "일정이 필요한 할 일",
-  };
-
-const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
-  {
-    result: {
-      actionLabel: "로드맵에서 할 일 찾기",
-      actionTo: "/preparation",
-      actionVariant: "link",
-      description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
-      icon: "lock",
-      title: "로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요.",
-      tone: "neutral",
-    },
-    status: "authentication-required",
-    title: "추천 할 일",
-  };
+function GuestCalendarIntroduction() {
+  return (
+    <section
+      aria-labelledby="guest-calendar-introduction-title"
+      className="home-dashboard-guest__introduction"
+    >
+      <header className="home-dashboard-state__section-header">
+        <h2 id="guest-calendar-introduction-title">일정이 필요한 할 일</h2>
+        <Link
+          className="home-dashboard-state__result-action home-dashboard-state__result-action--link"
+          to="/preparation"
+        >
+          로드맵 보기
+          <ChevronRightIcon />
+        </Link>
+      </header>
+      <ul className="home-dashboard-guest__instructions">
+        <li>로드맵에서 필요한 할 일을 골라 담아보세요.</li>
+        <li>일정을 추가해 언제 무엇을 할지 기록해봐요.</li>
+        <li>로그인해서 나만의 체크리스트를 관리해요.</li>
+      </ul>
+    </section>
+  );
+}
 
 export function GuestHomeScheduleDashboard({
+  recommended,
   referenceDate,
 }: {
+  recommended?: ReactNode;
   referenceDate: string;
 }) {
+  const isMobileLayout = useIsMobileLayout();
+  const introduction = <GuestCalendarIntroduction key="introduction" />;
+  const calendar = (
+    <MonthlyCalendar key="calendar" referenceDate={referenceDate} />
+  );
+
   return (
     <section aria-label="홈 일정 대시보드" className="home-dashboard-state">
-      <div className="home-dashboard-state__top">
-        <MonthlyCalendar referenceDate={referenceDate} />
-        <DashboardSide
-          recommended={
-            <DashboardResultSection
-              className="home-dashboard-state__section--recommended"
-              id="dashboard-recommended-schedule"
-              viewModel={guestRecommendedViewModel}
-            />
-          }
-          unscheduled={
-            <DashboardResultSection
-              id="dashboard-unscheduled-task"
-              viewModel={guestUnscheduledViewModel}
-            />
-          }
-        />
+      <div className="home-dashboard-state__top home-dashboard-guest__top">
+        {isMobileLayout ? (
+          <>
+            {introduction}
+            {calendar}
+            {recommended}
+          </>
+        ) : (
+          <>
+            {calendar}
+            <div className="home-dashboard-guest__side">
+              {introduction}
+              {recommended}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
