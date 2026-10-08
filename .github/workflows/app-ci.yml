@@ -73,6 +73,7 @@ jobs:
         check: [tests, build]
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      RUN_IOS_UI_TESTS: ${{ github.event_name != 'pull_request' || github.base_ref == 'release-app' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -104,15 +105,29 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath APP/iosApp/build/DerivedData
           CODE_SIGNING_ALLOWED=NO build
+      - name: Prepare UI test Simulator
+        if: matrix.check == 'tests' && env.RUN_IOS_UI_TESTS == 'true'
+        timeout-minutes: 5
+        run: |
+          simulator_id=$(xcrun simctl create Bibbidi-CI com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro com.apple.CoreSimulator.SimRuntime.iOS-27-0)
+          echo "UI_TEST_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+          xcrun simctl bootstatus "$simulator_id" -b
       - name: Run iOS app launch test
-        if: matrix.check == 'tests'
+        if: matrix.check == 'tests' && env.RUN_IOS_UI_TESTS == 'true'
+        timeout-minutes: 15
         run: >-
           xcodebuild -project APP/iosApp/iosApp.xcodeproj
           -scheme Bibbidi -configuration Debug
-          -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
+          -destination "platform=iOS Simulator,id=$UI_TEST_SIMULATOR_ID"
           -derivedDataPath APP/iosApp/build/DerivedData
           -resultBundlePath APP/iosApp/build/TestResults.xcresult
           -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+      - name: Clean up UI test Simulator
+        if: always() && matrix.check == 'tests' && env.UI_TEST_SIMULATOR_ID != ''
+        timeout-minutes: 2
+        run: |
+          xcrun simctl shutdown "$UI_TEST_SIMULATOR_ID" || true
+          xcrun simctl delete "$UI_TEST_SIMULATOR_ID"
       - name: Save Kotlin/Native dependencies from trusted branch
         if: success() && github.event_name != 'pull_request' && steps.konan.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5

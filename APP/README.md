@@ -132,8 +132,19 @@ Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니�
 | Shared tests | `:shared:testAndroidHostTest`로 commonTest 실행 |
 | Android tests | `:androidApp:testDebugUnitTest` |
 | Android build | `:androidApp:assembleDebug` |
-| iOS tests | `:shared:iosSimulatorArm64Test`와 Xcode 앱 실행 UI 테스트 |
+| iOS tests | `:shared:iosSimulatorArm64Test`, 실행 시점에 따라 Xcode 앱 실행 UI 테스트 추가 |
 | iOS build | 서명 없는 Simulator Debug 앱 빌드 |
+
+`dev-app` 대상 PR에서는 iOS shared 테스트와 앱 빌드를 실행하고 앱 실행 UI 테스트는 생략합니다.
+`dev-app` push, `release-app` 대상 PR, 수동 실행에서는 앱 실행 UI 테스트까지 검증합니다.
+개발 PR에서는 빠르게 피드백을 받고, 개발 브랜치 통합 후와 릴리스 전에는 앱 실행을 확인합니다.
+UI 테스트를 생략해도 `iOS tests` check는 shared 테스트 결과를 보고합니다.
+
+UI 테스트 직전에는 전용 iPhone 18 Pro / iOS 27.0 Simulator를 생성하고
+`simctl bootstatus -b`로 부팅 완료를 기다린 뒤, 해당 Simulator ID로 테스트합니다.
+준비 단계는 5분, UI 테스트는 15분으로 제한하고 성공·실패 후 Simulator를 정리합니다.
+이는 Simulator 준비 상태를 보강하는 조치이며 XCTest Accessibility 초기화의 간헐적인 실패가
+완전히 해결됐음을 보장하지는 않습니다. UI 테스트 실패는 그대로 CI 실패로 표시합니다.
 
 GitHub 브랜치 보호의 필수 검사에는 위 다섯 check를 등록합니다. 경로 필터로 건너뛴 workflow는
 필수 검사가 pending으로 남을 수 있으므로, APP 브랜치에서 APP과 무관한 PR을 병합할 때 이 점을 고려하세요.
