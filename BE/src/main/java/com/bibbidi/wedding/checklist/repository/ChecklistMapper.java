@@ -47,7 +47,8 @@ public class ChecklistMapper {
                 entity.categoryId(),
                 entity.title(),
                 entity.sourceCatalogItemId(),
-                entity.status()
+                entity.status(),
+                entity.createdAt()
         );
     }
 }

@@ -1,5 +1,5 @@
-INSERT INTO users (id, nickname, password_hash, created_at, updated_at) VALUES
-(1, 'bibbidi', 'password-hash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO users (id, nickname, status, role, created_at, updated_at) VALUES
+(1, 'bibbidi', 'ACTIVE', 'NORMAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO checklists (id, owner_id, created_at, updated_at) VALUES
 (1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

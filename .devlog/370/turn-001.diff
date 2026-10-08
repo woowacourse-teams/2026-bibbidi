@@ -1,0 +1,262 @@
+diff --git a/Infra/monitoring/README.md b/Infra/monitoring/README.md
+index a9a64e6c640f94d65c509ea4a5beea26890c0867..4cd1d852e99e357e6f2e8605cc7f5e722f11263e 100644
+--- a/Infra/monitoring/README.md
++++ b/Infra/monitoring/README.md
+@@ -35,8 +35,135 @@
+ 
+ Grafana Cloud는 IRM과 Synthetic Monitoring에 사용한다. 기존 Cloud 대시보드, 알림, 데이터소스는 새 알림과 외부 점검의 실제 수신을 확인한 뒤 정리한다.
+ 
+-## AWS 상태 검사
++## AWS 상태 검사 (수동 설정)
+ 
+-`aws/status-check.yaml`은 모니터링 EC2의 `StatusCheckFailed_System`이 연속 2분 실패하면 EC2 복구 작업을 실행하고 SNS → Lambda → Discord로 알린다. 이 지표는 AWS 호스트 장애를 감지한다. 인스턴스 내부의 Grafana 장애는 Synthetic Monitoring으로 감지한다.
++모니터링 EC2가 AWS 호스트 장애로 멈추면 CloudWatch가 인스턴스를 자동 복구하고 Discord로 알린다. 이 구성은 저장소에서 자동 적용하지 않으므로 AWS 콘솔에서 아래 순서대로 직접 만든다. 인스턴스 안의 Grafana 장애는 이 알람으로 잡히지 않으며 Synthetic Monitoring이 감지한다.
+ 
+-모니터링 서버가 있는 AWS 계정과 리전에서 Discord 웹훅 URL을 Secrets Manager의 **일반 문자열**로 저장한다. 스택을 배포할 때 모니터링 EC2 ID와 비밀 ARN을 파라미터로 전달한다. 웹훅 URL은 템플릿이나 CLI 인수에 직접 넣지 않는다. 배포 전에 `aws cloudformation validate-template --template-body file://infra/monitoring/aws/status-check.yaml`로 확인한다. 배포 후 SNS 테스트 메시지로 Discord 수신을 확인하고 CloudWatch 알람 동작을 점검한다.
++```
++CloudWatch 알람(StatusCheckFailed_System) ─┬─> EC2 복구(recover)
++                                           └─> SNS 토픽 ─> Lambda ─> Discord
++```
++
++모든 리소스는 모니터링 EC2가 있는 계정·리전에 만든다.
++
++### 1. Discord 웹훅 URL 저장
++
++1. Secrets Manager → **새 보안 암호 저장** → **다른 유형의 보안 암호**를 고른다.
++2. **일반 텍스트** 탭에서 내용 전체를 웹훅 URL 한 줄로 바꾼다(키/값 JSON이 아니다).
++3. 이름은 `bibbidi/monitoring/discord-webhook`으로 하고 ARN을 기록한다.
++
++웹훅 URL을 Lambda 코드, 환경변수, 저장소에 직접 넣지 않는다.
++
++### 2. Lambda 실행 역할
++
++1. IAM → 역할 → **역할 생성** → 신뢰할 엔터티 `AWS 서비스` / `Lambda`.
++2. 관리형 정책 `AWSLambdaBasicExecutionRole`을 붙인다.
++3. 인라인 정책으로 1번 보안 암호만 읽게 한다.
++
++```json
++{
++  "Version": "2012-10-17",
++  "Statement": [
++    {
++      "Effect": "Allow",
++      "Action": "secretsmanager:GetSecretValue",
++      "Resource": "<1번 보안 암호 ARN>"
++    }
++  ]
++}
++```
++
++### 3. Lambda 함수
++
++1. Lambda → **함수 생성** → 런타임 `Python 3.13`, 실행 역할은 2번 역할.
++2. 구성 → 일반 구성에서 제한 시간을 10초로 바꾼다.
++3. 구성 → 환경 변수에 `DISCORD_WEBHOOK_SECRET_ARN=<1번 보안 암호 ARN>`을 추가한다.
++4. 코드 `lambda_function.py`를 아래로 바꾸고 **Deploy**한다.
++
++```python
++import json
++import os
++import urllib.request
++
++import boto3
++
++
++def lambda_handler(event, context):
++    webhook_url = boto3.client("secretsmanager").get_secret_value(
++        SecretId=os.environ["DISCORD_WEBHOOK_SECRET_ARN"]
++    )["SecretString"]
++    for record in event.get("Records", []):
++        message = record["Sns"]["Message"]
++        body = json.dumps({"content": "Bibbidi monitoring EC2 status check: " + message[:1700]})
++        request = urllib.request.Request(
++            webhook_url,
++            data=body.encode("utf-8"),
++            headers={"Content-Type": "application/json"},
++            method="POST",
++        )
++        with urllib.request.urlopen(request, timeout=5):
++            pass
++```
++
++### 4. SNS 토픽과 구독
++
++1. SNS → 주제 생성 → 유형 `표준`, 이름 `bibbidi-monitoring-alert`.
++2. 주제에서 **구독 생성** → 프로토콜 `AWS Lambda`, 엔드포인트는 3번 함수. 콘솔이 Lambda 호출 권한을 함께 추가한다.
++3. 주제에서 **메시지 게시**로 테스트 메시지를 보내 Discord 수신을 확인한다. 안 오면 Lambda → 모니터링 → CloudWatch Logs를 본다.
++
++### 5. CloudWatch 알람
++
++1. CloudWatch → 경보 → **경보 생성** → 지표 `EC2 > 인스턴스별 지표`에서 모니터링 EC2의 `StatusCheckFailed_System`.
++2. 통계 `최대`, 기간 `1분`.
++3. 조건 `보다 큼` `0`, 추가 구성에서 경보를 발생시킬 데이터 포인트 `2/2`, 누락된 데이터 처리 `누락`.
++4. 작업
++   - 알림: 상태 `경보 상태` → 4번 SNS 토픽. 필요하면 `정상` 상태에도 같은 토픽을 추가해 복구 알림을 받는다.
++   - EC2 작업: 상태 `경보 상태` → **이 인스턴스 복구**.
++5. 이름은 `bibbidi-monitoring-system-status`로 한다.
++
++EC2 작업 목록에 복구가 없으면 인스턴스 유형이 복구를 지원하지 않는 것이다. 이때는 알림만 두고 이 README에 그 사실을 적는다.
++
++### 6. Grafana CloudWatch 데이터소스
++
++Grafana에서 CloudWatch 지표를 보려면 모니터링 EC2의 인스턴스 역할(`ec2-project`)에 읽기 권한이 있어야 한다.
++
++1. IAM → 역할 → `ec2-project`에서 아래 권한이 있는지 확인하고, 없으면 인라인 정책으로 추가한다.
++
++```json
++{
++  "Version": "2012-10-17",
++  "Statement": [
++    {
++      "Effect": "Allow",
++      "Action": [
++        "cloudwatch:DescribeAlarms",
++        "cloudwatch:DescribeAlarmsForMetric",
++        "cloudwatch:GetMetricData",
++        "cloudwatch:ListMetrics",
++        "ec2:DescribeInstances",
++        "ec2:DescribeRegions",
++        "ec2:DescribeTags",
++        "tag:GetResources"
++      ],
++      "Resource": "*"
++    }
++  ]
++}
++```
++
++2. Grafana → Connections → Data sources → **CloudWatch** 추가 → 인증 공급자 `AWS SDK Default`, 기본 리전은 모니터링 EC2 리전.
++3. **Save & test** 후 Explore에서 `AWS/EC2` `StatusCheckFailed_System`이 조회되는지 확인한다.
++
++## 수동 작업 체크리스트
++
++아래 항목은 저장소에서 자동 적용되지 않는다. 처음 구성하거나 서버를 다시 만들 때 순서대로 확인한다.
++
++- [ ] 모니터링 서버에 `grafana/`, `systemd/` 설정 설치 후 `systemctl daemon-reload`와 서비스 재시작
++- [ ] AWS 상태 검사 1~5단계, SNS 테스트 메시지로 Discord 수신 확인
++- [ ] Grafana CloudWatch 데이터소스(6단계)
++- [ ] Grafana 연락처: Discord, Grafana Cloud IRM. 각 연락처의 **Test** 버튼으로 수신 확인
++- [ ] 알림 정책: `severity=critical` → IRM 중요 + Discord, `severity=warning` → IRM 기본 + Discord
++- [ ] 알림 규칙 작성 후 Alerting → Export로 YAML을 받아 저장소에 PR
++- [ ] Grafana Cloud IRM 온콜 스케줄(서버 개발자 3명 주간 교대)과 에스컬레이션(15분 → 다음 담당자, 15분 → 전원). 담당자마다 IRM 앱 설치와 전화번호 인증
++- [ ] Grafana Cloud Synthetic Monitoring: `https://monitoring.bibbidi.kr/api/health`와 서비스 주소 HTTP 점검, 실패 알림을 IRM으로 연결
++- [ ] 새 알림과 외부 점검 수신 확인 후 Grafana Cloud 대시보드·알림·데이터소스 정리
+diff --git a/Infra/monitoring/aws/status-check.yaml b/Infra/monitoring/aws/status-check.yaml
+deleted file mode 100644
+index f24ff3f03195ebe94191f92877e184276ea1aff7..0000000000000000000000000000000000000000
+--- a/Infra/monitoring/aws/status-check.yaml
++++ /dev/null
+@@ -1,113 +0,0 @@
+-AWSTemplateFormatVersion: '2010-09-09'
+-Description: Recover the Bibbidi monitoring EC2 instance and notify Discord on system status check failure.
+-
+-Parameters:
+-  MonitoringInstanceId:
+-    Type: AWS::EC2::Instance::Id
+-    Description: EC2 instance ID of the monitoring server.
+-  DiscordWebhookSecretArn:
+-    Type: String
+-    Description: Secrets Manager ARN containing the Discord webhook URL as a plain string.
+-    AllowedPattern: '^arn:aws:secretsmanager:.*:secret:.*$'
+-
+-Resources:
+-  AlertTopic:
+-    Type: AWS::SNS::Topic
+-
+-  DiscordNotifierRole:
+-    Type: AWS::IAM::Role
+-    Properties:
+-      AssumeRolePolicyDocument:
+-        Version: '2012-10-17'
+-        Statement:
+-          - Effect: Allow
+-            Principal:
+-              Service: lambda.amazonaws.com
+-            Action: sts:AssumeRole
+-      ManagedPolicyArns:
+-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+-      Policies:
+-        - PolicyName: ReadDiscordWebhook
+-          PolicyDocument:
+-            Version: '2012-10-17'
+-            Statement:
+-              - Effect: Allow
+-                Action: secretsmanager:GetSecretValue
+-                Resource: !Ref DiscordWebhookSecretArn
+-
+-  DiscordNotifier:
+-    Type: AWS::Lambda::Function
+-    Properties:
+-      Runtime: python3.13
+-      Handler: index.handler
+-      Role: !GetAtt DiscordNotifierRole.Arn
+-      Timeout: 10
+-      Environment:
+-        Variables:
+-          DISCORD_WEBHOOK_SECRET_ARN: !Ref DiscordWebhookSecretArn
+-      Code:
+-        ZipFile: |
+-          import json
+-          import os
+-          import urllib.request
+-
+-          import boto3
+-
+-
+-          def handler(event, context):
+-              secret = boto3.client("secretsmanager").get_secret_value(
+-                  SecretId=os.environ["DISCORD_WEBHOOK_SECRET_ARN"]
+-              )["SecretString"]
+-              for record in event.get("Records", []):
+-                  message = record["Sns"]["Message"]
+-                  body = json.dumps({"content": "Bibbidi monitoring EC2 status check: " + message[:1700]})
+-                  request = urllib.request.Request(
+-                      secret,
+-                      data=body.encode("utf-8"),
+-                      headers={"Content-Type": "application/json"},
+-                      method="POST",
+-                  )
+-                  with urllib.request.urlopen(request, timeout=5):
+-                      pass
+-
+-  AllowSnsInvoke:
+-    Type: AWS::Lambda::Permission
+-    Properties:
+-      Action: lambda:InvokeFunction
+-      FunctionName: !Ref DiscordNotifier
+-      Principal: sns.amazonaws.com
+-      SourceArn: !Ref AlertTopic
+-
+-  DiscordSubscription:
+-    Type: AWS::SNS::Subscription
+-    DependsOn: AllowSnsInvoke
+-    Properties:
+-      TopicArn: !Ref AlertTopic
+-      Protocol: lambda
+-      Endpoint: !GetAtt DiscordNotifier.Arn
+-
+-  SystemStatusAlarm:
+-    Type: AWS::CloudWatch::Alarm
+-    Properties:
+-      AlarmDescription: Monitoring EC2 system status failed twice; recover instance and notify Discord.
+-      Namespace: AWS/EC2
+-      MetricName: StatusCheckFailed_System
+-      Dimensions:
+-        - Name: InstanceId
+-          Value: !Ref MonitoringInstanceId
+-      Statistic: Maximum
+-      Period: 60
+-      EvaluationPeriods: 2
+-      DatapointsToAlarm: 2
+-      Threshold: 0
+-      ComparisonOperator: GreaterThanThreshold
+-      TreatMissingData: missing
+-      AlarmActions:
+-        - !Sub arn:aws:automate:${AWS::Region}:ec2:recover
+-        - !Ref AlertTopic
+-
+-Outputs:
+-  AlarmName:
+-    Value: !Ref SystemStatusAlarm
+-  TopicArn:
+-    Value: !Ref AlertTopic

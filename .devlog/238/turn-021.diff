@@ -1,0 +1,57 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java
+deleted file mode 100644
+index 36202c5da12e2f5a046fa3fc9a65ee49d5b019ca..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupScheduler.java
++++ /dev/null
+@@ -1,22 +0,0 @@
+-package com.bibbidi.wedding.auth.service;
+-
+-import org.springframework.scheduling.annotation.Scheduled;
+-import org.springframework.stereotype.Component;
+-
+-/**
+- * 정리 작업을 정해진 시각에 돌린다. 도는 시각은 설정에서 온다.
+- */
+-@Component
+-public class ExpiredAuthRecordCleanupScheduler {
+-
+-    private final ExpiredAuthRecordCleanupService cleanupService;
+-
+-    public ExpiredAuthRecordCleanupScheduler(ExpiredAuthRecordCleanupService cleanupService) {
+-        this.cleanupService = cleanupService;
+-    }
+-
+-    @Scheduled(cron = "${auth.cleanup.cron}")
+-    public void cleanUp() {
+-        cleanupService.cleanUp();
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
+index 4b63b5f3535c0a4d980f57caad1f0eca3d2290cf..0469555925a65fa4692744adf2afe737bb8d3d5a 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/auth/service/ExpiredAuthRecordCleanupService.java
+@@ -6,6 +6,7 @@ import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
+ import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+ import java.time.LocalDateTime;
+ import lombok.extern.slf4j.Slf4j;
++import org.springframework.scheduling.annotation.Scheduled;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -17,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
+  *
+  * <p>이 작업이 멈춰도 인증은 정상 동작한다. 만료 판정은 조회할 때 하고 여기서는 정리만 하기 때문이다.
+  * 한 번에 다 지우지 않고 정해진 수만큼 끊어 지운다. 운영 MySQL에서 큰 삭제 한 방은 락을 오래 잡는다.
++ *
++ * <p>도는 시각은 설정에서 온다. 테스트는 이 메서드를 직접 불러 확인하므로 스케줄을 꺼 둔다.
+  */
+ @Slf4j
+ @Service
+@@ -40,6 +43,7 @@ public class ExpiredAuthRecordCleanupService {
+         this.properties = properties;
+     }
+ 
++    @Scheduled(cron = "${auth.cleanup.cron}")
+     public CleanupResult cleanUp() {
+         LocalDateTime now = LocalDateTime.now();
+         LocalDateTime revokedThreshold = now.minus(properties.revokedSessionRetention());

@@ -1,0 +1,74 @@
+diff --git a/Infra/monitoring/README.md b/Infra/monitoring/README.md
+index 4cd1d852e99e357e6f2e8605cc7f5e722f11263e..c6e8b27c1217f35dea90ef1755f6a3b0f0dd66f8 100644
+--- a/Infra/monitoring/README.md
++++ b/Infra/monitoring/README.md
+@@ -19,6 +19,8 @@
+ 
+ 설치 전 `systemctl cat prometheus loki tempo grafana-server`로 실제 서비스 이름과 실행 경로를 확인한다. 특히 Prometheus 유닛의 바이너리 경로(`/usr/local/bin/prometheus`)와 데이터 경로(`/var/lib/prometheus`)가 서버와 일치해야 한다. 적용 후 `systemctl daemon-reload`와 각 서비스 재시작을 수행하고 `systemctl status` 및 각 서비스 `/metrics`를 확인한다. Loki 설정은 조회 결과 캐시를 사용한다.
+ 
++Grafana override는 GitHub OAuth 값을 `/etc/grafana/github-oauth.env`에서 읽는다. 이 파일은 비밀이라 저장소에 두지 않으므로 서버를 새로 만들 때 직접 만든다(소유자 `root:root`, 권한 `600`). 저장소의 systemd 파일은 운영 서버에서 그대로 복사한 것이다. 서버에서 바꾸면 이 파일도 같이 갱신한다.
++
+ ## 앱 서버 점검
+ 
+ - 사용자 요청은 8080, Actuator는 8081에서 처리한다. 호스트의 두 포트는 loopback에만 바인딩하며 Alloy는 Docker 네트워크의 `backend:8081/actuator/prometheus`를 수집한다.
+diff --git a/Infra/monitoring/systemd/grafana-server.service.d/override.conf b/Infra/monitoring/systemd/grafana-server.service.d/override.conf
+index 7339d4d0fd0b39a4885bcad9ffc21892df3e7928..3553dc233975c50a57677f44cc158da714487a8a 100644
+--- a/Infra/monitoring/systemd/grafana-server.service.d/override.conf
++++ b/Infra/monitoring/systemd/grafana-server.service.d/override.conf
+@@ -1,6 +1,18 @@
+ [Service]
++# 외부가 아닌 서버 내부(127.0.0.1)에서만 접속 허용. 나중에 nginx가 443으로 앞에서 받음
++Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
++# Grafana Labs로 사용 통계 전송 끄기
++Environment=GF_ANALYTICS_REPORTING_ENABLED=false
++# Grafana 본체 / 플러그인 새 버전 확인 요청 끄기 (외부 호출 줄이기)
++Environment=GF_ANALYTICS_CHECK_FOR_UPDATES=false
++Environment=GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
++# Go 런타임에게 "240MiB 근처면 GC를 더 열심히 해라"라고 알려주는 소프트 한도
+ Environment=GOMEMLIMIT=320MiB
++# 커널이 강제하는 하드 한도. 넘으면 OOM kill → Restart 정책으로 재시작
+ MemoryMax=400M
+-Restart=on-failure
++Environment=GF_PLUGINS_DISABLE_PLUGINS=grafana-postgresql-datasource,mssql,influxdb,elasticsearch,opentsdb,stackdriver,jaeger,zipkin,grafana-pyroscope-datasource,grafana-pyroscope-app
++Environment=GF_SERVER_ROOT_URL=https://monitoring.bibbidi.kr/
++Environment=GF_SECURITY_COOKIE_SECURE=true
++EnvironmentFile=/etc/grafana/github-oauth.env
+ RestartSec=5s
+ LimitNOFILE=65536
+diff --git a/Infra/monitoring/systemd/prometheus.service b/Infra/monitoring/systemd/prometheus.service
+index a6cccd4529f11d5047a4789f42428357be51223a..dbea6a5654dff36a276b514d9a4b9224ddb9c871 100644
+--- a/Infra/monitoring/systemd/prometheus.service
++++ b/Infra/monitoring/systemd/prometheus.service
+@@ -1,13 +1,11 @@
+ [Unit]
+-Description=Prometheus monitoring server
+-After=network-online.target
++Description=Prometheus
+ Wants=network-online.target
++After=network-online.target
+ 
+ [Service]
+-Type=simple
+ User=prometheus
+ Group=prometheus
+-Environment=GOMEMLIMIT=320MiB
+ ExecStart=/usr/local/bin/prometheus \
+   --config.file=/etc/prometheus/prometheus.yml \
+   --storage.tsdb.path=/var/lib/prometheus \
+@@ -16,10 +14,15 @@ ExecStart=/usr/local/bin/prometheus \
+   --web.listen-address=127.0.0.1:9090 \
+   --web.enable-remote-write-receiver \
+   --enable-feature=exemplar-storage
++ExecReload=/bin/kill -HUP $MAINPID
++Environment=GOMEMLIMIT=320MiB
++MemoryMax=400M
+ Restart=on-failure
+ RestartSec=5s
+-MemoryMax=400M
+ LimitNOFILE=65536
++NoNewPrivileges=true
++ProtectSystem=full
++ProtectHome=true
+ 
+ [Install]
+ WantedBy=multi-user.target
