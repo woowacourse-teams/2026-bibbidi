@@ -1,0 +1,108 @@
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+index 9bcf8f8e78a9a5baef3d0c240954b0eac3fd4597..81695a4dc514a84f657f356097722b4b5660b80b 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+@@ -171,7 +171,6 @@ describe("HomeScheduleDashboardFeature", () => {
+       ),
+     ).toHaveLength(2);
+     expect(screen.getByRole("button", { name: "오늘" })).toBeTruthy();
+-    expect(screen.queryByRole("link")).toBeNull();
+     expect(unscheduledRepository.getUnscheduledTasks).not.toHaveBeenCalled();
+     expect(
+       recommendedRepository.getRecommendedCatalogItems,
+@@ -179,6 +178,41 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(myChecklistRepository.getChecklist).not.toHaveBeenCalled();
+   });
+ 
++  it.each([
++    ["일정이 필요한 할 일", "로드맵에서 할 일 찾기"],
++    ["추천 할 일", "로드맵 보기"],
++  ])(
++    "비로그인 사용자는 %s 잠금 카드의 %s 링크로 로드맵에 이동한다",
++    (sectionName, linkName) => {
++      vi.mocked(useAuth).mockReturnValue({
++        authState: { status: "guest" },
++        beginAuthentication: vi.fn(),
++        beginOnboarding: vi.fn(),
++        completeAuthentication: vi.fn(),
++        endAuthentication: vi.fn(),
++        failAuthentication: vi.fn(),
++        requireAccountSetup: vi.fn(),
++        refreshAuth,
++      });
++
++      render(
++        <HomeScheduleDashboardFeature
++          recommendedRepository={createRecommendedRepository()}
++          unscheduledRepository={createUnscheduledRepository()}
++        />,
++      );
++
++      const section = screen.getByRole("region", { name: sectionName });
++      const link = within(section).getByRole("link", { name: linkName });
++
++      expect(link.getAttribute("href")).toBe("/preparation");
++      fireEvent.click(link);
++      expect(screen.getByTestId("dashboard-location").textContent).toBe(
++        "/preparation",
++      );
++    },
++  );
++
+   it("로그인 사용자의 체크리스트 일정을 해당 날짜에 표시한다", async () => {
+     vi.mocked(myChecklistRepository.getChecklist).mockResolvedValue({
+       exists: true,
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.test.tsx b/FE/src/features/home/view/HomeScheduleDashboard.test.tsx
+index 098217202b10a24be12842f34c9cafafe1d14366..fc2ebcde54a07d63e952595975cfabb338bd9cc1 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.test.tsx
++++ b/FE/src/features/home/view/HomeScheduleDashboard.test.tsx
+@@ -26,7 +26,11 @@ describe("HomeScheduleDashboard", () => {
+   it("모바일에서는 캘린더, 추천 할 일, 일정이 필요한 할 일 순서로 표시한다", () => {
+     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+ 
+-    render(<GuestHomeScheduleDashboard referenceDate="2026-09-30" />);
++    render(
++      <MemoryRouter>
++        <GuestHomeScheduleDashboard referenceDate="2026-09-30" />
++      </MemoryRouter>,
++    );
+ 
+     expect(getSectionHeadings()).toEqual([
+       "캘린더",
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.tsx b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+index bbb0e15e9653289a0bb253a667dff43eccc5c949..f24cd772779f53e0f7f7e08d06f999af98a3dc7c 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.tsx
++++ b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+@@ -349,6 +349,9 @@ function DashboardSide({ recommended, unscheduled }: DashboardSideProps) {
+ const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+   {
+     result: {
++      actionLabel: "로드맵에서 할 일 찾기",
++      actionTo: "/preparation",
++      actionVariant: "link",
+       description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+       icon: "lock",
+       title: "로그인하면 일정이 필요한 할 일을 확인할 수 있어요.",
+@@ -361,6 +364,9 @@ const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"au
+ const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+   {
+     result: {
++      actionLabel: "로드맵 보기",
++      actionTo: "/preparation",
++      actionVariant: "link",
+       description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",
+       icon: "lock",
+       title: "로그인하면 나에게 맞는 추천 할 일을 확인할 수 있어요.",
+diff --git a/FE/src/features/home/view/MonthlyCalendar.css b/FE/src/features/home/view/MonthlyCalendar.css
+index 3978a603e5d18d8c844155564ba6f19de6268c4b..ee877084862a02e32c1b74940860c58f4dbfbd12 100644
+--- a/FE/src/features/home/view/MonthlyCalendar.css
++++ b/FE/src/features/home/view/MonthlyCalendar.css
+@@ -209,7 +209,7 @@
+   }
+ 
+   .monthly-calendar__grid td {
+-    height: 64px;
++    height: 48px;
+   }
+ 
+   .monthly-calendar__grid time {

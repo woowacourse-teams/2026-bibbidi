@@ -18,6 +18,7 @@ export interface UnscheduledTaskItemViewModel {
 export interface UnscheduledTaskViewModel {
   addScheduleLabel: string;
   items: UnscheduledTaskItemViewModel[];
+  roadmapActionLabel: string;
   title: string;
 }
 
@@ -32,6 +33,7 @@ export function createUnscheduledTaskViewModel(
       statusLabel: statusLabels[task.status],
       title: task.title,
     })),
+    roadmapActionLabel: "로드맵에서 할 일 찾기",
     title: "일정이 필요한 할 일",
   };
 }

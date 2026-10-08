@@ -39,7 +39,7 @@ function createDataSource(
 }
 
 describe("createRecommendedCatalogItemsRepository", () => {
-  it("limit 4를 전달하고 API 순서와 표시 데이터만 보존한다", async () => {
+  it("limit 2를 전달하고 API 순서와 표시 데이터만 보존한다", async () => {
     const dataSource = createDataSource([
       createItem({ catalogItemId: 201 }),
       createItem({
@@ -72,7 +72,7 @@ describe("createRecommendedCatalogItemsRepository", () => {
       },
     ]);
     expect(dataSource.getRecommendedCatalogItems).toHaveBeenCalledWith(
-      4,
+      2,
       controller.signal,
     );
   });

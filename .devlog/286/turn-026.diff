@@ -1,0 +1,113 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index 589ab2d5109cbb95a774c30b94616d91ef924581..482785d95a64aa8a8dd1f01c739349e52a5e2260 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -1,10 +1,11 @@
+ .social-login-form {
+   display: flex;
+-  width: min(100%, 440px);
++  width: min(100%, 352px);
+   min-height: 100%;
++  min-width: 0;
+   flex-direction: column;
+   justify-content: space-between;
+-  padding: 0 44px;
++  justify-self: center;
+ }
+ 
+ .social-login-form__intro {
+@@ -38,8 +39,11 @@
+   gap: 12px;
+ }
+ 
+-.social-login-form__actions {
++.social-login-form__login-options {
++  display: flex;
+   flex: none;
++  flex-direction: column;
++  gap: 12px;
+ }
+ 
+ .social-login-form__button {
+@@ -187,10 +191,6 @@
+ }
+ 
+ @media (max-width: 520px) {
+-  .social-login-form {
+-    padding: 0 24px;
+-  }
+-
+   .social-login-form__headline {
+     font-size: clamp(23px, 7.2vw, 28px);
+   }
+@@ -209,10 +209,3 @@
+     font-size: 12px;
+   }
+ }
+-
+-@media (max-width: 360px) {
+-  .social-login-form {
+-    padding-right: 20px;
+-    padding-left: 20px;
+-  }
+-}
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.tsx b/FE/src/features/social-login/view/SocialLoginForm.tsx
+index a018f45e6d271bdabb70e314982da8282c6fd622..8b0640d1320d1c03e3c48452c311b13b8d721812 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.tsx
++++ b/FE/src/features/social-login/view/SocialLoginForm.tsx
+@@ -99,7 +99,7 @@ export function SocialLoginForm() {
+         </h1>
+       </header>
+ 
+-      <div className="social-login-form__actions">
++      <div className="social-login-form__login-options">
+         <div className="social-login-form__buttons">
+           {SOCIAL_LOGIN_PROVIDERS.map((provider) => (
+             <button
+@@ -117,29 +117,29 @@ export function SocialLoginForm() {
+           ))}
+         </div>
+ 
++        <aside
++          aria-labelledby="legacy-account-guide-title"
++          className="social-login-form__account-guide"
++        >
++          <span aria-hidden="true" className="social-login-form__guide-icon">
++            <svg fill="none" viewBox="0 0 24 24">
++              <path d="M9.5 14.5 14.5 9.5M7.25 16.75l-1 1a3.54 3.54 0 0 1-5-5l3.5-3.5a3.54 3.54 0 0 1 5 0M16.75 7.25l1-1a3.54 3.54 0 0 1 5 5l-3.5 3.5a3.54 3.54 0 0 1-5 0" />
++            </svg>
++          </span>
++          <span className="social-login-form__guide-copy">
++            <strong id="legacy-account-guide-title">
++              기존 계정이 있으신가요?
++            </strong>
++            <span>소셜 로그인 후 기존 계정과 연동할 수 있어요.</span>
++          </span>
++        </aside>
++
+         {socialLoginNotice && (
+           <p className="social-login-form__notice" role="status">
+             {socialLoginNotice}
+           </p>
+         )}
+       </div>
+-
+-      <aside
+-        aria-labelledby="legacy-account-guide-title"
+-        className="social-login-form__account-guide"
+-      >
+-        <span aria-hidden="true" className="social-login-form__guide-icon">
+-          <svg fill="none" viewBox="0 0 24 24">
+-            <path d="M9.5 14.5 14.5 9.5M7.25 16.75l-1 1a3.54 3.54 0 0 1-5-5l3.5-3.5a3.54 3.54 0 0 1 5 0M16.75 7.25l1-1a3.54 3.54 0 0 1 5 5l-3.5 3.5a3.54 3.54 0 0 1-5 0" />
+-          </svg>
+-        </span>
+-        <span className="social-login-form__guide-copy">
+-          <strong id="legacy-account-guide-title">
+-            기존 계정이 있으신가요?
+-          </strong>
+-          <span>소셜 로그인 후 기존 계정과 연동할 수 있어요.</span>
+-        </span>
+-      </aside>
+     </section>
+   );
+ }

@@ -75,7 +75,7 @@ export function createRecommendedCatalogItemsRepository(
   return {
     async getRecommendedCatalogItems(signal) {
       try {
-        const tasks = await dataSource.getRecommendedCatalogItems(4, signal);
+        const tasks = await dataSource.getRecommendedCatalogItems(2, signal);
 
         return tasks.map(toRecommendedCatalogItem);
       } catch (error) {

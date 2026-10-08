@@ -48,6 +48,27 @@ phases:
             ;;
         esac
 
+        if [ "$S3_PREFIX" = "bibbidi/fe/development" ] &&
+          [ "${BIBBIDI_SENTRY_ENABLED:-}" != "true" ]; then
+          echo "Development FE deployment requires Sentry error tracking." >&2
+          exit 1
+        fi
+
+        if [ "${BIBBIDI_SENTRY_ENABLED:-}" = "true" ]; then
+          required_sentry_variables=(
+            BIBBIDI_SENTRY_DSN
+            SENTRY_ORG
+            SENTRY_PROJECT
+            SENTRY_AUTH_TOKEN
+          )
+          for variable_name in "${required_sentry_variables[@]}"; do
+            if [ -z "${!variable_name:-}" ]; then
+              echo "Missing CodeBuild environment variable: ${variable_name}" >&2
+              exit 1
+            fi
+          done
+        fi
+
         pnpm install --frozen-lockfile
 
   build:
@@ -63,6 +84,11 @@ phases:
 
         BIBBIDI_API_BASE_URL="${BIBBIDI_API_BASE_URL:-}" \
           pnpm --filter bibbidi-fe build
+
+        if [ -n "$(find FE/dist -type f -name '*.map' -print -quit)" ]; then
+          echo "Source maps must not be uploaded to public S3." >&2
+          exit 1
+        fi
 
         export BUILD_COMMIT="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
         export BUILD_ID="${CODEBUILD_BUILD_ID:-unknown}"

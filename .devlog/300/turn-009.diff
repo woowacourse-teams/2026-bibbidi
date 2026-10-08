@@ -1,0 +1,125 @@
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.test.ts b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+index 2dcf6877ac5aecd26d850eff27b3fb1fb570151c..d91df07d68c93751bbeaba591db7e22f6d204c0a 100644
+--- a/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.test.ts
+@@ -123,6 +123,23 @@ describe("PostHog 개인정보 정제", () => {
+       $initial_referring_domain: "m.instagram.com",
+     });
+   });
++  it("경로 집계용 속성은 공개 경로만 남기고 콜백 경로는 제거한다", () => {
++    const result = sanitizePostHogEvent({
++      uuid: "id",
++      event: "$pageview",
++      properties: {
++        $host: "dev.bibbidi.kr",
++        $pathname: "/checklist/",
++        $session_entry_host: "dev.bibbidi.kr",
++        $session_entry_pathname: "/auth/kakao",
++      },
++    });
++    expect(result?.properties).toEqual({
++      $host: "dev.bibbidi.kr",
++      $pathname: "/checklist",
++      $session_entry_host: "dev.bibbidi.kr",
++    });
++  });
+   it("입력·텍스트·민감 속성·네트워크를 마스킹하고 이미지와 iframe을 차단한다", () => {
+     expect(PRIVATE_REPLAY_CONFIG.maskAllInputs).toBe(true);
+     expect(PRIVATE_REPLAY_CONFIG.maskTextSelector).toBe("*");
+diff --git a/FE/src/infrastructure/analytics/posthogPrivacy.ts b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+index e739cbfec9d0ad6ba6d1d704c65d484fd927ef81..905a7ec94bb870703b09a2605808ddfcbeb6766e 100644
+--- a/FE/src/infrastructure/analytics/posthogPrivacy.ts
++++ b/FE/src/infrastructure/analytics/posthogPrivacy.ts
+@@ -95,8 +95,13 @@ const ATTRIBUTION_PROPERTIES = new Set([
+   ...CAMPAIGN_KEYS.map((key) => `$session_entry_${key}`),
+   "$referring_domain",
+   "$session_entry_referring_domain",
++  "$host",
++  "$session_entry_host",
+ ]);
+ 
++// Web analytics의 경로 표는 이 속성으로 집계한다. 공개 경로만 남기고 콜백 경로는 버린다.
++const PATH_PROPERTIES = new Set(["$pathname", "$session_entry_pathname"]);
++
+ const INITIAL_PERSON_PROPERTIES = new Set([
+   ...CAMPAIGN_KEYS.map((key) => `$initial_${key}`),
+   "$initial_referring_domain",
+@@ -110,6 +115,10 @@ export function sanitizePostHogEvent(
+   for (const [key, value] of Object.entries(event.properties)) {
+     if (ALLOWED_PROPERTIES.has(key) || ATTRIBUTION_PROPERTIES.has(key))
+       properties[key] = value;
++    if (PATH_PROPERTIES.has(key) && typeof value === "string") {
++      const path = analyticsPagePath(value);
++      if (path) properties[key] = path;
++    }
+     if (
+       ["$current_url", "page_location", "page_referrer"].includes(key) &&
+       typeof value === "string"
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.test.ts b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+index 4c1a921208028e526b1f1d5bac1b1d00e22b7315..17467afad7d88c21cb32103d790adef7aeb27fb3 100644
+--- a/FE/src/infrastructure/analytics/posthogProvider.test.ts
++++ b/FE/src/infrastructure/analytics/posthogProvider.test.ts
+@@ -31,6 +31,7 @@ function setup(initialId = "anonymous-1", enabled = true) {
+       id = "anonymous-2";
+     }),
+     get_distinct_id: vi.fn(() => id),
++    register: vi.fn(),
+     startSessionRecording: vi.fn(),
+     stopSessionRecording: vi.fn(),
+   };
+@@ -191,6 +192,10 @@ describe("PostHog 사용자 여정", () => {
+       expect.objectContaining({ auth_state: "guest" }),
+     );
+     expect(sdk.startSessionRecording).toHaveBeenCalled();
++    expect(sdk.register).toHaveBeenCalledWith({
++      environment: "test",
++      app_version: "test-sha",
++    });
+   });
+ 
+   it("기존 회원이 게스트가 되면 한 번만 reset하고 익명 탐색을 유지한다", () => {
+diff --git a/FE/src/infrastructure/analytics/posthogProvider.ts b/FE/src/infrastructure/analytics/posthogProvider.ts
+index f36273f890e18da05d75031f98fc55a25b8341cb..4870939280e5482f779f0e1ac353080d52e8ab6b 100644
+--- a/FE/src/infrastructure/analytics/posthogProvider.ts
++++ b/FE/src/infrastructure/analytics/posthogProvider.ts
+@@ -22,6 +22,7 @@ type PostHogSdk = Pick<
+   | "identify"
+   | "reset"
+   | "get_distinct_id"
++  | "register"
+   | "startSessionRecording"
+   | "stopSessionRecording"
+ >;
+@@ -99,6 +100,11 @@ export function createPostHogProvider(
+           return sanitizePostHogEvent(event);
+         },
+       });
++      // $identify 같은 SDK 이벤트에도 붙여 테스트 서버 기록을 환경으로 걸러낸다.
++      sdk.register({
++        environment: options.environment,
++        app_version: options.appVersion,
++      });
+       initialized = true;
+     },
+     setContext(nextContext) {
+@@ -151,8 +157,6 @@ export function createPostHogProvider(
+         return;
+       const properties = {
+         ...event.parameters,
+-        environment: options.environment,
+-        app_version: options.appVersion,
+         auth_state: isCallbackEvent ? "anonymous_callback" : context.authState,
+         ...(event.name === "page_view"
+           ? { $current_url: event.parameters.page_location }
+diff --git a/docs/posthog.md b/docs/posthog.md
+index 64203a76b3459d0bbcb68a19379ea1cd63b13fe5..a5f125d768d41d71a2bc0fa9ffa179a8ff0d8716 100644
+--- a/docs/posthog.md
++++ b/docs/posthog.md
+@@ -55,7 +55,7 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
+ 
+ 서버의 208은 state 불일치, 만료, 쿠키 바인딩 실패를 함께 나타낸다. FE에서 구분할 수 없으므로 `state_invalid_or_expired`로 묶는다. 취소는 제공자가 `error=access_denied`로 돌려준 경우다. 제공자 화면에서 돌아오지 않은 사용자는 실패 이벤트가 없고 시작 후 다음 단계가 관측되지 않은 방문으로만 해석한다.
+ 
+-오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
++오류 메시지·원문 응답·닉네임·비밀번호·토큰·OAuth code/state·제목·피드백·장소·메모·일정 일시는 전송하지 않는다. 이벤트별 고정 속성과 카탈로그 ID·이름·단계만 사용한다. `page_title`은 페이지 정의의 고정 제목만 허용하고 SDK 자동 `$title`은 제거한다. 페이지 URL은 알려진 경로와 origin만 남긴다. Web analytics의 경로 표에 쓰는 `$pathname`·`$session_entry_pathname`도 공개 경로일 때만 남기고, `$host`는 그대로 둔다. `environment`와 `app_version`은 SDK 공통 속성으로 등록해 `$identify` 같은 SDK 이벤트에도 붙인다. PostHog의 테스트 계정 필터는 `environment ≠ development`로 두어 테스트 서버 기록을 뺀다. 홍보 유입 분석을 위해 `utm_source`·`utm_medium`·`utm_campaign`·`utm_content`·`utm_term`과 유입 도메인(`$referring_domain`)은 이벤트·세션 진입값(`$session_entry_*`)·Person 첫 유입값(`$initial_*`)으로 남긴다. 전체 URL과 referrer 원문(`$referrer`, `$session_entry_url`, `$initial_current_url` 등)은 쿼리에 OAuth 값이 섞일 수 있어 계속 제거한다. 신규 일정 이벤트는 저장 성공과 목록 새로고침 실패를 구분하며, 기존 appointment_create는 현행 의미를 유지한다.
+ 
+ ## SDK와 리플레이
