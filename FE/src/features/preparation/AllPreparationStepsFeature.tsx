@@ -33,7 +33,7 @@ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
 import { RoadmapSectionHeader } from "./view/RoadmapSectionHeader";
 import { AllPreparationStepsSummaryFeature } from "./AllPreparationStepsSummaryFeature";
 
-type CatalogRequestState =
+type CatalogRequestState = { owner: string | undefined } & (
   | { audience?: PreparationAudience; status: "loading" }
   | { audience: PreparationAudience; status: "empty" }
   | {
@@ -46,7 +46,8 @@ type CatalogRequestState =
       catalog: PreparationCatalogModel;
       selection: PreparationRoadmapSelection;
       status: "success";
-    };
+    }
+);
 
 export function AllPreparationStepsFeature({
   initialCategoryId,
@@ -66,6 +67,7 @@ export function AllPreparationStepsFeature({
     [],
   );
   const [requestState, setRequestState] = useState<CatalogRequestState>({
+    owner: undefined,
     status: "loading",
   });
   const [requestRevision, setRequestRevision] = useState(0);
@@ -78,6 +80,10 @@ export function AllPreparationStepsFeature({
       : authState.status === "guest"
         ? "guest"
         : undefined;
+  const owner =
+    authState.status === "authenticated"
+      ? `authenticated:${authState.user.id}`
+      : audience;
 
   useEffect(() => {
     if (!audience) {
@@ -102,9 +108,10 @@ export function AllPreparationStepsFeature({
         );
 
         setAdditionErrorMessage(null);
+        setAddingCatalogItemIds([]);
 
         if (!hasSelectablePreparationSteps(nextCatalog)) {
-          setRequestState({ audience, status: "empty" });
+          setRequestState({ audience, owner, status: "empty" });
           return;
         }
 
@@ -120,6 +127,7 @@ export function AllPreparationStepsFeature({
 
         setRequestState({
           audience,
+          owner,
           catalog: nextCatalog,
           selection,
           status: "success",
@@ -136,6 +144,7 @@ export function AllPreparationStepsFeature({
 
           setRequestState({
             audience,
+            owner,
             status: requiresAuthentication
               ? "authentication-required"
               : "error",
@@ -149,6 +158,7 @@ export function AllPreparationStepsFeature({
     };
   }, [
     audience,
+    owner,
     checklistRepository,
     refreshAuth,
     requestRevision,
@@ -158,8 +168,9 @@ export function AllPreparationStepsFeature({
   useEffect(
     () => () => {
       additionControllerRef.current?.abort();
+      additionControllerRef.current = null;
     },
-    [audience],
+    [audience, owner],
   );
 
   useEffect(() => {
@@ -179,7 +190,7 @@ export function AllPreparationStepsFeature({
       return;
     }
 
-    setRequestState({ audience, status: "loading" });
+    setRequestState({ audience, owner, status: "loading" });
     setRequestRevision((value) => value + 1);
   };
 
@@ -200,7 +211,7 @@ export function AllPreparationStepsFeature({
     );
   }
 
-  if (requestState.audience !== audience) {
+  if (requestState.audience !== audience || requestState.owner !== owner) {
     return <PreparationRoadmapState status="loading" />;
   }
 
@@ -311,7 +322,8 @@ export function AllPreparationStepsFeature({
       setRequestState((currentState) => {
         if (
           currentState.status !== "success" ||
-          currentState.audience !== audience
+          currentState.audience !== audience ||
+          currentState.owner !== owner
         ) {
           return currentState;
         }

@@ -14,7 +14,7 @@ const analyticsMocks = vi.hoisted(() => ({
 }));
 const authMocks = vi.hoisted(() => ({
   authState: { status: "guest" } as
-    | { status: "authenticated"; user: { nickname: string } }
+    | { status: "authenticated"; user: { id: number; nickname: string } }
     | { status: "guest" }
     | { status: "loading" },
   refreshAuth: vi.fn(),
@@ -244,7 +244,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
   it("로그인 사용자는 단일 준비 목록과 서버 체크리스트를 요청한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
 
@@ -269,7 +269,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
   it("로그인 사용자는 내 체크리스트의 원본 준비 항목 ID로 included를 계산한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
     checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
@@ -302,7 +302,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     rerender(<AllPreparationStepsFeature />);
 
@@ -325,7 +325,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     rerender(<AllPreparationStepsFeature />);
 
@@ -333,6 +333,93 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
     expect(screen.getByRole("status").textContent).toBe(
       "로드맵을 불러오고 있어요.",
     );
+  });
+
+  it("authenticated 상태에서 계정이 바뀌면 이전 목록을 즉시 숨기고 다시 조회한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 1, nickname: "A" },
+    };
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+    let resolveNext: ((ids: string[]) => void) | undefined;
+    checklistRepositoryMocks.getCatalogItemIds
+      .mockResolvedValueOnce(["101"])
+      .mockReturnValueOnce(
+        new Promise<string[]>((resolve) => {
+          resolveNext = resolve;
+        }),
+      );
+    const { rerender } = await renderFeature({ expandFirstStep: true });
+    expect(
+      within(
+        screen.getByRole("region", { name: "이 단계의 체크리스트" }),
+      ).getByText("웨딩홀 투어"),
+    ).toBeTruthy();
+
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 2, nickname: "B" },
+    };
+    rerender(
+      <div data-page-scroll-container>
+        <AllPreparationStepsFeature />
+      </div>,
+    );
+
+    expect(
+      screen.queryByRole("region", { name: "이 단계의 체크리스트" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: ROADMAP_TITLE_PATTERN }),
+    ).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe(
+      "로드맵을 불러오고 있어요.",
+    );
+    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
+    await act(async () => resolveNext?.(["102"]));
+    fireEvent.click(
+      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+    );
+    const checklist = within(
+      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
+    );
+    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
+    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
+  });
+
+  it("계정 전환 후 늦게 도착한 이전 계정의 조회 응답을 무시한다", async () => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 1, nickname: "A" },
+    };
+    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+    let resolvePrevious: ((ids: string[]) => void) | undefined;
+    let previousSignal: AbortSignal | undefined;
+    checklistRepositoryMocks.getCatalogItemIds
+      .mockImplementationOnce((_audience: string, signal: AbortSignal) => {
+        previousSignal = signal;
+        return new Promise<string[]>((resolve) => {
+          resolvePrevious = resolve;
+        });
+      })
+      .mockResolvedValueOnce(["102"]);
+    const { rerender } = render(<AllPreparationStepsFeature />);
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 2, nickname: "B" },
+    };
+    rerender(<AllPreparationStepsFeature />);
+    expect(previousSignal?.aborted).toBe(true);
+    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
+    await act(async () => resolvePrevious?.(["101"]));
+    fireEvent.click(
+      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+    );
+    const checklist = within(
+      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
+    );
+    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
+    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
   });
 
   it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
@@ -383,7 +470,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
   it("내 체크리스트의 401 응답을 로그인 만료로 안내한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
       new PreparationAuthenticationRequiredError(),
@@ -402,7 +489,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
   it("인증 상태 재조회 중에도 로그인 만료 안내에서 다시 시도할 수 있다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
       new PreparationAuthenticationRequiredError(),
@@ -424,7 +511,7 @@ describe("AllPreparationStepsFeature 로그인 체크리스트 추가", () => {
   beforeEach(() => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     authMocks.refreshAuth.mockReset();
     analyticsMocks.track.mockReset();
@@ -554,6 +641,54 @@ describe("AllPreparationStepsFeature 로그인 체크리스트 추가", () => {
     expect(additionSignal?.aborted).toBe(true);
     await act(async () => resolveAddition?.(["102"]));
     expect(analyticsMocks.track).not.toHaveBeenCalled();
+  });
+
+  it("authenticated 상태에서 계정이 바뀌면 이전 담기를 취소하고 새 계정은 담기를 계속할 수 있다", async () => {
+    let previousSignal: AbortSignal | undefined;
+    let resolvePrevious: ((ids: string[]) => void) | undefined;
+    checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
+      (_audience: string, _ids: string[], signal: AbortSignal) => {
+        previousSignal = signal;
+        return new Promise<string[]>((resolve) => {
+          resolvePrevious = resolve;
+        });
+      },
+    );
+    const { rerender } = await renderFeature({ expandFirstStep: true });
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 2, nickname: "B" },
+    };
+    rerender(
+      <div data-page-scroll-container>
+        <AllPreparationStepsFeature />
+      </div>,
+    );
+    expect(previousSignal?.aborted).toBe(true);
+    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
+    fireEvent.click(
+      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+    );
+    const button = screen.getByRole("button", {
+      name: "웨딩홀 견적 비교 추가",
+    });
+    expect(button.hasAttribute("disabled")).toBe(false);
+    analyticsMocks.track.mockClear();
+    await act(async () => resolvePrevious?.(["102"]));
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeTruthy();
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+      ).toBeNull(),
+    );
+    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledTimes(2);
   });
 
   it("추가 실패 시 화면을 유지하고 같은 동작을 다시 시도한다", async () => {
