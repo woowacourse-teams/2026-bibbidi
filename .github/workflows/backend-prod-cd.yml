@@ -9,6 +9,7 @@ on:
       - "Infra/nginx/**"
       - "Infra/scripts/**"
       - ".github/workflows/backend-*-cd.yml"
+      - ".github/be-cd-jobs/**"
 
 permissions:
   contents: read
