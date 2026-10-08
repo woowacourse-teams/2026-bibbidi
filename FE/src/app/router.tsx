@@ -1,13 +1,15 @@
 import { createBrowserRouter, Navigate, RouteObject } from "react-router";
 
-import { PlannerAccessGuard } from "../features/auth";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
+import { AccountSetupPage } from "../pages/AccountSetupPage";
 import { ChecklistPage } from "../pages/ChecklistPage";
 import { LoginPage } from "../pages/LoginPage";
-import { PlannerPage } from "../pages/PlannerPage";
+import { OnboardingPage } from "../pages/OnboardingPage";
+import { CalendarPage } from "../pages/CalendarPage";
+import { HomeEntryPage } from "../pages/HomeEntryPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
-import { SignupPage } from "../pages/SignupPage";
+import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -15,20 +17,15 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: "/",
-        Component: PreparationCatalogPage,
+        Component: HomeEntryPage,
       },
       {
         path: "/preparation",
-        element: <Navigate replace to="/" />,
+        Component: PreparationCatalogPage,
       },
       {
-        Component: PlannerAccessGuard,
-        children: [
-          {
-            path: "/planner",
-            Component: PlannerPage,
-          },
-        ],
+        path: "/calendar",
+        Component: CalendarPage,
       },
       {
         path: "/checklist",
@@ -45,7 +42,20 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "/signup",
-        Component: SignupPage,
+        element: <Navigate replace to="/login" />,
+      },
+      {
+        path: "/onboarding",
+        Component: OnboardingPage,
+      },
+      {
+        path: "/onboarding/account",
+        Component: AccountSetupPage,
+      },
+      {
+        // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.
+        path: "/auth/:provider",
+        Component: SocialLoginCallbackPage,
       },
     ],
   },

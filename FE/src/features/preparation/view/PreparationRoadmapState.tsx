@@ -10,7 +10,7 @@ export function PreparationRoadmapState({
   if (status === "loading") {
     return (
       <div className="preparation-roadmap-state" role="status">
-        준비 목록을 불러오고 있어요.
+        로드맵을 불러오고 있어요.
       </div>
     );
   }
@@ -18,7 +18,7 @@ export function PreparationRoadmapState({
   if (status === "empty") {
     return (
       <div className="preparation-roadmap-state" role="status">
-        표시할 준비 목록이 없어요.
+        표시할 로드맵이 없어요.
       </div>
     );
   }
@@ -36,7 +36,7 @@ export function PreparationRoadmapState({
 
   return (
     <div className="preparation-roadmap-state" role="alert">
-      <p>준비 목록을 불러오지 못했어요.</p>
+      <p>로드맵을 불러오지 못했어요.</p>
       <button onClick={onRetry} type="button">
         다시 시도
       </button>

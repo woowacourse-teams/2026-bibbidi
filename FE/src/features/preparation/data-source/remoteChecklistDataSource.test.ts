@@ -21,6 +21,7 @@ describe("parseAddedChecklistCatalogItems", () => {
           {
             catalogItemId: 100,
             categoryId: 2,
+            createdAt: "2026-09-23T09:00:00",
             id: 1,
             status: "prev",
             title: "계약서 확인",
@@ -28,6 +29,7 @@ describe("parseAddedChecklistCatalogItems", () => {
           {
             catalogItemId: 101,
             categoryId: 3,
+            createdAt: "2026-09-23T09:00:00",
             id: 2,
             status: "prev",
             title: "예식장 예약",
@@ -38,6 +40,7 @@ describe("parseAddedChecklistCatalogItems", () => {
       {
         catalogItemId: 100,
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 1,
         status: "prev",
         title: "계약서 확인",
@@ -45,6 +48,7 @@ describe("parseAddedChecklistCatalogItems", () => {
       {
         catalogItemId: 101,
         categoryId: 3,
+        createdAt: "2026-09-23T09:00:00",
         id: 2,
         status: "prev",
         title: "예식장 예약",
@@ -56,6 +60,7 @@ describe("parseAddedChecklistCatalogItems", () => {
     {
       catalogItemId: "100",
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 1,
       status: "prev",
       title: "할 일",
@@ -63,6 +68,7 @@ describe("parseAddedChecklistCatalogItems", () => {
     {
       catalogItemId: 100,
       categoryId: 0,
+      createdAt: "2026-09-23T09:00:00",
       id: 1,
       status: "prev",
       title: "할 일",
@@ -70,6 +76,15 @@ describe("parseAddedChecklistCatalogItems", () => {
     {
       catalogItemId: 100,
       categoryId: 2,
+      createdAt: "2026-02-30T09:00:00",
+      id: 1,
+      status: "prev",
+      title: "할 일",
+    },
+    {
+      catalogItemId: 100,
+      categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: -1,
       status: "prev",
       title: "할 일",
@@ -77,6 +92,7 @@ describe("parseAddedChecklistCatalogItems", () => {
     {
       catalogItemId: 100,
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 1,
       status: "done",
       title: "할 일",
@@ -98,6 +114,7 @@ describe("remoteChecklistDataSource.addCatalogItemIds", () => {
             {
               catalogItemId: 100,
               categoryId: 2,
+              createdAt: "2026-09-23T09:00:00",
               id: 1,
               status: "prev",
               title: "계약서 확인",
@@ -115,6 +132,7 @@ describe("remoteChecklistDataSource.addCatalogItemIds", () => {
       {
         catalogItemId: 100,
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 1,
         status: "prev",
         title: "계약서 확인",

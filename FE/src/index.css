@@ -2,6 +2,16 @@
   box-sizing: border-box;
 }
 
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+a {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 html {
   min-width: 320px;
   background: var(--color-bg-layer-basement);

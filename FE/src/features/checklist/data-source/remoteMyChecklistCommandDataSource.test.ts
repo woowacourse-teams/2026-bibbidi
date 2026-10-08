@@ -27,6 +27,7 @@ import {
 const changedItemResponse = {
   catalogItemId: null,
   categoryId: 2,
+  createdAt: "2026-09-23T09:00:00",
   id: 500,
   status: "continue",
   title: "청첩장 문구 최종 확정",
@@ -37,6 +38,7 @@ const doneItemResponse = { ...changedItemResponse, status: "done" } as const;
 const createdCustomItemResponse = {
   catalogItemId: null,
   categoryId: 2,
+  createdAt: "2026-09-23T09:00:00",
   id: 501,
   status: "prev",
   title: "청첩장 문구 정하기",
@@ -196,6 +198,8 @@ describe("remoteMyChecklistCommandDataSource.createCustomChecklistItem", () => {
     [201, { ...createdCustomItemResponse, id: 0 }],
     [201, { ...createdCustomItemResponse, catalogItemId: 101 }],
     [201, { ...createdCustomItemResponse, categoryId: -1 }],
+    [201, { ...createdCustomItemResponse, createdAt: undefined }],
+    [201, { ...createdCustomItemResponse, createdAt: "2026-02-30T09:00:00" }],
     [201, { ...createdCustomItemResponse, title: 3 }],
     [201, { ...createdCustomItemResponse, status: "unknown" }],
   ])("생성 성공 상태와 전체 응답 계약을 검증한다", async (status, body) => {
@@ -748,6 +752,8 @@ describe("remoteMyChecklistCommandDataSource.changeChecklistItemStatus", () => {
 
   it.each([
     { ...doneItemResponse, id: 501 },
+    { ...doneItemResponse, createdAt: undefined },
+    { ...doneItemResponse, createdAt: "2026-02-30T09:00:00" },
     { ...doneItemResponse, status: undefined },
     { ...doneItemResponse, status: "complete" },
     { ...doneItemResponse, status: "prev" },
