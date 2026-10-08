@@ -5,7 +5,6 @@ node_modules.isolated-backup/
 # Build output
 dist/
 web-build/
-.expo/
 .cache/
 
 # Local environment
@@ -22,7 +21,3 @@ web-build/
 
 # Logs
 *.log
-
-# iOS is generated with Expo Prebuild. Android is versioned so every team
-# member builds with the same Gradle and signing configuration.
-APP/ios/

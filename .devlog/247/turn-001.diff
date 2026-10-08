@@ -1,0 +1,324 @@
+diff --git a/.github/workflows/app-ci.yml b/.github/workflows/app-ci.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..5a613e03f2ef403b9c7c767f1925dc0af56b8006
+--- /dev/null
++++ b/.github/workflows/app-ci.yml
+@@ -0,0 +1,133 @@
++name: App CI
++
++on:
++  pull_request:
++    branches: [dev-app, release-app]
++    paths:
++      - APP/**
++      - .github/workflows/app-ci.yml
++  push:
++    branches: [dev-app]
++    paths:
++      - APP/**
++      - .github/workflows/app-ci.yml
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: app-ci-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  android:
++    name: ${{ matrix.name }}
++    runs-on: ubuntu-24.04
++    timeout-minutes: 25
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - name: Shared tests
++            tasks: ':shared:testAndroidHostTest'
++          - name: Android tests
++            tasks: ':androidApp:testDebugUnitTest'
++          - name: Android build
++            tasks: ':androidApp:assembleDebug'
++    steps:
++      - uses: actions/checkout@v6
++        with:
++          persist-credentials: false
++      - uses: actions/setup-java@v5
++        with:
++          distribution: temurin
++          java-version: '25'
++      - uses: gradle/actions/setup-gradle@v6
++        with:
++          cache-read-only: ${{ github.event_name == 'pull_request' }}
++      - name: Install Android SDK packages
++        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-36' 'build-tools;36.0.0'"
++      - name: Run Gradle checks
++        working-directory: APP
++        env:
++          GRADLE_TASKS: ${{ matrix.tasks }}
++        run: ./gradlew --no-daemon --stacktrace $GRADLE_TASKS
++      - name: Upload test reports
++        if: ${{ !cancelled() && matrix.name != 'Android build' }}
++        uses: actions/upload-artifact@v4
++        with:
++          name: ${{ matrix.name }}-reports
++          path: |
++            APP/**/build/reports/tests/
++            APP/**/build/test-results/
++          retention-days: 7
++
++  ios:
++    name: iOS ${{ matrix.check }}
++    runs-on: xcode-27
++    timeout-minutes: 40
++    strategy:
++      fail-fast: false
++      matrix:
++        check: [tests, build]
++    env:
++      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
++    steps:
++      - uses: actions/checkout@v6
++        with:
++          persist-credentials: false
++      - uses: actions/setup-java@v5
++        with:
++          distribution: temurin
++          java-version: '25'
++      - uses: gradle/actions/setup-gradle@v6
++        with:
++          cache-read-only: ${{ github.event_name == 'pull_request' }}
++      - name: Restore Kotlin/Native dependencies
++        id: konan
++        uses: actions/cache/restore@v5
++        with:
++          path: |
++            ~/.konan/dependencies
++            ~/.konan/kotlin-native-prebuilt-*
++          key: konan-${{ runner.os }}-${{ runner.arch }}-xcode27-${{ hashFiles('APP/gradle/libs.versions.toml', 'APP/gradle/wrapper/gradle-wrapper.properties') }}
++      - name: Run shared tests on iOS Simulator
++        if: matrix.check == 'tests'
++        working-directory: APP
++        run: ./gradlew --no-daemon --stacktrace :shared:iosSimulatorArm64Test
++      - name: Build iOS Simulator app
++        if: matrix.check == 'build'
++        run: >-
++          xcodebuild -project APP/iosApp/iosApp.xcodeproj
++          -scheme Bibbidi -configuration Debug -sdk iphonesimulator
++          -destination 'generic/platform=iOS Simulator'
++          -derivedDataPath APP/iosApp/build/DerivedData
++          CODE_SIGNING_ALLOWED=NO build
++      - name: Run iOS app launch test
++        if: matrix.check == 'tests'
++        run: >-
++          xcodebuild -project APP/iosApp/iosApp.xcodeproj
++          -scheme Bibbidi -configuration Debug
++          -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
++          -derivedDataPath APP/iosApp/build/DerivedData
++          -resultBundlePath APP/iosApp/build/TestResults.xcresult
++          -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
++      - name: Save Kotlin/Native dependencies from trusted branch
++        if: success() && github.event_name != 'pull_request' && steps.konan.outputs.cache-hit != 'true'
++        uses: actions/cache/save@v5
++        with:
++          path: |
++            ~/.konan/dependencies
++            ~/.konan/kotlin-native-prebuilt-*
++          key: ${{ steps.konan.outputs.cache-primary-key }}
++      - name: Upload iOS test reports
++        if: ${{ !cancelled() && matrix.check == 'tests' }}
++        uses: actions/upload-artifact@v4
++        with:
++          name: iOS-test-reports
++          path: |
++            APP/shared/build/reports/tests/
++            APP/shared/build/test-results/
++            APP/iosApp/build/TestResults.xcresult
++          retention-days: 7
+diff --git a/APP/README.md b/APP/README.md
+index 87158c0049c21fab26166636e4375e1f8467564a..9b5cb12382416eaaea88f189a2425783fcc890df 100644
+--- a/APP/README.md
++++ b/APP/README.md
+@@ -96,8 +96,8 @@ xcodebuild -project APP/iosApp/iosApp.xcodeproj \
+ ./APP/gradlew -p APP :shared:linkDebugFrameworkIosArm64 :shared:linkDebugFrameworkIosSimulatorArm64
+ ```
+ 
+-공통 테스트 의존성과 Android host test 구성이 준비되어 있습니다. 현재 비즈니스 로직과 테스트 사례는 없으며,
+-인증 상태 구현 #241과 CI #247에서 실제 테스트를 추가합니다.
++공통 모듈의 앱 이름 계약, Android에서 공통 모듈 접근, iOS 앱 실행 후 공통 앱 이름 표시를 테스트합니다.
++인증 상태와 시나리오 테스트는 #241에서 확장합니다.
+ iOS 타깃은 `iosArm64`, `iosSimulatorArm64`, `iosX64`입니다.
+ Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니다.
+ 
+@@ -116,8 +116,42 @@ Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니
+ - 기존 Android Release AAB 워크플로는 KMP 전환 중 job을 항상 건너뛰도록 중지했습니다.
+   #240에서 새 `androidApp` 경로·서명·릴리스 브랜치 조건을 연결합니다.
+   SDK 액션의 옛 `tools` 패키지 설치 오류도 그때 수정합니다. GitHub Secrets 자체는 변경하지 않았습니다.
+-- #247에서 shared·Android·iOS PR CI를 추가합니다.
++- shared·Android·iOS PR CI는 `.github/workflows/app-ci.yml`에서 실행합니다.
+ - 환경별 빌드·서명(#240), 인증(#241–#243), WebView(#244–#245)는 최소 틀에 포함하지 않습니다.
+ 
+ 추적: [#239](https://github.com/woowacourse-teams/2026-bibbidi/issues/239),
+ [#211](https://github.com/woowacourse-teams/2026-bibbidi/issues/211).
++
++## APP CI
++
++`dev-app`·`release-app` 대상 PR에서 `APP/**` 또는 APP CI workflow가 바뀌면 다음 check를 실행합니다.
++`dev-app` push에서도 실행해 기본 캐시를 생성하며, Actions에서 수동 재실행도 가능합니다.
++
++| Check | 검사 |
++| --- | --- |
++| Shared tests | `:shared:testAndroidHostTest`로 commonTest 실행 |
++| Android tests | `:androidApp:testDebugUnitTest` |
++| Android build | `:androidApp:assembleDebug` |
++| iOS tests | `:shared:iosSimulatorArm64Test`와 Xcode 앱 실행 UI 테스트 |
++| iOS build | 서명 없는 Simulator Debug 앱 빌드 |
++
++GitHub 브랜치 보호의 필수 검사에는 위 다섯 check를 등록합니다. 경로 필터로 건너뛴 workflow는
++필수 검사가 pending으로 남을 수 있으므로, APP 브랜치에서 APP과 무관한 PR을 병합할 때 이 점을 고려하세요.
++Workflow 파일만으로 브랜치 보호 설정이 바뀌지는 않습니다.
++
++JDK 25와 Android SDK 36을 사용하며, iOS는 ARM64 `xcode-27` runner에서 Xcode 27.0과
++iPhone 18 Pro / iOS 27.0 Simulator를 사용합니다. 이 runner는 GitHub의 public preview입니다.
++Gradle·Kotlin/Native 캐시는 PR에서 읽기만 하며, push·수동 실행에서 갱신합니다.
++Kotlin/Native 캐시는 OS·CPU·Xcode·Kotlin/Gradle 설정으로 구분하고 다운로드한 도구·의존성만 보관합니다.
++서명·OAuth secret 없이 fork PR에서도 실행하며, 같은 PR의 새 실행은 이전 실행을 취소합니다.
++실패한 테스트 보고서와 Xcode 결과는 Actions Artifacts에 7일 보관합니다.
++
++로컬에서 CI와 같은 Gradle 검사를 실행하려면:
++
++```bash
++./APP/gradlew -p APP :shared:testAndroidHostTest :androidApp:testDebugUnitTest :androidApp:assembleDebug
++./APP/gradlew -p APP :shared:iosSimulatorArm64Test
++xcodebuild -project APP/iosApp/iosApp.xcodeproj -scheme Bibbidi -configuration Debug \
++  -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
++  -derivedDataPath APP/iosApp/build/DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
++```
+diff --git a/APP/androidApp/build.gradle.kts b/APP/androidApp/build.gradle.kts
+index 2907da8485e067c2815fdcf7820ac5e94e1825ea..5a06a7c4ca7e5d1b2021479590ed21eedb519f58 100644
+--- a/APP/androidApp/build.gradle.kts
++++ b/APP/androidApp/build.gradle.kts
+@@ -32,6 +32,7 @@ kotlin {
+ }
+ 
+ dependencies {
++    testImplementation(libs.kotlin.test.junit)
+     implementation(project(":shared"))
+     implementation(platform(libs.androidx.compose.bom))
+     implementation(libs.androidx.activity.compose)
+diff --git a/APP/androidApp/src/test/kotlin/com/bobbidi/bibbidi/SharedIntegrationTest.kt b/APP/androidApp/src/test/kotlin/com/bobbidi/bibbidi/SharedIntegrationTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1da33f125f5833b1d077ad5fbb8cd269158fb88e
+--- /dev/null
++++ b/APP/androidApp/src/test/kotlin/com/bobbidi/bibbidi/SharedIntegrationTest.kt
+@@ -0,0 +1,12 @@
++package com.bobbidi.bibbidi
++
++import com.bobbidi.bibbidi.shared.AppInfo
++import kotlin.test.Test
++import kotlin.test.assertEquals
++
++class SharedIntegrationTest {
++    @Test
++    fun androidCanReadSharedAppName() {
++        assertEquals("비비디", AppInfo.name)
++    }
++}
+diff --git a/APP/gradle/libs.versions.toml b/APP/gradle/libs.versions.toml
+index f4c301820e073821854661e191f24fd9f8b88b75..d8d4ca974ee44980b0576da2528300ff3b7cdd55 100644
+--- a/APP/gradle/libs.versions.toml
++++ b/APP/gradle/libs.versions.toml
+@@ -8,6 +8,7 @@ activityCompose = "1.11.0"
+ androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+ androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+ androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
++kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+ kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+ 
+ [plugins]
+diff --git a/APP/iosApp/iosApp.xcodeproj/project.pbxproj b/APP/iosApp/iosApp.xcodeproj/project.pbxproj
+index 83ba42c707b64085833af504c80fc0022df732f8..0e235109485e81e6c9d7051c69b4b47f89945ac6 100644
+--- a/APP/iosApp/iosApp.xcodeproj/project.pbxproj
++++ b/APP/iosApp/iosApp.xcodeproj/project.pbxproj
+@@ -4,19 +4,31 @@
+ 	classes = {};
+ 	objectVersion = 56;
+ 	objects = {
++		000000000000000000000020 = { isa = PBXNativeTarget; buildConfigurationList = 000000000000000000000029; buildPhases = (000000000000000000000025, 000000000000000000000026); buildRules = (); dependencies = (00000000000000000000002D); name = BibbidiUITests; productName = BibbidiUITests; productReference = 000000000000000000000022; productType = "com.apple.product-type.bundle.ui-testing"; };
++		000000000000000000000021 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchTests.swift; sourceTree = "<group>"; };
++		000000000000000000000022 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = BibbidiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
++		000000000000000000000023 = { isa = PBXBuildFile; fileRef = 000000000000000000000021; };
++		000000000000000000000024 = { isa = PBXGroup; children = (000000000000000000000021); path = iosAppUITests; sourceTree = "<group>"; };
++		000000000000000000000025 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000023); runOnlyForDeploymentPostprocessing = 0; };
++		000000000000000000000026 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
++		000000000000000000000029 = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000002A, 00000000000000000000002B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
++		00000000000000000000002C = { isa = PBXContainerItemProxy; containerPortal = 000000000000000000000001; proxyType = 1; remoteGlobalIDString = 000000000000000000000009; remoteInfo = Bibbidi; };
++		00000000000000000000002D = { isa = PBXTargetDependency; target = 000000000000000000000009; targetProxy = 00000000000000000000002C; };
++		00000000000000000000002A = { isa = XCBuildConfiguration; buildSettings = { CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.bobbidi.bibbidi.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = Bibbidi; }; name = Debug; };
++		00000000000000000000002B = { isa = XCBuildConfiguration; buildSettings = { CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.bobbidi.bibbidi.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = Bibbidi; }; name = Release; };
+ 		000000000000000000000005 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibbidiApp.swift; sourceTree = "<group>"; };
+ 		000000000000000000000006 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+ 		000000000000000000000007 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = Bibbidi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+ 		000000000000000000000008 = { isa = PBXBuildFile; fileRef = 000000000000000000000005; };
+ 		000000000000000000000003 = { isa = PBXGroup; children = (000000000000000000000005, 000000000000000000000006); path = iosApp; sourceTree = "<group>"; };
+-		000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000007); name = Products; sourceTree = "<group>"; };
+-		000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000003, 000000000000000000000004); sourceTree = "<group>"; };
++		000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000007, 000000000000000000000022); name = Products; sourceTree = "<group>"; };
++		000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000003, 000000000000000000000024, 000000000000000000000004); sourceTree = "<group>"; };
+ 		00000000000000000000000A = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000008); runOnlyForDeploymentPostprocessing = 0; };
+ 		00000000000000000000000B = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+ 		00000000000000000000000C = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+ 		00000000000000000000000D = { isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = (); name = "Build shared framework"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "set -eu\nif [ \"YES\" = \"${OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED:-NO}\" ]; then\n    exit 0\nfi\ncd \"$SRCROOT/..\"\nif [ -z \"${JAVA_HOME:-}\" ]; then\n    export JAVA_HOME=$(/usr/libexec/java_home -v 25)\nfi\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n"; };
+ 		000000000000000000000009 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000F; buildPhases = (00000000000000000000000D, 00000000000000000000000A, 00000000000000000000000B, 00000000000000000000000C); buildRules = (); dependencies = (); name = Bibbidi; productName = Bibbidi; productReference = 000000000000000000000007; productType = "com.apple.product-type.application"; };
+-		000000000000000000000001 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; }; buildConfigurationList = 00000000000000000000000E; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko, en, Base); mainGroup = 000000000000000000000002; productRefGroup = 000000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000009); };
++		000000000000000000000001 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; }; buildConfigurationList = 00000000000000000000000E; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko, en, Base); mainGroup = 000000000000000000000002; productRefGroup = 000000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000009, 000000000000000000000020); };
+ 		000000000000000000000010 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
+ 		000000000000000000000011 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; name = Release; };
+ 		000000000000000000000012 = { isa = XCBuildConfiguration; buildSettings = { CODE_SIGN_STYLE = Automatic;
+diff --git a/APP/iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/Bibbidi.xcscheme b/APP/iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/Bibbidi.xcscheme
+index 407cf9551fec0b9f85c2e2800e61cffd91ba0963..60d86f09e4cd2f32fa25381e53137f5cff47275e 100644
+--- a/APP/iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/Bibbidi.xcscheme
++++ b/APP/iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/Bibbidi.xcscheme
+@@ -3,7 +3,7 @@
+     <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
+         <BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000009" BuildableName="Bibbidi.app" BlueprintName="Bibbidi" ReferencedContainer="container:iosApp.xcodeproj"/></BuildActionEntry></BuildActionEntries>
+     </BuildAction>
+-    <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables/></TestAction>
++    <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000020" BuildableName="BibbidiUITests.xctest" BlueprintName="BibbidiUITests" ReferencedContainer="container:iosApp.xcodeproj"/></TestableReference></Testables></TestAction>
+     <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000009" BuildableName="Bibbidi.app" BlueprintName="Bibbidi" ReferencedContainer="container:iosApp.xcodeproj"/></BuildableProductRunnable></LaunchAction>
+     <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO"><BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000009" BuildableName="Bibbidi.app" BlueprintName="Bibbidi" ReferencedContainer="container:iosApp.xcodeproj"/></BuildableProductRunnable></ProfileAction>
+     <AnalyzeAction buildConfiguration="Debug"/>
+diff --git a/APP/iosApp/iosAppUITests/AppLaunchTests.swift b/APP/iosApp/iosAppUITests/AppLaunchTests.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..63f906e0c7a89ae877c550e14af34c56518e650b
+--- /dev/null
++++ b/APP/iosApp/iosAppUITests/AppLaunchTests.swift
+@@ -0,0 +1,9 @@
++import XCTest
++
++final class AppLaunchTests: XCTestCase {
++    func testLaunchDisplaysSharedAppName() {
++        let app = XCUIApplication()
++        app.launch()
++        XCTAssertTrue(app.staticTexts["비비디"].waitForExistence(timeout: 10))
++    }
++}
+diff --git a/APP/shared/src/commonTest/kotlin/com/bobbidi/bibbidi/shared/AppInfoTest.kt b/APP/shared/src/commonTest/kotlin/com/bobbidi/bibbidi/shared/AppInfoTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b50671eba9602dbda5abe0c43b57fc594793d0e
+--- /dev/null
++++ b/APP/shared/src/commonTest/kotlin/com/bobbidi/bibbidi/shared/AppInfoTest.kt
+@@ -0,0 +1,11 @@
++package com.bobbidi.bibbidi.shared
++
++import kotlin.test.Test
++import kotlin.test.assertEquals
++
++class AppInfoTest {
++    @Test
++    fun appNameIsAvailableToPlatformEntryPoints() {
++        assertEquals("비비디", AppInfo.name)
++    }
++}

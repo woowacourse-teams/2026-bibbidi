@@ -299,7 +299,13 @@ function onPreToolUse(root: string, config: LoggerConfig, payload: HookPayload, 
       }
       const typeLabel = expectedTypeLabel(gitMetadata(root).branch, config);
       issueTypeLabel(issueData, config, typeLabel);
-      const prepared = preparePullRequest({ root, config, state });
+      const baseBranch = argumentValues(commandFromToolInput(toolInput), 'base', 'B')[0];
+      const prepared = preparePullRequest({
+        root,
+        config: baseBranch ? { ...config, defaultBaseBranch: baseBranch } : config,
+        state,
+        issueData,
+      });
       const dirty = gitMetadata(root).status;
       if (dirty) return denyWith(`커밋하지 않은 변경이 있어 PR을 만들 수 없습니다:\n${dirty}`);
       return allow(updatePullRequestInput(toolInput, prepared.bodyPath, typeLabel, config));
