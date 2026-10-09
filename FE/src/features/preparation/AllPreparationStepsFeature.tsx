@@ -26,6 +26,7 @@ import {
   createPreparationRoadmapViewModel,
   hasSelectablePreparationSteps,
   PreparationRoadmapSelection,
+  PreparationCategoryViewModel,
   selectPreparationCategory,
 } from "./view-model/createPreparationRoadmapViewModel";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
@@ -53,9 +54,14 @@ export function AllPreparationStepsFeature({
   initialCategoryId,
   onCategoryChange,
   viewSwitcher,
+  renderRoadmap,
 }: {
   initialCategoryId?: string | null;
   viewSwitcher?: ReactNode;
+  renderRoadmap?: (props: {
+    categories: readonly PreparationCategoryViewModel[];
+    onCategorySelect: (id: string) => void;
+  }) => ReactNode;
   onCategoryChange?: (categoryId: string) => void;
 } = {}) {
   const { authState, refreshAuth } = useAuth();
@@ -262,6 +268,13 @@ export function AllPreparationStepsFeature({
       selection: nextSelection,
     });
   };
+
+  if (renderRoadmap) {
+    return renderRoadmap({
+      categories: viewModel.categories,
+      onCategorySelect: handleCategorySelect,
+    });
+  }
 
   const handleStepSelect = (stepId: string) => {
     const selectedStep = viewModel.steps.find((step) => step.id === stepId);

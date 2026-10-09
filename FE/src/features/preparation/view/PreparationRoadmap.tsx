@@ -1,6 +1,7 @@
 import { ReactNode, useRef, useState } from "react";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
+import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
 import "./PreparationRoadmap.css";
 
 interface PreparationRoadmapProps {
@@ -156,30 +157,14 @@ export function PreparationRoadmap({
 
   return (
     <div className="preparation-roadmap">
-      <nav
-        aria-label="준비 카테고리"
-        className="preparation-roadmap__categories"
-      >
-        <ul className="preparation-roadmap__category-list">
-          {viewModel.categories.map((category) => (
-            <li key={category.id}>
-              <button
-                aria-controls="preparation-roadmap-content"
-                aria-pressed={category.isCurrent}
-                className={`preparation-roadmap__category${
-                  category.isCurrent
-                    ? " preparation-roadmap__category--current"
-                    : ""
-                }`}
-                onClick={() => handleCategorySelect(category.id)}
-                type="button"
-              >
-                {category.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <RoadmapCategoryTabs
+        categories={viewModel.categories}
+        selectedCategoryId={
+          viewModel.categories.find((category) => category.isCurrent)?.id
+        }
+        controlsId="preparation-roadmap-content"
+        onCategorySelect={handleCategorySelect}
+      />
 
       <section
         aria-labelledby="preparation-roadmap-title"
