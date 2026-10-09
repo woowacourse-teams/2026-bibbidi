@@ -9,9 +9,6 @@ import static com.bibbidi.wedding.chat.ChatTestFixtures.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.CatalogItem;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.ChecklistItem;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Status;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +22,7 @@ class ConversationStateTest {
     @DisplayName("통과한 사용자 조건과 확인 일정은 DB 스냅샷의 상태를 바꾸지 않는다")
     void shouldKeepDatabaseSnapshotWhenApplyingAcceptedContext() {
         PreparationSnapshot snapshot = snapshot(List.of(
-                item(10L, Status.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
+                item(10L, PreparationChecklistItemStatus.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
         ));
         ConversationState original = new ConversationState("conversation", OWNER_ID, snapshot, List.of(), Set.of());
 
@@ -33,7 +30,7 @@ class ConversationStateTest {
                 List.of(new ExplicitUserFact("피팅 방문 완료", "피팅 다녀왔어")), Set.of(100L));
 
         assertThat(changed.snapshot()).isSameAs(snapshot);
-        assertThat(changed.snapshot().checklistItems().getFirst().status()).isEqualTo(Status.CONTINUE);
+        assertThat(changed.snapshot().checklistItems().getFirst().status()).isEqualTo(PreparationChecklistItemStatus.CONTINUE);
         assertThat(changed.snapshot().checklistItems().getFirst().appointments().getFirst().done()).isFalse();
         assertThat(changed.explicitFacts()).hasSize(1);
         assertThat(changed.confirmedAppointmentIds()).containsExactly(100L);
@@ -45,9 +42,9 @@ class ConversationStateTest {
     @DisplayName("입력 컬렉션을 바꿔도 보관된 스냅샷과 대화 조건은 바뀌지 않는다")
     void shouldDefensivelyCopySnapshotAndContextCollections() {
         var appointments = new ArrayList<>(List.of(appointment(100L, TODAY, false)));
-        var item = new ChecklistItem(10L, null, null, "피팅", Status.PREV, appointments);
+        var item = new PreparationChecklistItem(10L, null, null, "피팅", PreparationChecklistItemStatus.PREV, appointments);
         var items = new ArrayList<>(List.of(item));
-        var catalog = new ArrayList<>(List.of(new CatalogItem(1L, "드레스 투어", "스드메", 1, "계약")));
+        var catalog = new ArrayList<>(List.of(new PreparationCatalogItem(1L, "드레스 투어", "스드메", 1, "계약")));
         var facts = new ArrayList<>(List.of(new ExplicitUserFact("촬영 제외", "촬영은 안 할게")));
         var confirmed = new HashSet<>(Set.of(100L));
         PreparationSnapshot snapshot = new PreparationSnapshot(null, items, catalog, NOW);
@@ -73,14 +70,14 @@ class ConversationStateTest {
     @DisplayName("등록된 카탈로그 항목은 상태에 관계없이 새 추천 후보에서 제외한다")
     void shouldExcludeRegisteredItemsIncludingCompletedOnes() {
         PreparationSnapshot snapshot = new PreparationSnapshot(null, List.of(
-                new ChecklistItem(10L, 1L, 100L, "드레스 투어", Status.DONE, List.of()),
-                item(11L, Status.PREV)
+                new PreparationChecklistItem(10L, 1L, 100L, "드레스 투어", PreparationChecklistItemStatus.DONE, List.of()),
+                item(11L, PreparationChecklistItemStatus.PREV)
         ), List.of(
-                new CatalogItem(100L, "드레스 투어", "스드메", 1, "계약"),
-                new CatalogItem(101L, "드레스 피팅", "스드메", 2, "피팅")
+                new PreparationCatalogItem(100L, "드레스 투어", "스드메", 1, "계약"),
+                new PreparationCatalogItem(101L, "드레스 피팅", "스드메", 2, "피팅")
         ), NOW);
 
-        assertThat(snapshot.recommendationCandidates()).extracting(CatalogItem::id).containsExactly(101L);
+        assertThat(snapshot.recommendationCandidates()).extracting(PreparationCatalogItem::id).containsExactly(101L);
         assertThat(snapshot.catalogItems()).hasSize(2);
     }
 }

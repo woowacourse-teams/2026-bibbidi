@@ -1,9 +1,9 @@
 package com.bibbidi.wedding.chat;
 
+import com.bibbidi.wedding.chat.domain.PreparationAppointment;
+import com.bibbidi.wedding.chat.domain.PreparationChecklistItem;
+import com.bibbidi.wedding.chat.domain.PreparationChecklistItemStatus;
 import com.bibbidi.wedding.chat.domain.PreparationSnapshot;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Appointment;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.ChecklistItem;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Status;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,7 +20,7 @@ public final class ChatTestFixtures {
     private ChatTestFixtures() {
     }
 
-    public static PreparationSnapshot snapshot(List<ChecklistItem> items) {
+    public static PreparationSnapshot snapshot(List<PreparationChecklistItem> items) {
         return new PreparationSnapshot(null, items, List.of(), NOW);
     }
 
@@ -28,11 +28,11 @@ public final class ChatTestFixtures {
         return snapshot(List.of());
     }
 
-    public static ChecklistItem item(Long id, Status status, Appointment... appointments) {
-        return new ChecklistItem(id, 1L, null, "드레스 준비", status, List.of(appointments));
+    public static PreparationChecklistItem item(Long id, PreparationChecklistItemStatus status, PreparationAppointment... appointments) {
+        return new PreparationChecklistItem(id, 1L, null, "드레스 준비", status, List.of(appointments));
     }
 
-    public static Appointment appointment(Long id, LocalDate date, boolean done) {
-        return new Appointment(id, "드레스 피팅", date, null, null, null, null, done);
+    public static PreparationAppointment appointment(Long id, LocalDate date, boolean done) {
+        return new PreparationAppointment(id, "드레스 피팅", date, null, null, null, null, done);
     }
 }

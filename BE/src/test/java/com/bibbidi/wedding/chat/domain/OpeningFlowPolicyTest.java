@@ -7,7 +7,6 @@ import static com.bibbidi.wedding.chat.ChatTestFixtures.item;
 import static com.bibbidi.wedding.chat.ChatTestFixtures.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Status;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -35,7 +34,7 @@ class OpeningFlowPolicyTest {
     @DisplayName("첫 사용자 요청은 지난 일정 확인보다 우선한다")
     void shouldPrioritizeInitialRequestOverPastAppointments() {
         PreparationSnapshot snapshot = snapshot(List.of(
-                item(10L, Status.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
+                item(10L, PreparationChecklistItemStatus.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
         ));
 
         assertThat(policy.classify("다음 할 일 추천해줘", snapshot, Set.of(), TODAY).type())
@@ -69,7 +68,7 @@ class OpeningFlowPolicyTest {
     @DisplayName("지난 미완료 일정 확인은 진행 중인 할 일보다 우선한다")
     void shouldPrioritizePastAppointmentsOverInProgressItems() {
         PreparationSnapshot snapshot = snapshot(List.of(
-                item(10L, Status.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
+                item(10L, PreparationChecklistItemStatus.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
         ));
 
         OpeningDecision decision = policy.classify(null, snapshot, Set.of(), TODAY);
@@ -84,7 +83,7 @@ class OpeningFlowPolicyTest {
             "2026-10-08, false, false", "2026-10-09, false, false"})
     @DisplayName("오늘 이전의 미완료 일정만 확인한다")
     void shouldOnlySelectIncompleteAppointmentsBeforeToday(LocalDate date, boolean done, boolean expectedPast) {
-        PreparationSnapshot snapshot = snapshot(List.of(item(10L, Status.PREV, appointment(100L, date, done))));
+        PreparationSnapshot snapshot = snapshot(List.of(item(10L, PreparationChecklistItemStatus.PREV, appointment(100L, date, done))));
 
         OpeningDecision decision = policy.classify(null, snapshot, Set.of(), TODAY);
 
@@ -96,7 +95,7 @@ class OpeningFlowPolicyTest {
     @DisplayName("현재 대화에서 확인한 일정은 다시 묻지 않고 진행 중인 할 일로 이어간다")
     void shouldSkipConfirmedAppointments() {
         PreparationSnapshot snapshot = snapshot(List.of(
-                item(10L, Status.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
+                item(10L, PreparationChecklistItemStatus.CONTINUE, appointment(100L, TODAY.minusDays(1), false))
         ));
 
         OpeningDecision decision = policy.classify(null, snapshot, Set.of(100L), TODAY);
@@ -109,7 +108,7 @@ class OpeningFlowPolicyTest {
     @Test
     @DisplayName("확인한 일정만 제외하고 나머지 지난 일정은 확인한다")
     void shouldKeepUnconfirmedPastAppointments() {
-        PreparationSnapshot snapshot = snapshot(List.of(item(10L, Status.PREV,
+        PreparationSnapshot snapshot = snapshot(List.of(item(10L, PreparationChecklistItemStatus.PREV,
                 appointment(100L, TODAY.minusDays(2), false), appointment(101L, TODAY.minusDays(1), false))));
 
         assertThat(policy.classify(null, snapshot, Set.of(100L), TODAY).appointmentIds()).containsExactly(101L);
@@ -118,7 +117,7 @@ class OpeningFlowPolicyTest {
     @Test
     @DisplayName("진행 중인 할 일이 없으면 다음 할 일을 추천한다")
     void shouldRecommendNextItemsForRemainingStates() {
-        PreparationSnapshot snapshot = snapshot(List.of(item(10L, Status.PREV), item(11L, Status.DONE)));
+        PreparationSnapshot snapshot = snapshot(List.of(item(10L, PreparationChecklistItemStatus.PREV), item(11L, PreparationChecklistItemStatus.DONE)));
 
         assertThat(policy.classify(null, snapshot, Set.of(), TODAY).type()).isEqualTo(OpeningType.NEXT_RECOMMENDATIONS);
     }

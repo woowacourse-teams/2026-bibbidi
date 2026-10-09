@@ -18,7 +18,7 @@ import com.bibbidi.wedding.chat.domain.ConversationState;
 import com.bibbidi.wedding.chat.domain.OpeningFlowPolicy;
 import com.bibbidi.wedding.chat.domain.OpeningType;
 import com.bibbidi.wedding.chat.domain.PreparationSnapshot;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Status;
+import com.bibbidi.wedding.chat.domain.PreparationChecklistItemStatus;
 import com.bibbidi.wedding.chat.repository.ConversationStateRepository;
 import com.bibbidi.wedding.chat.service.dto.ConversationStartResult;
 import java.util.List;
@@ -38,7 +38,7 @@ class ConversationServiceTest {
     @DisplayName("대화 시작은 준비 조회 결과를 소유자와 연결하고 한국 날짜로 시작 상황을 분류한다")
     void shouldStartConversationUsingKoreanDateAndLoadedSnapshot() {
         PreparationSnapshot snapshot = snapshot(List.of(
-                item(10L, Status.PREV, appointment(100L, TODAY.minusDays(1), false))
+                item(10L, PreparationChecklistItemStatus.PREV, appointment(100L, TODAY.minusDays(1), false))
         ));
         ConversationState state = new ConversationState("conversation", OWNER_ID, snapshot, List.of(), Set.of());
         when(contextService.load(OWNER_ID)).thenReturn(snapshot);

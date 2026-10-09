@@ -13,8 +13,11 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.domain.PreparationAppointment;
+import com.bibbidi.wedding.chat.domain.PreparationCatalogItem;
+import com.bibbidi.wedding.chat.domain.PreparationChecklistItem;
+import com.bibbidi.wedding.chat.domain.PreparationChecklistItemStatus;
 import com.bibbidi.wedding.chat.domain.PreparationSnapshot;
-import com.bibbidi.wedding.chat.domain.PreparationSnapshot.Status;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistAppointmentResult;
@@ -56,13 +59,13 @@ class PreparationContextServiceTest {
 
         assertThat(snapshot.weddingDate()).isEqualTo(TODAY.plusMonths(6));
         assertThat(snapshot.queriedAt()).isEqualTo(NOW);
-        assertThat(snapshot.checklistItems()).containsExactly(new PreparationSnapshot.ChecklistItem(10L, 1L, 100L,
-                "드레스 투어", Status.CONTINUE, List.of(new PreparationSnapshot.Appointment(200L, "드레스 피팅",
+        assertThat(snapshot.checklistItems()).containsExactly(new PreparationChecklistItem(10L, 1L, 100L,
+                "드레스 투어", PreparationChecklistItemStatus.CONTINUE, List.of(new PreparationAppointment(200L, "드레스 피팅",
                 appointment.date(), appointment.startTime(), appointment.endTime(), "피팅샵", "피팅 메모", false))));
         assertThat(snapshot.catalogItems()).hasSize(2);
         assertThat(snapshot.catalogItems().getLast()).isEqualTo(
-                new PreparationSnapshot.CatalogItem(101L, "드레스 피팅", "스드메", 2, "피팅"));
-        assertThat(snapshot.recommendationCandidates()).extracting(PreparationSnapshot.CatalogItem::id)
+                new PreparationCatalogItem(101L, "드레스 피팅", "스드메", 2, "피팅"));
+        assertThat(snapshot.recommendationCandidates()).extracting(PreparationCatalogItem::id)
                 .containsExactly(101L);
         verify(userService).findWeddingDate(OWNER_ID);
         verify(checklistService).findMyChecklist(OWNER_ID);
@@ -80,7 +83,7 @@ class PreparationContextServiceTest {
 
         PreparationSnapshot snapshot = service.load(OWNER_ID);
 
-        assertThat(snapshot.checklistItems().getFirst().status()).isEqualTo(Status.valueOf(status.name()));
+        assertThat(snapshot.checklistItems().getFirst().status()).isEqualTo(PreparationChecklistItemStatus.valueOf(status.name()));
         assertThat(snapshot.weddingDate()).isNull();
         assertThat(snapshot.checklistItems().getFirst().sourceCatalogItemId()).isNull();
     }
