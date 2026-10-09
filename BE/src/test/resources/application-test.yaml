@@ -20,6 +20,11 @@ discord:
   url:
     feedback: https://discord.test/webhook
 
+bibbidi:
+  chat:
+    idle-timeout: 30m
+    cleanup-cron: "-"
+
 auth:
   jwt:
     # 테스트 전용 값이다. 운영 비밀말과 아무 관계가 없다.

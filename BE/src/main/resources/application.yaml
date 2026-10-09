@@ -15,6 +15,11 @@ spring:
 server:
   shutdown: graceful
 
+bibbidi:
+  chat:
+    idle-timeout: ${CHAT_IDLE_TIMEOUT:30m}
+    cleanup-cron: ${CHAT_CLEANUP_CRON:0 * * * * *}
+
 discord:
   url:
     feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
