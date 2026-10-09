@@ -32,24 +32,22 @@ public class ConversationStateRepository {
     }
 
     public ConversationState create(Long ownerId, PreparationSnapshot snapshot) {
-        ConversationState state = new ConversationState(UUID.randomUUID().toString(), ownerId, snapshot,
-                List.of(), Set.of());
+        ConversationState state = new ConversationState(
+                UUID.randomUUID().toString(),
+                ownerId,
+                snapshot,
+                List.of(),
+                Set.of()
+        );
         conversations.put(state.id(), new StoredConversation(state, clock.instant().plus(idleTimeout)));
         return state;
     }
 
     public Optional<ConversationState> findOwnedBy(String conversationId, Long userId) {
         Instant now = clock.instant();
-        StoredConversation stored = conversations.computeIfPresent(conversationId, (id, existing) -> {
-            if (existing.isExpiredAt(now)) {
-                return null;
-            }
-            if (!existing.state().isOwnedBy(userId)) {
-                return existing;
-            }
-            return new StoredConversation(existing.state(), now.plus(idleTimeout));
-        });
-        return Optional.ofNullable(stored).map(StoredConversation::state).filter(state -> state.isOwnedBy(userId));
+        StoredConversation stored = conversations.computeIfPresent(conversationId,
+                (ignored, existing) -> existing.renewOwnedBy(userId, now, idleTimeout));
+        return findOwnedState(stored, userId);
     }
 
     public Optional<ConversationState> saveOwnedBy(Long userId, ConversationState state) {
@@ -57,21 +55,14 @@ public class ConversationStateRepository {
             return Optional.empty();
         }
         Instant now = clock.instant();
-        StoredConversation stored = conversations.computeIfPresent(state.id(), (id, existing) -> {
-            if (existing.isExpiredAt(now)) {
-                return null;
-            }
-            if (!existing.state().isOwnedBy(userId)) {
-                return existing;
-            }
-            return new StoredConversation(state, now.plus(idleTimeout));
-        });
-        return Optional.ofNullable(stored).map(StoredConversation::state).filter(saved -> saved.isOwnedBy(userId));
+        StoredConversation stored = conversations.computeIfPresent(state.id(),
+                (ignored, existing) -> existing.replaceOwnedBy(userId, state, now, idleTimeout));
+        return findOwnedState(stored, userId);
     }
 
     public boolean deleteOwnedBy(String conversationId, Long userId) {
         StoredConversation stored = conversations.get(conversationId);
-        return stored != null && stored.state().isOwnedBy(userId) && conversations.remove(conversationId, stored);
+        return stored != null && stored.isOwnedBy(userId) && conversations.remove(conversationId, stored);
     }
 
     @Scheduled(cron = "${bibbidi.chat.cleanup-cron}")
@@ -86,10 +77,9 @@ public class ConversationStateRepository {
         return removed;
     }
 
-    private record StoredConversation(ConversationState state, Instant expiresAt) {
-
-        private boolean isExpiredAt(Instant now) {
-            return !now.isBefore(expiresAt);
-        }
+    private Optional<ConversationState> findOwnedState(StoredConversation stored, Long userId) {
+        return Optional.ofNullable(stored)
+                .filter(conversation -> conversation.isOwnedBy(userId))
+                .map(StoredConversation::state);
     }
 }
