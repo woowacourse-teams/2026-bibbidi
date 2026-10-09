@@ -30,3 +30,6 @@
 {"type":"USER_PROMPTED","issue":400,"prompt":"리팩한거 커밋해줘.","redacted":false,"bootstrap":true,"timestamp":"2026-10-09T05:55:37.964Z"}
 {"type":"USER_PROMPTED","issue":400,"prompt":"다시 진행해줘","redacted":false,"bootstrap":true,"timestamp":"2026-10-09T05:55:38.101Z"}
 {"type":"COMMIT_CONFIRMED","issue":400,"tree":"0939c3559e0a622db37d44a41734ac95c88d7c43","bootstrap":true,"timestamp":"2026-10-09T05:55:38.459Z"}
+{"type":"COMMIT_EXPLAINED","issue":400,"explanation":"OpeningDecision.java의 다섯 생성 메서드에서 생성자 인자를 여러 줄로 정리했습니다. 각 시작 판단 결과의 구성 요소를 읽기 쉽게 한 변경이며 동작은 그대로입니다. 앞서 검증하고 커밋한 BE1 구현과 함께 PR에 포함하고 docs/design 문서는 제외합니다.","diffStat":" .../wedding/chat/domain/OpeningDecision.java       | 36 ++++++++++++++++++----\n 1 file changed, 30 insertions(+), 6 deletions(-)","tree":"80e032a38aab5ddcfa9fe71a859e51af45062d22","bootstrap":true,"timestamp":"2026-10-09T06:24:44.198Z"}
+{"type":"USER_PROMPTED","issue":400,"prompt":"커밋하고 pr ㄱㄱ","redacted":false,"bootstrap":true,"timestamp":"2026-10-09T06:24:44.315Z"}
+{"type":"COMMIT_CONFIRMED","issue":400,"tree":"80e032a38aab5ddcfa9fe71a859e51af45062d22","bootstrap":true,"timestamp":"2026-10-09T06:24:44.678Z"}

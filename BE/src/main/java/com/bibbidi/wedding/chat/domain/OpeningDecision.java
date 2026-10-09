@@ -16,23 +16,47 @@ public record OpeningDecision(
     }
 
     public static OpeningDecision userRequest() {
-        return new OpeningDecision(OpeningType.USER_REQUEST, false, List.of(), List.of());
+        return new OpeningDecision(
+                OpeningType.USER_REQUEST,
+                false,
+                List.of(),
+                List.of()
+        );
     }
 
     public static OpeningDecision preparationInformationRequired(boolean askWeddingDate) {
-        return new OpeningDecision(OpeningType.PREPARATION_INFORMATION_REQUIRED, askWeddingDate,
-                List.of(), List.of());
+        return new OpeningDecision(
+                OpeningType.PREPARATION_INFORMATION_REQUIRED,
+                askWeddingDate,
+                List.of(),
+                List.of()
+        );
     }
 
     public static OpeningDecision pastAppointments(List<Long> appointmentIds) {
-        return new OpeningDecision(OpeningType.PAST_APPOINTMENTS, false, appointmentIds, List.of());
+        return new OpeningDecision(
+                OpeningType.PAST_APPOINTMENTS,
+                false,
+                appointmentIds,
+                List.of()
+        );
     }
 
     public static OpeningDecision inProgressItems(List<Long> checklistItemIds) {
-        return new OpeningDecision(OpeningType.IN_PROGRESS_ITEMS, false, List.of(), checklistItemIds);
+        return new OpeningDecision(
+                OpeningType.IN_PROGRESS_ITEMS,
+                false,
+                List.of(),
+                checklistItemIds
+        );
     }
 
     public static OpeningDecision nextRecommendations() {
-        return new OpeningDecision(OpeningType.NEXT_RECOMMENDATIONS, false, List.of(), List.of());
+        return new OpeningDecision(
+                OpeningType.NEXT_RECOMMENDATIONS,
+                false,
+                List.of(),
+                List.of()
+        );
     }
 }
