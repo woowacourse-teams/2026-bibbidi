@@ -39,6 +39,7 @@ class ArchitectureConventionTest {
     private static final List<String> FEATURES = List.of(
             "auth",
             "catalog",
+            "chat",
             "checklist",
             "feedback",
             "terms",
