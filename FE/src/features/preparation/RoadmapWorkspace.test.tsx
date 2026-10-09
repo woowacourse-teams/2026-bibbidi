@@ -116,6 +116,27 @@ function showAll() {
 }
 
 describe("준비 로드맵 보기 전환", () => {
+  it("비로그인도 채팅을 사용하고 카테고리·로드맵 보기 전환 중 대화를 유지한다", async () => {
+    mocks.authState = { status: "guest" };
+    render(<PreparationRoadmapFeature />);
+    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+    expect(screen.getByRole("log").textContent).toContain(
+      "다음으로 준비하면 좋은 일",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.getByRole("log").textContent).toContain(
+      "다음으로 준비하면 좋은 일",
+    );
+    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+  });
+
   it("상단 현황은 빈 단계를 포함하고 직접 추가한 일과 완료 상태를 집계한다", async () => {
     mocks.getChecklist.mockResolvedValue({
       categories: [
@@ -191,9 +212,14 @@ describe("준비 로드맵 보기 전환", () => {
     expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
   });
 
-  it("빈 카테고리에서 전체 단계로 전환하며 카테고리를 유지한다", async () => {
+  it("내 로드맵과 전체 단계 전환 시 카테고리 선택과 연결 영역을 유지한다", async () => {
     render(<PreparationRoadmapFeature />);
     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
+    expect(
+      screen
+        .getByRole("button", { name: "스드메" })
+        .getAttribute("aria-controls"),
+    ).toBe("personal-roadmap-content");
     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
     expect(screen.getByText("아직 담은 할 일이 없어요.")).toBeTruthy();
     fireEvent.click(
@@ -207,17 +233,67 @@ describe("준비 로드맵 보기 전환", () => {
         .getByRole("button", { name: "스드메" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "스드메" })
+        .getAttribute("aria-controls"),
+    ).toBe("preparation-roadmap-content");
+    fireEvent.click(screen.getByRole("button", { name: "웨딩홀" }));
+    await screen.findByRole("heading", { name: "웨딩홀 · 전체 단계" });
+    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+    await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
+    const categories = screen.getByRole("navigation", {
+      name: "준비 카테고리",
+    });
+    expect(within(categories).getByRole("list")).toBeTruthy();
+    expect(
+      within(categories)
+        .getByRole("button", { name: "웨딩홀" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      within(categories)
+        .getByRole("button", { name: "스드메" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 
-  it("비로그인은 전체 단계로 진입하고 내 로드맵에서는 로그인 안내를 본다", async () => {
+  it("비로그인 내 로드맵은 카테고리를 유지하고 콘텐츠 영역에 로그인 안내를 표시한다", async () => {
     mocks.authState = { status: "guest" };
     render(<PreparationRoadmapFeature />);
     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
-    expect(mocks.getChecklist).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
     fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+    const notice = screen.getByRole("region", { name: "내 로드맵" });
     expect(
-      screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
+      within(notice).getByText("로그인하면 내 로드맵을 확인할 수 있어요."),
+    ).toBeTruthy();
+    expect(
+      within(notice).getByRole("link", { name: "로그인" }).getAttribute("href"),
     ).toBe("/login");
+    expect(screen.getByRole("heading", { name: "스드메 로드맵" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "전체 단계 목록" })).toBeNull();
+    const categories = screen.getByRole("navigation", {
+      name: "준비 카테고리",
+    });
+    expect(
+      within(categories)
+        .getByRole("button", { name: "스드메" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(within(categories).getByRole("button", { name: "웨딩홀" }));
+    expect(screen.getByRole("heading", { name: "웨딩홀 로드맵" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "내 로드맵" })).toBe(notice);
+    fireEvent.click(
+      within(notice).getByRole("button", { name: "전체 단계 보기" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "웨딩홀 · 전체 단계" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "전체 단계 목록" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "내 로드맵" })).toBeNull();
+    expect(mocks.getChecklist).not.toHaveBeenCalled();
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(1);
   });
 
   it("PC에서도 전체 단계 상세를 펼치고 담은 일을 개인 목록에서 확인한다", async () => {

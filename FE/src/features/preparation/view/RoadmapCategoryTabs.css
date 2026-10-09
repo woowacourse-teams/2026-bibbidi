@@ -1,0 +1,57 @@
+.roadmap-category-tabs {
+  display: flex;
+  flex: none;
+  justify-content: safe center;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+  background: transparent;
+}
+
+.roadmap-category-tabs__list {
+  display: flex;
+  flex: none;
+  width: max-content;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  list-style: none;
+}
+
+.roadmap-category-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 10px 24px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.roadmap-category-tabs button[aria-pressed="true"] {
+  border-bottom-color: var(--color-stroke-brand-solid);
+  color: var(--color-fg-brand);
+  font-weight: 700;
+}
+
+.roadmap-category-tabs button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: -3px;
+}
+
+@media (max-width: 760px) {
+  .roadmap-category-tabs {
+    justify-content: flex-start;
+  }
+
+  .roadmap-category-tabs button {
+    padding: 10px 18px;
+  }
+}

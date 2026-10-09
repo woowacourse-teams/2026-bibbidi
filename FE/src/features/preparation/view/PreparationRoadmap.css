@@ -53,29 +53,6 @@
   overflow: hidden;
 }
 
-.preparation-roadmap__categories {
-  flex: none;
-  overflow-x: auto;
-  padding: 0;
-  border-right: 0;
-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
-}
-
-.preparation-roadmap__category-list {
-  display: flex;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-  width: max-content;
-  flex-direction: row;
-  gap: 4px;
-}
-
-.preparation-roadmap__category {
-  width: auto;
-  white-space: nowrap;
-}
-
 .preparation-roadmap__content {
   display: flex;
   flex-direction: column;

@@ -1,0 +1,2062 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..70fd0509dc25a095696bcb397bb8c691adf70eb4
+--- /dev/null
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -0,0 +1,241 @@
++import {
++  cleanup,
++  fireEvent,
++  render,
++  screen,
++  within,
++} from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++import { AiChatFeature } from "./AiChatFeature";
++
++const dialogMethods = Object.getOwnPropertyDescriptors(
++  HTMLDialogElement.prototype,
++);
++
++function send(text: string) {
++  fireEvent.change(screen.getByRole("textbox", { name: "추가하고 싶은 일" }), {
++    target: { value: text },
++  });
++  fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
++}
++
++function showCards() {
++  send("웨딩홀을 정했어요");
++  send("주례 없이 편안한 분위기로 하고 싶어");
++}
++
++beforeEach(() => {
++  vi.stubGlobal(
++    "matchMedia",
++    vi.fn().mockReturnValue({
++      matches: false,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++    }),
++  );
++});
++
++afterEach(() => {
++  cleanup();
++  vi.useRealTimers();
++  vi.unstubAllGlobals();
++  vi.restoreAllMocks();
++  for (const method of ["showModal", "close"] as const) {
++    if (dialogMethods[method]) {
++      Object.defineProperty(
++        HTMLDialogElement.prototype,
++        method,
++        dialogMethods[method],
++      );
++    } else {
++      delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
++        method
++      ];
++    }
++  }
++});
++
++describe("AI 채팅 예시", () => {
++  it("추천 질문을 전송하고 시간과 고정 안내를 표시한다", () => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date("2026-10-08T14:20:00+09:00"));
++    render(<AiChatFeature />);
++    const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
++    fireEvent.click(screen.getByRole("button", { name: question }));
++    const log = screen.getByRole("log");
++    expect(within(log).getByText(question)).toBeTruthy();
++    expect(within(log).getByText("다음으로 준비하면 좋은 일")).toBeTruthy();
++    expect(
++      within(log).getByText("사회자·축가·축사 맡을 사람 정하기"),
++    ).toBeTruthy();
++    expect(log.querySelector("time")?.textContent).toMatch(/\d{2}:\d{2}/);
++    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
++    vi.useRealTimers();
++  });
++
++  it("공백·줄바꿈·한글 조합 중 Enter를 전송하지 않고 완성된 입력만 전송한다", () => {
++    render(<AiChatFeature />);
++    const input = screen.getByRole("textbox");
++    fireEvent.change(input, { target: { value: " \n " } });
++    expect(
++      (screen.getByRole("button", { name: "메시지 전송" }) as HTMLButtonElement)
++        .disabled,
++    ).toBe(true);
++    fireEvent.keyDown(input, { key: "Enter" });
++    expect(screen.queryByRole("log")).toBeNull();
++
++    fireEvent.change(input, { target: { value: "촬영 준비" } });
++    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
++    fireEvent.compositionStart(input);
++    fireEvent.keyDown(input, { key: "Enter" });
++    fireEvent.compositionEnd(input);
++    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
++    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
++    expect(screen.queryByRole("log")).toBeNull();
++    fireEvent.change(input, { target: { value: "촬영 준비\n정리해줘" } });
++    fireEvent.keyDown(input, { key: "Enter" });
++    expect(screen.getByRole("log").textContent).toContain(
++      "촬영 준비\n정리해줘",
++    );
++    expect((input as HTMLTextAreaElement).value).toBe("");
++  });
++
++  it("카드를 추가·넘기기하면 진행 상태와 완료를 표시하고 서버나 저장소를 변경하지 않는다", () => {
++    const fetch = vi.fn();
++    vi.stubGlobal("fetch", fetch);
++    const storage = vi.spyOn(Storage.prototype, "setItem");
++    render(<AiChatFeature />);
++    showCards();
++    expect(screen.getByText("1 / 2")).toBeTruthy();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    expect(screen.getByRole("status").textContent).toContain(
++      "예시로 추가했어요",
++    );
++    expect(screen.getByText("2 / 2")).toBeTruthy();
++    fireEvent.click(screen.getByRole("button", { name: "← 넘기기" }));
++    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
++    expect(screen.queryByRole("button", { name: "추가하기 →" })).toBeNull();
++    expect(fetch).not.toHaveBeenCalled();
++    expect(storage).not.toHaveBeenCalled();
++
++    send("더 추천해줘");
++    expect(screen.getByText("1 / 2")).toBeTruthy();
++    expect(
++      screen.getByRole("article", { name: "주례 없는 예식 순서 정하기" }),
++    ).toBeTruthy();
++  });
++
++  it("수직 이동과 취소는 카드를 유지하고 좌우 스와이프는 추가·넘기기를 수행한다", () => {
++    class TestPointerEvent extends MouseEvent {
++      pointerId: number;
++      constructor(type: string, init: PointerEventInit) {
++        super(type, init);
++        this.pointerId = init.pointerId ?? 1;
++      }
++    }
++    vi.stubGlobal("PointerEvent", TestPointerEvent);
++    render(<AiChatFeature />);
++    showCards();
++    let card = screen.getByRole("article", {
++      name: "주례 없는 예식 순서 정하기",
++    });
++    const pointer = { pointerId: 1, button: 0 };
++    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
++    fireEvent.pointerUp(card, { ...pointer, clientX: 110, clientY: 200 });
++    expect(screen.getByText("1 / 2")).toBeTruthy();
++    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
++    fireEvent.pointerMove(card, { ...pointer, clientX: 180, clientY: 100 });
++    fireEvent.pointerCancel(card, pointer);
++    fireEvent.pointerUp(card, { ...pointer, clientX: 180, clientY: 100 });
++    expect(screen.getByText("1 / 2")).toBeTruthy();
++
++    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
++    fireEvent.pointerUp(card, { ...pointer, clientX: 180, clientY: 100 });
++    expect(screen.getByRole("status").textContent).toContain(
++      "예시로 추가했어요",
++    );
++    card = screen.getByRole("article", {
++      name: "사회자·축가 맡을 사람 정하기",
++    });
++    fireEvent.pointerDown(card, { ...pointer, clientX: 180, clientY: 100 });
++    fireEvent.pointerUp(card, { ...pointer, clientX: 100, clientY: 100 });
++    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
++  });
++
++  it("모바일을 닫고 다시 열어도 대화·작성 중 입력·카드 진행을 유지한다", () => {
++    const viewport = Object.assign(new EventTarget(), {
++      height: 844,
++      offsetTop: 0,
++    });
++    vi.stubGlobal("visualViewport", viewport);
++    vi.mocked(window.matchMedia).mockReturnValue({
++      matches: true,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++    } as unknown as MediaQueryList);
++    Object.defineProperties(HTMLDialogElement.prototype, {
++      showModal: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.setAttribute("open", "");
++        },
++      },
++      close: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.removeAttribute("open");
++        },
++      },
++    });
++    const { unmount } = render(<AiChatFeature />);
++    fireEvent.click(screen.getByRole("button", { name: "AI와 할 일 만들기" }));
++    showCards();
++    const dialog = screen.getByRole("dialog");
++    expect(dialog.style.height).toBe("844px");
++    const log = screen.getByRole("log");
++    Object.defineProperty(log, "scrollHeight", {
++      configurable: true,
++      value: 500,
++    });
++    viewport.height = 400;
++    viewport.offsetTop = 24;
++    viewport.dispatchEvent(new Event("resize"));
++    expect(dialog.style.height).toBe("400px");
++    expect(dialog.style.top).toBe("24px");
++    expect(log.scrollTop).toBe(500);
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    fireEvent.change(screen.getByRole("textbox"), {
++      target: { value: "작성 중" },
++    });
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
++    expect(screen.queryByRole("dialog")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    expect(screen.getByText("2 / 2")).toBeTruthy();
++    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
++      "작성 중",
++    );
++    const submit = screen.getByRole("button", { name: "메시지 전송" });
++    const back = screen.getByRole("button", { name: "로드맵으로 돌아가기" });
++    submit.focus();
++    fireEvent.keyDown(submit, { key: "Tab" });
++    expect(document.activeElement).toBe(back);
++    fireEvent.keyDown(back, { key: "Tab", shiftKey: true });
++    expect(document.activeElement).toBe(submit);
++    fireEvent(
++      screen.getByRole("dialog"),
++      new Event("cancel", { cancelable: true }),
++    );
++    expect(screen.queryByRole("dialog")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    fireEvent.click(
++      screen.getByRole("button", { name: "로드맵으로 돌아가기" }),
++    );
++    expect(screen.queryByRole("dialog")).toBeNull();
++    unmount();
++    render(<AiChatFeature />);
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    expect(screen.queryByRole("log")).toBeNull();
++    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
++  });
++});
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..359de690eb74d896f5596bb25e55d19a240a362a
+--- /dev/null
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -0,0 +1,59 @@
++import { useState } from "react";
++
++import { useIsMobileLayout } from "../../shared/responsive";
++import { useAiChatConversation } from "./hooks/useAiChatConversation";
++import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
++import { AiChatView, ChatIcon } from "./view/AiChatView";
++import "./view/AiChat.css";
++
++export function AiChatFeature() {
++  const isMobile = useIsMobileLayout();
++  const [isOpen, setIsOpen] = useState(false);
++  const { draft, messages, setDraft, send, chooseCard } =
++    useAiChatConversation();
++
++  const view = (
++    <AiChatView
++      active={!isMobile || isOpen}
++      draft={draft}
++      messages={messages}
++      onChooseCard={chooseCard}
++      onDraftChange={setDraft}
++      onSend={send}
++    />
++  );
++
++  return (
++    <div className="ai-chat-feature">
++      {isMobile ? (
++        <>
++          <div className="ai-chat-launchers">
++            <button
++              className="ai-chat-launchers__action"
++              onClick={() => setIsOpen(true)}
++              type="button"
++            >
++              AI와 할 일 만들기
++            </button>
++            <button
++              aria-label="AI 채팅 열기"
++              className="ai-chat-launchers__icon"
++              onClick={() => setIsOpen(true)}
++              type="button"
++            >
++              <ChatIcon />
++            </button>
++          </div>
++          <MobileAiChatDialog isOpen={isOpen} onClose={() => setIsOpen(false)}>
++            {view}
++          </MobileAiChatDialog>
++        </>
++      ) : (
++        <aside aria-label="AI 채팅" className="ai-chat-panel">
++          <span className="ai-chat-panel__badge">예시 대화</span>
++          {view}
++        </aside>
++      )}
++    </div>
++  );
++}
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e8eb16d4e47269f6203dad32097c1bfe4ff5af77
+--- /dev/null
++++ b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+@@ -0,0 +1,52 @@
++import { useState } from "react";
++
++import {
++  ChatMessage,
++  createExampleReply,
++  recommendedTasks,
++} from "../model/exampleChat";
++
++export function useAiChatConversation() {
++  const [draft, setDraft] = useState("");
++  const [messages, setMessages] = useState<ChatMessage[]>([]);
++
++  const send = (text: string) => {
++    const content = text.trim();
++    if (!content) return;
++    const time = new Date().toLocaleTimeString("ko-KR", {
++      hour: "2-digit",
++      minute: "2-digit",
++      hour12: false,
++    });
++    setMessages((current) => [
++      ...current,
++      { id: current.length, role: "user", text: content, time },
++      createExampleReply(current.length + 1, current.length === 0),
++    ]);
++    setDraft("");
++  };
++
++  const chooseCard = (messageId: number, add: boolean) => {
++    setMessages((current) =>
++      current.map((message) => {
++        if (
++          message.id !== messageId ||
++          message.role !== "assistant" ||
++          message.kind !== "recommendations"
++        )
++          return message;
++        const task = recommendedTasks[message.cardIndex];
++        if (!task) return message;
++        return {
++          ...message,
++          cardIndex: message.cardIndex + 1,
++          feedback: add
++            ? `예시로 추가했어요: ${task.title}`
++            : `넘겼어요: ${task.title}`,
++        };
++      }),
++    );
++  };
++
++  return { draft, messages, setDraft, send, chooseCard };
++}
+diff --git a/FE/src/features/ai-chat/model/exampleChat.ts b/FE/src/features/ai-chat/model/exampleChat.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..65638b23561ab8a342ab06e1ed2fe21a739edbe6
+--- /dev/null
++++ b/FE/src/features/ai-chat/model/exampleChat.ts
+@@ -0,0 +1,36 @@
++export const suggestedQuestions = [
++  "웨딩홀을 정한 다음엔 뭘 준비할까?",
++  "촬영 전에 준비할 일을 정리해줘",
++];
++
++export const recommendedTasks = [
++  { title: "주례 없는 예식 순서 정하기", step: "02 · 예식 진행 방식 결정" },
++  { title: "사회자·축가 맡을 사람 정하기", step: "03 · 예식 진행 인원 섭외" },
++];
++
++export type ChatMessage =
++  | { id: number; role: "user"; text: string; time: string }
++  | {
++      id: number;
++      role: "assistant";
++      kind: "guide" | "recommendations";
++      text: string;
++      cardIndex: number;
++      feedback: string;
++    };
++
++export function createExampleReply(
++  id: number,
++  isFirstMessage: boolean,
++): ChatMessage {
++  return {
++    id,
++    role: "assistant",
++    kind: isFirstMessage ? "guide" : "recommendations",
++    text: isFirstMessage
++      ? "웨딩홀을 정하셨군요! 이제 예식 진행 방식과 함께할 사람들을 정하면 좋아요."
++      : "카드를 한 장씩 확인해보세요. 오른쪽은 추가, 왼쪽은 넘기기예요.",
++    cardIndex: 0,
++    feedback: "",
++  };
++}
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..1079d85703604a5bbc7c096f4a674ecabcea035f
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -0,0 +1,460 @@
++.ai-chat-feature {
++  display: flex;
++  min-width: 0;
++  min-height: 0;
++  flex: 0 0 clamp(280px, 32vw, 480px);
++  padding: 16px 24px 24px 0;
++}
++
++@media (min-width: 761px) {
++  .service-layout:has(.ai-chat-panel) {
++    --service-side-panel-width: clamp(280px, 32vw, 480px);
++  }
++}
++
++.ai-chat-panel {
++  position: relative;
++  display: flex;
++  flex-direction: column;
++  width: 100%;
++  min-height: 0;
++  overflow: hidden;
++  border-radius: 24px;
++  background: var(--color-bg-layer-default);
++}
++
++.ai-chat-panel__badge {
++  flex: none;
++  align-self: flex-end;
++  margin: 12px 20px 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 11px;
++}
++
++.ai-chat {
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  min-width: 0;
++  min-height: 0;
++  gap: 16px;
++  padding: 24px 20px 18px;
++}
++
++.ai-chat button {
++  font: inherit;
++  cursor: pointer;
++}
++
++.ai-chat :is(button, textarea, [tabindex]):focus-visible,
++.ai-chat-launchers button:focus-visible,
++.ai-chat-dialog__header button:focus-visible {
++  outline: 3px solid var(--color-stroke-focus-ring);
++  outline-offset: 3px;
++}
++
++.ai-chat__welcome {
++  display: flex;
++  flex: 1;
++  min-height: 0;
++  overflow-y: auto;
++  align-items: center;
++  justify-content: safe center;
++  flex-direction: column;
++  padding: 24px 8px;
++  text-align: center;
++}
++
++.ai-chat__brand-mark {
++  position: relative;
++  display: block;
++  width: 48px;
++  height: 48px;
++  margin-bottom: 20px;
++  flex: none;
++  overflow: hidden;
++  border-radius: 16px;
++  background: var(--color-bg-layer-default);
++}
++
++.ai-chat__brand-mark img {
++  position: absolute;
++  top: 0;
++  left: 0;
++  width: 127px;
++  max-width: none;
++  height: auto;
++  transform: translate(-39px, -10px);
++}
++
++.ai-chat__welcome h2 {
++  margin: 0 0 12px;
++  font-size: 20px;
++  line-height: 1.4;
++  letter-spacing: -0.03em;
++  word-break: keep-all;
++}
++
++.ai-chat__welcome > p {
++  margin: 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 14px;
++  line-height: 1.7;
++}
++
++.ai-chat__questions {
++  display: grid;
++  width: 100%;
++  margin-top: 32px;
++  gap: 10px;
++}
++
++.ai-chat__questions button {
++  padding: 15px 18px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 14px;
++  background: var(--color-bg-layer-basement);
++  color: var(--color-fg-brand);
++  text-align: left;
++  font-size: 13px;
++  line-height: 1.6;
++}
++
++.ai-chat__questions button:hover {
++  background: var(--color-bg-brand-weak);
++}
++
++.ai-chat__log {
++  flex: 1;
++  min-height: 0;
++  overflow-y: auto;
++  overscroll-behavior-y: contain;
++  padding: 16px 4px 8px;
++  scrollbar-width: thin;
++}
++
++.ai-chat__message {
++  margin-bottom: 28px;
++  overflow-wrap: anywhere;
++  font-size: 14px;
++  line-height: 1.75;
++}
++
++.ai-chat__message p {
++  margin: 0;
++  white-space: pre-wrap;
++}
++
++.ai-chat__message--user {
++  width: fit-content;
++  max-width: 88%;
++  margin-left: auto;
++  padding: 14px 18px 10px;
++  border-radius: 18px;
++  background: var(--color-bg-brand-weak);
++}
++
++.ai-chat__message time {
++  display: block;
++  margin-top: 6px;
++  color: var(--color-fg-brand-contrast);
++  text-align: right;
++  font-size: 11px;
++}
++
++.ai-chat__author {
++  display: block;
++  margin-bottom: 8px;
++  color: var(--color-fg-brand);
++  font-size: 13px;
++}
++
++.ai-chat__guide {
++  padding: 16px;
++  margin: 16px 0;
++  border-radius: 16px;
++  background: var(--color-bg-layer-basement);
++}
++
++.ai-chat h3 {
++  margin: 0;
++  font-size: 14px;
++}
++
++.ai-chat__guide ol {
++  margin: 6px 0 0;
++  padding-left: 20px;
++}
++
++.ai-chat__composer {
++  position: relative;
++  flex: none;
++  padding: 12px 12px 42px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 18px;
++  background: var(--color-bg-layer-basement);
++}
++
++.ai-chat__composer textarea {
++  display: block;
++  width: 100%;
++  max-height: 160px;
++  min-height: 38px;
++  padding: 0;
++  resize: none;
++  border: 0;
++  background: transparent;
++  color: var(--color-fg-neutral);
++  font: inherit;
++  font-size: 14px;
++  line-height: 1.6;
++}
++
++.ai-chat__composer textarea::placeholder {
++  color: var(--color-fg-placeholder);
++}
++
++.ai-chat__composer button {
++  position: absolute;
++  right: 12px;
++  bottom: 12px;
++  display: grid;
++  width: 30px;
++  height: 30px;
++  place-items: center;
++  border: 0;
++  border-radius: 8px;
++  background: var(--color-bg-brand-solid);
++  color: var(--color-fg-on-brand);
++  font-size: 22px;
++  line-height: 1;
++}
++
++.ai-chat__composer button:disabled {
++  opacity: 0.5;
++  cursor: default;
++}
++
++.ai-chat-cards {
++  margin-top: 18px;
++}
++
++.ai-chat-cards__heading,
++.ai-chat-cards__actions {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 8px;
++}
++
++.ai-chat-cards__heading {
++  margin: 0 16px 14px;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++}
++
++.ai-chat-cards__stack {
++  position: relative;
++  isolation: isolate;
++  margin: 0 12px 24px;
++}
++
++.ai-chat-cards__stack::before,
++.ai-chat-cards__stack::after {
++  position: absolute;
++  z-index: -1;
++  inset: 0 6px -8px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 22px;
++  background: var(--color-bg-layer-basement);
++  content: "";
++}
++
++.ai-chat-cards__stack::after {
++  z-index: -2;
++  inset: 0 12px -16px;
++}
++
++.ai-chat-cards__card {
++  position: relative;
++  padding: 20px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 22px;
++  background: var(--color-bg-layer-default);
++  cursor: grab;
++  touch-action: pan-y;
++  user-select: none;
++}
++
++.ai-chat-cards__number {
++  color: var(--color-palette-coral-muted);
++  font-size: 22px;
++  font-weight: 700;
++}
++
++.ai-chat-cards__card h4 {
++  max-width: 145px;
++  margin: 8px 0 30px;
++  font-size: 17px;
++  line-height: 1.5;
++  word-break: keep-all;
++}
++
++.ai-chat-cards__card :is(p, small) {
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++}
++
++.ai-chat-cards__direction {
++  position: absolute;
++  top: 14px;
++  right: 14px;
++  color: var(--color-fg-brand);
++  font-size: 12px;
++  font-weight: 700;
++}
++
++.ai-chat-cards__actions button {
++  padding: 8px 0;
++  border: 0;
++  background: transparent;
++  color: var(--color-fg-neutral-muted);
++  font-size: 13px;
++}
++
++.ai-chat-cards__actions button:last-child {
++  color: var(--color-fg-brand);
++  font-weight: 700;
++}
++
++.ai-chat-cards__actions > span {
++  color: var(--color-fg-neutral-muted);
++  font-size: 10px;
++}
++
++.ai-chat-cards .ai-chat-cards__feedback {
++  margin-top: 12px;
++  color: var(--color-fg-brand);
++  font-size: 12px;
++}
++
++.ai-chat-cards__complete {
++  padding: 20px;
++  border-radius: 16px;
++  background: var(--color-bg-layer-basement);
++}
++
++.ai-chat__sr-only {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  overflow: hidden;
++  clip-path: inset(50%);
++  white-space: nowrap;
++}
++
++@media (max-width: 760px) {
++  .ai-chat-feature {
++    display: contents;
++  }
++
++  .ai-chat-launchers {
++    display: flex;
++    flex: none;
++    gap: 12px;
++    padding: 8px 16px 0;
++  }
++
++  .ai-chat-launchers button {
++    display: grid;
++    min-height: 44px;
++    place-items: center;
++    border: 0;
++    cursor: pointer;
++    font: inherit;
++  }
++
++  .ai-chat-launchers__action {
++    flex: 1;
++    border-radius: 14px;
++    background: var(--color-bg-brand-solid);
++    color: var(--color-fg-on-brand);
++    font-size: 14px;
++    font-weight: 700;
++  }
++
++  .ai-chat-launchers .ai-chat-launchers__icon {
++    width: 44px;
++    border: 1px solid var(--color-stroke-neutral-weak);
++    border-radius: 50%;
++    background: var(--color-bg-layer-default);
++    color: var(--color-fg-neutral);
++  }
++
++  .ai-chat-launchers__icon svg {
++    width: 20px;
++    height: 20px;
++  }
++
++  .ai-chat-dialog {
++    position: fixed;
++    inset: 0;
++    width: 100%;
++    max-width: none;
++    height: 100dvh;
++    max-height: none;
++    margin: 0;
++    padding: 0;
++    overflow: hidden;
++    border: 0;
++    background: var(--color-bg-layer-default);
++    color: var(--color-fg-neutral);
++  }
++
++  .ai-chat-dialog[open] {
++    display: flex;
++    flex-direction: column;
++  }
++
++  .ai-chat-dialog::backdrop {
++    background: var(--color-bg-layer-default);
++  }
++
++  .ai-chat-dialog__header {
++    display: flex;
++    flex: none;
++    align-items: center;
++    gap: 12px;
++    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
++    border-bottom: 1px solid var(--color-stroke-neutral-weak);
++    background: var(--color-bg-layer-basement);
++  }
++
++  .ai-chat-dialog__header h2 {
++    flex: 1;
++    margin: 0;
++    font-size: 16px;
++  }
++
++  .ai-chat-dialog__header h2 span {
++    margin-left: 6px;
++    color: var(--color-fg-neutral-muted);
++    font-size: 10px;
++    font-weight: 400;
++  }
++
++  .ai-chat-dialog__header button {
++    width: 36px;
++    height: 36px;
++    border: 0;
++    background: transparent;
++    color: var(--color-fg-neutral-muted);
++    cursor: pointer;
++    font: inherit;
++    font-size: 26px;
++  }
++
++  .ai-chat-dialog .ai-chat {
++    padding: 16px 16px max(16px, env(safe-area-inset-bottom));
++  }
++}
+diff --git a/FE/src/features/ai-chat/view/AiChatView.tsx b/FE/src/features/ai-chat/view/AiChatView.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..da14213204aeebca7ce51fb4ad05f124a5a35f30
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/AiChatView.tsx
+@@ -0,0 +1,164 @@
++import { useEffect, useId, useRef } from "react";
++
++import bibbidiLogo from "../../../assets/bibbidi-logo.png";
++import { ChatMessage, suggestedQuestions } from "../model/exampleChat";
++import { RecommendedTaskCards } from "./RecommendedTaskCards";
++
++export function ChatIcon() {
++  return (
++    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
++      <path
++        d="M5 5h14v11H9l-4 3V5Z M8 9h8 M8 12h5"
++        stroke="currentColor"
++        strokeLinecap="round"
++        strokeLinejoin="round"
++        strokeWidth="1.6"
++      />
++    </svg>
++  );
++}
++
++export function AiChatView({
++  active,
++  draft,
++  messages,
++  onChooseCard,
++  onDraftChange,
++  onSend,
++}: {
++  active: boolean;
++  draft: string;
++  messages: ChatMessage[];
++  onChooseCard: (messageId: number, add: boolean) => void;
++  onDraftChange: (value: string) => void;
++  onSend: (text: string) => void;
++}) {
++  const logRef = useRef<HTMLDivElement>(null);
++  const composing = useRef(false);
++  const inputId = useId();
++  useEffect(() => {
++    if (!active) return;
++    const scrollToEnd = () => {
++      if (logRef.current) {
++        logRef.current.scrollTop = logRef.current.scrollHeight;
++      }
++    };
++    scrollToEnd();
++    const viewport = window.visualViewport;
++    viewport?.addEventListener("resize", scrollToEnd);
++    viewport?.addEventListener("scroll", scrollToEnd);
++    return () => {
++      viewport?.removeEventListener("resize", scrollToEnd);
++      viewport?.removeEventListener("scroll", scrollToEnd);
++    };
++  }, [active, messages]);
++
++  return (
++    <div className="ai-chat">
++      {messages.length === 0 ? (
++        <div className="ai-chat__welcome">
++          <span aria-hidden="true" className="ai-chat__brand-mark">
++            <img alt="" draggable={false} src={bibbidiLogo} />
++          </span>
++          <h2>어떤 준비를 도와드릴까요?</h2>
++          <p>
++            원하는 준비를 말해주시면 나에게 맞는
++            <br />할 일을 정리해드려요.
++          </p>
++          <div className="ai-chat__questions">
++            {suggestedQuestions.map((question) => (
++              <button
++                key={question}
++                onClick={() => onSend(question)}
++                type="button"
++              >
++                {question}
++              </button>
++            ))}
++          </div>
++        </div>
++      ) : (
++        <div
++          aria-label="AI와 나눈 대화"
++          aria-live="polite"
++          className="ai-chat__log"
++          ref={logRef}
++          role="log"
++          // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 대화 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
++          tabIndex={0}
++        >
++          {messages.map((message) => (
++            <div
++              className={`ai-chat__message ai-chat__message--${message.role}`}
++              key={message.id}
++            >
++              {message.role === "assistant" ? (
++                <strong className="ai-chat__author">Bibbidi</strong>
++              ) : null}
++              <p>{message.text}</p>
++              {message.role === "user" ? (
++                <time>{message.time}</time>
++              ) : message.kind === "guide" ? (
++                <>
++                  <div className="ai-chat__guide">
++                    <h3>다음으로 준비하면 좋은 일</h3>
++                    <ol>
++                      <li>예식 형태와 입장 방식 정하기</li>
++                      <li>사회자·축가·축사 맡을 사람 정하기</li>
++                    </ol>
++                  </div>
++                  <p>원하시는 예식 분위기가 있나요?</p>
++                </>
++              ) : (
++                <RecommendedTaskCards
++                  cardIndex={message.cardIndex}
++                  feedback={message.feedback}
++                  onChoose={(add) => onChooseCard(message.id, add)}
++                />
++              )}
++            </div>
++          ))}
++        </div>
++      )}
++      <form
++        className="ai-chat__composer"
++        onSubmit={(event) => {
++          event.preventDefault();
++          if (!composing.current) onSend(draft);
++        }}
++      >
++        <label className="ai-chat__sr-only" htmlFor={inputId}>
++          추가하고 싶은 일
++        </label>
++        <textarea
++          id={inputId}
++          onChange={(event) => onDraftChange(event.target.value)}
++          onCompositionEnd={() => {
++            composing.current = false;
++          }}
++          onCompositionStart={() => {
++            composing.current = true;
++          }}
++          onKeyDown={(event) => {
++            if (
++              event.key === "Enter" &&
++              !event.shiftKey &&
++              !composing.current &&
++              !event.nativeEvent.isComposing &&
++              event.nativeEvent.keyCode !== 229
++            ) {
++              event.preventDefault();
++              onSend(draft);
++            }
++          }}
++          placeholder="추가하고 싶은 일을 이야기해요"
++          rows={2}
++          value={draft}
++        />
++        <button aria-label="메시지 전송" disabled={!draft.trim()} type="submit">
++          ↑
++        </button>
++      </form>
++    </div>
++  );
++}
+diff --git a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..580873c7ad53568a2e4d07fda611db1a3100b28b
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+@@ -0,0 +1,79 @@
++import { ReactNode, useEffect, useLayoutEffect, useRef } from "react";
++
++import { containTabFocus } from "../../../shared/focus/containTabFocus";
++
++export function MobileAiChatDialog({
++  children,
++  isOpen,
++  onClose,
++}: {
++  children: ReactNode;
++  isOpen: boolean;
++  onClose: () => void;
++}) {
++  const dialogRef = useRef<HTMLDialogElement>(null);
++
++  useLayoutEffect(() => {
++    const dialog = dialogRef.current;
++    if (!dialog) return;
++    if (isOpen) {
++      dialog.showModal();
++    } else if (dialog.open) {
++      dialog.close();
++    }
++    const handleKeyDown = (event: KeyboardEvent) =>
++      containTabFocus(event, dialog);
++    dialog.addEventListener("keydown", handleKeyDown);
++    return () => {
++      dialog.removeEventListener("keydown", handleKeyDown);
++      if (dialog.open) dialog.close();
++    };
++  }, [isOpen]);
++
++  useEffect(() => {
++    const viewport = window.visualViewport;
++    const dialog = dialogRef.current;
++    if (!viewport || !dialog || !isOpen) return;
++    const resize = () => {
++      dialog.style.height = `${viewport.height}px`;
++      dialog.style.top = `${viewport.offsetTop}px`;
++    };
++    resize();
++    viewport.addEventListener("resize", resize);
++    viewport.addEventListener("scroll", resize);
++    return () => {
++      viewport.removeEventListener("resize", resize);
++      viewport.removeEventListener("scroll", resize);
++    };
++  }, [isOpen]);
++
++  return (
++    <dialog
++      aria-label="AI 채팅"
++      className="ai-chat-dialog"
++      onCancel={(event) => {
++        event.preventDefault();
++        onClose();
++      }}
++      onClose={onClose}
++      ref={dialogRef}
++    >
++      <header className="ai-chat-dialog__header">
++        <button
++          aria-label="로드맵으로 돌아가기"
++          onClick={onClose}
++          type="button"
++        >
++          ‹
++        </button>
++        <h2>
++          AI 채팅 <span>예시</span>
++        </h2>
++        <button aria-label="AI 채팅 닫기" onClick={onClose} type="button">
++          ×
++        </button>
++      </header>
++      {children}
++    </dialog>
++  );
++}
+diff --git a/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx b/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..04301c0da2a398e458b4da88913cb13a9f7d6276
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx
+@@ -0,0 +1,103 @@
++import { useRef, useState } from "react";
++
++import { recommendedTasks } from "../model/exampleChat";
++
++export function RecommendedTaskCards({
++  cardIndex,
++  feedback,
++  onChoose,
++}: {
++  cardIndex: number;
++  feedback: string;
++  onChoose: (add: boolean) => void;
++}) {
++  const gesture = useRef<{ x: number; y: number; pointerId: number } | null>(
++    null,
++  );
++  const [offset, setOffset] = useState(0);
++  const task = recommendedTasks[cardIndex];
++  const resetDrag = () => {
++    gesture.current = null;
++    setOffset(0);
++  };
++
++  return (
++    <section aria-label="추천 할 일" className="ai-chat-cards">
++      {task ? (
++        <>
++          <div className="ai-chat-cards__heading">
++            <h3>추천 할 일</h3>
++            <span>
++              {cardIndex + 1} / {recommendedTasks.length}
++            </span>
++          </div>
++          <div className="ai-chat-cards__stack">
++            <article
++              aria-label={task.title}
++              className="ai-chat-cards__card"
++              onPointerCancel={resetDrag}
++              onPointerDown={(event) => {
++                if (event.button !== 0) return;
++                gesture.current = {
++                  x: event.clientX,
++                  y: event.clientY,
++                  pointerId: event.pointerId,
++                };
++                event.currentTarget.setPointerCapture?.(event.pointerId);
++              }}
++              onPointerMove={(event) => {
++                const start = gesture.current;
++                if (!start || start.pointerId !== event.pointerId) return;
++                const dx = event.clientX - start.x;
++                if (Math.abs(dx) > Math.abs(event.clientY - start.y)) {
++                  setOffset(Math.max(-120, Math.min(120, dx)));
++                }
++              }}
++              onPointerUp={(event) => {
++                const start = gesture.current;
++                resetDrag();
++                if (!start || start.pointerId !== event.pointerId) return;
++                const dx = event.clientX - start.x;
++                if (
++                  Math.abs(dx) >= 48 &&
++                  Math.abs(dx) > Math.abs(event.clientY - start.y) * 1.5
++                ) {
++                  onChoose(dx > 0);
++                }
++              }}
++              style={{
++                transform: `translateX(${offset}px) rotate(${offset / 16}deg)`,
++              }}
++            >
++              {Math.abs(offset) > 24 ? (
++                <span className="ai-chat-cards__direction">
++                  {offset > 0 ? "추가하기 →" : "← 넘기기"}
++                </span>
++              ) : null}
++              <span className="ai-chat-cards__number">
++                {String(cardIndex + 1).padStart(2, "0")}
++              </span>
++              <h4>{task.title}</h4>
++              <p>{task.step}</p>
++              <small>이 단계의 세부 할 일을 확인해보세요.</small>
++            </article>
++          </div>
++          <div className="ai-chat-cards__actions">
++            <button onClick={() => onChoose(false)} type="button">
++              ← 넘기기
++            </button>
++            <span>좌우로 밀어 선택</span>
++            <button onClick={() => onChoose(true)} type="button">
++              추가하기 →
++            </button>
++          </div>
++        </>
++      ) : (
++        <p className="ai-chat-cards__complete">추천 할 일을 모두 확인했어요.</p>
++      )}
++      <p className="ai-chat-cards__feedback" role="status">
++        {feedback}
++      </p>
++    </section>
++  );
++}
+diff --git a/FE/src/features/checklist/view/ChecklistAppointmentCreation.tsx b/FE/src/features/checklist/view/ChecklistAppointmentCreation.tsx
+index f4e89dc4e674bfefc7e62d6db39d5faa28961ea7..0effcab7514f59fbbf1f616996b0528108a8f9af 100644
+--- a/FE/src/features/checklist/view/ChecklistAppointmentCreation.tsx
++++ b/FE/src/features/checklist/view/ChecklistAppointmentCreation.tsx
+@@ -6,7 +6,7 @@ import {
+   ChecklistAppointmentCreationController,
+ } from "../useChecklistAppointmentCreation";
+ import { ChecklistAppointmentEditingController } from "../useChecklistAppointmentManagement";
+-import { containTabFocus } from "./containTabFocus";
++import { containTabFocus } from "../../../shared/focus/containTabFocus";
+ import "./ChecklistAppointmentCreation.css";
+ 
+ interface ChecklistAppointmentCreationProps {
+diff --git a/FE/src/features/checklist/view/ChecklistModalDialog.tsx b/FE/src/features/checklist/view/ChecklistModalDialog.tsx
+index 55469d62dc5c8b8a1a6ab7237aa1f40683e82b17..bec35f47446a4fe2f487b94f636142ff32158f8f 100644
+--- a/FE/src/features/checklist/view/ChecklistModalDialog.tsx
++++ b/FE/src/features/checklist/view/ChecklistModalDialog.tsx
+@@ -1,7 +1,10 @@
+ import { ReactNode, useEffect, useId, useRef } from "react";
+ 
+ import "./ChecklistModalDialog.css";
+-import { containTabFocus, focusFirstElement } from "./containTabFocus";
++import {
++  containTabFocus,
++  focusFirstElement,
++} from "../../../shared/focus/containTabFocus";
+ 
+ interface ChecklistModalDialogProps {
+   actions: ReactNode;
+diff --git a/FE/src/features/checklist/view/ChecklistTaskCreation.tsx b/FE/src/features/checklist/view/ChecklistTaskCreation.tsx
+index 0b5b5006052decc2cc136481ea5b8140810262d7..fa05398021f1baa1743134f08009a7d7c06f7846 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskCreation.tsx
++++ b/FE/src/features/checklist/view/ChecklistTaskCreation.tsx
+@@ -7,7 +7,7 @@ import {
+ } from "../useChecklistTaskCreation";
+ import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
+ import { ChecklistModalDialog } from "./ChecklistModalDialog";
+-import { containTabFocus } from "./containTabFocus";
++import { containTabFocus } from "../../../shared/focus/containTabFocus";
+ import "./ChecklistTaskCreation.css";
+ 
+ interface ChecklistTaskCreationProps {
+diff --git a/FE/src/features/preparation/AllPreparationStepsFeature.tsx b/FE/src/features/preparation/AllPreparationStepsFeature.tsx
+index 3cf0fb14a0abcbcb85c947ec0a6dd946c0aa9e3c..aefde7c2dde2ec7933ce33cdadd4f9575634de6f 100644
+--- a/FE/src/features/preparation/AllPreparationStepsFeature.tsx
++++ b/FE/src/features/preparation/AllPreparationStepsFeature.tsx
+@@ -26,6 +26,7 @@ import {
+   createPreparationRoadmapViewModel,
+   hasSelectablePreparationSteps,
+   PreparationRoadmapSelection,
++  PreparationCategoryViewModel,
+   selectPreparationCategory,
+ } from "./view-model/createPreparationRoadmapViewModel";
+ import { PreparationRoadmap } from "./view/PreparationRoadmap";
+@@ -53,9 +54,14 @@ export function AllPreparationStepsFeature({
+   initialCategoryId,
+   onCategoryChange,
+   viewSwitcher,
++  renderRoadmap,
+ }: {
+   initialCategoryId?: string | null;
+   viewSwitcher?: ReactNode;
++  renderRoadmap?: (props: {
++    categories: readonly PreparationCategoryViewModel[];
++    onCategorySelect: (id: string) => void;
++  }) => ReactNode;
+   onCategoryChange?: (categoryId: string) => void;
+ } = {}) {
+   const { authState, refreshAuth } = useAuth();
+@@ -263,6 +269,13 @@ export function AllPreparationStepsFeature({
+     });
+   };
+ 
++  if (renderRoadmap) {
++    return renderRoadmap({
++      categories: viewModel.categories,
++      onCategorySelect: handleCategorySelect,
++    });
++  }
++
+   const handleStepSelect = (stepId: string) => {
+     const selectedStep = viewModel.steps.find((step) => step.id === stepId);
+ 
+diff --git a/FE/src/features/preparation/PreparationRoadmapFeature.tsx b/FE/src/features/preparation/PreparationRoadmapFeature.tsx
+index 3f386240e649cbcd77497267e9fd05c9e6e6bf2d..4b9f691c7a2876212c2b196334efddff8b0d3528 100644
+--- a/FE/src/features/preparation/PreparationRoadmapFeature.tsx
++++ b/FE/src/features/preparation/PreparationRoadmapFeature.tsx
+@@ -1,5 +1,6 @@
+ import { RoadmapWorkspace } from "./RoadmapWorkspace";
+ import { AllPreparationStepsFeature } from "./AllPreparationStepsFeature";
++import { GuestPersonalRoadmap } from "./view/GuestPersonalRoadmap";
+ 
+ export function PreparationRoadmapFeature({
+   initialCategoryId,
+@@ -9,11 +10,28 @@ export function PreparationRoadmapFeature({
+   return (
+     <RoadmapWorkspace
+       initialCategoryId={initialCategoryId}
+-      renderAllSteps={(categoryId, onCategorySelect, viewSwitcher) => (
++      renderCatalogRoadmap={({
++        categoryId,
++        onCategorySelect,
++        viewSwitcher,
++        view,
++        onShowAll,
++      }) => (
+         <AllPreparationStepsFeature
+           initialCategoryId={categoryId}
+           onCategoryChange={onCategorySelect}
+           viewSwitcher={viewSwitcher}
++          renderRoadmap={
++            view === "personal"
++              ? (props) => (
++                  <GuestPersonalRoadmap
++                    {...props}
++                    viewSwitcher={viewSwitcher}
++                    onShowAll={onShowAll}
++                  />
++                )
++              : undefined
++          }
+         />
+       )}
+     />
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index 948a663b144e4681660dfcd31bebcfbd90184bb5..fc15cb15d9d6f698d78b009bf631fa0b5dd5f7b4 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -116,6 +116,27 @@ function showAll() {
+ }
+ 
+ describe("준비 로드맵 보기 전환", () => {
++  it("비로그인도 채팅을 사용하고 카테고리·로드맵 보기 전환 중 대화를 유지한다", async () => {
++    mocks.authState = { status: "guest" };
++    render(<PreparationRoadmapFeature />);
++    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
++    fireEvent.click(
++      screen.getByRole("button", {
++        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
++      }),
++    );
++    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
++    expect(screen.getByRole("log").textContent).toContain(
++      "다음으로 준비하면 좋은 일",
++    );
++    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
++    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
++    expect(screen.getByRole("log").textContent).toContain(
++      "다음으로 준비하면 좋은 일",
++    );
++    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
++  });
++
+   it("상단 현황은 빈 단계를 포함하고 직접 추가한 일과 완료 상태를 집계한다", async () => {
+     mocks.getChecklist.mockResolvedValue({
+       categories: [
+@@ -191,9 +212,14 @@ describe("준비 로드맵 보기 전환", () => {
+     expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
+   });
+ 
+-  it("빈 카테고리에서 전체 단계로 전환하며 카테고리를 유지한다", async () => {
++  it("내 로드맵과 전체 단계 전환 시 카테고리 선택과 연결 영역을 유지한다", async () => {
+     render(<PreparationRoadmapFeature />);
+     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
++    expect(
++      screen
++        .getByRole("button", { name: "스드메" })
++        .getAttribute("aria-controls"),
++    ).toBe("personal-roadmap-content");
+     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+     expect(screen.getByText("아직 담은 할 일이 없어요.")).toBeTruthy();
+     fireEvent.click(
+@@ -207,17 +233,67 @@ describe("준비 로드맵 보기 전환", () => {
+         .getByRole("button", { name: "스드메" })
+         .getAttribute("aria-pressed"),
+     ).toBe("true");
++    expect(
++      screen
++        .getByRole("button", { name: "스드메" })
++        .getAttribute("aria-controls"),
++    ).toBe("preparation-roadmap-content");
++    fireEvent.click(screen.getByRole("button", { name: "웨딩홀" }));
++    await screen.findByRole("heading", { name: "웨딩홀 · 전체 단계" });
++    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
++    await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
++    const categories = screen.getByRole("navigation", {
++      name: "준비 카테고리",
++    });
++    expect(within(categories).getByRole("list")).toBeTruthy();
++    expect(
++      within(categories)
++        .getByRole("button", { name: "웨딩홀" })
++        .getAttribute("aria-pressed"),
++    ).toBe("true");
++    expect(
++      within(categories)
++        .getByRole("button", { name: "스드메" })
++        .getAttribute("aria-pressed"),
++    ).toBe("false");
+   });
+ 
+-  it("비로그인은 전체 단계로 진입하고 내 로드맵에서는 로그인 안내를 본다", async () => {
++  it("비로그인 내 로드맵은 카테고리를 유지하고 콘텐츠 영역에 로그인 안내를 표시한다", async () => {
+     mocks.authState = { status: "guest" };
+     render(<PreparationRoadmapFeature />);
+     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+-    expect(mocks.getChecklist).not.toHaveBeenCalled();
++    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+     fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
++    const notice = screen.getByRole("region", { name: "내 로드맵" });
++    expect(
++      within(notice).getByText("로그인하면 내 로드맵을 확인할 수 있어요."),
++    ).toBeTruthy();
+     expect(
+-      screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
++      within(notice).getByRole("link", { name: "로그인" }).getAttribute("href"),
+     ).toBe("/login");
++    expect(screen.getByRole("heading", { name: "스드메 로드맵" })).toBeTruthy();
++    expect(screen.queryByRole("region", { name: "전체 단계 목록" })).toBeNull();
++    const categories = screen.getByRole("navigation", {
++      name: "준비 카테고리",
++    });
++    expect(
++      within(categories)
++        .getByRole("button", { name: "스드메" })
++        .getAttribute("aria-pressed"),
++    ).toBe("true");
++    fireEvent.click(within(categories).getByRole("button", { name: "웨딩홀" }));
++    expect(screen.getByRole("heading", { name: "웨딩홀 로드맵" })).toBeTruthy();
++    expect(screen.getByRole("region", { name: "내 로드맵" })).toBe(notice);
++    fireEvent.click(
++      within(notice).getByRole("button", { name: "전체 단계 보기" }),
++    );
++    expect(
++      screen.getByRole("heading", { name: "웨딩홀 · 전체 단계" }),
++    ).toBeTruthy();
++    expect(screen.getByRole("region", { name: "전체 단계 목록" })).toBeTruthy();
++    expect(screen.queryByRole("region", { name: "내 로드맵" })).toBeNull();
++    expect(mocks.getChecklist).not.toHaveBeenCalled();
++    expect(mocks.getCatalog).toHaveBeenCalledTimes(1);
+   });
+ 
+   it("PC에서도 전체 단계 상세를 펼치고 담은 일을 개인 목록에서 확인한다", async () => {
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.tsx b/FE/src/features/preparation/RoadmapWorkspace.tsx
+index 2c9a2daf88d53624eb1e85d72350d3e80c1fd690..92f19e4d58e7dd7b5167639856c9a5ae6aff7e0a 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.tsx
+@@ -1,5 +1,6 @@
+ import { ReactNode, useState } from "react";
+ import { useAuth } from "../auth";
++import { AiChatFeature } from "../ai-chat/AiChatFeature";
+ import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
+ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+ import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
+@@ -7,14 +8,16 @@ import "./view/RoadmapWorkspace.css";
+ 
+ export function RoadmapWorkspace({
+   initialCategoryId,
+-  renderAllSteps,
++  renderCatalogRoadmap,
+ }: {
+   initialCategoryId?: string | null;
+-  renderAllSteps: (
+-    categoryId: string | null | undefined,
+-    onCategorySelect: (id: string) => void,
+-    viewSwitcher: ReactNode,
+-  ) => ReactNode;
++  renderCatalogRoadmap: (options: {
++    categoryId: string | null | undefined;
++    onCategorySelect: (id: string) => void;
++    viewSwitcher: ReactNode;
++    view: RoadmapView;
++    onShowAll: () => void;
++  }) => ReactNode;
+ }) {
+   const { authState, refreshAuth } = useAuth();
+   const [choice, setChoice] = useState<{
+@@ -51,34 +54,32 @@ export function RoadmapWorkspace({
+ 
+   return (
+     <div className="roadmap-workspace">
+-      <header className="roadmap-workspace__hero">
+-        <h1>우리 결혼 준비, 한 단계씩</h1>
+-        <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
+-      </header>
+-      <div id="roadmap-view-content">
+-        {view === "all" ? (
+-          renderAllSteps(categoryId, setCategoryId, viewSwitcher)
+-        ) : isAuthenticated ? (
+-          <PersonalRoadmapFeature
+-            key={audience}
+-            categoryId={categoryId}
+-            onCategorySelect={setCategoryId}
+-            onShowAll={showAll}
+-            viewSwitcher={viewSwitcher}
+-          />
+-        ) : (
+-          <>
+-            {viewSwitcher}
+-            <div className="preparation-roadmap-state">
+-              <p>로그인하면 내 로드맵을 확인할 수 있어요.</p>
+-              <a href="/login">로그인</a>
+-              <button type="button" onClick={showAll}>
+-                전체 단계 보기
+-              </button>
+-            </div>
+-          </>
+-        )}
++      <div className="roadmap-workspace__roadmap">
++        <header className="roadmap-workspace__hero">
++          <h1>우리 결혼 준비, 한 단계씩</h1>
++          <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
++        </header>
++        <div id="roadmap-view-content">
++          {view === "all" || !isAuthenticated ? (
++            renderCatalogRoadmap({
++              categoryId,
++              onCategorySelect: setCategoryId,
++              viewSwitcher,
++              view,
++              onShowAll: showAll,
++            })
++          ) : (
++            <PersonalRoadmapFeature
++              key={audience}
++              categoryId={categoryId}
++              onCategorySelect={setCategoryId}
++              onShowAll={showAll}
++              viewSwitcher={viewSwitcher}
++            />
++          )}
++        </div>
+       </div>
++      <AiChatFeature />
+     </div>
+   );
+ }
+diff --git a/FE/src/features/preparation/view/GuestPersonalRoadmap.tsx b/FE/src/features/preparation/view/GuestPersonalRoadmap.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..5603ca45bb262cbf9ee02dd08b9d2eb346395018
+--- /dev/null
++++ b/FE/src/features/preparation/view/GuestPersonalRoadmap.tsx
+@@ -0,0 +1,43 @@
++import { ReactNode } from "react";
++
++import { PreparationCategoryViewModel } from "../view-model/createPreparationRoadmapViewModel";
++import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
++import { RoadmapLoginNotice } from "./RoadmapLoginNotice";
++import { RoadmapSectionHeader } from "./RoadmapSectionHeader";
++import "./PersonalRoadmap.css";
++
++export function GuestPersonalRoadmap({
++  categories,
++  onCategorySelect,
++  onShowAll,
++  viewSwitcher,
++}: {
++  categories: readonly PreparationCategoryViewModel[];
++  onCategorySelect: (id: string) => void;
++  onShowAll: () => void;
++  viewSwitcher: ReactNode;
++}) {
++  const category = categories.find((item) => item.isCurrent);
++
++  return (
++    <div className="personal-roadmap">
++      <RoadmapCategoryTabs
++        categories={categories}
++        selectedCategoryId={category?.id}
++        controlsId="personal-roadmap-content"
++        onCategorySelect={onCategorySelect}
++      />
++      <section
++        aria-labelledby="personal-roadmap-title"
++        id="personal-roadmap-content"
++      >
++        <RoadmapSectionHeader
++          id="personal-roadmap-title"
++          title={`${category?.label ?? "준비"} 로드맵`}
++          viewSwitcher={viewSwitcher}
++        />
++        <RoadmapLoginNotice onShowAll={onShowAll} />
++      </section>
++    </div>
++  );
++}
+diff --git a/FE/src/features/preparation/view/PersonalRoadmap.css b/FE/src/features/preparation/view/PersonalRoadmap.css
+index 4dd42ed1d35312861eac9f81463499d3989ea73f..af9f654aeea08a0bea7380dd60fddca53eb9a04b 100644
+--- a/FE/src/features/preparation/view/PersonalRoadmap.css
++++ b/FE/src/features/preparation/view/PersonalRoadmap.css
+@@ -17,40 +17,6 @@
+   min-height: 0;
+ }
+ 
+-.personal-roadmap__categories {
+-  display: flex;
+-  flex: none;
+-  justify-content: center;
+-  overflow-x: auto;
+-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+-  background: transparent;
+-}
+-
+-.personal-roadmap__categories button {
+-  display: flex;
+-  flex: none;
+-  align-items: center;
+-  justify-content: center;
+-  width: auto;
+-  height: auto;
+-  padding: 10px 24px;
+-  border: 0;
+-  border-bottom: 3px solid transparent;
+-  border-radius: 0;
+-  background: transparent;
+-  color: var(--color-fg-neutral-muted);
+-  cursor: pointer;
+-  font: inherit;
+-  font-size: 15px;
+-  white-space: nowrap;
+-}
+-
+-.personal-roadmap__categories button[aria-pressed="true"] {
+-  border-bottom-color: var(--color-stroke-brand-solid);
+-  color: var(--color-fg-brand);
+-  font-weight: 700;
+-}
+-
+ .personal-roadmap__cards {
+   display: flex;
+   flex: 1;
+@@ -196,12 +162,4 @@
+   .personal-roadmap__card {
+     padding: 16px;
+   }
+-
+-  .personal-roadmap__categories {
+-    justify-content: flex-start;
+-  }
+-
+-  .personal-roadmap__categories button {
+-    padding: 10px 18px;
+-  }
+ }
+diff --git a/FE/src/features/preparation/view/PersonalRoadmap.tsx b/FE/src/features/preparation/view/PersonalRoadmap.tsx
+index 11167901d50cf12519e9b328498af96ee9528069..bbcb440af75eb69bf6bae65f91ef88f18f958e4d 100644
+--- a/FE/src/features/preparation/view/PersonalRoadmap.tsx
++++ b/FE/src/features/preparation/view/PersonalRoadmap.tsx
+@@ -2,6 +2,7 @@ import { ReactNode } from "react";
+ import { PersonalRoadmapCategoryViewModel } from "../view-model/createPersonalRoadmapViewModel";
+ import { RoadmapSectionHeader } from "./RoadmapSectionHeader";
+ import { PersonalRoadmapCard } from "./PersonalRoadmapCard";
++import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
+ import "./PersonalRoadmap.css";
+ 
+ export function PersonalRoadmap({
+@@ -22,19 +23,15 @@ export function PersonalRoadmap({
+ 
+   return (
+     <div className="personal-roadmap">
+-      <nav aria-label="준비 카테고리" className="personal-roadmap__categories">
+-        {categories.map((item) => (
+-          <button
+-            type="button"
+-            key={item.id}
+-            aria-pressed={item.id === category?.id}
+-            aria-controls="personal-roadmap-content"
+-            onClick={() => onCategorySelect(item.id)}
+-          >
+-            {item.title}
+-          </button>
+-        ))}
+-      </nav>
++      <RoadmapCategoryTabs
++        categories={categories.map((item) => ({
++          id: item.id,
++          label: item.title,
++        }))}
++        selectedCategoryId={category?.id}
++        controlsId="personal-roadmap-content"
++        onCategorySelect={onCategorySelect}
++      />
+       <section
+         id="personal-roadmap-content"
+         aria-labelledby="personal-roadmap-title"
+diff --git a/FE/src/features/preparation/view/PreparationRoadmap.css b/FE/src/features/preparation/view/PreparationRoadmap.css
+index 7189228c8fceff5ec1d5a307fd101a236c2f580d..b771490472de54ad6684233f465606be92b64bff 100644
+--- a/FE/src/features/preparation/view/PreparationRoadmap.css
++++ b/FE/src/features/preparation/view/PreparationRoadmap.css
+@@ -53,29 +53,6 @@
+   overflow: hidden;
+ }
+ 
+-.preparation-roadmap__categories {
+-  flex: none;
+-  overflow-x: auto;
+-  padding: 0;
+-  border-right: 0;
+-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+-}
+-
+-.preparation-roadmap__category-list {
+-  display: flex;
+-  padding: 0;
+-  margin: 0;
+-  list-style: none;
+-  width: max-content;
+-  flex-direction: row;
+-  gap: 4px;
+-}
+-
+-.preparation-roadmap__category {
+-  width: auto;
+-  white-space: nowrap;
+-}
+-
+ .preparation-roadmap__content {
+   display: flex;
+   flex-direction: column;
+diff --git a/FE/src/features/preparation/view/PreparationRoadmap.tsx b/FE/src/features/preparation/view/PreparationRoadmap.tsx
+index 166de1fca5eacdd5775fb355710649076f27eb6e..db552e7c7b93fe359092a90cf2f96cc72b21a7fc 100644
+--- a/FE/src/features/preparation/view/PreparationRoadmap.tsx
++++ b/FE/src/features/preparation/view/PreparationRoadmap.tsx
+@@ -1,6 +1,7 @@
+ import { ReactNode, useRef, useState } from "react";
+ import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
+ import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
++import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
+ import "./PreparationRoadmap.css";
+ 
+ interface PreparationRoadmapProps {
+@@ -156,30 +157,14 @@ export function PreparationRoadmap({
+ 
+   return (
+     <div className="preparation-roadmap">
+-      <nav
+-        aria-label="준비 카테고리"
+-        className="preparation-roadmap__categories"
+-      >
+-        <ul className="preparation-roadmap__category-list">
+-          {viewModel.categories.map((category) => (
+-            <li key={category.id}>
+-              <button
+-                aria-controls="preparation-roadmap-content"
+-                aria-pressed={category.isCurrent}
+-                className={`preparation-roadmap__category${
+-                  category.isCurrent
+-                    ? " preparation-roadmap__category--current"
+-                    : ""
+-                }`}
+-                onClick={() => handleCategorySelect(category.id)}
+-                type="button"
+-              >
+-                {category.label}
+-              </button>
+-            </li>
+-          ))}
+-        </ul>
+-      </nav>
++      <RoadmapCategoryTabs
++        categories={viewModel.categories}
++        selectedCategoryId={
++          viewModel.categories.find((category) => category.isCurrent)?.id
++        }
++        controlsId="preparation-roadmap-content"
++        onCategorySelect={handleCategorySelect}
++      />
+ 
+       <section
+         aria-labelledby="preparation-roadmap-title"
+diff --git a/FE/src/features/preparation/view/RoadmapCategoryTabs.css b/FE/src/features/preparation/view/RoadmapCategoryTabs.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..aedaa5cdfb0ab06b562e2d0d51140241aa05b439
+--- /dev/null
++++ b/FE/src/features/preparation/view/RoadmapCategoryTabs.css
+@@ -0,0 +1,57 @@
++.roadmap-category-tabs {
++  display: flex;
++  flex: none;
++  justify-content: safe center;
++  overflow-x: auto;
++  border-bottom: 1px solid var(--color-stroke-neutral-weak);
++  background: transparent;
++}
++
++.roadmap-category-tabs__list {
++  display: flex;
++  flex: none;
++  width: max-content;
++  padding: 0;
++  margin: 0;
++  gap: 0;
++  list-style: none;
++}
++
++.roadmap-category-tabs button {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: auto;
++  height: auto;
++  padding: 10px 24px;
++  border: 0;
++  border-bottom: 3px solid transparent;
++  border-radius: 0;
++  background: transparent;
++  color: var(--color-fg-neutral-muted);
++  cursor: pointer;
++  font: inherit;
++  font-size: 15px;
++  white-space: nowrap;
++}
++
++.roadmap-category-tabs button[aria-pressed="true"] {
++  border-bottom-color: var(--color-stroke-brand-solid);
++  color: var(--color-fg-brand);
++  font-weight: 700;
++}
++
++.roadmap-category-tabs button:focus-visible {
++  outline: 3px solid var(--color-stroke-focus-ring);
++  outline-offset: -3px;
++}
++
++@media (max-width: 760px) {
++  .roadmap-category-tabs {
++    justify-content: flex-start;
++  }
++
++  .roadmap-category-tabs button {
++    padding: 10px 18px;
++  }
++}
+diff --git a/FE/src/features/preparation/view/RoadmapCategoryTabs.tsx b/FE/src/features/preparation/view/RoadmapCategoryTabs.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..d544bf34747309a67c85df1914c88a44fb01863a
+--- /dev/null
++++ b/FE/src/features/preparation/view/RoadmapCategoryTabs.tsx
+@@ -0,0 +1,32 @@
++import "./RoadmapCategoryTabs.css";
++
++export function RoadmapCategoryTabs({
++  categories,
++  selectedCategoryId,
++  controlsId,
++  onCategorySelect,
++}: {
++  categories: readonly { id: string; label: string }[];
++  selectedCategoryId?: string;
++  controlsId: string;
++  onCategorySelect: (id: string) => void;
++}) {
++  return (
++    <nav aria-label="준비 카테고리" className="roadmap-category-tabs">
++      <ul className="roadmap-category-tabs__list">
++        {categories.map((category) => (
++          <li key={category.id}>
++            <button
++              aria-controls={controlsId}
++              aria-pressed={category.id === selectedCategoryId}
++              onClick={() => onCategorySelect(category.id)}
++              type="button"
++            >
++              {category.label}
++            </button>
++          </li>
++        ))}
++      </ul>
++    </nav>
++  );
++}
+diff --git a/FE/src/features/preparation/view/RoadmapLoginNotice.tsx b/FE/src/features/preparation/view/RoadmapLoginNotice.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..95e763e2991d706edbf223fe0d661d5a827c2948
+--- /dev/null
++++ b/FE/src/features/preparation/view/RoadmapLoginNotice.tsx
+@@ -0,0 +1,15 @@
++export function RoadmapLoginNotice({ onShowAll }: { onShowAll: () => void }) {
++  return (
++    <div
++      aria-label="내 로드맵"
++      className="preparation-roadmap-state roadmap-login-notice"
++      role="region"
++    >
++      <p>로그인하면 내 로드맵을 확인할 수 있어요.</p>
++      <a href="/login">로그인</a>
++      <button onClick={onShowAll} type="button">
++        전체 단계 보기
++      </button>
++    </div>
++  );
++}
+diff --git a/FE/src/features/preparation/view/RoadmapSectionHeader.tsx b/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
+index 88179dc59556950c3ac600ad551278994b873aa9..2ff11166131affd0ddbd70cd6faaff59279f937f 100644
+--- a/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
++++ b/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
+@@ -8,14 +8,16 @@ export function RoadmapSectionHeader({
+ }: {
+   id: string;
+   title: string;
+-  summary: ReactNode;
++  summary?: ReactNode;
+   viewSwitcher: ReactNode;
+ }) {
+   return (
+     <header className="roadmap-section-header">
+       <div>
+         <h2 id={id}>{title}</h2>
+-        <p className="roadmap-section-header__summary">{summary}</p>
++        {summary != null ? (
++          <p className="roadmap-section-header__summary">{summary}</p>
++        ) : null}
+       </div>
+       {viewSwitcher}
+     </header>
+diff --git a/FE/src/features/preparation/view/RoadmapWorkspace.css b/FE/src/features/preparation/view/RoadmapWorkspace.css
+index 8f38e8a3617a4322d39586642c7b64ac666d2359..7d5543f73fb4a0ef29d4a038194607a0b022d97e 100644
+--- a/FE/src/features/preparation/view/RoadmapWorkspace.css
++++ b/FE/src/features/preparation/view/RoadmapWorkspace.css
+@@ -1,5 +1,14 @@
+ .roadmap-workspace {
+   display: flex;
++  flex-direction: row;
++  min-height: 0;
++  min-width: 0;
++  overflow: hidden;
++}
++
++.roadmap-workspace__roadmap {
++  display: flex;
++  flex: 1;
+   flex-direction: column;
+   min-height: 0;
+   min-width: 0;
+@@ -49,6 +58,17 @@
+   padding: 12px 0;
+ }
+ 
++.preparation-roadmap-state.roadmap-login-notice {
++  flex: 1;
++  min-height: 0;
++  overflow-y: auto;
++  justify-content: safe center;
++}
++
++.roadmap-login-notice > * {
++  flex: none;
++}
++
+ .roadmap-section-header > div {
+   display: flex;
+   align-items: center;
+@@ -144,41 +164,15 @@
+   outline-offset: -3px;
+ }
+ 
+-.preparation-roadmap .preparation-roadmap__categories {
+-  display: flex;
+-  flex: none;
+-  justify-content: center;
+-  overflow-x: auto;
+-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+-  background: transparent;
+-}
+-
+-.preparation-roadmap .preparation-roadmap__category {
+-  display: flex;
+-  flex: none;
+-  align-items: center;
+-  justify-content: center;
+-  width: auto;
+-  height: auto;
+-  padding: 10px 24px;
+-  border: 0;
+-  border-bottom: 3px solid transparent;
+-  border-radius: 0;
+-  background: transparent;
+-  color: var(--color-fg-neutral-muted);
+-  cursor: pointer;
+-  font: inherit;
+-  font-size: 15px;
+-  white-space: nowrap;
+-}
++@media (max-width: 760px) {
++  .preparation-roadmap-state.roadmap-login-notice {
++    padding: 16px;
++  }
+ 
+-.preparation-roadmap .preparation-roadmap__category--current {
+-  border-bottom-color: var(--color-stroke-brand-solid);
+-  color: var(--color-fg-brand);
+-  font-weight: 700;
+-}
++  .roadmap-workspace {
++    flex-direction: column;
++  }
+ 
+-@media (max-width: 760px) {
+   .roadmap-workspace__hero {
+     padding: 12px 16px 8px;
+   }
+@@ -191,14 +185,6 @@
+     font-size: 13px;
+   }
+ 
+-  .preparation-roadmap .preparation-roadmap__categories {
+-    justify-content: flex-start;
+-  }
+-
+-  .preparation-roadmap .preparation-roadmap__category {
+-    padding: 10px 18px;
+-  }
+-
+   .roadmap-section-header {
+     align-items: flex-start;
+     flex-direction: column;
+diff --git a/FE/src/features/checklist/view/containTabFocus.ts b/FE/src/shared/focus/containTabFocus.ts
+similarity index 100%
+rename from FE/src/features/checklist/view/containTabFocus.ts
+rename to FE/src/shared/focus/containTabFocus.ts

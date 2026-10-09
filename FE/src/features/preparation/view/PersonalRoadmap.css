@@ -17,40 +17,6 @@
   min-height: 0;
 }
 
-.personal-roadmap__categories {
-  display: flex;
-  flex: none;
-  justify-content: center;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
-  background: transparent;
-}
-
-.personal-roadmap__categories button {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: auto;
-  padding: 10px 24px;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-fg-neutral-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 15px;
-  white-space: nowrap;
-}
-
-.personal-roadmap__categories button[aria-pressed="true"] {
-  border-bottom-color: var(--color-stroke-brand-solid);
-  color: var(--color-fg-brand);
-  font-weight: 700;
-}
-
 .personal-roadmap__cards {
   display: flex;
   flex: 1;
@@ -195,13 +161,5 @@
 
   .personal-roadmap__card {
     padding: 16px;
-  }
-
-  .personal-roadmap__categories {
-    justify-content: flex-start;
-  }
-
-  .personal-roadmap__categories button {
-    padding: 10px 18px;
   }
 }

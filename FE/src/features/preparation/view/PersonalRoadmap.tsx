@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { PersonalRoadmapCategoryViewModel } from "../view-model/createPersonalRoadmapViewModel";
 import { RoadmapSectionHeader } from "./RoadmapSectionHeader";
 import { PersonalRoadmapCard } from "./PersonalRoadmapCard";
+import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
 import "./PersonalRoadmap.css";
 
 export function PersonalRoadmap({
@@ -22,19 +23,15 @@ export function PersonalRoadmap({
 
   return (
     <div className="personal-roadmap">
-      <nav aria-label="준비 카테고리" className="personal-roadmap__categories">
-        {categories.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            aria-pressed={item.id === category?.id}
-            aria-controls="personal-roadmap-content"
-            onClick={() => onCategorySelect(item.id)}
-          >
-            {item.title}
-          </button>
-        ))}
-      </nav>
+      <RoadmapCategoryTabs
+        categories={categories.map((item) => ({
+          id: item.id,
+          label: item.title,
+        }))}
+        selectedCategoryId={category?.id}
+        controlsId="personal-roadmap-content"
+        onCategorySelect={onCategorySelect}
+      />
       <section
         id="personal-roadmap-content"
         aria-labelledby="personal-roadmap-title"

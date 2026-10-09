@@ -8,14 +8,16 @@ export function RoadmapSectionHeader({
 }: {
   id: string;
   title: string;
-  summary: ReactNode;
+  summary?: ReactNode;
   viewSwitcher: ReactNode;
 }) {
   return (
     <header className="roadmap-section-header">
       <div>
         <h2 id={id}>{title}</h2>
-        <p className="roadmap-section-header__summary">{summary}</p>
+        {summary != null ? (
+          <p className="roadmap-section-header__summary">{summary}</p>
+        ) : null}
       </div>
       {viewSwitcher}
     </header>
