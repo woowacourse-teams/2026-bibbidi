@@ -1,4 +1,10 @@
-import { ReactNode, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  ReactNode,
+  RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 
 import { containTabFocus } from "../../../shared/focus/containTabFocus";
 
@@ -6,15 +12,18 @@ export function MobileAiChatDialog({
   children,
   isOpen,
   onClose,
+  returnFocusRef,
 }: {
   children: ReactNode;
   isOpen: boolean;
   onClose: () => void;
+  returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
+    const launcher = returnFocusRef.current;
     if (!dialog) return;
     if (isOpen) {
       dialog.showModal();
@@ -27,8 +36,13 @@ export function MobileAiChatDialog({
     return () => {
       dialog.removeEventListener("keydown", handleKeyDown);
       if (dialog.open) dialog.close();
+      if (isOpen) {
+        queueMicrotask(() => {
+          if (launcher?.isConnected && !dialog.open) launcher.focus();
+        });
+      }
     };
-  }, [isOpen]);
+  }, [isOpen, returnFocusRef]);
 
   useEffect(() => {
     const viewport = window.visualViewport;

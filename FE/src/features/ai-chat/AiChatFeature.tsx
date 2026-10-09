@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
@@ -9,8 +9,14 @@ import "./view/AiChat.css";
 export function AiChatFeature() {
   const isMobile = useIsMobileLayout();
   const [isOpen, setIsOpen] = useState(false);
+  const returnFocusRef = useRef<HTMLButtonElement>(null);
   const { draft, messages, setDraft, send, chooseCard } =
     useAiChatConversation();
+
+  const openChat = (launcher: HTMLButtonElement) => {
+    returnFocusRef.current = launcher;
+    setIsOpen(true);
+  };
 
   const view = (
     <AiChatView
@@ -30,7 +36,7 @@ export function AiChatFeature() {
           <div className="ai-chat-launchers">
             <button
               className="ai-chat-launchers__action"
-              onClick={() => setIsOpen(true)}
+              onClick={(event) => openChat(event.currentTarget)}
               type="button"
             >
               AI와 할 일 만들기
@@ -38,13 +44,17 @@ export function AiChatFeature() {
             <button
               aria-label="AI 채팅 열기"
               className="ai-chat-launchers__icon"
-              onClick={() => setIsOpen(true)}
+              onClick={(event) => openChat(event.currentTarget)}
               type="button"
             >
               <ChatIcon />
             </button>
           </div>
-          <MobileAiChatDialog isOpen={isOpen} onClose={() => setIsOpen(false)}>
+          <MobileAiChatDialog
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            returnFocusRef={returnFocusRef}
+          >
             {view}
           </MobileAiChatDialog>
         </>

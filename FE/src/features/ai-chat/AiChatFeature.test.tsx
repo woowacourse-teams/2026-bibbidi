@@ -4,6 +4,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +24,28 @@ function send(text: string) {
 function showCards() {
   send("웨딩홀을 정했어요");
   send("주례 없이 편안한 분위기로 하고 싶어");
+}
+
+function mockMobileDialog() {
+  vi.mocked(window.matchMedia).mockReturnValue({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  } as unknown as MediaQueryList);
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      },
+    },
+    close: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.removeAttribute("open");
+      },
+    },
+  });
 }
 
 beforeEach(() => {
@@ -57,6 +80,33 @@ afterEach(() => {
 });
 
 describe("AI 채팅 예시", () => {
+  it.each(
+    ["AI와 할 일 만들기", "AI 채팅 열기"].flatMap((launcher) =>
+      ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
+        launcher,
+        close,
+      ]),
+    ),
+  )(
+    "%s로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
+    async (launcherName, closeName) => {
+      mockMobileDialog();
+      render(<AiChatFeature />);
+      const launcher = screen.getByRole("button", { name: launcherName });
+      // 클릭이 실행 버튼을 포커스하지 않는 경우에도 복원할 대상을 기억해야 한다.
+      fireEvent.click(launcher);
+      const dialog = screen.getByRole("dialog");
+      screen.getByRole("textbox").focus();
+      if (closeName === "Escape") {
+        fireEvent(dialog, new Event("cancel", { cancelable: true }));
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: closeName }));
+      }
+      expect(screen.queryByRole("dialog")).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(launcher));
+    },
+  );
+
   it("추천 질문을 전송하고 시간과 고정 안내를 표시한다", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-08T14:20:00+09:00"));
@@ -169,25 +219,7 @@ describe("AI 채팅 예시", () => {
       offsetTop: 0,
     });
     vi.stubGlobal("visualViewport", viewport);
-    vi.mocked(window.matchMedia).mockReturnValue({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    } as unknown as MediaQueryList);
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.setAttribute("open", "");
-        },
-      },
-      close: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.removeAttribute("open");
-        },
-      },
-    });
+    mockMobileDialog();
     const { unmount } = render(<AiChatFeature />);
     fireEvent.click(screen.getByRole("button", { name: "AI와 할 일 만들기" }));
     showCards();
