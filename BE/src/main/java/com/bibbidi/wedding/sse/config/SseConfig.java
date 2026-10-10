@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class SseConfig {
 
     @Bean(destroyMethod = "shutdownNow")
-    ExecutorService sseWorkerExecutor() {
+    ExecutorService sseVirtualThreadExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
 

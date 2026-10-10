@@ -18,7 +18,7 @@ public class SseService {
     private final ScheduledExecutorService timeoutExecutor;
 
     public SseService(
-            @Qualifier("sseWorkerExecutor") ExecutorService workerExecutor,
+            @Qualifier("sseVirtualThreadExecutor") ExecutorService workerExecutor,
             @Qualifier("sseTimeoutExecutor") ScheduledExecutorService timeoutExecutor
     ) {
         this.workerExecutor = workerExecutor;
