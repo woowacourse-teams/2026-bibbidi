@@ -2,17 +2,22 @@ package com.bibbidi.wedding.sse.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bibbidi.wedding.sse.service.dto.SseEvent;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 class SseConnectionTest {
@@ -40,11 +45,41 @@ class SseConnectionTest {
         connection.timeout();
         connection.disconnect();
 
-        verify(remember).run();
-        verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
-        verify(emitter).complete();
+        InOrder completion = inOrder(emitter, remember);
+        completion.verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        completion.verify(remember).run();
+        completion.verify(emitter).complete();
         verify(timer).cancel(false);
         verify(task, never()).cancel(true);
+    }
+
+    @Test
+    void finalEventWriteFailureDoesNotRunTheSuccessAction() throws Exception {
+        IOException exception = new IOException("연결이 끊겼습니다.");
+        doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        Runnable remember = mock(Runnable.class);
+
+        assertThatThrownBy(() -> connection.complete(new SseEvent("done", "대화 ID"), remember))
+                .isInstanceOf(UncheckedIOException.class)
+                .hasCause(exception);
+
+        verifyNoInteractions(remember);
+        verify(task).cancel(true);
+        verify(timer).cancel(false);
+    }
+
+    @Test
+    void finalEventRejectionDoesNotRunTheSuccessAction() throws Exception {
+        IllegalStateException exception = new IllegalStateException("SSE 응답이 이미 종료되었습니다.");
+        doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        Runnable remember = mock(Runnable.class);
+
+        assertThatThrownBy(() -> connection.complete(new SseEvent("done", "대화 ID"), remember))
+                .isSameAs(exception);
+
+        verifyNoInteractions(remember);
+        verify(task).cancel(true);
+        verify(timer).cancel(false);
     }
 
     @Test

@@ -46,8 +46,8 @@ public final class SseConnection {
 
     public synchronized void complete(SseEvent lastEvent, Runnable onComplete) {
         checkActive();
-        onComplete.run();
         sendEvent(lastEvent);
+        onComplete.run();
         complete();
     }
 
