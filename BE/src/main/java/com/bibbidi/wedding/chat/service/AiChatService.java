@@ -1,10 +1,9 @@
 package com.bibbidi.wedding.chat.service;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.tools.ChecklistTools;
+import com.bibbidi.wedding.chat.tools.ChatToolContext;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,7 +50,7 @@ public class AiChatService {
         try (Stream<String> chunks = chatClient.prompt()
                 .messages(chatMemory.get(memoryKey))
                 .messages(new UserMessage(message))
-                .toolContext(Map.of(ChecklistTools.USER_ID, userId))
+                .toolContext(new ChatToolContext(userId).toMap())
                 .stream().content().toStream()) {
             StringBuilder answerBuilder = new StringBuilder();
             Iterator<String> chunksIterator = chunks.iterator();

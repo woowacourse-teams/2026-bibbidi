@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.tools.ChecklistTools;
+import com.bibbidi.wedding.chat.tools.ChatToolContext;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
@@ -31,6 +31,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -88,7 +89,7 @@ class AiChatServiceTest {
             assertThat(memory.get(key)).extracting(message -> message.getText())
                     .containsExactly("다음 할 일은?", "웨딩홀 계약을 확인하세요.");
             var options = (ToolCallingChatOptions) prompt.get().getOptions();
-            assertThat(options.getToolContext()).containsEntry(ChecklistTools.USER_ID, 7L);
+            assertThat(ChatToolContext.from(new ToolContext(options.getToolContext())).userId()).isEqualTo(7L);
         }
     }
 

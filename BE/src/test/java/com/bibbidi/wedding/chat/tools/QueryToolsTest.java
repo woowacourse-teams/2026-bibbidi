@@ -30,7 +30,7 @@ class QueryToolsTest {
 
     private final CatalogService catalog = mock(CatalogService.class);
     private final ChecklistService checklist = mock(ChecklistService.class);
-    private final ToolContext context = new ToolContext(Map.of(ChecklistTools.USER_ID, 7L));
+    private final ToolContext context = new ToolContext(new ChatToolContext(7L).toMap());
 
     @Test
     void catalogUsesOnlyTheExistingReadService() {
@@ -55,7 +55,7 @@ class QueryToolsTest {
         assertThat(result.exists()).isTrue();
         assertThat(result.items()).containsExactly(new ChecklistTools.Item(20L, 100L, "계약서 확인", "continue", List.of(appointment)));
         String schema = ToolCallbacks.from(tools)[0].getToolDefinition().inputSchema();
-        assertThat(schema).doesNotContain("userId", ChecklistTools.USER_ID, "context");
+        assertThat(schema).doesNotContain("userId", "authenticatedUserId", "context");
         verify(checklist).findMyChecklist(7L);
         verifyNoMoreInteractions(checklist);
     }
@@ -73,6 +73,15 @@ class QueryToolsTest {
     @Test
     void missingServerContextCannotSelectAUser() {
         assertThatThrownBy(() -> new ChecklistTools(checklist).findMyChecklist(new ToolContext(Map.of())))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(checklist);
+    }
+
+    @Test
+    void invalidServerUserIdCannotSelectAUser() {
+        ToolContext invalidContext = new ToolContext(Map.of("authenticatedUserId", "7"));
+
+        assertThatThrownBy(() -> new ChecklistTools(checklist).findMyChecklist(invalidContext))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(checklist);
     }
