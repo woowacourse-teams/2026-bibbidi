@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.tools.dto.ChecklistToolItemResponse;
+import com.bibbidi.wedding.chat.tools.dto.ChecklistToolResponse;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistAppointmentResult;
@@ -53,7 +55,7 @@ class QueryToolsTest {
         var result = tools.findMyChecklist(context);
 
         assertThat(result.exists()).isTrue();
-        assertThat(result.items()).containsExactly(new ChecklistTools.Item(20L, 100L, "계약서 확인", "continue", List.of(appointment)));
+        assertThat(result.items()).containsExactly(new ChecklistToolItemResponse(20L, 100L, "계약서 확인", "continue", List.of(appointment)));
         String schema = ToolCallbacks.from(tools)[0].getToolDefinition().inputSchema();
         assertThat(schema).doesNotContain("userId", "authenticatedUserId", "context");
         verify(checklist).findMyChecklist(7L);
@@ -64,7 +66,7 @@ class QueryToolsTest {
     void onlyMissingChecklistIsTreatedAsNoPreparationData() {
         when(checklist.findMyChecklist(7L)).thenThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "없음"));
         assertThat(new ChecklistTools(checklist).findMyChecklist(context))
-                .isEqualTo(new ChecklistTools.ChecklistDetails(false, List.of()));
+                .isEqualTo(new ChecklistToolResponse(false, List.of()));
         doThrow(new BusinessException(ClientError.INTERNAL_ERROR, "조회 장애")).when(checklist).findMyChecklist(7L);
         assertThatThrownBy(() -> new ChecklistTools(checklist).findMyChecklist(context))
                 .isInstanceOf(BusinessException.class).hasMessage("조회 장애");

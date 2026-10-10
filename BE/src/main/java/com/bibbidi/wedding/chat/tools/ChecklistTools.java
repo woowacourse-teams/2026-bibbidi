@@ -1,10 +1,10 @@
 package com.bibbidi.wedding.chat.tools;
 
+import com.bibbidi.wedding.chat.tools.dto.ChecklistToolResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
-import com.bibbidi.wedding.checklist.service.dto.ChecklistAppointmentResult;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.util.List;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 
@@ -17,26 +17,16 @@ public class ChecklistTools {
     }
 
     @Tool(description = "현재 로그인한 사용자의 체크리스트와 연결된 일정을 조회한다. exists=false이면 체크리스트가 없다.")
-    public ChecklistDetails findMyChecklist(ToolContext context) {
+    public ChecklistToolResponse findMyChecklist(ToolContext context) {
         Long userId = ChatToolContext.from(context).userId();
         try {
-            var result = checklistService.findMyChecklist(userId);
-            return new ChecklistDetails(true, result.items().stream()
-                    .map(item -> new Item(item.id(), item.sourceCatalogItemId(), item.title(), item.statusValue(),
-                            item.appointments()))
-                    .toList());
+            ChecklistWithAppointmentsResult result = checklistService.findMyChecklist(userId);
+            return ChecklistToolResponse.from(result);
         } catch (BusinessException exception) {
             if (exception.clientError() == ClientError.CHECKLIST_NOT_FOUND) {
-                return new ChecklistDetails(false, List.of());
+                return ChecklistToolResponse.notFound();
             }
             throw exception;
         }
-    }
-
-    public record ChecklistDetails(boolean exists, List<Item> items) {
-    }
-
-    public record Item(Long id, Long catalogItemId, String title, String status,
-                       List<ChecklistAppointmentResult> appointments) {
     }
 }
