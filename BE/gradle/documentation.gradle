@@ -1,3 +1,12 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.yaml:snakeyaml:2.5'
+    }
+}
+
 dependencies {
     // API DOCUMENTATION
     testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
@@ -51,6 +60,19 @@ tasks.matching { it.name == 'openapi3' }.configureEach {
         delete file('build/api-spec')
     }
     dependsOn test
+    doLast {
+        // REST Docs JSON 스키마 생성기는 SSE 본문을 빈 object로 추론하므로 텍스트 스트림으로 표시한다.
+        def specFile = file('build/api-spec/openapi3.yaml')
+        def yaml = new org.yaml.snakeyaml.Yaml()
+        def spec = yaml.load(specFile.text)
+        if (spec.components.schemas.containsKey('ChatEventStream')) {
+            spec.components.schemas.ChatEventStream = [
+                    type: 'string',
+                    description: 'conversation, delta, done 또는 failure 이벤트를 전송하는 SSE 텍스트 스트림'
+            ]
+            specFile.text = yaml.dump(spec)
+        }
+    }
 }
 
 tasks.register('copySwaggerUI', Copy) {

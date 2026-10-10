@@ -15,6 +15,10 @@ public record ChecklistItemWithAppointmentsResult(
         List<ChecklistAppointmentResult> appointments
 ) {
 
+    public String statusValue() {
+        return status.value();
+    }
+
     public static ChecklistItemWithAppointmentsResult from(ChecklistItem item, List<AppointmentSummaryResult> appointments) {
         return new ChecklistItemWithAppointmentsResult(
                 item.id(),
