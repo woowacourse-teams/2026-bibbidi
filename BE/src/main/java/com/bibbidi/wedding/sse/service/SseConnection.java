@@ -47,8 +47,13 @@ public final class SseConnection {
     public synchronized void complete(SseEvent lastEvent, Runnable onComplete) {
         checkActive();
         sendEvent(lastEvent);
-        onComplete.run();
-        complete();
+        try {
+            onComplete.run();
+        } catch (RuntimeException exception) {
+            log.error("SSE 완료 후 처리 실패", exception);
+        } finally {
+            complete();
+        }
     }
 
     synchronized void complete() {

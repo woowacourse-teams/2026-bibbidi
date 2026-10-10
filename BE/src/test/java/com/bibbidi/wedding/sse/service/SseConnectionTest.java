@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bibbidi.wedding.sse.service.dto.SseEvent;
 import java.io.IOException;
@@ -49,6 +50,24 @@ class SseConnectionTest {
         completion.verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
         completion.verify(remember).run();
         completion.verify(emitter).complete();
+        verify(timer).cancel(false);
+        verify(task, never()).cancel(true);
+    }
+
+    @Test
+    void completionActionFailureEndsTheResponseWithoutSendingAnotherEvent() throws Exception {
+        Runnable remember = mock(Runnable.class);
+        doThrow(new IllegalStateException("대화 기억 저장 실패")).when(remember).run();
+
+        connection.complete(new SseEvent("done", "대화 ID"), remember);
+        connection.fail(new IllegalStateException("완료 후 오류"));
+        connection.timeout();
+        connection.disconnect();
+
+        verify(remember).run();
+        verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        verify(emitter).complete();
+        verifyNoMoreInteractions(emitter);
         verify(timer).cancel(false);
         verify(task, never()).cancel(true);
     }
