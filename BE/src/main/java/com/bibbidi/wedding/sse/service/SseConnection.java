@@ -88,7 +88,7 @@ public final class SseConnection {
 
     private void fail(Exception exception, boolean interrupt) {
         if (!closed) {
-            log.error("SSE 응답 처리 실패. type={}", exception.getClass().getSimpleName());
+            log.error("SSE 응답 처리 실패. type={}", exception.getClass().getSimpleName(), exception);
             close(interrupt);
             try {
                 emitter.send(SseEmitter.event().name(failure.name()).data(failure.data(), MediaType.APPLICATION_JSON));
