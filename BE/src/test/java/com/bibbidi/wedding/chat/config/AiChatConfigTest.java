@@ -65,7 +65,7 @@ class AiChatConfigTest {
         runner.run(context -> {
             var memory = context.getBean(ChatMemory.class);
             var service = new AiChatService(context.getBean(ChatClient.class), memory);
-            String id = UUID.randomUUID().toString();
+            UUID id = UUID.randomUUID();
             var reply = mock(ChatReplyHandler.class);
             doAnswer(invocation -> {
                 invocation.<Runnable>getArgument(1).run();
@@ -88,7 +88,7 @@ class AiChatConfigTest {
         runner.run(context -> {
             var memory = context.getBean(ChatMemory.class);
             var service = new AiChatService(context.getBean(ChatClient.class), memory);
-            String id = UUID.randomUUID().toString();
+            UUID id = UUID.randomUUID();
             assertThatThrownBy(() -> service.chat(7L, id, "질문", mock(ChatReplyHandler.class)))
                     .isInstanceOf(org.springframework.ai.tool.execution.ToolExecutionException.class);
             org.mockito.Mockito.verify(model, org.mockito.Mockito.times(1)).stream(any(Prompt.class));

@@ -26,8 +26,8 @@ public class AiChatService {
         this.chatMemory = chatMemory;
     }
 
-    public void chat(Long userId, @Nullable String conversationId, String message, ChatReplyHandler reply) {
-        String id = conversationId == null ? UUID.randomUUID().toString() : UUID.fromString(conversationId).toString();
+    public void chat(Long userId, @Nullable UUID conversationId, String message, ChatReplyHandler reply) {
+        String id = conversationId == null ? UUID.randomUUID().toString() : conversationId.toString();
         String memoryKey = userId + ":" + id;
         reply.conversation(id);
         if (!activeConversations.add(memoryKey)) {

@@ -39,7 +39,7 @@ import reactor.test.publisher.TestPublisher;
 
 class AiChatServiceTest {
 
-    private static final String CONVERSATION_ID = "7bf4d204-8331-439b-bd8f-271abc0eea99";
+    private static final UUID CONVERSATION_ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99");
     private ChatModel model;
     private ChatMemory memory;
     private AiChatService service;
@@ -103,7 +103,7 @@ class AiChatServiceTest {
 
         service.chat(7L, CONVERSATION_ID, "추천해줘", reply);
         service.chat(8L, CONVERSATION_ID, "추천해줘", reply);
-        service.chat(7L, UUID.randomUUID().toString(), "추천해줘", reply);
+        service.chat(7L, UUID.randomUUID(), "추천해줘", reply);
 
         assertThat(prompts.getFirst().getInstructions()).extracting(message -> message.getText())
                 .containsExactly("예산은 1000", "알겠습니다.", "추천해줘");

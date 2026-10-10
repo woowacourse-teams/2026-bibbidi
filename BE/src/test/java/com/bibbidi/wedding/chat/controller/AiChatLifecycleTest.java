@@ -18,6 +18,7 @@ import com.bibbidi.wedding.sse.service.SseService;
 import com.bibbidi.wedding.sse.service.dto.SseEvent;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,7 +43,7 @@ import reactor.test.publisher.TestPublisher;
 
 class AiChatLifecycleTest {
 
-    private static final String ID = "7bf4d204-8331-439b-bd8f-271abc0eea99";
+    private static final UUID ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99");
     private ChatModel model;
     private ChatMemory memory;
     private AiChatService chat;
