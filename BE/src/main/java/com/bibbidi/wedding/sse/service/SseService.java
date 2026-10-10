@@ -14,6 +14,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Service
 public class SseService {
 
+    private static final long DISABLED_SERVLET_TIMEOUT = 0L;
+
     private final ExecutorService workerExecutor;
     private final ScheduledExecutorService timeoutExecutor;
 
@@ -26,8 +28,7 @@ public class SseService {
     }
 
     public SseEmitter stream(Duration timeout, SseEvent failure, Consumer<SseConnection> work) {
-        // 전체 제한 시간은 아래 타이머로 관리하며 Servlet의 별도 타이머는 사용하지 않는다.
-        SseEmitter emitter = new SseEmitter(0L);
+        SseEmitter emitter = new SseEmitter(DISABLED_SERVLET_TIMEOUT);
         long deadline = System.nanoTime() + timeout.toNanos();
         SseConnection connection = new SseConnection(emitter, failure, deadline);
         emitter.onCompletion(connection::disconnect);

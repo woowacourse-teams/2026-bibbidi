@@ -37,7 +37,7 @@ public class AiChatService {
         }
 
         try {
-            String answer = generateAnswer(userId, memoryKey, message, reply);
+            String answer = streamAnswer(userId, memoryKey, message, reply);
             ChatResult result = new ChatResult(id, answer);
             reply.complete(result, () -> rememberTurn(memoryKey, message, answer));
         } finally {
@@ -45,8 +45,7 @@ public class AiChatService {
         }
     }
 
-    private String generateAnswer(Long userId, String memoryKey, String message, ChatReplyHandler reply) {
-        // 답변 조각을 기다리는 작업은 호출한 가상 스레드에서 실행한다.
+    private String streamAnswer(Long userId, String memoryKey, String message, ChatReplyHandler reply) {
         try (Stream<String> chunks = chatClient.prompt()
                 .messages(chatMemory.get(memoryKey))
                 .messages(new UserMessage(message))

@@ -25,7 +25,7 @@ final class ChatSseHandler implements ChatReplyHandler {
     }
 
     @Override
-    public void complete(ChatResult result, Runnable remember) {
-        connection.complete(new SseEvent("done", new ChatResponse.Conversation(result.conversationId())), remember);
+    public void complete(ChatResult result, Runnable rememberTurn) {
+        connection.complete(new SseEvent("done", new ChatResponse.Conversation(result.conversationId())), rememberTurn);
     }
 }
