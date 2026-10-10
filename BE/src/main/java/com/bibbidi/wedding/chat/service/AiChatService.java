@@ -13,6 +13,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 
@@ -69,6 +70,7 @@ public class AiChatService {
     }
 
     private void rememberTurn(String memoryKey, String message, String answer) {
-        chatMemory.add(memoryKey, List.of(new UserMessage(message), new AssistantMessage(answer)));
+        List<Message> turnMessages = List.of(new UserMessage(message), new AssistantMessage(answer));
+        chatMemory.add(memoryKey, turnMessages);
     }
 }
