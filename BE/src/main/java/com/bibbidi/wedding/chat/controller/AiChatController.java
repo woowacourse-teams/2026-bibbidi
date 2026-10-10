@@ -28,8 +28,11 @@ public class AiChatController {
         this.properties = properties;
     }
 
-    @PostMapping(value = "/api/ai/chat", consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(
+            value = "/api/ai/chat",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
     public SseEmitter chat(
             @AuthenticationPrincipal(expression = "userId") Long userId,
             @Valid @RequestBody ChatRequest request
