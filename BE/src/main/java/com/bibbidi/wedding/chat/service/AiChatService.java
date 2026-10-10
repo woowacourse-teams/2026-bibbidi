@@ -56,7 +56,7 @@ public class AiChatService {
             Iterator<String> chunksIterator = chunks.iterator();
             while (chunksIterator.hasNext()) {
                 String chunk = chunksIterator.next();
-                reply.delta(chunk);
+                reply.sendAnswerChunk(chunk);
                 answerBuilder.append(chunk);
             }
 

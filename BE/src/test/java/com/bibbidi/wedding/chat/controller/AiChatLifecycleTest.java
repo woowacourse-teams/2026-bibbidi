@@ -82,7 +82,7 @@ class AiChatLifecycleTest {
                         invocation.callRealMethod();
                         sent.countDown();
                         return null;
-                    }).when(handler).delta(anyString());
+                    }).when(handler).sendAnswerChunk(anyString());
                     chat.chat(7L, ID, "질문", handler);
                 } finally {
                     finished.set(true);

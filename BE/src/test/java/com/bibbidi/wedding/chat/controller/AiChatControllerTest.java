@@ -106,10 +106,10 @@ class AiChatControllerTest {
         assertThat(initial.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("event:conversation", "\"conversationId\":\"" + ID + "\"").doesNotContain("event:done");
 
-        source.get().delta("웨딩홀 ");
+        source.get().sendAnswerChunk("웨딩홀 ");
         assertThat(initial.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("event:delta", "\"text\":\"웨딩홀 \"").doesNotContain("event:done");
-        source.get().delta("계약을 확인하세요.");
+        source.get().sendAnswerChunk("계약을 확인하세요.");
         source.get().complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
         finished.countDown();
 
@@ -140,7 +140,7 @@ class AiChatControllerTest {
         doAnswer(invocation -> {
             ChatReplyHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
-            reply.delta("일부 답변");
+            reply.sendAnswerChunk("일부 답변");
             throw new IllegalStateException("외부 API 비밀 원문");
         }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatReplyHandler.class));
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
@@ -207,7 +207,7 @@ class AiChatControllerTest {
         for (var listener : listeners) {
             listener.onTimeout(event);
         }
-        assertThatThrownBy(() -> source.get().delta("늦은 답변")).isInstanceOf(CancellationException.class);
+        assertThatThrownBy(() -> source.get().sendAnswerChunk("늦은 답변")).isInstanceOf(CancellationException.class);
         await().untilTrue(cancelled);
         String body = mockMvc.perform(asyncDispatch(initial)).andReturn().getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);

@@ -20,7 +20,7 @@ final class ChatSseHandler implements ChatReplyHandler {
     }
 
     @Override
-    public void delta(String text) {
+    public void sendAnswerChunk(String text) {
         connection.send(new SseEvent("delta", new ChatResponse.Delta(text)));
     }
 

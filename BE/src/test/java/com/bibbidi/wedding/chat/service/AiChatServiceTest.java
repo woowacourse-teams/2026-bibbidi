@@ -78,10 +78,10 @@ class AiChatServiceTest {
             String key = "7:" + id.getValue();
 
             publisher.next(response("웨딩홀 "));
-            await().untilAsserted(() -> verify(reply).delta("웨딩홀 "));
+            await().untilAsserted(() -> verify(reply).sendAnswerChunk("웨딩홀 "));
             assertThat(memory.get(key)).isEmpty();
             publisher.next(response("계약을 확인하세요."));
-            await().untilAsserted(() -> verify(reply).delta("계약을 확인하세요."));
+            await().untilAsserted(() -> verify(reply).sendAnswerChunk("계약을 확인하세요."));
             publisher.complete();
             await().until(task::isDone);
             assertThat(task).isNotCancelled();
@@ -120,7 +120,7 @@ class AiChatServiceTest {
             return Flux.just(response("확인했어요."));
         });
         service.chat(7L, null, question, reply);
-        verify(reply).delta("확인했어요.");
+        verify(reply).sendAnswerChunk("확인했어요.");
     }
 
     @Test
@@ -139,7 +139,7 @@ class AiChatServiceTest {
             });
             await().until(() -> subscribed.getCount() == 0);
             publisher.next(response("일부 답변"));
-            await().untilAsserted(() -> verify(reply).delta("일부 답변"));
+            await().untilAsserted(() -> verify(reply).sendAnswerChunk("일부 답변"));
             publisher.error(new IllegalStateException("비공개 제공사 오류"));
             await().until(task::isDone);
             assertThat(error.get()).isInstanceOf(IllegalStateException.class);
@@ -185,7 +185,7 @@ class AiChatServiceTest {
             });
             await().until(() -> subscribed.getCount() == 0);
             publisher.next(response("중단할 답변"));
-            await().untilAsserted(() -> verify(reply).delta("중단할 답변"));
+            await().untilAsserted(() -> verify(reply).sendAnswerChunk("중단할 답변"));
             task.cancel(true);
             await().untilAsserted(publisher::assertCancelled);
             await().untilTrue(finished);

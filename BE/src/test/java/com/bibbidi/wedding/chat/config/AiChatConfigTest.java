@@ -72,7 +72,7 @@ class AiChatConfigTest {
                 return null;
             }).when(reply).complete(any(ChatResult.class), any(Runnable.class));
             service.chat(7L, id, "할 일 알려줘", reply);
-            verify(reply).delta("확인했어요.");
+            verify(reply).sendAnswerChunk("확인했어요.");
             assertThat(calls).hasValue(2);
             org.mockito.Mockito.verify(checklist).findMyChecklist(7L);
             assertThat(memory.get("7:" + id)).extracting(message -> message.getMessageType())
