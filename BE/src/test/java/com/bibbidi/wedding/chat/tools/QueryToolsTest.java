@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.tools;
+package com.bibbidi.wedding.chat.tools;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

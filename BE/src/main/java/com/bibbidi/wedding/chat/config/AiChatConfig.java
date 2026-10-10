@@ -3,8 +3,8 @@ package com.bibbidi.wedding.chat.config;
 import static org.springframework.ai.chat.client.ChatClient.*;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.chat.service.tools.CatalogTools;
-import com.bibbidi.wedding.chat.service.tools.ChecklistTools;
+import com.bibbidi.wedding.chat.tools.CatalogTools;
+import com.bibbidi.wedding.chat.tools.ChecklistTools;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;

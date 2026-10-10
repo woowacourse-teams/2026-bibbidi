@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.tools;
+package com.bibbidi.wedding.chat.tools;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;

@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.chat.service;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.service.tools.ChecklistTools;
+import com.bibbidi.wedding.chat.tools.ChecklistTools;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;

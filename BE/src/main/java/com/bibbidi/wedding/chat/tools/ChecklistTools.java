@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.tools;
+package com.bibbidi.wedding.chat.tools;
 
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistAppointmentResult;

@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.service.tools.ChecklistTools;
+import com.bibbidi.wedding.chat.tools.ChecklistTools;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
