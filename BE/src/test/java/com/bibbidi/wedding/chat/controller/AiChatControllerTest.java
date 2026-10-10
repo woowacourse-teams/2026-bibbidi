@@ -119,11 +119,48 @@ class AiChatControllerTest {
                         preprocessRequest(modifyHeaders().set("Authorization", "Bearer <access-token>")),
                         preprocessResponse(), resource(ResourceSnippetParameters.builder()
                         .tag("AI Chat").summary("결혼 준비 AI 대화")
-                        .description("인증된 POST SSE 응답입니다. conversation {conversationId} 이후 "
-                                + "delta {text}를 순서대로 이어 붙이고, done {conversationId}에서 정상 완료합니다. "
-                                + "스트림 시작 후 오류는 failure {message}로 끝납니다. done 없이 끊긴 답변은 미완료입니다. "
-                                + "전체 제한 시간은 기본 30초이며 조각 도착으로 연장하지 않습니다. "
-                                + "같은 대화의 동시 요청은 failure로 종료합니다.")
+                        .description("""
+                                로그인 사용자의 결혼 준비 질문에 답하는 POST SSE API입니다.
+
+                                ### 요청
+                                - Authorization: Bearer <access-token>
+                                - Content-Type: application/json, Accept: text/event-stream
+                                - message: 공백만으로 구성되지 않은 필수 문자열, 최대 4,000자
+                                - conversationId: 선택적인 UUID 문자열. 생략 또는 null이면 새 대화를 생성합니다.
+                                - 같은 대화를 이어가려면 받은 conversationId와 이번 message를 다시 POST합니다.
+                                - 사용자 ID는 서버의 인증 정보에서 가져옵니다.
+
+                                ### SSE 이벤트
+                                이벤트의 data는 아래 형식의 JSON입니다.
+
+                                | 이벤트 | data | 프론트 처리 |
+                                | --- | --- | --- |
+                                | conversation | {"conversationId":"UUID"} | 대화 ID 보관 |
+                                | delta | {"text":"새 답변 조각"} | 현재 답변에 text 이어 붙이기 |
+                                | done | {"conversationId":"UUID"} | 답변을 정상 완료로 표시 |
+                                | failure | {"message":"실패 안내"} | 생성 중단, 실패 또는 미완료로 표시 |
+
+                                ### 프론트 처리 순서
+                                1. 인증 정보를 포함한 POST 요청을 보내고 HTTP 상태를 확인합니다.
+                                2. 200 응답의 text/event-stream 본문을 SSE 이벤트 단위로 읽고 data를 JSON으로 파싱합니다.
+                                3. conversation의 ID를 보관하고 delta.text를 도착 순서대로 이어 붙입니다.
+                                4. done을 받으면 누적한 텍스트를 최종 답변으로 확정합니다. done에는 전체 답변이 없습니다.
+                                5. failure 또는 done 없이 연결 종료가 발생하면 일부 텍스트를 완료된 답변으로 표시하지 않습니다.
+
+                                네트워크에서 읽은 조각 하나와 SSE 이벤트 하나의 경계는 다를 수 있습니다.
+                                SSE 이벤트는 빈 줄로 구분하고 data의 JSON을 파싱합니다. delta.text의 공백과 줄바꿈은 유지합니다.
+                                생성 중 같은 대화의 추가 전송을 막고, 다음 질문은 완료 후 같은 conversationId로 보냅니다.
+
+                                ### 오류와 제한
+                                - SSE 시작 전: 입력 오류는 400, 인증 오류는 401, 약관 미동의 등 접근 권한 오류는 403의 기존 JSON 오류 응답입니다.
+                                - SSE 시작 후: HTTP 200 응답 안의 failure 이벤트로 실패를 안내하며 done은 보내지 않습니다.
+                                - 같은 사용자와 대화의 동시 요청은 failure로 종료합니다.
+                                - 전체 제한 시간은 기본 30초이며 답변 조각이 도착해도 연장되지 않습니다.
+                                - 대화 기억은 서버 메모리에 보관하므로 서버 재시작 후 초기화됩니다.
+
+                                Responses의 text/event-stream 예제에서 ai-chat-stream은 정상 완료,
+                                ai-chat-failure는 일부 답변을 보낸 뒤 실패한 경우를 보여 줍니다.
+                                """)
                         .requestSchema(schema("ChatRequest"))
                         .responseSchema(schema("ChatEventStream"))
                         .requestHeaders(headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
@@ -230,7 +267,11 @@ class AiChatControllerTest {
     void pendingUsersCannotStartTheStream() throws Exception {
         mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L, UserStatus.PENDING)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
-                .andExpect(status().isForbidden()).andExpect(request().asyncNotStarted());
+                .andExpect(status().isForbidden()).andExpect(request().asyncNotStarted())
+                .andDo(document("ai-chat-forbidden", resource(ResourceSnippetParameters.builder().tag("AI Chat")
+                        .summary("AI 대화 접근 권한 오류").description("약관 미동의 사용자는 SSE 시작 전에 HTTP 403으로 거절됩니다.")
+                        .responseFields(fieldWithPath("errorCode").description("접근 권한 오류 코드"),
+                                fieldWithPath("message").description("공개 접근 권한 오류 메시지")).build())));
         verifyNoInteractions(aiChatService);
     }
 
@@ -266,7 +307,11 @@ class AiChatControllerTest {
         mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest()).andExpect(request().asyncNotStarted())
-                .andExpect(jsonPath("$.errorCode").value(ClientError.INVALID_REQUEST.errorCode()));
+                .andExpect(jsonPath("$.errorCode").value(ClientError.INVALID_REQUEST.errorCode()))
+                .andDo(document("ai-chat-invalid-request", resource(ResourceSnippetParameters.builder().tag("AI Chat")
+                        .summary("AI 대화 요청 값 오류").description("UUID로 변환할 수 없는 대화 ID는 SSE 시작 전에 HTTP 400으로 거절됩니다.")
+                        .responseFields(fieldWithPath("errorCode").description("요청 오류 코드"),
+                                fieldWithPath("message").description("공개 요청 오류 메시지")).build())));
         verifyNoInteractions(aiChatService);
     }
 
