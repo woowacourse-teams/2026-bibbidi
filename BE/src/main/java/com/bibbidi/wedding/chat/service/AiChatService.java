@@ -31,7 +31,7 @@ public class AiChatService {
         this.chatMemory = chatMemory;
     }
 
-    public void chat(Long userId, @Nullable UUID conversationId, String message, ChatReplyHandler reply) {
+    public void chat(Long userId, @Nullable UUID conversationId, String message, ChatSseHandler reply) {
         UUID id = conversationId == null ? UUID.randomUUID() : conversationId;
         ConversationKey key = new ConversationKey(userId, id);
         reply.conversation(id.toString());
@@ -48,7 +48,7 @@ public class AiChatService {
         }
     }
 
-    private String streamAnswer(ConversationKey key, String message, ChatReplyHandler reply) {
+    private String streamAnswer(ConversationKey key, String message, ChatSseHandler reply) {
         Flux<String> answerChunks = chatClient.prompt()
                 .messages(chatMemory.get(key.toMemoryKey()))
                 .messages(new UserMessage(message))

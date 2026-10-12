@@ -46,7 +46,7 @@ class AiChatServiceTest {
     private ChatModel model;
     private ChatMemory memory;
     private AiChatService service;
-    private ChatReplyHandler reply;
+    private ChatSseHandler reply;
 
     @BeforeEach
     void setUp() {
@@ -54,7 +54,7 @@ class AiChatServiceTest {
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
         memory = MessageWindowChatMemory.builder().maxMessages(20).build();
         service = new AiChatService(ChatClient.create(model), memory);
-        reply = mock(ChatReplyHandler.class);
+        reply = mock(ChatSseHandler.class);
         doAnswer(invocation -> {
             invocation.<Runnable>getArgument(1).run();
             return null;

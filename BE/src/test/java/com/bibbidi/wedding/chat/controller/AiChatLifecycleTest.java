@@ -14,8 +14,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.sse.service.SseService;
-import com.bibbidi.wedding.sse.service.dto.SseEvent;
+import com.bibbidi.wedding.chat.service.ChatSseHandler;
+import com.bibbidi.wedding.chat.sse.service.SseService;
+import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;

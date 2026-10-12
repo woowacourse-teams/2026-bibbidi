@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatReplyHandler;
+import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
@@ -66,7 +66,7 @@ class AiChatConfigTest {
             var memory = context.getBean(ChatMemory.class);
             var service = new AiChatService(context.getBean(ChatClient.class), memory);
             UUID id = UUID.randomUUID();
-            var reply = mock(ChatReplyHandler.class);
+            var reply = mock(ChatSseHandler.class);
             doAnswer(invocation -> {
                 invocation.<Runnable>getArgument(1).run();
                 return null;
@@ -89,7 +89,7 @@ class AiChatConfigTest {
             var memory = context.getBean(ChatMemory.class);
             var service = new AiChatService(context.getBean(ChatClient.class), memory);
             UUID id = UUID.randomUUID();
-            assertThatThrownBy(() -> service.chat(7L, id, "질문", mock(ChatReplyHandler.class)))
+            assertThatThrownBy(() -> service.chat(7L, id, "질문", mock(ChatSseHandler.class)))
                     .isInstanceOf(org.springframework.ai.tool.execution.ToolExecutionException.class);
             org.mockito.Mockito.verify(model, org.mockito.Mockito.times(1)).stream(any(Prompt.class));
             assertThat(memory.get("7:" + id)).isEmpty();

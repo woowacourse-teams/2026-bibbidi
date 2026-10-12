@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.sse.service;
+package com.bibbidi.wedding.chat.sse.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import com.bibbidi.wedding.sse.service.dto.SseEvent;
+import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;

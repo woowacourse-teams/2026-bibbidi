@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.sse.service.dto;
+package com.bibbidi.wedding.chat.sse.service.dto;
 
 public record SseEvent(
         String name,

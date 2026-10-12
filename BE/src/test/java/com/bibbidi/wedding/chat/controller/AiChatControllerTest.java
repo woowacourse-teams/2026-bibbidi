@@ -30,12 +30,12 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 import com.bibbidi.wedding.chat.config.AiChatProperties;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatReplyHandler;
+import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.sse.service.SseService;
-import com.bibbidi.wedding.sse.config.SseConfig;
+import com.bibbidi.wedding.chat.sse.service.SseService;
+import com.bibbidi.wedding.chat.sse.config.SseConfig;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import java.nio.charset.StandardCharsets;
@@ -88,15 +88,15 @@ class AiChatControllerTest {
 
     @Test
     void sendsChunksBeforeCompletionAndDocumentsTheSseContract() throws Exception {
-        var source = new AtomicReference<ChatReplyHandler>();
+        var source = new AtomicReference<ChatSseHandler>();
         var finished = new CountDownLatch(1);
         doAnswer(invocation -> {
-            ChatReplyHandler reply = invocation.getArgument(3);
+            ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
             source.set(reply);
             finished.await();
             return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatReplyHandler.class));
+        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 준비를 알려줘"))))
@@ -175,11 +175,11 @@ class AiChatControllerTest {
     @Test
     void streamErrorsSendOnlyTheFixedPublicMessageAndNeverDone() throws Exception {
         doAnswer(invocation -> {
-            ChatReplyHandler reply = invocation.getArgument(3);
+            ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
             reply.sendAnswerChunk("일부 답변");
             throw new IllegalStateException("외부 API 비밀 원문");
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatReplyHandler.class));
+        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문"))))
                 .andExpect(request().asyncStarted()).andReturn();
@@ -198,7 +198,7 @@ class AiChatControllerTest {
         var started = new CountDownLatch(1);
         var cancelled = new AtomicBoolean();
         doAnswer(invocation -> {
-            ChatReplyHandler reply = invocation.getArgument(3);
+            ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
             started.countDown();
             try {
@@ -208,7 +208,7 @@ class AiChatControllerTest {
                 throw exception;
             }
             return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatReplyHandler.class));
+        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
         var result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> started.getCount() == 0);
@@ -222,10 +222,10 @@ class AiChatControllerTest {
 
     @Test
     void servletTimeoutInterruptsTheWorkerWithoutSendingLateEvents() throws Exception {
-        var source = new AtomicReference<ChatReplyHandler>();
+        var source = new AtomicReference<ChatSseHandler>();
         var cancelled = new AtomicBoolean();
         doAnswer(invocation -> {
-            ChatReplyHandler reply = invocation.getArgument(3);
+            ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
             source.set(reply);
             try {
@@ -235,7 +235,7 @@ class AiChatControllerTest {
                 throw exception;
             }
             return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatReplyHandler.class));
+        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> source.get() != null);
@@ -279,11 +279,11 @@ class AiChatControllerTest {
     void convertsTheConversationIdToUuidBeforeCallingTheService() throws Exception {
         UUID id = UUID.fromString(ID);
         doAnswer(invocation -> {
-            ChatReplyHandler reply = invocation.getArgument(3);
+            ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
             reply.complete(new ChatResult(ID, "답변"), () -> {});
             return null;
-        }).when(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatReplyHandler.class));
+        }).when(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
         ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(id, "질문"));
         request.put("conversationId", ID.toUpperCase(java.util.Locale.ROOT));
 
@@ -293,7 +293,7 @@ class AiChatControllerTest {
         initial.getAsyncResult(5000);
         var completed = mockMvc.perform(asyncDispatch(initial)).andExpect(status().isOk()).andReturn();
 
-        verify(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatReplyHandler.class));
+        verify(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
         assertThat(completed.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("event:done").doesNotContain("event:failure");
     }

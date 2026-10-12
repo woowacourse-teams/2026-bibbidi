@@ -42,7 +42,6 @@ class ArchitectureConventionTest {
             "chat",
             "checklist",
             "feedback",
-            "sse",
             "terms",
             "user"
     );
@@ -69,16 +68,16 @@ class ArchitectureConventionTest {
             .whereLayer("Persistence").mayOnlyBeAccessedByLayers("Repository", "Persistence");
 
     @ArchTest
-    static final ArchRule 대화_서비스는_HTTP와_SSE_전송에_의존하지_않는다 = noClasses()
+    static final ArchRule 대화_서비스는_HTTP_타입에_직접_의존하지_않는다 = noClasses()
             .that().resideInAPackage("..chat.service..")
             .should().dependOnClassesThat()
-            .resideInAnyPackage("org.springframework.http..", "org.springframework.web..", "..sse..");
+            .resideInAnyPackage("org.springframework.http..", "org.springframework.web..");
 
     @ArchTest
-    static final ArchRule SSE는_대화와_AI_모델에_의존하지_않는다 = noClasses()
-            .that().resideInAPackage("..sse..")
+    static final ArchRule SSE_연결_관리는_대화_처리와_AI_모델에_의존하지_않는다 = noClasses()
+            .that().resideInAPackage("..chat.sse..")
             .should().dependOnClassesThat()
-            .resideInAnyPackage("..chat..", "org.springframework.ai..");
+            .resideInAnyPackage("..chat.service..", "..chat.controller..", "org.springframework.ai..");
 
     @ArchTest
     static final ArchRule domain_패키지는_다른_계층에_의존하지_않는다 = noClasses()
