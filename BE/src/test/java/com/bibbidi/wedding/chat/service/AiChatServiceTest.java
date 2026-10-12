@@ -224,11 +224,16 @@ class AiChatServiceTest {
                             exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
             when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("다른 사용자")));
             service.chat(8L, CONVERSATION_ID, "다른 사용자", reply);
+            UUID anotherConversationId = UUID.randomUUID();
+            when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("다른 대화 답변")));
+            service.chat(7L, anotherConversationId, "다른 대화", reply);
             task.cancel(true);
             await().untilTrue(finished);
             assertThat(memory.get("7:" + CONVERSATION_ID)).isEmpty();
             assertThat(memory.get("8:" + CONVERSATION_ID)).extracting(message -> message.getText())
                     .containsExactly("다른 사용자", "다른 사용자");
+            assertThat(memory.get("7:" + anotherConversationId)).extracting(message -> message.getText())
+                    .containsExactly("다른 대화", "다른 대화 답변");
         }
     }
 

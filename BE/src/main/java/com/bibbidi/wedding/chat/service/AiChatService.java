@@ -23,7 +23,7 @@ public class AiChatService {
 
     private final ChatClient chatClient;
     private final ChatMemory chatMemory;
-    private final Set<String> activeConversations = ConcurrentHashMap.newKeySet();
+    private final Set<ConversationKey> activeConversations = ConcurrentHashMap.newKeySet();
 
     public AiChatService(ChatClient chatClient, ChatMemory chatMemory) {
         this.chatClient = chatClient;
@@ -31,27 +31,27 @@ public class AiChatService {
     }
 
     public void chat(Long userId, @Nullable UUID conversationId, String message, ChatReplyHandler reply) {
-        String id = conversationId == null ? UUID.randomUUID().toString() : conversationId.toString();
-        String memoryKey = userId + ":" + id;
-        reply.conversation(id);
-        if (!activeConversations.add(memoryKey)) {
+        UUID id = conversationId == null ? UUID.randomUUID() : conversationId;
+        ConversationKey key = new ConversationKey(userId, id);
+        reply.conversation(id.toString());
+        if (!activeConversations.add(key)) {
             throw new BusinessException(ClientError.INTERNAL_ERROR, "같은 대화의 응답이 이미 진행 중입니다.");
         }
 
         try {
-            String answer = streamAnswer(userId, memoryKey, message, reply);
-            ChatResult result = new ChatResult(id, answer);
-            reply.complete(result, () -> rememberTurn(memoryKey, message, answer));
+            String answer = streamAnswer(key, message, reply);
+            ChatResult result = new ChatResult(id.toString(), answer);
+            reply.complete(result, () -> rememberTurn(key, message, answer));
         } finally {
-            activeConversations.remove(memoryKey);
+            activeConversations.remove(key);
         }
     }
 
-    private String streamAnswer(Long userId, String memoryKey, String message, ChatReplyHandler reply) {
+    private String streamAnswer(ConversationKey key, String message, ChatReplyHandler reply) {
         try (Stream<String> chunks = chatClient.prompt()
-                .messages(chatMemory.get(memoryKey))
+                .messages(chatMemory.get(key.toMemoryKey()))
                 .messages(new UserMessage(message))
-                .toolContext(new ChatToolContext(userId).toMap())
+                .toolContext(new ChatToolContext(key.userId()).toMap())
                 .stream().content().toStream()) {
             StringBuilder answerBuilder = new StringBuilder();
             Iterator<String> chunksIterator = chunks.iterator();
@@ -69,8 +69,8 @@ public class AiChatService {
         }
     }
 
-    private void rememberTurn(String memoryKey, String message, String answer) {
+    private void rememberTurn(ConversationKey key, String message, String answer) {
         List<Message> turnMessages = List.of(new UserMessage(message), new AssistantMessage(answer));
-        chatMemory.add(memoryKey, turnMessages);
+        chatMemory.add(key.toMemoryKey(), turnMessages);
     }
 }
