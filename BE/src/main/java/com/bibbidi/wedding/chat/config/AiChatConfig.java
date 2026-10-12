@@ -6,21 +6,29 @@ import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.tools.CatalogTools;
 import com.bibbidi.wedding.chat.tools.ChecklistTools;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import java.nio.charset.StandardCharsets;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AiChatProperties.class)
 public class AiChatConfig {
 
     @Bean
-    ChatClient aiChatClient(Builder builder, CatalogService catalogService, ChecklistService checklistService) {
-        return builder.defaultSystem(AiChatPrompt.SYSTEM_PROMPT)
+    ChatClient aiChatClient(
+            Builder builder,
+            CatalogService catalogService,
+            ChecklistService checklistService,
+            @Value("classpath:prompts/ai-chat-system.txt") Resource systemPrompt
+    ) {
+        return builder.defaultSystem(systemPrompt, StandardCharsets.UTF_8)
                 .defaultTools(new CatalogTools(catalogService), new ChecklistTools(checklistService))
                 .build();
     }
