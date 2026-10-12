@@ -1,0 +1,1191 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index 64819b69d71d6a51860741cd97de24e4e4f0b7a3..2202cf8baafa799f34caccd02e0443187961d127 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -8,7 +8,40 @@ import {
+ } from "@testing-library/react";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+-import { AiChatFeature } from "./AiChatFeature";
++import { AiChatFeature as AiChatFeatureView } from "./AiChatFeature";
++import { useExampleTaskAddition } from "./hooks/useExampleTaskAddition";
++import type { ExampleRecommendedTask } from "./model/exampleChat";
++import { useIsMobileLayout } from "../../shared/responsive";
++
++function AiChatFeature({
++  onTaskAdd,
++  onShowAddedTasks,
++}: {
++  onTaskAdd?: (
++    task: ExampleRecommendedTask,
++    revealImmediately: boolean,
++  ) => void;
++  onShowAddedTasks?: () => void;
++} = {}) {
++  const isMobile = useIsMobileLayout();
++  const addition = useExampleTaskAddition({ audience: "test", isMobile });
++  return (
++    <AiChatFeatureView
++      addition={{
++        ...addition,
++        add: (task) => {
++          const added = addition.add(task);
++          if (added) onTaskAdd?.(task, !isMobile);
++          return added;
++        },
++        showAddedTasks: () => {
++          addition.showAddedTasks();
++          onShowAddedTasks?.();
++        },
++      }}
++    />
++  );
++}
+ 
+ const dialogMethods = Object.getOwnPropertyDescriptors(
+   HTMLDialogElement.prototype,
+@@ -80,6 +113,61 @@ afterEach(() => {
+ });
+ 
+ describe("AI 채팅 예시", () => {
++  it("PC 추가는 즉시 리스트에 알리고 같은 추천을 다시 선택해도 중복 추가하지 않는다", () => {
++    const onTaskAdd = vi.fn();
++    render(<AiChatFeature onTaskAdd={onTaskAdd} />);
++    showCards();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    expect(onTaskAdd).toHaveBeenCalledWith(
++      expect.objectContaining({ title: "주례 없는 예식 순서 정하기" }),
++      true,
++    );
++    fireEvent.click(screen.getByRole("button", { name: "← 넘기기" }));
++    send("더 추천해줘");
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    expect(onTaskAdd).toHaveBeenCalledTimes(1);
++    expect(
++      screen
++        .getAllByRole("status")
++        .some((status) =>
++          status.textContent?.includes("이미 예시로 추가했어요"),
++        ),
++    ).toBe(true);
++  });
++
++  it("모바일에서 연속 추가 후 보기 버튼으로 닫고 다시 열면 카드 진행을 유지한다", () => {
++    mockMobileDialog();
++    const onTaskAdd = vi.fn();
++    const onShowAddedTasks = vi.fn();
++    render(
++      <AiChatFeature
++        onTaskAdd={onTaskAdd}
++        onShowAddedTasks={onShowAddedTasks}
++      />,
++    );
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    showCards();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    expect(screen.getByRole("dialog")).toBeTruthy();
++    expect(
++      screen.getByRole("button", { name: "추가한 할 일 1개 보기" }),
++    ).toBeTruthy();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    expect(onTaskAdd).toHaveBeenCalledTimes(2);
++    expect(onTaskAdd).toHaveBeenLastCalledWith(
++      expect.objectContaining({ title: "사회자·축가 맡을 사람 정하기" }),
++      false,
++    );
++    expect(onShowAddedTasks).not.toHaveBeenCalled();
++    fireEvent.click(
++      screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
++    );
++    expect(screen.queryByRole("dialog")).toBeNull();
++    expect(onShowAddedTasks).toHaveBeenCalledTimes(1);
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
++  });
++
+   it.each(
+     ["AI와 할 일 만들기", "AI 채팅 열기"].flatMap((launcher) =>
+       ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
+@@ -247,13 +335,15 @@ describe("AI 채팅 예시", () => {
+     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+       "작성 중",
+     );
+-    const submit = screen.getByRole("button", { name: "메시지 전송" });
++    const showAdded = screen.getByRole("button", {
++      name: "추가한 할 일 1개 보기",
++    });
+     const back = screen.getByRole("button", { name: "로드맵으로 돌아가기" });
+-    submit.focus();
+-    fireEvent.keyDown(submit, { key: "Tab" });
++    showAdded.focus();
++    fireEvent.keyDown(showAdded, { key: "Tab" });
+     expect(document.activeElement).toBe(back);
+     fireEvent.keyDown(back, { key: "Tab", shiftKey: true });
+-    expect(document.activeElement).toBe(submit);
++    expect(document.activeElement).toBe(showAdded);
+     fireEvent(
+       screen.getByRole("dialog"),
+       new Event("cancel", { cancelable: true }),
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index ed2b6468e6a804caa8fea2672423bd16628c73c7..44b0050f86da8ab82dbf2c0997f356dd9b3b0c79 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -1,26 +1,38 @@
+-import { useRef, useState } from "react";
++import { useRef } from "react";
+ 
+ import { useIsMobileLayout } from "../../shared/responsive";
+ import { useAiChatConversation } from "./hooks/useAiChatConversation";
++import type { ExampleTaskAdditionController } from "./hooks/useExampleTaskAddition";
+ import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
+ import { AiChatView, ChatIcon } from "./view/AiChatView";
+ import "./view/AiChat.css";
+ 
+-export function AiChatFeature() {
++export function AiChatFeature({
++  addition,
++}: {
++  addition: Pick<
++    ExampleTaskAdditionController,
++    "add" | "addedTaskCount" | "isChatOpen" | "setChatOpen" | "showAddedTasks"
++  >;
++}) {
+   const isMobile = useIsMobileLayout();
+-  const [isOpen, setIsOpen] = useState(false);
+   const returnFocusRef = useRef<HTMLButtonElement>(null);
+-  const { draft, messages, setDraft, send, chooseCard } =
+-    useAiChatConversation();
++  const { draft, messages, setDraft, send, chooseCard } = useAiChatConversation(
++    addition.add,
++  );
++
++  const closeChat = () => {
++    addition.setChatOpen(false);
++  };
+ 
+   const openChat = (launcher: HTMLButtonElement) => {
+     returnFocusRef.current = launcher;
+-    setIsOpen(true);
++    addition.setChatOpen(true);
+   };
+ 
+   const view = (
+     <AiChatView
+-      active={!isMobile || isOpen}
++      active={!isMobile || addition.isChatOpen}
+       draft={draft}
+       messages={messages}
+       onChooseCard={chooseCard}
+@@ -51,11 +63,24 @@ export function AiChatFeature() {
+             </button>
+           </div>
+           <MobileAiChatDialog
+-            isOpen={isOpen}
+-            onClose={() => setIsOpen(false)}
++            isOpen={addition.isChatOpen}
++            onClose={closeChat}
+             returnFocusRef={returnFocusRef}
+           >
+             {view}
++            {addition.addedTaskCount > 0 ? (
++              <button
++                className="ai-chat__show-added"
++                onClick={() => {
++                  returnFocusRef.current = null;
++                  addition.showAddedTasks();
++                }}
++                type="button"
++              >
++                추가한 할 일 {addition.addedTaskCount}개 보기{" "}
++                <span aria-hidden="true">→</span>
++              </button>
++            ) : null}
+           </MobileAiChatDialog>
+         </>
+       ) : (
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+index e8eb16d4e47269f6203dad32097c1bfe4ff5af77..a375976979f969c4909888acb43afed219acc525 100644
+--- a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
++++ b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+@@ -2,11 +2,14 @@ import { useState } from "react";
+ 
+ import {
+   ChatMessage,
++  ExampleRecommendedTask,
+   createExampleReply,
+   recommendedTasks,
+ } from "../model/exampleChat";
+ 
+-export function useAiChatConversation() {
++export function useAiChatConversation(
++  onTaskAdd: (task: ExampleRecommendedTask) => boolean,
++) {
+   const [draft, setDraft] = useState("");
+   const [messages, setMessages] = useState<ChatMessage[]>([]);
+ 
+@@ -27,6 +30,12 @@ export function useAiChatConversation() {
+   };
+ 
+   const chooseCard = (messageId: number, add: boolean) => {
++    const message = messages.find((item) => item.id === messageId);
++    if (message?.role !== "assistant" || message.kind !== "recommendations")
++      return;
++    const task = recommendedTasks[message.cardIndex];
++    if (!task) return;
++    const alreadyAdded = add && !onTaskAdd(task);
+     setMessages((current) =>
+       current.map((message) => {
+         if (
+@@ -41,7 +50,7 @@ export function useAiChatConversation() {
+           ...message,
+           cardIndex: message.cardIndex + 1,
+           feedback: add
+-            ? `예시로 추가했어요: ${task.title}`
++            ? `${alreadyAdded ? "이미 예시로 추가했어요" : "예시로 추가했어요"}: ${task.title}`
+             : `넘겼어요: ${task.title}`,
+         };
+       }),
+diff --git a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4c0bc05cd7ffc75fb1055e01c207f1e008b7945
+--- /dev/null
++++ b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx
+@@ -0,0 +1,24 @@
++import { act, renderHook } from "@testing-library/react";
++import { expect, it } from "vitest";
++
++import { recommendedTasks } from "../model/exampleChat";
++import { useExampleTaskAddition } from "./useExampleTaskAddition";
++
++it("모바일에서 담은 항목을 PC에서 확인한 뒤 모바일로 돌아와도 목록과 완료 기록을 유지한다", () => {
++  const { result, rerender } = renderHook(
++    ({ isMobile }) => useExampleTaskAddition({ audience: "guest", isMobile }),
++    { initialProps: { isMobile: true } },
++  );
++  act(() => {
++    result.current.add(recommendedTasks[0]);
++  });
++  expect(result.current.visibleCount).toBe(0);
++  rerender({ isMobile: false });
++  expect(result.current.visibleCount).toBe(1);
++  act(() => {
++    result.current.completeTask(recommendedTasks[0].title);
++  });
++  rerender({ isMobile: true });
++  expect(result.current.visibleCount).toBe(1);
++  expect(result.current.completedCount).toBe(1);
++});
+diff --git a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2692e605d640cd8c7bc0816f0a979ec2c10d106
+--- /dev/null
++++ b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts
+@@ -0,0 +1,104 @@
++import { useCallback, useState } from "react";
++
++import type { ExampleRecommendedTask } from "../model/exampleChat";
++
++interface ExampleTaskAdditionState {
++  audience: string | null;
++  tasks: ExampleRecommendedTask[];
++  visibleCount: number;
++  completedCount: number;
++  focusRequest: number;
++  isChatOpen: boolean;
++}
++
++function createEmptyState(audience: string | null): ExampleTaskAdditionState {
++  return {
++    audience,
++    tasks: [],
++    visibleCount: 0,
++    completedCount: 0,
++    focusRequest: 0,
++    isChatOpen: false,
++  };
++}
++
++export function useExampleTaskAddition({
++  audience,
++  isMobile,
++}: {
++  audience: string | null;
++  isMobile: boolean;
++}) {
++  const [state, setState] = useState(() => createEmptyState(audience));
++  // 인증 확인 중에는 기존 기록을 보존하고, 실제 사용자가 바뀌면 함께 초기화한다.
++  if (audience !== null && state.audience !== audience) {
++    setState(createEmptyState(audience));
++  } else if (!isMobile && state.visibleCount < state.tasks.length) {
++    // PC에서 확인한 목록은 모바일로 돌아온 뒤에도 유지한다.
++    setState({ ...state, visibleCount: state.tasks.length });
++  }
++  const current =
++    audience === null || state.audience === audience
++      ? state
++      : createEmptyState(audience);
++
++  const add = (task: ExampleRecommendedTask) => {
++    if (current.tasks.some((item) => item.title === task.title)) return false;
++    setState((previous) => {
++      if (
++        previous.audience !== audience ||
++        previous.tasks.some((item) => item.title === task.title)
++      )
++        return previous;
++      const tasks = [...previous.tasks, task];
++      return {
++        ...previous,
++        tasks,
++        visibleCount: isMobile ? previous.visibleCount : tasks.length,
++        focusRequest: previous.focusRequest + (isMobile ? 0 : 1),
++      };
++    });
++    return true;
++  };
++
++  const showAddedTasks = () =>
++    setState((previous) => ({
++      ...previous,
++      isChatOpen: false,
++      visibleCount: previous.tasks.length,
++      focusRequest: previous.focusRequest + 1,
++    }));
++
++  const setChatOpen = (isChatOpen: boolean) =>
++    setState((previous) => ({ ...previous, isChatOpen }));
++
++  const completeTask = useCallback(
++    (title: string) => {
++      setState((previous) =>
++        previous.audience === audience &&
++        previous.tasks[previous.completedCount]?.title === title
++          ? { ...previous, completedCount: previous.completedCount + 1 }
++          : previous,
++      );
++    },
++    [audience],
++  );
++
++  return {
++    tasks: current.tasks,
++    addedTaskCount: current.tasks.length,
++    visibleCount: isMobile ? current.visibleCount : current.tasks.length,
++    completedCount: current.completedCount,
++    focusRequest: current.focusRequest,
++    isChatOpen: current.isChatOpen,
++    isPaused: isMobile && current.isChatOpen,
++    add,
++    showAddedTasks,
++    setChatOpen,
++    completeTask,
++  };
++}
++
++export type ExampleTaskAdditionController = ReturnType<
++  typeof useExampleTaskAddition
++>;
+diff --git a/FE/src/features/ai-chat/model/exampleChat.ts b/FE/src/features/ai-chat/model/exampleChat.ts
+index 65638b23561ab8a342ab06e1ed2fe21a739edbe6..9dee2e87856cd2baccd2b8051da295f33190791f 100644
+--- a/FE/src/features/ai-chat/model/exampleChat.ts
++++ b/FE/src/features/ai-chat/model/exampleChat.ts
+@@ -8,6 +8,8 @@ export const recommendedTasks = [
+   { title: "사회자·축가 맡을 사람 정하기", step: "03 · 예식 진행 인원 섭외" },
+ ];
+ 
++export type ExampleRecommendedTask = (typeof recommendedTasks)[number];
++
+ export type ChatMessage =
+   | { id: number; role: "user"; text: string; time: string }
+   | {
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+index 1079d85703604a5bbc7c096f4a674ecabcea035f..b237c03e3054c3eeca579c08457c3f35632cef99 100644
+--- a/FE/src/features/ai-chat/view/AiChat.css
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -353,7 +353,138 @@
+   white-space: nowrap;
+ }
+ 
++.ai-task-preview {
++  flex: none;
++  min-width: 0;
++  margin: 0 32px 12px;
++  padding: 12px 16px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 16px;
++  background: var(--color-bg-layer-default);
++}
++
++.ai-task-preview__header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++  margin-bottom: 8px;
++}
++
++.ai-task-preview__header h2 {
++  margin: 0;
++  font-size: 14px;
++}
++
++.ai-task-preview__header h2 span {
++  margin-left: 6px;
++  color: var(--color-fg-brand);
++  font-size: 12px;
++}
++
++.ai-task-preview__header > p,
++.ai-task-preview__step {
++  margin: 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 11px;
++  line-height: 1.6;
++}
++
++.ai-task-preview ul {
++  max-height: min(160px, 25dvh);
++  margin: 0;
++  padding: 0;
++  overflow-y: auto;
++  list-style: none;
++}
++
++.ai-task-preview__item {
++  display: flex;
++  align-items: flex-start;
++  gap: 10px;
++  padding: 10px 12px;
++  border-radius: 10px;
++  scroll-margin: 8px;
++  transition: background-color 240ms ease;
++}
++
++.ai-task-preview__item--writing {
++  background: var(--color-bg-brand-weak);
++}
++
++.ai-task-preview__item:focus-visible {
++  outline: 2px solid var(--color-stroke-focus-ring);
++  outline-offset: -2px;
++}
++
++.ai-task-preview__item > div {
++  min-width: 0;
++}
++
++.ai-task-preview__marker {
++  flex: none;
++  color: var(--color-fg-brand);
++  line-height: 1.5;
++}
++
++.ai-task-preview__title {
++  min-height: 21px;
++  margin: 0 0 3px;
++  font-size: 14px;
++  line-height: 1.5;
++  overflow-wrap: anywhere;
++}
++
++.ai-task-preview__cursor {
++  display: inline-block;
++  width: 2px;
++  height: 1em;
++  margin-left: 3px;
++  background: var(--color-fg-brand);
++  vertical-align: -0.12em;
++  animation: ai-task-cursor 700ms steps(2, start) infinite;
++}
++
++@keyframes ai-task-cursor {
++  to {
++    opacity: 0;
++  }
++}
++
++.ai-chat__show-added {
++  flex: none;
++  min-height: 44px;
++  margin: 0 16px max(12px, env(safe-area-inset-bottom));
++  padding: 12px 16px;
++  border: 0;
++  border-radius: 12px;
++  background: var(--color-bg-brand-solid);
++  color: var(--color-fg-on-brand);
++  cursor: pointer;
++  font: inherit;
++  font-size: 14px;
++  font-weight: 700;
++}
++
++.ai-chat__show-added:focus-visible {
++  outline: 3px solid var(--color-stroke-focus-ring);
++  outline-offset: 3px;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .ai-task-preview__item {
++    transition: none;
++  }
++  .ai-task-preview__cursor {
++    animation: none;
++  }
++}
++
+ @media (max-width: 760px) {
++  .ai-task-preview {
++    margin: 0 16px 8px;
++    padding: 12px;
++  }
+   .ai-chat-feature {
+     display: contents;
+   }
+diff --git a/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx b/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..41b98f3a156714f424df423c8e430d62f0f1c7cf
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx
+@@ -0,0 +1,153 @@
++import { act, render, screen, within } from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { useCallback, useState } from "react";
++import type { ComponentProps } from "react";
++
++import { recommendedTasks } from "../model/exampleChat";
++import { ExampleAddedTaskList as ExampleAddedTaskListView } from "./ExampleAddedTaskList";
++
++function ExampleAddedTaskList(
++  props: Omit<
++    ComponentProps<typeof ExampleAddedTaskListView>,
++    "completedCount" | "onTaskComplete"
++  >,
++) {
++  const [completedCount, setCompletedCount] = useState(0);
++  const onTaskComplete = useCallback(
++    () => setCompletedCount((count) => count + 1),
++    [],
++  );
++  return (
++    <ExampleAddedTaskListView
++      {...props}
++      completedCount={completedCount}
++      onTaskComplete={onTaskComplete}
++    />
++  );
++}
++
++const scrollIntoView = vi.fn();
++
++beforeEach(() => {
++  vi.useFakeTimers();
++  vi.stubGlobal(
++    "matchMedia",
++    vi.fn().mockReturnValue({
++      matches: false,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++    }),
++  );
++  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
++    configurable: true,
++    value: scrollIntoView,
++  });
++  scrollIntoView.mockClear();
++});
++
++afterEach(() => {
++  vi.useRealTimers();
++  vi.unstubAllGlobals();
++  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
++});
++
++const props = {
++  tasks: recommendedTasks,
++  visibleCount: 2,
++  focusRequest: 1,
++  isPaused: false,
++};
++const tick = (milliseconds: number) =>
++  act(() => vi.advanceTimersByTime(milliseconds));
++const title = (index: number) =>
++  within(screen.getAllByRole("listitem")[index]).getByText(
++    (_text, element) => element?.className === "ai-task-preview__title",
++  );
++
++describe("추천 할 일 추가 애니메이션", () => {
++  it("리스트로 이동해 첫 글자부터 보여주고 선택 순서대로 항목을 완성한다", () => {
++    render(<ExampleAddedTaskList {...props} />);
++    expect(document.activeElement).toBe(screen.getAllByRole("listitem")[0]);
++    expect(scrollIntoView).toHaveBeenCalledWith(
++      expect.objectContaining({ behavior: "smooth" }),
++    );
++    expect(title(0).textContent).toBe("");
++    expect(title(1).textContent).toBe("추가 대기 중");
++    tick(280);
++    expect(title(0).textContent).toBe("주");
++    tick(1000);
++    expect(title(0).textContent).toBe(recommendedTasks[0].title);
++    expect(title(1).textContent).toBe("");
++    tick(280);
++    expect(title(1).textContent).toBe("사");
++    tick(1000);
++    expect(title(1).textContent).toBe(recommendedTasks[1].title);
++    expect(screen.getByRole("status").textContent).toContain(
++      recommendedTasks[1].title,
++    );
++    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
++  });
++
++  it("재확인과 목록 갱신은 완성한 항목을 다시 타이핑하지 않는다", () => {
++    const { rerender } = render(
++      <ExampleAddedTaskList {...props} visibleCount={1} />,
++    );
++    tick(1300);
++    rerender(
++      <ExampleAddedTaskList {...props} visibleCount={1} focusRequest={2} />,
++    );
++    expect(title(0).textContent).toBe(recommendedTasks[0].title);
++    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
++    rerender(<ExampleAddedTaskList {...props} focusRequest={3} />);
++    expect(title(0).textContent).toBe(recommendedTasks[0].title);
++    expect(title(1).textContent).toBe("");
++    tick(280);
++    expect(title(1).textContent).toBe("사");
++  });
++
++  it("채팅을 다시 열면 타이핑을 멈추고 닫으면 이어 쓰며 포커스를 빼앗지 않는다", () => {
++    const { rerender } = render(<ExampleAddedTaskList {...props} />);
++    tick(400);
++    const partialTitle = title(0).textContent;
++    rerender(<ExampleAddedTaskList {...props} isPaused />);
++    const chatInput = document.createElement("input");
++    document.body.append(chatInput);
++    chatInput.focus();
++    tick(2000);
++    expect(title(0).textContent).toBe(partialTitle);
++    rerender(<ExampleAddedTaskList {...props} />);
++    tick(36);
++    expect(title(0).textContent!.length).toBe(partialTitle!.length + 1);
++    expect(document.activeElement).toBe(chatInput);
++    chatInput.remove();
++  });
++
++  it("모션 감소 설정에서는 완성된 글자를 즉시 표시하고 부드러운 이동을 생략한다", () => {
++    vi.mocked(window.matchMedia).mockReturnValue({
++      matches: true,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++    } as unknown as MediaQueryList);
++    render(<ExampleAddedTaskList {...props} />);
++    expect(title(0).textContent).toBe(recommendedTasks[0].title);
++    expect(title(1).textContent).toBe(recommendedTasks[1].title);
++    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
++    expect(scrollIntoView).toHaveBeenCalledWith(
++      expect.objectContaining({ behavior: "auto" }),
++    );
++  });
++
++  it("미확인 항목은 노출·재생하지 않고 화면을 떠나면 타이머를 정리한다", () => {
++    const { rerender, unmount } = render(
++      <ExampleAddedTaskList {...props} visibleCount={0} />,
++    );
++    tick(2000);
++    expect(screen.queryByRole("list")).toBeNull();
++    expect(scrollIntoView).not.toHaveBeenCalled();
++    rerender(<ExampleAddedTaskList {...props} />);
++    tick(280);
++    expect(title(0).textContent).toBe("주");
++    unmount();
++    expect(vi.getTimerCount()).toBe(0);
++  });
++});
+diff --git a/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx b/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..d2e424c220039211bb67798ba40b5a983ef64037
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx
+@@ -0,0 +1,143 @@
++import { useEffect, useRef, useState } from "react";
++
++import { useMediaQuery } from "../../../shared/responsive";
++import type { ExampleRecommendedTask } from "../model/exampleChat";
++
++function ExampleTaskRow({
++  task,
++  active,
++  complete,
++  isPaused,
++  reducedMotion,
++  onComplete,
++}: {
++  task: ExampleRecommendedTask;
++  active: boolean;
++  complete: boolean;
++  isPaused: boolean;
++  reducedMotion: boolean;
++  onComplete: (title: string) => void;
++}) {
++  const characterCountRef = useRef(0);
++  const [characterCount, setCharacterCount] = useState(0);
++  const characters = Array.from(task.title);
++
++  useEffect(() => {
++    if (!active || isPaused) return;
++    let timer: ReturnType<typeof setTimeout>;
++    const typeNext = () => {
++      if (reducedMotion || characterCountRef.current >= characters.length) {
++        onComplete(task.title);
++        return;
++      }
++      characterCountRef.current += 1;
++      setCharacterCount(characterCountRef.current);
++      timer = setTimeout(typeNext, Math.min(36, 700 / characters.length));
++    };
++    timer = setTimeout(
++      typeNext,
++      reducedMotion ? 0 : characterCountRef.current > 0 ? 36 : 280,
++    );
++    return () => clearTimeout(timer);
++  }, [
++    active,
++    isPaused,
++    reducedMotion,
++    characters.length,
++    task.title,
++    onComplete,
++  ]);
++
++  return (
++    <li
++      aria-label={task.title}
++      className={`ai-task-preview__item${active && !reducedMotion ? " ai-task-preview__item--writing" : ""}`}
++      tabIndex={-1}
++    >
++      <span aria-hidden="true" className="ai-task-preview__marker">
++        {complete || reducedMotion ? "✓" : "+"}
++      </span>
++      <div>
++        <p aria-hidden="true" className="ai-task-preview__title">
++          {complete || reducedMotion
++            ? task.title
++            : characters.slice(0, characterCount).join("")}
++          {active && !reducedMotion ? (
++            <span className="ai-task-preview__cursor" />
++          ) : null}
++          {!active && !complete && !reducedMotion ? "추가 대기 중" : null}
++        </p>
++        <p className="ai-task-preview__step">{task.step}</p>
++      </div>
++    </li>
++  );
++}
++
++export function ExampleAddedTaskList({
++  tasks,
++  visibleCount,
++  focusRequest,
++  isPaused,
++  completedCount,
++  onTaskComplete,
++}: {
++  tasks: ExampleRecommendedTask[];
++  visibleCount: number;
++  focusRequest: number;
++  isPaused: boolean;
++  completedCount: number;
++  onTaskComplete: (title: string) => void;
++}) {
++  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
++  const listRef = useRef<HTMLUListElement>(null);
++  const lastFocusRequestRef = useRef(0);
++
++  useEffect(() => {
++    if (isPaused || visibleCount === 0) return;
++    const requestsFocus = lastFocusRequestRef.current !== focusRequest;
++    if (!requestsFocus && completedCount >= visibleCount) return;
++    const row = listRef.current?.children[
++      Math.min(completedCount, visibleCount - 1)
++    ] as HTMLElement | undefined;
++    row?.scrollIntoView?.({
++      behavior: reducedMotion ? "auto" : "smooth",
++      block: "nearest",
++      inline: "nearest",
++    });
++    if (requestsFocus) {
++      lastFocusRequestRef.current = focusRequest;
++      row?.focus({ preventScroll: true });
++    }
++  }, [focusRequest, visibleCount, completedCount, isPaused, reducedMotion]);
++
++  if (visibleCount === 0) return null;
++
++  return (
++    <section aria-label="예시로 담은 일" className="ai-task-preview">
++      <header className="ai-task-preview__header">
++        <h2>
++          예시로 담은 일 <span>{visibleCount}개</span>
++        </h2>
++        <p>예시 · 저장되지 않아요</p>
++      </header>
++      <ul aria-label="AI가 추가한 예시 할 일" ref={listRef}>
++        {tasks.slice(0, visibleCount).map((task, index) => (
++          <ExampleTaskRow
++            key={task.title}
++            task={task}
++            active={index === completedCount}
++            complete={index < completedCount}
++            isPaused={isPaused}
++            reducedMotion={reducedMotion}
++            onComplete={onTaskComplete}
++          />
++        ))}
++      </ul>
++      <p className="ai-chat__sr-only" role="status">
++        {completedCount > 0
++          ? `${tasks[completedCount - 1]?.title} 예시 추가 완료`
++          : "할 일을 추가하고 있어요."}
++      </p>
++    </section>
++  );
++}
+diff --git a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+index 119e601607f1e29b47f89bffec6f310f0b642aa7..d61047683c680c2728b885474418674797dfdeab 100644
+--- a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
++++ b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+@@ -23,7 +23,6 @@ export function MobileAiChatDialog({
+ 
+   useLayoutEffect(() => {
+     const dialog = dialogRef.current;
+-    const launcher = returnFocusRef.current;
+     if (!dialog) return;
+     if (isOpen) {
+       dialog.showModal();
+@@ -38,6 +37,8 @@ export function MobileAiChatDialog({
+       if (dialog.open) dialog.close();
+       if (isOpen) {
+         queueMicrotask(() => {
++          // eslint-disable-next-line react-hooks/exhaustive-deps -- 목록 보기 선택 시 복원을 취소할 수 있도록 닫힌 시점의 수동 포커스 대상을 읽는다.
++          const launcher = returnFocusRef.current;
+           if (launcher?.isConnected && !dialog.open) launcher.focus();
+         });
+       }
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index fc15cb15d9d6f698d78b009bf631fa0b5dd5f7b4..eca93d20b68720e13bf6f6af57d91baef3a82da3 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -1,11 +1,13 @@
+ import {
+   fireEvent,
++  cleanup,
++  act,
+   render,
+   screen,
+   within,
+   waitFor,
+ } from "@testing-library/react";
+-import { beforeEach, describe, expect, it, vi } from "vitest";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import { AuthState } from "../auth/model/auth";
+ import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
+ 
+@@ -106,6 +108,22 @@ beforeEach(() => {
+   );
+ });
+ 
++afterEach(() => {
++  vi.useRealTimers();
++  vi.unstubAllGlobals();
++  vi.restoreAllMocks();
++});
++
++function showChatRecommendations() {
++  fireEvent.click(
++    screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
++  );
++  fireEvent.change(screen.getByRole("textbox", { name: "추가하고 싶은 일" }), {
++    target: { value: "추천해줘" },
++  });
++  fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
++}
++
+ function showAll() {
+   fireEvent.click(
+     within(screen.getByRole("navigation", { name: "로드맵 보기" })).getByRole(
+@@ -116,6 +134,215 @@ function showAll() {
+ }
+ 
+ describe("준비 로드맵 보기 전환", () => {
++  it("인증 확인 후 같은 사용자로 복귀해도 완료한 추천을 다시 타이핑하지 않는다", async () => {
++    const { rerender } = render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
++    vi.useFakeTimers();
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    act(() => vi.advanceTimersByTime(1300));
++    const owner = mocks.authState;
++    mocks.authState = { status: "loading" };
++    rerender(<PreparationRoadmapFeature />);
++    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
++    mocks.authState = owner;
++    await act(async () => {
++      rerender(<PreparationRoadmapFeature />);
++    });
++    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
++    expect(
++      within(preview).getByText("주례 없는 예식 순서 정하기"),
++    ).toBeTruthy();
++    expect(preview.querySelector(".ai-task-preview__cursor")).toBeNull();
++    act(() => vi.advanceTimersByTime(1300));
++    expect(
++      within(preview).getByText("주례 없는 예식 순서 정하기"),
++    ).toBeTruthy();
++  });
++
++  it("인증 확인 후 채팅이 다시 생성되어도 기존 추천을 중복 추가하지 않는다", async () => {
++    const { rerender } = render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
++    vi.useFakeTimers();
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    const owner = mocks.authState;
++    mocks.authState = { status: "loading" };
++    rerender(<PreparationRoadmapFeature />);
++    mocks.authState = owner;
++    await act(async () => {
++      rerender(<PreparationRoadmapFeature />);
++    });
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
++    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
++    expect(screen.getByRole("log").textContent).toContain(
++      "이미 예시로 추가했어요",
++    );
++    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
++  });
++
++  it("실제 사용자가 바뀌면 추가 목록과 완료 기록을 함께 초기화한다", async () => {
++    const { rerender } = render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
++    vi.useFakeTimers();
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    act(() => vi.advanceTimersByTime(1300));
++    const owner = mocks.authState;
++    mocks.authState = {
++      status: "authenticated",
++      user: { id: 2, nickname: "다른 사용자" },
++    };
++    await act(async () => {
++      rerender(<PreparationRoadmapFeature />);
++    });
++    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
++    mocks.authState = owner;
++    await act(async () => {
++      rerender(<PreparationRoadmapFeature />);
++    });
++    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
++    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
++    expect(
++      within(preview).queryByText("주례 없는 예식 순서 정하기"),
++    ).toBeNull();
++    act(() => vi.advanceTimersByTime(1300));
++    expect(
++      within(preview).getByText("주례 없는 예식 순서 정하기"),
++    ).toBeTruthy();
++  });
++
++  it("PC 추천 추가는 예시 리스트에서 타이핑하고 저장된 내 할 일과 브라우저 저장소를 바꾸지 않는다", async () => {
++    const storage = vi.spyOn(Storage.prototype, "setItem");
++    render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
++    vi.useFakeTimers();
++    showChatRecommendations();
++    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
++    const row = within(preview).getByRole("listitem", {
++      name: "주례 없는 예식 순서 정하기",
++    });
++    expect(document.activeElement).toBe(row);
++    expect(
++      within(preview).queryByText("주례 없는 예식 순서 정하기"),
++    ).toBeNull();
++    act(() => vi.advanceTimersByTime(1300));
++    expect(
++      within(preview).getByText("주례 없는 예식 순서 정하기"),
++    ).toBeTruthy();
++    expect(screen.getByText("2개 단계 · 내 할 일 2개 · 완료 0개")).toBeTruthy();
++    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
++    expect(storage).not.toHaveBeenCalled();
++  });
++
++  it("모바일에서 연속 선택한 뒤 보기 버튼으로 예시 리스트에 포커스를 넘기고 순서대로 쓴다", async () => {
++    vi.stubGlobal(
++      "matchMedia",
++      vi.fn().mockImplementation((query: string) => ({
++        matches: query === "(max-width: 760px)",
++        addEventListener: vi.fn(),
++        removeEventListener: vi.fn(),
++      })),
++    );
++    const descriptors = Object.getOwnPropertyDescriptors(
++      HTMLDialogElement.prototype,
++    );
++    Object.defineProperties(HTMLDialogElement.prototype, {
++      showModal: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.setAttribute("open", "");
++        },
++      },
++      close: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.removeAttribute("open");
++        },
++      },
++    });
++    try {
++      const { rerender } = render(<PreparationRoadmapFeature />);
++      await screen.findByText("내 웨딩홀 투어");
++      vi.useFakeTimers();
++      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++      showChatRecommendations();
++      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++      expect(screen.getByRole("dialog")).toBeTruthy();
++      expect(
++        screen.queryByRole("region", { name: "예시로 담은 일" }),
++      ).toBeNull();
++      fireEvent.click(
++        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
++      );
++      expect(screen.queryByRole("dialog")).toBeNull();
++      const preview = screen.getByRole("region", { name: "예시로 담은 일" });
++      const rows = within(preview).getAllByRole("listitem");
++      await act(async () => {
++        await Promise.resolve();
++      });
++      expect(document.activeElement).toBe(rows[0]);
++      act(() => vi.advanceTimersByTime(1300));
++      expect(
++        within(preview).getByText("주례 없는 예식 순서 정하기"),
++      ).toBeTruthy();
++      expect(
++        within(preview).queryByText("사회자·축가 맡을 사람 정하기"),
++      ).toBeNull();
++      act(() => vi.advanceTimersByTime(1300));
++      expect(
++        within(preview).getByText("사회자·축가 맡을 사람 정하기"),
++      ).toBeTruthy();
++      expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
++      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++      expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
++      const owner = mocks.authState;
++      mocks.authState = { status: "loading" };
++      rerender(<PreparationRoadmapFeature />);
++      mocks.authState = owner;
++      await act(async () => {
++        rerender(<PreparationRoadmapFeature />);
++      });
++      expect(screen.getByRole("dialog")).toBeTruthy();
++      fireEvent.click(
++        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
++      );
++      const restoredPreview = screen.getByRole("region", {
++        name: "예시로 담은 일",
++      });
++      expect(
++        within(restoredPreview).getByText("주례 없는 예식 순서 정하기"),
++      ).toBeTruthy();
++      expect(
++        within(restoredPreview).getByText("사회자·축가 맡을 사람 정하기"),
++      ).toBeTruthy();
++      expect(
++        restoredPreview.querySelector(".ai-task-preview__cursor"),
++      ).toBeNull();
++    } finally {
++      cleanup();
++      for (const method of ["showModal", "close"] as const) {
++        if (descriptors[method])
++          Object.defineProperty(
++            HTMLDialogElement.prototype,
++            method,
++            descriptors[method],
++          );
++        else
++          delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
++            method
++          ];
++      }
++    }
++  });
++
+   it("비로그인도 채팅을 사용하고 카테고리·로드맵 보기 전환 중 대화를 유지한다", async () => {
+     mocks.authState = { status: "guest" };
+     render(<PreparationRoadmapFeature />);
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.tsx b/FE/src/features/preparation/RoadmapWorkspace.tsx
+index 92f19e4d58e7dd7b5167639856c9a5ae6aff7e0a..854038d7ad2497721da896cb7e0e6f4b676d36fb 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.tsx
+@@ -1,6 +1,9 @@
+ import { ReactNode, useState } from "react";
+ import { useAuth } from "../auth";
+ import { AiChatFeature } from "../ai-chat/AiChatFeature";
++import { useExampleTaskAddition } from "../ai-chat/hooks/useExampleTaskAddition";
++import { ExampleAddedTaskList } from "../ai-chat/view/ExampleAddedTaskList";
++import { useIsMobileLayout } from "../../shared/responsive";
+ import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
+ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+ import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
+@@ -20,6 +23,7 @@ export function RoadmapWorkspace({
+   }) => ReactNode;
+ }) {
+   const { authState, refreshAuth } = useAuth();
++  const isMobile = useIsMobileLayout();
+   const [choice, setChoice] = useState<{
+     audience: string;
+     view: RoadmapView;
+@@ -37,6 +41,13 @@ export function RoadmapWorkspace({
+         ? "personal"
+         : "all";
+   const showAll = () => setChoice({ audience, view: "all" });
++  const addition = useExampleTaskAddition({
++    audience:
++      authState.status === "authenticated" || authState.status === "guest"
++        ? audience
++        : null,
++    isMobile,
++  });
+ 
+   if (authState.status === "error") {
+     return <PreparationRoadmapState status="error" onRetry={refreshAuth} />;
+@@ -59,6 +70,15 @@ export function RoadmapWorkspace({
+           <h1>우리 결혼 준비, 한 단계씩</h1>
+           <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
+         </header>
++        <ExampleAddedTaskList
++          key={audience}
++          tasks={addition.tasks}
++          visibleCount={addition.visibleCount}
++          focusRequest={addition.focusRequest}
++          isPaused={addition.isPaused}
++          completedCount={addition.completedCount}
++          onTaskComplete={addition.completeTask}
++        />
+         <div id="roadmap-view-content">
+           {view === "all" || !isAuthenticated ? (
+             renderCatalogRoadmap({
+@@ -79,7 +99,7 @@ export function RoadmapWorkspace({
+           )}
+         </div>
+       </div>
+-      <AiChatFeature />
++      <AiChatFeature key={audience} addition={addition} />
+     </div>
+   );
+ }

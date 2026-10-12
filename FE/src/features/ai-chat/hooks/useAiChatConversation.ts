@@ -2,11 +2,14 @@ import { useState } from "react";
 
 import {
   ChatMessage,
+  ExampleRecommendedTask,
   createExampleReply,
   recommendedTasks,
 } from "../model/exampleChat";
 
-export function useAiChatConversation() {
+export function useAiChatConversation(
+  onTaskAdd: (task: ExampleRecommendedTask) => boolean,
+) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -27,6 +30,12 @@ export function useAiChatConversation() {
   };
 
   const chooseCard = (messageId: number, add: boolean) => {
+    const message = messages.find((item) => item.id === messageId);
+    if (message?.role !== "assistant" || message.kind !== "recommendations")
+      return;
+    const task = recommendedTasks[message.cardIndex];
+    if (!task) return;
+    const alreadyAdded = add && !onTaskAdd(task);
     setMessages((current) =>
       current.map((message) => {
         if (
@@ -41,7 +50,7 @@ export function useAiChatConversation() {
           ...message,
           cardIndex: message.cardIndex + 1,
           feedback: add
-            ? `예시로 추가했어요: ${task.title}`
+            ? `${alreadyAdded ? "이미 예시로 추가했어요" : "예시로 추가했어요"}: ${task.title}`
             : `넘겼어요: ${task.title}`,
         };
       }),

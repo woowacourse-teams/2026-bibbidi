@@ -1,6 +1,9 @@
 import { ReactNode, useState } from "react";
 import { useAuth } from "../auth";
 import { AiChatFeature } from "../ai-chat/AiChatFeature";
+import { useExampleTaskAddition } from "../ai-chat/hooks/useExampleTaskAddition";
+import { ExampleAddedTaskList } from "../ai-chat/view/ExampleAddedTaskList";
+import { useIsMobileLayout } from "../../shared/responsive";
 import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
 import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
@@ -20,6 +23,7 @@ export function RoadmapWorkspace({
   }) => ReactNode;
 }) {
   const { authState, refreshAuth } = useAuth();
+  const isMobile = useIsMobileLayout();
   const [choice, setChoice] = useState<{
     audience: string;
     view: RoadmapView;
@@ -37,6 +41,13 @@ export function RoadmapWorkspace({
         ? "personal"
         : "all";
   const showAll = () => setChoice({ audience, view: "all" });
+  const addition = useExampleTaskAddition({
+    audience:
+      authState.status === "authenticated" || authState.status === "guest"
+        ? audience
+        : null,
+    isMobile,
+  });
 
   if (authState.status === "error") {
     return <PreparationRoadmapState status="error" onRetry={refreshAuth} />;
@@ -59,6 +70,15 @@ export function RoadmapWorkspace({
           <h1>우리 결혼 준비, 한 단계씩</h1>
           <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
         </header>
+        <ExampleAddedTaskList
+          key={audience}
+          tasks={addition.tasks}
+          visibleCount={addition.visibleCount}
+          focusRequest={addition.focusRequest}
+          isPaused={addition.isPaused}
+          completedCount={addition.completedCount}
+          onTaskComplete={addition.completeTask}
+        />
         <div id="roadmap-view-content">
           {view === "all" || !isAuthenticated ? (
             renderCatalogRoadmap({
@@ -79,7 +99,7 @@ export function RoadmapWorkspace({
           )}
         </div>
       </div>
-      <AiChatFeature />
+      <AiChatFeature key={audience} addition={addition} />
     </div>
   );
 }

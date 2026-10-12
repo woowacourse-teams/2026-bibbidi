@@ -1,26 +1,38 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
+import type { ExampleTaskAdditionController } from "./hooks/useExampleTaskAddition";
 import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
 import { AiChatView, ChatIcon } from "./view/AiChatView";
 import "./view/AiChat.css";
 
-export function AiChatFeature() {
+export function AiChatFeature({
+  addition,
+}: {
+  addition: Pick<
+    ExampleTaskAdditionController,
+    "add" | "addedTaskCount" | "isChatOpen" | "setChatOpen" | "showAddedTasks"
+  >;
+}) {
   const isMobile = useIsMobileLayout();
-  const [isOpen, setIsOpen] = useState(false);
   const returnFocusRef = useRef<HTMLButtonElement>(null);
-  const { draft, messages, setDraft, send, chooseCard } =
-    useAiChatConversation();
+  const { draft, messages, setDraft, send, chooseCard } = useAiChatConversation(
+    addition.add,
+  );
+
+  const closeChat = () => {
+    addition.setChatOpen(false);
+  };
 
   const openChat = (launcher: HTMLButtonElement) => {
     returnFocusRef.current = launcher;
-    setIsOpen(true);
+    addition.setChatOpen(true);
   };
 
   const view = (
     <AiChatView
-      active={!isMobile || isOpen}
+      active={!isMobile || addition.isChatOpen}
       draft={draft}
       messages={messages}
       onChooseCard={chooseCard}
@@ -51,11 +63,24 @@ export function AiChatFeature() {
             </button>
           </div>
           <MobileAiChatDialog
-            isOpen={isOpen}
-            onClose={() => setIsOpen(false)}
+            isOpen={addition.isChatOpen}
+            onClose={closeChat}
             returnFocusRef={returnFocusRef}
           >
             {view}
+            {addition.addedTaskCount > 0 ? (
+              <button
+                className="ai-chat__show-added"
+                onClick={() => {
+                  returnFocusRef.current = null;
+                  addition.showAddedTasks();
+                }}
+                type="button"
+              >
+                추가한 할 일 {addition.addedTaskCount}개 보기{" "}
+                <span aria-hidden="true">→</span>
+              </button>
+            ) : null}
           </MobileAiChatDialog>
         </>
       ) : (
