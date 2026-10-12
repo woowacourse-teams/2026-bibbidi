@@ -18,6 +18,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 public class AiChatController {
 
+    private static final String FAILURE_EVENT = "failure";
+
     private final AiChatService aiChatService;
     private final SseService sseService;
     private final AiChatProperties properties;
@@ -37,7 +39,7 @@ public class AiChatController {
             @AuthenticationPrincipal(expression = "userId") Long userId,
             @Valid @RequestBody ChatRequest request
     ) {
-        SseEvent failure = new SseEvent("failure", new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message()));
+        SseEvent failure = new SseEvent(FAILURE_EVENT, new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message()));
         return sseService.stream(properties.responseTimeout(), failure, connection ->
                 aiChatService.chat(
                         userId,

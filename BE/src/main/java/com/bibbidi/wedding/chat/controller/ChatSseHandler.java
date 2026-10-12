@@ -8,6 +8,10 @@ import com.bibbidi.wedding.sse.service.dto.SseEvent;
 
 final class ChatSseHandler implements ChatReplyHandler {
 
+    private static final String CONVERSATION_EVENT = "conversation";
+    private static final String DELTA_EVENT = "delta";
+    private static final String DONE_EVENT = "done";
+
     private final SseConnection connection;
 
     ChatSseHandler(SseConnection connection) {
@@ -16,16 +20,16 @@ final class ChatSseHandler implements ChatReplyHandler {
 
     @Override
     public void conversation(String conversationId) {
-        connection.send(new SseEvent("conversation", new ChatResponse.Conversation(conversationId)));
+        connection.send(new SseEvent(CONVERSATION_EVENT, new ChatResponse.Conversation(conversationId)));
     }
 
     @Override
     public void sendAnswerChunk(String text) {
-        connection.send(new SseEvent("delta", new ChatResponse.Delta(text)));
+        connection.send(new SseEvent(DELTA_EVENT, new ChatResponse.Delta(text)));
     }
 
     @Override
     public void complete(ChatResult result, Runnable rememberTurn) {
-        connection.complete(new SseEvent("done", new ChatResponse.Conversation(result.conversationId())), rememberTurn);
+        connection.complete(new SseEvent(DONE_EVENT, new ChatResponse.Conversation(result.conversationId())), rememberTurn);
     }
 }
