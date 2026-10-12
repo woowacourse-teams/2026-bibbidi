@@ -8,6 +8,8 @@ export const recommendedTasks = [
   { title: "사회자·축가 맡을 사람 정하기", step: "03 · 예식 진행 인원 섭외" },
 ];
 
+export type ExampleRecommendedTask = (typeof recommendedTasks)[number];
+
 export type ChatMessage =
   | { id: number; role: "user"; text: string; time: string }
   | {

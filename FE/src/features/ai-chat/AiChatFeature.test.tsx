@@ -8,7 +8,40 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AiChatFeature } from "./AiChatFeature";
+import { AiChatFeature as AiChatFeatureView } from "./AiChatFeature";
+import { useExampleTaskAddition } from "./hooks/useExampleTaskAddition";
+import type { ExampleRecommendedTask } from "./model/exampleChat";
+import { useIsMobileLayout } from "../../shared/responsive";
+
+function AiChatFeature({
+  onTaskAdd,
+  onShowAddedTasks,
+}: {
+  onTaskAdd?: (
+    task: ExampleRecommendedTask,
+    revealImmediately: boolean,
+  ) => void;
+  onShowAddedTasks?: () => void;
+} = {}) {
+  const isMobile = useIsMobileLayout();
+  const addition = useExampleTaskAddition({ audience: "test", isMobile });
+  return (
+    <AiChatFeatureView
+      addition={{
+        ...addition,
+        add: (task) => {
+          const added = addition.add(task);
+          if (added) onTaskAdd?.(task, !isMobile);
+          return added;
+        },
+        showAddedTasks: () => {
+          addition.showAddedTasks();
+          onShowAddedTasks?.();
+        },
+      }}
+    />
+  );
+}
 
 const dialogMethods = Object.getOwnPropertyDescriptors(
   HTMLDialogElement.prototype,
@@ -80,6 +113,61 @@ afterEach(() => {
 });
 
 describe("AI 채팅 예시", () => {
+  it("PC 추가는 즉시 리스트에 알리고 같은 추천을 다시 선택해도 중복 추가하지 않는다", () => {
+    const onTaskAdd = vi.fn();
+    render(<AiChatFeature onTaskAdd={onTaskAdd} />);
+    showCards();
+    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+    expect(onTaskAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "주례 없는 예식 순서 정하기" }),
+      true,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "← 넘기기" }));
+    send("더 추천해줘");
+    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+    expect(onTaskAdd).toHaveBeenCalledTimes(1);
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((status) =>
+          status.textContent?.includes("이미 예시로 추가했어요"),
+        ),
+    ).toBe(true);
+  });
+
+  it("모바일에서 연속 추가 후 보기 버튼으로 닫고 다시 열면 카드 진행을 유지한다", () => {
+    mockMobileDialog();
+    const onTaskAdd = vi.fn();
+    const onShowAddedTasks = vi.fn();
+    render(
+      <AiChatFeature
+        onTaskAdd={onTaskAdd}
+        onShowAddedTasks={onShowAddedTasks}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+    showCards();
+    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "추가한 할 일 1개 보기" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+    expect(onTaskAdd).toHaveBeenCalledTimes(2);
+    expect(onTaskAdd).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "사회자·축가 맡을 사람 정하기" }),
+      false,
+    );
+    expect(onShowAddedTasks).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onShowAddedTasks).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
+  });
+
   it.each(
     ["AI와 할 일 만들기", "AI 채팅 열기"].flatMap((launcher) =>
       ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
@@ -247,13 +335,15 @@ describe("AI 채팅 예시", () => {
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       "작성 중",
     );
-    const submit = screen.getByRole("button", { name: "메시지 전송" });
+    const showAdded = screen.getByRole("button", {
+      name: "추가한 할 일 1개 보기",
+    });
     const back = screen.getByRole("button", { name: "로드맵으로 돌아가기" });
-    submit.focus();
-    fireEvent.keyDown(submit, { key: "Tab" });
+    showAdded.focus();
+    fireEvent.keyDown(showAdded, { key: "Tab" });
     expect(document.activeElement).toBe(back);
     fireEvent.keyDown(back, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(submit);
+    expect(document.activeElement).toBe(showAdded);
     fireEvent(
       screen.getByRole("dialog"),
       new Event("cancel", { cancelable: true }),

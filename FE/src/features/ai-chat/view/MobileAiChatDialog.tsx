@@ -23,7 +23,6 @@ export function MobileAiChatDialog({
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
-    const launcher = returnFocusRef.current;
     if (!dialog) return;
     if (isOpen) {
       dialog.showModal();
@@ -38,6 +37,8 @@ export function MobileAiChatDialog({
       if (dialog.open) dialog.close();
       if (isOpen) {
         queueMicrotask(() => {
+          // eslint-disable-next-line react-hooks/exhaustive-deps -- 목록 보기 선택 시 복원을 취소할 수 있도록 닫힌 시점의 수동 포커스 대상을 읽는다.
+          const launcher = returnFocusRef.current;
           if (launcher?.isConnected && !dialog.open) launcher.focus();
         });
       }
