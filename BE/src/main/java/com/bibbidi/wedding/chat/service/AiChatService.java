@@ -2,6 +2,8 @@ package com.bibbidi.wedding.chat.service;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.chat.tools.ChatToolContext;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -33,7 +35,7 @@ public class AiChatService {
         String memoryKey = userId + ":" + id;
         reply.conversation(id);
         if (!activeConversations.add(memoryKey)) {
-            throw new IllegalStateException("같은 대화의 응답이 이미 진행 중입니다.");
+            throw new BusinessException(ClientError.INTERNAL_ERROR, "같은 대화의 응답이 이미 진행 중입니다.");
         }
 
         try {
@@ -61,7 +63,7 @@ public class AiChatService {
 
             String answer = answerBuilder.toString();
             if (answer.isBlank()) {
-                throw new IllegalStateException("챗봇이 빈 답변을 반환했습니다.");
+                throw new BusinessException(ClientError.INTERNAL_ERROR, "챗봇이 빈 답변을 반환했습니다.");
             }
             return answer;
         }

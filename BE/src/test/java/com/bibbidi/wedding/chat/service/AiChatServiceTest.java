@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.chat.tools.ChatToolContext;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
@@ -156,9 +158,13 @@ class AiChatServiceTest {
     @Test
     void emptyOrBlankAnswersDoNotRecordATurn() {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.empty());
-        assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "질문", reply)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "질문", reply))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response(" \n ")));
-        assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "질문", reply)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "질문", reply))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
         assertThat(memory.get("7:" + CONVERSATION_ID)).isEmpty();
     }
 
@@ -213,7 +219,9 @@ class AiChatServiceTest {
                 }
             });
             await().until(() -> subscribed.getCount() == 0);
-            assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "중복 요청", reply)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> service.chat(7L, CONVERSATION_ID, "중복 요청", reply))
+                    .isInstanceOfSatisfying(BusinessException.class,
+                            exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
             when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("다른 사용자")));
             service.chat(8L, CONVERSATION_ID, "다른 사용자", reply);
             task.cancel(true);
