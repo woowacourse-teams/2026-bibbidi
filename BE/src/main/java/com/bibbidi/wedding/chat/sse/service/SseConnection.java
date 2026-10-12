@@ -34,7 +34,9 @@ public final class SseConnection {
 
     private void sendEvent(SseEvent event) {
         try {
-            emitter.send(SseEmitter.event().name(event.name()).data(event.data(), MediaType.APPLICATION_JSON));
+            emitter.send(SseEmitter.event()
+                    .name(event.type().value())
+                    .data(event.data(), MediaType.APPLICATION_JSON));
         } catch (IOException exception) {
             disconnect();
             throw new UncheckedIOException(exception);
@@ -96,7 +98,9 @@ public final class SseConnection {
             log.error("SSE 응답 처리 실패. type={}", exception.getClass().getSimpleName(), exception);
             close(interrupt);
             try {
-                emitter.send(SseEmitter.event().name(failure.name()).data(failure.data(), MediaType.APPLICATION_JSON));
+                emitter.send(SseEmitter.event()
+                        .name(failure.type().value())
+                        .data(failure.data(), MediaType.APPLICATION_JSON));
             } catch (IOException | IllegalStateException ignored) {
                 // 이미 끊긴 연결에는 실패 이벤트를 다시 전송하지 않는다.
             } finally {

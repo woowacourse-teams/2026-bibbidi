@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.chat.sse.service.dto;
 
 public record SseEvent(
-        String name,
+        ChatEventType type,
         Object data
 ) {
 }

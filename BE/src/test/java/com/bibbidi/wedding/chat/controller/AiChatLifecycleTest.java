@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.sse.service.SseService;
+import com.bibbidi.wedding.chat.sse.service.dto.ChatEventType;
 import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
 import java.time.Duration;
 import java.util.List;
@@ -76,7 +77,7 @@ class AiChatLifecycleTest {
                 .doOnSubscribe(ignored -> subscribed.countDown()));
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var sse = new SseService(executor, scheduler);
-            sse.stream(Duration.ofSeconds(30), new SseEvent("failure", "실패 안내"), connection -> {
+            sse.stream(Duration.ofSeconds(30), new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
                 try {
                     var handler = spy(new ChatSseHandler(connection));
                     doAnswer(invocation -> {
@@ -124,7 +125,7 @@ class AiChatLifecycleTest {
         });
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var sse = new SseService(executor, scheduler);
-            sse.stream(Duration.ofSeconds(30), new SseEvent("failure", "실패 안내"), connection -> {
+            sse.stream(Duration.ofSeconds(30), new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
                 try {
                     chat.chat(7L, ID, "질문", new ChatSseHandler(connection));
                 } finally {

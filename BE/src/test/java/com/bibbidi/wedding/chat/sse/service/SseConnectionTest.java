@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.bibbidi.wedding.chat.sse.service.dto.ChatEventType;
 import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -31,7 +32,7 @@ class SseConnectionTest {
     @BeforeEach
     void setUp() {
         emitter = mock(SseEmitter.class);
-        connection = new SseConnection(emitter, new SseEvent("failure", "공개 실패 안내"),
+        connection = new SseConnection(emitter, new SseEvent(ChatEventType.FAILURE, "공개 실패 안내"),
                 System.nanoTime() + Duration.ofSeconds(30).toNanos());
         task = mock(Future.class);
         timer = mock(Future.class);
@@ -42,7 +43,7 @@ class SseConnectionTest {
     @Test
     void completionRunsTheSuccessActionAndCancelsOnlyTheTimer() throws Exception {
         Runnable remember = mock(Runnable.class);
-        connection.complete(new SseEvent("done", "대화 ID"), remember);
+        connection.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember);
         connection.timeout();
         connection.disconnect();
 
@@ -59,7 +60,7 @@ class SseConnectionTest {
         Runnable remember = mock(Runnable.class);
         doThrow(new IllegalStateException("대화 기억 저장 실패")).when(remember).run();
 
-        connection.complete(new SseEvent("done", "대화 ID"), remember);
+        connection.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember);
         connection.fail(new IllegalStateException("완료 후 오류"));
         connection.timeout();
         connection.disconnect();
@@ -78,7 +79,7 @@ class SseConnectionTest {
         doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
         Runnable remember = mock(Runnable.class);
 
-        assertThatThrownBy(() -> connection.complete(new SseEvent("done", "대화 ID"), remember))
+        assertThatThrownBy(() -> connection.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasCause(exception);
 
@@ -93,7 +94,7 @@ class SseConnectionTest {
         doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
         Runnable remember = mock(Runnable.class);
 
-        assertThatThrownBy(() -> connection.complete(new SseEvent("done", "대화 ID"), remember))
+        assertThatThrownBy(() -> connection.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember))
                 .isSameAs(exception);
 
         verifyNoInteractions(remember);
@@ -106,7 +107,7 @@ class SseConnectionTest {
         Runnable remember = mock(Runnable.class);
         connection.timeout();
         connection.timeout();
-        assertThatThrownBy(() -> connection.complete(new SseEvent("done", "대화 ID"), remember))
+        assertThatThrownBy(() -> connection.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember))
                 .isInstanceOf(CancellationException.class);
 
         verifyNoInteractions(remember);
@@ -119,7 +120,7 @@ class SseConnectionTest {
     @Test
     void disconnectionCancelsTheWorkerWithoutSendingAnotherEvent() {
         connection.disconnect();
-        assertThatThrownBy(() -> connection.send(new SseEvent("delta", "늦은 답변")))
+        assertThatThrownBy(() -> connection.send(new SseEvent(ChatEventType.DELTA, "늦은 답변")))
                 .isInstanceOf(CancellationException.class);
         connection.fail(new IllegalStateException("늦은 오류"));
 
@@ -130,9 +131,9 @@ class SseConnectionTest {
 
     @Test
     void completionChecksTheDeadlineEvenWhenTheTimerHasNotRunYet() {
-        var expired = new SseConnection(emitter, new SseEvent("failure", "공개 실패 안내"), System.nanoTime() - 1);
+        var expired = new SseConnection(emitter, new SseEvent(ChatEventType.FAILURE, "공개 실패 안내"), System.nanoTime() - 1);
         Runnable remember = mock(Runnable.class);
-        assertThatThrownBy(() -> expired.complete(new SseEvent("done", "대화 ID"), remember))
+        assertThatThrownBy(() -> expired.complete(new SseEvent(ChatEventType.DONE, "대화 ID"), remember))
                 .isInstanceOf(CancellationException.class);
         verifyNoInteractions(remember, emitter);
     }

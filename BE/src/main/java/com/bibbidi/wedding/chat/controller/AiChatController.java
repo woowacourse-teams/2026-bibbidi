@@ -5,9 +5,10 @@ import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.chat.sse.service.SseService;
+import com.bibbidi.wedding.chat.sse.service.dto.ChatEventType;
 import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
+import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,8 +19,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 public class AiChatController {
-
-    private static final String FAILURE_EVENT = "failure";
 
     private final AiChatService aiChatService;
     private final SseService sseService;
@@ -40,7 +39,7 @@ public class AiChatController {
             @AuthenticationPrincipal(expression = "userId") Long userId,
             @Valid @RequestBody ChatRequest request
     ) {
-        SseEvent failure = new SseEvent(FAILURE_EVENT, new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message()));
+        SseEvent failure = new SseEvent(ChatEventType.FAILURE, new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message()));
         return sseService.stream(properties.responseTimeout(), failure, connection ->
                 aiChatService.chat(
                         userId,
