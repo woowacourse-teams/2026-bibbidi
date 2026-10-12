@@ -17,6 +17,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 public class AiChatService {
@@ -48,11 +49,14 @@ public class AiChatService {
     }
 
     private String streamAnswer(ConversationKey key, String message, ChatReplyHandler reply) {
-        try (Stream<String> chunks = chatClient.prompt()
+        Flux<String> answerChunks = chatClient.prompt()
                 .messages(chatMemory.get(key.toMemoryKey()))
                 .messages(new UserMessage(message))
                 .toolContext(new ChatToolContext(key.userId()).toMap())
-                .stream().content().toStream()) {
+                .stream()
+                .content();
+
+        try (Stream<String> chunks = answerChunks.toStream()) {
             StringBuilder answerBuilder = new StringBuilder();
             Iterator<String> chunksIterator = chunks.iterator();
             while (chunksIterator.hasNext()) {

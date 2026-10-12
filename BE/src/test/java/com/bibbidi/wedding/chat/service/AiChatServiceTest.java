@@ -177,6 +177,34 @@ class AiChatServiceTest {
     }
 
     @Test
+    void sendingAChunkFailureCancelsTheModelAndDiscardsTheTurn() {
+        var publisher = TestPublisher.<ChatResponse>create();
+        var subscribed = new CountDownLatch(1);
+        var error = new AtomicReference<Throwable>();
+        when(model.stream(any(Prompt.class))).thenReturn(publisher.flux()
+                .doOnSubscribe(ignored -> subscribed.countDown()));
+        doThrow(new CancellationException("SSE 연결 종료")).when(reply).sendAnswerChunk("일부 답변");
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var task = executor.submit(() -> {
+                try {
+                    service.chat(7L, CONVERSATION_ID, "질문", reply);
+                } catch (RuntimeException exception) {
+                    error.set(exception);
+                }
+            });
+            await().until(() -> subscribed.getCount() == 0);
+            publisher.assertSubscribers(1);
+            publisher.next(response("일부 답변"));
+            await().until(task::isDone);
+
+            publisher.assertCancelled();
+            assertThat(error.get()).isInstanceOf(CancellationException.class);
+            assertThat(memory.get("7:" + CONVERSATION_ID)).isEmpty();
+        }
+    }
+
+    @Test
     void interruptCancelsTheModelAndDiscardsLateResults() {
         var publisher = TestPublisher.<ChatResponse>createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION);
         var subscribed = new CountDownLatch(1);
