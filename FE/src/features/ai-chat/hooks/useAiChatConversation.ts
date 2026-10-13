@@ -1,21 +1,89 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  ChatMessage,
-  ExampleRecommendedTask,
-  createExampleReply,
-  recommendedTasks,
-} from "../model/exampleChat";
+import { AiChatApiError, streamAiChat } from "../api/streamAiChat";
+import { ChatMessage, isValidChatMessage } from "../model/aiChat";
 
-export function useAiChatConversation(
-  onTaskAdd: (task: ExampleRecommendedTask) => boolean,
-) {
+type AssistantMessage = Extract<ChatMessage, { role: "assistant" }>;
+
+export function useAiChatConversation(onAuthenticationRequired: () => void) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const conversationId = useRef<string | undefined>(undefined);
+  const nextId = useRef(0);
+  const failedTurn = useRef<{ text: string; answerId: number } | null>(null);
+
+  useEffect(
+    () => () => {
+      requestRef.current?.abort();
+      requestRef.current = null;
+    },
+    [],
+  );
+
+  const updateAnswer = (
+    answerId: number,
+    update: (message: AssistantMessage) => AssistantMessage,
+  ) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === answerId && message.role === "assistant"
+          ? update(message)
+          : message,
+      ),
+    );
+  };
+
+  const receive = async (text: string, answerId: number) => {
+    const controller = new AbortController();
+    requestRef.current = controller;
+    failedTurn.current = null;
+    setErrorMessage(null);
+    const updateCurrentAnswer = (
+      update: (message: AssistantMessage) => AssistantMessage,
+    ) => {
+      if (requestRef.current !== controller) return;
+      updateAnswer(answerId, update);
+    };
+    try {
+      await streamAiChat(
+        { message: text, conversationId: conversationId.current },
+        {
+          onConversation: (id) => {
+            if (requestRef.current === controller) conversationId.current = id;
+          },
+          onDelta: (delta) =>
+            updateCurrentAnswer((message) => ({
+              ...message,
+              text: message.text + delta,
+            })),
+        },
+        controller.signal,
+      );
+      updateCurrentAnswer((message) => ({ ...message, status: "complete" }));
+    } catch (error) {
+      if (requestRef.current !== controller) return;
+      failedTurn.current = { text, answerId };
+      updateCurrentAnswer((message) => ({ ...message, status: "failed" }));
+      const authenticationRequired =
+        error instanceof AiChatApiError && error.authenticationRequired;
+      setErrorMessage(
+        authenticationRequired
+          ? "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
+          : "답변을 끝까지 받지 못했어요. 다시 시도해 주세요.",
+      );
+      if (authenticationRequired) onAuthenticationRequired();
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
+    }
+  };
 
   const send = (text: string) => {
     const content = text.trim();
-    if (!content) return;
+    if (!isValidChatMessage(text) || requestRef.current) return;
+    const id = nextId.current;
+    nextId.current += 2;
     const time = new Date().toLocaleTimeString("ko-KR", {
       hour: "2-digit",
       minute: "2-digit",
@@ -23,39 +91,26 @@ export function useAiChatConversation(
     });
     setMessages((current) => [
       ...current,
-      { id: current.length, role: "user", text: content, time },
-      createExampleReply(current.length + 1, current.length === 0),
+      { id, role: "user", text: content, time },
+      { id: id + 1, role: "assistant", text: "", status: "streaming" },
     ]);
     setDraft("");
+    void receive(content, id + 1);
   };
 
-  const chooseCard = (messageId: number, add: boolean) => {
-    const message = messages.find((item) => item.id === messageId);
-    if (message?.role !== "assistant" || message.kind !== "recommendations")
-      return;
-    const task = recommendedTasks[message.cardIndex];
-    if (!task) return;
-    const alreadyAdded = add && !onTaskAdd(task);
-    setMessages((current) =>
-      current.map((message) => {
-        if (
-          message.id !== messageId ||
-          message.role !== "assistant" ||
-          message.kind !== "recommendations"
-        )
-          return message;
-        const task = recommendedTasks[message.cardIndex];
-        if (!task) return message;
-        return {
-          ...message,
-          cardIndex: message.cardIndex + 1,
-          feedback: add
-            ? `${alreadyAdded ? "이미 예시로 추가했어요" : "예시로 추가했어요"}: ${task.title}`
-            : `넘겼어요: ${task.title}`,
-        };
-      }),
-    );
+  const retry = () => {
+    const turn = failedTurn.current;
+    if (!turn || requestRef.current) return;
+    updateAnswer(turn.answerId, (message) => ({
+      ...message,
+      text: "",
+      status: "streaming",
+    }));
+    void receive(turn.text, turn.answerId);
   };
 
-  return { draft, messages, setDraft, send, chooseCard };
+  const isPending = messages.some(
+    (message) => message.role === "assistant" && message.status === "streaming",
+  );
+  return { draft, messages, errorMessage, isPending, setDraft, send, retry };
 }
