@@ -1,6 +1,10 @@
 import type { AnalyticsEvent } from "../../infrastructure/analytics";
 
 const PAGE_DEFINITIONS = {
+  "/landing": {
+    pageTitle: "비비디 서비스 소개",
+    screenName: "landing",
+  },
   "/": {
     pageTitle: "준비 목록",
     screenName: "preparation_catalog",

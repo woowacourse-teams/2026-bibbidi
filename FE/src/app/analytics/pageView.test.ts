@@ -5,6 +5,8 @@ import { createPageViewEvent, normalizePagePath } from "./pageView";
 describe("normalizePagePath", () => {
   it.each([
     ["/", "/"],
+    ["/landing", "/landing"],
+    ["/landing/", "/landing"],
     ["/preparation", "/preparation"],
     ["/calendar", "/calendar"],
     ["/calendar/", "/calendar"],

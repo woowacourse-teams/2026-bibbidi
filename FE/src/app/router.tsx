@@ -13,6 +13,13 @@ import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
 export const appRoutes: RouteObject[] = [
   {
+    path: "/landing",
+    lazy: async () => {
+      const { LandingPage } = await import("../pages/LandingPage");
+      return { Component: LandingPage };
+    },
+  },
+  {
     Component: ServiceLayout,
     children: [
       {
