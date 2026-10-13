@@ -68,6 +68,7 @@ import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -95,16 +96,18 @@ class AiChatControllerTest {
     }
 
     @Test
-    @DisplayName("대화 ID와 답변 조각을 전송하고 마지막에 완료 이벤트를 보낸다")
-    void sendsChunksBeforeCompletionAndDocumentsTheSseContract() throws Exception {
+    @DisplayName("응답이 완료되기 전에도 대화 ID와 답변 조각을 전송한다")
+    void streamsConversationAndAnswerChunksBeforeCompletion() throws Exception {
         // given
-        AtomicReference<ChatSseHandler> source = new AtomicReference<ChatSseHandler>();
-        CountDownLatch finished = new CountDownLatch(1);
+        CountDownLatch answerChunkAllowed = new CountDownLatch(1);
+        CountDownLatch completionAllowed = new CountDownLatch(1);
         doAnswer(invocation -> {
             ChatSseHandler reply = invocation.getArgument(3);
             reply.conversation(ID);
-            source.set(reply);
-            finished.await();
+            answerChunkAllowed.await();
+            reply.sendAnswerChunk("웨딩홀 ");
+            completionAllowed.await();
+            reply.complete(new ChatResult(ID, "웨딩홀 "), () -> {});
             return null;
         }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
 
@@ -112,27 +115,55 @@ class AiChatControllerTest {
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 준비를 알려줘"))))
-                .andExpect(request().asyncStarted()).andReturn();
+                .andReturn();
 
-        // then
-        await().until(() -> source.get() != null);
-        await().until(() -> initial.getResponse().getContentAsString(StandardCharsets.UTF_8).contains("event:conversation"));
-        assertThat(initial.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("event:conversation", "\"conversationId\":\"" + ID + "\"").doesNotContain("event:done");
+        try {
+            await().until(() -> initial.getResponse().getContentAsString(StandardCharsets.UTF_8)
+                    .contains("event:conversation"));
+            answerChunkAllowed.countDown();
 
-        // when, then: 완료 전에 답변 조각을 전송한다
-        source.get().sendAnswerChunk("웨딩홀 ");
-        assertThat(initial.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("event:delta", "\"text\":\"웨딩홀 \"").doesNotContain("event:done");
+            // then
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            await().untilAsserted(() -> {
+                String body = initial.getResponse().getContentAsString(StandardCharsets.UTF_8);
+                assertThat(body)
+                        .containsSubsequence("event:conversation", "\"conversationId\":\"" + ID + "\"",
+                                "event:delta", "\"text\":\"웨딩홀 \"")
+                        .doesNotContain("event:done", "event:failure");
+            });
+        } finally {
+            answerChunkAllowed.countDown();
+            completionAllowed.countDown();
+            initial.getAsyncResult(5000);
+            mockMvc.perform(asyncDispatch(initial));
+        }
+    }
+
+    @Test
+    @DisplayName("정상 완료 시 SSE 응답 계약을 만족한다")
+    void documentsTheCompletedSseResponseContract() throws Exception {
+        // given
+        doAnswer(invocation -> {
+            ChatSseHandler reply = invocation.getArgument(3);
+            reply.conversation(ID);
+            reply.sendAnswerChunk("웨딩홀 ");
+            reply.sendAnswerChunk("계약을 확인하세요.");
+            reply.complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
+            return null;
+        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
 
         // when
-        source.get().sendAnswerChunk("계약을 확인하세요.");
-        source.get().complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
-        finished.countDown();
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 준비를 알려줘"))))
+                .andReturn();
+        initial.getAsyncResult(5000);
+        ResultActions completedResponse = mockMvc.perform(asyncDispatch(initial));
 
         // then
-        MvcResult completed = mockMvc.perform(asyncDispatch(initial))
-                .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+        MvcResult completed = completedResponse
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andDo(document("ai-chat-stream",
                         preprocessRequest(modifyHeaders().set("Authorization", "Bearer <access-token>")),
                         preprocessResponse(), resource(ResourceSnippetParameters.builder()
