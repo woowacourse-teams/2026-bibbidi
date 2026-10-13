@@ -39,6 +39,7 @@ class ArchitectureConventionTest {
     private static final List<String> FEATURES = List.of(
             "auth",
             "catalog",
+            "chat",
             "checklist",
             "feedback",
             "terms",
@@ -65,6 +66,18 @@ class ArchitectureConventionTest {
             .whereLayer("Service").mayOnlyBeAccessedByLayers("Controller", "Service")
             .whereLayer("Repository").mayOnlyBeAccessedByLayers("Service", "Repository")
             .whereLayer("Persistence").mayOnlyBeAccessedByLayers("Repository", "Persistence");
+
+    @ArchTest
+    static final ArchRule 대화_서비스는_HTTP_타입에_직접_의존하지_않는다 = noClasses()
+            .that().resideInAPackage("..chat.service..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("org.springframework.http..", "org.springframework.web..");
+
+    @ArchTest
+    static final ArchRule SSE_연결_관리는_대화_처리와_AI_모델에_의존하지_않는다 = noClasses()
+            .that().resideInAPackage("..chat.infra.sse..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("..chat.service..", "..chat.controller..", "org.springframework.ai..");
 
     @ArchTest
     static final ArchRule domain_패키지는_다른_계층에_의존하지_않는다 = noClasses()

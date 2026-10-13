@@ -4,6 +4,23 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+  ai:
+    model:
+      chat: bedrock-converse
+    tools:
+      throw-exception-on-error: true
+    bedrock:
+      aws:
+        region: ap-northeast-1
+        timeout: ${bibbidi.ai.response-timeout}
+        connection-timeout: 5s
+        connection-acquisition-timeout: 5s
+        async-read-timeout: ${bibbidi.ai.response-timeout}
+      converse:
+        chat:
+          model: qwen.qwen3-235b-a22b-2507-v1:0
+          max-tokens: 2048
+
   jpa:
     open-in-view: false
     show-sql: false
@@ -11,6 +28,11 @@ spring:
   sql:
     init:
       mode: never
+
+bibbidi:
+  ai:
+    response-timeout: 30s
+    memory-max-messages: 20
 
 server:
   shutdown: graceful

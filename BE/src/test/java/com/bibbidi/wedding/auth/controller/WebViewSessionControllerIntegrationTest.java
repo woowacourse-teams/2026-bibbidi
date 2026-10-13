@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.payload.PayloadDocumentation;
+import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
@@ -138,7 +139,7 @@ class WebViewSessionControllerIntegrationTest extends BibbidiIntegrationTest {
         return objectMapper.readTree(response).get("code").asString();
     }
 
-    private org.springframework.test.web.servlet.ResultActions exchange(String code) throws Exception {
+    private ResultActions exchange(String code) throws Exception {
         return mockMvc.perform(post("/api/auth/web/handoff-codes/exchange")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new HandoffCodeExchangeRequest(code))));
