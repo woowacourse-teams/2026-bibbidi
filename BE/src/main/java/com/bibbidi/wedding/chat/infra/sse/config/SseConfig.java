@@ -16,7 +16,8 @@ public class SseConfig {
 
     @Bean(destroyMethod = "shutdownNow")
     ScheduledThreadPoolExecutor sseTimeoutExecutor() {
-        var executor = new ScheduledThreadPoolExecutor(2, Thread.ofPlatform().name("sse-timeout-", 0).factory());
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+                2, Thread.ofPlatform().name("sse-timeout-", 0).factory());
         executor.setRemoveOnCancelPolicy(true);
         return executor;
     }

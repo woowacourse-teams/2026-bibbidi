@@ -35,7 +35,7 @@ public class SseStreamManager {
         emitter.onError(ignored -> connection.disconnect());
         emitter.onTimeout(connection::disconnect);
 
-        var task = new FutureTask<Void>(() -> {
+        FutureTask<Void> task = new FutureTask<>(() -> {
             try {
                 connection.checkActive();
                 work.accept(connection);
