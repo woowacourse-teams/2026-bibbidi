@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.service.AiChatService;
@@ -31,6 +33,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.autoconfigure.ToolCallingAutoConfiguration;
+import org.springframework.ai.tool.execution.ToolExecutionException;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import reactor.core.publisher.Flux;
@@ -54,7 +57,7 @@ class AiChatConfigTest {
         when(checklist.findMyChecklist(7L)).thenReturn(new ChecklistWithAppointmentsResult(10L, List.of()));
         var calls = new AtomicInteger();
         when(model.stream(any(Prompt.class))).thenAnswer(invocation -> {
-            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(isActualTransactionActive()).isFalse();
             Prompt prompt = invocation.getArgument(0);
             assertThat(prompt.getInstructions())
                     .filteredOn(message -> message.getMessageType() == MessageType.SYSTEM)
@@ -80,7 +83,7 @@ class AiChatConfigTest {
             service.chat(7L, id, "할 일 알려줘", reply);
             verify(reply).sendAnswerChunk("확인했어요.");
             assertThat(calls).hasValue(2);
-            org.mockito.Mockito.verify(checklist).findMyChecklist(7L);
+            verify(checklist).findMyChecklist(7L);
             assertThat(memory.get("7:" + id)).extracting(message -> message.getMessageType())
                     .containsExactly(MessageType.USER, MessageType.ASSISTANT);
         });
@@ -96,8 +99,8 @@ class AiChatConfigTest {
             var service = new AiChatService(context.getBean(ChatClient.class), memory);
             UUID id = UUID.randomUUID();
             assertThatThrownBy(() -> service.chat(7L, id, "질문", mock(ChatSseHandler.class)))
-                    .isInstanceOf(org.springframework.ai.tool.execution.ToolExecutionException.class);
-            org.mockito.Mockito.verify(model, org.mockito.Mockito.times(1)).stream(any(Prompt.class));
+                    .isInstanceOf(ToolExecutionException.class);
+            verify(model, times(1)).stream(any(Prompt.class));
             assertThat(memory.get("7:" + id)).isEmpty();
         });
     }

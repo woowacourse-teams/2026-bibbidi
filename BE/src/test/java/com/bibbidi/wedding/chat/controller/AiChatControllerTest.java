@@ -38,12 +38,15 @@ import com.bibbidi.wedding.chat.sse.service.SseService;
 import com.bibbidi.wedding.chat.sse.config.SseConfig;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import jakarta.servlet.AsyncEvent;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CancellationException;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +58,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockAsyncContext;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.JsonFieldType;
@@ -212,8 +216,8 @@ class AiChatControllerTest {
         var result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> started.getCount() == 0);
-        var event = new jakarta.servlet.AsyncEvent(result.getRequest().getAsyncContext());
-        for (var listener : ((org.springframework.mock.web.MockAsyncContext) event.getAsyncContext()).getListeners()) {
+        var event = new AsyncEvent(result.getRequest().getAsyncContext());
+        for (var listener : ((MockAsyncContext) event.getAsyncContext()).getListeners()) {
             listener.onError(event);
         }
         await().untilTrue(cancelled);
@@ -239,8 +243,8 @@ class AiChatControllerTest {
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> source.get() != null);
-        var event = new jakarta.servlet.AsyncEvent(initial.getRequest().getAsyncContext());
-        var listeners = ((org.springframework.mock.web.MockAsyncContext) event.getAsyncContext()).getListeners();
+        var event = new AsyncEvent(initial.getRequest().getAsyncContext());
+        var listeners = ((MockAsyncContext) event.getAsyncContext()).getListeners();
         for (var listener : listeners) {
             listener.onTimeout(event);
         }
@@ -285,7 +289,7 @@ class AiChatControllerTest {
             return null;
         }).when(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
         ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(id, "질문"));
-        request.put("conversationId", ID.toUpperCase(java.util.Locale.ROOT));
+        request.put("conversationId", ID.toUpperCase(Locale.ROOT));
 
         var initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -325,8 +329,8 @@ class AiChatControllerTest {
         verifyNoInteractions(aiChatService);
     }
 
-    static java.util.stream.Stream<ChatRequest> invalidRequests() {
-        return java.util.stream.Stream.of(new ChatRequest(null, " "), new ChatRequest(null, null),
+    static Stream<ChatRequest> invalidRequests() {
+        return Stream.of(new ChatRequest(null, " "), new ChatRequest(null, null),
                 new ChatRequest(null, "가".repeat(4001)));
     }
 }

@@ -33,6 +33,7 @@ import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -127,7 +128,7 @@ class ChecklistServiceTest {
                 300L,
                 incompleteItem.id(),
                 "appointment",
-                java.time.LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 1),
                 null,
                 null,
                 null,
@@ -828,7 +829,7 @@ class ChecklistServiceTest {
                 null,
                 item.id(),
                 "웨딩홀 투어",
-                java.time.LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 1),
                 null,
                 null,
                 null,

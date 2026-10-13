@@ -5,6 +5,8 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithNam
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -22,6 +24,7 @@ import com.bibbidi.wedding.auth.oidc.verification.VerifiedOidcUser;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.http.Cookie;
+import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -232,11 +235,11 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").isNotEmpty())
                 .andExpect(jsonPath("$.authorizationUri").value(
-                        org.hamcrest.Matchers.allOf(
-                                org.hamcrest.Matchers.containsString("state="),
-                                org.hamcrest.Matchers.containsString("nonce="),
-                                org.hamcrest.Matchers.containsString("code_challenge="),
-                                org.hamcrest.Matchers.containsString("code_challenge_method=S256"))))
+                        allOf(
+                                containsString("state="),
+                                containsString("nonce="),
+                                containsString("code_challenge="),
+                                containsString("code_challenge_method=S256"))))
                 .andDo(document(
                         "auth-oidc-authorization",
                         resource(ResourceSnippetParameters.builder()
@@ -338,7 +341,7 @@ class AuthSessionLoginIntegrationTest extends BibbidiIntegrationTest {
 
     private String userIdOf(String loginResponse) {
         String accessToken = objectMapper.readTree(loginResponse).get("accessToken").asString();
-        String payload = new String(java.util.Base64.getUrlDecoder()
+        String payload = new String(Base64.getUrlDecoder()
                 .decode(accessToken.split("\\.")[1]));
         return objectMapper.readTree(payload).get("sub").asString();
     }

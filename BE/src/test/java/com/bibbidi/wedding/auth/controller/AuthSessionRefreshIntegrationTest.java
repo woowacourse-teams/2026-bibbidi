@@ -7,6 +7,7 @@ import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -202,8 +203,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 pending.email());
         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/users/me")
+        mockMvc.perform(get("/api/users/me")
                         .header(AUTHORIZATION, "Bearer " + issued.accessToken()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(211));
@@ -239,8 +239,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 .getContentAsString();
 
         String newAccessToken = objectMapper.readTree(reissued).get("accessToken").asString();
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/users/me")
+        mockMvc.perform(get("/api/users/me")
                         .header(AUTHORIZATION, "Bearer " + newAccessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nickname").value("pending"));
