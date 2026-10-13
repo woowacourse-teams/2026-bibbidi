@@ -34,8 +34,8 @@ import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.chat.sse.service.SseService;
-import com.bibbidi.wedding.chat.sse.config.SseConfig;
+import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.infra.sse.config.SseConfig;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.AsyncEvent;
@@ -69,7 +69,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @WebMvcTest(AiChatController.class)
-@Import({SecurityTestConfig.class, SseService.class, SseConfig.class})
+@Import({SecurityTestConfig.class, SseStreamManager.class, SseConfig.class})
 @EnableConfigurationProperties(AiChatProperties.class)
 @ExtendWith(RestDocumentationExtension.class)
 class AiChatControllerTest {

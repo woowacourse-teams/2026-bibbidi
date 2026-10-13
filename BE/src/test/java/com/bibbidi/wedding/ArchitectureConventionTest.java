@@ -75,7 +75,7 @@ class ArchitectureConventionTest {
 
     @ArchTest
     static final ArchRule SSE_연결_관리는_대화_처리와_AI_모델에_의존하지_않는다 = noClasses()
-            .that().resideInAPackage("..chat.sse..")
+            .that().resideInAPackage("..chat.infra.sse..")
             .should().dependOnClassesThat()
             .resideInAnyPackage("..chat.service..", "..chat.controller..", "org.springframework.ai..");
 

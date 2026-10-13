@@ -15,9 +15,9 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.chat.sse.service.SseService;
-import com.bibbidi.wedding.chat.sse.service.dto.ChatEventType;
-import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
+import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
+import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -76,7 +76,7 @@ class AiChatLifecycleTest {
         when(model.stream(any(Prompt.class))).thenReturn(publisher.flux()
                 .doOnSubscribe(ignored -> subscribed.countDown()));
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var sse = new SseService(executor, scheduler);
+            var sse = new SseStreamManager(executor, scheduler);
             sse.stream(Duration.ofSeconds(30), new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
                 try {
                     var handler = spy(new ChatSseHandler(connection));
@@ -124,7 +124,7 @@ class AiChatLifecycleTest {
             return Flux.just(response("늦은 답변"));
         });
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var sse = new SseService(executor, scheduler);
+            var sse = new SseStreamManager(executor, scheduler);
             sse.stream(Duration.ofSeconds(30), new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
                 try {
                     chat.chat(7L, ID, "질문", new ChatSseHandler(connection));

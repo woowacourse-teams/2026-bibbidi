@@ -1,6 +1,6 @@
-package com.bibbidi.wedding.chat.sse.service;
+package com.bibbidi.wedding.chat.infra.sse;
 
-import com.bibbidi.wedding.chat.sse.service.dto.SseEvent;
+import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
@@ -8,18 +8,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-@Service
-public class SseService {
+@Component
+public class SseStreamManager {
 
     private static final long DISABLED_SERVLET_TIMEOUT = 0L;
 
     private final ExecutorService workerExecutor;
     private final ScheduledExecutorService timeoutExecutor;
 
-    public SseService(
+    public SseStreamManager(
             @Qualifier("sseVirtualThreadExecutor") ExecutorService workerExecutor,
             @Qualifier("sseTimeoutExecutor") ScheduledExecutorService timeoutExecutor
     ) {

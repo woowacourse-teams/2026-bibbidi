@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.sse.service.dto;
+package com.bibbidi.wedding.chat.infra.sse.dto;
 
 public enum ChatEventType {
     CONVERSATION("conversation"),
