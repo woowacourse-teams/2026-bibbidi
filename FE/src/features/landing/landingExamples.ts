@@ -1,7 +1,4 @@
-import {
-  recommendedTasks,
-  suggestedQuestions,
-} from "../ai-chat/model/exampleChat";
+import { suggestedQuestions } from "../ai-chat/model/aiChat";
 
 export const landingChatExamples = [
   {
@@ -10,7 +7,13 @@ export const landingChatExamples = [
       "웨딩홀을 정하셨군요!",
       "이제 예식 진행 방식과 함께할 사람들을 정하면 좋아요.",
     ],
-    tasks: recommendedTasks,
+    tasks: [
+      { title: "주례 없는 예식 순서 정하기", step: "02 · 예식 진행 방식 결정" },
+      {
+        title: "사회자·축가 맡을 사람 정하기",
+        step: "03 · 예식 진행 인원 섭외",
+      },
+    ],
   },
   {
     question: suggestedQuestions[1],

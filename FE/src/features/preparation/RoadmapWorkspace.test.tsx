@@ -1,6 +1,5 @@
 import {
   fireEvent,
-  cleanup,
   act,
   render,
   screen,
@@ -22,6 +21,11 @@ const mocks = vi.hoisted(() => ({
   getCatalogItemIds: vi.fn(),
   addCatalogItemIds: vi.fn(),
   revision: 0,
+  stream: vi.fn(),
+}));
+vi.mock("../ai-chat/api/streamAiChat", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../ai-chat/api/streamAiChat")>()),
+  streamAiChat: mocks.stream,
 }));
 vi.mock("../auth", () => ({
   useAuth: () => ({
@@ -100,6 +104,11 @@ beforeEach(() => {
     user: { id: 1, nickname: "비비디" },
   };
   mocks.revision = 0;
+  mocks.stream.mockReset();
+  mocks.stream.mockImplementation(async (_request, receiver) => {
+    receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
+    receiver.onDelta("실제 준비 안내");
+  });
   mocks.getChecklist.mockResolvedValue(checklist);
   mocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
   mocks.getCatalogItemIds.mockResolvedValue(["101"]);
@@ -114,16 +123,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function showChatRecommendations() {
-  fireEvent.click(
-    screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
-  );
-  fireEvent.change(screen.getByRole("textbox", { name: "추가하고 싶은 일" }), {
-    target: { value: "추천해줘" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
-}
-
 function showAll() {
   fireEvent.click(
     within(screen.getByRole("navigation", { name: "로드맵 보기" })).getByRole(
@@ -134,234 +133,68 @@ function showAll() {
 }
 
 describe("준비 로드맵 보기 전환", () => {
-  it("인증 확인 후 같은 사용자로 복귀해도 완료한 추천을 다시 타이핑하지 않는다", async () => {
-    const { rerender } = render(<PreparationRoadmapFeature />);
+  it("로그인 사용자는 실제 채팅을 사용하고 카테고리·로드맵 전환 중 대화를 유지한다", async () => {
+    render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
-    vi.useFakeTimers();
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    act(() => vi.advanceTimersByTime(1300));
-    const owner = mocks.authState;
-    mocks.authState = { status: "loading" };
-    rerender(<PreparationRoadmapFeature />);
-    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
-    mocks.authState = owner;
-    await act(async () => {
-      rerender(<PreparationRoadmapFeature />);
-    });
-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
-    expect(
-      within(preview).getByText("주례 없는 예식 순서 정하기"),
-    ).toBeTruthy();
-    expect(preview.querySelector(".ai-task-preview__cursor")).toBeNull();
-    act(() => vi.advanceTimersByTime(1300));
-    expect(
-      within(preview).getByText("주례 없는 예식 순서 정하기"),
-    ).toBeTruthy();
-  });
-
-  it("인증 확인 후 채팅이 다시 생성되어도 기존 추천을 중복 추가하지 않는다", async () => {
-    const { rerender } = render(<PreparationRoadmapFeature />);
-    await screen.findByText("내 웨딩홀 투어");
-    vi.useFakeTimers();
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    const owner = mocks.authState;
-    mocks.authState = { status: "loading" };
-    rerender(<PreparationRoadmapFeature />);
-    mocks.authState = owner;
-    await act(async () => {
-      rerender(<PreparationRoadmapFeature />);
-    });
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
-    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByRole("log").textContent).toContain(
-      "이미 예시로 추가했어요",
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
     );
+    await screen.findByText("실제 준비 안내");
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+    expect(screen.getByRole("log").textContent).toContain("실제 준비 안내");
+    showAll();
+    await screen.findByRole("button", {
+      name: "01 스드메 상담·견적과 패키지 계약",
+    });
+    expect(screen.getByRole("log").textContent).toContain("실제 준비 안내");
     expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
   });
 
-  it("실제 사용자가 바뀌면 추가 목록과 완료 기록을 함께 초기화한다", async () => {
+  it("비로그인은 채팅에서 로그인 안내를 보고 카테고리 전환으로 API를 호출하지 않는다", async () => {
+    mocks.authState = { status: "guest" };
+    render(<PreparationRoadmapFeature />);
+    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+    const chat = screen.getByRole("complementary", { name: "AI 채팅" });
+    expect(
+      within(chat).getByRole("link", { name: "로그인" }).getAttribute("href"),
+    ).toBe("/login");
+    expect(within(chat).queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+    expect(within(chat).getByText("로그인하고 AI와 대화해요")).toBeTruthy();
+    expect(mocks.stream).not.toHaveBeenCalled();
+  });
+
+  it("사용자 변경 시 대화와 진행 요청을 초기화하고 이전 사용자의 늦은 조각을 무시한다", async () => {
+    mocks.stream.mockImplementationOnce((_request, receiver) => {
+      receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
+      receiver.onDelta("이전 사용자 답변");
+      return new Promise(() => {});
+    });
     const { rerender } = render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
-    vi.useFakeTimers();
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    act(() => vi.advanceTimersByTime(1300));
-    const owner = mocks.authState;
+    fireEvent.click(
+      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+    );
+    const previousReceiver = mocks.stream.mock.calls[0][1];
+    const previousSignal = mocks.stream.mock.calls[0][2] as AbortSignal;
+    expect(screen.getByText("이전 사용자 답변")).toBeTruthy();
     mocks.authState = {
       status: "authenticated",
       user: { id: 2, nickname: "다른 사용자" },
     };
-    await act(async () => {
-      rerender(<PreparationRoadmapFeature />);
-    });
-    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
-    mocks.authState = owner;
-    await act(async () => {
-      rerender(<PreparationRoadmapFeature />);
-    });
-    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
-    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
-    expect(
-      within(preview).queryByText("주례 없는 예식 순서 정하기"),
-    ).toBeNull();
-    act(() => vi.advanceTimersByTime(1300));
-    expect(
-      within(preview).getByText("주례 없는 예식 순서 정하기"),
-    ).toBeTruthy();
-  });
-
-  it("PC 추천 추가는 예시 리스트에서 타이핑하고 저장된 내 할 일과 브라우저 저장소를 바꾸지 않는다", async () => {
-    const storage = vi.spyOn(Storage.prototype, "setItem");
-    render(<PreparationRoadmapFeature />);
-    await screen.findByText("내 웨딩홀 투어");
-    vi.useFakeTimers();
-    showChatRecommendations();
-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
-    const row = within(preview).getByRole("listitem", {
-      name: "주례 없는 예식 순서 정하기",
-    });
-    expect(document.activeElement).toBe(row);
-    expect(
-      within(preview).queryByText("주례 없는 예식 순서 정하기"),
-    ).toBeNull();
-    act(() => vi.advanceTimersByTime(1300));
-    expect(
-      within(preview).getByText("주례 없는 예식 순서 정하기"),
-    ).toBeTruthy();
-    expect(screen.getByText("2개 단계 · 내 할 일 2개 · 완료 0개")).toBeTruthy();
-    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
-    expect(storage).not.toHaveBeenCalled();
-  });
-
-  it("모바일에서 연속 선택한 뒤 보기 버튼으로 예시 리스트에 포커스를 넘기고 순서대로 쓴다", async () => {
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn().mockImplementation((query: string) => ({
-        matches: query === "(max-width: 760px)",
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    );
-    const descriptors = Object.getOwnPropertyDescriptors(
-      HTMLDialogElement.prototype,
-    );
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.setAttribute("open", "");
-        },
-      },
-      close: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.removeAttribute("open");
-        },
-      },
-    });
-    try {
-      const { rerender } = render(<PreparationRoadmapFeature />);
-      await screen.findByText("내 웨딩홀 투어");
-      vi.useFakeTimers();
-      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
-      showChatRecommendations();
-      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
-      expect(screen.getByRole("dialog")).toBeTruthy();
-      expect(
-        screen.queryByRole("region", { name: "예시로 담은 일" }),
-      ).toBeNull();
-      fireEvent.click(
-        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
-      );
-      expect(screen.queryByRole("dialog")).toBeNull();
-      const preview = screen.getByRole("region", { name: "예시로 담은 일" });
-      const rows = within(preview).getAllByRole("listitem");
-      await act(async () => {
-        await Promise.resolve();
-      });
-      expect(document.activeElement).toBe(rows[0]);
-      act(() => vi.advanceTimersByTime(1300));
-      expect(
-        within(preview).getByText("주례 없는 예식 순서 정하기"),
-      ).toBeTruthy();
-      expect(
-        within(preview).queryByText("사회자·축가 맡을 사람 정하기"),
-      ).toBeNull();
-      act(() => vi.advanceTimersByTime(1300));
-      expect(
-        within(preview).getByText("사회자·축가 맡을 사람 정하기"),
-      ).toBeTruthy();
-      expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
-      expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
-      const owner = mocks.authState;
-      mocks.authState = { status: "loading" };
-      rerender(<PreparationRoadmapFeature />);
-      mocks.authState = owner;
-      await act(async () => {
-        rerender(<PreparationRoadmapFeature />);
-      });
-      expect(screen.getByRole("dialog")).toBeTruthy();
-      fireEvent.click(
-        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
-      );
-      const restoredPreview = screen.getByRole("region", {
-        name: "예시로 담은 일",
-      });
-      expect(
-        within(restoredPreview).getByText("주례 없는 예식 순서 정하기"),
-      ).toBeTruthy();
-      expect(
-        within(restoredPreview).getByText("사회자·축가 맡을 사람 정하기"),
-      ).toBeTruthy();
-      expect(
-        restoredPreview.querySelector(".ai-task-preview__cursor"),
-      ).toBeNull();
-    } finally {
-      cleanup();
-      for (const method of ["showModal", "close"] as const) {
-        if (descriptors[method])
-          Object.defineProperty(
-            HTMLDialogElement.prototype,
-            method,
-            descriptors[method],
-          );
-        else
-          delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
-            method
-          ];
-      }
-    }
-  });
-
-  it("비로그인도 채팅을 사용하고 카테고리·로드맵 보기 전환 중 대화를 유지한다", async () => {
-    mocks.authState = { status: "guest" };
-    render(<PreparationRoadmapFeature />);
-    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+    rerender(<PreparationRoadmapFeature />);
+    expect(previousSignal.aborted).toBe(true);
+    expect(screen.queryByRole("log")).toBeNull();
+    act(() => previousReceiver.onDelta("늦은 답변"));
+    expect(screen.queryByText("늦은 답변")).toBeNull();
     fireEvent.click(
-      screen.getByRole("button", {
-        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
-      }),
+      screen.getByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
-    expect(screen.getByRole("log").textContent).toContain(
-      "다음으로 준비하면 좋은 일",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
-    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
-    expect(screen.getByRole("log").textContent).toContain(
-      "다음으로 준비하면 좋은 일",
-    );
-    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+    await screen.findByText("실제 준비 안내");
+    expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
+    expect(screen.queryByText("이전 사용자 답변")).toBeNull();
   });
 
   it("상단 현황은 빈 단계를 포함하고 직접 추가한 일과 완료 상태를 집계한다", async () => {

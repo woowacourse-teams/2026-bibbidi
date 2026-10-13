@@ -1,44 +1,49 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
-import type { ExampleTaskAdditionController } from "./hooks/useExampleTaskAddition";
 import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
 import { AiChatView, ChatIcon } from "./view/AiChatView";
 import "./view/AiChat.css";
 
 export function AiChatFeature({
-  addition,
+  isAuthenticated,
+  onAuthenticationRequired,
 }: {
-  addition: Pick<
-    ExampleTaskAdditionController,
-    "add" | "addedTaskCount" | "isChatOpen" | "setChatOpen" | "showAddedTasks"
-  >;
+  isAuthenticated: boolean;
+  onAuthenticationRequired: () => void;
 }) {
   const isMobile = useIsMobileLayout();
+  const [isOpen, setOpen] = useState(false);
   const returnFocusRef = useRef<HTMLButtonElement>(null);
-  const { draft, messages, setDraft, send, chooseCard } = useAiChatConversation(
-    addition.add,
-  );
-
-  const closeChat = () => {
-    addition.setChatOpen(false);
-  };
-
+  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
+    useAiChatConversation(onAuthenticationRequired);
   const openChat = (launcher: HTMLButtonElement) => {
     returnFocusRef.current = launcher;
-    addition.setChatOpen(true);
+    setOpen(true);
   };
-
-  const view = (
+  const closeChat = () => setOpen(false);
+  const view = isAuthenticated ? (
     <AiChatView
-      active={!isMobile || addition.isChatOpen}
+      active={!isMobile || isOpen}
       draft={draft}
       messages={messages}
-      onChooseCard={chooseCard}
+      errorMessage={errorMessage}
+      isPending={isPending}
       onDraftChange={setDraft}
       onSend={send}
+      onRetry={retry}
     />
+  ) : (
+    <div className="ai-chat">
+      <div className="ai-chat__welcome">
+        <h2>로그인하고 AI와 대화해요</h2>
+        <p>나의 결혼 준비에 맞는 안내를 받아보세요.</p>
+        <a className="ai-chat__login" href="/login">
+          로그인
+        </a>
+      </div>
+    </div>
   );
 
   return (
@@ -51,7 +56,7 @@ export function AiChatFeature({
               onClick={(event) => openChat(event.currentTarget)}
               type="button"
             >
-              AI와 할 일 만들기
+              AI와 대화하기
             </button>
             <button
               aria-label="AI 채팅 열기"
@@ -63,29 +68,15 @@ export function AiChatFeature({
             </button>
           </div>
           <MobileAiChatDialog
-            isOpen={addition.isChatOpen}
+            isOpen={isOpen}
             onClose={closeChat}
             returnFocusRef={returnFocusRef}
           >
             {view}
-            {addition.addedTaskCount > 0 ? (
-              <button
-                className="ai-chat__show-added"
-                onClick={() => {
-                  returnFocusRef.current = null;
-                  addition.showAddedTasks();
-                }}
-                type="button"
-              >
-                추가한 할 일 {addition.addedTaskCount}개 보기{" "}
-                <span aria-hidden="true">→</span>
-              </button>
-            ) : null}
           </MobileAiChatDialog>
         </>
       ) : (
         <aside aria-label="AI 채팅" className="ai-chat-panel">
-          <span className="ai-chat-panel__badge">예시 대화</span>
           {view}
         </aside>
       )}

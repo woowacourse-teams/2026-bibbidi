@@ -1,0 +1,2893 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index 2202cf8baafa799f34caccd02e0443187961d127..0f67da944bb712c2a4d51f5d621077377cbe55e4 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -1,4 +1,5 @@
+ import {
++  act,
+   cleanup,
+   fireEvent,
+   render,
+@@ -8,57 +9,33 @@ import {
+ } from "@testing-library/react";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+-import { AiChatFeature as AiChatFeatureView } from "./AiChatFeature";
+-import { useExampleTaskAddition } from "./hooks/useExampleTaskAddition";
+-import type { ExampleRecommendedTask } from "./model/exampleChat";
+-import { useIsMobileLayout } from "../../shared/responsive";
++import { AiChatFeature } from "./AiChatFeature";
++import { AiChatApiError, streamAiChat } from "./api/streamAiChat";
+ 
+-function AiChatFeature({
+-  onTaskAdd,
+-  onShowAddedTasks,
+-}: {
+-  onTaskAdd?: (
+-    task: ExampleRecommendedTask,
+-    revealImmediately: boolean,
+-  ) => void;
+-  onShowAddedTasks?: () => void;
+-} = {}) {
+-  const isMobile = useIsMobileLayout();
+-  const addition = useExampleTaskAddition({ audience: "test", isMobile });
+-  return (
+-    <AiChatFeatureView
+-      addition={{
+-        ...addition,
+-        add: (task) => {
+-          const added = addition.add(task);
+-          if (added) onTaskAdd?.(task, !isMobile);
+-          return added;
+-        },
+-        showAddedTasks: () => {
+-          addition.showAddedTasks();
+-          onShowAddedTasks?.();
+-        },
+-      }}
+-    />
+-  );
+-}
++const mocks = vi.hoisted(() => ({ stream: vi.fn() }));
++vi.mock("./api/streamAiChat", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("./api/streamAiChat")>()),
++  streamAiChat: mocks.stream,
++}));
+ 
++const id = "d67a9265-3f45-4d7f-99f1-b5823054c8d9";
+ const dialogMethods = Object.getOwnPropertyDescriptors(
+   HTMLDialogElement.prototype,
+ );
++const authRequired = vi.fn();
+ 
++function chat(isAuthenticated = true) {
++  return (
++    <AiChatFeature
++      isAuthenticated={isAuthenticated}
++      onAuthenticationRequired={authRequired}
++    />
++  );
++}
+ function send(text: string) {
+-  fireEvent.change(screen.getByRole("textbox", { name: "추가하고 싶은 일" }), {
+-    target: { value: text },
+-  });
++  fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
+   fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
+ }
+-
+-function showCards() {
+-  send("웨딩홀을 정했어요");
+-  send("주례 없이 편안한 분위기로 하고 싶어");
+-}
+-
+ function mockMobileDialog() {
+   vi.mocked(window.matchMedia).mockReturnValue({
+     matches: true,
+@@ -80,8 +57,37 @@ function mockMobileDialog() {
+     },
+   });
+ }
++function pendingReply() {
++  let receiver: Parameters<typeof streamAiChat>[1];
++  let signal: AbortSignal;
++  let resolve!: () => void;
++  let reject!: (error: Error) => void;
++  const promise = new Promise<void>((finish, fail) => {
++    resolve = finish;
++    reject = fail;
++  });
++  mocks.stream.mockImplementationOnce((_request, target, requestSignal) => {
++    receiver = target;
++    signal = requestSignal;
++    receiver.onConversation(id);
++    return promise;
++  });
++  return {
++    delta: (text: string) => act(() => receiver.onDelta(text)),
++    complete: () => act(async () => resolve()),
++    fail: (error = new Error("secret failure")) =>
++      act(async () => reject(error)),
++    signal: () => signal,
++  };
++}
+ 
+ beforeEach(() => {
++  authRequired.mockReset();
++  mocks.stream.mockReset();
++  mocks.stream.mockImplementation(async (_request, receiver) => {
++    receiver.onConversation(id);
++    receiver.onDelta("실제 AI 답변이에요.");
++  });
+   vi.stubGlobal(
+     "matchMedia",
+     vi.fn().mockReturnValue({
+@@ -98,78 +104,165 @@ afterEach(() => {
+   vi.unstubAllGlobals();
+   vi.restoreAllMocks();
+   for (const method of ["showModal", "close"] as const) {
+-    if (dialogMethods[method]) {
++    if (dialogMethods[method])
+       Object.defineProperty(
+         HTMLDialogElement.prototype,
+         method,
+         dialogMethods[method],
+       );
+-    } else {
++    else
+       delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
+         method
+       ];
+-    }
+   }
+ });
+ 
+-describe("AI 채팅 예시", () => {
+-  it("PC 추가는 즉시 리스트에 알리고 같은 추천을 다시 선택해도 중복 추가하지 않는다", () => {
+-    const onTaskAdd = vi.fn();
+-    render(<AiChatFeature onTaskAdd={onTaskAdd} />);
+-    showCards();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    expect(onTaskAdd).toHaveBeenCalledWith(
+-      expect.objectContaining({ title: "주례 없는 예식 순서 정하기" }),
+-      true,
++describe("실제 AI 채팅", () => {
++  it("추천 질문으로 실제 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
++    render(chat());
++    const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
++    fireEvent.click(screen.getByRole("button", { name: question }));
++    await screen.findByText("실제 AI 답변이에요.");
++    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
++    expect(within(screen.getByRole("log")).getByText(question)).toBeTruthy();
++    expect(screen.getByRole("log").querySelector("time")?.textContent).toMatch(
++      /\d{2}:\d{2}/,
+     );
+-    fireEvent.click(screen.getByRole("button", { name: "← 넘기기" }));
+-    send("더 추천해줘");
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    expect(onTaskAdd).toHaveBeenCalledTimes(1);
++    expect(screen.queryByText("예시 대화")).toBeNull();
++    expect(screen.queryByText("다음으로 준비하면 좋은 일")).toBeNull();
++    expect(screen.queryByRole("button", { name: "추가하기 →" })).toBeNull();
++    expect(mocks.stream.mock.calls[0][0]).toEqual({
++      message: question,
++      conversationId: undefined,
++    });
++    send("그 다음은?");
++    await waitFor(() => expect(mocks.stream).toHaveBeenCalledTimes(2));
++    expect(mocks.stream.mock.calls[1][0]).toEqual({
++      message: "그 다음은?",
++      conversationId: id,
++    });
++    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
++  });
++
++  it("생성 중 받은 조각을 표시하고 전송을 막되 다음 메시지는 작성할 수 있다", async () => {
++    const reply = pendingReply();
++    render(chat());
++    send("촬영 준비");
++    reply.delta("촬영 전에 ");
++    reply.delta("준비해요.");
++    expect(screen.getByText("촬영 전에 준비해요.")).toBeTruthy();
++    expect(screen.getByRole("status").textContent).toContain("작성하고");
++    fireEvent.change(screen.getByRole("textbox"), {
++      target: { value: "다음 질문" },
++    });
+     expect(
+-      screen
+-        .getAllByRole("status")
+-        .some((status) =>
+-          status.textContent?.includes("이미 예시로 추가했어요"),
+-        ),
++      (screen.getByRole("button", { name: "메시지 전송" }) as HTMLButtonElement)
++        .disabled,
+     ).toBe(true);
++    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
++    expect(mocks.stream).toHaveBeenCalledOnce();
++    await reply.complete();
++    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
++      "다음 질문",
++    );
++    expect(
++      (screen.getByRole("button", { name: "메시지 전송" }) as HTMLButtonElement)
++        .disabled,
++    ).toBe(false);
++    expect(screen.queryByText("미완료 답변")).toBeNull();
+   });
+ 
+-  it("모바일에서 연속 추가 후 보기 버튼으로 닫고 다시 열면 카드 진행을 유지한다", () => {
+-    mockMobileDialog();
+-    const onTaskAdd = vi.fn();
+-    const onShowAddedTasks = vi.fn();
+-    render(
+-      <AiChatFeature
+-        onTaskAdd={onTaskAdd}
+-        onShowAddedTasks={onShowAddedTasks}
+-      />,
++  it("공백·4000자 초과·한글 조합 중 Enter는 보내지 않고 완성된 줄바꿈 입력만 보낸다", async () => {
++    render(chat());
++    const input = screen.getByRole("textbox");
++    expect(input.getAttribute("maxlength")).toBe("4000");
++    for (const value of [" \n ", "가".repeat(4001)]) {
++      fireEvent.change(input, { target: { value } });
++      fireEvent.keyDown(input, { key: "Enter" });
++      expect(mocks.stream).not.toHaveBeenCalled();
++    }
++    fireEvent.change(input, { target: { value: "촬영 준비\n정리해줘" } });
++    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
++    fireEvent.compositionStart(input);
++    fireEvent.keyDown(input, { key: "Enter" });
++    fireEvent.compositionEnd(input);
++    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
++    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
++    expect(mocks.stream).not.toHaveBeenCalled();
++    fireEvent.keyDown(input, { key: "Enter" });
++    await screen.findByText("실제 AI 답변이에요.");
++    expect(mocks.stream.mock.calls[0][0].message).toBe("촬영 준비\n정리해줘");
++    expect((input as HTMLTextAreaElement).value).toBe("");
++    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
++  });
++
++  it("중간 실패는 받은 내용을 미완료로 남기고 같은 질문을 중복 표시하지 않고 재시도한다", async () => {
++    const reply = pendingReply();
++    render(chat());
++    send("질문");
++    reply.delta("중간 답변");
++    await reply.fail();
++    expect(screen.getByText("중간 답변")).toBeTruthy();
++    expect(screen.getByText("미완료 답변")).toBeTruthy();
++    expect(screen.getByRole("alert").textContent).toContain(
++      "끝까지 받지 못했어요",
+     );
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-    showCards();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    expect(screen.getByRole("dialog")).toBeTruthy();
+-    expect(
+-      screen.getByRole("button", { name: "추가한 할 일 1개 보기" }),
+-    ).toBeTruthy();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    expect(onTaskAdd).toHaveBeenCalledTimes(2);
+-    expect(onTaskAdd).toHaveBeenLastCalledWith(
+-      expect.objectContaining({ title: "사회자·축가 맡을 사람 정하기" }),
+-      false,
++    expect(screen.queryByText("secret failure")).toBeNull();
++    expect(mocks.stream).toHaveBeenCalledOnce();
++    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
++    await screen.findByText("실제 AI 답변이에요.");
++    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
++    expect(screen.queryByText("중간 답변")).toBeNull();
++    expect(screen.queryByText("미완료 답변")).toBeNull();
++    expect(within(screen.getByRole("log")).getAllByText("질문")).toHaveLength(
++      1,
+     );
+-    expect(onShowAddedTasks).not.toHaveBeenCalled();
+-    fireEvent.click(
+-      screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
++    expect(mocks.stream.mock.calls[1][0]).toEqual({
++      message: "질문",
++      conversationId: id,
++    });
++  });
++
++  it("인증 만료는 안전하게 안내하고 기존 인증 상태를 다시 확인한다", async () => {
++    mocks.stream.mockRejectedValueOnce(new AiChatApiError(401));
++    render(chat());
++    send("질문");
++    await screen.findByRole("alert");
++    expect(screen.getByRole("alert").textContent).toContain(
++      "로그인이 만료됐어요",
+     );
+-    expect(screen.queryByRole("dialog")).toBeNull();
+-    expect(onShowAddedTasks).toHaveBeenCalledTimes(1);
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
++    expect(authRequired).toHaveBeenCalledOnce();
++  });
++
++  it("비로그인은 로그인 링크만 제공하고 API를 호출하지 않는다", () => {
++    render(chat(false));
++    expect(
++      screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
++    ).toBe("/login");
++    expect(screen.queryByRole("textbox")).toBeNull();
++    expect(screen.queryByRole("log")).toBeNull();
++    expect(mocks.stream).not.toHaveBeenCalled();
++  });
++
++  it("화면을 떠나면 진행 요청을 취소하고 새 화면에 이전 결과를 반영하지 않는다", async () => {
++    const reply = pendingReply();
++    const { unmount } = render(chat());
++    send("이전 질문");
++    unmount();
++    expect(reply.signal().aborted).toBe(true);
++    render(chat());
++    reply.delta("늦은 답변");
++    await reply.complete();
++    expect(screen.queryByRole("log")).toBeNull();
++    expect(screen.queryByText("늦은 답변")).toBeNull();
++    send("새 질문");
++    await screen.findByText("실제 AI 답변이에요.");
++    expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
++    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+   });
+ 
+   it.each(
+-    ["AI와 할 일 만들기", "AI 채팅 열기"].flatMap((launcher) =>
++    ["AI와 대화하기", "AI 채팅 열기"].flatMap((launcher) =>
+       ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
+         launcher,
+         close,
+@@ -179,185 +272,54 @@ describe("AI 채팅 예시", () => {
+     "%s로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
+     async (launcherName, closeName) => {
+       mockMobileDialog();
+-      render(<AiChatFeature />);
++      render(chat());
+       const launcher = screen.getByRole("button", { name: launcherName });
+-      // 클릭이 실행 버튼을 포커스하지 않는 경우에도 복원할 대상을 기억해야 한다.
+       fireEvent.click(launcher);
+       const dialog = screen.getByRole("dialog");
+-      screen.getByRole("textbox").focus();
+-      if (closeName === "Escape") {
++      expect(within(dialog).queryByText("예시")).toBeNull();
++      if (closeName === "Escape")
+         fireEvent(dialog, new Event("cancel", { cancelable: true }));
+-      } else {
+-        fireEvent.click(screen.getByRole("button", { name: closeName }));
+-      }
++      else fireEvent.click(screen.getByRole("button", { name: closeName }));
+       expect(screen.queryByRole("dialog")).toBeNull();
+       await waitFor(() => expect(document.activeElement).toBe(launcher));
+     },
+   );
+ 
+-  it("추천 질문을 전송하고 시간과 고정 안내를 표시한다", () => {
+-    vi.useFakeTimers();
+-    vi.setSystemTime(new Date("2026-10-08T14:20:00+09:00"));
+-    render(<AiChatFeature />);
+-    const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
+-    fireEvent.click(screen.getByRole("button", { name: question }));
+-    const log = screen.getByRole("log");
+-    expect(within(log).getByText(question)).toBeTruthy();
+-    expect(within(log).getByText("다음으로 준비하면 좋은 일")).toBeTruthy();
+-    expect(
+-      within(log).getByText("사회자·축가·축사 맡을 사람 정하기"),
+-    ).toBeTruthy();
+-    expect(log.querySelector("time")?.textContent).toMatch(/\d{2}:\d{2}/);
+-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+-    vi.useRealTimers();
+-  });
+-
+-  it("공백·줄바꿈·한글 조합 중 Enter를 전송하지 않고 완성된 입력만 전송한다", () => {
+-    render(<AiChatFeature />);
+-    const input = screen.getByRole("textbox");
+-    fireEvent.change(input, { target: { value: " \n " } });
+-    expect(
+-      (screen.getByRole("button", { name: "메시지 전송" }) as HTMLButtonElement)
+-        .disabled,
+-    ).toBe(true);
+-    fireEvent.keyDown(input, { key: "Enter" });
+-    expect(screen.queryByRole("log")).toBeNull();
+-
+-    fireEvent.change(input, { target: { value: "촬영 준비" } });
+-    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+-    fireEvent.compositionStart(input);
+-    fireEvent.keyDown(input, { key: "Enter" });
+-    fireEvent.compositionEnd(input);
+-    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+-    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+-    expect(screen.queryByRole("log")).toBeNull();
+-    fireEvent.change(input, { target: { value: "촬영 준비\n정리해줘" } });
+-    fireEvent.keyDown(input, { key: "Enter" });
+-    expect(screen.getByRole("log").textContent).toContain(
+-      "촬영 준비\n정리해줘",
+-    );
+-    expect((input as HTMLTextAreaElement).value).toBe("");
+-  });
+-
+-  it("카드를 추가·넘기기하면 진행 상태와 완료를 표시하고 서버나 저장소를 변경하지 않는다", () => {
+-    const fetch = vi.fn();
+-    vi.stubGlobal("fetch", fetch);
+-    const storage = vi.spyOn(Storage.prototype, "setItem");
+-    render(<AiChatFeature />);
+-    showCards();
+-    expect(screen.getByText("1 / 2")).toBeTruthy();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    expect(screen.getByRole("status").textContent).toContain(
+-      "예시로 추가했어요",
+-    );
+-    expect(screen.getByText("2 / 2")).toBeTruthy();
+-    fireEvent.click(screen.getByRole("button", { name: "← 넘기기" }));
+-    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
+-    expect(screen.queryByRole("button", { name: "추가하기 →" })).toBeNull();
+-    expect(fetch).not.toHaveBeenCalled();
+-    expect(storage).not.toHaveBeenCalled();
+-
+-    send("더 추천해줘");
+-    expect(screen.getByText("1 / 2")).toBeTruthy();
+-    expect(
+-      screen.getByRole("article", { name: "주례 없는 예식 순서 정하기" }),
+-    ).toBeTruthy();
+-  });
+-
+-  it("수직 이동과 취소는 카드를 유지하고 좌우 스와이프는 추가·넘기기를 수행한다", () => {
+-    class TestPointerEvent extends MouseEvent {
+-      pointerId: number;
+-      constructor(type: string, init: PointerEventInit) {
+-        super(type, init);
+-        this.pointerId = init.pointerId ?? 1;
+-      }
+-    }
+-    vi.stubGlobal("PointerEvent", TestPointerEvent);
+-    render(<AiChatFeature />);
+-    showCards();
+-    let card = screen.getByRole("article", {
+-      name: "주례 없는 예식 순서 정하기",
+-    });
+-    const pointer = { pointerId: 1, button: 0 };
+-    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
+-    fireEvent.pointerUp(card, { ...pointer, clientX: 110, clientY: 200 });
+-    expect(screen.getByText("1 / 2")).toBeTruthy();
+-    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
+-    fireEvent.pointerMove(card, { ...pointer, clientX: 180, clientY: 100 });
+-    fireEvent.pointerCancel(card, pointer);
+-    fireEvent.pointerUp(card, { ...pointer, clientX: 180, clientY: 100 });
+-    expect(screen.getByText("1 / 2")).toBeTruthy();
+-
+-    fireEvent.pointerDown(card, { ...pointer, clientX: 100, clientY: 100 });
+-    fireEvent.pointerUp(card, { ...pointer, clientX: 180, clientY: 100 });
+-    expect(screen.getByRole("status").textContent).toContain(
+-      "예시로 추가했어요",
+-    );
+-    card = screen.getByRole("article", {
+-      name: "사회자·축가 맡을 사람 정하기",
+-    });
+-    fireEvent.pointerDown(card, { ...pointer, clientX: 180, clientY: 100 });
+-    fireEvent.pointerUp(card, { ...pointer, clientX: 100, clientY: 100 });
+-    expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
+-  });
+-
+-  it("모바일을 닫고 다시 열어도 대화·작성 중 입력·카드 진행을 유지한다", () => {
++  it("모바일을 닫아도 답변을 계속 받고 다시 열면 대화와 작성 중 입력을 유지한다", async () => {
++    const reply = pendingReply();
++    mockMobileDialog();
+     const viewport = Object.assign(new EventTarget(), {
+       height: 844,
+       offsetTop: 0,
+     });
+     vi.stubGlobal("visualViewport", viewport);
+-    mockMobileDialog();
+-    const { unmount } = render(<AiChatFeature />);
+-    fireEvent.click(screen.getByRole("button", { name: "AI와 할 일 만들기" }));
+-    showCards();
+-    const dialog = screen.getByRole("dialog");
+-    expect(dialog.style.height).toBe("844px");
+-    const log = screen.getByRole("log");
+-    Object.defineProperty(log, "scrollHeight", {
+-      configurable: true,
+-      value: 500,
+-    });
+-    viewport.height = 400;
+-    viewport.offsetTop = 24;
+-    viewport.dispatchEvent(new Event("resize"));
+-    expect(dialog.style.height).toBe("400px");
+-    expect(dialog.style.top).toBe("24px");
+-    expect(log.scrollTop).toBe(500);
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
++    render(chat());
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    send("질문");
++    reply.delta("앞부분 ");
+     fireEvent.change(screen.getByRole("textbox"), {
+       target: { value: "작성 중" },
+     });
+     fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+-    expect(screen.queryByRole("dialog")).toBeNull();
++    expect(reply.signal().aborted).toBe(false);
++    reply.delta("뒷부분");
++    await reply.complete();
+     fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-    expect(screen.getByText("2 / 2")).toBeTruthy();
++    expect(screen.getByText("앞부분 뒷부분")).toBeTruthy();
+     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+       "작성 중",
+     );
+-    const showAdded = screen.getByRole("button", {
+-      name: "추가한 할 일 1개 보기",
++    expect(screen.getByRole("dialog").style.height).toBe("844px");
++    const log = screen.getByRole("log");
++    Object.defineProperty(log, "scrollHeight", {
++      configurable: true,
++      value: 500,
+     });
+-    const back = screen.getByRole("button", { name: "로드맵으로 돌아가기" });
+-    showAdded.focus();
+-    fireEvent.keyDown(showAdded, { key: "Tab" });
+-    expect(document.activeElement).toBe(back);
+-    fireEvent.keyDown(back, { key: "Tab", shiftKey: true });
+-    expect(document.activeElement).toBe(showAdded);
+-    fireEvent(
+-      screen.getByRole("dialog"),
+-      new Event("cancel", { cancelable: true }),
+-    );
+-    expect(screen.queryByRole("dialog")).toBeNull();
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-    fireEvent.click(
+-      screen.getByRole("button", { name: "로드맵으로 돌아가기" }),
+-    );
+-    expect(screen.queryByRole("dialog")).toBeNull();
+-    unmount();
+-    render(<AiChatFeature />);
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-    expect(screen.queryByRole("log")).toBeNull();
+-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
++    viewport.height = 400;
++    viewport.offsetTop = 24;
++    viewport.dispatchEvent(new Event("resize"));
++    expect(log.scrollTop).toBe(500);
++    expect(screen.getByRole("dialog").style.height).toBe("400px");
++    expect(screen.getByRole("dialog").style.top).toBe("24px");
+   });
+ });
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index 44b0050f86da8ab82dbf2c0997f356dd9b3b0c79..9998fda5b17a85cb7ae40f92e243fae179b8592a 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -1,44 +1,49 @@
+-import { useRef } from "react";
++import { useRef, useState } from "react";
+ 
+ import { useIsMobileLayout } from "../../shared/responsive";
+ import { useAiChatConversation } from "./hooks/useAiChatConversation";
+-import type { ExampleTaskAdditionController } from "./hooks/useExampleTaskAddition";
+ import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
+ import { AiChatView, ChatIcon } from "./view/AiChatView";
+ import "./view/AiChat.css";
+ 
+ export function AiChatFeature({
+-  addition,
++  isAuthenticated,
++  onAuthenticationRequired,
+ }: {
+-  addition: Pick<
+-    ExampleTaskAdditionController,
+-    "add" | "addedTaskCount" | "isChatOpen" | "setChatOpen" | "showAddedTasks"
+-  >;
++  isAuthenticated: boolean;
++  onAuthenticationRequired: () => void;
+ }) {
+   const isMobile = useIsMobileLayout();
++  const [isOpen, setOpen] = useState(false);
+   const returnFocusRef = useRef<HTMLButtonElement>(null);
+-  const { draft, messages, setDraft, send, chooseCard } = useAiChatConversation(
+-    addition.add,
+-  );
+-
+-  const closeChat = () => {
+-    addition.setChatOpen(false);
+-  };
+-
++  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
++    useAiChatConversation(onAuthenticationRequired);
+   const openChat = (launcher: HTMLButtonElement) => {
+     returnFocusRef.current = launcher;
+-    addition.setChatOpen(true);
++    setOpen(true);
+   };
+-
+-  const view = (
++  const closeChat = () => setOpen(false);
++  const view = isAuthenticated ? (
+     <AiChatView
+-      active={!isMobile || addition.isChatOpen}
++      active={!isMobile || isOpen}
+       draft={draft}
+       messages={messages}
+-      onChooseCard={chooseCard}
++      errorMessage={errorMessage}
++      isPending={isPending}
+       onDraftChange={setDraft}
+       onSend={send}
++      onRetry={retry}
+     />
++  ) : (
++    <div className="ai-chat">
++      <div className="ai-chat__welcome">
++        <h2>로그인하고 AI와 대화해요</h2>
++        <p>나의 결혼 준비에 맞는 안내를 받아보세요.</p>
++        <a className="ai-chat__login" href="/login">
++          로그인
++        </a>
++      </div>
++    </div>
+   );
+ 
+   return (
+@@ -51,7 +56,7 @@ export function AiChatFeature({
+               onClick={(event) => openChat(event.currentTarget)}
+               type="button"
+             >
+-              AI와 할 일 만들기
++              AI와 대화하기
+             </button>
+             <button
+               aria-label="AI 채팅 열기"
+@@ -63,29 +68,15 @@ export function AiChatFeature({
+             </button>
+           </div>
+           <MobileAiChatDialog
+-            isOpen={addition.isChatOpen}
++            isOpen={isOpen}
+             onClose={closeChat}
+             returnFocusRef={returnFocusRef}
+           >
+             {view}
+-            {addition.addedTaskCount > 0 ? (
+-              <button
+-                className="ai-chat__show-added"
+-                onClick={() => {
+-                  returnFocusRef.current = null;
+-                  addition.showAddedTasks();
+-                }}
+-                type="button"
+-              >
+-                추가한 할 일 {addition.addedTaskCount}개 보기{" "}
+-                <span aria-hidden="true">→</span>
+-              </button>
+-            ) : null}
+           </MobileAiChatDialog>
+         </>
+       ) : (
+         <aside aria-label="AI 채팅" className="ai-chat-panel">
+-          <span className="ai-chat-panel__badge">예시 대화</span>
+           {view}
+         </aside>
+       )}
+diff --git a/FE/src/features/ai-chat/api/readSseEvents.ts b/FE/src/features/ai-chat/api/readSseEvents.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..389ffc21f31c9691e1b0f8ea34cfbaad5864ed9e
+--- /dev/null
++++ b/FE/src/features/ai-chat/api/readSseEvents.ts
+@@ -0,0 +1,50 @@
++export interface SseEvent {
++  type: string;
++  data: string;
++}
++
++// 이벤트 형식만 해석한다. onEvent가 true를 반환하면 수신을 끝낸다.
++export async function readSseEvents(
++  reader: ReadableStreamDefaultReader<Uint8Array>,
++  onEvent: (event: SseEvent) => boolean,
++  signal: AbortSignal,
++): Promise<boolean> {
++  const decoder = new TextDecoder("utf-8", { fatal: true });
++  let buffer = "";
++  let type = "";
++  let data: string[] = [];
++
++  while (true) {
++    signal.throwIfAborted();
++    const chunk = await reader.read();
++    signal.throwIfAborted();
++    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
++    let lineEnd: RegExpExecArray | null;
++    while ((lineEnd = /\r\n|\r|\n/.exec(buffer))) {
++      // CRLF가 두 응답 조각에 나뉘면 LF까지 기다린다.
++      if (
++        lineEnd[0] === "\r" &&
++        lineEnd.index === buffer.length - 1 &&
++        !chunk.done
++      )
++        break;
++      const line = buffer.slice(0, lineEnd.index);
++      buffer = buffer.slice(lineEnd.index + lineEnd[0].length);
++      if (!line) {
++        const event = { type: type || "message", data: data.join("\n") };
++        const hasData = data.length > 0;
++        type = "";
++        data = [];
++        if (hasData && onEvent(event)) return true;
++      } else {
++        const colon = line.indexOf(":");
++        const field = colon < 0 ? line : line.slice(0, colon);
++        const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
++        if (field === "event") type = value;
++        if (field === "data") data.push(value);
++      }
++    }
++    // 빈 줄로 끝나지 않은 마지막 이벤트는 전달하지 않는다.
++    if (chunk.done) return false;
++  }
++}
+diff --git a/FE/src/features/ai-chat/api/streamAiChat.test.ts b/FE/src/features/ai-chat/api/streamAiChat.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ce87a9c0faed6ad4d44d3c1e1bed0b2195100d8e
+--- /dev/null
++++ b/FE/src/features/ai-chat/api/streamAiChat.test.ts
+@@ -0,0 +1,280 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++import {
++  acceptWebAccessToken,
++  resetWebAuthSessionForTest,
++} from "../../../infrastructure/auth/webSessionManager";
++import { AiChatApiError, streamAiChat } from "./streamAiChat";
++
++const id = "d67a9265-3f45-4d7f-99f1-b5823054c8d9";
++const otherId = "d67a9265-3f45-4d7f-99f1-b5823054c8d8";
++const encoder = new TextEncoder();
++const conversation = `event: conversation\ndata: {"conversationId":"${id}"}\n\n`;
++const done = `event: done\ndata: {"conversationId":"${id}"}\n\n`;
++const delta = (text: string) =>
++  `event: delta\ndata: ${JSON.stringify({ text })}\n\n`;
++const fetchMock = vi.fn();
++
++function response(chunks: Uint8Array[], cancel = vi.fn()) {
++  return new Response(
++    new ReadableStream<Uint8Array>({
++      start(controller) {
++        chunks.forEach((chunk) => controller.enqueue(chunk));
++        controller.close();
++      },
++      cancel,
++    }),
++    { headers: { "Content-Type": "text/event-stream; charset=utf-8" } },
++  );
++}
++
++function receive(conversationId?: string) {
++  const receiver = { onConversation: vi.fn(), onDelta: vi.fn() };
++  const controller = new AbortController();
++  const promise = streamAiChat(
++    { message: "준비를 도와줘", conversationId },
++    receiver,
++    controller.signal,
++  );
++  return { receiver, controller, promise };
++}
++
++beforeEach(() => {
++  fetchMock.mockReset();
++  vi.stubGlobal("fetch", fetchMock);
++});
++
++afterEach(() => {
++  resetWebAuthSessionForTest();
++  vi.useRealTimers();
++  vi.unstubAllGlobals();
++});
++
++describe("AI 채팅 SSE 통신", () => {
++  it("연결이 열린 동안 도착한 답변을 완료 이벤트보다 먼저 전달한다", async () => {
++    let source!: ReadableStreamDefaultController<Uint8Array>;
++    fetchMock.mockResolvedValue(
++      new Response(
++        new ReadableStream<Uint8Array>({
++          start(controller) {
++            source = controller;
++          },
++        }),
++        { headers: { "Content-Type": "text/event-stream" } },
++      ),
++    );
++    const { receiver, promise } = receive();
++    let completed = false;
++    const completion = promise.then(() => {
++      completed = true;
++    });
++    source.enqueue(encoder.encode(conversation + delta("먼저 도착한 답변 ")));
++    await vi.waitFor(() =>
++      expect(receiver.onDelta).toHaveBeenCalledWith("먼저 도착한 답변 "),
++    );
++    expect(completed).toBe(false);
++    source.enqueue(encoder.encode(delta("다음 답변")));
++    await vi.waitFor(() =>
++      expect(receiver.onDelta.mock.calls.flat()).toEqual([
++        "먼저 도착한 답변 ",
++        "다음 답변",
++      ]),
++    );
++    expect(completed).toBe(false);
++    source.enqueue(encoder.encode(done));
++    await completion;
++    expect(completed).toBe(true);
++  });
++
++  it("기존 인증을 포함한 POST로 대화 ID를 보내고 한글 바이트와 이벤트 경계를 복원한다", async () => {
++    const token = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600 }))}.signature`;
++    acceptWebAccessToken(token);
++    const bytes = encoder.encode(conversation + delta("한글 \n 답변 ") + done);
++    fetchMock.mockResolvedValue(
++      response(Array.from(bytes, (byte) => new Uint8Array([byte]))),
++    );
++    const { receiver, promise } = receive(id);
++    await promise;
++    expect(fetchMock).toHaveBeenCalledOnce();
++    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
++    expect(url).toBe("/api/ai/chat");
++    expect(init).toMatchObject({ method: "POST", credentials: "include" });
++    expect(new Headers(init.headers).get("Authorization")).toBe(
++      `Bearer ${token}`,
++    );
++    expect(new Headers(init.headers).get("Accept")).toBe("text/event-stream");
++    expect(JSON.parse(init.body as string)).toEqual({
++      message: "준비를 도와줘",
++      conversationId: id,
++    });
++    expect(receiver.onConversation).toHaveBeenCalledWith(id);
++    expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith("한글 \n 답변 ");
++  });
++
++  it.each(["\n", "\r\n", "\r"])(
++    "%j 줄바꿈, 여러 data 행과 주석을 처리하고 공백을 보존한다",
++    async (newline) => {
++      const multiLine =
++        'event: delta\ndata: {\ndata: "text": " 첫 답변 "\ndata: }\n\n';
++      const text = (
++        ": heartbeat\n\nevent: ping\ndata: ignored\n\n" +
++        conversation +
++        multiLine +
++        delta("둘째") +
++        done
++      ).replaceAll("\n", newline);
++      const bytes = encoder.encode(text);
++      fetchMock.mockResolvedValue(
++        response(Array.from(bytes, (byte) => new Uint8Array([byte]))),
++      );
++      const { receiver, promise } = receive();
++      await promise;
++      expect(receiver.onDelta.mock.calls.flat()).toEqual([" 첫 답변 ", "둘째"]);
++    },
++  );
++
++  it("완료 뒤 연결을 기다리지 않고 수신을 취소한다", async () => {
++    const cancel = vi.fn();
++    fetchMock.mockResolvedValue(
++      new Response(
++        new ReadableStream({
++          start(controller) {
++            controller.enqueue(
++              encoder.encode(
++                conversation + delta("완료") + done + delta("늦은 답변"),
++              ),
++            );
++          },
++          cancel,
++        }),
++        { headers: { "Content-Type": "text/event-stream" } },
++      ),
++    );
++    const { receiver, promise } = receive();
++    await promise;
++    expect(cancel).toHaveBeenCalledOnce();
++    expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith("완료");
++  });
++
++  it.each([
++    conversation + delta("중간 답변"),
++    conversation +
++      delta("중간 답변") +
++      'event: done\ndata: {"conversationId":"' +
++      id +
++      '"}',
++    conversation +
++      delta("중간 답변") +
++      'event: failure\ndata: {"message":"secret upstream error"}\n\n',
++  ])(
++    "실패와 완료 이벤트 없이 끊긴 응답을 성공으로 처리하지 않는다",
++    async (text) => {
++      fetchMock.mockResolvedValue(response([encoder.encode(text)]));
++      const { receiver, promise } = receive();
++      await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
++      expect(receiver.onDelta).toHaveBeenCalledWith("중간 답변");
++    },
++  );
++
++  it.each([
++    conversation + "event: delta\ndata: invalid-json\n\n",
++    conversation + 'event: delta\ndata: {"text":123}\n\n',
++    delta("대화 ID 없음") + done,
++    conversation +
++      delta("답변") +
++      `event: done\ndata: {"conversationId":"${otherId}"}\n\n`,
++    conversation + done,
++    conversation + delta(" \n ") + done,
++    'event: conversation\ndata: {"conversationId":"invalid"}\n\n',
++  ])("잘못된 이벤트와 빈 답변을 실패로 처리한다", async (text) => {
++    fetchMock.mockResolvedValue(response([encoder.encode(text)]));
++    await expect(receive().promise).rejects.toBeInstanceOf(AiChatApiError);
++  });
++
++  it("요청한 대화와 다른 ID의 응답을 전달하지 않는다", async () => {
++    fetchMock.mockResolvedValue(
++      response([encoder.encode(conversation + delta("답변") + done)]),
++    );
++    const { receiver, promise } = receive(otherId);
++    await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
++    expect(receiver.onConversation).not.toHaveBeenCalled();
++    expect(receiver.onDelta).not.toHaveBeenCalled();
++  });
++
++  it.each([400, 401, 403, 500])(
++    "HTTP %s를 안전한 오류로 전달한다",
++    async (status) => {
++      fetchMock.mockResolvedValue(new Response("secret response", { status }));
++      await expect(receive().promise).rejects.toMatchObject({
++        status,
++        message: "AI 답변을 끝까지 받지 못했습니다.",
++      });
++      expect(fetchMock).toHaveBeenCalledOnce();
++    },
++  );
++
++  it.each([
++    new Response("{}", { headers: { "Content-Type": "application/json" } }),
++    new Response(null, { headers: { "Content-Type": "text/event-stream" } }),
++  ])("스트림이 아닌 응답을 거부한다", async (result) => {
++    fetchMock.mockResolvedValue(result);
++    await expect(receive().promise).rejects.toBeInstanceOf(AiChatApiError);
++  });
++
++  it("네트워크 오류의 원문을 노출하지 않는다", async () => {
++    fetchMock.mockRejectedValue(new Error("secret network error"));
++    await expect(receive().promise).rejects.toMatchObject({
++      message: "AI 답변을 끝까지 받지 못했습니다.",
++    });
++  });
++
++  it.each(["", " \n ", "가".repeat(4001)])(
++    "유효하지 않은 입력은 요청하지 않는다",
++    async (message) => {
++      await expect(
++        streamAiChat(
++          { message },
++          { onConversation: vi.fn(), onDelta: vi.fn() },
++          new AbortController().signal,
++        ),
++      ).rejects.toBeInstanceOf(AiChatApiError);
++      expect(fetchMock).not.toHaveBeenCalled();
++    },
++  );
++
++  it("수신 대기 중 취소하면 스트림과 타이머를 정리한다", async () => {
++    vi.useFakeTimers();
++    const cancel = vi.fn();
++    fetchMock.mockResolvedValue(
++      new Response(new ReadableStream({ cancel }), {
++        headers: { "Content-Type": "text/event-stream" },
++      }),
++    );
++    const { controller, promise } = receive();
++    const rejection = expect(promise).rejects.toMatchObject({
++      name: "AbortError",
++    });
++    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
++    controller.abort();
++    await rejection;
++    expect(cancel).toHaveBeenCalledOnce();
++    expect(vi.getTimerCount()).toBe(0);
++  });
++
++  it("전체 제한 시간이 지나면 수신을 끝내고 재요청하지 않는다", async () => {
++    vi.useFakeTimers();
++    const cancel = vi.fn();
++    fetchMock.mockResolvedValue(
++      new Response(new ReadableStream({ cancel }), {
++        headers: { "Content-Type": "text/event-stream" },
++      }),
++    );
++    const { promise } = receive();
++    const rejection = expect(promise).rejects.toBeInstanceOf(AiChatApiError);
++    await vi.advanceTimersByTimeAsync(45_000);
++    await rejection;
++    expect(cancel).toHaveBeenCalledOnce();
++    expect(fetchMock).toHaveBeenCalledOnce();
++    expect(vi.getTimerCount()).toBe(0);
++  });
++});
+diff --git a/FE/src/features/ai-chat/api/streamAiChat.ts b/FE/src/features/ai-chat/api/streamAiChat.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ea9cdeb72f5b06ca93e7b3d42bbf196830ba6f41
+--- /dev/null
++++ b/FE/src/features/ai-chat/api/streamAiChat.ts
+@@ -0,0 +1,143 @@
++import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
++import { isValidChatMessage } from "../model/aiChat";
++import { readSseEvents, SseEvent } from "./readSseEvents";
++
++const CHAT_ENDPOINT = `${__BIBBIDI_API_BASE_URL__.replace(/\/+$/, "")}/api/ai/chat`;
++// 서버의 30초 제한 뒤에도 완료/실패 이벤트가 도착하지 않으면 수신을 종료한다.
++const CHAT_TIMEOUT_MS = 45_000;
++const UUID_PATTERN = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
++
++export class AiChatApiError extends Error {
++  constructor(readonly status?: number) {
++    super("AI 답변을 끝까지 받지 못했습니다.");
++    this.name = "AiChatApiError";
++  }
++
++  get authenticationRequired(): boolean {
++    return this.status === 401;
++  }
++}
++
++interface ChatRequest {
++  message: string;
++  conversationId?: string;
++}
++
++interface ChatReceiver {
++  onConversation: (id: string) => void;
++  onDelta: (text: string) => void;
++}
++
++function createChatEventHandler(request: ChatRequest, receiver: ChatReceiver) {
++  let conversationId: string | undefined;
++  let hasAnswer = false;
++
++  return (event: SseEvent): boolean => {
++    if (!["conversation", "delta", "done", "failure"].includes(event.type))
++      return false;
++    if (event.type === "failure") throw new AiChatApiError();
++    const value: unknown = JSON.parse(event.data);
++    if (typeof value !== "object" || value === null) throw new AiChatApiError();
++    if (event.type === "delta") {
++      if (
++        !conversationId ||
++        !("text" in value) ||
++        typeof value.text !== "string"
++      ) {
++        throw new AiChatApiError();
++      }
++      hasAnswer ||= Boolean(value.text.trim());
++      receiver.onDelta(value.text);
++    } else {
++      if (
++        !("conversationId" in value) ||
++        typeof value.conversationId !== "string" ||
++        !UUID_PATTERN.test(value.conversationId)
++      ) {
++        throw new AiChatApiError();
++      }
++      if (event.type === "conversation") {
++        if (
++          conversationId ||
++          (request.conversationId &&
++            request.conversationId !== value.conversationId)
++        ) {
++          throw new AiChatApiError();
++        }
++        conversationId = value.conversationId;
++        receiver.onConversation(conversationId);
++      } else {
++        if (conversationId !== value.conversationId || !hasAnswer)
++          throw new AiChatApiError();
++        return true;
++      }
++    }
++    return false;
++  };
++}
++
++export async function streamAiChat(
++  request: ChatRequest,
++  receiver: ChatReceiver,
++  signal: AbortSignal,
++): Promise<void> {
++  if (!isValidChatMessage(request.message)) {
++    throw new AiChatApiError();
++  }
++  signal.throwIfAborted();
++  const controller = new AbortController();
++  const abort = () => controller.abort();
++  signal.addEventListener("abort", abort, { once: true });
++  const timeout = window.setTimeout(abort, CHAT_TIMEOUT_MS);
++  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
++  const cancelReader = () => {
++    void reader?.cancel().catch(() => {});
++  };
++
++  try {
++    const response = await authenticatedFetch(CHAT_ENDPOINT, {
++      method: "POST",
++      credentials: "include",
++      headers: {
++        "Content-Type": "application/json",
++        Accept: "text/event-stream",
++      },
++      body: JSON.stringify(request),
++      signal: controller.signal,
++    });
++    if (!response.ok) {
++      await response.body?.cancel();
++      throw new AiChatApiError(response.status);
++    }
++    if (
++      response.headers
++        .get("content-type")
++        ?.split(";")[0]
++        .trim()
++        .toLowerCase() !== "text/event-stream" ||
++      !response.body
++    ) {
++      await response.body?.cancel();
++      throw new AiChatApiError();
++    }
++
++    reader = response.body.getReader();
++    controller.signal.addEventListener("abort", cancelReader, { once: true });
++    const completed = await readSseEvents(
++      reader,
++      createChatEventHandler(request, receiver),
++      controller.signal,
++    );
++    if (!completed) throw new AiChatApiError();
++  } catch (error) {
++    if (signal.aborted) signal.throwIfAborted();
++    if (error instanceof AiChatApiError) throw error;
++    throw new AiChatApiError();
++  } finally {
++    window.clearTimeout(timeout);
++    signal.removeEventListener("abort", abort);
++    controller.signal.removeEventListener("abort", cancelReader);
++    await reader?.cancel().catch(() => {});
++    reader?.releaseLock();
++  }
++}
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+index a375976979f969c4909888acb43afed219acc525..f6464225de0330f8718b974c1c9eeb312bcfae2a 100644
+--- a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
++++ b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+@@ -1,21 +1,89 @@
+-import { useState } from "react";
+-
+-import {
+-  ChatMessage,
+-  ExampleRecommendedTask,
+-  createExampleReply,
+-  recommendedTasks,
+-} from "../model/exampleChat";
+-
+-export function useAiChatConversation(
+-  onTaskAdd: (task: ExampleRecommendedTask) => boolean,
+-) {
++import { useEffect, useRef, useState } from "react";
++
++import { AiChatApiError, streamAiChat } from "../api/streamAiChat";
++import { ChatMessage, isValidChatMessage } from "../model/aiChat";
++
++type AssistantMessage = Extract<ChatMessage, { role: "assistant" }>;
++
++export function useAiChatConversation(onAuthenticationRequired: () => void) {
+   const [draft, setDraft] = useState("");
+   const [messages, setMessages] = useState<ChatMessage[]>([]);
++  const [errorMessage, setErrorMessage] = useState<string | null>(null);
++  const requestRef = useRef<AbortController | null>(null);
++  const conversationId = useRef<string | undefined>(undefined);
++  const nextId = useRef(0);
++  const failedTurn = useRef<{ text: string; answerId: number } | null>(null);
++
++  useEffect(
++    () => () => {
++      requestRef.current?.abort();
++      requestRef.current = null;
++    },
++    [],
++  );
++
++  const updateAnswer = (
++    answerId: number,
++    update: (message: AssistantMessage) => AssistantMessage,
++  ) => {
++    setMessages((current) =>
++      current.map((message) =>
++        message.id === answerId && message.role === "assistant"
++          ? update(message)
++          : message,
++      ),
++    );
++  };
++
++  const receive = async (text: string, answerId: number) => {
++    const controller = new AbortController();
++    requestRef.current = controller;
++    failedTurn.current = null;
++    setErrorMessage(null);
++    const updateCurrentAnswer = (
++      update: (message: AssistantMessage) => AssistantMessage,
++    ) => {
++      if (requestRef.current !== controller) return;
++      updateAnswer(answerId, update);
++    };
++    try {
++      await streamAiChat(
++        { message: text, conversationId: conversationId.current },
++        {
++          onConversation: (id) => {
++            if (requestRef.current === controller) conversationId.current = id;
++          },
++          onDelta: (delta) =>
++            updateCurrentAnswer((message) => ({
++              ...message,
++              text: message.text + delta,
++            })),
++        },
++        controller.signal,
++      );
++      updateCurrentAnswer((message) => ({ ...message, status: "complete" }));
++    } catch (error) {
++      if (requestRef.current !== controller) return;
++      failedTurn.current = { text, answerId };
++      updateCurrentAnswer((message) => ({ ...message, status: "failed" }));
++      const authenticationRequired =
++        error instanceof AiChatApiError && error.authenticationRequired;
++      setErrorMessage(
++        authenticationRequired
++          ? "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
++          : "답변을 끝까지 받지 못했어요. 다시 시도해 주세요.",
++      );
++      if (authenticationRequired) onAuthenticationRequired();
++    } finally {
++      if (requestRef.current === controller) requestRef.current = null;
++    }
++  };
+ 
+   const send = (text: string) => {
+     const content = text.trim();
+-    if (!content) return;
++    if (!isValidChatMessage(text) || requestRef.current) return;
++    const id = nextId.current;
++    nextId.current += 2;
+     const time = new Date().toLocaleTimeString("ko-KR", {
+       hour: "2-digit",
+       minute: "2-digit",
+@@ -23,39 +91,26 @@ export function useAiChatConversation(
+     });
+     setMessages((current) => [
+       ...current,
+-      { id: current.length, role: "user", text: content, time },
+-      createExampleReply(current.length + 1, current.length === 0),
++      { id, role: "user", text: content, time },
++      { id: id + 1, role: "assistant", text: "", status: "streaming" },
+     ]);
+     setDraft("");
++    void receive(content, id + 1);
+   };
+ 
+-  const chooseCard = (messageId: number, add: boolean) => {
+-    const message = messages.find((item) => item.id === messageId);
+-    if (message?.role !== "assistant" || message.kind !== "recommendations")
+-      return;
+-    const task = recommendedTasks[message.cardIndex];
+-    if (!task) return;
+-    const alreadyAdded = add && !onTaskAdd(task);
+-    setMessages((current) =>
+-      current.map((message) => {
+-        if (
+-          message.id !== messageId ||
+-          message.role !== "assistant" ||
+-          message.kind !== "recommendations"
+-        )
+-          return message;
+-        const task = recommendedTasks[message.cardIndex];
+-        if (!task) return message;
+-        return {
+-          ...message,
+-          cardIndex: message.cardIndex + 1,
+-          feedback: add
+-            ? `${alreadyAdded ? "이미 예시로 추가했어요" : "예시로 추가했어요"}: ${task.title}`
+-            : `넘겼어요: ${task.title}`,
+-        };
+-      }),
+-    );
++  const retry = () => {
++    const turn = failedTurn.current;
++    if (!turn || requestRef.current) return;
++    updateAnswer(turn.answerId, (message) => ({
++      ...message,
++      text: "",
++      status: "streaming",
++    }));
++    void receive(turn.text, turn.answerId);
+   };
+ 
+-  return { draft, messages, setDraft, send, chooseCard };
++  const isPending = messages.some(
++    (message) => message.role === "assistant" && message.status === "streaming",
++  );
++  return { draft, messages, errorMessage, isPending, setDraft, send, retry };
+ }
+diff --git a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx
+deleted file mode 100644
+index a4c0bc05cd7ffc75fb1055e01c207f1e008b7945..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.test.tsx
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import { act, renderHook } from "@testing-library/react";
+-import { expect, it } from "vitest";
+-
+-import { recommendedTasks } from "../model/exampleChat";
+-import { useExampleTaskAddition } from "./useExampleTaskAddition";
+-
+-it("모바일에서 담은 항목을 PC에서 확인한 뒤 모바일로 돌아와도 목록과 완료 기록을 유지한다", () => {
+-  const { result, rerender } = renderHook(
+-    ({ isMobile }) => useExampleTaskAddition({ audience: "guest", isMobile }),
+-    { initialProps: { isMobile: true } },
+-  );
+-  act(() => {
+-    result.current.add(recommendedTasks[0]);
+-  });
+-  expect(result.current.visibleCount).toBe(0);
+-  rerender({ isMobile: false });
+-  expect(result.current.visibleCount).toBe(1);
+-  act(() => {
+-    result.current.completeTask(recommendedTasks[0].title);
+-  });
+-  rerender({ isMobile: true });
+-  expect(result.current.visibleCount).toBe(1);
+-  expect(result.current.completedCount).toBe(1);
+-});
+diff --git a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts b/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts
+deleted file mode 100644
+index a2692e605d640cd8c7bc0816f0a979ec2c10d106..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/hooks/useExampleTaskAddition.ts
++++ /dev/null
+@@ -1,104 +0,0 @@
+-import { useCallback, useState } from "react";
+-
+-import type { ExampleRecommendedTask } from "../model/exampleChat";
+-
+-interface ExampleTaskAdditionState {
+-  audience: string | null;
+-  tasks: ExampleRecommendedTask[];
+-  visibleCount: number;
+-  completedCount: number;
+-  focusRequest: number;
+-  isChatOpen: boolean;
+-}
+-
+-function createEmptyState(audience: string | null): ExampleTaskAdditionState {
+-  return {
+-    audience,
+-    tasks: [],
+-    visibleCount: 0,
+-    completedCount: 0,
+-    focusRequest: 0,
+-    isChatOpen: false,
+-  };
+-}
+-
+-export function useExampleTaskAddition({
+-  audience,
+-  isMobile,
+-}: {
+-  audience: string | null;
+-  isMobile: boolean;
+-}) {
+-  const [state, setState] = useState(() => createEmptyState(audience));
+-  // 인증 확인 중에는 기존 기록을 보존하고, 실제 사용자가 바뀌면 함께 초기화한다.
+-  if (audience !== null && state.audience !== audience) {
+-    setState(createEmptyState(audience));
+-  } else if (!isMobile && state.visibleCount < state.tasks.length) {
+-    // PC에서 확인한 목록은 모바일로 돌아온 뒤에도 유지한다.
+-    setState({ ...state, visibleCount: state.tasks.length });
+-  }
+-  const current =
+-    audience === null || state.audience === audience
+-      ? state
+-      : createEmptyState(audience);
+-
+-  const add = (task: ExampleRecommendedTask) => {
+-    if (current.tasks.some((item) => item.title === task.title)) return false;
+-    setState((previous) => {
+-      if (
+-        previous.audience !== audience ||
+-        previous.tasks.some((item) => item.title === task.title)
+-      )
+-        return previous;
+-      const tasks = [...previous.tasks, task];
+-      return {
+-        ...previous,
+-        tasks,
+-        visibleCount: isMobile ? previous.visibleCount : tasks.length,
+-        focusRequest: previous.focusRequest + (isMobile ? 0 : 1),
+-      };
+-    });
+-    return true;
+-  };
+-
+-  const showAddedTasks = () =>
+-    setState((previous) => ({
+-      ...previous,
+-      isChatOpen: false,
+-      visibleCount: previous.tasks.length,
+-      focusRequest: previous.focusRequest + 1,
+-    }));
+-
+-  const setChatOpen = (isChatOpen: boolean) =>
+-    setState((previous) => ({ ...previous, isChatOpen }));
+-
+-  const completeTask = useCallback(
+-    (title: string) => {
+-      setState((previous) =>
+-        previous.audience === audience &&
+-        previous.tasks[previous.completedCount]?.title === title
+-          ? { ...previous, completedCount: previous.completedCount + 1 }
+-          : previous,
+-      );
+-    },
+-    [audience],
+-  );
+-
+-  return {
+-    tasks: current.tasks,
+-    addedTaskCount: current.tasks.length,
+-    visibleCount: isMobile ? current.visibleCount : current.tasks.length,
+-    completedCount: current.completedCount,
+-    focusRequest: current.focusRequest,
+-    isChatOpen: current.isChatOpen,
+-    isPaused: isMobile && current.isChatOpen,
+-    add,
+-    showAddedTasks,
+-    setChatOpen,
+-    completeTask,
+-  };
+-}
+-
+-export type ExampleTaskAdditionController = ReturnType<
+-  typeof useExampleTaskAddition
+->;
+diff --git a/FE/src/features/ai-chat/model/aiChat.ts b/FE/src/features/ai-chat/model/aiChat.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ddef2b07cb6c6705fb5bd20034270a9f6acc2cab
+--- /dev/null
++++ b/FE/src/features/ai-chat/model/aiChat.ts
+@@ -0,0 +1,19 @@
++export const MAX_CHAT_MESSAGE_LENGTH = 4000;
++
++export function isValidChatMessage(text: string): boolean {
++  return Boolean(text.trim()) && text.length <= MAX_CHAT_MESSAGE_LENGTH;
++}
++
++export const suggestedQuestions = [
++  "웨딩홀을 정한 다음엔 뭘 준비할까?",
++  "촬영 전에 준비할 일을 정리해줘",
++];
++
++export type ChatMessage =
++  | { id: number; role: "user"; text: string; time: string }
++  | {
++      id: number;
++      role: "assistant";
++      text: string;
++      status: "streaming" | "complete" | "failed";
++    };
+diff --git a/FE/src/features/ai-chat/model/exampleChat.ts b/FE/src/features/ai-chat/model/exampleChat.ts
+deleted file mode 100644
+index 9dee2e87856cd2baccd2b8051da295f33190791f..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/model/exampleChat.ts
++++ /dev/null
+@@ -1,38 +0,0 @@
+-export const suggestedQuestions = [
+-  "웨딩홀을 정한 다음엔 뭘 준비할까?",
+-  "촬영 전에 준비할 일을 정리해줘",
+-];
+-
+-export const recommendedTasks = [
+-  { title: "주례 없는 예식 순서 정하기", step: "02 · 예식 진행 방식 결정" },
+-  { title: "사회자·축가 맡을 사람 정하기", step: "03 · 예식 진행 인원 섭외" },
+-];
+-
+-export type ExampleRecommendedTask = (typeof recommendedTasks)[number];
+-
+-export type ChatMessage =
+-  | { id: number; role: "user"; text: string; time: string }
+-  | {
+-      id: number;
+-      role: "assistant";
+-      kind: "guide" | "recommendations";
+-      text: string;
+-      cardIndex: number;
+-      feedback: string;
+-    };
+-
+-export function createExampleReply(
+-  id: number,
+-  isFirstMessage: boolean,
+-): ChatMessage {
+-  return {
+-    id,
+-    role: "assistant",
+-    kind: isFirstMessage ? "guide" : "recommendations",
+-    text: isFirstMessage
+-      ? "웨딩홀을 정하셨군요! 이제 예식 진행 방식과 함께할 사람들을 정하면 좋아요."
+-      : "카드를 한 장씩 확인해보세요. 오른쪽은 추가, 왼쪽은 넘기기예요.",
+-    cardIndex: 0,
+-    feedback: "",
+-  };
+-}
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+index b237c03e3054c3eeca579c08457c3f35632cef99..d034a3291a8d24141403a558b4f94e23efb2accb 100644
+--- a/FE/src/features/ai-chat/view/AiChat.css
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -23,14 +23,6 @@
+   background: var(--color-bg-layer-default);
+ }
+ 
+-.ai-chat-panel__badge {
+-  flex: none;
+-  align-self: flex-end;
+-  margin: 12px 20px 0;
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 11px;
+-}
+-
+ .ai-chat {
+   display: flex;
+   flex: 1;
+@@ -46,7 +38,7 @@
+   cursor: pointer;
+ }
+ 
+-.ai-chat :is(button, textarea, [tabindex]):focus-visible,
++.ai-chat :is(button, a, textarea, [tabindex]):focus-visible,
+ .ai-chat-launchers button:focus-visible,
+ .ai-chat-dialog__header button:focus-visible {
+   outline: 3px solid var(--color-stroke-focus-ring);
+@@ -169,21 +161,37 @@
+   font-size: 13px;
+ }
+ 
+-.ai-chat__guide {
+-  padding: 16px;
+-  margin: 16px 0;
+-  border-radius: 16px;
++.ai-chat__status,
++.ai-chat__incomplete {
++  margin: 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++}
++
++.ai-chat__error {
++  padding: 12px;
++  border-radius: 12px;
+   background: var(--color-bg-layer-basement);
++  font-size: 13px;
+ }
+ 
+-.ai-chat h3 {
+-  margin: 0;
+-  font-size: 14px;
++.ai-chat__error p {
++  margin: 0 0 8px;
+ }
+ 
+-.ai-chat__guide ol {
+-  margin: 6px 0 0;
+-  padding-left: 20px;
++.ai-chat__error button {
++  border: 0;
++  background: transparent;
++  color: var(--color-fg-brand);
++}
++
++.ai-chat__login {
++  margin-top: 24px;
++  padding: 12px 24px;
++  border-radius: 12px;
++  background: var(--color-bg-brand-solid);
++  color: var(--color-fg-on-brand);
++  text-decoration: none;
+ }
+ 
+ .ai-chat__composer {
+@@ -235,115 +243,6 @@
+   cursor: default;
+ }
+ 
+-.ai-chat-cards {
+-  margin-top: 18px;
+-}
+-
+-.ai-chat-cards__heading,
+-.ai-chat-cards__actions {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 8px;
+-}
+-
+-.ai-chat-cards__heading {
+-  margin: 0 16px 14px;
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 12px;
+-}
+-
+-.ai-chat-cards__stack {
+-  position: relative;
+-  isolation: isolate;
+-  margin: 0 12px 24px;
+-}
+-
+-.ai-chat-cards__stack::before,
+-.ai-chat-cards__stack::after {
+-  position: absolute;
+-  z-index: -1;
+-  inset: 0 6px -8px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 22px;
+-  background: var(--color-bg-layer-basement);
+-  content: "";
+-}
+-
+-.ai-chat-cards__stack::after {
+-  z-index: -2;
+-  inset: 0 12px -16px;
+-}
+-
+-.ai-chat-cards__card {
+-  position: relative;
+-  padding: 20px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 22px;
+-  background: var(--color-bg-layer-default);
+-  cursor: grab;
+-  touch-action: pan-y;
+-  user-select: none;
+-}
+-
+-.ai-chat-cards__number {
+-  color: var(--color-palette-coral-muted);
+-  font-size: 22px;
+-  font-weight: 700;
+-}
+-
+-.ai-chat-cards__card h4 {
+-  max-width: 145px;
+-  margin: 8px 0 30px;
+-  font-size: 17px;
+-  line-height: 1.5;
+-  word-break: keep-all;
+-}
+-
+-.ai-chat-cards__card :is(p, small) {
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 12px;
+-}
+-
+-.ai-chat-cards__direction {
+-  position: absolute;
+-  top: 14px;
+-  right: 14px;
+-  color: var(--color-fg-brand);
+-  font-size: 12px;
+-  font-weight: 700;
+-}
+-
+-.ai-chat-cards__actions button {
+-  padding: 8px 0;
+-  border: 0;
+-  background: transparent;
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 13px;
+-}
+-
+-.ai-chat-cards__actions button:last-child {
+-  color: var(--color-fg-brand);
+-  font-weight: 700;
+-}
+-
+-.ai-chat-cards__actions > span {
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 10px;
+-}
+-
+-.ai-chat-cards .ai-chat-cards__feedback {
+-  margin-top: 12px;
+-  color: var(--color-fg-brand);
+-  font-size: 12px;
+-}
+-
+-.ai-chat-cards__complete {
+-  padding: 20px;
+-  border-radius: 16px;
+-  background: var(--color-bg-layer-basement);
+-}
+-
+ .ai-chat__sr-only {
+   position: absolute;
+   width: 1px;
+@@ -353,138 +252,7 @@
+   white-space: nowrap;
+ }
+ 
+-.ai-task-preview {
+-  flex: none;
+-  min-width: 0;
+-  margin: 0 32px 12px;
+-  padding: 12px 16px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 16px;
+-  background: var(--color-bg-layer-default);
+-}
+-
+-.ai-task-preview__header {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 12px;
+-  margin-bottom: 8px;
+-}
+-
+-.ai-task-preview__header h2 {
+-  margin: 0;
+-  font-size: 14px;
+-}
+-
+-.ai-task-preview__header h2 span {
+-  margin-left: 6px;
+-  color: var(--color-fg-brand);
+-  font-size: 12px;
+-}
+-
+-.ai-task-preview__header > p,
+-.ai-task-preview__step {
+-  margin: 0;
+-  color: var(--color-fg-neutral-muted);
+-  font-size: 11px;
+-  line-height: 1.6;
+-}
+-
+-.ai-task-preview ul {
+-  max-height: min(160px, 25dvh);
+-  margin: 0;
+-  padding: 0;
+-  overflow-y: auto;
+-  list-style: none;
+-}
+-
+-.ai-task-preview__item {
+-  display: flex;
+-  align-items: flex-start;
+-  gap: 10px;
+-  padding: 10px 12px;
+-  border-radius: 10px;
+-  scroll-margin: 8px;
+-  transition: background-color 240ms ease;
+-}
+-
+-.ai-task-preview__item--writing {
+-  background: var(--color-bg-brand-weak);
+-}
+-
+-.ai-task-preview__item:focus-visible {
+-  outline: 2px solid var(--color-stroke-focus-ring);
+-  outline-offset: -2px;
+-}
+-
+-.ai-task-preview__item > div {
+-  min-width: 0;
+-}
+-
+-.ai-task-preview__marker {
+-  flex: none;
+-  color: var(--color-fg-brand);
+-  line-height: 1.5;
+-}
+-
+-.ai-task-preview__title {
+-  min-height: 21px;
+-  margin: 0 0 3px;
+-  font-size: 14px;
+-  line-height: 1.5;
+-  overflow-wrap: anywhere;
+-}
+-
+-.ai-task-preview__cursor {
+-  display: inline-block;
+-  width: 2px;
+-  height: 1em;
+-  margin-left: 3px;
+-  background: var(--color-fg-brand);
+-  vertical-align: -0.12em;
+-  animation: ai-task-cursor 700ms steps(2, start) infinite;
+-}
+-
+-@keyframes ai-task-cursor {
+-  to {
+-    opacity: 0;
+-  }
+-}
+-
+-.ai-chat__show-added {
+-  flex: none;
+-  min-height: 44px;
+-  margin: 0 16px max(12px, env(safe-area-inset-bottom));
+-  padding: 12px 16px;
+-  border: 0;
+-  border-radius: 12px;
+-  background: var(--color-bg-brand-solid);
+-  color: var(--color-fg-on-brand);
+-  cursor: pointer;
+-  font: inherit;
+-  font-size: 14px;
+-  font-weight: 700;
+-}
+-
+-.ai-chat__show-added:focus-visible {
+-  outline: 3px solid var(--color-stroke-focus-ring);
+-  outline-offset: 3px;
+-}
+-
+-@media (prefers-reduced-motion: reduce) {
+-  .ai-task-preview__item {
+-    transition: none;
+-  }
+-  .ai-task-preview__cursor {
+-    animation: none;
+-  }
+-}
+-
+ @media (max-width: 760px) {
+-  .ai-task-preview {
+-    margin: 0 16px 8px;
+-    padding: 12px;
+-  }
+   .ai-chat-feature {
+     display: contents;
+   }
+@@ -567,13 +335,6 @@
+     font-size: 16px;
+   }
+ 
+-  .ai-chat-dialog__header h2 span {
+-    margin-left: 6px;
+-    color: var(--color-fg-neutral-muted);
+-    font-size: 10px;
+-    font-weight: 400;
+-  }
+-
+   .ai-chat-dialog__header button {
+     width: 36px;
+     height: 36px;
+diff --git a/FE/src/features/ai-chat/view/AiChatView.tsx b/FE/src/features/ai-chat/view/AiChatView.tsx
+index da14213204aeebca7ce51fb4ad05f124a5a35f30..871a554664f4157d58faf9cc13ba10ce8f46149f 100644
+--- a/FE/src/features/ai-chat/view/AiChatView.tsx
++++ b/FE/src/features/ai-chat/view/AiChatView.tsx
+@@ -1,8 +1,12 @@
+ import { useEffect, useId, useRef } from "react";
+ 
+ import bibbidiLogo from "../../../assets/bibbidi-logo.png";
+-import { ChatMessage, suggestedQuestions } from "../model/exampleChat";
+-import { RecommendedTaskCards } from "./RecommendedTaskCards";
++import {
++  ChatMessage,
++  MAX_CHAT_MESSAGE_LENGTH,
++  isValidChatMessage,
++  suggestedQuestions,
++} from "../model/aiChat";
+ 
+ export function ChatIcon() {
+   return (
+@@ -22,16 +26,20 @@ export function AiChatView({
+   active,
+   draft,
+   messages,
+-  onChooseCard,
++  errorMessage,
++  isPending,
+   onDraftChange,
+   onSend,
++  onRetry,
+ }: {
+   active: boolean;
+   draft: string;
+   messages: ChatMessage[];
+-  onChooseCard: (messageId: number, add: boolean) => void;
++  errorMessage: string | null;
++  isPending: boolean;
+   onDraftChange: (value: string) => void;
+   onSend: (text: string) => void;
++  onRetry: () => void;
+ }) {
+   const logRef = useRef<HTMLDivElement>(null);
+   const composing = useRef(false);
+@@ -62,8 +70,9 @@ export function AiChatView({
+           </span>
+           <h2>어떤 준비를 도와드릴까요?</h2>
+           <p>
+-            원하는 준비를 말해주시면 나에게 맞는
+-            <br />할 일을 정리해드려요.
++            궁금한 준비를 말해주시면 나에게 맞는
++            <br />
++            안내를 드려요.
+           </p>
+           <div className="ai-chat__questions">
+             {suggestedQuestions.map((question) => (
+@@ -80,6 +89,7 @@ export function AiChatView({
+       ) : (
+         <div
+           aria-label="AI와 나눈 대화"
++          aria-busy={isPending}
+           aria-live="polite"
+           className="ai-chat__log"
+           ref={logRef}
+@@ -95,31 +105,29 @@ export function AiChatView({
+               {message.role === "assistant" ? (
+                 <strong className="ai-chat__author">Bibbidi</strong>
+               ) : null}
+-              <p>{message.text}</p>
++              {message.text ? <p>{message.text}</p> : null}
+               {message.role === "user" ? (
+                 <time>{message.time}</time>
+-              ) : message.kind === "guide" ? (
+-                <>
+-                  <div className="ai-chat__guide">
+-                    <h3>다음으로 준비하면 좋은 일</h3>
+-                    <ol>
+-                      <li>예식 형태와 입장 방식 정하기</li>
+-                      <li>사회자·축가·축사 맡을 사람 정하기</li>
+-                    </ol>
+-                  </div>
+-                  <p>원하시는 예식 분위기가 있나요?</p>
+-                </>
+-              ) : (
+-                <RecommendedTaskCards
+-                  cardIndex={message.cardIndex}
+-                  feedback={message.feedback}
+-                  onChoose={(add) => onChooseCard(message.id, add)}
+-                />
+-              )}
++              ) : message.status === "failed" ? (
++                <span className="ai-chat__incomplete">미완료 답변</span>
++              ) : null}
+             </div>
+           ))}
+         </div>
+       )}
++      {isPending ? (
++        <p className="ai-chat__status" role="status">
++          답변을 작성하고 있어요.
++        </p>
++      ) : null}
++      {errorMessage ? (
++        <div className="ai-chat__error" role="alert">
++          <p>{errorMessage}</p>
++          <button onClick={onRetry} type="button">
++            다시 시도
++          </button>
++        </div>
++      ) : null}
+       <form
+         className="ai-chat__composer"
+         onSubmit={(event) => {
+@@ -128,10 +136,11 @@ export function AiChatView({
+         }}
+       >
+         <label className="ai-chat__sr-only" htmlFor={inputId}>
+-          추가하고 싶은 일
++          AI에게 보낼 메시지
+         </label>
+         <textarea
+           id={inputId}
++          maxLength={MAX_CHAT_MESSAGE_LENGTH}
+           onChange={(event) => onDraftChange(event.target.value)}
+           onCompositionEnd={() => {
+             composing.current = false;
+@@ -151,11 +160,15 @@ export function AiChatView({
+               onSend(draft);
+             }
+           }}
+-          placeholder="추가하고 싶은 일을 이야기해요"
++          placeholder="궁금한 준비를 이야기해요"
+           rows={2}
+           value={draft}
+         />
+-        <button aria-label="메시지 전송" disabled={!draft.trim()} type="submit">
++        <button
++          aria-label="메시지 전송"
++          disabled={isPending || !isValidChatMessage(draft)}
++          type="submit"
++        >
+           ↑
+         </button>
+       </form>
+diff --git a/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx b/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx
+deleted file mode 100644
+index 41b98f3a156714f424df423c8e430d62f0f1c7cf..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/view/ExampleAddedTaskList.test.tsx
++++ /dev/null
+@@ -1,153 +0,0 @@
+-import { act, render, screen, within } from "@testing-library/react";
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-import { useCallback, useState } from "react";
+-import type { ComponentProps } from "react";
+-
+-import { recommendedTasks } from "../model/exampleChat";
+-import { ExampleAddedTaskList as ExampleAddedTaskListView } from "./ExampleAddedTaskList";
+-
+-function ExampleAddedTaskList(
+-  props: Omit<
+-    ComponentProps<typeof ExampleAddedTaskListView>,
+-    "completedCount" | "onTaskComplete"
+-  >,
+-) {
+-  const [completedCount, setCompletedCount] = useState(0);
+-  const onTaskComplete = useCallback(
+-    () => setCompletedCount((count) => count + 1),
+-    [],
+-  );
+-  return (
+-    <ExampleAddedTaskListView
+-      {...props}
+-      completedCount={completedCount}
+-      onTaskComplete={onTaskComplete}
+-    />
+-  );
+-}
+-
+-const scrollIntoView = vi.fn();
+-
+-beforeEach(() => {
+-  vi.useFakeTimers();
+-  vi.stubGlobal(
+-    "matchMedia",
+-    vi.fn().mockReturnValue({
+-      matches: false,
+-      addEventListener: vi.fn(),
+-      removeEventListener: vi.fn(),
+-    }),
+-  );
+-  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+-    configurable: true,
+-    value: scrollIntoView,
+-  });
+-  scrollIntoView.mockClear();
+-});
+-
+-afterEach(() => {
+-  vi.useRealTimers();
+-  vi.unstubAllGlobals();
+-  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+-});
+-
+-const props = {
+-  tasks: recommendedTasks,
+-  visibleCount: 2,
+-  focusRequest: 1,
+-  isPaused: false,
+-};
+-const tick = (milliseconds: number) =>
+-  act(() => vi.advanceTimersByTime(milliseconds));
+-const title = (index: number) =>
+-  within(screen.getAllByRole("listitem")[index]).getByText(
+-    (_text, element) => element?.className === "ai-task-preview__title",
+-  );
+-
+-describe("추천 할 일 추가 애니메이션", () => {
+-  it("리스트로 이동해 첫 글자부터 보여주고 선택 순서대로 항목을 완성한다", () => {
+-    render(<ExampleAddedTaskList {...props} />);
+-    expect(document.activeElement).toBe(screen.getAllByRole("listitem")[0]);
+-    expect(scrollIntoView).toHaveBeenCalledWith(
+-      expect.objectContaining({ behavior: "smooth" }),
+-    );
+-    expect(title(0).textContent).toBe("");
+-    expect(title(1).textContent).toBe("추가 대기 중");
+-    tick(280);
+-    expect(title(0).textContent).toBe("주");
+-    tick(1000);
+-    expect(title(0).textContent).toBe(recommendedTasks[0].title);
+-    expect(title(1).textContent).toBe("");
+-    tick(280);
+-    expect(title(1).textContent).toBe("사");
+-    tick(1000);
+-    expect(title(1).textContent).toBe(recommendedTasks[1].title);
+-    expect(screen.getByRole("status").textContent).toContain(
+-      recommendedTasks[1].title,
+-    );
+-    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
+-  });
+-
+-  it("재확인과 목록 갱신은 완성한 항목을 다시 타이핑하지 않는다", () => {
+-    const { rerender } = render(
+-      <ExampleAddedTaskList {...props} visibleCount={1} />,
+-    );
+-    tick(1300);
+-    rerender(
+-      <ExampleAddedTaskList {...props} visibleCount={1} focusRequest={2} />,
+-    );
+-    expect(title(0).textContent).toBe(recommendedTasks[0].title);
+-    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
+-    rerender(<ExampleAddedTaskList {...props} focusRequest={3} />);
+-    expect(title(0).textContent).toBe(recommendedTasks[0].title);
+-    expect(title(1).textContent).toBe("");
+-    tick(280);
+-    expect(title(1).textContent).toBe("사");
+-  });
+-
+-  it("채팅을 다시 열면 타이핑을 멈추고 닫으면 이어 쓰며 포커스를 빼앗지 않는다", () => {
+-    const { rerender } = render(<ExampleAddedTaskList {...props} />);
+-    tick(400);
+-    const partialTitle = title(0).textContent;
+-    rerender(<ExampleAddedTaskList {...props} isPaused />);
+-    const chatInput = document.createElement("input");
+-    document.body.append(chatInput);
+-    chatInput.focus();
+-    tick(2000);
+-    expect(title(0).textContent).toBe(partialTitle);
+-    rerender(<ExampleAddedTaskList {...props} />);
+-    tick(36);
+-    expect(title(0).textContent!.length).toBe(partialTitle!.length + 1);
+-    expect(document.activeElement).toBe(chatInput);
+-    chatInput.remove();
+-  });
+-
+-  it("모션 감소 설정에서는 완성된 글자를 즉시 표시하고 부드러운 이동을 생략한다", () => {
+-    vi.mocked(window.matchMedia).mockReturnValue({
+-      matches: true,
+-      addEventListener: vi.fn(),
+-      removeEventListener: vi.fn(),
+-    } as unknown as MediaQueryList);
+-    render(<ExampleAddedTaskList {...props} />);
+-    expect(title(0).textContent).toBe(recommendedTasks[0].title);
+-    expect(title(1).textContent).toBe(recommendedTasks[1].title);
+-    expect(document.querySelector(".ai-task-preview__cursor")).toBeNull();
+-    expect(scrollIntoView).toHaveBeenCalledWith(
+-      expect.objectContaining({ behavior: "auto" }),
+-    );
+-  });
+-
+-  it("미확인 항목은 노출·재생하지 않고 화면을 떠나면 타이머를 정리한다", () => {
+-    const { rerender, unmount } = render(
+-      <ExampleAddedTaskList {...props} visibleCount={0} />,
+-    );
+-    tick(2000);
+-    expect(screen.queryByRole("list")).toBeNull();
+-    expect(scrollIntoView).not.toHaveBeenCalled();
+-    rerender(<ExampleAddedTaskList {...props} />);
+-    tick(280);
+-    expect(title(0).textContent).toBe("주");
+-    unmount();
+-    expect(vi.getTimerCount()).toBe(0);
+-  });
+-});
+diff --git a/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx b/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx
+deleted file mode 100644
+index d2e424c220039211bb67798ba40b5a983ef64037..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/view/ExampleAddedTaskList.tsx
++++ /dev/null
+@@ -1,143 +0,0 @@
+-import { useEffect, useRef, useState } from "react";
+-
+-import { useMediaQuery } from "../../../shared/responsive";
+-import type { ExampleRecommendedTask } from "../model/exampleChat";
+-
+-function ExampleTaskRow({
+-  task,
+-  active,
+-  complete,
+-  isPaused,
+-  reducedMotion,
+-  onComplete,
+-}: {
+-  task: ExampleRecommendedTask;
+-  active: boolean;
+-  complete: boolean;
+-  isPaused: boolean;
+-  reducedMotion: boolean;
+-  onComplete: (title: string) => void;
+-}) {
+-  const characterCountRef = useRef(0);
+-  const [characterCount, setCharacterCount] = useState(0);
+-  const characters = Array.from(task.title);
+-
+-  useEffect(() => {
+-    if (!active || isPaused) return;
+-    let timer: ReturnType<typeof setTimeout>;
+-    const typeNext = () => {
+-      if (reducedMotion || characterCountRef.current >= characters.length) {
+-        onComplete(task.title);
+-        return;
+-      }
+-      characterCountRef.current += 1;
+-      setCharacterCount(characterCountRef.current);
+-      timer = setTimeout(typeNext, Math.min(36, 700 / characters.length));
+-    };
+-    timer = setTimeout(
+-      typeNext,
+-      reducedMotion ? 0 : characterCountRef.current > 0 ? 36 : 280,
+-    );
+-    return () => clearTimeout(timer);
+-  }, [
+-    active,
+-    isPaused,
+-    reducedMotion,
+-    characters.length,
+-    task.title,
+-    onComplete,
+-  ]);
+-
+-  return (
+-    <li
+-      aria-label={task.title}
+-      className={`ai-task-preview__item${active && !reducedMotion ? " ai-task-preview__item--writing" : ""}`}
+-      tabIndex={-1}
+-    >
+-      <span aria-hidden="true" className="ai-task-preview__marker">
+-        {complete || reducedMotion ? "✓" : "+"}
+-      </span>
+-      <div>
+-        <p aria-hidden="true" className="ai-task-preview__title">
+-          {complete || reducedMotion
+-            ? task.title
+-            : characters.slice(0, characterCount).join("")}
+-          {active && !reducedMotion ? (
+-            <span className="ai-task-preview__cursor" />
+-          ) : null}
+-          {!active && !complete && !reducedMotion ? "추가 대기 중" : null}
+-        </p>
+-        <p className="ai-task-preview__step">{task.step}</p>
+-      </div>
+-    </li>
+-  );
+-}
+-
+-export function ExampleAddedTaskList({
+-  tasks,
+-  visibleCount,
+-  focusRequest,
+-  isPaused,
+-  completedCount,
+-  onTaskComplete,
+-}: {
+-  tasks: ExampleRecommendedTask[];
+-  visibleCount: number;
+-  focusRequest: number;
+-  isPaused: boolean;
+-  completedCount: number;
+-  onTaskComplete: (title: string) => void;
+-}) {
+-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+-  const listRef = useRef<HTMLUListElement>(null);
+-  const lastFocusRequestRef = useRef(0);
+-
+-  useEffect(() => {
+-    if (isPaused || visibleCount === 0) return;
+-    const requestsFocus = lastFocusRequestRef.current !== focusRequest;
+-    if (!requestsFocus && completedCount >= visibleCount) return;
+-    const row = listRef.current?.children[
+-      Math.min(completedCount, visibleCount - 1)
+-    ] as HTMLElement | undefined;
+-    row?.scrollIntoView?.({
+-      behavior: reducedMotion ? "auto" : "smooth",
+-      block: "nearest",
+-      inline: "nearest",
+-    });
+-    if (requestsFocus) {
+-      lastFocusRequestRef.current = focusRequest;
+-      row?.focus({ preventScroll: true });
+-    }
+-  }, [focusRequest, visibleCount, completedCount, isPaused, reducedMotion]);
+-
+-  if (visibleCount === 0) return null;
+-
+-  return (
+-    <section aria-label="예시로 담은 일" className="ai-task-preview">
+-      <header className="ai-task-preview__header">
+-        <h2>
+-          예시로 담은 일 <span>{visibleCount}개</span>
+-        </h2>
+-        <p>예시 · 저장되지 않아요</p>
+-      </header>
+-      <ul aria-label="AI가 추가한 예시 할 일" ref={listRef}>
+-        {tasks.slice(0, visibleCount).map((task, index) => (
+-          <ExampleTaskRow
+-            key={task.title}
+-            task={task}
+-            active={index === completedCount}
+-            complete={index < completedCount}
+-            isPaused={isPaused}
+-            reducedMotion={reducedMotion}
+-            onComplete={onTaskComplete}
+-          />
+-        ))}
+-      </ul>
+-      <p className="ai-chat__sr-only" role="status">
+-        {completedCount > 0
+-          ? `${tasks[completedCount - 1]?.title} 예시 추가 완료`
+-          : "할 일을 추가하고 있어요."}
+-      </p>
+-    </section>
+-  );
+-}
+diff --git a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+index d61047683c680c2728b885474418674797dfdeab..b4e9f583bbb00b85c261d1f0d9b978279a489891 100644
+--- a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
++++ b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+@@ -24,6 +24,7 @@ export function MobileAiChatDialog({
+   useLayoutEffect(() => {
+     const dialog = dialogRef.current;
+     if (!dialog) return;
++    const launcher = returnFocusRef.current;
+     if (isOpen) {
+       dialog.showModal();
+     } else if (dialog.open) {
+@@ -37,8 +38,6 @@ export function MobileAiChatDialog({
+       if (dialog.open) dialog.close();
+       if (isOpen) {
+         queueMicrotask(() => {
+-          // eslint-disable-next-line react-hooks/exhaustive-deps -- 목록 보기 선택 시 복원을 취소할 수 있도록 닫힌 시점의 수동 포커스 대상을 읽는다.
+-          const launcher = returnFocusRef.current;
+           if (launcher?.isConnected && !dialog.open) launcher.focus();
+         });
+       }
+@@ -81,9 +80,7 @@ export function MobileAiChatDialog({
+         >
+           ‹
+         </button>
+-        <h2>
+-          AI 채팅 <span>예시</span>
+-        </h2>
++        <h2>AI 채팅</h2>
+         <button aria-label="AI 채팅 닫기" onClick={onClose} type="button">
+           ×
+         </button>
+diff --git a/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx b/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx
+deleted file mode 100644
+index 04301c0da2a398e458b4da88913cb13a9f7d6276..0000000000000000000000000000000000000000
+--- a/FE/src/features/ai-chat/view/RecommendedTaskCards.tsx
++++ /dev/null
+@@ -1,103 +0,0 @@
+-import { useRef, useState } from "react";
+-
+-import { recommendedTasks } from "../model/exampleChat";
+-
+-export function RecommendedTaskCards({
+-  cardIndex,
+-  feedback,
+-  onChoose,
+-}: {
+-  cardIndex: number;
+-  feedback: string;
+-  onChoose: (add: boolean) => void;
+-}) {
+-  const gesture = useRef<{ x: number; y: number; pointerId: number } | null>(
+-    null,
+-  );
+-  const [offset, setOffset] = useState(0);
+-  const task = recommendedTasks[cardIndex];
+-  const resetDrag = () => {
+-    gesture.current = null;
+-    setOffset(0);
+-  };
+-
+-  return (
+-    <section aria-label="추천 할 일" className="ai-chat-cards">
+-      {task ? (
+-        <>
+-          <div className="ai-chat-cards__heading">
+-            <h3>추천 할 일</h3>
+-            <span>
+-              {cardIndex + 1} / {recommendedTasks.length}
+-            </span>
+-          </div>
+-          <div className="ai-chat-cards__stack">
+-            <article
+-              aria-label={task.title}
+-              className="ai-chat-cards__card"
+-              onPointerCancel={resetDrag}
+-              onPointerDown={(event) => {
+-                if (event.button !== 0) return;
+-                gesture.current = {
+-                  x: event.clientX,
+-                  y: event.clientY,
+-                  pointerId: event.pointerId,
+-                };
+-                event.currentTarget.setPointerCapture?.(event.pointerId);
+-              }}
+-              onPointerMove={(event) => {
+-                const start = gesture.current;
+-                if (!start || start.pointerId !== event.pointerId) return;
+-                const dx = event.clientX - start.x;
+-                if (Math.abs(dx) > Math.abs(event.clientY - start.y)) {
+-                  setOffset(Math.max(-120, Math.min(120, dx)));
+-                }
+-              }}
+-              onPointerUp={(event) => {
+-                const start = gesture.current;
+-                resetDrag();
+-                if (!start || start.pointerId !== event.pointerId) return;
+-                const dx = event.clientX - start.x;
+-                if (
+-                  Math.abs(dx) >= 48 &&
+-                  Math.abs(dx) > Math.abs(event.clientY - start.y) * 1.5
+-                ) {
+-                  onChoose(dx > 0);
+-                }
+-              }}
+-              style={{
+-                transform: `translateX(${offset}px) rotate(${offset / 16}deg)`,
+-              }}
+-            >
+-              {Math.abs(offset) > 24 ? (
+-                <span className="ai-chat-cards__direction">
+-                  {offset > 0 ? "추가하기 →" : "← 넘기기"}
+-                </span>
+-              ) : null}
+-              <span className="ai-chat-cards__number">
+-                {String(cardIndex + 1).padStart(2, "0")}
+-              </span>
+-              <h4>{task.title}</h4>
+-              <p>{task.step}</p>
+-              <small>이 단계의 세부 할 일을 확인해보세요.</small>
+-            </article>
+-          </div>
+-          <div className="ai-chat-cards__actions">
+-            <button onClick={() => onChoose(false)} type="button">
+-              ← 넘기기
+-            </button>
+-            <span>좌우로 밀어 선택</span>
+-            <button onClick={() => onChoose(true)} type="button">
+-              추가하기 →
+-            </button>
+-          </div>
+-        </>
+-      ) : (
+-        <p className="ai-chat-cards__complete">추천 할 일을 모두 확인했어요.</p>
+-      )}
+-      <p className="ai-chat-cards__feedback" role="status">
+-        {feedback}
+-      </p>
+-    </section>
+-  );
+-}
+diff --git a/FE/src/features/landing/landingExamples.ts b/FE/src/features/landing/landingExamples.ts
+index 9dc22dd1a65d966221a4d7b0f2d07956ee6441a2..5a9b049a17bea0efbcfc894ccd174f9e0eb58ffe 100644
+--- a/FE/src/features/landing/landingExamples.ts
++++ b/FE/src/features/landing/landingExamples.ts
+@@ -1,7 +1,4 @@
+-import {
+-  recommendedTasks,
+-  suggestedQuestions,
+-} from "../ai-chat/model/exampleChat";
++import { suggestedQuestions } from "../ai-chat/model/aiChat";
+ 
+ export const landingChatExamples = [
+   {
+@@ -10,7 +7,13 @@ export const landingChatExamples = [
+       "웨딩홀을 정하셨군요!",
+       "이제 예식 진행 방식과 함께할 사람들을 정하면 좋아요.",
+     ],
+-    tasks: recommendedTasks,
++    tasks: [
++      { title: "주례 없는 예식 순서 정하기", step: "02 · 예식 진행 방식 결정" },
++      {
++        title: "사회자·축가 맡을 사람 정하기",
++        step: "03 · 예식 진행 인원 섭외",
++      },
++    ],
+   },
+   {
+     question: suggestedQuestions[1],
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index eca93d20b68720e13bf6f6af57d91baef3a82da3..0852e06f7b9930af0cd2f7c606f1b129664d3881 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -1,6 +1,5 @@
+ import {
+   fireEvent,
+-  cleanup,
+   act,
+   render,
+   screen,
+@@ -22,6 +21,11 @@ const mocks = vi.hoisted(() => ({
+   getCatalogItemIds: vi.fn(),
+   addCatalogItemIds: vi.fn(),
+   revision: 0,
++  stream: vi.fn(),
++}));
++vi.mock("../ai-chat/api/streamAiChat", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("../ai-chat/api/streamAiChat")>()),
++  streamAiChat: mocks.stream,
+ }));
+ vi.mock("../auth", () => ({
+   useAuth: () => ({
+@@ -100,6 +104,11 @@ beforeEach(() => {
+     user: { id: 1, nickname: "비비디" },
+   };
+   mocks.revision = 0;
++  mocks.stream.mockReset();
++  mocks.stream.mockImplementation(async (_request, receiver) => {
++    receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
++    receiver.onDelta("실제 준비 안내");
++  });
+   mocks.getChecklist.mockResolvedValue(checklist);
+   mocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+   mocks.getCatalogItemIds.mockResolvedValue(["101"]);
+@@ -114,16 +123,6 @@ afterEach(() => {
+   vi.restoreAllMocks();
+ });
+ 
+-function showChatRecommendations() {
+-  fireEvent.click(
+-    screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+-  );
+-  fireEvent.change(screen.getByRole("textbox", { name: "추가하고 싶은 일" }), {
+-    target: { value: "추천해줘" },
+-  });
+-  fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
+-}
+-
+ function showAll() {
+   fireEvent.click(
+     within(screen.getByRole("navigation", { name: "로드맵 보기" })).getByRole(
+@@ -134,234 +133,68 @@ function showAll() {
+ }
+ 
+ describe("준비 로드맵 보기 전환", () => {
+-  it("인증 확인 후 같은 사용자로 복귀해도 완료한 추천을 다시 타이핑하지 않는다", async () => {
+-    const { rerender } = render(<PreparationRoadmapFeature />);
+-    await screen.findByText("내 웨딩홀 투어");
+-    vi.useFakeTimers();
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    act(() => vi.advanceTimersByTime(1300));
+-    const owner = mocks.authState;
+-    mocks.authState = { status: "loading" };
+-    rerender(<PreparationRoadmapFeature />);
+-    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
+-    mocks.authState = owner;
+-    await act(async () => {
+-      rerender(<PreparationRoadmapFeature />);
+-    });
+-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
+-    expect(
+-      within(preview).getByText("주례 없는 예식 순서 정하기"),
+-    ).toBeTruthy();
+-    expect(preview.querySelector(".ai-task-preview__cursor")).toBeNull();
+-    act(() => vi.advanceTimersByTime(1300));
+-    expect(
+-      within(preview).getByText("주례 없는 예식 순서 정하기"),
+-    ).toBeTruthy();
+-  });
+-
+-  it("인증 확인 후 채팅이 다시 생성되어도 기존 추천을 중복 추가하지 않는다", async () => {
+-    const { rerender } = render(<PreparationRoadmapFeature />);
++  it("로그인 사용자는 실제 채팅을 사용하고 카테고리·로드맵 전환 중 대화를 유지한다", async () => {
++    render(<PreparationRoadmapFeature />);
+     await screen.findByText("내 웨딩홀 투어");
+-    vi.useFakeTimers();
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    const owner = mocks.authState;
+-    mocks.authState = { status: "loading" };
+-    rerender(<PreparationRoadmapFeature />);
+-    mocks.authState = owner;
+-    await act(async () => {
+-      rerender(<PreparationRoadmapFeature />);
+-    });
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
+-    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
+-    expect(screen.getByRole("log").textContent).toContain(
+-      "이미 예시로 추가했어요",
++    fireEvent.click(
++      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+     );
+-    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+-  });
+-
+-  it("실제 사용자가 바뀌면 추가 목록과 완료 기록을 함께 초기화한다", async () => {
+-    const { rerender } = render(<PreparationRoadmapFeature />);
+-    await screen.findByText("내 웨딩홀 투어");
+-    vi.useFakeTimers();
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    act(() => vi.advanceTimersByTime(1300));
+-    const owner = mocks.authState;
+-    mocks.authState = {
+-      status: "authenticated",
+-      user: { id: 2, nickname: "다른 사용자" },
+-    };
+-    await act(async () => {
+-      rerender(<PreparationRoadmapFeature />);
+-    });
+-    expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
+-    mocks.authState = owner;
+-    await act(async () => {
+-      rerender(<PreparationRoadmapFeature />);
++    await screen.findByText("실제 준비 안내");
++    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
++    expect(screen.getByRole("log").textContent).toContain("실제 준비 안내");
++    showAll();
++    await screen.findByRole("button", {
++      name: "01 스드메 상담·견적과 패키지 계약",
+     });
++    expect(screen.getByRole("log").textContent).toContain("실제 준비 안내");
++    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+     expect(screen.queryByRole("region", { name: "예시로 담은 일" })).toBeNull();
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
+-    expect(within(preview).getAllByRole("listitem")).toHaveLength(1);
+-    expect(
+-      within(preview).queryByText("주례 없는 예식 순서 정하기"),
+-    ).toBeNull();
+-    act(() => vi.advanceTimersByTime(1300));
+-    expect(
+-      within(preview).getByText("주례 없는 예식 순서 정하기"),
+-    ).toBeTruthy();
+   });
+ 
+-  it("PC 추천 추가는 예시 리스트에서 타이핑하고 저장된 내 할 일과 브라우저 저장소를 바꾸지 않는다", async () => {
+-    const storage = vi.spyOn(Storage.prototype, "setItem");
++  it("비로그인은 채팅에서 로그인 안내를 보고 카테고리 전환으로 API를 호출하지 않는다", async () => {
++    mocks.authState = { status: "guest" };
+     render(<PreparationRoadmapFeature />);
+-    await screen.findByText("내 웨딩홀 투어");
+-    vi.useFakeTimers();
+-    showChatRecommendations();
+-    fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-    const preview = screen.getByRole("region", { name: "예시로 담은 일" });
+-    const row = within(preview).getByRole("listitem", {
+-      name: "주례 없는 예식 순서 정하기",
+-    });
+-    expect(document.activeElement).toBe(row);
+-    expect(
+-      within(preview).queryByText("주례 없는 예식 순서 정하기"),
+-    ).toBeNull();
+-    act(() => vi.advanceTimersByTime(1300));
++    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
++    const chat = screen.getByRole("complementary", { name: "AI 채팅" });
+     expect(
+-      within(preview).getByText("주례 없는 예식 순서 정하기"),
+-    ).toBeTruthy();
+-    expect(screen.getByText("2개 단계 · 내 할 일 2개 · 완료 0개")).toBeTruthy();
+-    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+-    expect(storage).not.toHaveBeenCalled();
++      within(chat).getByRole("link", { name: "로그인" }).getAttribute("href"),
++    ).toBe("/login");
++    expect(within(chat).queryByRole("textbox")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
++    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
++    expect(within(chat).getByText("로그인하고 AI와 대화해요")).toBeTruthy();
++    expect(mocks.stream).not.toHaveBeenCalled();
+   });
+ 
+-  it("모바일에서 연속 선택한 뒤 보기 버튼으로 예시 리스트에 포커스를 넘기고 순서대로 쓴다", async () => {
+-    vi.stubGlobal(
+-      "matchMedia",
+-      vi.fn().mockImplementation((query: string) => ({
+-        matches: query === "(max-width: 760px)",
+-        addEventListener: vi.fn(),
+-        removeEventListener: vi.fn(),
+-      })),
+-    );
+-    const descriptors = Object.getOwnPropertyDescriptors(
+-      HTMLDialogElement.prototype,
+-    );
+-    Object.defineProperties(HTMLDialogElement.prototype, {
+-      showModal: {
+-        configurable: true,
+-        value(this: HTMLDialogElement) {
+-          this.setAttribute("open", "");
+-        },
+-      },
+-      close: {
+-        configurable: true,
+-        value(this: HTMLDialogElement) {
+-          this.removeAttribute("open");
+-        },
+-      },
++  it("사용자 변경 시 대화와 진행 요청을 초기화하고 이전 사용자의 늦은 조각을 무시한다", async () => {
++    mocks.stream.mockImplementationOnce((_request, receiver) => {
++      receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
++      receiver.onDelta("이전 사용자 답변");
++      return new Promise(() => {});
+     });
+-    try {
+-      const { rerender } = render(<PreparationRoadmapFeature />);
+-      await screen.findByText("내 웨딩홀 투어");
+-      vi.useFakeTimers();
+-      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-      showChatRecommendations();
+-      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-      fireEvent.click(screen.getByRole("button", { name: "추가하기 →" }));
+-      expect(screen.getByRole("dialog")).toBeTruthy();
+-      expect(
+-        screen.queryByRole("region", { name: "예시로 담은 일" }),
+-      ).toBeNull();
+-      fireEvent.click(
+-        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
+-      );
+-      expect(screen.queryByRole("dialog")).toBeNull();
+-      const preview = screen.getByRole("region", { name: "예시로 담은 일" });
+-      const rows = within(preview).getAllByRole("listitem");
+-      await act(async () => {
+-        await Promise.resolve();
+-      });
+-      expect(document.activeElement).toBe(rows[0]);
+-      act(() => vi.advanceTimersByTime(1300));
+-      expect(
+-        within(preview).getByText("주례 없는 예식 순서 정하기"),
+-      ).toBeTruthy();
+-      expect(
+-        within(preview).queryByText("사회자·축가 맡을 사람 정하기"),
+-      ).toBeNull();
+-      act(() => vi.advanceTimersByTime(1300));
+-      expect(
+-        within(preview).getByText("사회자·축가 맡을 사람 정하기"),
+-      ).toBeTruthy();
+-      expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
+-      fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+-      expect(screen.getByText("추천 할 일을 모두 확인했어요.")).toBeTruthy();
+-      const owner = mocks.authState;
+-      mocks.authState = { status: "loading" };
+-      rerender(<PreparationRoadmapFeature />);
+-      mocks.authState = owner;
+-      await act(async () => {
+-        rerender(<PreparationRoadmapFeature />);
+-      });
+-      expect(screen.getByRole("dialog")).toBeTruthy();
+-      fireEvent.click(
+-        screen.getByRole("button", { name: "추가한 할 일 2개 보기" }),
+-      );
+-      const restoredPreview = screen.getByRole("region", {
+-        name: "예시로 담은 일",
+-      });
+-      expect(
+-        within(restoredPreview).getByText("주례 없는 예식 순서 정하기"),
+-      ).toBeTruthy();
+-      expect(
+-        within(restoredPreview).getByText("사회자·축가 맡을 사람 정하기"),
+-      ).toBeTruthy();
+-      expect(
+-        restoredPreview.querySelector(".ai-task-preview__cursor"),
+-      ).toBeNull();
+-    } finally {
+-      cleanup();
+-      for (const method of ["showModal", "close"] as const) {
+-        if (descriptors[method])
+-          Object.defineProperty(
+-            HTMLDialogElement.prototype,
+-            method,
+-            descriptors[method],
+-          );
+-        else
+-          delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
+-            method
+-          ];
+-      }
+-    }
+-  });
+-
+-  it("비로그인도 채팅을 사용하고 카테고리·로드맵 보기 전환 중 대화를 유지한다", async () => {
+-    mocks.authState = { status: "guest" };
+-    render(<PreparationRoadmapFeature />);
+-    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
++    const { rerender } = render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
+     fireEvent.click(
+-      screen.getByRole("button", {
+-        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
+-      }),
++      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+     );
+-    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+-    expect(screen.getByRole("log").textContent).toContain(
+-      "다음으로 준비하면 좋은 일",
+-    );
+-    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+-    expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
+-    expect(screen.getByRole("log").textContent).toContain(
+-      "다음으로 준비하면 좋은 일",
++    const previousReceiver = mocks.stream.mock.calls[0][1];
++    const previousSignal = mocks.stream.mock.calls[0][2] as AbortSignal;
++    expect(screen.getByText("이전 사용자 답변")).toBeTruthy();
++    mocks.authState = {
++      status: "authenticated",
++      user: { id: 2, nickname: "다른 사용자" },
++    };
++    rerender(<PreparationRoadmapFeature />);
++    expect(previousSignal.aborted).toBe(true);
++    expect(screen.queryByRole("log")).toBeNull();
++    act(() => previousReceiver.onDelta("늦은 답변"));
++    expect(screen.queryByText("늦은 답변")).toBeNull();
++    fireEvent.click(
++      screen.getByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
+     );
+-    expect(mocks.addCatalogItemIds).not.toHaveBeenCalled();
++    await screen.findByText("실제 준비 안내");
++    expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
++    expect(screen.queryByText("이전 사용자 답변")).toBeNull();
+   });
+ 
+   it("상단 현황은 빈 단계를 포함하고 직접 추가한 일과 완료 상태를 집계한다", async () => {
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.tsx b/FE/src/features/preparation/RoadmapWorkspace.tsx
+index 854038d7ad2497721da896cb7e0e6f4b676d36fb..17ce3399e0ac03994054aa92f5c7aa955fc83880 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.tsx
+@@ -1,9 +1,6 @@
+ import { ReactNode, useState } from "react";
+ import { useAuth } from "../auth";
+ import { AiChatFeature } from "../ai-chat/AiChatFeature";
+-import { useExampleTaskAddition } from "../ai-chat/hooks/useExampleTaskAddition";
+-import { ExampleAddedTaskList } from "../ai-chat/view/ExampleAddedTaskList";
+-import { useIsMobileLayout } from "../../shared/responsive";
+ import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
+ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+ import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
+@@ -23,7 +20,6 @@ export function RoadmapWorkspace({
+   }) => ReactNode;
+ }) {
+   const { authState, refreshAuth } = useAuth();
+-  const isMobile = useIsMobileLayout();
+   const [choice, setChoice] = useState<{
+     audience: string;
+     view: RoadmapView;
+@@ -41,13 +37,6 @@ export function RoadmapWorkspace({
+         ? "personal"
+         : "all";
+   const showAll = () => setChoice({ audience, view: "all" });
+-  const addition = useExampleTaskAddition({
+-    audience:
+-      authState.status === "authenticated" || authState.status === "guest"
+-        ? audience
+-        : null,
+-    isMobile,
+-  });
+ 
+   if (authState.status === "error") {
+     return <PreparationRoadmapState status="error" onRetry={refreshAuth} />;
+@@ -70,15 +59,6 @@ export function RoadmapWorkspace({
+           <h1>우리 결혼 준비, 한 단계씩</h1>
+           <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
+         </header>
+-        <ExampleAddedTaskList
+-          key={audience}
+-          tasks={addition.tasks}
+-          visibleCount={addition.visibleCount}
+-          focusRequest={addition.focusRequest}
+-          isPaused={addition.isPaused}
+-          completedCount={addition.completedCount}
+-          onTaskComplete={addition.completeTask}
+-        />
+         <div id="roadmap-view-content">
+           {view === "all" || !isAuthenticated ? (
+             renderCatalogRoadmap({
+@@ -99,7 +79,11 @@ export function RoadmapWorkspace({
+           )}
+         </div>
+       </div>
+-      <AiChatFeature key={audience} addition={addition} />
++      <AiChatFeature
++        key={audience}
++        isAuthenticated={isAuthenticated}
++        onAuthenticationRequired={refreshAuth}
++      />
+     </div>
+   );
+ }

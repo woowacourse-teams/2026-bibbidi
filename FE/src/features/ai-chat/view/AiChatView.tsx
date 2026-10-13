@@ -1,8 +1,12 @@
 import { useEffect, useId, useRef } from "react";
 
 import bibbidiLogo from "../../../assets/bibbidi-logo.png";
-import { ChatMessage, suggestedQuestions } from "../model/exampleChat";
-import { RecommendedTaskCards } from "./RecommendedTaskCards";
+import {
+  ChatMessage,
+  MAX_CHAT_MESSAGE_LENGTH,
+  isValidChatMessage,
+  suggestedQuestions,
+} from "../model/aiChat";
 
 export function ChatIcon() {
   return (
@@ -22,16 +26,20 @@ export function AiChatView({
   active,
   draft,
   messages,
-  onChooseCard,
+  errorMessage,
+  isPending,
   onDraftChange,
   onSend,
+  onRetry,
 }: {
   active: boolean;
   draft: string;
   messages: ChatMessage[];
-  onChooseCard: (messageId: number, add: boolean) => void;
+  errorMessage: string | null;
+  isPending: boolean;
   onDraftChange: (value: string) => void;
   onSend: (text: string) => void;
+  onRetry: () => void;
 }) {
   const logRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
@@ -62,8 +70,9 @@ export function AiChatView({
           </span>
           <h2>어떤 준비를 도와드릴까요?</h2>
           <p>
-            원하는 준비를 말해주시면 나에게 맞는
-            <br />할 일을 정리해드려요.
+            궁금한 준비를 말해주시면 나에게 맞는
+            <br />
+            안내를 드려요.
           </p>
           <div className="ai-chat__questions">
             {suggestedQuestions.map((question) => (
@@ -80,6 +89,7 @@ export function AiChatView({
       ) : (
         <div
           aria-label="AI와 나눈 대화"
+          aria-busy={isPending}
           aria-live="polite"
           className="ai-chat__log"
           ref={logRef}
@@ -95,31 +105,29 @@ export function AiChatView({
               {message.role === "assistant" ? (
                 <strong className="ai-chat__author">Bibbidi</strong>
               ) : null}
-              <p>{message.text}</p>
+              {message.text ? <p>{message.text}</p> : null}
               {message.role === "user" ? (
                 <time>{message.time}</time>
-              ) : message.kind === "guide" ? (
-                <>
-                  <div className="ai-chat__guide">
-                    <h3>다음으로 준비하면 좋은 일</h3>
-                    <ol>
-                      <li>예식 형태와 입장 방식 정하기</li>
-                      <li>사회자·축가·축사 맡을 사람 정하기</li>
-                    </ol>
-                  </div>
-                  <p>원하시는 예식 분위기가 있나요?</p>
-                </>
-              ) : (
-                <RecommendedTaskCards
-                  cardIndex={message.cardIndex}
-                  feedback={message.feedback}
-                  onChoose={(add) => onChooseCard(message.id, add)}
-                />
-              )}
+              ) : message.status === "failed" ? (
+                <span className="ai-chat__incomplete">미완료 답변</span>
+              ) : null}
             </div>
           ))}
         </div>
       )}
+      {isPending ? (
+        <p className="ai-chat__status" role="status">
+          답변을 작성하고 있어요.
+        </p>
+      ) : null}
+      {errorMessage ? (
+        <div className="ai-chat__error" role="alert">
+          <p>{errorMessage}</p>
+          <button onClick={onRetry} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
       <form
         className="ai-chat__composer"
         onSubmit={(event) => {
@@ -128,10 +136,11 @@ export function AiChatView({
         }}
       >
         <label className="ai-chat__sr-only" htmlFor={inputId}>
-          추가하고 싶은 일
+          AI에게 보낼 메시지
         </label>
         <textarea
           id={inputId}
+          maxLength={MAX_CHAT_MESSAGE_LENGTH}
           onChange={(event) => onDraftChange(event.target.value)}
           onCompositionEnd={() => {
             composing.current = false;
@@ -151,11 +160,15 @@ export function AiChatView({
               onSend(draft);
             }
           }}
-          placeholder="추가하고 싶은 일을 이야기해요"
+          placeholder="궁금한 준비를 이야기해요"
           rows={2}
           value={draft}
         />
-        <button aria-label="메시지 전송" disabled={!draft.trim()} type="submit">
+        <button
+          aria-label="메시지 전송"
+          disabled={isPending || !isValidChatMessage(draft)}
+          type="submit"
+        >
           ↑
         </button>
       </form>
