@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.restdocs.payload.PayloadDocumentation;
 import org.springframework.test.context.jdbc.Sql;
 
-@Sql("/terms-fixture.sql")
+@Sql("/fixtures/terms-fixture.sql")
 class TermsControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Test

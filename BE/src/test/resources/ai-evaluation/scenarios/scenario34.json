@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario34",
+  "metrics": [
+    "FollowingInstructions",
+    "ProfessionalStyleAndTone"
+  ],
+  "userMessage": "웨딩홀 계약은 끝났어요. 웨딩홀 카테고리 항목은 빼고 다음 준비 항목 두 개만 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "웨딩홀 항목을 제외하고 '스드메 상담'과 '본식스냅 계약' 등 다른 준비 항목 두 개를 제시한다.",
+  "expectedRefusal": "none"
+}

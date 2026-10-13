@@ -1,0 +1,42 @@
+{
+  "id": "Coherence",
+  "task": "답변의 추론과 설명이 일관적인가",
+  "rubric": "일정 완료와 준비 항목 완료, 등록 항목 완료와 전체 준비 완료를 혼동하지 않는다. 이전 대화와 모순되지 않는다.",
+  "scale": [
+    {
+      "value": 0,
+      "definition": "전혀 충족하지 않음"
+    },
+    {
+      "value": 1,
+      "definition": "대부분 미충족"
+    },
+    {
+      "value": 2,
+      "definition": "부분 충족"
+    },
+    {
+      "value": 3,
+      "definition": "대체로 충족"
+    },
+    {
+      "value": 4,
+      "definition": "완전히 충족"
+    }
+  ],
+  "direction": "높을수록 논리적",
+  "reportOnly": true,
+  "requiredInputs": [
+    "chatMemory",
+    "userMessage",
+    "modelResponse",
+    "observedToolResults"
+  ],
+  "promptOrder": [
+    "role",
+    "task",
+    "rubric",
+    "input"
+  ],
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+}

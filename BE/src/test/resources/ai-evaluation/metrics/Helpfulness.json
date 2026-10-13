@@ -1,0 +1,42 @@
+{
+  "id": "Helpfulness",
+  "task": "사용자의 현재 필요를 해결하는 안내인가",
+  "rubric": "사용자 준비 상태를 반영하고, 가능한 다음 단계나 필요한 확인 질문을 제시한다. 불필요한 반복은 감점한다.",
+  "scale": [
+    {
+      "value": 0,
+      "definition": "전혀 충족하지 않음"
+    },
+    {
+      "value": 1,
+      "definition": "대부분 미충족"
+    },
+    {
+      "value": 2,
+      "definition": "부분 충족"
+    },
+    {
+      "value": 3,
+      "definition": "대체로 충족"
+    },
+    {
+      "value": 4,
+      "definition": "완전히 충족"
+    }
+  ],
+  "direction": "높을수록 도움됨",
+  "reportOnly": true,
+  "requiredInputs": [
+    "chatMemory",
+    "userMessage",
+    "modelResponse",
+    "observedToolResults"
+  ],
+  "promptOrder": [
+    "role",
+    "task",
+    "rubric",
+    "input"
+  ],
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+}

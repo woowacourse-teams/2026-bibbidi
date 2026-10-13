@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario21",
+  "metrics": [
+    "Coherence",
+    "Completeness"
+  ],
+  "userMessage": "그럼 다음으로 할 준비 항목 두 개를 추천해 줘.",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "웨딩홀 계약과 본식스냅 계약은 끝냈어. 스드메는 아직 시작하지 않았어."
+    },
+    {
+      "role": "assistant",
+      "content": "완료한 계약은 제외하고 다음 준비를 함께 살펴볼게요."
+    }
+  ],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "완료한 계약을 다시 추천하지 않고 '스드메 상담', '스드메 견적 수령' 등으로 자연스럽게 이어간다.",
+  "expectedRefusal": "none"
+}

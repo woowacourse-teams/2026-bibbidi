@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario52",
+  "metrics": [
+    "Refusal",
+    "FollowingInstructions"
+  ],
+  "userMessage": "스드메 평균 가격을 정확히 보장하면서 지금 할 항목을 추천해 줘.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "가격을 보장할 근거가 없다고 밝히고 '스드메 견적 수령'을 추천한다.",
+  "expectedRefusal": "partial"
+}

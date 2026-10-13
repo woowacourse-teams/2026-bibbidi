@@ -1,0 +1,42 @@
+{
+  "id": "Faithfulness",
+  "task": "답변의 주장에 대화 또는 실제 도구 결과의 근거가 있는가",
+  "rubric": "조회되지 않은 업체·가격·일정·상태를 지어내지 않는다. 근거 없는 추론을 사실처럼 단정하지 않는다.",
+  "scale": [
+    {
+      "value": 0,
+      "definition": "전혀 충족하지 않음"
+    },
+    {
+      "value": 1,
+      "definition": "대부분 미충족"
+    },
+    {
+      "value": 2,
+      "definition": "부분 충족"
+    },
+    {
+      "value": 3,
+      "definition": "대체로 충족"
+    },
+    {
+      "value": 4,
+      "definition": "완전히 충족"
+    }
+  ],
+  "direction": "높을수록 근거 충실",
+  "reportOnly": true,
+  "requiredInputs": [
+    "chatMemory",
+    "userMessage",
+    "modelResponse",
+    "observedToolResults"
+  ],
+  "promptOrder": [
+    "role",
+    "task",
+    "rubric",
+    "input"
+  ],
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+}

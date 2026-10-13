@@ -1,0 +1,42 @@
+{
+  "id": "Correctness",
+  "task": "응답의 사실과 상태 판단이 주어진 대화 및 기준 사실에 비추어 정확한가",
+  "rubric": "상태값, 날짜, 계산, 항목 구분의 사실 오류를 찾는다.",
+  "scale": [
+    {
+      "value": 0,
+      "definition": "전혀 충족하지 않음"
+    },
+    {
+      "value": 1,
+      "definition": "대부분 미충족"
+    },
+    {
+      "value": 2,
+      "definition": "부분 충족"
+    },
+    {
+      "value": 3,
+      "definition": "대체로 충족"
+    },
+    {
+      "value": 4,
+      "definition": "완전히 충족"
+    }
+  ],
+  "direction": "높을수록 정확함",
+  "reportOnly": true,
+  "requiredInputs": [
+    "chatMemory",
+    "userMessage",
+    "modelResponse",
+    "observedToolResults"
+  ],
+  "promptOrder": [
+    "role",
+    "task",
+    "rubric",
+    "input"
+  ],
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+}

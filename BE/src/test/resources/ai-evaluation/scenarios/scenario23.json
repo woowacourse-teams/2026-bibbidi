@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario23",
+  "metrics": [
+    "Coherence",
+    "Completeness"
+  ],
+  "userMessage": "그것까지 끝냈어. 다음 준비 항목은 뭐야?",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "촬영 사진 셀렉은 끝났어. 다음에 뭘 해야 해?"
+    },
+    {
+      "role": "assistant",
+      "content": "보정본을 받는 단계를 확인하면 좋겠어요."
+    },
+    {
+      "role": "user",
+      "content": "보정본도 이미 받았어."
+    },
+    {
+      "role": "assistant",
+      "content": "그다음 단계를 찾아볼게요."
+    }
+  ],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "이미 완료한 '촬영 사진 셀렉'과 '보정본 수령'을 제외하고 '앨범 구성 결정과 주문'을 추천한다.",
+  "expectedRefusal": "none"
+}

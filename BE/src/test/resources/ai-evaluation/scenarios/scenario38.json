@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario38",
+  "metrics": [
+    "ProfessionalStyleAndTone",
+    "Refusal"
+  ],
+  "userMessage": "양가와 예산 이야기가 잘 안 돼 마음이 복잡해요. 가족과 상의할 준비 항목을 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "상황을 존중하는 말투로 '총예산 수립'과 '예식 일정·조건 조율' 같은 항목을 추천한다.",
+  "expectedRefusal": "none"
+}

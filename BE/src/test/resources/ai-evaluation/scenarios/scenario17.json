@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario17",
+  "metrics": [
+    "Helpfulness",
+    "Relevance"
+  ],
+  "userMessage": "평일에는 시간이 거의 없어요. 웨딩홀을 정하기 전에 이번 주말에 집중할 항목 두 개를 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'예식 지역 결정'과 '웨딩홀 투어'를 우선순위와 실행 순서에 맞게 제안한다.",
+  "expectedRefusal": "none"
+}

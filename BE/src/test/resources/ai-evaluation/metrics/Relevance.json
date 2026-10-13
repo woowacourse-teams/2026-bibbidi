@@ -1,0 +1,42 @@
+{
+  "id": "Relevance",
+  "task": "현재 질문과 이전 대화 맥락에 맞는가",
+  "rubric": "질문과 관계없는 일반 설명에 치우치지 않는다. 지시어는 ChatMemory의 선행 항목에 연결한다.",
+  "scale": [
+    {
+      "value": 0,
+      "definition": "전혀 충족하지 않음"
+    },
+    {
+      "value": 1,
+      "definition": "대부분 미충족"
+    },
+    {
+      "value": 2,
+      "definition": "부분 충족"
+    },
+    {
+      "value": 3,
+      "definition": "대체로 충족"
+    },
+    {
+      "value": 4,
+      "definition": "완전히 충족"
+    }
+  ],
+  "direction": "높을수록 관련성 큼",
+  "reportOnly": true,
+  "requiredInputs": [
+    "chatMemory",
+    "userMessage",
+    "modelResponse",
+    "observedToolResults"
+  ],
+  "promptOrder": [
+    "role",
+    "task",
+    "rubric",
+    "input"
+  ],
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+}

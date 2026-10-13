@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "scenario18",
+  "metrics": [
+    "Helpfulness",
+    "Relevance"
+  ],
+  "userMessage": "웨딩홀 계약은 끝났고 촬영 업체는 아직 못 찾았어요. 바로 다음에 챙길 준비 항목을 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'본식스냅 계약'을 우선 추천하고 필요하면 '스튜디오 선택'과 구분한다.",
+  "expectedRefusal": "none"
+}
