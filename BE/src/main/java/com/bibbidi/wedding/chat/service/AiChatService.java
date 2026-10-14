@@ -2,6 +2,8 @@ package com.bibbidi.wedding.chat.service;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.chat.tools.ChatToolContext;
+import com.bibbidi.wedding.chat.tools.RecommendationTools;
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Iterator;
@@ -24,11 +26,13 @@ public class AiChatService {
 
     private final ChatClient chatClient;
     private final ChatMemory chatMemory;
+    private final ChecklistService checklistService;
     private final Set<ConversationKey> activeConversations = ConcurrentHashMap.newKeySet();
 
-    public AiChatService(ChatClient chatClient, ChatMemory chatMemory) {
+    public AiChatService(ChatClient chatClient, ChatMemory chatMemory, ChecklistService checklistService) {
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
+        this.checklistService = checklistService;
     }
 
     public void chat(Long userId, @Nullable UUID conversationId, String message, ChatSseHandler reply) {
@@ -52,6 +56,7 @@ public class AiChatService {
         Flux<String> answerChunks = chatClient.prompt()
                 .messages(chatMemory.get(key.toMemoryKey()))
                 .messages(new UserMessage(message))
+                .tools(new RecommendationTools(checklistService, reply::sendComponent))
                 .toolContext(new ChatToolContext(key.userId()).toMap())
                 .stream()
                 .content();

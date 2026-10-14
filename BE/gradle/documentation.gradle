@@ -68,7 +68,7 @@ tasks.matching { it.name == 'openapi3' }.configureEach {
         if (spec.components.schemas.containsKey('ChatEventStream')) {
             spec.components.schemas.ChatEventStream = [
                     type: 'string',
-                    description: 'conversation, delta, done 또는 failure 이벤트를 전송하는 SSE 텍스트 스트림'
+                    description: 'conversation, delta, component, done 또는 failure 이벤트를 전송하는 SSE 텍스트 스트림. component 데이터는 추천 순서의 catalogItemIds 배열을 포함한다.'
             ]
             specFile.text = yaml.dump(spec)
         }

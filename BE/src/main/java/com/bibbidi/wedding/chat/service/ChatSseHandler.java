@@ -5,6 +5,7 @@ import com.bibbidi.wedding.chat.infra.sse.SseConnection;
 import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
 import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import java.util.List;
 
 public final class ChatSseHandler {
 
@@ -20,6 +21,10 @@ public final class ChatSseHandler {
 
     public void sendAnswerChunk(String text) {
         connection.send(new SseEvent(ChatEventType.DELTA, new ChatResponse.Delta(text)));
+    }
+
+    public void sendComponent(List<Long> catalogItemIds) {
+        connection.send(new SseEvent(ChatEventType.COMPONENT, new ChatResponse.Component(catalogItemIds)));
     }
 
     public void complete(ChatResult result, Runnable rememberTurn) {

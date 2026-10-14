@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatSseHandler;
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
 import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
@@ -62,7 +63,7 @@ class AiChatLifecycleTest {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
         memory = MessageWindowChatMemory.builder().maxMessages(20).build();
-        chat = new AiChatService(ChatClient.create(model), memory);
+        chat = new AiChatService(ChatClient.create(model), memory, mock(ChecklistService.class));
         scheduler = mock(ScheduledExecutorService.class);
         timeout = new AtomicReference<>();
         executor = Executors.newVirtualThreadPerTaskExecutor();

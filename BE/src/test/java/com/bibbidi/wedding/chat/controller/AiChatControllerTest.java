@@ -96,8 +96,8 @@ class AiChatControllerTest {
     }
 
     @Test
-    @DisplayName("응답이 완료되기 전에도 대화 ID와 답변 조각을 전송한다")
-    void streamsConversationAndAnswerChunksBeforeCompletion() throws Exception {
+    @DisplayName("응답이 완료되기 전에도 대화 ID와 답변 조각 및 추천 카드를 전송한다")
+    void streamsConversationAnswerChunksAndComponentsBeforeCompletion() throws Exception {
         // given
         CountDownLatch answerChunkAllowed = new CountDownLatch(1);
         CountDownLatch completionAllowed = new CountDownLatch(1);
@@ -106,6 +106,7 @@ class AiChatControllerTest {
             reply.conversation(ID);
             answerChunkAllowed.await();
             reply.sendAnswerChunk("웨딩홀 ");
+            reply.sendComponent(List.of(1L, 2L, 3L));
             completionAllowed.await();
             reply.complete(new ChatResult(ID, "웨딩홀 "), () -> {});
             return null;
@@ -128,7 +129,8 @@ class AiChatControllerTest {
                 String body = initial.getResponse().getContentAsString(StandardCharsets.UTF_8);
                 assertThat(body)
                         .containsSubsequence("event:conversation", "\"conversationId\":\"" + ID + "\"",
-                                "event:delta", "\"text\":\"웨딩홀 \"")
+                                "event:delta", "\"text\":\"웨딩홀 \"", "event:component",
+                                "data:{\"catalogItemIds\":[1,2,3]}")
                         .doesNotContain("event:done", "event:failure");
             });
         } finally {
@@ -148,6 +150,7 @@ class AiChatControllerTest {
             reply.conversation(ID);
             reply.sendAnswerChunk("웨딩홀 ");
             reply.sendAnswerChunk("계약을 확인하세요.");
+            reply.sendComponent(List.of(1L, 2L, 3L));
             reply.complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
             return null;
         }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
@@ -169,7 +172,9 @@ class AiChatControllerTest {
                         preprocessResponse(), resource(ResourceSnippetParameters.builder()
                         .tag("AI Chat").summary("결혼 준비 AI 대화")
                         .description("로그인 사용자의 결혼 준비 질문에 SSE로 답변합니다. "
-                                + "대화 ID와 답변 조각을 전송하고, 정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
+                                + "대화 ID와 답변 조각을 전송하고, 추천 카드가 있으면 component 이벤트의 catalogItemIds 배열로 전달합니다. "
+                                + "배열 순서가 추천 순서이며, component는 도구 실행 시 답변 조각 사이에도 올 수 있습니다. "
+                                + "정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
                         .requestSchema(schema("ChatRequest"))
                         .responseSchema(schema("ChatEventStream"))
                         .requestHeaders(headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
@@ -177,7 +182,8 @@ class AiChatControllerTest {
                                 fieldWithPath("message").description("사용자 메시지. 공백 제외 필수, 최대 4000자"))
                         .build()))).andReturn();
         String body = completed.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(body).containsSubsequence("event:conversation", "event:delta", "웨딩홀 ", "event:delta", "계약을 확인하세요.", "event:done")
+        assertThat(body).containsSubsequence("event:conversation", "event:delta", "웨딩홀 ", "event:delta", "계약을 확인하세요.",
+                        "event:component", "data:{\"catalogItemIds\":[1,2,3]}", "event:done")
                 .doesNotContain("event:failure");
     }
 

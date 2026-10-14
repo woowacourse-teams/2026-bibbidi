@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.chat.tools.ChatToolContext;
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
@@ -67,7 +68,7 @@ class AiChatServiceTest {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
         memory = MessageWindowChatMemory.builder().maxMessages(20).build();
-        service = new AiChatService(ChatClient.create(model), memory);
+        service = new AiChatService(ChatClient.create(model), memory, mock(ChecklistService.class));
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
         reply = mock(ChatSseHandler.class);
