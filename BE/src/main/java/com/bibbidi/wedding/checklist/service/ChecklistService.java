@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,13 @@ public class ChecklistService {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
         List<ChecklistItemWithAppointmentsResult> items = getChecklistItemWithAppointmentsResults(checklist);
         return new ChecklistWithAppointmentsResult(checklist.id(), items);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ChecklistWithAppointmentsResult> findMyChecklistIfPresent(Long ownerId) {
+        return checklistRepository.findByOwnerId(ownerId)
+                .map(checklist -> new ChecklistWithAppointmentsResult(checklist.id(),
+                        getChecklistItemWithAppointmentsResults(checklist)));
     }
 
     @Transactional(readOnly = true)

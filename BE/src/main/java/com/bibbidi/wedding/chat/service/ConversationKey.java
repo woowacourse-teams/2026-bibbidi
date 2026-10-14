@@ -7,6 +7,11 @@ public record ConversationKey(
         UUID conversationId
 ) {
 
+    public static ConversationKey fromMemoryKey(String key) {
+        String[] parts = key.split(":", 2);
+        return new ConversationKey(Long.valueOf(parts[0]), UUID.fromString(parts[1]));
+    }
+
     public String toMemoryKey() {
         return userId + ":" + conversationId;
     }
