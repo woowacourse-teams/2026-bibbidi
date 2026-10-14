@@ -1,12 +1,14 @@
 import {
   fireEvent,
   act,
-  render,
+  render as renderView,
   screen,
   within,
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ReactElement } from "react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { AuthState } from "../auth/model/auth";
 import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
 import { installMatchMedia } from "../../test/matchMedia";
@@ -23,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   addCatalogItemIds: vi.fn(),
   revision: 0,
   stream: vi.fn(),
+  command: { changeItemStatus: vi.fn(), hasRemainingAppointments: vi.fn() },
+  track: vi.fn(),
 }));
 vi.mock("../ai-chat/api/streamAiChat", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../ai-chat/api/streamAiChat")>()),
@@ -39,6 +43,8 @@ vi.mock("../checklist/checklistQueryDependencies", () => {
   return {
     useChecklistQueryRepository: () => repository,
     useChecklistRevision: () => mocks.revision,
+    useChecklistCommandRepository: () => mocks.command,
+    useChecklistCacheRepository: () => repository,
   };
 });
 vi.mock("./preparationDependencies", () => {
@@ -52,12 +58,36 @@ vi.mock("./preparationDependencies", () => {
   };
 });
 vi.mock("../../infrastructure/analytics", () => ({
-  analytics: { track: vi.fn() },
+  analytics: { track: mocks.track },
 }));
 
 import { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
 import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 import { ChecklistQueryAuthenticationRequiredError } from "../checklist/repository/checklistQueryRepository";
+import { ChecklistFeature } from "../checklist/ChecklistFeature";
+import { ChecklistItemChangeError } from "../checklist/repository/myChecklistCommandRepository";
+import { MyChecklistAuthenticationRequiredError } from "../checklist/repository/myChecklistQueryRepository";
+
+function CurrentUrl() {
+  const location = useLocation();
+  return (
+    <div data-testid="current-url">
+      {location.pathname}
+      {location.search}
+    </div>
+  );
+}
+
+function render(ui: ReactElement) {
+  return renderView(ui, {
+    wrapper: ({ children }) => (
+      <MemoryRouter>
+        {children}
+        <CurrentUrl />
+      </MemoryRouter>
+    ),
+  });
+}
 
 function item(id: number, title: string, custom = false) {
   return {
@@ -105,6 +135,8 @@ beforeEach(() => {
     user: { id: 1, nickname: "비비디" },
   };
   mocks.revision = 0;
+  mocks.command.changeItemStatus.mockResolvedValue(undefined);
+  mocks.command.hasRemainingAppointments.mockResolvedValue(false);
   mocks.stream.mockReset();
   mocks.stream.mockImplementation(async (_request, receiver) => {
     receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
@@ -364,7 +396,7 @@ describe("준비 로드맵 보기 전환", () => {
     await screen.findByText(/내 할 일 0개 · 완료 0개/);
   });
 
-  it("각 카드에 완료 상태와 일정을 조회용으로 표시하고 변경 뒤 갱신한다", async () => {
+  it("각 카드에 완료 상태와 일정을 표시하고 변경 뒤 갱신한다", async () => {
     mocks.getChecklist.mockResolvedValue({
       categories: [
         {
@@ -377,8 +409,14 @@ describe("준비 로드맵 보기 전환", () => {
     const card = await screen.findByRole("article", { name: "내가 추가한 일" });
     expect(within(card).getByText("내 할 일 1개 · 완료 1개")).toBeTruthy();
     expect(within(card).getByText("완료 · 일정 없음")).toBeTruthy();
-    expect(within(card).queryByRole("checkbox")).toBeNull();
-    expect(within(card).queryByRole("button")).toBeNull();
+    expect(
+      within(card).getByRole<HTMLInputElement>("checkbox", {
+        name: "우리만의 준비 완료",
+      }).checked,
+    ).toBe(true);
+    expect(
+      within(card).getByRole("button", { name: /우리만의 준비/ }),
+    ).toBeTruthy();
     mocks.getChecklist.mockResolvedValue(checklist);
     mocks.revision += 1;
     rerender(<PreparationRoadmapFeature />);
@@ -594,5 +632,282 @@ describe("준비 로드맵 보기 전환", () => {
     rerender(<PreparationRoadmapFeature />);
     expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
     expect(screen.getByRole("status").textContent).toContain("불러오고");
+  });
+});
+
+describe("내 로드맵 할 일 동작", () => {
+  it.each([
+    ["prev", "done", "완료"],
+    ["continue", "done", "완료"],
+    ["done", "continue", "진행 중"],
+  ] as const)(
+    "%s 항목의 체크박스를 누르면 %s로 저장하고 현황을 갱신한다",
+    async (before, after, label) => {
+      let current = structuredClone(checklist);
+      current.categories[0].steps![0].items[0].status = before;
+      mocks.getChecklist.mockImplementation(async () => current);
+      mocks.command.changeItemStatus.mockImplementation(async () => {
+        current = structuredClone(current);
+        current.categories[0].steps![0].items[0].status = after;
+        mocks.revision += 1;
+      });
+      render(<PreparationRoadmapFeature />);
+      fireEvent.click(
+        await screen.findByRole("checkbox", { name: "내 웨딩홀 투어 완료" }),
+      );
+      await waitFor(() =>
+        expect(mocks.command.changeItemStatus).toHaveBeenCalledWith(
+          1,
+          after,
+          expect.any(AbortSignal),
+        ),
+      );
+      const row = await screen.findByRole("button", {
+        name: new RegExp(`내 웨딩홀 투어 ${label}`),
+      });
+      expect(within(row).getByText(`${label} · 일정 없음`)).toBeTruthy();
+      const card = screen.getByRole("article", { name: "웨딩홀 투어와 계약" });
+      expect(
+        within(card).getByText(
+          `내 할 일 1개 · 완료 ${after === "done" ? 1 : 0}개`,
+        ),
+      ).toBeTruthy();
+      expect(screen.getByTestId("current-url").textContent).toBe("/");
+      expect(mocks.command.hasRemainingAppointments).toHaveBeenCalledTimes(
+        after === "done" ? 1 : 0,
+      );
+      expect(mocks.track).toHaveBeenCalledTimes(after === "done" ? 1 : 0);
+    },
+  );
+
+  it("완료 확인 취소는 저장하지 않고, 동의하면 남은 일정과 함께 완료한다", async () => {
+    mocks.command.hasRemainingAppointments.mockResolvedValue(true);
+    render(<PreparationRoadmapFeature />);
+    const checkbox = await screen.findByRole<HTMLInputElement>("checkbox", {
+      name: "내 웨딩홀 투어 완료",
+    });
+    fireEvent.click(checkbox);
+    let dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    expect(checkbox.checked).toBe(false);
+    expect(mocks.command.changeItemStatus).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mocks.track).not.toHaveBeenCalled();
+    fireEvent.click(checkbox);
+    dialog = await screen.findByRole("dialog", {
+      name: "남은 일정도 완료할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
+    await waitFor(() =>
+      expect(mocks.command.changeItemStatus).toHaveBeenCalledWith(
+        1,
+        "done",
+        expect.any(AbortSignal),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mocks.track).toHaveBeenCalledOnce();
+    expect(mocks.track).toHaveBeenCalledWith({
+      name: "checklist_task_complete",
+      parameters: { action: "complete", category_id: "wedding-hall" },
+    });
+    expect(screen.getByTestId("current-url").textContent).toBe("/");
+  });
+
+  it("저장 중 중복 조작을 막고 저장 실패 시 체크 상태를 유지하며 재시도한다", async () => {
+    let reject: (error: unknown) => void = () => undefined;
+    mocks.command.changeItemStatus.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, rejectRequest) => {
+          reject = rejectRequest;
+        }),
+    );
+    render(<PreparationRoadmapFeature />);
+    const checkbox = await screen.findByRole<HTMLInputElement>("checkbox", {
+      name: "우리만의 준비 완료",
+    });
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(mocks.command.changeItemStatus).toHaveBeenCalledOnce(),
+    );
+    expect(checkbox.disabled).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: /우리만의 준비 예정/,
+      }).disabled,
+    ).toBe(true);
+    await act(async () => reject(new ChecklistItemChangeError("unknown")));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(checkbox.checked).toBe(false);
+    expect(checkbox.disabled).toBe(false);
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(mocks.command.changeItemStatus).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("인증 만료 시 저장 실패를 알리고 세션을 갱신한다", async () => {
+    mocks.command.changeItemStatus.mockRejectedValueOnce(
+      new MyChecklistAuthenticationRequiredError(),
+    );
+    render(<PreparationRoadmapFeature />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "우리만의 준비 완료" }),
+    );
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(mocks.refreshAuth).toHaveBeenCalledOnce();
+  });
+
+  it("저장 후 조회 실패는 오래된 카드를 숨기고 재조회로 복구한다", async () => {
+    mocks.command.changeItemStatus.mockRejectedValueOnce(
+      new ChecklistItemChangeError(
+        "refresh-failed",
+        "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+      ),
+    );
+    render(<PreparationRoadmapFeature />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "우리만의 준비 완료" }),
+    );
+    await screen.findByText(
+      "상태는 변경됐지만 최신 체크리스트를 불러오지 못했습니다. 다시 조회해주세요.",
+    );
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByRole("checkbox", { name: "우리만의 준비 완료" });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(mocks.command.changeItemStatus).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])(
+    "모바일=%s에서 상세를 열고 닫으면 보던 로드맵 카테고리로 돌아온다",
+    async (mobile) => {
+      installMatchMedia("(max-width: 760px)", mobile);
+      const current = structuredClone(checklist);
+      current.categories[1].customItems = [
+        { ...item(3, "스드메 상담", true), categoryId: "studio-dress-makeup" },
+      ];
+      mocks.getChecklist.mockResolvedValue(current);
+      renderView(
+        <MemoryRouter initialEntries={["/preparation"]}>
+          <Routes>
+            <Route
+              path="/preparation"
+              element={<PreparationRoadmapFeature />}
+            />
+            <Route path="/checklist" element={<ChecklistFeature />} />
+          </Routes>
+          <CurrentUrl />
+        </MemoryRouter>,
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "스드메" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /스드메 상담 예정/ }),
+      );
+      const detail = await screen.findByRole(
+        mobile ? "dialog" : "complementary",
+        { name: "스드메 상담" },
+      );
+      expect(screen.getByTestId("current-url").textContent).toBe(
+        "/checklist?taskId=checklist-item-3",
+      );
+      expect(mocks.command.changeItemStatus).not.toHaveBeenCalled();
+      if (mobile) {
+        fireEvent.click(
+          document.querySelector(
+            ".checklist-detail-bottom-sheet__scrim",
+          ) as HTMLButtonElement,
+        );
+        fireEvent.transitionEnd(detail, { propertyName: "transform" });
+      } else {
+        fireEvent.click(
+          within(detail).getByRole("button", { name: "할 일 상세 닫기" }),
+        );
+      }
+      await screen.findByRole("button", { name: /스드메 상담 예정/ });
+      expect(screen.getByTestId("current-url").textContent).toBe(
+        "/preparation?categoryId=studio-dress-makeup",
+      );
+      expect(
+        screen
+          .getByRole("button", { name: "스드메" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+    },
+  );
+});
+
+describe("내 로드맵 갱신 중 목록 유지", () => {
+  it("완료 저장 중과 갱신 후에도 카드·행 목록의 스크롤 위치를 유지한다", async () => {
+    const updated = structuredClone(checklist);
+    updated.categories[0].steps![0].items[0].status = "done";
+    let resolveRefresh: (value: ChecklistQueryModel) => void = () => undefined;
+    mocks.getChecklist.mockResolvedValueOnce(checklist).mockImplementationOnce(
+      () =>
+        new Promise<ChecklistQueryModel>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    mocks.command.changeItemStatus.mockImplementationOnce(async () => {
+      mocks.revision += 1;
+    });
+    render(<PreparationRoadmapFeature />);
+    const checkbox = await screen.findByRole<HTMLInputElement>("checkbox", {
+      name: "내 웨딩홀 투어 완료",
+    });
+    const cards = screen.getByRole("list", { name: "내 할 일이 있는 단계" });
+    const tasks = screen.getByRole("list", {
+      name: "웨딩홀 투어와 계약의 할 일",
+    });
+    cards.scrollLeft = 240;
+    tasks.scrollTop = 80;
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(mocks.getChecklist).toHaveBeenCalledTimes(2));
+    expect(cards.isConnected).toBe(true);
+    expect(tasks.isConnected).toBe(true);
+    expect(checkbox.disabled).toBe(true);
+    await act(async () => resolveRefresh(updated));
+    await screen.findByRole("button", { name: /내 웨딩홀 투어 완료/ });
+    expect(screen.getByRole("list", { name: "내 할 일이 있는 단계" })).toBe(
+      cards,
+    );
+    expect(
+      screen.getByRole("list", { name: "웨딩홀 투어와 계약의 할 일" }),
+    ).toBe(tasks);
+    expect(cards.scrollLeft).toBe(240);
+    expect(tasks.scrollTop).toBe(80);
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox.disabled).toBe(false);
+  });
+
+  it("백그라운드 조회 실패 시 기존 카드를 숨기고 재시도로 복구한다", async () => {
+    let rejectRefresh: (error: unknown) => void = () => undefined;
+    mocks.getChecklist
+      .mockResolvedValueOnce(checklist)
+      .mockImplementationOnce(
+        () =>
+          new Promise<ChecklistQueryModel>((_resolve, reject) => {
+            rejectRefresh = reject;
+          }),
+      )
+      .mockResolvedValue(checklist);
+    const { rerender } = render(<PreparationRoadmapFeature />);
+    await screen.findByRole("checkbox", { name: "내 웨딩홀 투어 완료" });
+    mocks.revision += 1;
+    rerender(<PreparationRoadmapFeature />);
+    expect(
+      screen.getByRole<HTMLInputElement>("checkbox", {
+        name: "내 웨딩홀 투어 완료",
+      }).disabled,
+    ).toBe(true);
+    await act(async () => rejectRefresh(new Error("조회 실패")));
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByRole("checkbox", { name: "내 웨딩홀 투어 완료" });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

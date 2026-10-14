@@ -11,6 +11,7 @@ import { ChecklistAppointmentCreation } from "./ChecklistAppointmentCreation";
 import { ChecklistModalDialog } from "./ChecklistModalDialog";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
+import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 
 interface ChecklistProps {
@@ -23,6 +24,7 @@ interface ChecklistProps {
   onBackTaskDetail: () => void;
   onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
+  onDismissTaskDetail?: () => void;
   onOpenTaskCreation?: () => void;
   onRequestScheduleCreation?: () => void;
   onSelectTask: (taskId: string) => void;
@@ -54,6 +56,7 @@ export function Checklist({
   onBackTaskDetail,
   onCancelLoginRequired,
   onCloseTaskDetail,
+  onDismissTaskDetail = onCloseTaskDetail,
   onOpenTaskCreation,
   onRequestScheduleCreation,
   onSelectTask,
@@ -310,7 +313,7 @@ export function Checklist({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onCloseTaskDetail();
+        onDismissTaskDetail();
       }
     };
 
@@ -322,7 +325,7 @@ export function Checklist({
     isAppointmentDeletionOpen,
     isAppointmentEditingOpen,
     isMobileLayout,
-    onCloseTaskDetail,
+    onDismissTaskDetail,
     selectedTaskContext,
   ]);
 
@@ -636,7 +639,7 @@ export function Checklist({
             categories={categories}
             categoryTitle={selectedTaskContext.categoryTitle}
             editing={itemEditing}
-            onClose={onCloseTaskDetail}
+            onClose={onDismissTaskDetail}
             onRequestScheduleCreation={onRequestScheduleCreation}
             task={selectedTaskContext.task}
           />
@@ -717,45 +720,15 @@ export function Checklist({
       ) : null}
 
       {statusConfirmation ? (
-        <ChecklistModalDialog
-          actions={
-            <>
-              <button
-                disabled={isStatusChangePending}
-                onClick={() =>
-                  itemEditing?.cancelStatusChange(statusConfirmation.itemId)
-                }
-                type="button"
-              >
-                취소
-              </button>
-              <button
-                disabled={isStatusChangePending}
-                onClick={() =>
-                  void itemEditing?.confirmStatusChange(
-                    statusConfirmation.itemId,
-                  )
-                }
-                type="button"
-              >
-                {isStatusChangePending ? "변경 중" : "함께 완료"}
-              </button>
-            </>
+        <ChecklistStatusConfirmationDialog
+          isPending={isStatusChangePending}
+          errorMessage={statusConfirmationError}
+          onCancel={() =>
+            itemEditing?.cancelStatusChange(statusConfirmation.itemId)
           }
-          description={
-            <>
-              이 할 일을 완료하면 아직 남아 있는 일정도 함께 완료돼요.
-              {statusConfirmationError ? (
-                <p role="alert">{statusConfirmationError}</p>
-              ) : null}
-            </>
+          onConfirm={() =>
+            void itemEditing?.confirmStatusChange(statusConfirmation.itemId)
           }
-          onEscape={() => {
-            if (!isStatusChangePending) {
-              itemEditing?.cancelStatusChange(statusConfirmation.itemId);
-            }
-          }}
-          title="남은 일정도 완료할까요?"
         />
       ) : null}
 

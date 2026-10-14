@@ -51,13 +51,21 @@ export function useRoadmapChecklist(enabled = true) {
     return () => controller.abort();
   }, [repository, revision, owner, enabled, refreshAuth, retryCount]);
 
+  const isRefreshing = Boolean(
+    enabled &&
+    result?.owner === owner &&
+    result.request.status === "success" &&
+    result.revision !== revision,
+  );
   const request: ChecklistRequest =
-    enabled && result?.owner === owner && result.revision === revision
+    enabled &&
+    result?.owner === owner &&
+    (result.revision === revision || isRefreshing)
       ? result.request
       : { status: "loading" };
   const retry = () => {
     setResult(null);
     setRetryCount((value) => value + 1);
   };
-  return { request, retry };
+  return { request, isRefreshing, retry };
 }

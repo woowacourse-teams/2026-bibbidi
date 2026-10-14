@@ -98,12 +98,42 @@
 .personal-roadmap__task {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding-bottom: 24px;
+  gap: 2px;
+  padding-bottom: 12px;
 }
 
-.personal-roadmap__task > div {
+.personal-roadmap__task-detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 44px;
   min-width: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.personal-roadmap__task-detail:is(:hover, :active) {
+  background: var(--color-bg-neutral-weak);
+}
+
+.personal-roadmap__task-detail:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+}
+
+.personal-roadmap__checkbox-target {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  padding-top: 11px;
+  cursor: pointer;
 }
 
 .personal-roadmap__task-title {
@@ -115,30 +145,11 @@
 }
 
 .personal-roadmap__status {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
   width: 16px;
   height: 16px;
-  margin-top: 3px;
-  border: 1px solid var(--color-stroke-neutral);
-  border-radius: 4px;
-}
-
-.personal-roadmap__status--complete {
-  border-color: var(--color-stroke-brand-solid);
-  background: var(--color-bg-brand-solid);
-  color: var(--color-fg-on-brand);
-}
-
-.personal-roadmap__status svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  margin: 0;
+  accent-color: var(--color-bg-brand-solid);
+  cursor: pointer;
 }
 
 .personal-roadmap :is(ol, ul):focus-visible {

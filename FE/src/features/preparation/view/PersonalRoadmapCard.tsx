@@ -2,8 +2,14 @@ import { PersonalRoadmapGroupViewModel } from "../view-model/createPersonalRoadm
 
 export function PersonalRoadmapCard({
   group,
+  onTaskSelect,
+  onTaskComplete,
+  isChangingStatus,
 }: {
   group: PersonalRoadmapGroupViewModel;
+  onTaskSelect: (taskId: string) => void;
+  onTaskComplete: (taskId: string, checked: boolean) => void;
+  isChangingStatus: boolean;
 }) {
   return (
     <article
@@ -25,22 +31,30 @@ export function PersonalRoadmapCard({
       >
         {group.tasks.map((task) => (
           <li className="personal-roadmap__task" key={task.id}>
-            <span
-              aria-hidden="true"
-              className={`personal-roadmap__status${task.isComplete ? " personal-roadmap__status--complete" : ""}`}
+            <label className="personal-roadmap__checkbox-target">
+              <input
+                aria-label={`${task.title} 완료`}
+                checked={task.isComplete}
+                className="personal-roadmap__status"
+                disabled={isChangingStatus}
+                onChange={(event) =>
+                  onTaskComplete(task.id, event.target.checked)
+                }
+                type="checkbox"
+              />
+            </label>
+            <button
+              aria-label={`${task.title} ${task.statusLabel} ${task.schedule} 상세 보기`}
+              className="personal-roadmap__task-detail"
+              disabled={isChangingStatus}
+              onClick={() => onTaskSelect(task.id)}
+              type="button"
             >
-              {task.isComplete ? (
-                <svg viewBox="0 0 16 16" fill="none">
-                  <path d="m3 8 3 3 7-7" />
-                </svg>
-              ) : null}
-            </span>
-            <div>
-              <p className="personal-roadmap__task-title">{task.title}</p>
-              <p className="personal-roadmap__task-meta">
+              <span className="personal-roadmap__task-title">{task.title}</span>
+              <span className="personal-roadmap__task-meta">
                 {task.statusLabel} · {task.schedule}
-              </p>
-            </div>
+              </span>
+            </button>
           </li>
         ))}
       </ul>
