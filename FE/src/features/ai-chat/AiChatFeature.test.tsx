@@ -203,7 +203,7 @@ describe("실제 AI 채팅", () => {
       if (isMobile) mockMobileDialog();
       render(chat());
       if (isMobile)
-        fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+        fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
       send("**준비** 알려줘");
       expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
       reply.delta("## 준비 순서\n\n**웨딩");
@@ -267,14 +267,58 @@ describe("실제 AI 채팅", () => {
     expect(authRequired).toHaveBeenCalledOnce();
   });
 
-  it("비로그인은 로그인 링크만 제공하고 API를 호출하지 않는다", () => {
-    render(chat(false));
-    expect(
-      screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
-    ).toBe("/login");
-    expect(screen.queryByRole("textbox")).toBeNull();
+  it.each([false, true])(
+    "모바일 여부 %s에서 비로그인 사용자에게 채팅 UI와 로그인 placeholder를 표시하고 전송을 막는다",
+    (isMobile) => {
+      if (isMobile) mockMobileDialog();
+      render(chat(false));
+      if (isMobile)
+        fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+
+      expect(
+        screen.getByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
+      ).toBeTruthy();
+      const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+      expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
+      expect(input.disabled).toBe(true);
+      for (const question of [
+        "웨딩홀을 정한 다음엔 뭘 준비할까?",
+        "촬영 전에 준비할 일을 정리해줘",
+      ]) {
+        const button = screen.getByRole<HTMLButtonElement>("button", {
+          name: question,
+        });
+        expect(button.disabled).toBe(true);
+        fireEvent.click(button);
+      }
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", { name: "메시지 전송" })
+          .disabled,
+      ).toBe(true);
+      fireEvent.change(input, { target: { value: "질문" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.submit(input.closest("form")!);
+      expect(input.value).toBe("");
+      expect(screen.queryByRole("log")).toBeNull();
+      expect(mocks.stream).not.toHaveBeenCalled();
+    },
+  );
+
+  it("로그인하면 채팅 입력을 활성화하고 로그아웃하면 대화 대신 로그인 placeholder를 표시한다", async () => {
+    const { rerender } = render(chat(false));
+    rerender(chat());
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    expect(input.disabled).toBe(false);
+    expect(input.placeholder).toBe("궁금한 준비를 이야기해요");
+    send("질문");
+    await screen.findByText("실제 AI 답변이에요.");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    rerender(chat(false));
+    expect(input.disabled).toBe(true);
+    expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
     expect(screen.queryByRole("log")).toBeNull();
-    expect(mocks.stream).not.toHaveBeenCalled();
+    expect(screen.queryByText("실제 AI 답변이에요.")).toBeNull();
+    expect(mocks.stream).toHaveBeenCalledOnce();
   });
 
   it("화면을 떠나면 진행 요청을 취소하고 새 화면에 이전 결과를 반영하지 않는다", async () => {
@@ -294,19 +338,13 @@ describe("실제 AI 채팅", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
-  it.each(
-    ["AI와 대화하기", "AI 채팅 열기"].flatMap((launcher) =>
-      ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
-        launcher,
-        close,
-      ]),
-    ),
-  )(
-    "%s로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
-    async (launcherName, closeName) => {
+  it.each(["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"])(
+    "AI와 대화하기로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
+    async (closeName) => {
       mockMobileDialog();
       render(chat());
-      const launcher = screen.getByRole("button", { name: launcherName });
+      const launcher = screen.getByRole("button", { name: "AI와 대화하기" });
+      expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
       fireEvent.click(launcher);
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).queryByText("예시")).toBeNull();
@@ -327,7 +365,7 @@ describe("실제 AI 채팅", () => {
     });
     vi.stubGlobal("visualViewport", viewport);
     render(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
     send("질문");
     reply.delta("앞부분 ");
     fireEvent.change(screen.getByRole("textbox"), {
@@ -337,7 +375,7 @@ describe("실제 AI 채팅", () => {
     expect(reply.signal().aborted).toBe(false);
     reply.delta("뒷부분");
     await reply.complete();
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
     expect(screen.getByText("앞부분 뒷부분")).toBeTruthy();
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       "작성 중",

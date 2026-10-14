@@ -1,3 +1,5 @@
+import { RefCallback } from "react";
+
 export type RoadmapView = "personal" | "all";
 
 function RoadmapViewIcon({
@@ -30,10 +32,36 @@ function RoadmapViewIcon({
 export function RoadmapViewSwitcher({
   view,
   onViewChange,
+  mobile,
+  triggerRef,
 }: {
   view: RoadmapView;
   onViewChange: (view: RoadmapView) => void;
+  triggerRef?: RefCallback<HTMLButtonElement>;
+  mobile?: {
+    expanded: boolean;
+    onOpen: () => void;
+  };
 }) {
+  if (mobile) {
+    return (
+      <button
+        aria-controls="roadmap-view-picker"
+        aria-expanded={mobile.expanded}
+        aria-haspopup="dialog"
+        className="roadmap-view-picker-trigger"
+        onClick={mobile.onOpen}
+        ref={triggerRef}
+        type="button"
+      >
+        {view === "personal" ? "내 로드맵" : "전체 단계"}
+        <svg aria-hidden="true" viewBox="0 0 16 16">
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </button>
+    );
+  }
+
   return (
     <nav aria-label="로드맵 보기" className="roadmap-workspace__views">
       <button

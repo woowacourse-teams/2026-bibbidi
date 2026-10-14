@@ -1,0 +1,1142 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index 5af2e7760a5b1b19b69027b274c34c86bb8e6357..fdc3599b039971b271c34144590f8bbb2d4e5a2a 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -203,7 +203,7 @@ describe("실제 AI 채팅", () => {
+       if (isMobile) mockMobileDialog();
+       render(chat());
+       if (isMobile)
+-        fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++        fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+       send("**준비** 알려줘");
+       expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
+       reply.delta("## 준비 순서\n\n**웨딩");
+@@ -273,7 +273,7 @@ describe("실제 AI 채팅", () => {
+       if (isMobile) mockMobileDialog();
+       render(chat(false));
+       if (isMobile)
+-        fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++        fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+ 
+       expect(
+         screen.getByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
+@@ -338,19 +338,13 @@ describe("실제 AI 채팅", () => {
+     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+   });
+ 
+-  it.each(
+-    ["AI와 대화하기", "AI 채팅 열기"].flatMap((launcher) =>
+-      ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
+-        launcher,
+-        close,
+-      ]),
+-    ),
+-  )(
+-    "%s로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
+-    async (launcherName, closeName) => {
++  it.each(["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"])(
++    "AI와 대화하기로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
++    async (closeName) => {
+       mockMobileDialog();
+       render(chat());
+-      const launcher = screen.getByRole("button", { name: launcherName });
++      const launcher = screen.getByRole("button", { name: "AI와 대화하기" });
++      expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
+       fireEvent.click(launcher);
+       const dialog = screen.getByRole("dialog");
+       expect(within(dialog).queryByText("예시")).toBeNull();
+@@ -371,7 +365,7 @@ describe("실제 AI 채팅", () => {
+     });
+     vi.stubGlobal("visualViewport", viewport);
+     render(chat());
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+     send("질문");
+     reply.delta("앞부분 ");
+     fireEvent.change(screen.getByRole("textbox"), {
+@@ -381,7 +375,7 @@ describe("실제 AI 채팅", () => {
+     expect(reply.signal().aborted).toBe(false);
+     reply.delta("뒷부분");
+     await reply.complete();
+-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+     expect(screen.getByText("앞부분 뒷부분")).toBeTruthy();
+     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+       "작성 중",
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index 9c49bd141490c83c49fbc3418518731a545f8d1b..eb5d1371ef9b9c66856fff8c16547a9b04dcf293 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
+ import { useIsMobileLayout } from "../../shared/responsive";
+ import { useAiChatConversation } from "./hooks/useAiChatConversation";
+ import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
+-import { AiChatView, ChatIcon } from "./view/AiChatView";
++import { AiChatView } from "./view/AiChatView";
+ import "./view/AiChat.css";
+ 
+ export function AiChatFeature({
+@@ -55,14 +55,6 @@ export function AiChatFeature({
+             >
+               AI와 대화하기
+             </button>
+-            <button
+-              aria-label="AI 채팅 열기"
+-              className="ai-chat-launchers__icon"
+-              onClick={(event) => openChat(event.currentTarget)}
+-              type="button"
+-            >
+-              <ChatIcon />
+-            </button>
+           </div>
+           <MobileAiChatDialog
+             isOpen={isOpen}
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+index baeaedcc7e0278f30d0dd8b03ffca8f2a3242ee1..7ce91f27244c6e39ad51da8e291ff831ba2e751f 100644
+--- a/FE/src/features/ai-chat/view/AiChat.css
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -241,7 +241,6 @@
+ 
+ .ai-chat__composer button:disabled {
+   opacity: 0.5;
+-  cursor: default;
+ }
+ 
+ .ai-chat__sr-only {
+@@ -261,7 +260,6 @@
+   .ai-chat-launchers {
+     display: flex;
+     flex: none;
+-    gap: 12px;
+     padding: 8px 16px 0;
+   }
+ 
+@@ -283,19 +281,6 @@
+     font-weight: 700;
+   }
+ 
+-  .ai-chat-launchers .ai-chat-launchers__icon {
+-    width: 44px;
+-    border: 1px solid var(--color-stroke-neutral-weak);
+-    border-radius: 50%;
+-    background: var(--color-bg-layer-default);
+-    color: var(--color-fg-neutral);
+-  }
+-
+-  .ai-chat-launchers__icon svg {
+-    width: 20px;
+-    height: 20px;
+-  }
+-
+   .ai-chat-dialog {
+     position: fixed;
+     inset: 0;
+diff --git a/FE/src/features/ai-chat/view/AiChatView.tsx b/FE/src/features/ai-chat/view/AiChatView.tsx
+index a691ff2ea7400f87bd9d15057de0094a91fde368..a5d616a83765ad39cf259e02783c30e1d243eaae 100644
+--- a/FE/src/features/ai-chat/view/AiChatView.tsx
++++ b/FE/src/features/ai-chat/view/AiChatView.tsx
+@@ -9,20 +9,6 @@ import {
+ } from "../model/aiChat";
+ import { AiChatMarkdown } from "./AiChatMarkdown";
+ 
+-export function ChatIcon() {
+-  return (
+-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+-      <path
+-        d="M5 5h14v11H9l-4 3V5Z M8 9h8 M8 12h5"
+-        stroke="currentColor"
+-        strokeLinecap="round"
+-        strokeLinejoin="round"
+-        strokeWidth="1.6"
+-      />
+-    </svg>
+-  );
+-}
+-
+ export function AiChatView({
+   active,
+   isAuthenticated,
+diff --git a/FE/src/features/checklist/view/ChecklistTaskDetailBottomSheet.tsx b/FE/src/features/checklist/view/ChecklistTaskDetailBottomSheet.tsx
+index a57e051a32801b7fe9950d713afc68a68110b57b..617899c2c9f6959986bf6d26b65d3e2d13f5af8e 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskDetailBottomSheet.tsx
++++ b/FE/src/features/checklist/view/ChecklistTaskDetailBottomSheet.tsx
+@@ -1,6 +1,6 @@
+ import { ReactNode } from "react";
+ 
+-import { useBottomSheetDismiss } from "../../../shared/bottom-sheet/useBottomSheetDismiss";
++import { BottomSheet } from "../../../shared/bottom-sheet/BottomSheet";
+ import { ChecklistItemEditingController } from "../model/checklistEditing";
+ import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
+ import {
+@@ -34,66 +34,17 @@ export function ChecklistTaskDetailBottomSheetShell({
+   title,
+   titleId = "checklist-task-detail-bottom-sheet-title",
+ }: ChecklistTaskDetailBottomSheetShellProps) {
+-  const {
+-    dialogRef,
+-    finishDrag,
+-    handleDragKeyDown,
+-    handleDragMove,
+-    handleDragStart,
+-    handleRef,
+-    handleTransitionEnd,
+-    isClosing,
+-    isDragging,
+-    requestDismiss,
+-    rootStyle,
+-  } = useBottomSheetDismiss({ onDismiss: onClose });
+-
+   return (
+-    <div
+-      className={`checklist-detail-bottom-sheet bottom-sheet-dismiss${
+-        isDragging ? " bottom-sheet-dismiss--dragging" : ""
+-      }${isClosing ? " bottom-sheet-dismiss--closing" : ""}`}
+-      style={rootStyle}
++    <BottomSheet
++      className="checklist-detail-bottom-sheet"
++      closeLabel="할 일 상세 닫기"
++      id="checklist-task-detail-bottom-sheet"
++      onClose={onClose}
++      title={title}
++      titleId={titleId}
+     >
+-      <button
+-        aria-label="할 일 상세 닫기"
+-        className="checklist-detail-bottom-sheet__scrim bottom-sheet-dismiss__scrim"
+-        onClick={requestDismiss}
+-        tabIndex={-1}
+-        type="button"
+-      />
+-      <section
+-        aria-labelledby={titleId}
+-        aria-modal="true"
+-        className="checklist-detail-bottom-sheet__dialog bottom-sheet-dismiss__dialog"
+-        id="checklist-task-detail-bottom-sheet"
+-        onTransitionEnd={handleTransitionEnd}
+-        ref={dialogRef}
+-        role="dialog"
+-        tabIndex={-1}
+-      >
+-        <button
+-          aria-label="아래로 밀어 할 일 상세 닫기"
+-          className="checklist-detail-bottom-sheet__handle-area bottom-sheet-dismiss__handle-area"
+-          onKeyDown={handleDragKeyDown}
+-          onPointerCancel={finishDrag}
+-          onPointerDown={handleDragStart}
+-          onPointerMove={handleDragMove}
+-          onPointerUp={finishDrag}
+-          ref={handleRef}
+-          type="button"
+-        >
+-          <span
+-            aria-hidden="true"
+-            className="checklist-detail-bottom-sheet__handle bottom-sheet-dismiss__handle"
+-          />
+-        </button>
+-        <header className="checklist-detail-bottom-sheet__header">
+-          {typeof title === "string" ? <h2 id={titleId}>{title}</h2> : title}
+-        </header>
+-        {children}
+-      </section>
+-    </div>
++      {children}
++    </BottomSheet>
+   );
+ }
+ 
+diff --git a/FE/src/features/feedback/FeedbackFeature.css b/FE/src/features/feedback/FeedbackFeature.css
+index b84b890ca2fb44a700cdf28e413b4847b4fa9a2b..d89b515e1709e9b4a89bff29fd83356c55be2f3e 100644
+--- a/FE/src/features/feedback/FeedbackFeature.css
++++ b/FE/src/features/feedback/FeedbackFeature.css
+@@ -324,7 +324,7 @@
+     cursor: default;
+   }
+ 
+-  .feedback-bottom-sheet__content {
++  .feedback-bottom-sheet__dialog {
+     position: fixed;
+     right: 0;
+     bottom: 0;
+diff --git a/FE/src/features/feedback/view/FeedbackBottomSheet.tsx b/FE/src/features/feedback/view/FeedbackBottomSheet.tsx
+index 486e8263916e57d9259bc31bc38ee6b459ee88b3..c2e33eb65154362d0a309ac685ac6179351a9ac4 100644
+--- a/FE/src/features/feedback/view/FeedbackBottomSheet.tsx
++++ b/FE/src/features/feedback/view/FeedbackBottomSheet.tsx
+@@ -1,4 +1,4 @@
+-import { useBottomSheetDismiss } from "../../../shared/bottom-sheet/useBottomSheetDismiss";
++import { BottomSheet } from "../../../shared/bottom-sheet/BottomSheet";
+ import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
+ import type { FeedbackFormViewProps } from "./feedbackFormView";
+ import { FeedbackRatingField } from "./FeedbackRatingField";
+@@ -33,104 +33,49 @@ export function FeedbackBottomSheet({
+   onSubmit,
+   sentiment,
+ }: FeedbackFormViewProps) {
+-  const {
+-    dialogRef,
+-    finishDrag,
+-    handleDragKeyDown,
+-    handleDragMove,
+-    handleDragStart,
+-    handleRef,
+-    handleTransitionEnd,
+-    isClosing,
+-    isDragging,
+-    requestDismiss,
+-    rootStyle,
+-  } = useBottomSheetDismiss({
+-    canDismiss: !isSubmitting,
+-    onDismiss: onClose,
+-  });
+-
+   return (
+-    <div
+-      className={`feedback-bottom-sheet bottom-sheet-dismiss${
+-        isDragging ? " bottom-sheet-dismiss--dragging" : ""
+-      }${isClosing ? " bottom-sheet-dismiss--closing" : ""}`}
+-      style={rootStyle}
++    <BottomSheet
++      canDismiss={!isSubmitting}
++      className="feedback-bottom-sheet"
++      closeLabel="피드백 창 닫기"
++      onClose={onClose}
++      title="비비디, 어떠셨나요?"
++      titleId="feedback-bottom-sheet-title"
+     >
+-      <button
+-        aria-label="피드백 창 닫기"
+-        className="feedback-bottom-sheet__scrim bottom-sheet-dismiss__scrim"
+-        disabled={isSubmitting}
+-        onClick={requestDismiss}
+-        tabIndex={-1}
+-        type="button"
+-      />
+-      <section
+-        aria-labelledby="feedback-bottom-sheet-title"
+-        aria-modal="true"
+-        className="feedback-bottom-sheet__content bottom-sheet-dismiss__dialog"
+-        onTransitionEnd={handleTransitionEnd}
+-        ref={dialogRef}
+-        role="dialog"
+-        tabIndex={-1}
+-      >
+-        <button
+-          aria-label="아래로 밀어 피드백 창 닫기"
+-          className="feedback-bottom-sheet__handle-area bottom-sheet-dismiss__handle-area"
++      <form aria-busy={isSubmitting} onSubmit={onSubmit}>
++        <FeedbackRatingField
+           disabled={isSubmitting}
+-          onKeyDown={handleDragKeyDown}
+-          onPointerCancel={finishDrag}
+-          onPointerDown={handleDragStart}
+-          onPointerMove={handleDragMove}
+-          onPointerUp={finishDrag}
+-          ref={handleRef}
+-          type="button"
+-        >
+-          <span
+-            aria-hidden="true"
+-            className="feedback-bottom-sheet__handle bottom-sheet-dismiss__handle"
+-          />
+-        </button>
++          onChange={onSentimentChange}
++          value={sentiment}
++        />
+ 
+-        <header className="feedback-bottom-sheet__header">
+-          <h2 id="feedback-bottom-sheet-title">비비디, 어떠셨나요?</h2>
+-        </header>
+-
+-        <form aria-busy={isSubmitting} onSubmit={onSubmit}>
+-          <FeedbackRatingField
++        <label className="feedback-bottom-sheet__field">
++          <span className="feedback-feature__sr-only">
++            의견을 들려주세요 (선택)
++          </span>
++          <MessageIcon />
++          <textarea
+             disabled={isSubmitting}
+-            onChange={onSentimentChange}
+-            value={sentiment}
++            maxLength={MAX_FEEDBACK_LENGTH}
++            onChange={(event) => onContentChange(event.target.value)}
++            placeholder="조금 더 자세히 알려주실래요? (선택)"
++            value={content}
+           />
++        </label>
+ 
+-          <label className="feedback-bottom-sheet__field">
+-            <span className="feedback-feature__sr-only">
+-              의견을 들려주세요 (선택)
+-            </span>
+-            <MessageIcon />
+-            <textarea
+-              disabled={isSubmitting}
+-              maxLength={MAX_FEEDBACK_LENGTH}
+-              onChange={(event) => onContentChange(event.target.value)}
+-              placeholder="조금 더 자세히 알려주실래요? (선택)"
+-              value={content}
+-            />
+-          </label>
+-
+-          <button
+-            className="feedback-bottom-sheet__submit"
+-            disabled={!canSubmit}
+-            type="submit"
+-          >
+-            {isSubmitting ? "보내는 중..." : "의견 보내기"}
+-          </button>
+-          {errorMessage ? (
+-            <p className="feedback-form__error" role="alert">
+-              {errorMessage}
+-            </p>
+-          ) : null}
+-        </form>
+-      </section>
+-    </div>
++        <button
++          className="feedback-bottom-sheet__submit"
++          disabled={!canSubmit}
++          type="submit"
++        >
++          {isSubmitting ? "보내는 중..." : "의견 보내기"}
++        </button>
++        {errorMessage ? (
++          <p className="feedback-form__error" role="alert">
++            {errorMessage}
++          </p>
++        ) : null}
++      </form>
++    </BottomSheet>
+   );
+ }
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index 0852e06f7b9930af0cd2f7c606f1b129664d3881..09ed457625eb439d097aed2268d71f1aca0a4ec6 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -9,6 +9,7 @@ import {
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import { AuthState } from "../auth/model/auth";
+ import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
++import { installMatchMedia } from "../../test/matchMedia";
+ 
+ const mocks = vi.hoisted(() => ({
+   authState: {
+@@ -132,7 +133,156 @@ function showAll() {
+   );
+ }
+ 
++function mockMobile() {
++  vi.stubGlobal(
++    "matchMedia",
++    vi.fn((query: string) => ({
++      matches: query === "(max-width: 760px)",
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++    })),
++  );
++}
++
+ describe("준비 로드맵 보기 전환", () => {
++  it.each(["authenticated", "guest"])(
++    "모바일 %s 사용자는 보기 선택 시트에서 카테고리를 유지하며 로드맵을 전환한다",
++    async (audience) => {
++      mockMobile();
++      if (audience === "guest") mocks.authState = { status: "guest" };
++      render(<PreparationRoadmapFeature />);
++      await screen.findByRole("button", { name: "스드메" });
++      fireEvent.click(screen.getByRole("button", { name: "스드메" }));
++      const initialView = audience === "guest" ? "전체 단계" : "내 로드맵";
++      const trigger = await screen.findByRole("button", { name: initialView });
++      trigger.focus();
++      fireEvent.click(trigger);
++      const dialog = screen.getByRole("dialog", { name: "보기 선택" });
++      expect(trigger.getAttribute("aria-expanded")).toBe("true");
++      expect(document.body.style.overflow).toBe("hidden");
++      expect(
++        within(dialog)
++          .getByRole("button", { name: new RegExp(initialView) })
++          .getAttribute("aria-pressed"),
++      ).toBe("true");
++      const nextView = audience === "guest" ? "내 로드맵" : "전체 단계";
++      fireEvent.click(
++        within(dialog).getByRole("button", { name: new RegExp(nextView) }),
++      );
++      expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
++      expect(document.body.style.overflow).toBe("");
++      const nextTrigger = await screen.findByRole("button", { name: nextView });
++      await waitFor(() => expect(document.activeElement).toBe(nextTrigger));
++      expect(
++        screen
++          .getByRole("button", { name: "스드메" })
++          .getAttribute("aria-pressed"),
++      ).toBe("true");
++      expect(
++        screen.queryByRole("navigation", { name: "로드맵 보기" }),
++      ).toBeNull();
++      if (audience === "guest")
++        expect(
++          screen.getByText("로그인하면 내 로드맵을 확인할 수 있어요."),
++        ).toBeTruthy();
++      else
++        expect(
++          screen.getByRole("region", { name: "전체 단계 목록" }),
++        ).toBeTruthy();
++    },
++  );
++
++  it.each([
++    "닫기 버튼",
++    "바깥 영역",
++    "Escape",
++    "아래로 밀기",
++    "현재 보기 선택",
++  ])(
++    "모바일 보기 선택 시트는 %s로 닫고 선택과 포커스를 유지한다",
++    async (method) => {
++      mockMobile();
++      render(<PreparationRoadmapFeature />);
++      await screen.findByText("내 웨딩홀 투어");
++      const trigger = screen.getByRole("button", { name: "내 로드맵" });
++      trigger.focus();
++      fireEvent.click(trigger);
++      const dialog = screen.getByRole("dialog", { name: "보기 선택" });
++      const handle = within(dialog).getByRole("button", {
++        name: "아래로 밀어 보기 선택 닫기",
++      });
++      expect(document.activeElement).toBe(handle);
++      const lastOption = within(dialog).getByRole("button", {
++        name: /전체 단계/,
++      });
++      lastOption.focus();
++      fireEvent.keyDown(lastOption, { key: "Tab" });
++      expect(document.activeElement).toBe(handle);
++      if (method === "닫기 버튼")
++        fireEvent.click(
++          within(dialog).getByRole("button", { name: "보기 선택 닫기" }),
++        );
++      else if (method === "바깥 영역")
++        fireEvent.click(
++          screen
++            .getAllByRole("button", { name: "보기 선택 닫기" })
++            .find((button) => !dialog.contains(button))!,
++        );
++      else if (method === "Escape")
++        fireEvent.keyDown(handle, { key: "Escape" });
++      else if (method === "현재 보기 선택")
++        fireEvent.click(
++          within(dialog).getByRole("button", { name: /내 로드맵/ }),
++        );
++      else {
++        fireEvent.pointerDown(handle, {
++          button: 0,
++          clientY: 20,
++          pointerId: 1,
++          pointerType: "touch",
++        });
++        fireEvent.pointerMove(handle, {
++          clientY: 140,
++          pointerId: 1,
++          pointerType: "touch",
++        });
++        fireEvent.pointerUp(handle, {
++          clientY: 140,
++          pointerId: 1,
++          pointerType: "touch",
++        });
++      }
++      fireEvent.transitionEnd(dialog, { propertyName: "transform" });
++      await waitFor(() =>
++        expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull(),
++      );
++      expect(document.activeElement).toBe(trigger);
++      expect(trigger.getAttribute("aria-expanded")).toBe("false");
++      expect(document.body.style.overflow).toBe("");
++    },
++  );
++
++  it("PC로 전환하면 열린 선택 시트를 닫고 모바일로 돌아와도 다시 열지 않는다", async () => {
++    const media = installMatchMedia("(max-width: 760px)", true);
++    render(<PreparationRoadmapFeature />);
++    await screen.findByText("내 웨딩홀 투어");
++    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
++    expect(screen.getByRole("dialog", { name: "보기 선택" })).toBeTruthy();
++    act(() => media.setMatches(false));
++    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
++    expect(
++      screen.getByRole("navigation", { name: "로드맵 보기" }),
++    ).toBeTruthy();
++    expect(document.body.style.overflow).toBe("");
++    act(() => media.setMatches(true));
++    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
++    expect(
++      screen
++        .getByRole("button", { name: "내 로드맵" })
++        .getAttribute("aria-expanded"),
++    ).toBe("false");
++  });
++
+   it("로그인 사용자는 실제 채팅을 사용하고 카테고리·로드맵 전환 중 대화를 유지한다", async () => {
+     render(<PreparationRoadmapFeature />);
+     await screen.findByText("내 웨딩홀 투어");
+@@ -156,13 +306,12 @@ describe("준비 로드맵 보기 전환", () => {
+     render(<PreparationRoadmapFeature />);
+     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+     const chat = screen.getByRole("complementary", { name: "AI 채팅" });
+-    expect(
+-      within(chat).getByRole("link", { name: "로그인" }).getAttribute("href"),
+-    ).toBe("/login");
+-    expect(within(chat).queryByRole("textbox")).toBeNull();
++    const input = within(chat).getByRole<HTMLTextAreaElement>("textbox");
++    expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
++    expect(input.disabled).toBe(true);
+     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+     fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+-    expect(within(chat).getByText("로그인하고 AI와 대화해요")).toBeTruthy();
++    expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
+     expect(mocks.stream).not.toHaveBeenCalled();
+   });
+ 
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.tsx b/FE/src/features/preparation/RoadmapWorkspace.tsx
+index 17ce3399e0ac03994054aa92f5c7aa955fc83880..5d68001b20a962fb46cccde6d4c72991e1d47b63 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.tsx
+@@ -4,6 +4,8 @@ import { AiChatFeature } from "../ai-chat/AiChatFeature";
+ import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
+ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+ import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
++import { RoadmapViewBottomSheet } from "./view/RoadmapViewBottomSheet";
++import { useRoadmapViewPicker } from "./hooks/useRoadmapViewPicker";
+ import "./view/RoadmapWorkspace.css";
+ 
+ export function RoadmapWorkspace({
+@@ -36,7 +38,17 @@ export function RoadmapWorkspace({
+       : isAuthenticated
+         ? "personal"
+         : "all";
+-  const showAll = () => setChoice({ audience, view: "all" });
++  const changeView = (nextView: RoadmapView) =>
++    setChoice({ audience, view: nextView });
++  const showAll = () => changeView("all");
++  const {
++    isMobile,
++    isOpen: isPickerOpen,
++    open: openPicker,
++    close: closePicker,
++    select: selectPickerView,
++    triggerRef,
++  } = useRoadmapViewPicker({ audience, onViewChange: changeView });
+ 
+   if (authState.status === "error") {
+     return <PreparationRoadmapState status="error" onRetry={refreshAuth} />;
+@@ -48,7 +60,16 @@ export function RoadmapWorkspace({
+   const viewSwitcher = (
+     <RoadmapViewSwitcher
+       view={view}
+-      onViewChange={(nextView) => setChoice({ audience, view: nextView })}
++      onViewChange={changeView}
++      triggerRef={triggerRef}
++      mobile={
++        isMobile
++          ? {
++              expanded: isPickerOpen,
++              onOpen: openPicker,
++            }
++          : undefined
++      }
+     />
+   );
+ 
+@@ -84,6 +105,13 @@ export function RoadmapWorkspace({
+         isAuthenticated={isAuthenticated}
+         onAuthenticationRequired={refreshAuth}
+       />
++      {isPickerOpen ? (
++        <RoadmapViewBottomSheet
++          view={view}
++          onClose={closePicker}
++          onViewChange={selectPickerView}
++        />
++      ) : null}
+     </div>
+   );
+ }
+diff --git a/FE/src/features/preparation/hooks/useRoadmapViewPicker.ts b/FE/src/features/preparation/hooks/useRoadmapViewPicker.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf5a1a987b889c5cbd53a332f74b6248df3ebbb9
+--- /dev/null
++++ b/FE/src/features/preparation/hooks/useRoadmapViewPicker.ts
+@@ -0,0 +1,51 @@
++import { useCallback, useEffect, useRef, useState } from "react";
++
++import {
++  MOBILE_LAYOUT_MEDIA_QUERY,
++  useIsMobileLayout,
++} from "../../../shared/responsive";
++import { RoadmapView } from "../view/RoadmapViewSwitcher";
++
++export function useRoadmapViewPicker({
++  audience,
++  onViewChange,
++}: {
++  audience: string;
++  onViewChange: (view: RoadmapView) => void;
++}) {
++  const isMobile = useIsMobileLayout();
++  const [pickerAudience, setPickerAudience] = useState<string | null>(null);
++  const restorePickerFocus = useRef(false);
++  const triggerRef = useCallback((node: HTMLButtonElement | null) => {
++    if (node && restorePickerFocus.current) {
++      node.focus();
++      restorePickerFocus.current = false;
++    }
++  }, []);
++
++  useEffect(() => {
++    const mediaQuery = window.matchMedia?.(MOBILE_LAYOUT_MEDIA_QUERY);
++    const closeOnDesktop = (event: MediaQueryListEvent) => {
++      if (!event.matches) setPickerAudience(null);
++    };
++    mediaQuery?.addEventListener("change", closeOnDesktop);
++    return () => mediaQuery?.removeEventListener("change", closeOnDesktop);
++  }, []);
++
++  const open = () => setPickerAudience(audience);
++  const close = () => setPickerAudience(null);
++  const select = (view: RoadmapView) => {
++    restorePickerFocus.current = true;
++    close();
++    onViewChange(view);
++  };
++
++  return {
++    isMobile,
++    isOpen: isMobile && pickerAudience === audience,
++    open,
++    close,
++    select,
++    triggerRef,
++  };
++}
+diff --git a/FE/src/features/preparation/view/RoadmapSectionHeader.tsx b/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
+index 2ff11166131affd0ddbd70cd6faaff59279f937f..8f1f94c12acbe856580ac01a31b088e70bffd245 100644
+--- a/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
++++ b/FE/src/features/preparation/view/RoadmapSectionHeader.tsx
+@@ -1,4 +1,5 @@
+ import { ReactNode } from "react";
++import { useIsMobileLayout } from "../../../shared/responsive";
+ 
+ export function RoadmapSectionHeader({
+   id,
+@@ -11,15 +12,16 @@ export function RoadmapSectionHeader({
+   summary?: ReactNode;
+   viewSwitcher: ReactNode;
+ }) {
++  const isMobile = useIsMobileLayout();
+   return (
+     <header className="roadmap-section-header">
+       <div>
+-        <h2 id={id}>{title}</h2>
++        <h2 id={id}>{isMobile && viewSwitcher ? viewSwitcher : title}</h2>
+         {summary != null ? (
+           <p className="roadmap-section-header__summary">{summary}</p>
+         ) : null}
+       </div>
+-      {viewSwitcher}
++      {!isMobile ? viewSwitcher : null}
+     </header>
+   );
+ }
+diff --git a/FE/src/features/preparation/view/RoadmapViewBottomSheet.css b/FE/src/features/preparation/view/RoadmapViewBottomSheet.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..04e0e92b038a71addb7d747d6be8692241ebd644
+--- /dev/null
++++ b/FE/src/features/preparation/view/RoadmapViewBottomSheet.css
+@@ -0,0 +1,119 @@
++.roadmap-view-picker {
++  position: fixed;
++  z-index: 40;
++  inset: 0;
++}
++
++.roadmap-view-picker__scrim {
++  position: absolute;
++  inset: 0;
++  width: 100%;
++  border: 0;
++  padding: 0;
++  background: rgb(23 23 23 / 40%);
++}
++
++.roadmap-view-picker__dialog {
++  position: absolute;
++  right: 0;
++  bottom: 0;
++  left: 0;
++  display: flex;
++  flex-direction: column;
++  max-width: 480px;
++  max-height: 90dvh;
++  margin: 0 auto;
++  padding: 8px 20px max(28px, env(safe-area-inset-bottom));
++  overflow-y: auto;
++  border-radius: 24px 24px 0 0;
++  outline: none;
++  background: var(--color-bg-layer-default);
++  color: var(--color-fg-neutral);
++  box-shadow: 0 -8px 32px -8px rgb(0 0 0 / 18%);
++}
++
++.roadmap-view-picker__header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  min-height: 48px;
++  margin-bottom: 8px;
++}
++
++.roadmap-view-picker__header h2 {
++  margin: 0;
++  font-size: 18px;
++}
++
++.roadmap-view-picker__header button {
++  width: 36px;
++  height: 36px;
++  border: 0;
++  background: transparent;
++  color: var(--color-fg-neutral-muted);
++  font: inherit;
++  font-size: 26px;
++  cursor: pointer;
++}
++
++.roadmap-view-picker__options {
++  display: grid;
++  gap: 12px;
++}
++
++.roadmap-view-picker__options button {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++  min-height: 88px;
++  padding: 16px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 16px;
++  background: var(--color-bg-layer-default);
++  color: var(--color-fg-neutral);
++  text-align: left;
++  font: inherit;
++  cursor: pointer;
++}
++
++.roadmap-view-picker__options button > span {
++  display: grid;
++  gap: 8px;
++}
++
++.roadmap-view-picker__options strong {
++  font-size: 14px;
++}
++
++.roadmap-view-picker__options button > span > span {
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++  line-height: 1.5;
++}
++
++.roadmap-view-picker__options button[aria-pressed="true"] {
++  border-color: transparent;
++  background: var(--color-bg-brand-weak);
++  color: var(--color-fg-brand);
++}
++
++.roadmap-view-picker__options svg {
++  width: 20px;
++  height: 20px;
++  flex: none;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 2;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
++.roadmap-view-picker button:focus-visible {
++  outline: 3px solid var(--color-stroke-focus-ring);
++  outline-offset: 2px;
++}
++
++.roadmap-view-picker .bottom-sheet-dismiss__handle-area:focus-visible {
++  outline: none;
++}
+diff --git a/FE/src/features/preparation/view/RoadmapViewBottomSheet.tsx b/FE/src/features/preparation/view/RoadmapViewBottomSheet.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..4131edb30a0f548b13cad1c5c249e1ea392b4d15
+--- /dev/null
++++ b/FE/src/features/preparation/view/RoadmapViewBottomSheet.tsx
+@@ -0,0 +1,67 @@
++import { createPortal } from "react-dom";
++import { BottomSheet } from "../../../shared/bottom-sheet/BottomSheet";
++import { RoadmapView } from "./RoadmapViewSwitcher";
++import "./RoadmapViewBottomSheet.css";
++
++const options: { view: RoadmapView; label: string; description: string }[] = [
++  {
++    view: "personal",
++    label: "내 로드맵",
++    description: "내가 저장한 할 일을 관리해요.",
++  },
++  {
++    view: "all",
++    label: "전체 단계",
++    description: "기본 준비 단계와 할 일을 확인해요.",
++  },
++];
++
++export function RoadmapViewBottomSheet({
++  view,
++  onClose,
++  onViewChange,
++}: {
++  view: RoadmapView;
++  onClose: () => void;
++  onViewChange: (view: RoadmapView) => void;
++}) {
++  return createPortal(
++    <BottomSheet
++      className="roadmap-view-picker"
++      closeLabel="보기 선택 닫기"
++      id="roadmap-view-picker"
++      onClose={onClose}
++      showCloseButton
++      title="보기 선택"
++      titleId="roadmap-view-picker-title"
++    >
++      {(requestClose) => (
++        <div className="roadmap-view-picker__options">
++          {options.map((option) => (
++            <button
++              aria-controls="roadmap-view-content"
++              aria-pressed={view === option.view}
++              key={option.view}
++              onClick={() => {
++                if (view === option.view) requestClose();
++                else onViewChange(option.view);
++              }}
++              type="button"
++            >
++              <span>
++                <strong>{option.label}</strong>
++                <span>{option.description}</span>
++              </span>
++              {view === option.view ? (
++                <svg aria-hidden="true" viewBox="0 0 16 16">
++                  <path d="m2 8 4 4 8-8" />
++                </svg>
++              ) : null}
++            </button>
++          ))}
++        </div>
++      )}
++    </BottomSheet>,
++    document.body,
++  );
++}
+diff --git a/FE/src/features/preparation/view/RoadmapViewSwitcher.tsx b/FE/src/features/preparation/view/RoadmapViewSwitcher.tsx
+index 054419a46e51f7ce7134d8915ceaf2ae9eb1baba..761de67e60fc8a9ca795c29a8b1a647130f5f60d 100644
+--- a/FE/src/features/preparation/view/RoadmapViewSwitcher.tsx
++++ b/FE/src/features/preparation/view/RoadmapViewSwitcher.tsx
+@@ -1,3 +1,5 @@
++import { RefCallback } from "react";
++
+ export type RoadmapView = "personal" | "all";
+ 
+ function RoadmapViewIcon({
+@@ -30,10 +32,36 @@ function RoadmapViewIcon({
+ export function RoadmapViewSwitcher({
+   view,
+   onViewChange,
++  mobile,
++  triggerRef,
+ }: {
+   view: RoadmapView;
+   onViewChange: (view: RoadmapView) => void;
++  triggerRef?: RefCallback<HTMLButtonElement>;
++  mobile?: {
++    expanded: boolean;
++    onOpen: () => void;
++  };
+ }) {
++  if (mobile) {
++    return (
++      <button
++        aria-controls="roadmap-view-picker"
++        aria-expanded={mobile.expanded}
++        aria-haspopup="dialog"
++        className="roadmap-view-picker-trigger"
++        onClick={mobile.onOpen}
++        ref={triggerRef}
++        type="button"
++      >
++        {view === "personal" ? "내 로드맵" : "전체 단계"}
++        <svg aria-hidden="true" viewBox="0 0 16 16">
++          <path d="m4 6 4 4 4-4" />
++        </svg>
++      </button>
++    );
++  }
++
+   return (
+     <nav aria-label="로드맵 보기" className="roadmap-workspace__views">
+       <button
+diff --git a/FE/src/features/preparation/view/RoadmapWorkspace.css b/FE/src/features/preparation/view/RoadmapWorkspace.css
+index 7d5543f73fb4a0ef29d4a038194607a0b022d97e..1019227a1b349f824638fecc421f5f74c049e15b 100644
+--- a/FE/src/features/preparation/view/RoadmapWorkspace.css
++++ b/FE/src/features/preparation/view/RoadmapWorkspace.css
+@@ -164,6 +164,30 @@
+   outline-offset: -3px;
+ }
+ 
++.roadmap-view-picker-trigger {
++  display: inline-flex;
++  align-items: center;
++  gap: 12px;
++  min-height: 44px;
++  padding: 0;
++  border: 0;
++  background: transparent;
++  color: inherit;
++  font: inherit;
++  font-weight: 700;
++  cursor: pointer;
++}
++
++.roadmap-view-picker-trigger svg {
++  width: 16px;
++  height: 16px;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.5;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
+ @media (max-width: 760px) {
+   .preparation-roadmap-state.roadmap-login-notice {
+     padding: 16px;
+@@ -200,8 +224,4 @@
+   .roadmap-section-header h2 {
+     font-size: 20px;
+   }
+-
+-  .roadmap-section-header .roadmap-workspace__views {
+-    align-self: flex-start;
+-  }
+ }
+diff --git a/FE/src/shared/bottom-sheet/BottomSheet.tsx b/FE/src/shared/bottom-sheet/BottomSheet.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..05756050ade3def21ac3a373e7a13a197a0aac77
+--- /dev/null
++++ b/FE/src/shared/bottom-sheet/BottomSheet.tsx
+@@ -0,0 +1,99 @@
++import { ReactNode } from "react";
++
++import { useBottomSheetDismiss } from "./useBottomSheetDismiss";
++
++export function BottomSheet({
++  canDismiss = true,
++  children,
++  className,
++  closeLabel,
++  id,
++  onClose,
++  showCloseButton = false,
++  title,
++  titleId,
++}: {
++  canDismiss?: boolean;
++  children: ReactNode | ((requestClose: () => void) => ReactNode);
++  className: string;
++  closeLabel: string;
++  id?: string;
++  onClose: () => void;
++  showCloseButton?: boolean;
++  title: ReactNode;
++  titleId: string;
++}) {
++  const {
++    dialogRef,
++    finishDrag,
++    handleDragKeyDown,
++    handleDragMove,
++    handleDragStart,
++    handleRef,
++    handleTransitionEnd,
++    isClosing,
++    isDragging,
++    requestDismiss,
++    rootStyle,
++  } = useBottomSheetDismiss({ canDismiss, onDismiss: onClose });
++
++  return (
++    <div
++      className={`${className} bottom-sheet-dismiss${
++        isDragging ? " bottom-sheet-dismiss--dragging" : ""
++      }${isClosing ? " bottom-sheet-dismiss--closing" : ""}`}
++      style={rootStyle}
++    >
++      <button
++        aria-label={closeLabel}
++        className={`${className}__scrim bottom-sheet-dismiss__scrim`}
++        disabled={!canDismiss}
++        onClick={requestDismiss}
++        tabIndex={-1}
++        type="button"
++      />
++      <section
++        aria-labelledby={titleId}
++        aria-modal="true"
++        className={`${className}__dialog bottom-sheet-dismiss__dialog`}
++        id={id}
++        onTransitionEnd={handleTransitionEnd}
++        ref={dialogRef}
++        role="dialog"
++        tabIndex={-1}
++      >
++        <button
++          aria-label={`아래로 밀어 ${closeLabel}`}
++          className={`${className}__handle-area bottom-sheet-dismiss__handle-area`}
++          disabled={!canDismiss}
++          onKeyDown={handleDragKeyDown}
++          onPointerCancel={finishDrag}
++          onPointerDown={handleDragStart}
++          onPointerMove={handleDragMove}
++          onPointerUp={finishDrag}
++          ref={handleRef}
++          type="button"
++        >
++          <span
++            aria-hidden="true"
++            className={`${className}__handle bottom-sheet-dismiss__handle`}
++          />
++        </button>
++        <header className={`${className}__header`}>
++          {typeof title === "string" ? <h2 id={titleId}>{title}</h2> : title}
++          {showCloseButton ? (
++            <button
++              aria-label={closeLabel}
++              disabled={!canDismiss}
++              onClick={requestDismiss}
++              type="button"
++            >
++              <span aria-hidden="true">×</span>
++            </button>
++          ) : null}
++        </header>
++        {typeof children === "function" ? children(requestDismiss) : children}
++      </section>
++    </div>
++  );
++}

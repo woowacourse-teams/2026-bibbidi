@@ -4,6 +4,8 @@ import { AiChatFeature } from "../ai-chat/AiChatFeature";
 import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
 import { RoadmapView, RoadmapViewSwitcher } from "./view/RoadmapViewSwitcher";
+import { RoadmapViewBottomSheet } from "./view/RoadmapViewBottomSheet";
+import { useRoadmapViewPicker } from "./hooks/useRoadmapViewPicker";
 import "./view/RoadmapWorkspace.css";
 
 export function RoadmapWorkspace({
@@ -36,7 +38,17 @@ export function RoadmapWorkspace({
       : isAuthenticated
         ? "personal"
         : "all";
-  const showAll = () => setChoice({ audience, view: "all" });
+  const changeView = (nextView: RoadmapView) =>
+    setChoice({ audience, view: nextView });
+  const showAll = () => changeView("all");
+  const {
+    isMobile,
+    isOpen: isPickerOpen,
+    open: openPicker,
+    close: closePicker,
+    select: selectPickerView,
+    triggerRef,
+  } = useRoadmapViewPicker({ audience, onViewChange: changeView });
 
   if (authState.status === "error") {
     return <PreparationRoadmapState status="error" onRetry={refreshAuth} />;
@@ -48,7 +60,16 @@ export function RoadmapWorkspace({
   const viewSwitcher = (
     <RoadmapViewSwitcher
       view={view}
-      onViewChange={(nextView) => setChoice({ audience, view: nextView })}
+      onViewChange={changeView}
+      triggerRef={triggerRef}
+      mobile={
+        isMobile
+          ? {
+              expanded: isPickerOpen,
+              onOpen: openPicker,
+            }
+          : undefined
+      }
     />
   );
 
@@ -84,6 +105,13 @@ export function RoadmapWorkspace({
         isAuthenticated={isAuthenticated}
         onAuthenticationRequired={refreshAuth}
       />
+      {isPickerOpen ? (
+        <RoadmapViewBottomSheet
+          view={view}
+          onClose={closePicker}
+          onViewChange={selectPickerView}
+        />
+      ) : null}
     </div>
   );
 }

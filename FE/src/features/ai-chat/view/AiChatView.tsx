@@ -9,22 +9,9 @@ import {
 } from "../model/aiChat";
 import { AiChatMarkdown } from "./AiChatMarkdown";
 
-export function ChatIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M5 5h14v11H9l-4 3V5Z M8 9h8 M8 12h5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.6"
-      />
-    </svg>
-  );
-}
-
 export function AiChatView({
   active,
+  isAuthenticated,
   draft,
   messages,
   errorMessage,
@@ -34,6 +21,7 @@ export function AiChatView({
   onRetry,
 }: {
   active: boolean;
+  isAuthenticated: boolean;
   draft: string;
   messages: ChatMessage[];
   errorMessage: string | null;
@@ -78,6 +66,7 @@ export function AiChatView({
           <div className="ai-chat__questions">
             {suggestedQuestions.map((question) => (
               <button
+                disabled={!isAuthenticated}
                 key={question}
                 onClick={() => onSend(question)}
                 type="button"
@@ -146,6 +135,7 @@ export function AiChatView({
           AI에게 보낼 메시지
         </label>
         <textarea
+          disabled={!isAuthenticated}
           id={inputId}
           maxLength={MAX_CHAT_MESSAGE_LENGTH}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -167,13 +157,17 @@ export function AiChatView({
               onSend(draft);
             }
           }}
-          placeholder="궁금한 준비를 이야기해요"
+          placeholder={
+            isAuthenticated
+              ? "궁금한 준비를 이야기해요"
+              : "로그인 후 AI와 대화할 수 있어요"
+          }
           rows={2}
           value={draft}
         />
         <button
           aria-label="메시지 전송"
-          disabled={isPending || !isValidChatMessage(draft)}
+          disabled={!isAuthenticated || isPending || !isValidChatMessage(draft)}
           type="submit"
         >
           ↑
