@@ -1,42 +1,35 @@
 {
-  "id": "Faithfulness",
-  "task": "답변의 주장에 대화 또는 실제 도구 결과의 근거가 있는가",
-  "rubric": "조회되지 않은 업체·가격·일정·상태를 지어내지 않는다. 근거 없는 추론을 사실처럼 단정하지 않는다.",
+  "metricType": "Faithfulness",
+  "role": "당신은 결혼 준비 카탈로그 추천 답변의 근거 충실성을 판정하는 평가자다.",
+  "task": "답변의 구체적 주장이 실제로 제공된 대화와 도구 결과에 근거하는지 판정한다.",
+  "rubric": "항목의 존재·속성은 실제 조회된 카탈로그에서, 사용자 상태·선호·이미 한 일은 대화에서 근거를 찾는다. 시나리오 참고 답변이나 기대 도구 호출은 모델이 실제로 본 자료로 취급하지 않는다. 조회되지 않은 업체·가격·재고·예약 가능 여부를 단정하거나 추측을 조회 사실처럼 말하면 감점한다. 일반적인 조언은 사실 주장과 구분하고, 불확실성을 명시한 추론은 허위 단정보다 높게 평가한다.",
   "scale": [
     {
       "value": 0,
-      "definition": "전혀 충족하지 않음"
+      "definition": "핵심 추천이 제공된 근거와 무관하거나 허구에 의존함"
     },
     {
       "value": 1,
-      "definition": "대부분 미충족"
+      "definition": "중요한 주장 다수가 대화·조회 결과에 근거하지 않음"
     },
     {
       "value": 2,
-      "definition": "부분 충족"
+      "definition": "근거 있는 추천과 근거 없는 주장이 섞여 있음"
     },
     {
       "value": 3,
-      "definition": "대체로 충족"
+      "definition": "주요 주장은 근거가 있고 작은 추정만 불명확함"
     },
     {
       "value": 4,
-      "definition": "완전히 충족"
+      "definition": "모든 구체적 주장이 제공된 근거에 부합하거나 불확실성으로 표시됨"
     }
   ],
   "direction": "높을수록 근거 충실",
-  "reportOnly": true,
   "requiredInputs": [
     "chatMemory",
     "userMessage",
     "modelResponse",
     "observedToolResults"
-  ],
-  "promptOrder": [
-    "role",
-    "task",
-    "rubric",
-    "input"
-  ],
-  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+  ]
 }

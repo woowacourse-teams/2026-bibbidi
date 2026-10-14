@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario02",
+  "name": "scenario02",
   "metrics": [
     "Correctness",
     "Faithfulness"

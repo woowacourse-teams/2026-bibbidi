@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario16",
+  "name": "scenario16",
   "metrics": [
     "Helpfulness",
     "Relevance"

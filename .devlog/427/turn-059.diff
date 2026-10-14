@@ -1,0 +1,82 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+index fd92e1ee67e198d2e4a31ea1590d14c5affc3234..fd61d639ac24dfefd5144c77bc36d7d7d021f827 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+@@ -8,6 +8,7 @@ import java.util.Comparator;
+ import java.util.List;
+ import org.springframework.core.io.Resource;
+ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
++import tools.jackson.core.JacksonException;
+ import tools.jackson.databind.ObjectMapper;
+ 
+ public class EvaluationDataLoader {
+@@ -17,18 +18,23 @@ public class EvaluationDataLoader {
+     private final ObjectMapper objectMapper = new ObjectMapper();
+     private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
+ 
+-    public List<EvaluationScenario> loadScenarios() throws IOException {
++    public List<EvaluationScenario> loadScenarios() {
+         return load("scenarios/*.json", EvaluationScenario.class);
+     }
+ 
+-    public List<MetricConfig> loadMetrics() throws IOException {
++    public List<MetricConfig> loadMetrics() {
+         return load("metrics/*.json", MetricConfig.class);
+     }
+ 
+-    private <T> List<T> load(String pattern, Class<T> type) throws IOException {
+-        Resource[] resources = resourceResolver.getResources(BASE_PATH + pattern);
++    private <T> List<T> load(String pattern, Class<T> type) {
++        Resource[] resources;
++        try {
++            resources = resourceResolver.getResources(BASE_PATH + pattern);
++        } catch (IOException exception) {
++            throw new IllegalStateException("평가 데이터 목록을 읽을 수 없습니다: " + BASE_PATH + pattern, exception);
++        }
+         if (resources.length == 0) {
+-            throw new IOException("Evaluation data not found: " + BASE_PATH + pattern);
++            throw new IllegalStateException("평가 데이터를 찾을 수 없습니다: " + BASE_PATH + pattern);
+         }
+         Arrays.sort(resources, Comparator.comparing(Resource::getFilename));
+ 
+@@ -36,8 +42,8 @@ public class EvaluationDataLoader {
+         for (Resource resource : resources) {
+             try (InputStream input = resource.getInputStream()) {
+                 result.add(objectMapper.readValue(input, type));
+-            } catch (Exception e) {
+-                throw new IOException("Failed to load evaluation data: " + resource.getDescription(), e);
++            } catch (IOException | JacksonException exception) {
++                throw new IllegalStateException("평가 데이터를 읽을 수 없습니다: " + resource.getDescription(), exception);
+             }
+         }
+         return List.copyOf(result);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+index b6b7c7e88590dbdaaf1d6316d7c4651b74a94bab..3e1a37364928d1cd7eec3bd9c67fe189d560cbe7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+@@ -2,7 +2,6 @@ package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
+-import java.io.IOException;
+ import org.junit.jupiter.api.Test;
+ 
+ class EvaluationDataLoaderTest {
+@@ -10,7 +9,7 @@ class EvaluationDataLoaderTest {
+     private final EvaluationDataLoader loader = new EvaluationDataLoader();
+ 
+     @Test
+-    void loadsAllScenariosInFilenameOrder() throws IOException {
++    void loadsAllScenariosInFilenameOrder() {
+         var scenarios = loader.loadScenarios();
+ 
+         assertThat(scenarios).hasSize(55);
+@@ -20,7 +19,7 @@ class EvaluationDataLoaderTest {
+     }
+ 
+     @Test
+-    void loadsAllMetrics() throws IOException {
++    void loadsAllMetrics() {
+         var metrics = loader.loadMetrics();
+ 
+         assertThat(metrics).hasSize(11);

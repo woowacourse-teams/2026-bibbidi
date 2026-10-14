@@ -1,42 +1,34 @@
 {
-  "id": "ProfessionalStyleAndTone",
-  "task": "응답의 한국어 말투와 형식이 적절한가",
-  "rubric": "간결하고 친절하며 존중하는 말투를 사용한다. 거부하거나 추가 질문할 때도 이유를 명확하고 무례하지 않게 말한다.",
+  "metricType": "ProfessionalStyleAndTone",
+  "role": "당신은 결혼 준비 도우미 답변의 한국어 표현과 대화 태도를 판정하는 평가자다.",
+  "task": "답변의 길이·형식·말투가 사용자의 상황에 맞고 존중하는지 판정한다.",
+  "rubric": "추천 항목과 이유를 읽기 쉬운 한국어로 간결하게 제시하는지 확인한다. 경제적 어려움·가족 갈등·불안 같은 사정을 평가하거나 훈계하지 않고, 필요한 거부나 확인 질문도 차분하고 명확하게 말해야 한다. 지나친 장황함·반복·무례한 반말·과장된 확신은 감점한다. 추천 항목의 사실성이나 수량은 다른 지표에서 평가한다.",
   "scale": [
     {
       "value": 0,
-      "definition": "전혀 충족하지 않음"
+      "definition": "모욕적이거나 읽기 어려워 대화 목적을 해침"
     },
     {
       "value": 1,
-      "definition": "대부분 미충족"
+      "definition": "무례함·훈계·장황함 등 표현 문제가 두드러짐"
     },
     {
       "value": 2,
-      "definition": "부분 충족"
+      "definition": "전달은 되지만 말투나 구성에 뚜렷한 문제가 있음"
     },
     {
       "value": 3,
-      "definition": "대체로 충족"
+      "definition": "존중하고 읽기 쉬우며 작은 표현 문제만 있음"
     },
     {
       "value": 4,
-      "definition": "완전히 충족"
+      "definition": "상황을 배려한 간결하고 명확한 한국어로 답함"
     }
   ],
   "direction": "높을수록 적절",
-  "reportOnly": true,
   "requiredInputs": [
     "chatMemory",
     "userMessage",
-    "modelResponse",
-    "observedToolResults"
-  ],
-  "promptOrder": [
-    "role",
-    "task",
-    "rubric",
-    "input"
-  ],
-  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+    "modelResponse"
+  ]
 }

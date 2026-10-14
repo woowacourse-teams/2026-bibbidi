@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario08",
+  "name": "scenario08",
   "metrics": [
     "Completeness",
     "Coherence"

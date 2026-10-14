@@ -1,42 +1,34 @@
 {
-  "id": "Coherence",
-  "task": "답변의 추론과 설명이 일관적인가",
-  "rubric": "일정 완료와 준비 항목 완료, 등록 항목 완료와 전체 준비 완료를 혼동하지 않는다. 이전 대화와 모순되지 않는다.",
+  "metricType": "Coherence",
+  "role": "당신은 결혼 준비 카탈로그 추천 답변의 논리적 일관성을 판정하는 평가자다.",
+  "task": "답변 내부와 이전 대화 사이에 모순이나 설명의 논리적 비약이 있는지 판정한다.",
+  "rubric": "추천 이유와 항목 순서가 서로 양립하는지, 대화에서 이미 완료했다고 한 일을 다시 미완료로 전제하지 않는지 확인한다. 예식 조건이 미정이라면서 확정된 조건에만 가능한 항목을 필수라고 말하는 등 앞뒤가 맞지 않으면 감점한다. 카탈로그 사실의 진위는 Correctness, 근거 출처는 Faithfulness에서 다루며 이 지표는 주장의 연결과 모순에 집중한다.",
   "scale": [
     {
       "value": 0,
-      "definition": "전혀 충족하지 않음"
+      "definition": "핵심 추천과 설명이 서로 모순되어 의미를 파악하기 어려움"
     },
     {
       "value": 1,
-      "definition": "대부분 미충족"
+      "definition": "중요한 모순이나 논리적 비약이 여러 곳에 있음"
     },
     {
       "value": 2,
-      "definition": "부분 충족"
+      "definition": "전체 흐름은 이해되지만 중요한 연결이 빠지거나 일부 모순됨"
     },
     {
       "value": 3,
-      "definition": "대체로 충족"
+      "definition": "추천과 설명이 일관되며 사소한 연결 부족만 있음"
     },
     {
       "value": 4,
-      "definition": "완전히 충족"
+      "definition": "답변과 이전 대화가 모순 없이 자연스럽게 연결됨"
     }
   ],
   "direction": "높을수록 논리적",
-  "reportOnly": true,
   "requiredInputs": [
     "chatMemory",
     "userMessage",
-    "modelResponse",
-    "observedToolResults"
-  ],
-  "promptOrder": [
-    "role",
-    "task",
-    "rubric",
-    "input"
-  ],
-  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+    "modelResponse"
+  ]
 }

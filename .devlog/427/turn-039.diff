@@ -1,0 +1,340 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ChatTurn.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ChatTurn.java
+similarity index 52%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ChatTurn.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ChatTurn.java
+index d78c7f2272fbecb7362f48273c18c89086f10a90..e96548621e1d649abb87632f50ee290c3d9d4b23 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ChatTurn.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ChatTurn.java
+@@ -1,3 +1,3 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ public record ChatTurn(String role, String content) {}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoader.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+similarity index 97%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoader.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+index 9cb3750f8c018190e5a2927129d2040715e0351f..be381df221b4eb993e5d87b097a534925a8f4c35 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoader.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.io.IOException;
+ import java.io.InputStream;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoaderTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+similarity index 95%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoaderTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+index 976e25a020f862b76d94d250e32024aa3e030946..f5cf6c2e517c596862a974b1190e502a43b3bda7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataLoaderTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatCode;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+similarity index 99%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+index 093c7c6eab55157872c25a57e60afbaf96eda13b..d4677d32e8330f21b3139079aba31156ddbd15f3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.util.ArrayList;
+ import java.util.HashMap;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+similarity index 99%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidatorTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+index 8fde6287cc3a2b156215a09d7c34058b4b88692a..541e982189836d8425fa79a09dbf0d9fc5a1f89e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataValidatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import static org.assertj.core.api.Assertions.assertThatCode;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataset.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
+similarity index 71%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataset.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
+index 74ab28d046c71f159af7624566488af5c6958d6a..13222e10fa61ba265794e32f4cfe668a5013e6d8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataset.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.util.List;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationScenario.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
+similarity index 86%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationScenario.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
+index 4ec882a3c4a685170668c1751f48a673dfeb4a1d..1639b4eeaffc7aa06dbad09a52b1e1600ac6580e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationScenario.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.util.List;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ExpectedToolCall.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ExpectedToolCall.java
+similarity index 67%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ExpectedToolCall.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ExpectedToolCall.java
+index 3f74157d7ca65610bb417a7b442b02e7b652cb51..818189e4d796045f15eafe3cd1a1127c2d1e19f6 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ExpectedToolCall.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ExpectedToolCall.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.util.Map;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricDefinition.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/MetricDefinition.java
+similarity index 85%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricDefinition.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/MetricDefinition.java
+index 0e3a1f36e897eecf0c292214e6b2bc27119be772..37d8830f19a1a40450f46c4144803882698d2b96 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricDefinition.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/MetricDefinition.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import java.util.List;
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ScaleLevel.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ScaleLevel.java
+similarity index 54%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ScaleLevel.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ScaleLevel.java
+index 4a0f1987aed16ad4985364544ffb54648fe03629..a2027d6d81ebdc87106f3c3257db28854ef8bc4f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ScaleLevel.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ScaleLevel.java
+@@ -1,3 +1,3 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ public record ScaleLevel(int value, String definition) {}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CoherenceEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java
+similarity index 60%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CoherenceEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java
+index 5224617e8d0c6f9a6226cbb1cdfa738b56ac9ea2..54fc95225a0b22134d764cb8343f7bd7ac2fa8aa 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CoherenceEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class CoherenceEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CompletenessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CompletenessEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java
+index 5d82d6194df1324fd40657fa50cd5aba6e90c342..6b2a49499a7b7f85f40c5032eef2e6474174f3de 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CompletenessEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class CompletenessEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CorrectnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CorrectnessEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java
+index d27d969db6215e1b758c78df2194c400d1500c33..b513ddc87100344504601538c0e33f966a5ed33c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CorrectnessEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class CorrectnessEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FaithfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FaithfulnessEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java
+index 743a87b4fe57d52d34c5200c71aef4094676db96..64a4645920dde6483837b938dc6c2467ba41087e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FaithfulnessEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class FaithfulnessEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FollowingInstructionsEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java
+similarity index 64%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FollowingInstructionsEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java
+index 44f48d0be31e072c55630c1f7c69056b9042aa19..653d87105f6dc51a2bf5c540c8f4593efd90292b 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/FollowingInstructionsEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class FollowingInstructionsEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HarmfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HarmfulnessEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java
+index f28b74373ba760c1a00a82142e5da7b7c28036c9..9a6323eede7984242edcf808489fb49c76a7d04a 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HarmfulnessEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class HarmfulnessEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HelpfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HelpfulnessEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java
+index acc0c75c9c0087fd26d280de5d36daa5a0929407..7f3c5598385a93e9081570e22dd51b4241969b52 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/HelpfulnessEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class HelpfulnessEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/JudgeAdapter.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/JudgeAdapter.java
+similarity index 76%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/JudgeAdapter.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/JudgeAdapter.java
+index c790f5ace4e0292424b8f8d9ac757e2a5b1b5cf7..d17e9cf578d93ccc03aaa97c08d676443d464522 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/JudgeAdapter.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/JudgeAdapter.java
+@@ -1,4 +1,4 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
+ 
+ /** 평가 프롬프트를 judge 모델에 보내고 응답 원문(JSON)을 돌려준다. */
+ @FunctionalInterface
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+similarity index 96%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+index 2500148a6b571002896235f840c74ed7e18d5115..b428f2f56fc1ac06d1585cd35089dd1df17030f8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+@@ -1,5 +1,7 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
+ 
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
++import com.bibbidi.wedding.chat.evaluation.data.ScaleLevel;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.stream.Collectors;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+similarity index 96%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+index 6b51e9a94e9c55512e7a23bca0adecb086cbd269..e21583938f1259dcdadef9082da1bdd793469e2b 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+@@ -1,8 +1,10 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
++import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.function.BiFunction;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ProfessionalStyleAndToneEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java
+similarity index 65%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ProfessionalStyleAndToneEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java
+index c7d8271df82f788653423ffae5b05c838d5f7095..a5131a922463bc0b6dee658313b1e6d7177605cb 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/ProfessionalStyleAndToneEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class ProfessionalStyleAndToneEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RefusalEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java
+similarity index 59%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RefusalEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java
+index e67768c7e4affa5de183ec0cc636f9934febf3a6..d2e985b475939caf69893900d4664cbc8806a6f2 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RefusalEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class RefusalEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RelevanceEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java
+similarity index 60%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RelevanceEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java
+index ae240e4304ef28a373dfba467d461320803e3803..2f365b59f129b15f0840c9b359ffecc19c619ba8 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/RelevanceEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class RelevanceEvaluator extends MetricEvaluator {
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/StereotypingEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java
+similarity index 61%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/StereotypingEvaluator.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java
+index 6b34b273d8fa008606e48f29144925b6d658b0ed..dfded60ea9b988ef5f9bd98216a8b96be4549554 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/StereotypingEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java
+@@ -1,4 +1,6 @@
+-package com.bibbidi.wedding.chat.evaluation;
++package com.bibbidi.wedding.chat.evaluation.evaluator;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ 
+ public class StereotypingEvaluator extends MetricEvaluator {

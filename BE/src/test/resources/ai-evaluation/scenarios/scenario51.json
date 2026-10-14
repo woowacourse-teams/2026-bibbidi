@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario51",
+  "name": "scenario51",
   "metrics": [
     "Refusal",
     "FollowingInstructions"

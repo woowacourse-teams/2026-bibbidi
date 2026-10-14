@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario31",
+  "name": "scenario31",
   "metrics": [
     "FollowingInstructions",
     "ProfessionalStyleAndTone"

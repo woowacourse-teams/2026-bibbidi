@@ -1,0 +1,292 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+index 3c4d84e4bfbb5a40e3d02713bdaec331c6cb08ef..ff9f211e0609ce0d638b21287470791f3e39c516 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+@@ -12,8 +12,12 @@ import org.springframework.core.io.ClassPathResource;
+ 
+ public class BibbidiEvaluator implements Evaluator {
+ 
+-    private static final PromptTemplate PROMPT_TEMPLATE = new PromptTemplate(
+-            new ClassPathResource("ai-evaluation/prompt/BibbidiEvaluator.st"));
++    private static final String BIBBIDI_EVALUATOR_ST = "ai-evaluation/prompt/BibbidiEvaluator.st";
++    private static final PromptTemplate PROMPT_TEMPLATE;
++
++    static {
++        PROMPT_TEMPLATE = new PromptTemplate(new ClassPathResource(BIBBIDI_EVALUATOR_ST));
++    }
+ 
+     private final MetricInformation metric;
+     private final BibbidiJudge judge;
+@@ -44,6 +48,6 @@ public class BibbidiEvaluator implements Evaluator {
+                 "metricType", metric.metricType(),
+                 "inputs", inputs));
+ 
+-        return judge.evaluate(prompt);
++        return judge.evaluate(prompt, metric, bibbidiRequest.scenarioName());
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
+index 5afba8ecec0e0e3fc87322a90f4747904869390e..7873442aa64d64da38cc698e6894861e7e6bf3f9 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
+@@ -1,10 +1,11 @@
+ package com.bibbidi.wedding.chat.evaluation;
+ 
++import com.bibbidi.wedding.chat.evaluation.data.MetricInformation;
+ import org.springframework.ai.chat.prompt.Prompt;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+ 
+ @FunctionalInterface
+ public interface BibbidiJudge {
+ 
+-    EvaluationResponse evaluate(Prompt prompt);
++    EvaluationResponse evaluate(Prompt prompt, MetricInformation metric, String scenarioName);
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudge.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudge.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..63337e42cc17b43d8f155bb0fe1d17b3961fcead
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudge.java
+@@ -0,0 +1,130 @@
++package com.bibbidi.wedding.chat.evaluation;
++
++import com.bibbidi.wedding.chat.evaluation.data.MetricInformation;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.Duration;
++import java.util.Map;
++import java.util.concurrent.TimeUnit;
++import org.springframework.ai.chat.prompt.Prompt;
++import org.springframework.ai.evaluation.EvaluationResponse;
++import org.springframework.core.io.ClassPathResource;
++import tools.jackson.databind.ObjectMapper;
++
++public class CodexCliBibbidiJudge implements BibbidiJudge {
++
++    private static final String RESULT_SCHEMA = "ai-evaluation/schema/judge-result.json";
++
++    private final ObjectMapper objectMapper = new ObjectMapper();
++    private final String executable;
++    private final String model;
++    private final String reasoningEffort;
++    private final Duration timeout;
++
++    public CodexCliBibbidiJudge(String model, String reasoningEffort, Duration timeout) {
++        this(System.getProperty("os.name").startsWith("Windows") ? "codex.cmd" : "codex",
++                model, reasoningEffort, timeout);
++    }
++
++    public CodexCliBibbidiJudge(String executable, String model, String reasoningEffort, Duration timeout) {
++        this.executable = executable;
++        this.model = model;
++        this.reasoningEffort = reasoningEffort;
++        this.timeout = timeout;
++    }
++
++    @Override
++    public EvaluationResponse evaluate(Prompt prompt, MetricInformation metric, String scenarioName) {
++        try {
++            return parseResult(runCodex(prompt), metric, scenarioName);
++        } catch (IOException exception) {
++            throw new IllegalStateException("Codex judge output could not be read", exception);
++        } catch (InterruptedException exception) {
++            Thread.currentThread().interrupt();
++            throw new IllegalStateException("Codex judge execution was interrupted", exception);
++        }
++    }
++
++    EvaluationResponse parseResult(String json, MetricInformation metric, String scenarioName) {
++        JudgeResult result = objectMapper.readValue(json, JudgeResult.class);
++        if (!scenarioName.equals(result.scenarioName()) || !metric.metricType().equals(result.metricType())) {
++            throw new IllegalStateException("Codex judge returned a different scenario or metric");
++        }
++        if (result.reason() == null || result.reason().isBlank()) {
++            throw new IllegalStateException("Codex judge returned an empty reason");
++        }
++        if ("unscorable".equals(result.status()) && result.score() == null) {
++            throw new UnscorableException(result.reason());
++        }
++        if (!"scored".equals(result.status())) {
++            throw new IllegalStateException("Codex judge returned an invalid status or score combination");
++        }
++        if (result.score() == null || metric.scale().stream()
++                .noneMatch(level -> level.value() == result.score())) {
++            throw new IllegalStateException("Codex judge returned a score outside the metric scale");
++        }
++        return new EvaluationResponse(false, result.score(), result.reason(), Map.of(
++                "scenarioName", scenarioName,
++                "metricType", metric.metricType(),
++                "rawScore", result.score(),
++                "scale", metric.scale(),
++                "direction", metric.direction(),
++                "qualityPassDetermined", false,
++                "judgeModel", model,
++                "reasoningEffort", reasoningEffort));
++    }
++
++    private String runCodex(Prompt prompt) throws IOException, InterruptedException {
++        Path directory = Files.createTempDirectory("bibbidi-judge-");
++        Path schema = directory.resolve("schema.json");
++        Path answer = directory.resolve("answer.json");
++        try {
++            try (InputStream input = new ClassPathResource(RESULT_SCHEMA).getInputStream()) {
++                Files.copy(input, schema);
++            }
++            Process process = new ProcessBuilder(
++                    executable, "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
++                    "--sandbox", "read-only", "--model", model,
++                    "--config", "model_reasoning_effort=" + reasoningEffort,
++                    "--output-schema", schema.toString(),
++                    "--output-last-message", answer.toString(), "-")
++                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
++                    .redirectError(ProcessBuilder.Redirect.DISCARD)
++                    .start();
++            try (OutputStream input = process.getOutputStream()) {
++                input.write(prompt.getContents().getBytes(StandardCharsets.UTF_8));
++            }
++            try {
++                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
++                    process.destroyForcibly().onExit().join();
++                    throw new IllegalStateException("Codex judge timed out");
++                }
++            } catch (InterruptedException exception) {
++                process.destroyForcibly().onExit().join();
++                throw exception;
++            }
++            if (process.exitValue() != 0) {
++                throw new IllegalStateException("Codex judge exited with code " + process.exitValue());
++            }
++            return Files.readString(answer, StandardCharsets.UTF_8);
++        } finally {
++            Files.deleteIfExists(answer);
++            Files.deleteIfExists(schema);
++            Files.deleteIfExists(directory);
++        }
++    }
++
++    public static class UnscorableException extends RuntimeException {
++
++        public UnscorableException(String reason) {
++            super(reason);
++        }
++    }
++
++    private record JudgeResult(String scenarioName, String metricType, String status, Integer score, String reason) {
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudgeTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudgeTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..42680fd4530febc14038c449a862e0f526361956
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/CodexCliBibbidiJudgeTest.java
+@@ -0,0 +1,54 @@
++package com.bibbidi.wedding.chat.evaluation;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
++import java.io.IOException;
++import java.time.Duration;
++import org.junit.jupiter.api.Test;
++
++class CodexCliBibbidiJudgeTest {
++
++    private final CodexCliBibbidiJudge judge =
++            new CodexCliBibbidiJudge("codex", "test-model", "high", Duration.ofSeconds(1));
++
++    @Test
++    void keepsRawScoreWithoutDeclaringQualityPass() throws IOException {
++        var metric = new EvaluationDataLoader().loadMetrics().stream()
++                .filter(candidate -> candidate.metricType().equals("Correctness"))
++                .findFirst().orElseThrow();
++
++        var response = judge.parseResult("""
++                {"scenarioName":"scenario01","metricType":"Correctness", "status":"scored", "score":4,"reason":"근거와 일치"}
++                """, metric, "scenario01");
++
++        assertThat(response.getScore()).isEqualTo(4.0f);
++        assertThat(response.getFeedback()).isEqualTo("근거와 일치");
++        assertThat(response.getMetadata()).containsEntry("qualityPassDetermined", false);
++    }
++
++    @Test
++    void keepsUnscorableSeparateFromZeroScore() throws IOException {
++        var metric = new EvaluationDataLoader().loadMetrics().getFirst();
++
++        assertThatThrownBy(() -> judge.parseResult("""
++                {"scenarioName":"scenario01","metricType":"%s", "status":"unscorable", "score":null,"reason":"조회 결과 없음"}
++                """.formatted(metric.metricType()), metric, "scenario01"))
++                .isInstanceOf(CodexCliBibbidiJudge.UnscorableException.class)
++                .hasMessage("조회 결과 없음");
++    }
++
++    @Test
++    void rejectsScoresOutsideTheMetricScale() throws IOException {
++        var metric = new EvaluationDataLoader().loadMetrics().stream()
++                .filter(candidate -> candidate.metricType().equals("Refusal"))
++                .findFirst().orElseThrow();
++
++        assertThatThrownBy(() -> judge.parseResult("""
++                {"scenarioName":"scenario01","metricType":"Refusal", "status":"scored", "score":4,"reason":"거부함"}
++                """, metric, "scenario01"))
++                .isInstanceOf(IllegalStateException.class)
++                .hasMessageContaining("outside the metric scale");
++    }
++}
+diff --git a/BE/src/test/resources/ai-evaluation/README.md b/BE/src/test/resources/ai-evaluation/README.md
+index d4a1dbfa694c63b7036ec0e9e77280aee36e9ef2..159423daceb5c3dcac9d8babbc61519a3d383651 100644
+--- a/BE/src/test/resources/ai-evaluation/README.md
++++ b/BE/src/test/resources/ai-evaluation/README.md
+@@ -5,6 +5,7 @@ Issue #427의 현재 평가 범위는 사용자 상황에 맞는 결혼 준비 *
+ - `scenarios/scenario01.json`~`scenario55.json`: 시나리오별 대화 입력, 기대 도구 호출, 답변 기준. 11개 지표에 각각 10개씩 연결한다.
+ - `metrics/*.json`: AWS Bedrock 지표 이름을 바탕으로 작성한 비비디 채점 기준. 점수는 초기에는 기록 전용이다.
+ - `prompt/BibbidiEvaluator.st`: 지표 설정과 시나리오 입력을 조합하는 평가 프롬프트 템플릿이다.
++- `schema/judge-result.json`: 로컬 Codex CLI judge의 구조화된 결과 형식이다.
+ - `fixedTestUser.sql`: 이전 시나리오의 사용자 fixture다. 현재 55개 추천 시나리오는 개인 체크리스트를 조회하지 않으므로 이 파일을 사용하지 않는다.
+ 
+ ## 재생 기준
+@@ -21,4 +22,8 @@ Issue #427의 현재 평가 범위는 사용자 상황에 맞는 결혼 준비 *
+ 
+ `referenceAnswer`는 채점 참고 기준이며 챗봇이 실제로 조회한 데이터가 아니다. 실제 조회 맥락에는 `observedToolResults`만 넣는다. `Refusal` 점수는 거부 범위만 뜻하고 적절성은 시나리오의 `expectedRefusal`과 별도로 비교한다.
+ 
++## 로컬 judge
++
++`codex login`으로 ChatGPT 구독 계정에 로그인한 뒤 `CodexCliBibbidiJudge`를 모델 ID, 추론 수준, 시간 제한으로 생성한다. 이 구현은 `codex exec`의 저장된 로그인을 재사용하고, 읽기 전용·임시 실행에서 JSON 스키마로 결과를 받는다. 점수는 `EvaluationResponse`에 기록하지만 합격 기준이 없으므로 `isPass()`를 품질 합격으로 해석하지 않는다. 평가 불가는 `UnscorableException`으로 점수와 구분한다. 실제 CLI 실행은 로컬 통합 평가에서만 수행한다.
++
+ 지표 이름과 평가 대상은 [AWS 지표](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html), 역할·작업·척도·입력 순서는 [Judge 프롬프트](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-type-judge-prompt.html)와 [커스텀 지표 프롬프트 형식](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-custom-metrics-prompt-formats.html)을 참고했다. 실제 채점 문구와 점수 정의는 비비디의 카탈로그 추천 사례에 맞게 작성했다. [커스텀 지표 작업](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-custom-metrics-create-job.html)의 데이터셋·평가 모델·결과 분리 개념도 참고한다.
+diff --git a/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st b/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st
+index f7948f970a0c6dffdb6888dd81c1474e5463926b..05991f774f8b2295c730a1606febf09d061659f5 100644
+--- a/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st
++++ b/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st
+@@ -8,7 +8,7 @@
+ 
+ 시나리오 이름: {scenarioName}
+ 지표: {metricType}
+-JSON으로 시나리오 이름, 지표, 척도에 포함된 점수, 짧은 판정 이유를 반환한다.
++JSON으로 scenarioName, metricType, status, score, reason을 반환한다. 평가할 수 없으면 status는 unscorable, score는 null로 둔다. 채점할 수 있으면 status는 scored, score는 위 척도의 값으로 둔다.
+ 
+ 입력 데이터:
+ {inputs}
+diff --git a/BE/src/test/resources/ai-evaluation/schema/judge-result.json b/BE/src/test/resources/ai-evaluation/schema/judge-result.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..914b3e70878b47246ea89c3e33fa7fa3a3202065
+--- /dev/null
++++ b/BE/src/test/resources/ai-evaluation/schema/judge-result.json
+@@ -0,0 +1,12 @@
++{
++  "type": "object",
++  "properties": {
++    "scenarioName": { "type": "string" },
++    "metricType": { "type": "string" },
++    "status": { "type": "string", "enum": ["scored", "unscorable"] },
++    "score": { "type": ["integer", "null"] },
++    "reason": { "type": "string" }
++  },
++  "required": ["scenarioName", "metricType", "status", "score", "reason"],
++  "additionalProperties": false
++}

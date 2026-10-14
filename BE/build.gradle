@@ -62,6 +62,19 @@ dependencies {
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
 
+tasks.named('test', Test) {
+    exclude '**/BibbidiEvaluationIntegrationTest.class'
+}
+
+tasks.register('aiEvaluationTest', Test) {
+    description = 'Runs the AI evaluation manually.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/BibbidiEvaluationIntegrationTest.class'
+    useJUnitPlatform()
+}
+
 tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }

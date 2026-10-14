@@ -1,0 +1,631 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataMappingTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataMappingTest.java
+index fe427c1f5d32541f4a8d93f82881a7d19ce75344..967f9e7f32c1051d9054587f2fc3cd1396ec3226 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataMappingTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/EvaluationDataMappingTest.java
+@@ -35,7 +35,7 @@ class EvaluationDataMappingTest {
+ 
+         EvaluationScenario scenario = objectMapper.readValue(json, EvaluationScenario.class);
+ 
+-        assertThat(scenario.id()).isEqualTo("scenario21");
++        assertThat(scenario.name()).isEqualTo("scenario21");
+         assertThat(scenario.chatMemory()).hasSize(2);
+         assertThat(scenario.chatMemory().getFirst().role()).isEqualTo("user");
+         assertThat(scenario.expectedToolCalls()).hasSize(1);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
+index 12c7e797183e054666c372df3c73f8454d8ee1c7..b1e95c0aa5e33faa716b7ec4541c3134fda46e48 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationScenario.java
+@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.evaluation.data;
+ import java.util.List;
+ 
+ public record EvaluationScenario(
+-        String id,
++        String name,
+         List<String> metrics,
+         String userMessage,
+         List<ChatMessage> chatMemory,
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario01.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario01.json
+index cd48e7975b51abb20f811a3b2eab38cead6e6bec..80a09bd7e9571dfdbd715dab78c379b454f4e7b3 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario01.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario01.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario01",
++  "name": "scenario01",
+   "metrics": [
+     "Correctness",
+     "Faithfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario02.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario02.json
+index bef2115e31864ba2ee145fa8415d7e6aee662987..b75f17d2250881bbcb813611c823d763c49dad65 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario02.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario02.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario02",
++  "name": "scenario02",
+   "metrics": [
+     "Correctness",
+     "Faithfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario03.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario03.json
+index 43d1261cbbd6f6434b258a0bb4c5457235589c8b..98a92c267fcbb2238b1ab3907118cddf5b3bbce8 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario03.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario03.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario03",
++  "name": "scenario03",
+   "metrics": [
+     "Correctness",
+     "Faithfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario04.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario04.json
+index 831d6ec081d04de6f419387965711e7352726a84..2e1cc3fafb57e14f42c3549af34e4f9335e3cfdb 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario04.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario04.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario04",
++  "name": "scenario04",
+   "metrics": [
+     "Correctness",
+     "Faithfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario05.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario05.json
+index 3522721a3c50f5814d844bd71e2814eaeed56017..93aca1714e01a55153db013e3075984239fe9209 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario05.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario05.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario05",
++  "name": "scenario05",
+   "metrics": [
+     "Correctness",
+     "Faithfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario06.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario06.json
+index c05a7e125b789ccb9bb1f448613d62a52e3020ae..20542b963afc5cf959e23222e44c7a04a68b540e 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario06.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario06.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario06",
++  "name": "scenario06",
+   "metrics": [
+     "Completeness",
+     "Coherence"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario07.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario07.json
+index 56ff09366c48e59fcbfbb551803ddd64c6aa4e4b..9cffcc57a4852d5ce089656efa4cc0315b9c8f9c 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario07.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario07.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario07",
++  "name": "scenario07",
+   "metrics": [
+     "Completeness",
+     "Coherence"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario08.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario08.json
+index 3d9f2cdd6262021d867cf124910a1af65f0b4f6a..f2f76becca9ba1fcf0d5ac9566ec5630c9398837 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario08.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario08.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario08",
++  "name": "scenario08",
+   "metrics": [
+     "Completeness",
+     "Coherence"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario09.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario09.json
+index ee489a4ba976c8af956de0f25eb95c02b83e4b94..0be6b60cea737bc5efeacd451320bf40b6284200 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario09.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario09.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario09",
++  "name": "scenario09",
+   "metrics": [
+     "Completeness",
+     "Coherence"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario10.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario10.json
+index bf61f465c9e735b04d0ab6e355e5def798d085df..8e8211158ce932b6034895a51e746c3479cd65e8 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario10.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario10.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario10",
++  "name": "scenario10",
+   "metrics": [
+     "Completeness",
+     "Coherence"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario11.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario11.json
+index 37d747fd51e5ec1811ad4342c3cd8aeff657dfa7..bd4ee7ebf21181b8c233f1c7195ecd26e69deea0 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario11.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario11.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario11",
++  "name": "scenario11",
+   "metrics": [
+     "Faithfulness",
+     "Correctness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario12.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario12.json
+index aaa082b88952e1abd53ddac48a35fe2e130b3f2c..82b4ddc781482cd2e820c0dcc36be6163c82032e 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario12.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario12.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario12",
++  "name": "scenario12",
+   "metrics": [
+     "Faithfulness",
+     "Correctness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario13.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario13.json
+index 6f6b7dba12cada0ed113da4ed2661d525c36ace7..0dfe4389f6f4b3e68a9b1287893fec315c776c78 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario13.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario13.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario13",
++  "name": "scenario13",
+   "metrics": [
+     "Faithfulness",
+     "Correctness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario14.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario14.json
+index 1691883cdacefbc9654573706ebba63b4de81f6b..7361fa24e404e54c3cc07b684d139d8310e13835 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario14.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario14.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario14",
++  "name": "scenario14",
+   "metrics": [
+     "Faithfulness",
+     "Correctness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario15.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario15.json
+index 86b4c5b3b19d18a20e848cbb833dbe48a4ceba34..3fdfdaeab334b55b664d144eba112b16cf002ff9 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario15.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario15.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario15",
++  "name": "scenario15",
+   "metrics": [
+     "Faithfulness",
+     "Correctness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario16.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario16.json
+index 1ecd11aad9e80cd9cbdfccb56e76c9fd201267c5..acb62d5e184dab4d9db69fdec9333bb903b3355a 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario16.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario16.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario16",
++  "name": "scenario16",
+   "metrics": [
+     "Helpfulness",
+     "Relevance"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario17.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario17.json
+index 8bc70502a24f8759f85892797478d807e72e57e2..420eadc87692c77d7bffd926a9dd19ff2affd442 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario17.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario17.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario17",
++  "name": "scenario17",
+   "metrics": [
+     "Helpfulness",
+     "Relevance"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario18.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario18.json
+index f10b6aad4c0ca7eeb0fa01d68510a97ded6d077a..63ec821f2cdcd64333c4255e16dc25d495b43c71 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario18.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario18.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario18",
++  "name": "scenario18",
+   "metrics": [
+     "Helpfulness",
+     "Relevance"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario19.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario19.json
+index 0a3613d79d5b736c722c98748d00a808c11828c7..e7c72afec179f0117a6955928213f800212d639c 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario19.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario19.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario19",
++  "name": "scenario19",
+   "metrics": [
+     "Helpfulness",
+     "Relevance"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario20.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario20.json
+index 61b5078a66df85de4736947174b3ce63400c2955..cc6947bd2ec51d866f7b9836b23d07f75ad11ad2 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario20.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario20.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario20",
++  "name": "scenario20",
+   "metrics": [
+     "Helpfulness",
+     "Relevance"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario21.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario21.json
+index eec41f64cdc93372f3d1ccf7478511efb2f6a4f2..eafb279fbec22639557f3155ac31bfbd5d37a259 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario21.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario21.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario21",
++  "name": "scenario21",
+   "metrics": [
+     "Coherence",
+     "Completeness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario22.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario22.json
+index 2b680c47b7cf8ab86a289995bb203ef11ac1a091..d65c44290c447598aa29d620c972bdc856dc6e9f 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario22.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario22.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario22",
++  "name": "scenario22",
+   "metrics": [
+     "Coherence",
+     "Completeness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario23.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario23.json
+index 0d62f18da44172d8fb343e160d22d2e156b0d33e..6bdacba8b80359b615635386acfe65f4acb758e4 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario23.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario23.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario23",
++  "name": "scenario23",
+   "metrics": [
+     "Coherence",
+     "Completeness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario24.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario24.json
+index 116c356cac29d2a0f4630a4555fc5756cddb7123..dede6f223e3e75c4c4779ff7897633947cb99123 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario24.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario24.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario24",
++  "name": "scenario24",
+   "metrics": [
+     "Coherence",
+     "Completeness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario25.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario25.json
+index dcaa8884af9a811084dd7500bd20eb9105afa53a..983e1205b602381753471cde589087e3cfd5f4f2 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario25.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario25.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario25",
++  "name": "scenario25",
+   "metrics": [
+     "Coherence",
+     "Completeness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario26.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario26.json
+index 09adc028cca536b02fa54a1134db62d048de1e8d..1cc87c6d41f775bccd2aa9c58d560a3101c9c9fe 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario26.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario26.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario26",
++  "name": "scenario26",
+   "metrics": [
+     "Relevance",
+     "Helpfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario27.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario27.json
+index abac4deda8139ba94011ddb4b27b5e3e80f6c7b9..a4bdfaaa0fd7194f2c95498871b44f44f2ae1209 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario27.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario27.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario27",
++  "name": "scenario27",
+   "metrics": [
+     "Relevance",
+     "Helpfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario28.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario28.json
+index 4f712f6d13265148370e229df62636f6c5e0f10a..a4ce4267fbbf0cf79e344e83ef56bccd314c8c62 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario28.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario28.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario28",
++  "name": "scenario28",
+   "metrics": [
+     "Relevance",
+     "Helpfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario29.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario29.json
+index aa92dbca8fcc47c6b6b6bf6a7de71fdd7258fc65..bb7815981cf7d69d16f5b557bc568f25bcc02189 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario29.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario29.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario29",
++  "name": "scenario29",
+   "metrics": [
+     "Relevance",
+     "Helpfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario30.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario30.json
+index b84f011f26685c269b498189cd50d8be20f96969..c7f74a5a2a60a772f79a670069f07e129e8bf2b6 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario30.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario30.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario30",
++  "name": "scenario30",
+   "metrics": [
+     "Relevance",
+     "Helpfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario31.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario31.json
+index c245f6d4b536c465bd12658ad93fc4e728f24aed..6814af672271fba397c1f235594b661b7bbeb180 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario31.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario31.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario31",
++  "name": "scenario31",
+   "metrics": [
+     "FollowingInstructions",
+     "ProfessionalStyleAndTone"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario32.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario32.json
+index b830a65b31a2bb43ebac3cd30a58324b50a87e82..b5027154c9f8ce0b068451cdb85871f207c78cdd 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario32.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario32.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario32",
++  "name": "scenario32",
+   "metrics": [
+     "FollowingInstructions",
+     "ProfessionalStyleAndTone"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario33.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario33.json
+index 61c54ea228181b745cf18fc6afc95c44ecd7ef95..5818f61fa0a1988063923fcc7c1f297a03f96725 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario33.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario33.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario33",
++  "name": "scenario33",
+   "metrics": [
+     "FollowingInstructions",
+     "ProfessionalStyleAndTone"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario34.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario34.json
+index 4147fa92a1aed9c73ab86c1eb2b690423f768b56..579ad59636d3dd4a1015b2b6a674e4f6fa4125c3 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario34.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario34.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario34",
++  "name": "scenario34",
+   "metrics": [
+     "FollowingInstructions",
+     "ProfessionalStyleAndTone"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario35.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario35.json
+index f84567dc83bfb7b59d51e801fc4303ce76fb63a0..a789a1cda391b70515760e5d5a525018fd565d37 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario35.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario35.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario35",
++  "name": "scenario35",
+   "metrics": [
+     "FollowingInstructions",
+     "ProfessionalStyleAndTone"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario36.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario36.json
+index 3c7245567a8634a09c4a3e8e1049c464e46def4d..64568fbc4f264b3759e22bf21a08a08d70de3de7 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario36.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario36.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario36",
++  "name": "scenario36",
+   "metrics": [
+     "ProfessionalStyleAndTone",
+     "Refusal"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario37.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario37.json
+index bf67bb09051f20768d8d59a1a3f27e90af925c5e..b179abe06edac503d4ee2c3635fced97882f97f8 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario37.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario37.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario37",
++  "name": "scenario37",
+   "metrics": [
+     "ProfessionalStyleAndTone",
+     "Refusal"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario38.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario38.json
+index 96aa9fe6ef5d1a2503953ae5aefafdfabe16c2a5..1493a11fbf03dbeb6a0c93c321d39739adb9ea61 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario38.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario38.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario38",
++  "name": "scenario38",
+   "metrics": [
+     "ProfessionalStyleAndTone",
+     "Refusal"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario39.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario39.json
+index 60d8f50ee912580d59c35562249c3ae36fac7271..7c224264bce210541df29b4bec70f8fb93af4397 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario39.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario39.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario39",
++  "name": "scenario39",
+   "metrics": [
+     "ProfessionalStyleAndTone",
+     "Refusal"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario40.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario40.json
+index 703d0005f7371b6629b5a77657ea5ddedaf80e0b..5953c0e634016d971d8afc38fd43c09a5c948d2a 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario40.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario40.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario40",
++  "name": "scenario40",
+   "metrics": [
+     "ProfessionalStyleAndTone",
+     "Refusal"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario41.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario41.json
+index 31ee7f10debbc1f55ac6f13815bcdb4575c58c28..cd4f1c87ae4918c7cbfc92718953026bb7a222c7 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario41.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario41.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario41",
++  "name": "scenario41",
+   "metrics": [
+     "Harmfulness",
+     "Stereotyping"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario42.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario42.json
+index 442aa6ffc1fcddf711c0aea69a3ad3adad688b47..b50b6269d4e273b047f09d08f084260943cc98b1 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario42.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario42.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario42",
++  "name": "scenario42",
+   "metrics": [
+     "Harmfulness",
+     "Stereotyping"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario43.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario43.json
+index 149ff78e53e1501aadebc9a00c15cff2f95b2849..bd9189b8caae7e22d446cd43b1fb9736263d9f8f 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario43.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario43.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario43",
++  "name": "scenario43",
+   "metrics": [
+     "Harmfulness",
+     "Stereotyping"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario44.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario44.json
+index 3316b3d5b8d573b32a1858167ffe6e0db8aa545e..fa0a0bef72897b7a74026994a0a7e3d3518926ef 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario44.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario44.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario44",
++  "name": "scenario44",
+   "metrics": [
+     "Harmfulness",
+     "Stereotyping"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario45.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario45.json
+index 27d26b273ad3a3278406f7c8164b45e4ed773708..e22cdbcdf808f0ae2983af6d2ed55cf1bc6c12ed 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario45.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario45.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario45",
++  "name": "scenario45",
+   "metrics": [
+     "Harmfulness",
+     "Stereotyping"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario46.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario46.json
+index 47b16bd01e90e2f6ac015bc412c2aeccb425def2..146ca186782bcae34235616acaef103df535ec2f 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario46.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario46.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario46",
++  "name": "scenario46",
+   "metrics": [
+     "Stereotyping",
+     "Harmfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario47.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario47.json
+index 2a21298f6311a534c4c0216a0618e80ad3c06bf4..59ecd58c7982e4d420386fc29af758957017a6fe 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario47.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario47.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario47",
++  "name": "scenario47",
+   "metrics": [
+     "Stereotyping",
+     "Harmfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario48.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario48.json
+index 890d1ddbe9c5b280cb92a0c664ef586580681332..fec677b54efecfd91d0df68681027791cd1a08ab 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario48.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario48.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario48",
++  "name": "scenario48",
+   "metrics": [
+     "Stereotyping",
+     "Harmfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario49.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario49.json
+index 227de49d7099cd8f9e877db190f8e8f0df8a292c..b54ccc0659a72a5b545ca03a04f8bbccf417a740 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario49.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario49.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario49",
++  "name": "scenario49",
+   "metrics": [
+     "Stereotyping",
+     "Harmfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario50.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario50.json
+index d6d4454d8255177088e8d069423712c49249df25..0ee6fef45f0dd7a2e79e4161b61d8ad596aee164 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario50.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario50.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario50",
++  "name": "scenario50",
+   "metrics": [
+     "Stereotyping",
+     "Harmfulness"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario51.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario51.json
+index 66d463490c65b68c70654eb3b82e3bf43a6e4891..78ea49e2cf9c5c03055d1336f993db94c6f96221 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario51.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario51.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario51",
++  "name": "scenario51",
+   "metrics": [
+     "Refusal",
+     "FollowingInstructions"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario52.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario52.json
+index 6d865d9044d107d2fedd12bebf5b82042be3484b..60fb04aa73d31b44206b1152daa63ba5ca85e88e 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario52.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario52.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario52",
++  "name": "scenario52",
+   "metrics": [
+     "Refusal",
+     "FollowingInstructions"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario53.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario53.json
+index 82164d007d02c27ffbc722b9c04c7442bbbccb11..209626e1affd79f65256094e6af4846835c1d0be 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario53.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario53.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario53",
++  "name": "scenario53",
+   "metrics": [
+     "Refusal",
+     "FollowingInstructions"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario54.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario54.json
+index afaf0c9362b69348dbbdf01964f4dc09082aa6b1..26e5a00952f4bc9865f23f0b0bb9b2ff617f15d9 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario54.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario54.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario54",
++  "name": "scenario54",
+   "metrics": [
+     "Refusal",
+     "FollowingInstructions"
+diff --git a/BE/src/test/resources/ai-evaluation/scenarios/scenario55.json b/BE/src/test/resources/ai-evaluation/scenarios/scenario55.json
+index b473b568fa87a488aeb910d4deb56e8b132672ec..d9acd71d7a87e6d4acf1fef51e869918c1fa3e55 100644
+--- a/BE/src/test/resources/ai-evaluation/scenarios/scenario55.json
++++ b/BE/src/test/resources/ai-evaluation/scenarios/scenario55.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "scenario55",
++  "name": "scenario55",
+   "metrics": [
+     "Refusal",
+     "FollowingInstructions"

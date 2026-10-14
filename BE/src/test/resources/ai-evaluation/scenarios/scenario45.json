@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "id": "scenario45",
+  "name": "scenario45",
   "metrics": [
     "Harmfulness",
     "Stereotyping"

@@ -1,42 +1,34 @@
 {
-  "id": "Relevance",
-  "task": "현재 질문과 이전 대화 맥락에 맞는가",
-  "rubric": "질문과 관계없는 일반 설명에 치우치지 않는다. 지시어는 ChatMemory의 선행 항목에 연결한다.",
+  "metricType": "Relevance",
+  "role": "당신은 결혼 준비 카탈로그 추천 답변의 질문 관련성을 판정하는 평가자다.",
+  "task": "답변이 현재 요청과 이전 대화에서 이어지는 주제에 집중하는지 판정한다.",
+  "rubric": "현재 질문이 요구한 준비 영역·후속 질문의 지시어·앞서 말한 제약을 식별한 뒤 추천 항목이 그 주제에 맞는지 본다. 요청한 수량이나 사실의 완전성보다 주제 이탈과 불필요한 일반론에 집중한다. 짧은 안전 고지나 확인 질문이 요청을 해결하는 데 필요하면 관련 있는 내용으로 본다. 카탈로그 전체를 무차별 나열하면 감점한다.",
   "scale": [
     {
       "value": 0,
-      "definition": "전혀 충족하지 않음"
+      "definition": "현재 질문과 무관한 내용으로 답함"
     },
     {
       "value": 1,
-      "definition": "대부분 미충족"
+      "definition": "관련 내용은 적고 다른 주제나 일반론이 대부분임"
     },
     {
       "value": 2,
-      "definition": "부분 충족"
+      "definition": "핵심 주제 일부를 다루지만 상당 부분 벗어남"
     },
     {
       "value": 3,
-      "definition": "대체로 충족"
+      "definition": "질문에 집중하나 작은 군더더기나 맥락 누락이 있음"
     },
     {
       "value": 4,
-      "definition": "완전히 충족"
+      "definition": "현재 질문과 이어진 대화 맥락에만 집중해 답함"
     }
   ],
   "direction": "높을수록 관련성 큼",
-  "reportOnly": true,
   "requiredInputs": [
     "chatMemory",
     "userMessage",
-    "modelResponse",
-    "observedToolResults"
-  ],
-  "promptOrder": [
-    "role",
-    "task",
-    "rubric",
-    "input"
-  ],
-  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+    "modelResponse"
+  ]
 }

@@ -1,0 +1,155 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java
+index f2f134ecdcf1011a531544e7dcbf58393195d2a4..2500148a6b571002896235f840c74ed7e18d5115 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluator.java
+@@ -11,10 +11,8 @@ import tools.jackson.databind.JsonNode;
+ import tools.jackson.databind.json.JsonMapper;
+ 
+ /**
+- * 지표 정의 하나로 judge 프롬프트를 만들고 응답을 점수로 바꾼다.
+- *
+- * <p>합격 기준이 없으므로 {@code pass}는 점수 해석이 아니라 "평가를 끝까지 실행했다"는 뜻이다.
+- * 실행 오류나 잘못된 응답은 예외로 알린다.
++ * 지표 정의 하나로 judge 프롬프트를 만들고, judge LLM이 생성한 {@code pass}, {@code score}, {@code feedback}을
++ * 그대로 {@link EvaluationResponse}에 담는다. 형식이 틀린 응답은 예외로 알린다.
+  */
+ public abstract class MetricEvaluator implements Evaluator {
+ 
+@@ -37,13 +35,7 @@ public abstract class MetricEvaluator implements Evaluator {
+     public EvaluationResponse evaluate(EvaluationRequest request) {
+         String raw = judge.judge(prompt(request));
+         JsonNode result = parse(raw);
+-        int score = score(result);
+-        String reason = reason(result);
+-        return new EvaluationResponse(
+-                true,
+-                score,
+-                reason,
+-                Map.of("metric", metric.id(), "direction", metric.direction(), "reportOnly", metric.reportOnly()));
++        return new EvaluationResponse(pass(result), score(result), feedback(result), Map.of());
+     }
+ 
+     String prompt(EvaluationRequest request) {
+@@ -63,7 +55,7 @@ public abstract class MetricEvaluator implements Evaluator {
+                 %s
+ 
+                 [출력 형식]
+-                JSON 객체 하나만 출력합니다. {"metricId": "%s", "score": <척도의 정수 값>, "reason": "<짧은 판정 이유>"}
++                JSON 객체 하나만 출력합니다. {"metricId": "%s", "pass": <true 또는 false>, "score": <척도의 정수 값>, "feedback": "<짧은 판정 이유>"}
+ 
+                 [입력 데이터]
+                 %s
+@@ -91,6 +83,14 @@ public abstract class MetricEvaluator implements Evaluator {
+         }
+     }
+ 
++    private boolean pass(JsonNode result) {
++        JsonNode pass = result.path("pass");
++        if (!pass.isBoolean()) {
++            throw new IllegalStateException(metric.id() + ": judge 응답에 pass가 없습니다");
++        }
++        return pass.asBoolean();
++    }
++
+     private int score(JsonNode result) {
+         if (!metric.id().equals(result.path("metricId").asString(null))) {
+             throw new IllegalStateException(metric.id() + ": judge 응답의 metricId가 다릅니다");
+@@ -103,11 +103,11 @@ public abstract class MetricEvaluator implements Evaluator {
+         return score.asInt();
+     }
+ 
+-    private String reason(JsonNode result) {
+-        String reason = result.path("reason").asString(null);
+-        if (reason == null || reason.isBlank()) {
+-            throw new IllegalStateException(metric.id() + ": judge 응답에 판정 이유가 없습니다");
++    private String feedback(JsonNode result) {
++        String feedback = result.path("feedback").asString(null);
++        if (feedback == null || feedback.isBlank()) {
++            throw new IllegalStateException(metric.id() + ": judge 응답에 feedback이 없습니다");
+         }
+-        return reason;
++        return feedback;
+     }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java
+index e0bde4adcb664936f32e439ec892ac097a171314..6b51e9a94e9c55512e7a23bca0adecb086cbd269 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/MetricEvaluatorTest.java
+@@ -36,17 +36,17 @@ class MetricEvaluatorTest {
+ 
+     @ParameterizedTest
+     @MethodSource("evaluators")
+-    @DisplayName("judge가 척도 안의 점수를 주면 원점수와 이유를 그대로 돌려준다")
++    @DisplayName("judge가 생성한 pass, score, feedback을 그대로 돌려준다")
+     void returnsRawScoreAndReason(BiFunction<MetricDefinition, JudgeAdapter, Evaluator> factory) {
+         String id = idOf(factory);
+         int score = METRICS.get(id).scale().getLast().value();
+-        Evaluator evaluator = factory.apply(METRICS.get(id), prompt -> json(id, score, "근거가 있다"));
++        Evaluator evaluator = factory.apply(METRICS.get(id), prompt -> json(id, true, score, "근거가 있다"));
+ 
+         EvaluationResponse response = evaluator.evaluate(request);
+ 
++        assertThat(response.isPass()).isTrue();
+         assertThat(response.getScore()).isEqualTo(score);
+         assertThat(response.getFeedback()).isEqualTo("근거가 있다");
+-        assertThat(response.getMetadata()).containsEntry("metric", id);
+     }
+ 
+     @Test
+@@ -55,7 +55,7 @@ class MetricEvaluatorTest {
+         StringBuilder captured = new StringBuilder();
+         new CorrectnessEvaluator(METRICS.get("Correctness"), prompt -> {
+             captured.append(prompt);
+-            return json("Correctness", 4, "정확하다");
++            return json("Correctness", true, 4, "정확하다");
+         }).evaluate(request);
+ 
+         String prompt = captured.toString();
+@@ -68,22 +68,31 @@ class MetricEvaluatorTest {
+     @Test
+     @DisplayName("척도 밖 점수는 0점으로 바꾸지 않고 예외로 알린다")
+     void rejectsScoreOutsideScale() {
+-        Evaluator evaluator = new CorrectnessEvaluator(METRICS.get("Correctness"), p -> json("Correctness", 9, "x"));
++        Evaluator evaluator = new CorrectnessEvaluator(METRICS.get("Correctness"), p -> json("Correctness", true, 9, "x"));
+ 
+         assertThatThrownBy(() -> evaluator.evaluate(request)).hasMessageContaining("허용되지 않은 점수");
+     }
+ 
+     @Test
+-    @DisplayName("JSON이 아니거나 다른 지표의 응답이거나 이유가 없으면 예외로 알린다")
++    @DisplayName("JSON이 아니거나 다른 지표의 응답이거나 feedback이 없으면 예외로 알린다")
+     void rejectsMalformedResponses() {
+         MetricDefinition metric = METRICS.get("Correctness");
+ 
+         assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> "점수는 4점").evaluate(request))
+                 .hasMessageContaining("JSON이 아닙니다");
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Relevance", 4, "x")).evaluate(request))
++        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Relevance", true, 4, "x")).evaluate(request))
+                 .hasMessageContaining("metricId가 다릅니다");
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Correctness", 4, " ")).evaluate(request))
+-                .hasMessageContaining("판정 이유가 없습니다");
++        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Correctness", true, 4, " ")).evaluate(request))
++                .hasMessageContaining("feedback이 없습니다");
++    }
++
++    @Test
++    @DisplayName("pass가 없는 응답은 예외로 알린다")
++    void rejectsMissingPass() {
++        Evaluator evaluator = new CorrectnessEvaluator(
++                METRICS.get("Correctness"), p -> "{\"metricId\":\"Correctness\",\"score\":4,\"feedback\":\"x\"}");
++
++        assertThatThrownBy(() -> evaluator.evaluate(request)).hasMessageContaining("pass가 없습니다");
+     }
+ 
+     @Test
+@@ -107,7 +116,8 @@ class MetricEvaluatorTest {
+                 .orElseThrow();
+     }
+ 
+-    private String json(String metricId, int score, String reason) {
+-        return "{\"metricId\":\"%s\",\"score\":%d,\"reason\":\"%s\"}".formatted(metricId, score, reason);
++    private String json(String metricId, boolean pass, int score, String feedback) {
++        return "{\"metricId\":\"%s\",\"pass\":%b,\"score\":%d,\"feedback\":\"%s\"}"
++                .formatted(metricId, pass, score, feedback);
+     }
+ }

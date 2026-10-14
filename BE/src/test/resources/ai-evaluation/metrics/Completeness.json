@@ -1,42 +1,36 @@
 {
-  "id": "Completeness",
-  "task": "사용자의 질문에서 답할 수 있는 모든 부분을 다뤘는가",
-  "rubric": "여러 항목과 날짜·시간·장소·메모 등 요청한 속성을 빠뜨리지 않는다. 정보가 부족하면 부족한 부분을 구분해 말한다.",
+  "metricType": "Completeness",
+  "role": "당신은 결혼 준비 카탈로그 추천 답변의 충족 범위를 판정하는 평가자다.",
+  "task": "사용자가 요청한 추천 개수와 조건, 설명할 수 있는 부분을 빠짐없이 다뤘는지 판정한다.",
+  "rubric": "현재 질문과 이전 대화에서 요청한 항목 수, 준비 단계, 예산·시기·상황 제약을 먼저 식별한다. 각 요구에 답했는지 확인하되 확인할 수 없는 업체·가격·예약 정보는 한계를 밝히고 가능한 카탈로그 추천을 계속했으면 충족으로 본다. 참고 답변은 필수 사실과 제약의 기준이며 표현이나 동의어가 달라도 감점하지 않는다. 근거 없는 내용을 채워 넣어 누락을 숨기면 충족으로 보지 않는다.",
   "scale": [
     {
       "value": 0,
-      "definition": "전혀 충족하지 않음"
+      "definition": "요청한 추천이나 핵심 요구에 답하지 않음"
     },
     {
       "value": 1,
-      "definition": "대부분 미충족"
+      "definition": "여러 핵심 요구를 빠뜨림"
     },
     {
       "value": 2,
-      "definition": "부분 충족"
+      "definition": "일부 요구는 다뤘지만 추천 수나 중요한 제약이 빠짐"
     },
     {
       "value": 3,
-      "definition": "대체로 충족"
+      "definition": "핵심 요구를 모두 다루고 사소한 세부사항만 빠짐"
     },
     {
       "value": 4,
-      "definition": "완전히 충족"
+      "definition": "요청한 추천 수·조건·필요한 한계 고지를 모두 다룸"
     }
   ],
   "direction": "높을수록 완전함",
-  "reportOnly": true,
   "requiredInputs": [
     "chatMemory",
     "userMessage",
     "modelResponse",
-    "observedToolResults"
-  ],
-  "promptOrder": [
-    "role",
-    "task",
-    "rubric",
-    "input"
-  ],
-  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html"
+    "observedToolResults",
+    "referenceAnswer"
+  ]
 }
