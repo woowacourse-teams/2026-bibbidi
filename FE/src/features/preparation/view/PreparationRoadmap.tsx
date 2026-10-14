@@ -1,7 +1,9 @@
 import { ReactNode, useRef, useState } from "react";
+import { EXPAND_MOTION_STYLE } from "../../../shared/motion";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
 import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
+import { RoadmapStepDisclosure } from "./RoadmapStepDisclosure";
 import "./PreparationRoadmap.css";
 
 interface PreparationRoadmapProps {
@@ -88,21 +90,23 @@ function PreparationRoadmapSteps({
                 />
               ) : null}
             </button>
-            {isExpanded ? (
-              <PreparationStepInlineDetail
-                additionErrorMessage={additionErrorMessage}
-                addingCatalogItemIds={addingCatalogItemIds}
-                canAddTasks={canAddTasks}
-                detail={viewModel.selectedStepDetail}
-                id={detailId}
-                onAddAllTasks={onAddAllTasks}
-                onCollapse={() => {
-                  document.getElementById(triggerId)?.focus();
-                  onStepSelect(step.id);
-                }}
-                onTaskAdd={onTaskAdd}
-              />
-            ) : null}
+            <RoadmapStepDisclosure expanded={isExpanded}>
+              {isExpanded ? (
+                <PreparationStepInlineDetail
+                  additionErrorMessage={additionErrorMessage}
+                  addingCatalogItemIds={addingCatalogItemIds}
+                  canAddTasks={canAddTasks}
+                  detail={viewModel.selectedStepDetail}
+                  id={detailId}
+                  onAddAllTasks={onAddAllTasks}
+                  onCollapse={() => {
+                    document.getElementById(triggerId)?.focus();
+                    onStepSelect(step.id);
+                  }}
+                  onTaskAdd={onTaskAdd}
+                />
+              ) : null}
+            </RoadmapStepDisclosure>
           </li>
         );
       })}
@@ -156,7 +160,7 @@ export function PreparationRoadmap({
   };
 
   return (
-    <div className="preparation-roadmap">
+    <div className="preparation-roadmap" style={EXPAND_MOTION_STYLE}>
       <RoadmapCategoryTabs
         categories={viewModel.categories}
         selectedCategoryId={

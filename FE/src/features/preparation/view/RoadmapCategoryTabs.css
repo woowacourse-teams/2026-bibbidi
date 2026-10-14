@@ -8,6 +8,7 @@
 }
 
 .roadmap-category-tabs__list {
+  position: relative;
   display: flex;
   flex: none;
   width: max-content;
@@ -15,6 +16,24 @@
   margin: 0;
   gap: 0;
   list-style: none;
+}
+
+.roadmap-category-tabs__list::after {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: var(--category-indicator-width, 0px);
+  height: 3px;
+  background: var(--color-stroke-brand-solid);
+  content: "";
+  pointer-events: none;
+  transform: translateX(var(--category-indicator-left, 0px));
+}
+
+.roadmap-category-tabs__list[data-indicator-ready="true"]::after {
+  transition:
+    transform var(--expand-duration) ease,
+    width var(--expand-duration) ease;
 }
 
 .roadmap-category-tabs button {
@@ -33,12 +52,19 @@
   font: inherit;
   font-size: 15px;
   white-space: nowrap;
+  transition: color 150ms ease;
 }
 
 .roadmap-category-tabs button[aria-pressed="true"] {
-  border-bottom-color: var(--color-stroke-brand-solid);
   color: var(--color-fg-brand);
   font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roadmap-category-tabs__list[data-indicator-ready="true"]::after,
+  .roadmap-category-tabs button {
+    transition: none;
+  }
 }
 
 .roadmap-category-tabs button:focus-visible {
