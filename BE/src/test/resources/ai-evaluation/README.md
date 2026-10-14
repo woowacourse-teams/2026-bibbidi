@@ -36,8 +36,10 @@ Issue #427의 현재 평가 범위는 사용자 상황에 맞는 결혼 준비 *
 .\gradlew.bat aiEvaluationTest
 ```
 
+실행 결과는 `build/reports/ai-evaluation/result.json`에 상세 JSON으로, `build/reports/ai-evaluation/summary.md`에 시나리오와 지표의 완료·오류·평가 불가 건수 요약으로 저장한다.
+
 `BIBBIDI_EVALUATION_GENERATION_MODEL`은 Bedrock 생성 모델 ID다. `BIBBIDI_EVALUATION_JUDGE_PROVIDER`는 `codex` 또는 `claude`, `BIBBIDI_EVALUATION_JUDGE_MODEL`은 판독 모델 ID다. Codex 추론 수준은 `BIBBIDI_EVALUATION_JUDGE_REASONING_EFFORT`로 설정한다. 실행 시 전체 시나리오의 지정 메트릭을 평가한다.
 
-실행 결과는 `build/reports/ai-evaluation/result.json`에 기록한다. 시나리오마다 생성 모델의 호출별 질문(시스템·대화·사용자·도구 응답), 답변, 요청한 도구와 토큰 사용량을 기록하고, 생성 호출 전체의 토큰 합계와 최종 답변 및 실제 도구 호출·결과도 담는다. 각 메트릭에는 판독 모델에 전달한 전체 프롬프트, 구조화된 답변, 점수·이유와 토큰 사용량을 담는다. 토큰 사용량을 제공하지 않는 필드는 `null`로 기록한다. 실패한 시나리오는 Gradle 테스트 결과에 표시하며 JSON에는 완료된 시나리오만 기록한다. 현재 점수에는 품질 합격 기준을 적용하지 않으므로 `qualityPassDetermined`는 `false`다.
+실행 결과는 `build/reports/ai-evaluation/result.json`에 기록한다. 실행 시각과 판독 모델의 추론 설정을 함께 저장한다. 시나리오마다 생성 모델의 호출별 질문(시스템·대화·사용자·도구 응답), 답변, 요청한 도구와 인자, 토큰 사용량을 기록하고, 생성 호출 전체의 토큰 합계와 최종 답변 및 기대·실제 도구 호출과 도구 결과도 담는다. 각 메트릭에는 판독 모델에 전달한 전체 프롬프트, 구조화된 답변, 점수·이유와 토큰 사용량을 담는다. 토큰 사용량을 제공하지 않는 필드는 `null`로 기록한다. 생성·도구 검증·판독 중 오류가 나거나 평가 불가가 발생하면 해당 시나리오의 상태, 실패 단계와 이유, 그때까지 수집한 결과를 JSON에 기록하고 테스트 실패도 유지한다. 현재 점수에는 품질 합격 기준을 적용하지 않으므로 `qualityPassDetermined`는 `false`다.
 
 지표 이름과 평가 대상은 [AWS 지표](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html), 역할·작업·척도·입력 순서는 [Judge 프롬프트](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-type-judge-prompt.html)와 [커스텀 지표 프롬프트 형식](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-custom-metrics-prompt-formats.html)을 참고했다. 실제 채점 문구와 점수 정의는 비비디의 카탈로그 추천 사례에 맞게 작성했다. [커스텀 지표 작업](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-custom-metrics-create-job.html)의 데이터셋·평가 모델·결과 분리 개념도 참고한다.

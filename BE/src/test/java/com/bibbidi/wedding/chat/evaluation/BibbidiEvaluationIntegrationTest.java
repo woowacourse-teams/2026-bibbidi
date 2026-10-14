@@ -10,6 +10,7 @@ import com.bibbidi.wedding.chat.evaluation.judge.BibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.judge.ClaudeCliBibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.judge.CodexCliBibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
+import com.bibbidi.wedding.chat.evaluation.report.ObservedToolCall;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.tools.CatalogTools;
 import java.io.IOException;
@@ -80,10 +81,13 @@ class BibbidiEvaluationIntegrationTest {
     @Value("${bibbidi.evaluation.judge.model}")
     private String judgeModelId;
 
+    @Value("${bibbidi.evaluation.judge.reasoning-effort}")
+    private String judgeReasoningEffort;
+
     @BeforeAll
     void createReportWriter() {
         reportWriter = new BibbidiEvaluationReportWriter(
-                generationModelId, judgeProvider, judgeModelId);
+                generationModelId, judgeProvider, judgeModelId, judgeReasoningEffort);
     }
 
     @TestFactory
@@ -113,36 +117,49 @@ class BibbidiEvaluationIntegrationTest {
 
     private void evaluateScenario(EvaluationScenario scenario, Map<String, MetricInformation> metrics) {
         List<Document> observedToolResults = new ArrayList<>();
-        List<String> observedToolCalls = new ArrayList<>();
-        ToolCallback catalogTool = recordingCatalogTool(observedToolCalls, observedToolResults);
+        List<ObservedToolCall> observedToolCalls = new ArrayList<>();
         RecordingChatModel recordingModel = new RecordingChatModel(generationModel);
-        ChatClient client = ChatClient.builder(recordingModel)
-                .defaultSystem(systemPrompt, StandardCharsets.UTF_8)
-                .defaultToolCallbacks(catalogTool)
-                .build();
-
-        ChatResponse generationResponse = client.prompt()
-                .messages(scenario.chatMemory().stream().map(this::toMessage).toList())
-                .messages(new UserMessage(scenario.userMessage()))
-                .call()
-                .chatResponse();
-
-        assertThat(generationResponse).isNotNull();
-        String responseContent = generationResponse.getResult().getOutput().getText();
-        assertThat(responseContent).isNotBlank();
-        assertThat(observedToolCalls).containsExactlyElementsOf(scenario.expectedToolCalls().stream()
-                .map(EvaluationScenario.ExpectedToolCall::name).toList());
-
-        BibbidiEvaluationRequest request = new BibbidiEvaluationRequest(
-                scenario, observedToolResults, responseContent);
+        ChatResponse generationResponse = null;
         List<EvaluationResponse> evaluations = new ArrayList<>();
-        for (String metricType : scenario.metrics()) {
-            MetricInformation metric = metrics.get(metricType);
-            assertThat(metric).as("unknown metric: %s", metricType).isNotNull();
-            var result = new BibbidiEvaluator(metric, judgeModel).evaluate(request);
-            assertThat(result.getScore()).isIn(metric.scale().stream()
-                    .map(level -> (float) level.value()).toList());
-            evaluations.add(result);
+        String phase = "generation";
+        String evaluatingMetric = null;
+        try {
+            ToolCallback catalogTool = recordingCatalogTool(observedToolCalls, observedToolResults);
+            ChatClient client = ChatClient.builder(recordingModel)
+                    .defaultSystem(systemPrompt, StandardCharsets.UTF_8)
+                    .defaultToolCallbacks(catalogTool)
+                    .build();
+            generationResponse = client.prompt()
+                    .messages(scenario.chatMemory().stream().map(this::toMessage).toList())
+                    .messages(new UserMessage(scenario.userMessage()))
+                    .call()
+                    .chatResponse();
+
+            assertThat(generationResponse).isNotNull();
+            String responseContent = generationResponse.getResult().getOutput().getText();
+            assertThat(responseContent).isNotBlank();
+            phase = "toolVerification";
+            assertThat(observedToolCalls.stream().map(ObservedToolCall::name).toList())
+                    .containsExactlyElementsOf(scenario.expectedToolCalls().stream()
+                            .map(EvaluationScenario.ExpectedToolCall::name).toList());
+
+            BibbidiEvaluationRequest request = new BibbidiEvaluationRequest(
+                    scenario, observedToolResults, responseContent);
+            phase = "metricEvaluation";
+            for (String metricType : scenario.metrics()) {
+                evaluatingMetric = metricType;
+                MetricInformation metric = metrics.get(metricType);
+                assertThat(metric).as("unknown metric: %s", metricType).isNotNull();
+                var result = new BibbidiEvaluator(metric, judgeModel).evaluate(request);
+                assertThat(result.getScore()).isIn(metric.scale().stream()
+                        .map(level -> (float) level.value()).toList());
+                evaluations.add(result);
+                evaluatingMetric = null;
+            }
+        } catch (RuntimeException | AssertionError failure) {
+            reportWriter.recordFailure(scenario, recordingModel.calls(), generationResponse,
+                    observedToolCalls, observedToolResults, evaluations, phase, evaluatingMetric, failure);
+            throw failure;
         }
         reportWriter.record(scenario, recordingModel.calls(), generationResponse,
                 observedToolCalls, observedToolResults, evaluations);
@@ -156,7 +173,7 @@ class BibbidiEvaluationIntegrationTest {
         };
     }
 
-    private ToolCallback recordingCatalogTool(List<String> calls, List<Document> results) {
+    private ToolCallback recordingCatalogTool(List<ObservedToolCall> calls, List<Document> results) {
         ToolCallback delegate = ToolCallbacks.from(new CatalogTools(catalogService))[0];
         return new ToolCallback() {
             @Override
@@ -171,16 +188,17 @@ class BibbidiEvaluationIntegrationTest {
 
             @Override
             public String call(String input) {
-                return record(delegate.call(input));
+                calls.add(new ObservedToolCall(getToolDefinition().name(), input));
+                return recordResult(delegate.call(input));
             }
 
             @Override
             public String call(String input, ToolContext context) {
-                return record(delegate.call(input, context));
+                calls.add(new ObservedToolCall(getToolDefinition().name(), input));
+                return recordResult(delegate.call(input, context));
             }
 
-            private String record(String result) {
-                calls.add(getToolDefinition().name());
+            private String recordResult(String result) {
                 results.add(new Document(result));
                 return result;
             }

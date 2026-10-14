@@ -31,6 +31,9 @@ public class EvaluationDataLoader {
 
     private <T> List<T> load(String pattern, Class<T> type) throws IOException {
         Resource[] resources = resourceResolver.getResources(BASE_PATH + pattern);
+        if (resources.length == 0) {
+            throw new IllegalStateException("No evaluation resources found: " + BASE_PATH + pattern);
+        }
         Arrays.sort(resources, Comparator.comparing(Resource::getFilename));
 
         List<T> result = new ArrayList<>(resources.length);
