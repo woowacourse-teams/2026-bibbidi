@@ -58,17 +58,6 @@
   padding: 12px 0;
 }
 
-.preparation-roadmap-state.roadmap-login-notice {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  justify-content: safe center;
-}
-
-.roadmap-login-notice > * {
-  flex: none;
-}
-
 .roadmap-section-header > div {
   display: flex;
   align-items: center;
@@ -189,10 +178,6 @@
 }
 
 @media (max-width: 760px) {
-  .preparation-roadmap-state.roadmap-login-notice {
-    padding: 16px;
-  }
-
   .roadmap-workspace {
     flex-direction: column;
   }

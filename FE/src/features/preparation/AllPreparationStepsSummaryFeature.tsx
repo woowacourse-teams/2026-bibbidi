@@ -23,7 +23,7 @@ export function AllPreparationStepsSummaryFeature({
     <>
       {stepCount}개 단계 ·{" "}
       {isGuest
-        ? `내 할 일 ${guestTaskCount}개 · 완료 0개`
+        ? `내 할 일 ${guestTaskCount}개`
         : category
           ? `내 할 일 ${items.length}개 · 완료 ${items.filter((item) => item.status === "done").length}개`
           : request.status === "loading"
