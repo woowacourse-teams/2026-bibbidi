@@ -36,7 +36,6 @@
 }
 
 .app-header__navigation-item {
-  position: relative;
   display: inline-flex;
   height: 100%;
   align-items: center;
@@ -48,17 +47,7 @@
 }
 
 .app-header__navigation-item[aria-current="page"] {
-  color: var(--color-fg-neutral);
-}
-
-.app-header__navigation-item[aria-current="page"]::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 3px;
-  background: var(--color-bg-brand-solid);
-  content: "";
+  color: var(--color-fg-brand);
 }
 
 .app-header__right {
