@@ -12,12 +12,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
 import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
 import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
+import com.bibbidi.wedding.chat.service.AiChatService;
+import com.bibbidi.wedding.chat.service.ChatSseHandler;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.checklist.service.ChecklistService;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +39,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -45,12 +50,14 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import reactor.core.publisher.Flux;
 import reactor.test.publisher.TestPublisher;
+import tools.jackson.databind.json.JsonMapper;
 
 class AiChatLifecycleTest {
 
     private static final UUID ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99");
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
     private ChatModel model;
+    private boolean answerStarted;
     private ChatMemory memory;
     private AiChatService chat;
     private ScheduledExecutorService scheduler;
@@ -62,8 +69,14 @@ class AiChatLifecycleTest {
     void setUp() {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
-        memory = MessageWindowChatMemory.builder().maxMessages(20).build();
-        chat = new AiChatService(ChatClient.create(model), memory, mock(ChecklistService.class));
+        ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
+        memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
+        ChecklistService checklistService = mock(ChecklistService.class);
+        JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
+        ChatMemory bibbidiMemory = new BibbidiChatMemory(repository, 20, mock(CatalogService.class),
+                checklistService, mapper);
+        chat = new AiChatService(ChatClient.create(model), bibbidiMemory, checklistService, mapper);
+        answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
         timeout = new AtomicReference<>();
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -186,11 +199,14 @@ class AiChatLifecycleTest {
             delivered.countDown();
             return null;
         }).when(handler).sendAnswerChunk(text);
-        publisher.next(response(text));
+        String jsonChunk = (answerStarted ? "" : "{\"answer\":\"") + text;
+        answerStarted = true;
+        publisher.next(new ChatResponse(List.of(new Generation(new AssistantMessage(jsonChunk)))));
         await().until(() -> delivered.getCount() == 0);
     }
 
     private static ChatResponse response(String text) {
-        return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(
+                JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of()))))));
     }
 }

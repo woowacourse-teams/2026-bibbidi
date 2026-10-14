@@ -7,11 +7,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.tools.ChatToolContext;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -36,18 +39,20 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Flux;
 import reactor.test.publisher.TestPublisher;
+import tools.jackson.databind.json.JsonMapper;
 
 class AiChatServiceTest {
 
@@ -60,6 +65,7 @@ class AiChatServiceTest {
     private ChatMemory memory;
     private AiChatService service;
     private ChatSseHandler reply;
+    private ChecklistService checklistService;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
 
@@ -67,8 +73,13 @@ class AiChatServiceTest {
     void setUp() {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
-        memory = MessageWindowChatMemory.builder().maxMessages(20).build();
-        service = new AiChatService(ChatClient.create(model), memory, mock(ChecklistService.class));
+        ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
+        memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
+        checklistService = mock(ChecklistService.class);
+        JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
+        ChatMemory bibbidiMemory = new BibbidiChatMemory(repository, 20, mock(CatalogService.class),
+                checklistService, mapper);
+        service = new AiChatService(ChatClient.create(model), bibbidiMemory, checklistService, mapper);
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
         reply = mock(ChatSseHandler.class);
@@ -93,10 +104,10 @@ class AiChatServiceTest {
         Future<?> responseTask = startStreamingChat(publisher);
 
         // when, then: 답변 조각을 받는 동안에는 대화를 저장하지 않는다
-        publisher.next(response("웨딩홀 "));
+        publisher.next(chunk("{\"answer\":\"웨딩홀 "));
         await().untilAsserted(() -> verify(reply).sendAnswerChunk("웨딩홀 "));
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
-        publisher.next(response("계약을 확인하세요."));
+        publisher.next(chunk("계약을 확인하세요.\",\"recommendedItemIds\":[]}"));
         await().untilAsserted(() -> verify(reply).sendAnswerChunk("계약을 확인하세요."));
 
         // when
@@ -126,8 +137,8 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("인증된 사용자 ID를 조회 도구의 실행 정보에 전달한다")
-    void passesTheAuthenticatedUserToToolContext() {
+    @DisplayName("인증된 사용자로 최신 정보를 준비하고 모델에는 도구를 전달하지 않는다")
+    void loadsTheAuthenticatedUsersContextWithoutTools() {
         // given
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
@@ -137,8 +148,9 @@ class AiChatServiceTest {
         // then
         Prompt prompt = captureModelPrompt();
         ToolCallingChatOptions options = (ToolCallingChatOptions) prompt.getOptions();
-        ChatToolContext context = ChatToolContext.from(new ToolContext(options.getToolContext()));
-        assertThat(context.userId()).isEqualTo(USER_ID);
+        verify(checklistService).findMyChecklistIfPresent(USER_ID);
+        assertThat(options.getToolCallbacks()).isNullOrEmpty();
+        assertThat(options.getToolContext()).isNullOrEmpty();
     }
 
     @Test
@@ -173,7 +185,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .containsExactly("예산은 1000", "알겠습니다.", "추천해줘");
+                .hasSize(5).startsWith("예산은 1000", "알겠습니다.").endsWith("추천해줘");
     }
 
     @Test
@@ -190,7 +202,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .containsExactly("추천해줘");
+                .hasSize(3).endsWith("추천해줘").doesNotContain("예산은 1000", "알겠습니다.");
     }
 
     @Test
@@ -207,7 +219,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .containsExactly("추천해줘");
+                .hasSize(3).endsWith("추천해줘").doesNotContain("예산은 1000", "알겠습니다.");
     }
 
     @Test
@@ -234,7 +246,7 @@ class AiChatServiceTest {
         Future<?> responseTask = startStreamingChat(publisher);
 
         // when
-        publisher.next(response("일부 답변"));
+        publisher.next(chunk("{\"answer\":\"일부 답변"));
         await().untilAsserted(() -> verify(reply).sendAnswerChunk("일부 답변"));
         publisher.error(new IllegalStateException("비공개 제공사 오류"));
 
@@ -277,6 +289,22 @@ class AiChatServiceTest {
     }
 
     @Test
+    @DisplayName("답변 뒤의 추천 데이터가 잘못되면 카드를 보내거나 대화를 저장하지 않는다")
+    void invalidRecommendationOutputDoesNotCompleteOrRecordTheTurn() {
+        // given
+        when(model.stream(any(Prompt.class))).thenReturn(Flux.just(
+                chunk("{\"answer\":\"부분 답변\",\"recommendedItemIds\":[\"1\"]}")));
+
+        // when, then
+        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "추천해줘", reply))
+                .isInstanceOf(BusinessException.class);
+        verify(reply).sendAnswerChunk("부분 답변");
+        verify(reply, never()).sendComponent(any());
+        verify(reply, never()).complete(any(), any());
+        assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
+    }
+
+    @Test
     @DisplayName("연결이 종료되면 완성된 답변도 대화에 저장하지 않는다")
     void closedReplyDoesNotRecordTheCompletedAnswer() {
         // given
@@ -301,7 +329,7 @@ class AiChatServiceTest {
         publisher.assertSubscribers(1);
 
         // when
-        publisher.next(response("일부 답변"));
+        publisher.next(chunk("{\"answer\":\"일부 답변"));
 
         // then
         assertThatThrownBy(() -> responseTask.get(5, TimeUnit.SECONDS))
@@ -319,7 +347,7 @@ class AiChatServiceTest {
         Future<?> responseTask = startStreamingChat(publisher);
 
         // when
-        publisher.next(response("중단할 답변"));
+        publisher.next(chunk("{\"answer\":\"중단할 답변"));
         await().untilAsserted(() -> verify(reply).sendAnswerChunk("중단할 답변"));
         responseTask.cancel(true);
 
@@ -418,6 +446,10 @@ class AiChatServiceTest {
     }
 
     private static ChatResponse response(String text) {
+        return chunk(JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of())));
+    }
+
+    private static ChatResponse chunk(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
     }
 }

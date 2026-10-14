@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.chat.service;
 
+import com.bibbidi.wedding.chat.infra.ai.ChatAnswerStream;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
-import com.bibbidi.wedding.chat.tools.ChatToolContext;
-import com.bibbidi.wedding.chat.tools.RecommendationTools;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -20,6 +20,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class AiChatService {
@@ -27,12 +28,19 @@ public class AiChatService {
     private final ChatClient chatClient;
     private final ChatMemory chatMemory;
     private final ChecklistService checklistService;
+    private final ObjectMapper objectMapper;
     private final Set<ConversationKey> activeConversations = ConcurrentHashMap.newKeySet();
 
-    public AiChatService(ChatClient chatClient, ChatMemory chatMemory, ChecklistService checklistService) {
+    public AiChatService(
+            ChatClient chatClient,
+            ChatMemory chatMemory,
+            ChecklistService checklistService,
+            ObjectMapper objectMapper
+    ) {
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
         this.checklistService = checklistService;
+        this.objectMapper = objectMapper;
     }
 
     public void chat(Long userId, @Nullable UUID conversationId, String message, ChatSseHandler reply) {
@@ -53,29 +61,45 @@ public class AiChatService {
     }
 
     private String streamAnswer(ConversationKey key, String message, ChatSseHandler reply) {
+        List<Message> memory = chatMemory.get(key.toMemoryKey());
+        Set<?> recommendableIds = findRecommendableIds(memory);
         Flux<String> answerChunks = chatClient.prompt()
-                .messages(chatMemory.get(key.toMemoryKey()))
+                .messages(memory)
                 .messages(new UserMessage(message))
-                .tools(new RecommendationTools(checklistService, reply::sendComponent))
-                .toolContext(new ChatToolContext(key.userId()).toMap())
                 .stream()
                 .content();
 
         try (Stream<String> chunks = answerChunks.toStream()) {
-            StringBuilder answerBuilder = new StringBuilder();
+            ChatAnswerStream output = new ChatAnswerStream(objectMapper);
             Iterator<String> chunksIterator = chunks.iterator();
             while (chunksIterator.hasNext()) {
-                String chunk = chunksIterator.next();
-                reply.sendAnswerChunk(chunk);
-                answerBuilder.append(chunk);
+                String delta = output.append(chunksIterator.next());
+                if (!delta.isEmpty()) {
+                    reply.sendAnswerChunk(delta);
+                }
             }
-
-            String answer = answerBuilder.toString();
-            if (answer.isBlank()) {
-                throw new BusinessException(ClientError.INTERNAL_ERROR, "챗봇이 빈 답변을 반환했습니다.");
+            ChatAnswer answer = output.finish();
+            List<Long> suggestedIds = answer.recommendedItemIds().stream()
+                    .filter(recommendableIds::contains)
+                    .distinct()
+                    .toList();
+            if (!suggestedIds.isEmpty()) {
+                List<Long> ids = checklistService.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
+                if (!ids.isEmpty()) {
+                    reply.sendComponent(ids);
+                }
             }
-            return answer;
+            return answer.answer();
         }
+    }
+
+    private Set<?> findRecommendableIds(List<Message> messages) {
+        for (Message message : messages) {
+            if (message.getMetadata().get("recommendableItemIds") instanceof Set<?> ids) {
+                return ids;
+            }
+        }
+        return Set.of();
     }
 
     private void rememberTurn(ConversationKey key, String message, String answer) {

@@ -7,8 +7,6 @@ spring:
   ai:
     model:
       chat: bedrock-converse
-    tools:
-      throw-exception-on-error: true
     bedrock:
       aws:
         region: ap-northeast-1
