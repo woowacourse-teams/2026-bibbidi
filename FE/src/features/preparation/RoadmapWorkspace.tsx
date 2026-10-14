@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "../auth";
 import { AiChatFeature } from "../ai-chat/AiChatFeature";
 import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
@@ -26,7 +27,17 @@ export function RoadmapWorkspace({
     audience: string;
     view: RoadmapView;
   } | null>(null);
-  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const categoryId = searchParams.get("categoryId") ?? initialCategoryId;
+  const setCategoryId = (id: string) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("categoryId", id);
+        return next;
+      },
+      { replace: true },
+    );
   const isAuthenticated = authState.status === "authenticated";
   const audience =
     authState.status === "authenticated"

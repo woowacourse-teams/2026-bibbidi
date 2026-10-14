@@ -1,10 +1,12 @@
 interface PreparationRoadmapStateProps {
   onRetry?: () => void;
+  errorMessage?: string;
   status: "authentication-required" | "loading" | "empty" | "error";
 }
 
 export function PreparationRoadmapState({
   onRetry,
+  errorMessage,
   status,
 }: PreparationRoadmapStateProps) {
   if (status === "loading") {
@@ -36,7 +38,7 @@ export function PreparationRoadmapState({
 
   return (
     <div className="preparation-roadmap-state" role="alert">
-      <p>로드맵을 불러오지 못했어요.</p>
+      <p>{errorMessage ?? "로드맵을 불러오지 못했어요."}</p>
       <button onClick={onRetry} type="button">
         다시 시도
       </button>

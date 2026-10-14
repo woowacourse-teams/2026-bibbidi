@@ -11,12 +11,18 @@ export function PersonalRoadmap({
   onCategorySelect,
   onShowAll,
   viewSwitcher,
+  onTaskSelect,
+  onTaskComplete,
+  isChangingStatus,
 }: {
   categories: PersonalRoadmapCategoryViewModel[];
   categoryId?: string | null;
   onCategorySelect: (id: string) => void;
   onShowAll: () => void;
   viewSwitcher: ReactNode;
+  onTaskSelect: (taskId: string) => void;
+  onTaskComplete: (taskId: string, checked: boolean) => void;
+  isChangingStatus: boolean;
 }) {
   const category =
     categories.find((item) => item.id === categoryId) ?? categories[0];
@@ -51,7 +57,12 @@ export function PersonalRoadmap({
           >
             {category.groups.map((group) => (
               <li key={group.id}>
-                <PersonalRoadmapCard group={group} />
+                <PersonalRoadmapCard
+                  group={group}
+                  onTaskSelect={onTaskSelect}
+                  onTaskComplete={onTaskComplete}
+                  isChangingStatus={isChangingStatus}
+                />
               </li>
             ))}
           </ol>
