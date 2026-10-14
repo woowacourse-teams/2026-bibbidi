@@ -144,6 +144,11 @@
   overflow-wrap: anywhere;
 }
 
+.personal-roadmap__guest-task {
+  min-height: 44px;
+  padding: 8px;
+}
+
 .personal-roadmap__status {
   width: 16px;
   height: 16px;

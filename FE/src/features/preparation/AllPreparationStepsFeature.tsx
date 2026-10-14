@@ -59,6 +59,7 @@ export function AllPreparationStepsFeature({
   initialCategoryId?: string | null;
   viewSwitcher?: ReactNode;
   renderRoadmap?: (props: {
+    catalog: PreparationCatalogModel;
     categories: readonly PreparationCategoryViewModel[];
     onCategorySelect: (id: string) => void;
   }) => ReactNode;
@@ -271,6 +272,7 @@ export function AllPreparationStepsFeature({
 
   if (renderRoadmap) {
     return renderRoadmap({
+      catalog,
       categories: viewModel.categories,
       onCategorySelect: handleCategorySelect,
     });
