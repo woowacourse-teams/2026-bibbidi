@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: classpath:monitoring.yaml
   application:
     name: ${OTEL_SERVICE_NAME:bibbidi-backend}
   lifecycle:
@@ -131,41 +133,3 @@ auth:
       - /actuator/prometheus
       - /swagger-ui/**
       - /docs/**
-
-management:
-  server:
-    port: 8081
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
-  metrics:
-    tags:
-      service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
-      deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
-  tracing:
-    sampling:
-      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
-  opentelemetry:
-    tracing:
-      export:
-        otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}/v1/traces
-  otlp:
-    metrics:
-      export:
-        enabled: false
-  logging:
-    export:
-      otlp:
-        enabled: false
-
-logging:
-  structured:
-    format:
-      console: ecs
-  include-application-name: false
