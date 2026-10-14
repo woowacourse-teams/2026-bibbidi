@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthState } from "../auth/model/auth";
 import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
+import { installMatchMedia } from "../../test/matchMedia";
 
 const mocks = vi.hoisted(() => ({
   authState: {
@@ -132,7 +133,156 @@ function showAll() {
   );
 }
 
+function mockMobile() {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: query === "(max-width: 760px)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+}
+
 describe("준비 로드맵 보기 전환", () => {
+  it.each(["authenticated", "guest"])(
+    "모바일 %s 사용자는 보기 선택 시트에서 카테고리를 유지하며 로드맵을 전환한다",
+    async (audience) => {
+      mockMobile();
+      if (audience === "guest") mocks.authState = { status: "guest" };
+      render(<PreparationRoadmapFeature />);
+      await screen.findByRole("button", { name: "스드메" });
+      fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+      const initialView = audience === "guest" ? "전체 단계" : "내 로드맵";
+      const trigger = await screen.findByRole("button", { name: initialView });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "보기 선택" });
+      expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      expect(document.body.style.overflow).toBe("hidden");
+      expect(
+        within(dialog)
+          .getByRole("button", { name: new RegExp(initialView) })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+      const nextView = audience === "guest" ? "내 로드맵" : "전체 단계";
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: new RegExp(nextView) }),
+      );
+      expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+      expect(document.body.style.overflow).toBe("");
+      const nextTrigger = await screen.findByRole("button", { name: nextView });
+      await waitFor(() => expect(document.activeElement).toBe(nextTrigger));
+      expect(
+        screen
+          .getByRole("button", { name: "스드메" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(
+        screen.queryByRole("navigation", { name: "로드맵 보기" }),
+      ).toBeNull();
+      if (audience === "guest")
+        expect(
+          screen.getByText("로그인하면 내 로드맵을 확인할 수 있어요."),
+        ).toBeTruthy();
+      else
+        expect(
+          screen.getByRole("region", { name: "전체 단계 목록" }),
+        ).toBeTruthy();
+    },
+  );
+
+  it.each([
+    "닫기 버튼",
+    "바깥 영역",
+    "Escape",
+    "아래로 밀기",
+    "현재 보기 선택",
+  ])(
+    "모바일 보기 선택 시트는 %s로 닫고 선택과 포커스를 유지한다",
+    async (method) => {
+      mockMobile();
+      render(<PreparationRoadmapFeature />);
+      await screen.findByText("내 웨딩홀 투어");
+      const trigger = screen.getByRole("button", { name: "내 로드맵" });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "보기 선택" });
+      const handle = within(dialog).getByRole("button", {
+        name: "아래로 밀어 보기 선택 닫기",
+      });
+      expect(document.activeElement).toBe(handle);
+      const lastOption = within(dialog).getByRole("button", {
+        name: /전체 단계/,
+      });
+      lastOption.focus();
+      fireEvent.keyDown(lastOption, { key: "Tab" });
+      expect(document.activeElement).toBe(handle);
+      if (method === "닫기 버튼")
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: "보기 선택 닫기" }),
+        );
+      else if (method === "바깥 영역")
+        fireEvent.click(
+          screen
+            .getAllByRole("button", { name: "보기 선택 닫기" })
+            .find((button) => !dialog.contains(button))!,
+        );
+      else if (method === "Escape")
+        fireEvent.keyDown(handle, { key: "Escape" });
+      else if (method === "현재 보기 선택")
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /내 로드맵/ }),
+        );
+      else {
+        fireEvent.pointerDown(handle, {
+          button: 0,
+          clientY: 20,
+          pointerId: 1,
+          pointerType: "touch",
+        });
+        fireEvent.pointerMove(handle, {
+          clientY: 140,
+          pointerId: 1,
+          pointerType: "touch",
+        });
+        fireEvent.pointerUp(handle, {
+          clientY: 140,
+          pointerId: 1,
+          pointerType: "touch",
+        });
+      }
+      fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull(),
+      );
+      expect(document.activeElement).toBe(trigger);
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+      expect(document.body.style.overflow).toBe("");
+    },
+  );
+
+  it("PC로 전환하면 열린 선택 시트를 닫고 모바일로 돌아와도 다시 열지 않는다", async () => {
+    const media = installMatchMedia("(max-width: 760px)", true);
+    render(<PreparationRoadmapFeature />);
+    await screen.findByText("내 웨딩홀 투어");
+    fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
+    expect(screen.getByRole("dialog", { name: "보기 선택" })).toBeTruthy();
+    act(() => media.setMatches(false));
+    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+    expect(
+      screen.getByRole("navigation", { name: "로드맵 보기" }),
+    ).toBeTruthy();
+    expect(document.body.style.overflow).toBe("");
+    act(() => media.setMatches(true));
+    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "내 로드맵" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+  });
+
   it("로그인 사용자는 실제 채팅을 사용하고 카테고리·로드맵 전환 중 대화를 유지한다", async () => {
     render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
@@ -156,13 +306,12 @@ describe("준비 로드맵 보기 전환", () => {
     render(<PreparationRoadmapFeature />);
     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
     const chat = screen.getByRole("complementary", { name: "AI 채팅" });
-    expect(
-      within(chat).getByRole("link", { name: "로그인" }).getAttribute("href"),
-    ).toBe("/login");
-    expect(within(chat).queryByRole("textbox")).toBeNull();
+    const input = within(chat).getByRole<HTMLTextAreaElement>("textbox");
+    expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
+    expect(input.disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
     fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
-    expect(within(chat).getByText("로그인하고 AI와 대화해요")).toBeTruthy();
+    expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
     expect(mocks.stream).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useIsMobileLayout } from "../../../shared/responsive";
 
 export function RoadmapSectionHeader({
   id,
@@ -11,15 +12,16 @@ export function RoadmapSectionHeader({
   summary?: ReactNode;
   viewSwitcher: ReactNode;
 }) {
+  const isMobile = useIsMobileLayout();
   return (
     <header className="roadmap-section-header">
       <div>
-        <h2 id={id}>{title}</h2>
+        <h2 id={id}>{isMobile && viewSwitcher ? viewSwitcher : title}</h2>
         {summary != null ? (
           <p className="roadmap-section-header__summary">{summary}</p>
         ) : null}
       </div>
-      {viewSwitcher}
+      {!isMobile ? viewSwitcher : null}
     </header>
   );
 }
