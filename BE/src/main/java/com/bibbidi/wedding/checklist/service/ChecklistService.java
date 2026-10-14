@@ -120,6 +120,37 @@ public class ChecklistService {
         return toResults(randomRecommendedItems);
     }
 
+    @Transactional(readOnly = true)
+    public List<Long> filterRecommendableCatalogItemIds(Long ownerId, List<Long> catalogItemIds) {
+        if (catalogItemIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> existingIds = catalogService.findItems(catalogItemIds).stream()
+                .map(CatalogItemSnapshot::id)
+                .collect(Collectors.toSet());
+        Set<Long> alreadyAddedIds = findAlreadyAddedCatalogItemIds(ownerId);
+
+        return catalogItemIds.stream()
+                .filter(existingIds::contains)
+                .filter(id -> !alreadyAddedIds.contains(id))
+                .distinct()
+                .toList();
+    }
+
+    private Set<Long> findAlreadyAddedCatalogItemIds(Long ownerId) {
+        try {
+            return checklistRepository.getByOwnerId(ownerId).items().stream()
+                    .map(ChecklistItem::sourceCatalogItemId)
+                    .collect(Collectors.toSet());
+        } catch (BusinessException exception) {
+            if (exception.clientError() == ClientError.CHECKLIST_NOT_FOUND) {
+                return Set.of();
+            }
+            throw exception;
+        }
+    }
+
     private List<CatalogItemDetailSnapshot> chooseAllRecommendedItems(Checklist checklist, CatalogItemDetails catalogItems) {
         CatalogItemDetails alreadyAddedItems = catalogItems.selectIn(checklist);
         CatalogItemDetails notYetAddedItems = catalogItems.selectNotIn(checklist);
