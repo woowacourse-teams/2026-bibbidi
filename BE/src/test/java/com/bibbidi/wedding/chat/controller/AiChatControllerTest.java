@@ -13,6 +13,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
@@ -28,11 +29,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import com.bibbidi.wedding.chat.config.AiChatProperties;
+import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.common.domain.UserStatus;
+import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.infra.sse.config.SseConfig;
@@ -85,6 +89,8 @@ class AiChatControllerTest {
     private WebApplicationContext context;
     @Autowired
     private ObjectMapper objectMapper;
+    @MockitoBean
+    private BibbidiTokenParser bibbidiTokenParser;
     @MockitoBean
     private AiChatService aiChatService;
     private MockMvc mockMvc;
@@ -212,6 +218,65 @@ class AiChatControllerTest {
                         .build()))).andReturn();
         assertThat(completed.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("event:failure", ClientError.INTERNAL_ERROR.message()).doesNotContain("비밀", "event:done");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("토큰으로 인증한 SSE는 정상 완료와 실패 후에도 인증을 복원하며 다음 요청에 인증을 넘기지 않는다")
+    void tokenAuthenticationSurvivesAsyncDispatchWithoutCreatingASession(boolean fails) throws Exception {
+        // given
+        String token = "test-access-token";
+        when(bibbidiTokenParser.parseAccessToken(token)).thenReturn(
+                new BibbidiTokenClaims(7L, UserStatus.ACTIVE, UserRole.NORMAL, "테스트회원", null));
+        CountDownLatch completionAllowed = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            ChatSseHandler reply = invocation.getArgument(3);
+            reply.conversation(ID);
+            completionAllowed.await();
+            reply.sendAnswerChunk("답변");
+            reply.sendComponent(List.of(1L, 2L));
+            if (fails) {
+                throw new IllegalStateException("테스트 답변 생성 실패");
+            }
+            reply.complete(new ChatResult(ID, "답변"), () -> {});
+            return null;
+        }).when(aiChatService).chat(eq(7L), any(), eq("질문"), any(ChatSseHandler.class));
+
+        // when
+        MvcResult initial;
+        try {
+            initial = mockMvc.perform(post("/api/ai/chat")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
+                    .andExpect(request().asyncStarted()).andReturn();
+        } finally {
+            completionAllowed.countDown();
+        }
+        initial.getAsyncResult(5000);
+
+        // then
+        MvcResult completed = mockMvc.perform(asyncDispatch(initial))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andReturn();
+        String body = completed.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(body).contains("event:conversation", "event:delta", "event:component");
+        if (fails) {
+            assertThat(body).contains("event:failure").doesNotContain("event:done");
+        } else {
+            assertThat(body).contains("event:done").doesNotContain("event:failure");
+        }
+        assertThat(completed.getRequest().getSession(false)).isNull();
+        verify(bibbidiTokenParser).parseAccessToken(token);
+        verify(aiChatService).chat(eq(7L), any(), eq("질문"), any(ChatSseHandler.class));
+
+        mockMvc.perform(post("/api/ai/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 질문"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(request().asyncNotStarted())
+                .andExpect(jsonPath("$.errorCode").value(ClientError.AUTHENTICATION_REQUIRED.errorCode()));
     }
 
     @Test

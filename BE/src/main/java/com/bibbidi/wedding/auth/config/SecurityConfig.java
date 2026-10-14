@@ -25,6 +25,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
  * 인증은 access token 하나로만 한다. 서버 세션을 만들지 않는다. CORS 헤더는 앞단 nginx가 붙이므로 여기서 켜지 않는다. 켜면 헤더가 겹친다.
@@ -74,11 +76,17 @@ public class SecurityConfig {
     }
 
     @Bean
+    public SecurityContextRepository securityContextRepository() {
+        return new RequestAttributeSecurityContextRepository();
+    }
+
+    @Bean
     public BibbidiTokenAuthenticationFilter bibbidiTokenAuthenticationFilter() {
         return new BibbidiTokenAuthenticationFilter(
                 bibbidiTokenParser,
                 failureResponseWriter,
-                bibbidiTokenProperties
+                bibbidiTokenProperties,
+                securityContextRepository()
         );
     }
 
@@ -108,6 +116,7 @@ public class SecurityConfig {
                 .requestCache(RequestCacheConfigurer::disable)
                 .anonymous(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(context -> context.securityContextRepository(securityContextRepository()))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(securityProperties.permitPendingUserPatterns()).authenticated()
