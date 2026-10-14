@@ -196,13 +196,46 @@ describe("실제 AI 채팅", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
+  it.each([false, true])(
+    "모바일 여부 %s에서 수신 중 나뉜 마크다운을 누적해 표시하고 사용자 입력은 텍스트로 유지한다",
+    async (isMobile) => {
+      const reply = pendingReply();
+      if (isMobile) mockMobileDialog();
+      render(chat());
+      if (isMobile)
+        fireEvent.click(screen.getByRole("button", { name: "AI 채팅 열기" }));
+      send("**준비** 알려줘");
+      expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
+      reply.delta("## 준비 순서\n\n**웨딩");
+      expect(screen.getByRole("heading", { name: "준비 순서" })).toBeTruthy();
+      expect(screen.getByText("**웨딩").tagName).toBe("P");
+      reply.delta("홀** 예약\n\n| 항목 | 비용 |\n");
+      expect(screen.getByText("웨딩홀").tagName).toBe("STRONG");
+      expect(screen.queryByRole("table")).toBeNull();
+      reply.delta("| --- | --- |\n| 대관 | 100만 원 |\n\n``");
+      expect(screen.getByRole("cell", { name: "100만 원" })).toBeTruthy();
+      reply.delta("`ts\nconst wedding = true;\n");
+      const code = screen.getByText("const wedding = true;");
+      expect(code.tagName).toBe("CODE");
+      expect(code.parentElement?.tagName).toBe("PRE");
+      reply.delta("```\n\n- [x] 예약 완료");
+      expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(true);
+      expect(screen.getByRole("status")).toBeTruthy();
+      await reply.complete();
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.getByText("웨딩홀").tagName).toBe("STRONG");
+      expect(screen.getByRole("table")).toBeTruthy();
+    },
+  );
+
   it("중간 실패는 받은 내용을 미완료로 남기고 같은 질문을 중복 표시하지 않고 재시도한다", async () => {
     const reply = pendingReply();
     render(chat());
     send("질문");
-    reply.delta("중간 답변");
+    reply.delta("**중간 답변**");
     await reply.fail();
     expect(screen.getByText("중간 답변")).toBeTruthy();
+    expect(screen.getByText("중간 답변").tagName).toBe("STRONG");
     expect(screen.getByText("미완료 답변")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain(
       "끝까지 받지 못했어요",

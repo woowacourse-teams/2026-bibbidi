@@ -7,6 +7,7 @@ import {
   isValidChatMessage,
   suggestedQuestions,
 } from "../model/aiChat";
+import { AiChatMarkdown } from "./AiChatMarkdown";
 
 export function ChatIcon() {
   return (
@@ -105,7 +106,13 @@ export function AiChatView({
               {message.role === "assistant" ? (
                 <strong className="ai-chat__author">Bibbidi</strong>
               ) : null}
-              {message.text ? <p>{message.text}</p> : null}
+              {message.text ? (
+                message.role === "assistant" ? (
+                  <AiChatMarkdown text={message.text} />
+                ) : (
+                  <p>{message.text}</p>
+                )
+              ) : null}
               {message.role === "user" ? (
                 <time>{message.time}</time>
               ) : message.status === "failed" ? (

@@ -132,7 +132,7 @@
   line-height: 1.75;
 }
 
-.ai-chat__message p {
+.ai-chat__message--user p {
   margin: 0;
   white-space: pre-wrap;
 }
