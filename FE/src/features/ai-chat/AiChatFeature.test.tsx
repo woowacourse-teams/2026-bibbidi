@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AiChatFeature } from "./AiChatFeature";
 import { AiChatApiError, streamAiChat } from "./api/streamAiChat";
+import { installMatchMedia } from "../../test/matchMedia";
 
 const mocks = vi.hoisted(() => ({ stream: vi.fn() }));
 vi.mock("./api/streamAiChat", async (importOriginal) => ({
@@ -32,8 +33,10 @@ function chat(isAuthenticated = true) {
     />
   );
 }
-function send(text: string) {
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
+async function send(text: string) {
+  fireEvent.change(await screen.findByRole("textbox"), {
+    target: { value: text },
+  });
   fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
 }
 function mockMobileDialog() {
@@ -118,10 +121,38 @@ afterEach(() => {
 });
 
 describe("실제 AI 채팅", () => {
+  it("모바일은 처음 열 때 채팅을 표시하고 데스크톱으로 전환해도 대화와 입력을 유지한다", async () => {
+    mockMobileDialog();
+    const media = installMatchMedia("(max-width: 760px)", true);
+    render(chat());
+    expect(screen.queryByText("어떤 준비를 도와드릴까요?")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    await send("준비 순서");
+    await screen.findByText("실제 AI 답변이에요.");
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "다음 질문 작성 중" },
+    });
+    act(() => media.setMatches(false));
+    expect(screen.getByRole("log").textContent).toContain(
+      "실제 AI 답변이에요.",
+    );
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(
+      "다음 질문 작성 중",
+    );
+    act(() => media.setMatches(true));
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    expect(screen.getByRole("log").textContent).toContain(
+      "실제 AI 답변이에요.",
+    );
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(
+      "다음 질문 작성 중",
+    );
+  });
+
   it("추천 질문으로 실제 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
     render(chat());
     const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
-    fireEvent.click(screen.getByRole("button", { name: question }));
+    fireEvent.click(await screen.findByRole("button", { name: question }));
     await screen.findByText("실제 AI 답변이에요.");
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     expect(within(screen.getByRole("log")).getByText(question)).toBeTruthy();
@@ -135,7 +166,7 @@ describe("실제 AI 채팅", () => {
       message: question,
       conversationId: undefined,
     });
-    send("그 다음은?");
+    await send("그 다음은?");
     await waitFor(() => expect(mocks.stream).toHaveBeenCalledTimes(2));
     expect(mocks.stream.mock.calls[1][0]).toEqual({
       message: "그 다음은?",
@@ -147,7 +178,7 @@ describe("실제 AI 채팅", () => {
   it("생성 중 받은 조각을 표시하고 전송을 막되 다음 메시지는 작성할 수 있다", async () => {
     const reply = pendingReply();
     render(chat());
-    send("촬영 준비");
+    await send("촬영 준비");
     reply.delta("촬영 전에 ");
     reply.delta("준비해요.");
     expect(screen.getByText("촬영 전에 준비해요.")).toBeTruthy();
@@ -174,7 +205,7 @@ describe("실제 AI 채팅", () => {
 
   it("공백·4000자 초과·한글 조합 중 Enter는 보내지 않고 완성된 줄바꿈 입력만 보낸다", async () => {
     render(chat());
-    const input = screen.getByRole("textbox");
+    const input = await screen.findByRole("textbox");
     expect(input.getAttribute("maxlength")).toBe("4000");
     for (const value of [" \n ", "가".repeat(4001)]) {
       fireEvent.change(input, { target: { value } });
@@ -204,7 +235,7 @@ describe("실제 AI 채팅", () => {
       render(chat());
       if (isMobile)
         fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
-      send("**준비** 알려줘");
+      await send("**준비** 알려줘");
       expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
       reply.delta("## 준비 순서\n\n**웨딩");
       expect(screen.getByRole("heading", { name: "준비 순서" })).toBeTruthy();
@@ -231,7 +262,7 @@ describe("실제 AI 채팅", () => {
   it("중간 실패는 받은 내용을 미완료로 남기고 같은 질문을 중복 표시하지 않고 재시도한다", async () => {
     const reply = pendingReply();
     render(chat());
-    send("질문");
+    await send("질문");
     reply.delta("**중간 답변**");
     await reply.fail();
     expect(screen.getByText("중간 답변")).toBeTruthy();
@@ -259,7 +290,7 @@ describe("실제 AI 채팅", () => {
   it("인증 만료는 안전하게 안내하고 기존 인증 상태를 다시 확인한다", async () => {
     mocks.stream.mockRejectedValueOnce(new AiChatApiError(401));
     render(chat());
-    send("질문");
+    await send("질문");
     await screen.findByRole("alert");
     expect(screen.getByRole("alert").textContent).toContain(
       "로그인이 만료됐어요",
@@ -269,16 +300,18 @@ describe("실제 AI 채팅", () => {
 
   it.each([false, true])(
     "모바일 여부 %s에서 비로그인 사용자에게 채팅 UI와 로그인 placeholder를 표시하고 전송을 막는다",
-    (isMobile) => {
+    async (isMobile) => {
       if (isMobile) mockMobileDialog();
       render(chat(false));
       if (isMobile)
         fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
 
       expect(
-        screen.getByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
+        await screen.findByRole("heading", {
+          name: "어떤 준비를 도와드릴까요?",
+        }),
       ).toBeTruthy();
-      const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+      const input = await screen.findByRole<HTMLTextAreaElement>("textbox");
       expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
       expect(input.disabled).toBe(true);
       for (const question of [
@@ -307,10 +340,10 @@ describe("실제 AI 채팅", () => {
   it("로그인하면 채팅 입력을 활성화하고 로그아웃하면 대화 대신 로그인 placeholder를 표시한다", async () => {
     const { rerender } = render(chat(false));
     rerender(chat());
-    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    const input = await screen.findByRole<HTMLTextAreaElement>("textbox");
     expect(input.disabled).toBe(false);
     expect(input.placeholder).toBe("궁금한 준비를 이야기해요");
-    send("질문");
+    await send("질문");
     await screen.findByText("실제 AI 답변이에요.");
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     rerender(chat(false));
@@ -324,7 +357,7 @@ describe("실제 AI 채팅", () => {
   it("화면을 떠나면 진행 요청을 취소하고 새 화면에 이전 결과를 반영하지 않는다", async () => {
     const reply = pendingReply();
     const { unmount } = render(chat());
-    send("이전 질문");
+    await send("이전 질문");
     unmount();
     expect(reply.signal().aborted).toBe(true);
     render(chat());
@@ -332,7 +365,7 @@ describe("실제 AI 채팅", () => {
     await reply.complete();
     expect(screen.queryByRole("log")).toBeNull();
     expect(screen.queryByText("늦은 답변")).toBeNull();
-    send("새 질문");
+    await send("새 질문");
     await screen.findByText("실제 AI 답변이에요.");
     expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
@@ -366,7 +399,7 @@ describe("실제 AI 채팅", () => {
     vi.stubGlobal("visualViewport", viewport);
     render(chat());
     fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
-    send("질문");
+    await send("질문");
     reply.delta("앞부분 ");
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "작성 중" },

@@ -118,6 +118,51 @@ describe("AllPreparationStepsFeature Analytics", () => {
     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
   });
 
+  it("단계 아이콘은 화면 근처에 들어올 때 요청하고 관찰을 해제한다", async () => {
+    let notify!: IntersectionObserverCallback;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          notify = callback;
+        }
+        observe = observe;
+        disconnect = disconnect;
+      },
+    );
+    try {
+      const { container, unmount } = await renderFeature();
+      const icon = container.querySelector<HTMLImageElement>(
+        ".preparation-roadmap__step-icon",
+      )!;
+      expect(icon.getAttribute("src")).toBeNull();
+      expect(observe).toHaveBeenCalledWith(icon);
+      act(() =>
+        notify(
+          [
+            {
+              boundingClientRect: icon.getBoundingClientRect(),
+              intersectionRatio: 1,
+              intersectionRect: icon.getBoundingClientRect(),
+              isIntersecting: true,
+              rootBounds: null,
+              target: icon,
+              time: 0,
+            },
+          ],
+          {} as IntersectionObserver,
+        ),
+      );
+      expect(icon.src).toBe("https://example.com/wedding-hall.png");
+      unmount();
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("StrictMode에서도 준비 목록 최초 진입 이벤트를 한 번 전송한다", async () => {
     await renderFeature({ strictMode: true });
 

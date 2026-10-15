@@ -2,14 +2,8 @@ import { createBrowserRouter, Navigate, RouteObject } from "react-router";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { ServiceLayout } from "../layouts/ServiceLayout";
-import { AccountSetupPage } from "../pages/AccountSetupPage";
-import { ChecklistPage } from "../pages/ChecklistPage";
-import { LoginPage } from "../pages/LoginPage";
-import { OnboardingPage } from "../pages/OnboardingPage";
-import { CalendarPage } from "../pages/CalendarPage";
 import { HomeEntryPage } from "../pages/HomeEntryPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
-import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -32,11 +26,15 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "/calendar",
-        Component: CalendarPage,
+        lazy: async () => ({
+          Component: (await import("../pages/CalendarPage")).CalendarPage,
+        }),
       },
       {
         path: "/checklist",
-        Component: ChecklistPage,
+        lazy: async () => ({
+          Component: (await import("../pages/ChecklistPage")).ChecklistPage,
+        }),
       },
     ],
   },
@@ -45,7 +43,9 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: "/login",
-        Component: LoginPage,
+        lazy: async () => ({
+          Component: (await import("../pages/LoginPage")).LoginPage,
+        }),
       },
       {
         path: "/signup",
@@ -53,16 +53,24 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "/onboarding",
-        Component: OnboardingPage,
+        lazy: async () => ({
+          Component: (await import("../pages/OnboardingPage")).OnboardingPage,
+        }),
       },
       {
         path: "/onboarding/account",
-        Component: AccountSetupPage,
+        lazy: async () => ({
+          Component: (await import("../pages/AccountSetupPage"))
+            .AccountSetupPage,
+        }),
       },
       {
         // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.
         path: "/auth/:provider",
-        Component: SocialLoginCallbackPage,
+        lazy: async () => ({
+          Component: (await import("../pages/SocialLoginCallbackPage"))
+            .SocialLoginCallbackPage,
+        }),
       },
     ],
   },

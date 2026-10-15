@@ -1,4 +1,4 @@
-import bibidiLogo from "../../assets/bibbidi-logo.png";
+import bibidiLogo from "../../assets/bibbidi-logo.webp";
 import "./BibidiBrand.css";
 
 export function BibidiBrand() {

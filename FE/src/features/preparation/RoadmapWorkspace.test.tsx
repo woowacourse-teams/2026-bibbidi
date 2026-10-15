@@ -317,7 +317,9 @@ describe("준비 로드맵 보기 전환", () => {
     render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
     fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+      await screen.findByRole("button", {
+        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
+      }),
     );
     await screen.findByText("실제 준비 안내");
     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
@@ -336,7 +338,7 @@ describe("준비 로드맵 보기 전환", () => {
     render(<PreparationRoadmapFeature />);
     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
     const chat = screen.getByRole("complementary", { name: "AI 채팅" });
-    const input = within(chat).getByRole<HTMLTextAreaElement>("textbox");
+    const input = await within(chat).findByRole<HTMLTextAreaElement>("textbox");
     expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
     expect(input.disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
@@ -354,7 +356,9 @@ describe("준비 로드맵 보기 전환", () => {
     const { rerender } = render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
     fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
+      await screen.findByRole("button", {
+        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
+      }),
     );
     const previousReceiver = mocks.stream.mock.calls[0][1];
     const previousSignal = mocks.stream.mock.calls[0][2] as AbortSignal;
@@ -369,7 +373,9 @@ describe("준비 로드맵 보기 전환", () => {
     act(() => previousReceiver.onDelta("늦은 답변"));
     expect(screen.queryByText("늦은 답변")).toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
+      await screen.findByRole("button", {
+        name: "촬영 전에 준비할 일을 정리해줘",
+      }),
     );
     await screen.findByText("실제 준비 안내");
     expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
@@ -678,7 +684,7 @@ describe("준비 로드맵 보기 전환", () => {
     mocks.getChecklist.mockReturnValue(new Promise(() => {}));
     rerender(<PreparationRoadmapFeature />);
     expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
-    expect(screen.getByRole("status").textContent).toContain("불러오고");
+    expect(screen.getByText("로드맵을 불러오고 있어요.")).toBeTruthy();
   });
 });
 
