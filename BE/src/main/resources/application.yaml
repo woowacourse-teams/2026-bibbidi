@@ -29,7 +29,7 @@ spring:
 
 bibbidi:
   ai:
-    response-timeout: 30s
+    response-timeout-seconds: 10
     memory-max-messages: 20
 
 server:
