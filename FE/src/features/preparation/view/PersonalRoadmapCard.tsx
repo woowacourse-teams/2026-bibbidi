@@ -1,17 +1,28 @@
 import { PersonalRoadmapGroupViewModel } from "../view-model/createPersonalRoadmapViewModel";
 import { PersonalRoadmapCardFrame } from "./PersonalRoadmapCardFrame";
+import { AddedRoadmapTaskTitle } from "./AddedRoadmapTaskTitle";
+import { useRoadmapTaskScroll } from "../hooks/useRoadmapTaskScroll";
 
 export function PersonalRoadmapCard({
   group,
   onTaskSelect,
   onTaskComplete,
   isChangingStatus,
+  revealTaskId,
+  onRevealComplete,
 }: {
   group: PersonalRoadmapGroupViewModel;
   onTaskSelect: (taskId: string) => void;
   onTaskComplete: (taskId: string, checked: boolean) => void;
   isChangingStatus: boolean;
+  revealTaskId?: string;
+  onRevealComplete?: () => void;
 }) {
+  const { ref: revealRef, isReady } = useRoadmapTaskScroll(
+    group.tasks.some((task) => task.id === revealTaskId)
+      ? revealTaskId
+      : undefined,
+  );
   return (
     <PersonalRoadmapCardFrame
       id={group.id}
@@ -21,7 +32,11 @@ export function PersonalRoadmapCard({
       isCurrent={group.isCurrent}
     >
       {group.tasks.map((task) => (
-        <li className="personal-roadmap__task" key={task.id}>
+        <li
+          className="personal-roadmap__task"
+          key={task.id}
+          ref={task.id === revealTaskId ? revealRef : undefined}
+        >
           <label className="personal-roadmap__checkbox-target">
             <input
               aria-label={`${task.title} 완료`}
@@ -41,7 +56,15 @@ export function PersonalRoadmapCard({
             onClick={() => onTaskSelect(task.id)}
             type="button"
           >
-            <span className="personal-roadmap__task-title">{task.title}</span>
+            {task.id === revealTaskId && onRevealComplete ? (
+              <AddedRoadmapTaskTitle
+                title={task.title}
+                isReady={isReady}
+                onComplete={onRevealComplete}
+              />
+            ) : (
+              <span className="personal-roadmap__task-title">{task.title}</span>
+            )}
             <span className="personal-roadmap__task-meta">
               {task.statusLabel} · {task.schedule}
             </span>

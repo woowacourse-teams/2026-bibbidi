@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../auth";
 import { AiChatFeature } from "../ai-chat/AiChatFeature";
@@ -43,14 +43,44 @@ export function RoadmapWorkspace({
     authState.status === "authenticated"
       ? `authenticated:${authState.user.id}`
       : "guest";
+  const [reveals, setReveals] = useState<{
+    audience: string;
+    ids: number[];
+  } | null>(null);
+  const revealIds = reveals?.audience === audience ? reveals.ids : [];
+  const revealCatalogItemId = revealIds[0];
+  useEffect(() => () => setReveals(null), [audience]);
+  const finishReveal = useCallback(() => {
+    setReveals((current) =>
+      current?.audience === audience && current.ids[0] === revealCatalogItemId
+        ? { ...current, ids: current.ids.slice(1) }
+        : current,
+    );
+  }, [audience, revealCatalogItemId]);
+  const revealTask = (catalogItemId: number) => {
+    setReveals((current) => ({
+      audience,
+      ids: [
+        ...(current?.audience === audience ? current.ids : []),
+        catalogItemId,
+      ],
+    }));
+    setChoice({ audience, view: "personal" });
+  };
   const view =
     choice?.audience === audience
       ? choice.view
       : isAuthenticated
         ? "personal"
         : "all";
-  const changeView = (nextView: RoadmapView) =>
+  const changeView = (nextView: RoadmapView) => {
+    setReveals(null);
     setChoice({ audience, view: nextView });
+  };
+  const changeCategory = (id: string) => {
+    setReveals(null);
+    setCategoryId(id);
+  };
   const showAll = () => changeView("all");
   const {
     isMobile,
@@ -95,7 +125,7 @@ export function RoadmapWorkspace({
           {view === "all" || !isAuthenticated ? (
             renderCatalogRoadmap({
               categoryId,
-              onCategorySelect: setCategoryId,
+              onCategorySelect: changeCategory,
               viewSwitcher,
               view,
               onShowAll: showAll,
@@ -104,9 +134,12 @@ export function RoadmapWorkspace({
             <PersonalRoadmapFeature
               key={audience}
               categoryId={categoryId}
-              onCategorySelect={setCategoryId}
+              onCategorySelect={changeCategory}
+              onRevealCategorySelect={setCategoryId}
               onShowAll={showAll}
               viewSwitcher={viewSwitcher}
+              revealCatalogItemId={revealCatalogItemId}
+              onRevealComplete={finishReveal}
             />
           )}
         </div>
@@ -115,6 +148,8 @@ export function RoadmapWorkspace({
         key={audience}
         isAuthenticated={isAuthenticated}
         onAuthenticationRequired={refreshAuth}
+        onTaskAdded={revealTask}
+        isRevealingTask={revealIds.length > 0}
       />
       {isPickerOpen ? (
         <RoadmapViewBottomSheet

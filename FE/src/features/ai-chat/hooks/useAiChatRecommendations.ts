@@ -29,6 +29,7 @@ export function useAiChatRecommendations(
   messages: ChatMessage[],
   isAuthenticated: boolean,
   onAuthenticationRequired: () => void,
+  onTaskAdded?: (catalogItemId: number) => void,
 ): RecommendationController {
   const checklist = usePreparationChecklistRepository();
   const query = useMyChecklistQueryRepository();
@@ -43,6 +44,9 @@ export function useAiChatRecommendations(
     isAuthenticated,
     onAuthenticationRequired,
     repository: checklist,
+    onSuccess: (catalogItemId, itemCount) => {
+      if (itemCount > 0) onTaskAdded?.(catalogItemId);
+    },
     errorMessage: "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
     saveCatalogItem: async (catalogItemId, signal) => {
       const id = String(catalogItemId);

@@ -149,6 +149,41 @@
   padding: 8px;
 }
 
+.personal-roadmap__task-title--added {
+  display: grid;
+  color: var(--color-fg-brand);
+}
+
+.personal-roadmap__task-title--added > span {
+  grid-area: 1 / 1;
+}
+
+.personal-roadmap__title-reserve {
+  visibility: hidden;
+}
+
+.personal-roadmap__title-typing::after {
+  content: "";
+  display: inline-block;
+  height: 1em;
+  margin-left: 2px;
+  border-right: 2px solid currentColor;
+  vertical-align: -0.1em;
+  animation: roadmap-typing-caret 700ms step-end infinite;
+}
+
+@keyframes roadmap-typing-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personal-roadmap__title-typing::after {
+    display: none;
+  }
+}
+
 .personal-roadmap__status {
   width: 16px;
   height: 16px;

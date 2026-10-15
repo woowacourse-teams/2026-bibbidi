@@ -12,6 +12,8 @@ export function PersonalRoadmap({
   onTaskSelect,
   onTaskComplete,
   isChangingStatus,
+  revealTaskId,
+  onRevealComplete,
 }: {
   categories: PersonalRoadmapCategoryViewModel[];
   categoryId?: string | null;
@@ -21,6 +23,8 @@ export function PersonalRoadmap({
   onTaskSelect: (taskId: string) => void;
   onTaskComplete: (taskId: string, checked: boolean) => void;
   isChangingStatus: boolean;
+  revealTaskId?: string;
+  onRevealComplete?: () => void;
 }) {
   const category =
     categories.find((item) => item.id === categoryId) ?? categories[0];
@@ -45,6 +49,8 @@ export function PersonalRoadmap({
             onTaskSelect={onTaskSelect}
             onTaskComplete={onTaskComplete}
             isChangingStatus={isChangingStatus}
+            revealTaskId={revealTaskId}
+            onRevealComplete={onRevealComplete}
           />
         ),
       }))}
