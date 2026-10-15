@@ -1,7 +1,7 @@
 import exec from 'k6/execution';
-import type { ApiFactory } from './api.ts';
-import type { SessionSelector, SetupData } from './session.ts';
-import { UserIds, ReturningUserPool } from './users.ts';
+import type { ApiFactory } from '../api/api.ts';
+import type { SessionSelector, SetupData } from '../session/session.ts';
+import { UserIds, ReturningUserPool } from '../session/users.ts';
 
 export class LoadTest {
   private readonly pool: ReturningUserPool;

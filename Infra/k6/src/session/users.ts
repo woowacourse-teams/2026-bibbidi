@@ -1,4 +1,4 @@
-import type { ApiFactory } from './api.ts';
+import type { ApiFactory } from '../api/api.ts';
 
 // 부하 테스트 전용 사용자 ID 대역. 이 값 이상의 owner_id는 정리 SQL이 테스트 데이터로 본다.
 const LOAD_TEST_USER_ID_BASE = 900_000_000;
