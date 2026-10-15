@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.security;
 
-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -55,7 +55,7 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
                     claims.nickname(),
                     claims.email()
             );
-            saveAuthenticationForRedispatch(user, request, response);
+            saveAuthenticationForReDispatch(user, request, response);
         } catch (BusinessException exception) {
             SecurityContextHolder.clearContext();
             failureResponseWriter.write(request, response, exception);
@@ -65,10 +65,16 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void saveAuthenticationForRedispatch(AuthenticatedUser user, HttpServletRequest request,
-                                               HttpServletResponse response) {
+    private void saveAuthenticationForReDispatch(AuthenticatedUser user, HttpServletRequest request,
+                                                 HttpServletResponse response) {
+        PreAuthenticatedAuthenticationToken authenticatedAuthenticationToken = new PreAuthenticatedAuthenticationToken(
+                user,
+                null,
+                user.getAuthorities()
+        );
+
         SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new PreAuthenticatedAuthenticationToken(user, null, user.getAuthorities()));
+        context.setAuthentication(authenticatedAuthenticationToken);
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
     }
