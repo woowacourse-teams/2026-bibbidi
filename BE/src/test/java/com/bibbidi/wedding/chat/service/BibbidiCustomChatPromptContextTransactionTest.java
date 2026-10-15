@@ -28,6 +28,7 @@ import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.util.List;
 import java.util.Optional;
@@ -94,7 +95,8 @@ class BibbidiCustomChatPromptContextTransactionTest {
             BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
             ObjectMapper mapper = context.getBean(ObjectMapper.class);
             ChecklistService checklist = context.getBean(ChecklistService.class);
-            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+                    AiChatStreamRecorderFixture.create()),
                     new CatalogServiceAdapter(context.getBean(CatalogService.class)),
                     new ChecklistServiceAdapter(checklist),
                     new JacksonChatAnswerParser(mapper));
@@ -124,7 +126,8 @@ class BibbidiCustomChatPromptContextTransactionTest {
             BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
             ObjectMapper mapper = context.getBean(ObjectMapper.class);
             ChecklistService checklist = context.getBean(ChecklistService.class);
-            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+                    AiChatStreamRecorderFixture.create()),
                     new CatalogServiceAdapter(context.getBean(CatalogService.class)),
                     new ChecklistServiceAdapter(checklist),
                     new JacksonChatAnswerParser(mapper));

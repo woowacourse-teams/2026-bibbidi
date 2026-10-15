@@ -19,6 +19,7 @@ import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +79,8 @@ class AiChatServiceTest {
         catalogService = mock(CatalogLookupPort.class);
         checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        service = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+        service = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+                AiChatStreamRecorderFixture.create()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -433,8 +435,8 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("중단된 이전 응답이 전달한 부분 답변까지 대화 기록에 저장하고 새 요청에서 이어 사용한다")
-    void supersededTurnIsRecordedWithItsPartialAnswerAndResumedByTheNextRequest() throws Exception {
+    @DisplayName("중단된 이전 응답은 부분 답변을 전달했더라도 대화 기록에 저장하지 않는다")
+    void supersededTurnIsNotRecordedEvenWithAPartialAnswer() throws Exception {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         Future<?> firstResponse = startStreamingChat(publisher);
@@ -449,12 +451,12 @@ class AiChatServiceTest {
         firstResponse.get(5, TimeUnit.SECONDS);
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("질문", "웨딩홀은 ", "새 질문", "새 답변");
+                .containsExactly("새 질문", "새 답변");
         List<Prompt> prompts = model.prompts();
         assertThat(prompts).hasSize(2);
         assertThat(prompts.getLast().getInstructions())
                 .extracting(message -> message.getText())
-                .containsSubsequence("질문", "웨딩홀은 ", "새 질문");
+                .doesNotContain("질문", "웨딩홀은 ");
     }
 
     @Test

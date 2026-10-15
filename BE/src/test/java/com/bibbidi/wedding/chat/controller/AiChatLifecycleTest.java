@@ -24,6 +24,7 @@ import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.time.Duration;
 import java.util.List;
@@ -74,7 +75,8 @@ class AiChatLifecycleTest {
         ChecklistLookupPort checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
-        chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+        chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+                AiChatStreamRecorderFixture.create()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
         answerStarted = false;

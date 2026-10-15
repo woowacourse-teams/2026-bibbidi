@@ -1,0 +1,399 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/AiChatStreamRecorder.java b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/AiChatStreamRecorder.java
+index 4e7da458ec9513f574899e4f759b4485381dbac9..49a2de62949a949bb81b88023e482f9c7316ac66 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/AiChatStreamRecorder.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/AiChatStreamRecorder.java
+@@ -1,6 +1,5 @@
+ package com.bibbidi.wedding.chat.adapter.ai;
+ 
+-import com.bibbidi.wedding.chat.config.AiPricing;
+ import io.micrometer.core.instrument.Counter;
+ import io.micrometer.core.instrument.MeterRegistry;
+ import io.micrometer.core.instrument.Timer;
+@@ -20,23 +19,24 @@ public class AiChatStreamRecorder {
+ 
+     private static final Logger CONTENT_LOG = LoggerFactory.getLogger("ai.chat.content");
+ 
+-    private final MeterRegistry registry;
+-    private final AiPricing pricing;
+     private final String model;
+     private final Counter turns;
+     private final Counter failures;
++    private final Counter inputTokenCount;
++    private final Counter outputTokenCount;
+     private final Timer timeToFirstToken;
+ 
+     public AiChatStreamRecorder(
+             MeterRegistry registry,
+-            AiPricing pricing,
+             @Value("${spring.ai.bedrock.converse.chat.model}") String model
+     ) {
+-        this.registry = registry;
+-        this.pricing = pricing;
+         this.model = model;
+         this.turns = Counter.builder("ai.chat.turns").register(registry);
+         this.failures = Counter.builder("ai.chat.failures").register(registry);
++        this.inputTokenCount = Counter.builder("ai.tokens").tag("model", model).tag("type", "input")
++                .register(registry);
++        this.outputTokenCount = Counter.builder("ai.tokens").tag("model", model).tag("type", "output")
++                .register(registry);
+         this.timeToFirstToken = Timer.builder("ai.chat.ttft").register(registry);
+     }
+ 
+@@ -107,7 +107,8 @@ public class AiChatStreamRecorder {
+                 return;
+             }
+             turns.increment();
+-            recordCost();
++            inputTokenCount.increment(inputTokens.get());
++            outputTokenCount.increment(outputTokens.get());
+             long durationMillis = Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis();
+             long ttftNanos = firstTokenNanos.get();
+             CONTENT_LOG.info(
+@@ -117,12 +118,5 @@ public class AiChatStreamRecorder {
+                     ttftNanos < 0 ? -1 : Duration.ofNanos(ttftNanos).toMillis(), durationMillis,
+                     userPrompt, completion);
+         }
+-
+-        private void recordCost() {
+-            pricing.find(model).ifPresent(price -> {
+-                double cost = price.costUsd(inputTokens.get(), outputTokens.get());
+-                Counter.builder("ai.cost.usd").tag("model", model).register(registry).increment(cost);
+-            });
+-        }
+     }
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
+index 0ed93d821ecc077b50ac4d0555d54b2d90a16daa..38b93a3ff404a11d2bc85f031b56e4c5e378e62b 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
+@@ -16,6 +16,11 @@ import tools.jackson.databind.ObjectMapper;
+ @Component
+ public class SpringAiConversationAdapter implements AiConversationPort {
+ 
++    /**
++     * 대화 기록 뒤에 덧붙이는 고정 메시지 수. 체크리스트와 카탈로그 두 개다.
++     */
++    public static final int PROMPT_CONTEXT_MESSAGE_COUNT = 2;
++
+     private final ChatClient chatClient;
+     private final BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory;
+     private final ObjectMapper mapper;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java b/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
+index 5c695c4579b06dfc45add6cc095b8aa59208b0ae..41e738a1d20233a905fbb26e6b1e4dc33d0bb5de 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
+@@ -1,6 +1,7 @@
+ package com.bibbidi.wedding.chat.config;
+ 
+ import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
++import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+ import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
+ import java.nio.charset.StandardCharsets;
+ import java.util.Map;
+@@ -16,7 +17,7 @@ import org.springframework.context.annotation.Configuration;
+ import org.springframework.core.io.Resource;
+ 
+ @Configuration(proxyBeanMethods = false)
+-@EnableConfigurationProperties({AiChatProperties.class, AiPricing.class})
++@EnableConfigurationProperties(AiChatProperties.class)
+ public class AiChatConfig {
+ 
+     @Bean
+@@ -58,7 +59,8 @@ public class AiChatConfig {
+ 
+     @Bean
+     BibbidiInMemoryChatMemory aiChatMemory(ChatMemoryRepository repository, AiChatProperties properties) {
+-        return new BibbidiInMemoryChatMemory(repository, properties.memoryMaxMessages());
++        int conversationMessages = properties.memoryMaxMessages() - SpringAiConversationAdapter.PROMPT_CONTEXT_MESSAGE_COUNT;
++        return new BibbidiInMemoryChatMemory(repository, conversationMessages);
+     }
+ 
+ }
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiPricing.java b/BE/src/main/java/com/bibbidi/wedding/chat/config/AiPricing.java
+deleted file mode 100644
+index 080275c489786013ed2613307c297848b1c22ba8..0000000000000000000000000000000000000000
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiPricing.java
++++ /dev/null
+@@ -1,40 +0,0 @@
+-package com.bibbidi.wedding.chat.config;
+-
+-import jakarta.validation.Valid;
+-import jakarta.validation.constraints.NotBlank;
+-import jakarta.validation.constraints.NotNull;
+-import jakarta.validation.constraints.PositiveOrZero;
+-import java.math.BigDecimal;
+-import java.util.List;
+-import java.util.Optional;
+-import org.springframework.boot.context.properties.ConfigurationProperties;
+-import org.springframework.validation.annotation.Validated;
+-
+-@Validated
+-@ConfigurationProperties("bibbidi.ai.pricing")
+-public record AiPricing(
+-        @NotNull List<@Valid ModelPrice> models
+-) {
+-
+-    private static final BigDecimal ONE_MILLION = BigDecimal.valueOf(1_000_000);
+-
+-    public Optional<ModelPrice> find(String modelName) {
+-        return models.stream()
+-                .filter(price -> price.name().equals(modelName))
+-                .findFirst();
+-    }
+-
+-    public record ModelPrice(
+-            @NotBlank String name,
+-            @NotNull @PositiveOrZero BigDecimal inputPerMillionTokens,
+-            @NotNull @PositiveOrZero BigDecimal outputPerMillionTokens
+-    ) {
+-
+-        public double costUsd(long inputTokens, long outputTokens) {
+-            return inputPerMillionTokens.multiply(BigDecimal.valueOf(inputTokens))
+-                    .add(outputPerMillionTokens.multiply(BigDecimal.valueOf(outputTokens)))
+-                    .divide(ONE_MILLION)
+-                    .doubleValue();
+-        }
+-    }
+-}
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/service/AiChatService.java b/BE/src/main/java/com/bibbidi/wedding/chat/service/AiChatService.java
+index 69ba1f2ced2170140ebc9dc178cb91c160fac362..666bd4f51b1bb44ad20717e1f164be96716de843 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/service/AiChatService.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/service/AiChatService.java
+@@ -18,8 +18,6 @@ import java.util.Map;
+ import java.util.Set;
+ import java.util.UUID;
+ import java.util.concurrent.ConcurrentHashMap;
+-import java.util.concurrent.atomic.AtomicBoolean;
+-import java.util.concurrent.atomic.AtomicReference;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.stereotype.Service;
+ import reactor.core.publisher.Flux;
+@@ -54,7 +52,6 @@ public class AiChatService {
+         ConversationKey key = new ConversationKey(chatCommand.userId(), id);
+         return Flux.defer(() -> {
+                     Sinks.Empty<Void> superseded = Sinks.empty();
+-                    AtomicReference<Runnable> recordPartialTurn = new AtomicReference<>(() -> { });
+                     Sinks.Empty<Void> previous = activeConversations.put(key, superseded);
+                     if (previous != null) {
+                         previous.tryEmitEmpty();
+@@ -62,24 +59,20 @@ public class AiChatService {
+ 
+                     return Flux.concat(
+                                     Flux.just(new ChatEvent.Conversation(id.toString())),
+-                                    Flux.defer(() -> streamAnswer(key, id, chatCommand.message(), recordPartialTurn))
++                                    Flux.defer(() -> streamAnswer(key, id, chatCommand.message()))
+                             )
+                             .subscribeOn(Schedulers.boundedElastic())
+-                            .takeUntilOther(superseded.asMono()
+-                                    .doOnSuccess(ignored -> recordPartialTurn.get().run()))
++                            .takeUntilOther(superseded.asMono())
+                             .doFinally(ignored -> activeConversations.remove(key, superseded));
+                 }
+         );
+     }
+ 
+-    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message,
+-                                         AtomicReference<Runnable> recordPartialTurn) {
++    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
+         BibbidiCustomChatPromptContext context = loadPromptContext(key.userId());
+         AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
+         List<String> deltas = new ArrayList<>();
+         ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
+-        StringBuffer streamed = new StringBuffer();
+-        AtomicBoolean remembered = new AtomicBoolean();
+ 
+         Flux<ChatEvent> answerEvents = response.content()
+                 .publishOn(Schedulers.boundedElastic())
+@@ -88,7 +81,6 @@ public class AiChatService {
+                             answer.accept(chunk);
+                             List<ChatEvent> events = new ArrayList<>();
+                             for (String delta : deltas) {
+-                                streamed.append(delta);
+                                 events.add(new ChatEvent.Delta(delta));
+                             }
+                             return Flux.fromIterable(events);
+@@ -96,12 +88,7 @@ public class AiChatService {
+                 );
+ 
+         Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, message,
+-                response.recommendableItemIds(), answer, remembered));
+-        recordPartialTurn.set(() -> {
+-            if (!streamed.isEmpty() && remembered.compareAndSet(false, true)) {
+-                rememberTurn(key, message, streamed.toString());
+-            }
+-        });
++                response.recommendableItemIds(), answer));
+         return Flux.concat(answerEvents, completion);
+     }
+ 
+@@ -126,8 +113,7 @@ public class AiChatService {
+     }
+ 
+     private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
+-                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream,
+-                                           AtomicBoolean remembered) {
++                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
+         ChatAnswer answer = stream.finish();
+         List<Long> suggestedIds = answer.recommendedItemIds().stream()
+                 .filter(recommendableIds::contains)
+@@ -143,12 +129,7 @@ public class AiChatService {
+         return Flux.concat(
+                 Flux.fromIterable(events),
+                 Flux.just(new ChatEvent.Done(id.toString())),
+-                Mono.fromRunnable(() -> {
+-                                    if (remembered.compareAndSet(false, true)) {
+-                                        rememberTurn(key, message, answer.answer());
+-                                    }
+-                                }
+-                        )
++                Mono.fromRunnable(() -> rememberTurn(key, message, answer.answer()))
+                         .then(Mono.empty())
+         );
+     }
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index fb04b7812f1bda7ff35fd8f299b5371049b2b2e6..09973fa798fb7884cf028a74f1168202d0644b71 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -37,11 +37,6 @@ bibbidi:
+       memory-max-messages: 20
+       conversation-idle-timeout: 1h
+       conversation-cleanup-interval: 10m
+-    pricing:
+-      models:
+-        - name: qwen.qwen3-235b-a22b-2507-v1:0
+-          input-per-million-tokens: 0.22
+-          output-per-million-tokens: 0.88
+ 
+ server:
+   shutdown: graceful
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapterTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapterTest.java
+index 4b890897d84d0075ac7931ac8c58117a3a4508c2..c51e698c19038e35c9f42927b8669e1905f37d89 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapterTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapterTest.java
+@@ -108,8 +108,8 @@ class SpringAiConversationAdapterTest {
+     }
+ 
+     @Test
+-    @DisplayName("답변을 마치면 대화 수, 첫 토큰 지연, 토큰 사용량으로 계산한 비용을 기록한다")
+-    void recordsTurnTtftAndCostWhenTheAnswerCompletes() {
++    @DisplayName("답변을 마치면 대화 수, 첫 토큰 지연, 입력·출력 토큰 수를 기록한다")
++    void recordsTurnTtftAndTokensWhenTheAnswerCompletes() {
+         // given
+         model.respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
+ 
+@@ -119,8 +119,8 @@ class SpringAiConversationAdapterTest {
+         // then
+         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
+         assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(1);
+-        assertThat(registry.get("ai.cost.usd").tag("model", AiChatStreamRecorderFixture.MODEL).counter().count())
+-                .isEqualTo(7.0);
++        assertThat(registry.get("ai.tokens").tag("type", "input").counter().count()).isEqualTo(1_000_000);
++        assertThat(registry.get("ai.tokens").tag("type", "output").counter().count()).isEqualTo(500_000);
+         assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
+     }
+ 
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b79243a17c95c56f43aeede37e0bcfa98538f1ab
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java
+@@ -0,0 +1,43 @@
++package com.bibbidi.wedding.chat.config;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
++import java.time.Duration;
++import java.util.ArrayList;
++import java.util.List;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
++import org.springframework.ai.chat.messages.AssistantMessage;
++import org.springframework.ai.chat.messages.Message;
++import org.springframework.ai.chat.messages.UserMessage;
++
++class AiChatConfigTest {
++
++    private static final String CONVERSATION = "7:conversation-a";
++    private static final int MEMORY_MAX_MESSAGES = 20;
++    private static final int FIXED_MESSAGES = 2;
++
++    @Test
++    @DisplayName("전체 메시지 한도에서 고정 정보 2개를 뺀 최근 대화만 기억한다")
++    void keepsOnlyTheRecentMessagesLeftAfterTheFixedContext() {
++        // given
++        BibbidiInMemoryChatMemory memory = new AiChatConfig().aiChatMemory(
++                new InMemoryChatMemoryRepository(),
++                new AiChatProperties(MEMORY_MAX_MESSAGES, Duration.ofHours(1), Duration.ofMinutes(10)));
++        List<Message> messages = new ArrayList<>();
++        for (int turn = 1; turn <= MEMORY_MAX_MESSAGES; turn++) {
++            messages.add(new UserMessage("질문 " + turn));
++            messages.add(new AssistantMessage("답변 " + turn));
++        }
++
++        // when
++        memory.add(CONVERSATION, messages);
++
++        // then
++        List<Message> remembered = memory.get(CONVERSATION);
++        assertThat(remembered).hasSize(MEMORY_MAX_MESSAGES - FIXED_MESSAGES);
++        assertThat(remembered.getLast().getText()).isEqualTo("답변 " + MEMORY_MAX_MESSAGES);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/service/AiChatServiceTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/service/AiChatServiceTest.java
+index fd713807a26c5e18a6d711f151d23d67950fe84d..f6ef0fcf1d93ff22abf8a0e37952bc41adf3dbf6 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/service/AiChatServiceTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/service/AiChatServiceTest.java
+@@ -435,8 +435,8 @@ class AiChatServiceTest {
+     }
+ 
+     @Test
+-    @DisplayName("중단된 이전 응답이 전달한 부분 답변까지 대화 기록에 저장하고 새 요청에서 이어 사용한다")
+-    void supersededTurnIsRecordedWithItsPartialAnswerAndResumedByTheNextRequest() throws Exception {
++    @DisplayName("중단된 이전 응답은 부분 답변을 전달했더라도 대화 기록에 저장하지 않는다")
++    void supersededTurnIsNotRecordedEvenWithAPartialAnswer() throws Exception {
+         // given
+         TestPublisher<ChatResponse> publisher = TestPublisher.create();
+         Future<?> firstResponse = startStreamingChat(publisher);
+@@ -451,12 +451,12 @@ class AiChatServiceTest {
+         firstResponse.get(5, TimeUnit.SECONDS);
+         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
+                 .extracting(message -> message.getText())
+-                .containsExactly("질문", "웨딩홀은 ", "새 질문", "새 답변");
++                .containsExactly("새 질문", "새 답변");
+         List<Prompt> prompts = model.prompts();
+         assertThat(prompts).hasSize(2);
+         assertThat(prompts.getLast().getInstructions())
+                 .extracting(message -> message.getText())
+-                .containsSubsequence("질문", "웨딩홀은 ", "새 질문");
++                .doesNotContain("질문", "웨딩홀은 ");
+     }
+ 
+     @Test
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/support/AiChatStreamRecorderFixture.java b/BE/src/test/java/com/bibbidi/wedding/chat/support/AiChatStreamRecorderFixture.java
+index 6c0f483de52d4a4bacd92f514a601b72050d1b81..cc7ed25c4a670093bae65de48870dde3e4574eb7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/support/AiChatStreamRecorderFixture.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/support/AiChatStreamRecorderFixture.java
+@@ -1,11 +1,8 @@
+ package com.bibbidi.wedding.chat.support;
+ 
+ import com.bibbidi.wedding.chat.adapter.ai.AiChatStreamRecorder;
+-import com.bibbidi.wedding.chat.config.AiPricing;
+ import io.micrometer.core.instrument.MeterRegistry;
+ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+-import java.math.BigDecimal;
+-import java.util.List;
+ 
+ /**
+  * 어댑터를 직접 만드는 테스트가 쓰는 대화 기록기. 지표는 메모리 레지스트리에만 쌓인다.
+@@ -22,8 +19,6 @@ public final class AiChatStreamRecorderFixture {
+     }
+ 
+     public static AiChatStreamRecorder create(MeterRegistry registry) {
+-        AiPricing pricing = new AiPricing(List.of(
+-                new AiPricing.ModelPrice(MODEL, BigDecimal.valueOf(2), BigDecimal.valueOf(10))));
+-        return new AiChatStreamRecorder(registry, pricing, MODEL);
++        return new AiChatStreamRecorder(registry, MODEL);
+     }
+ }

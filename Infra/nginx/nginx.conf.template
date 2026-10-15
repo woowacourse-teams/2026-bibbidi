@@ -120,7 +120,7 @@ http {
         }
 
         # AI chat streams SSE. Pass each event through without buffering, and wait
-        # longer than the app's own 30s response timeout so its failure event arrives first.
+        # longer than the app's own 60s response timeout so its failure event arrives first.
         location ^~ /api/ai/ {
             ${NGINX_API_RATE_LIMIT}
             ${NGINX_API_CONN_LIMIT}
@@ -144,7 +144,7 @@ http {
             proxy_cache off;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
-            proxy_read_timeout 60s;
+            proxy_read_timeout 75s;
 
             proxy_pass http://backend:8080;
             proxy_hide_header Access-Control-Allow-Origin;

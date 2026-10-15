@@ -1,17 +1,19 @@
 spring:
   ai:
-    tools:
-      observations:
-        include-content: true
     chat:
       observations:
-        log-prompt: true
-        log-completion: true
+        log-prompt: false
+        log-completion: false
         include-error-logging: true
       client:
         observations:
-          log-prompt: true
-          log-completion: true
+          log-prompt: false
+          log-completion: false
+
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 management:
   server:
@@ -31,6 +33,11 @@ management:
     tags:
       service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
       deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        gen_ai.client.operation: true
+        ai.chat.ttft: true
   tracing:
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
