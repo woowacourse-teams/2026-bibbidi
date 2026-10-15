@@ -1,10 +1,14 @@
 package com.bibbidi.wedding.auth.config;
 
+import com.bibbidi.wedding.auth.security.ActiveUserAuthorizationManager;
 import com.bibbidi.wedding.auth.security.AuthenticatedUser;
 import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
 import com.bibbidi.wedding.auth.security.BibbidiTokenAuthenticationFilter;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.common.exception.ClientError;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
@@ -13,18 +17,19 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authorization.AuthorizationDecision;
-import org.springframework.security.authorization.AuthorizationManager;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.ExceptionHandlingConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
-import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
@@ -56,23 +61,6 @@ public class SecurityConfig {
         this.failureResponseWriter = failureResponseWriter;
         this.securityProperties = securityProperties;
         this.bibbidiTokenProperties = bibbidiTokenProperties;
-    }
-
-    /**
-     * 약관에 동의해 가입을 끝낸 회원만 통과시킨다.
-     *
-     * <p>가입 상태를 권한 이름으로 바꿔 쓰지 않는다. 권한은 무엇을 할 수 있는지를 가르는 축이고,
-     * 가입 상태는 서비스를 쓸 준비가 됐는지를 가르는 다른 축이기 때문이다.
-     */
-    private static AuthorizationManager<RequestAuthorizationContext> activeUser() {
-        return (authentication, context) -> {
-            Authentication current = authentication.get();
-            if (current == null || !current.isAuthenticated()) {
-                return new AuthorizationDecision(false);
-            }
-            return new AuthorizationDecision(
-                    current.getPrincipal() instanceof AuthenticatedUser user && user.isActive());
-        };
     }
 
     @Bean
@@ -122,27 +110,58 @@ public class SecurityConfig {
                         .requestMatchers(securityProperties.permitPendingUserPatterns()).authenticated()
                         .requestMatchers(securityProperties.permitAllPatterns()).permitAll()
                         .requestMatchers(TERMS_AGREEMENT_PATH).authenticated()
-                        .anyRequest().access(activeUser()))
+                        .anyRequest().access(new ActiveUserAuthorizationManager()))
                 // 인가를 판단하는 필터가 우리 인증 결과를 보게 그 앞에 둔다.
                 .addFilterBefore(bibbidiTokenAuthenticationFilter(), AuthorizationFilter.class)
-                .exceptionHandling(handling -> handling
-                        .authenticationEntryPoint(
-                                (
-                                        request, response, exception) -> failureResponseWriter.write(
-                                        request,
-                                        response,
-                                        ClientError.AUTHENTICATION_REQUIRED,
-                                        "인증이 필요한 요청에 유효한 access token이 없습니다."
-                                )
-                        )
-                        .accessDeniedHandler(
-                                (request, response, exception) -> failureResponseWriter.write(
-                                        request,
-                                        response,
-                                        ClientError.TERMS_AGREEMENT_REQUIRED,
-                                        "약관에 동의하지 않은 사용자의 요청입니다."
-                                )
-                        )
-                ).build();
+                .exceptionHandling(this::configureExceptionHandling)
+                .build();
+    }
+
+    private void configureExceptionHandling(ExceptionHandlingConfigurer<HttpSecurity> handling) {
+        handling.authenticationEntryPoint(this::writeAuthenticationFailure);
+        handling.accessDeniedHandler(this::writeAccessDenied);
+    }
+
+    private void writeAuthenticationFailure(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException exception
+    ) throws IOException {
+        writeAuthenticationRequired(request, response);
+    }
+
+    private void writeAuthenticationRequired(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        failureResponseWriter.write(
+                request,
+                response,
+                ClientError.AUTHENTICATION_REQUIRED,
+                "인증이 필요한 요청에 유효한 access token이 없습니다."
+        );
+    }
+
+    private void writeAccessDenied(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AccessDeniedException exception
+    ) throws IOException {
+        if (!hasAuthenticatedUser()) {
+            writeAuthenticationRequired(request, response);
+            return;
+        }
+        failureResponseWriter.write(
+                request,
+                response,
+                ClientError.TERMS_AGREEMENT_REQUIRED,
+                "약관에 동의하지 않은 사용자의 요청입니다."
+        );
+    }
+
+    private boolean hasAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        return authentication.getPrincipal() instanceof AuthenticatedUser;
     }
 }
