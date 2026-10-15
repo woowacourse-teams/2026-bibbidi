@@ -6,12 +6,10 @@ import com.bibbidi.wedding.chat.service.dto.ChatResult;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -69,28 +67,18 @@ public class AiChatService {
                 .stream()
                 .content();
 
-        try (Stream<String> chunks = answerChunks.toStream()) {
-            ChatAnswerStream output = new ChatAnswerStream(objectMapper);
-            Iterator<String> chunksIterator = chunks.iterator();
-            while (chunksIterator.hasNext()) {
-                String delta = output.append(chunksIterator.next());
-                if (!delta.isEmpty()) {
-                    reply.sendAnswerChunk(delta);
-                }
+        ChatAnswer answer = new ChatAnswerStream(objectMapper).read(answerChunks.toStream(), reply::sendAnswerChunk);
+        List<Long> suggestedIds = answer.recommendedItemIds().stream()
+                .filter(recommendableIds::contains)
+                .distinct()
+                .toList();
+        if (!suggestedIds.isEmpty()) {
+            List<Long> ids = checklistService.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
+            if (!ids.isEmpty()) {
+                reply.sendComponent(ids);
             }
-            ChatAnswer answer = output.finish();
-            List<Long> suggestedIds = answer.recommendedItemIds().stream()
-                    .filter(recommendableIds::contains)
-                    .distinct()
-                    .toList();
-            if (!suggestedIds.isEmpty()) {
-                List<Long> ids = checklistService.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
-                if (!ids.isEmpty()) {
-                    reply.sendComponent(ids);
-                }
-            }
-            return answer.answer();
         }
+        return answer.answer();
     }
 
     private Set<?> findRecommendableIds(List<Message> messages) {
