@@ -1,9 +1,7 @@
 package com.bibbidi.wedding.chat.config;
 
-import static org.springframework.ai.chat.client.ChatClient.Builder;
-
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
@@ -24,12 +22,12 @@ public class AiChatConfig {
 
     @Bean
     ChatClient aiChatClient(
-            Builder builder,
+            ChatClient.Builder chatClientBuilder,
             @Value("${spring.ai.bedrock.converse.chat.model}") String model,
             @Value("classpath:prompts/ai-chat-system.txt") Resource systemPrompt
     ) {
         BedrockChatOptions.Builder options = buildBedrockChatOptions(model);
-        return builder.defaultSystem(systemPrompt, StandardCharsets.UTF_8)
+        return chatClientBuilder.defaultSystem(systemPrompt, StandardCharsets.UTF_8)
                 .defaultOptions(options)
                 .build();
     }

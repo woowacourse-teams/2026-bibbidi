@@ -32,7 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-@AnalyzeClasses(packages = "com.bibbidi.wedding", importOptions = ImportOption.DoNotIncludeTests.class)
+@AnalyzeClasses(
+        packages = "com.bibbidi.wedding",
+        importOptions = ImportOption.DoNotIncludeTests.class
+)
 class ArchitectureConventionTest {
 
     private static final String BASE_PACKAGE = "com.bibbidi.wedding";

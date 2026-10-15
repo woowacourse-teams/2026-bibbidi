@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.service.port;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import java.util.function.Consumer;
 
 public interface ChatAnswerParser {

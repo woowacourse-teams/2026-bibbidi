@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.service.parser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,13 +66,18 @@ class ChatAnswerStreamTest {
     @MethodSource("singleCharacterOutputs")
     @DisplayName("한 글자씩 수신해도 JSON처럼 보이는 답변과 이모지를 원문대로 전달한다")
     void streamsSingleCharacterChunksWithoutSplittingEmoji(String json, String expected) {
+        // given
         ChatAnswerStream stream = new ChatAnswerStream(mapper);
         List<String> deltas = new ArrayList<>();
         Stream<String> chunks = json.chars().mapToObj(character -> String.valueOf((char) character));
+
+        // when
         ChatAnswer answer = stream.read(chunks, delta -> {
             assertThat(Character.isHighSurrogate(delta.charAt(delta.length() - 1))).isFalse();
             deltas.add(delta);
         });
+
+        // then
         assertThat(String.join("", deltas)).isEqualTo(expected);
         assertThat(answer).isEqualTo(new ChatAnswer(expected, List.of(2L)));
     }
@@ -80,14 +85,17 @@ class ChatAnswerStreamTest {
     @Test
     @DisplayName("입력과 출력 버퍼보다 큰 답변도 조각별로 전송하고 원문을 유지한다")
     void streamsAnswersLargerThanTheParserBuffers() {
+        // given
         String expected = "준비 \\\"목록\\\"\n😀 ".repeat(3000);
         String json = mapper.writeValueAsString(new ChatAnswer(expected, List.of(2L)));
         List<String> deltas = new ArrayList<>();
         AtomicBoolean closed = new AtomicBoolean();
 
+        // when
         ChatAnswer answer = new ChatAnswerStream(mapper).read(
                 Stream.of(json).onClose(() -> closed.set(true)), deltas::add);
 
+        // then
         assertThat(answer).isEqualTo(new ChatAnswer(expected, List.of(2L)));
         assertThat(deltas.size()).isGreaterThan(1);
         assertThat(String.join("", deltas)).isEqualTo(expected);
@@ -99,11 +107,13 @@ class ChatAnswerStreamTest {
     @Test
     @DisplayName("답변 전송이 취소되면 원래 예외를 유지하고 모델 스트림을 닫는다")
     void closesTheModelStreamWhenAnswerDeliveryIsCancelled() {
+        // given
         AtomicBoolean closed = new AtomicBoolean();
         CancellationException cancelled = new CancellationException("연결이 종료되었습니다.");
         Stream<String> chunks = Stream.of("{\"answer\":\"일부 ", "답변\",\"recommendedItemIds\":[]}")
                 .onClose(() -> closed.set(true));
 
+        // when, then
         assertThatThrownBy(() -> new ChatAnswerStream(mapper).read(chunks, delta -> {
             throw cancelled;
         })).isSameAs(cancelled);

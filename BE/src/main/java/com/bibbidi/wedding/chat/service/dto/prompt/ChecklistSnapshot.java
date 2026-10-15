@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.dto;
+package com.bibbidi.wedding.chat.service.dto.prompt;
 
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import java.util.List;

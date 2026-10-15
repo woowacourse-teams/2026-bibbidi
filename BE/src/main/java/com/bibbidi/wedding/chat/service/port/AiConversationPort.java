@@ -1,11 +1,11 @@
 package com.bibbidi.wedding.chat.service.port;
 
-import com.bibbidi.wedding.chat.service.dto.AiResponseStream;
-import com.bibbidi.wedding.chat.service.dto.BibbidiCustomChatPromptContext;
+import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
+import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 
 public interface AiConversationPort {
 
-    AiResponseStream stream(String conversationKey, String message, BibbidiCustomChatPromptContext context);
+    AiResponseStream stream(String conversationKey, String userPrompt, BibbidiCustomChatPromptContext context);
 
-    void remember(String conversationKey, String message, String answer);
+    void remember(String conversationKey, String userPrompt, String answer);
 }

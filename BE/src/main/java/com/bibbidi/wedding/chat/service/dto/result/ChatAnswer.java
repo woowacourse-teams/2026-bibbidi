@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.dto;
+package com.bibbidi.wedding.chat.service.dto.result;
 
 import java.util.List;
 

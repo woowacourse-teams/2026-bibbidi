@@ -5,28 +5,30 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
+import com.bibbidi.wedding.chat.service.ConversationKey;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
+import com.bibbidi.wedding.chat.controller.sse.ChatEventType;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
-import com.bibbidi.wedding.chat.controller.sse.dto.ChatEventType;
 import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.ChatEvent;
-import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
+import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,15 +43,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import reactor.core.publisher.Flux;
 import reactor.test.publisher.TestPublisher;
 import tools.jackson.databind.json.JsonMapper;
@@ -58,7 +56,7 @@ class AiChatLifecycleTest {
 
     private static final UUID ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99");
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
-    private ChatModel model;
+    private FakeChatModel model;
     private boolean answerStarted;
     private BibbidiInMemoryChatMemory memory;
     private AiChatService chat;
@@ -66,16 +64,16 @@ class AiChatLifecycleTest {
     private AtomicReference<Runnable> timeout;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
+    private List<ChatEvent> deliveredEvents;
 
     @BeforeEach
     void setUp() {
-        model = mock(ChatModel.class);
-        when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
+        model = new FakeChatModel();
         ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
         memory = new BibbidiInMemoryChatMemory(repository, 18);
-        ChecklistService checklistService = mock(ChecklistService.class);
+        ChecklistLookupPort checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        CatalogService catalogService = mock(CatalogService.class);
+        CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
         chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
@@ -84,6 +82,7 @@ class AiChatLifecycleTest {
         timeout = new AtomicReference<>();
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
+        deliveredEvents = new CopyOnWriteArrayList<>();
         when(scheduler.schedule(any(Runnable.class), anyLong(), eq(TimeUnit.NANOSECONDS)))
                 .thenAnswer(invocation -> {
                     timeout.set(invocation.getArgument(0));
@@ -102,11 +101,11 @@ class AiChatLifecycleTest {
     void chunksDoNotResetTheTotalTimer() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
-        ChatSseHandler handler = startStreamingChat(publisher);
+        startStreamingChat(publisher);
 
         // when
-        emitAnswerChunkAndAwaitDelivery(publisher, handler, "일부 ");
-        emitAnswerChunkAndAwaitDelivery(publisher, handler, "답변");
+        emitAnswerChunkAndAwaitDelivery(publisher, "일부 ");
+        emitAnswerChunkAndAwaitDelivery(publisher, "답변");
 
         // then
         ArgumentCaptor<Long> delay = ArgumentCaptor.forClass(Long.class);
@@ -119,8 +118,8 @@ class AiChatLifecycleTest {
     void timeoutCancelsTheModelAndDiscardsTheTurn() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
-        ChatSseHandler handler = startStreamingChat(publisher);
-        emitAnswerChunkAndAwaitDelivery(publisher, handler, "일부 답변");
+        startStreamingChat(publisher);
+        emitAnswerChunkAndAwaitDelivery(publisher, "일부 답변");
 
         // when
         timeout.get().run();
@@ -128,7 +127,7 @@ class AiChatLifecycleTest {
         // then
         await().untilAsserted(publisher::assertCancelled);
         await().untilTrue(responseFinished);
-        assertThat(memory.get("7:" + ID)).isEmpty();
+        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).isEmpty();
     }
 
     @Test
@@ -138,7 +137,7 @@ class AiChatLifecycleTest {
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicBoolean interrupted = new AtomicBoolean();
-        when(model.stream(any(Prompt.class))).thenAnswer(invocation -> {
+        model.respondWith(prompt -> {
             started.countDown();
             while (release.getCount() != 0) {
                 try {
@@ -152,7 +151,7 @@ class AiChatLifecycleTest {
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
         sse.stream(RESPONSE_TIMEOUT, new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
             try {
-                sendEvents(connection, chat.chat(7L, ID, "질문"));
+                sendEvents(connection, chat.chat(new ChatCommand(7L, ID, "질문")));
             } finally {
                 responseFinished.set(true);
             }
@@ -171,40 +170,34 @@ class AiChatLifecycleTest {
 
         // then
         await().untilTrue(responseFinished);
-        assertThat(memory.get("7:" + ID)).isEmpty();
+        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).isEmpty();
     }
 
-    private ChatSseHandler startStreamingChat(TestPublisher<ChatResponse> publisher) {
+    private void startStreamingChat(TestPublisher<ChatResponse> publisher) {
         CountDownLatch subscribed = new CountDownLatch(1);
-        AtomicReference<ChatSseHandler> handler = new AtomicReference<>();
-        when(model.stream(any(Prompt.class))).thenReturn(publisher.flux()
+        model.respondWith(publisher.flux()
                 .doOnSubscribe(ignored -> subscribed.countDown()));
 
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
         sse.stream(RESPONSE_TIMEOUT, new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
-            ChatSseHandler reply = spy(new ChatSseHandler(connection));
-            handler.set(reply);
+            ChatSseHandler reply = new ChatSseHandler(connection);
             try {
-                chat.chat(7L, ID, "질문").doOnNext(reply::send).blockLast();
+                chat.chat(new ChatCommand(7L, ID, "질문")).doOnNext(event -> {
+                    reply.send(event);
+                    deliveredEvents.add(event);
+                }).blockLast();
             } finally {
                 responseFinished.set(true);
             }
         });
         await().until(() -> subscribed.getCount() == 0);
-        return handler.get();
     }
 
-    private void emitAnswerChunkAndAwaitDelivery(TestPublisher<ChatResponse> publisher, ChatSseHandler handler, String text) {
-        CountDownLatch delivered = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            delivered.countDown();
-            return null;
-        }).when(handler).send(new ChatEvent.Delta(text));
+    private void emitAnswerChunkAndAwaitDelivery(TestPublisher<ChatResponse> publisher, String text) {
         String jsonChunk = (answerStarted ? "" : "{\"answer\":\"") + text;
         answerStarted = true;
         publisher.next(new ChatResponse(List.of(new Generation(new AssistantMessage(jsonChunk)))));
-        await().until(() -> delivered.getCount() == 0);
+        await().until(() -> deliveredEvents.contains(new ChatEvent.Delta(text)));
     }
 
     private static ChatResponse response(String text) {

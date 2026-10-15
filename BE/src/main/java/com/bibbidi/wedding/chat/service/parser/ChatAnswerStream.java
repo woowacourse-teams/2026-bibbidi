@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.service.parser;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.ArrayList;
