@@ -35,6 +35,8 @@ bibbidi:
   ai:
     chatbot:
       memory-max-messages: 20
+      conversation-idle-timeout: 1h
+      conversation-cleanup-interval: 10m
 
 server:
   shutdown: graceful

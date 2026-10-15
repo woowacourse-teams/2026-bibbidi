@@ -1,0 +1,87 @@
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
+index 38b93a3ff404a11d2bc85f031b56e4c5e378e62b..0ed93d821ecc077b50ac4d0555d54b2d90a16daa 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/adapter/ai/SpringAiConversationAdapter.java
+@@ -16,11 +16,6 @@ import tools.jackson.databind.ObjectMapper;
+ @Component
+ public class SpringAiConversationAdapter implements AiConversationPort {
+ 
+-    /**
+-     * 대화 기록 뒤에 덧붙이는 고정 메시지 수. 체크리스트와 카탈로그 두 개다.
+-     */
+-    public static final int PROMPT_CONTEXT_MESSAGE_COUNT = 2;
+-
+     private final ChatClient chatClient;
+     private final BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory;
+     private final ObjectMapper mapper;
+diff --git a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java b/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
+index 41e738a1d20233a905fbb26e6b1e4dc33d0bb5de..4327f80f2966c3eb52a2c2722c6084d41738c103 100644
+--- a/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
++++ b/BE/src/main/java/com/bibbidi/wedding/chat/config/AiChatConfig.java
+@@ -1,7 +1,6 @@
+ package com.bibbidi.wedding.chat.config;
+ 
+ import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+-import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+ import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
+ import java.nio.charset.StandardCharsets;
+ import java.util.Map;
+@@ -59,8 +58,7 @@ public class AiChatConfig {
+ 
+     @Bean
+     BibbidiInMemoryChatMemory aiChatMemory(ChatMemoryRepository repository, AiChatProperties properties) {
+-        int conversationMessages = properties.memoryMaxMessages() - SpringAiConversationAdapter.PROMPT_CONTEXT_MESSAGE_COUNT;
+-        return new BibbidiInMemoryChatMemory(repository, conversationMessages);
++        return new BibbidiInMemoryChatMemory(repository, properties.memoryMaxMessages());
+     }
+ 
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java
+deleted file mode 100644
+index b79243a17c95c56f43aeede37e0bcfa98538f1ab..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/config/AiChatConfigTest.java
++++ /dev/null
+@@ -1,43 +0,0 @@
+-package com.bibbidi.wedding.chat.config;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+-import java.time.Duration;
+-import java.util.ArrayList;
+-import java.util.List;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+-import org.springframework.ai.chat.messages.AssistantMessage;
+-import org.springframework.ai.chat.messages.Message;
+-import org.springframework.ai.chat.messages.UserMessage;
+-
+-class AiChatConfigTest {
+-
+-    private static final String CONVERSATION = "7:conversation-a";
+-    private static final int MEMORY_MAX_MESSAGES = 20;
+-    private static final int FIXED_MESSAGES = 2;
+-
+-    @Test
+-    @DisplayName("전체 메시지 한도에서 고정 정보 2개를 뺀 최근 대화만 기억한다")
+-    void keepsOnlyTheRecentMessagesLeftAfterTheFixedContext() {
+-        // given
+-        BibbidiInMemoryChatMemory memory = new AiChatConfig().aiChatMemory(
+-                new InMemoryChatMemoryRepository(),
+-                new AiChatProperties(MEMORY_MAX_MESSAGES, Duration.ofHours(1), Duration.ofMinutes(10)));
+-        List<Message> messages = new ArrayList<>();
+-        for (int turn = 1; turn <= MEMORY_MAX_MESSAGES; turn++) {
+-            messages.add(new UserMessage("질문 " + turn));
+-            messages.add(new AssistantMessage("답변 " + turn));
+-        }
+-
+-        // when
+-        memory.add(CONVERSATION, messages);
+-
+-        // then
+-        List<Message> remembered = memory.get(CONVERSATION);
+-        assertThat(remembered).hasSize(MEMORY_MAX_MESSAGES - FIXED_MESSAGES);
+-        assertThat(remembered.getLast().getText()).isEqualTo("답변 " + MEMORY_MAX_MESSAGES);
+-    }
+-}

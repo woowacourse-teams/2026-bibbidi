@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.adapter.ai.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
@@ -36,6 +37,7 @@ import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
@@ -130,6 +132,11 @@ class AiChatControllerTest {
         @Bean
         BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory() {
             return new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
+        }
+
+        @Bean
+        AiChatStreamRecorder aiChatStreamRecorder() {
+            return AiChatStreamRecorderFixture.create();
         }
     }
 

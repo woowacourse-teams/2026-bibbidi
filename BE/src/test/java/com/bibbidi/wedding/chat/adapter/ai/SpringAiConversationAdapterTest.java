@@ -7,7 +7,9 @@ import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContex
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistItemSnapshot;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,8 @@ import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import reactor.core.publisher.Flux;
@@ -30,13 +34,15 @@ class SpringAiConversationAdapterTest {
     private FakeChatModel model;
     private BibbidiInMemoryChatMemory memory;
     private SpringAiConversationAdapter adapter;
+    private SimpleMeterRegistry registry;
 
     @BeforeEach
     void setUp() {
+        registry = new SimpleMeterRegistry();
         model = new FakeChatModel();
         memory = new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
         adapter = new SpringAiConversationAdapter(ChatClient.create(model), memory,
-                JsonMapper.builder().findAndAddModules().build());
+                JsonMapper.builder().findAndAddModules().build(), AiChatStreamRecorderFixture.create(registry));
     }
 
     @Test
@@ -99,6 +105,56 @@ class SpringAiConversationAdapterTest {
         assertThat(memory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
         assertThat(memory.get(CONVERSATION)).extracting(Message::getMessageType)
                 .extracting(Enum::name).containsExactly("USER", "ASSISTANT");
+    }
+
+    @Test
+    @DisplayName("답변을 마치면 대화 수, 첫 토큰 지연, 입력·출력 토큰 수를 기록한다")
+    void recordsTurnTtftAndTokensWhenTheAnswerCompletes() {
+        // given
+        model.respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
+
+        // when
+        adapter.stream(CONVERSATION, "질문", context()).content().blockLast();
+
+        // then
+        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(1);
+        assertThat(registry.get("ai.tokens").tag("type", "input").counter().count()).isEqualTo(1_000_000);
+        assertThat(registry.get("ai.tokens").tag("type", "output").counter().count()).isEqualTo(500_000);
+        assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
+    }
+
+    @Test
+    @DisplayName("답변 도중 모델이 실패하면 실패 횟수를 기록한다")
+    void recordsFailureWhenTheModelFails() {
+        // given
+        model.respondWith(Flux.concat(Flux.just(chunk("웨딩홀 ")), Flux.error(new IllegalStateException("모델 오류"))));
+
+        // when
+        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+
+        // then
+        assertThat(registry.get("ai.chat.failures").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("토큰 사용량만 담긴 조각은 답변 조각으로 전달하지 않는다")
+    void doesNotForwardChunksWithoutText() {
+        // given
+        model.respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
+
+        // when
+        List<String> content = adapter.stream(CONVERSATION, "질문", context()).content().collectList().block();
+
+        // then
+        assertThat(content).containsExactly("답변");
+    }
+
+    private static ChatResponse usageOnly(int inputTokens, int outputTokens) {
+        return new ChatResponse(
+                List.of(new Generation(new AssistantMessage(""))),
+                ChatResponseMetadata.builder().usage(new DefaultUsage(inputTokens, outputTokens)).build());
     }
 
     private static BibbidiCustomChatPromptContext context() {

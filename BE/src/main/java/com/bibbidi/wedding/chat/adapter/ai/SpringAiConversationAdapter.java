@@ -19,15 +19,18 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     private final ChatClient chatClient;
     private final BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory;
     private final ObjectMapper mapper;
+    private final AiChatStreamRecorder recorder;
 
     public SpringAiConversationAdapter(
             ChatClient chatClient,
             BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory,
-            ObjectMapper mapper
+            ObjectMapper mapper,
+            AiChatStreamRecorder recorder
     ) {
         this.chatClient = chatClient;
         this.bibbidiInMemoryChatMemory = bibbidiInMemoryChatMemory;
         this.mapper = mapper;
+        this.recorder = recorder;
     }
 
     @Override
@@ -53,12 +56,17 @@ public class SpringAiConversationAdapter implements AiConversationPort {
 
         UserMessage userMessage = new UserMessage(userPrompt);
 
-        Flux<String> answerFlux = chatClient.prompt()
-                .messages(memories)
-                .messages(checklist, catalog)
-                .messages(userMessage)
-                .stream()
-                .content();
+        Flux<String> answerFlux = recorder.record(
+                        userPrompt,
+                        chatClient.prompt()
+                                .messages(memories)
+                                .messages(checklist, catalog)
+                                .messages(userMessage)
+                                .stream()
+                                .chatResponse()
+                )
+                .map(AiChatStreamRecorder::textOf)
+                .filter(text -> !text.isEmpty());
 
         return new AiResponseStream(
                 answerFlux,
