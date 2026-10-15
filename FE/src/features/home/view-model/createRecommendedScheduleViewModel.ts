@@ -1,5 +1,5 @@
 import type { RecommendedCatalogItemListModel } from "../model/recommendedCatalogItem";
-import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
+import type { CatalogTaskAdditionState } from "../../preparation/model/catalogTaskAddition";
 
 export interface RecommendedScheduleItemViewModel {
   addActionLabel: string;
@@ -19,7 +19,7 @@ export interface RecommendedScheduleViewModel {
 
 export function createRecommendedScheduleViewModel(
   model: RecommendedCatalogItemListModel,
-  addition: RecommendedTaskAdditionState,
+  addition: CatalogTaskAdditionState,
 ): RecommendedScheduleViewModel {
   return {
     catalogActionLabel: "로드맵 보기",

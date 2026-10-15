@@ -58,6 +58,8 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
               ...message,
               text: message.text + delta,
             })),
+          onRecommendations: (catalogItemIds) =>
+            updateCurrentAnswer((message) => ({ ...message, catalogItemIds })),
         },
         controller.signal,
       );
@@ -65,7 +67,11 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
     } catch (error) {
       if (requestRef.current !== controller) return;
       failedTurn.current = { text, answerId };
-      updateCurrentAnswer((message) => ({ ...message, status: "failed" }));
+      updateCurrentAnswer((message) => ({
+        ...message,
+        catalogItemIds: undefined,
+        status: "failed",
+      }));
       const authenticationRequired =
         error instanceof AiChatApiError && error.authenticationRequired;
       setErrorMessage(
@@ -104,6 +110,7 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
     updateAnswer(turn.answerId, (message) => ({
       ...message,
       text: "",
+      catalogItemIds: undefined,
       status: "streaming",
     }));
     void receive(turn.text, turn.answerId);

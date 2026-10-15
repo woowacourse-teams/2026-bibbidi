@@ -6,34 +6,37 @@ import {
   useState,
 } from "react";
 
-import { PreparationAuthenticationRequiredError } from "../preparation";
-import type { ChecklistRepository } from "../preparation";
-import type { RecommendedTaskAdditionState } from "./model/recommendedTaskAddition";
+import { PreparationAuthenticationRequiredError } from "../repository/preparationErrors";
+import type { ChecklistRepository } from "../repository/checklistRepository";
+import type { CatalogTaskAdditionState } from "../model/catalogTaskAddition";
 
-interface UseRecommendedTaskAdditionOptions {
+interface UseCatalogTaskAdditionOptions {
   allowGuestAddition?: boolean;
   authScope: string;
   isAuthenticated: boolean;
   onAuthenticationRequired: () => void;
-  onSuccess: (catalogItemId: number, itemCount: number) => void;
+  onSuccess?: (catalogItemId: number, itemCount: number) => void;
   repository: ChecklistRepository;
+  saveCatalogItem?: (
+    catalogItemId: number,
+    signal: AbortSignal,
+  ) => Promise<string[]>;
+  errorMessage?: string;
 }
 
-export interface RecommendedTaskAdditionController extends RecommendedTaskAdditionState {
-  add: (catalogItemId: number) => void;
+export interface CatalogTaskAdditionController extends CatalogTaskAdditionState {
+  add: (catalogItemId: number) => Promise<boolean>;
 }
 
 const authenticationErrorMessage =
   "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.";
 const additionErrorMessage = "할 일을 추가하지 못했어요. 다시 시도해 주세요.";
 
-interface RecommendedTaskAdditionScopedState extends RecommendedTaskAdditionState {
+interface CatalogTaskAdditionScopedState extends CatalogTaskAdditionState {
   authScope: string;
 }
 
-function createEmptyState(
-  authScope: string,
-): RecommendedTaskAdditionScopedState {
+function createEmptyState(authScope: string): CatalogTaskAdditionScopedState {
   return {
     addedCatalogItemIds: [],
     addingCatalogItemIds: [],
@@ -42,14 +45,16 @@ function createEmptyState(
   };
 }
 
-export function useRecommendedTaskAddition({
+export function useCatalogTaskAddition({
   allowGuestAddition = false,
   authScope,
   isAuthenticated,
   onAuthenticationRequired,
   onSuccess,
   repository,
-}: UseRecommendedTaskAdditionOptions): RecommendedTaskAdditionController {
+  saveCatalogItem,
+  errorMessage = additionErrorMessage,
+}: UseCatalogTaskAdditionOptions): CatalogTaskAdditionController {
   const currentAuthScopeRef = useRef(authScope);
   const controllersRef = useRef(
     new Map<number, { authScope: string; controller: AbortController }>(),
@@ -58,7 +63,7 @@ export function useRecommendedTaskAddition({
     authScope,
     ids: new Set<number>(),
   });
-  const [state, setState] = useState<RecommendedTaskAdditionScopedState>(() =>
+  const [state, setState] = useState<CatalogTaskAdditionScopedState>(() =>
     createEmptyState(authScope),
   );
   const currentState =
@@ -82,12 +87,12 @@ export function useRecommendedTaskAddition({
   }, [authScope]);
 
   const add = useCallback(
-    (catalogItemId: number) => {
+    async (catalogItemId: number) => {
       if (
         (!isAuthenticated && !allowGuestAddition) ||
         controllersRef.current.get(catalogItemId)?.authScope === authScope
       ) {
-        return;
+        return false;
       }
 
       if (addedCatalogItemIdsRef.current.authScope !== authScope) {
@@ -98,7 +103,7 @@ export function useRecommendedTaskAddition({
       }
 
       if (addedCatalogItemIdsRef.current.ids.has(catalogItemId)) {
-        return;
+        return false;
       }
 
       const controller = new AbortController();
@@ -119,72 +124,55 @@ export function useRecommendedTaskAddition({
         };
       });
 
-      void repository
-        .addCatalogItemIds(
-          isAuthenticated ? "authenticated" : "guest",
-          [String(catalogItemId)],
-          controller.signal,
-        )
-        .then((addedCatalogItemIds) => {
-          if (
-            controller.signal.aborted ||
-            currentAuthScopeRef.current !== authScope ||
-            controllersRef.current.get(catalogItemId) !== request
-          ) {
-            return;
-          }
+      const isCurrentRequest = () =>
+        !controller.signal.aborted &&
+        currentAuthScopeRef.current === authScope &&
+        controllersRef.current.get(catalogItemId) === request;
 
-          addedCatalogItemIdsRef.current.ids.add(catalogItemId);
-          setState((current) => {
-            if (current.authScope !== authScope) {
-              return current;
-            }
-
-            return {
-              ...current,
-              addedCatalogItemIds: [
-                ...current.addedCatalogItemIds,
-                catalogItemId,
-              ],
-            };
-          });
-          onSuccess(catalogItemId, addedCatalogItemIds.length);
-        })
-        .catch((error: unknown) => {
-          if (
-            controller.signal.aborted ||
-            currentAuthScopeRef.current !== authScope ||
-            controllersRef.current.get(catalogItemId) !== request
-          ) {
-            return;
-          }
-
-          const requiresAuthentication =
-            error instanceof PreparationAuthenticationRequiredError;
-
-          if (requiresAuthentication) {
-            onAuthenticationRequired();
-          }
-
-          setState((current) =>
-            current.authScope === authScope
-              ? {
-                  ...current,
-                  additionErrors: {
-                    ...current.additionErrors,
-                    [catalogItemId]: requiresAuthentication
-                      ? authenticationErrorMessage
-                      : additionErrorMessage,
-                  },
-                }
-              : current,
-          );
-        })
-        .finally(() => {
-          if (controllersRef.current.get(catalogItemId) !== request) {
-            return;
-          }
-
+      try {
+        const addedCatalogItemIds = await (saveCatalogItem
+          ? saveCatalogItem(catalogItemId, controller.signal)
+          : repository.addCatalogItemIds(
+              isAuthenticated ? "authenticated" : "guest",
+              [String(catalogItemId)],
+              controller.signal,
+            ));
+        if (!isCurrentRequest()) return false;
+        addedCatalogItemIdsRef.current.ids.add(catalogItemId);
+        setState((current) =>
+          current.authScope === authScope
+            ? {
+                ...current,
+                addedCatalogItemIds: [
+                  ...current.addedCatalogItemIds,
+                  catalogItemId,
+                ],
+              }
+            : current,
+        );
+        onSuccess?.(catalogItemId, addedCatalogItemIds.length);
+        return true;
+      } catch (error) {
+        if (!isCurrentRequest()) return false;
+        const requiresAuthentication =
+          error instanceof PreparationAuthenticationRequiredError;
+        if (requiresAuthentication) onAuthenticationRequired();
+        setState((current) =>
+          current.authScope === authScope
+            ? {
+                ...current,
+                additionErrors: {
+                  ...current.additionErrors,
+                  [catalogItemId]: requiresAuthentication
+                    ? authenticationErrorMessage
+                    : errorMessage,
+                },
+              }
+            : current,
+        );
+        return false;
+      } finally {
+        if (controllersRef.current.get(catalogItemId) === request) {
           controllersRef.current.delete(catalogItemId);
           setState((current) =>
             current.authScope === authScope
@@ -196,7 +184,8 @@ export function useRecommendedTaskAddition({
                 }
               : current,
           );
-        });
+        }
+      }
     },
     [
       authScope,
@@ -205,6 +194,8 @@ export function useRecommendedTaskAddition({
       onAuthenticationRequired,
       onSuccess,
       repository,
+      saveCatalogItem,
+      errorMessage,
     ],
   );
 

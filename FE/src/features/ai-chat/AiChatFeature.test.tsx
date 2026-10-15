@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiChatFeature } from "./AiChatFeature";
 import { AiChatApiError, streamAiChat } from "./api/streamAiChat";
 import { installMatchMedia } from "../../test/matchMedia";
+import { MyChecklistProvider } from "../checklist";
 
 const mocks = vi.hoisted(() => ({ stream: vi.fn() }));
 vi.mock("./api/streamAiChat", async (importOriginal) => ({
@@ -27,10 +28,12 @@ const authRequired = vi.fn();
 
 function chat(isAuthenticated = true) {
   return (
-    <AiChatFeature
-      isAuthenticated={isAuthenticated}
-      onAuthenticationRequired={authRequired}
-    />
+    <MyChecklistProvider sessionKey="ai-chat-test">
+      <AiChatFeature
+        isAuthenticated={isAuthenticated}
+        onAuthenticationRequired={authRequired}
+      />
+    </MyChecklistProvider>
   );
 }
 async function send(text: string) {

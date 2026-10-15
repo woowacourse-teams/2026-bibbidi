@@ -26,21 +26,45 @@ interface ChatRequest {
 interface ChatReceiver {
   onConversation: (id: string) => void;
   onDelta: (text: string) => void;
+  onRecommendations?: (catalogItemIds: string[]) => void;
 }
 
 function createChatEventHandler(request: ChatRequest, receiver: ChatReceiver) {
   let conversationId: string | undefined;
   let hasAnswer = false;
+  let hasComponent = false;
 
   return (event: SseEvent): boolean => {
-    if (!["conversation", "delta", "done", "failure"].includes(event.type))
+    if (
+      !["conversation", "delta", "component", "done", "failure"].includes(
+        event.type,
+      )
+    )
       return false;
     if (event.type === "failure") throw new AiChatApiError();
     const value: unknown = JSON.parse(event.data);
     if (typeof value !== "object" || value === null) throw new AiChatApiError();
-    if (event.type === "delta") {
+    if (event.type === "component") {
       if (
         !conversationId ||
+        !hasAnswer ||
+        hasComponent ||
+        !("catalogItemIds" in value) ||
+        !Array.isArray(value.catalogItemIds) ||
+        !value.catalogItemIds.every(
+          (id: unknown) =>
+            typeof id === "number" && Number.isSafeInteger(id) && id > 0,
+        )
+      )
+        throw new AiChatApiError();
+      hasComponent = true;
+      receiver.onRecommendations?.(
+        [...new Set<number>(value.catalogItemIds)].map(String),
+      );
+    } else if (event.type === "delta") {
+      if (
+        !conversationId ||
+        hasComponent ||
         !("text" in value) ||
         typeof value.text !== "string"
       ) {

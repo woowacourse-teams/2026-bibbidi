@@ -16,4 +16,5 @@ export type ChatMessage =
       role: "assistant";
       text: string;
       status: "streaming" | "complete" | "failed";
+      catalogItemIds?: string[];
     };
