@@ -1,12 +1,11 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
 import com.bibbidi.wedding.chat.service.dto.AiResponseStream;
-import com.bibbidi.wedding.chat.service.dto.ChatPromptContext;
+import com.bibbidi.wedding.chat.service.dto.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import java.util.List;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -20,22 +19,25 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     private final BibbidiInMemoryChatMemory chatMemory;
     private final ObjectMapper mapper;
 
-    public SpringAiConversationAdapter(ChatClient chatClient, BibbidiInMemoryChatMemory chatMemory, ObjectMapper mapper) {
+    public SpringAiConversationAdapter(ChatClient chatClient, BibbidiInMemoryChatMemory chatMemory,
+                                       ObjectMapper mapper) {
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
         this.mapper = mapper;
     }
 
     @Override
-    public AiResponseStream stream(String conversationKey, String message, ChatPromptContext context) {
-        chatMemory.rememberContext(conversationKey, context);
-        List<Message> memory = chatMemory.get(conversationKey);
-        ChatPromptContext currentContext = chatMemory.getContext(conversationKey);
+    public AiResponseStream stream(String conversationKey, String message, BibbidiCustomChatPromptContext context) {
+        chatMemory.remember(conversationKey, context);
+
+        List<Message> memories = chatMemory.get(conversationKey);
+        BibbidiCustomChatPromptContext currentContext = chatMemory.getContext(conversationKey);
         Message checklist = new UserMessage(mapper.writeValueAsString(Map.of(
-                "checklist", currentContext.checklist(), "recommendableItemIds", currentContext.recommendableItemIds())));
+                "checklist", currentContext.checklist(), "recommendableItemIds",
+                currentContext.recommendableItemIds())));
         Message catalog = new UserMessage(mapper.writeValueAsString(Map.of("catalog", currentContext.catalog())));
         return new AiResponseStream(chatClient.prompt()
-                .messages(memory)
+                .messages(memories)
                 .messages(checklist, catalog)
                 .messages(new UserMessage(message))
                 .stream()

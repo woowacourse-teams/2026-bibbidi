@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
-import com.bibbidi.wedding.chat.service.dto.ChatPromptContext;
+import com.bibbidi.wedding.chat.service.dto.BibbidiCustomChatPromptContext;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,7 +12,7 @@ import org.springframework.ai.chat.messages.Message;
 public class BibbidiInMemoryChatMemory implements ChatMemory {
 
     private final ChatMemory conversationMemory;
-    private final Map<String, ChatPromptContext> promptContexts = new ConcurrentHashMap<>();
+    private final Map<String, BibbidiCustomChatPromptContext> promptContexts = new ConcurrentHashMap<>();
 
     public BibbidiInMemoryChatMemory(ChatMemoryRepository repository, int maxMessages) {
         this.conversationMemory = MessageWindowChatMemory.builder()
@@ -37,11 +37,11 @@ public class BibbidiInMemoryChatMemory implements ChatMemory {
         promptContexts.remove(conversationId);
     }
 
-    public void rememberContext(String conversationId, ChatPromptContext context) {
+    public void remember(String conversationId, BibbidiCustomChatPromptContext context) {
         promptContexts.put(conversationId, context);
     }
 
-    public ChatPromptContext getContext(String conversationId) {
+    public BibbidiCustomChatPromptContext getContext(String conversationId) {
         return promptContexts.get(conversationId);
     }
 }

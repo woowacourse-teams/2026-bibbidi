@@ -5,7 +5,7 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.dto.AiResponseStream;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatEvent;
-import com.bibbidi.wedding.chat.service.dto.ChatPromptContext;
+import com.bibbidi.wedding.chat.service.dto.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
@@ -63,7 +63,7 @@ public class AiChatService {
     }
 
     private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
-        ChatPromptContext context = loadPromptContext(key.userId());
+        BibbidiCustomChatPromptContext context = loadPromptContext(key.userId());
         AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
         List<String> deltas = new ArrayList<>();
         ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
@@ -84,7 +84,7 @@ public class AiChatService {
         return Flux.concat(answerEvents, completion);
     }
 
-    private ChatPromptContext loadPromptContext(Long userId) {
+    private BibbidiCustomChatPromptContext loadPromptContext(Long userId) {
         List<CatalogItemDetailSnapshot> catalog = catalogService.findAllItemDetails();
         ChecklistSnapshot checklist = checklistService.findMyChecklistIfPresent(userId)
                 .map(ChecklistSnapshot::from).orElseGet(ChecklistSnapshot::notFound);
@@ -96,7 +96,7 @@ public class AiChatService {
                 recommendableIds.add(item.id());
             }
         });
-        return new ChatPromptContext(checklist, catalog, recommendableIds);
+        return new BibbidiCustomChatPromptContext(checklist, catalog, recommendableIds);
     }
 
     private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
