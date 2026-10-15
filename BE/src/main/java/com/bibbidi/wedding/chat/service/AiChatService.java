@@ -18,8 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -54,7 +52,6 @@ public class AiChatService {
         ConversationKey key = new ConversationKey(chatCommand.userId(), id);
         return Flux.defer(() -> {
                     Sinks.Empty<Void> superseded = Sinks.empty();
-                    AtomicReference<Runnable> recordPartialTurn = new AtomicReference<>(() -> { });
                     Sinks.Empty<Void> previous = activeConversations.put(key, superseded);
                     if (previous != null) {
                         previous.tryEmitEmpty();
@@ -62,24 +59,20 @@ public class AiChatService {
 
                     return Flux.concat(
                                     Flux.just(new ChatEvent.Conversation(id.toString())),
-                                    Flux.defer(() -> streamAnswer(key, id, chatCommand.message(), recordPartialTurn))
+                                    Flux.defer(() -> streamAnswer(key, id, chatCommand.message()))
                             )
                             .subscribeOn(Schedulers.boundedElastic())
-                            .takeUntilOther(superseded.asMono()
-                                    .doOnSuccess(ignored -> recordPartialTurn.get().run()))
+                            .takeUntilOther(superseded.asMono())
                             .doFinally(ignored -> activeConversations.remove(key, superseded));
                 }
         );
     }
 
-    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message,
-                                         AtomicReference<Runnable> recordPartialTurn) {
+    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
         BibbidiCustomChatPromptContext context = loadPromptContext(key.userId());
         AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
         List<String> deltas = new ArrayList<>();
         ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
-        StringBuffer streamed = new StringBuffer();
-        AtomicBoolean remembered = new AtomicBoolean();
 
         Flux<ChatEvent> answerEvents = response.content()
                 .publishOn(Schedulers.boundedElastic())
@@ -88,7 +81,6 @@ public class AiChatService {
                             answer.accept(chunk);
                             List<ChatEvent> events = new ArrayList<>();
                             for (String delta : deltas) {
-                                streamed.append(delta);
                                 events.add(new ChatEvent.Delta(delta));
                             }
                             return Flux.fromIterable(events);
@@ -96,12 +88,7 @@ public class AiChatService {
                 );
 
         Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, message,
-                response.recommendableItemIds(), answer, remembered));
-        recordPartialTurn.set(() -> {
-            if (!streamed.isEmpty() && remembered.compareAndSet(false, true)) {
-                rememberTurn(key, message, streamed.toString());
-            }
-        });
+                response.recommendableItemIds(), answer));
         return Flux.concat(answerEvents, completion);
     }
 
@@ -126,8 +113,7 @@ public class AiChatService {
     }
 
     private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
-                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream,
-                                           AtomicBoolean remembered) {
+                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
         ChatAnswer answer = stream.finish();
         List<Long> suggestedIds = answer.recommendedItemIds().stream()
                 .filter(recommendableIds::contains)
@@ -143,12 +129,7 @@ public class AiChatService {
         return Flux.concat(
                 Flux.fromIterable(events),
                 Flux.just(new ChatEvent.Done(id.toString())),
-                Mono.fromRunnable(() -> {
-                                    if (remembered.compareAndSet(false, true)) {
-                                        rememberTurn(key, message, answer.answer());
-                                    }
-                                }
-                        )
+                Mono.fromRunnable(() -> rememberTurn(key, message, answer.answer()))
                         .then(Mono.empty())
         );
     }
