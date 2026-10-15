@@ -1,0 +1,167 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluationRequest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluationRequest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d60bb064ceb18b80f94a2086da5f29479da07535
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluationRequest.java
+@@ -0,0 +1,41 @@
++package com.bibbidi.wedding.chat.evaluation;
++
++import com.bibbidi.wedding.chat.evaluation.data.EvaluationScenario;
++import java.util.List;
++import java.util.stream.Collectors;
++import org.springframework.ai.document.Document;
++import org.springframework.ai.evaluation.EvaluationRequest;
++
++public class BibbidiEvaluationRequest extends EvaluationRequest {
++
++    private final EvaluationScenario scenario;
++
++    public BibbidiEvaluationRequest(
++            EvaluationScenario scenario,
++            List<Document> observedToolResults,
++            String responseContent
++    ) {
++        super(scenario.userMessage(), observedToolResults, responseContent);
++        this.scenario = scenario;
++    }
++
++    public String scenarioName() {
++        return scenario.name();
++    }
++
++    public String inputValue(String input) {
++        return switch (input) {
++            case "chatMemory" -> scenario.chatMemory().stream()
++                    .map(message -> message.role() + ": " + message.content())
++                    .collect(Collectors.joining("\n"));
++            case "userMessage" -> getUserText();
++            case "modelResponse" -> getResponseContent();
++            case "observedToolResults" -> getDataList().stream()
++                    .map(Document::getText)
++                    .collect(Collectors.joining("\n"));
++            case "referenceAnswer" -> scenario.referenceAnswer();
++            case "expectedRefusal" -> scenario.expectedRefusal();
++            default -> throw new IllegalArgumentException("Unknown evaluation input: " + input);
++        };
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+index 847943ef4d557601a549a2051ece53a8147fc829..3c4d84e4bfbb5a40e3d02713bdaec331c6cb08ef 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+@@ -1,12 +1,10 @@
+ package com.bibbidi.wedding.chat.evaluation;
+ 
+-import com.bibbidi.wedding.chat.evaluation.data.EvaluationScenario;
+ import com.bibbidi.wedding.chat.evaluation.data.MetricInformation;
+ import java.util.Map;
+ import java.util.stream.Collectors;
+ import org.springframework.ai.chat.prompt.Prompt;
+ import org.springframework.ai.chat.prompt.PromptTemplate;
+-import org.springframework.ai.document.Document;
+ import org.springframework.ai.evaluation.EvaluationRequest;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+ import org.springframework.ai.evaluation.Evaluator;
+@@ -18,22 +16,23 @@ public class BibbidiEvaluator implements Evaluator {
+             new ClassPathResource("ai-evaluation/prompt/BibbidiEvaluator.st"));
+ 
+     private final MetricInformation metric;
+-    private final EvaluationScenario scenario;
+     private final BibbidiJudge judge;
+ 
+-    public BibbidiEvaluator(MetricInformation metric, EvaluationScenario scenario, BibbidiJudge judge) {
++    public BibbidiEvaluator(MetricInformation metric, BibbidiJudge judge) {
+         this.metric = metric;
+-        this.scenario = scenario;
+         this.judge = judge;
+     }
+ 
+     @Override
+     public EvaluationResponse evaluate(EvaluationRequest request) {
++        if (!(request instanceof BibbidiEvaluationRequest bibbidiRequest)) {
++            throw new IllegalArgumentException("BibbidiEvaluationRequest is required");
++        }
+         String scale = metric.scale().stream()
+                 .map(level -> level.value() + ": " + level.definition())
+                 .collect(Collectors.joining("\n"));
+         String inputs = metric.requiredInputs().stream()
+-                .map(input -> input + ":\n" + inputValue(input, request))
++                .map(input -> input + ":\n" + bibbidiRequest.inputValue(input))
+                 .collect(Collectors.joining("\n\n"));
+         Prompt prompt = PROMPT_TEMPLATE.create(Map.of(
+                 "role", metric.role(),
+@@ -41,26 +40,10 @@ public class BibbidiEvaluator implements Evaluator {
+                 "rubric", metric.rubric(),
+                 "direction", metric.direction(),
+                 "scale", scale,
+-                "scenarioName", scenario.name(),
++                "scenarioName", bibbidiRequest.scenarioName(),
+                 "metricType", metric.metricType(),
+                 "inputs", inputs));
+ 
+         return judge.evaluate(prompt);
+     }
+-
+-    private String inputValue(String input, EvaluationRequest request) {
+-        return switch (input) {
+-            case "chatMemory" -> scenario.chatMemory().stream()
+-                    .map(message -> message.role() + ": " + message.content())
+-                    .collect(Collectors.joining("\n"));
+-            case "userMessage" -> request.getUserText();
+-            case "modelResponse" -> request.getResponseContent();
+-            case "observedToolResults" -> request.getDataList().stream()
+-                    .map(Document::getText)
+-                    .collect(Collectors.joining("\n"));
+-            case "referenceAnswer" -> scenario.referenceAnswer();
+-            case "expectedRefusal" -> scenario.expectedRefusal();
+-            default -> throw new IllegalArgumentException("Unknown evaluation input: " + input);
+-        };
+-    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java
+deleted file mode 100644
+index dafa3f9eb3b10fa674c3cac00f639b9c642da4d7..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java
++++ /dev/null
+@@ -1,41 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
+-import java.io.IOException;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.concurrent.atomic.AtomicReference;
+-import org.junit.jupiter.api.Test;
+-import org.springframework.ai.chat.prompt.Prompt;
+-import org.springframework.ai.document.Document;
+-import org.springframework.ai.evaluation.EvaluationRequest;
+-import org.springframework.ai.evaluation.EvaluationResponse;
+-
+-class BibbidiEvaluatorTest {
+-
+-    @Test
+-    void rendersResourceTemplateAsPromptForJudge() throws IOException {
+-        EvaluationDataLoader loader = new EvaluationDataLoader();
+-        var metric = loader.loadMetrics().stream()
+-                .filter(candidate -> candidate.metricType().equals("Correctness"))
+-                .findFirst().orElseThrow();
+-        var scenario = loader.loadScenarios().getFirst();
+-        AtomicReference<Prompt> capturedPrompt = new AtomicReference<>();
+-        EvaluationResponse judgeResponse = new EvaluationResponse(false, "test", Map.of());
+-        BibbidiEvaluator evaluator = new BibbidiEvaluator(metric, scenario, prompt -> {
+-            capturedPrompt.set(prompt);
+-            return judgeResponse;
+-        });
+-
+-        EvaluationResponse response = evaluator.evaluate(new EvaluationRequest(
+-                "질문", List.of(new Document("실제 조회 결과")), "모델 답변"));
+-
+-        assertThat(response).isSameAs(judgeResponse);
+-        String content = capturedPrompt.get().getContents();
+-        assertThat(content).contains(metric.role(), metric.task(), metric.rubric(), "실제 조회 결과", "질문", "모델 답변")
+-                .doesNotContain("{role}", "{inputs}");
+-        assertThat(content.indexOf(metric.role())).isLessThan(content.indexOf("입력 데이터:"));
+-    }
+-}

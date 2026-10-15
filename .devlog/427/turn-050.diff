@@ -1,0 +1,1537 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+deleted file mode 100644
+index 214ce4b2d81b71e60b56a38922c24f9c9b2a312a..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
++++ /dev/null
+@@ -1,38 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.data;
+-
+-import static org.assertj.core.api.Assertions.assertThat;
+-import static org.assertj.core.api.Assertions.assertThatCode;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-
+-class EvaluationDataLoaderTest {
+-
+-    private final EvaluationDataset dataset = new EvaluationDataLoader().load();
+-
+-    @Test
+-    @DisplayName("저장소의 시나리오 55개와 지표 11개를 읽는다")
+-    void loadsRepositoryData() {
+-        assertThat(dataset.scenarios()).hasSize(55);
+-        assertThat(dataset.metrics()).extracting(MetricDefinition::metricType)
+-                .containsExactlyInAnyOrder(MetricType.values());
+-    }
+-
+-    @Test
+-    @DisplayName("저장소의 평가 데이터는 검증을 통과한다")
+-    void repositoryDataIsValid() {
+-        assertThatCode(() -> new EvaluationDataValidator().validate(dataset)).doesNotThrowAnyException();
+-    }
+-
+-    @Test
+-    @DisplayName("지표마다 시나리오 10개가 배정돼 총 110개 조합이다")
+-    void assignsTenScenariosPerMetric() {
+-        long combinations = dataset.scenarios().stream()
+-                .mapToLong(scenario -> scenario.metrics().size())
+-                .sum();
+-
+-        assertThat(combinations).isEqualTo(110);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+deleted file mode 100644
+index db48446798a9162dff0a2ec69ebc41114e995695..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
++++ /dev/null
+@@ -1,122 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.data;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+-import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
+-import java.util.ArrayList;
+-import java.util.EnumSet;
+-import java.util.HashMap;
+-import java.util.HashSet;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.Set;
+-
+-public class EvaluationDataValidator {
+-
+-    static final int SUPPORTED_SCHEMA_VERSION = 1;
+-    static final int SCENARIOS_PER_METRIC = 10;
+-
+-    public void validate(EvaluationDataset dataset) {
+-        List<String> violations = new ArrayList<>();
+-        Set<MetricType> metricTypes = validateMetrics(dataset.metrics(), violations);
+-        validateScenarios(dataset.scenarios(), metricTypes, violations);
+-        if (!violations.isEmpty()) {
+-            throw new IllegalStateException("평가 데이터 검증 실패:\n- " + String.join("\n- ", violations));
+-        }
+-    }
+-
+-    private Set<MetricType> validateMetrics(List<MetricDefinition> metrics, List<String> violations) {
+-        Set<MetricType> types = EnumSet.noneOf(MetricType.class);
+-        for (MetricDefinition metric : metrics) {
+-            if (metric.metricType() == null) {
+-                violations.add("지표 metricType이 비어 있다");
+-                continue;
+-            }
+-            if (!types.add(metric.metricType())) {
+-                violations.add("지표 중복: " + metric.metricType().label());
+-            }
+-            validateMetric(metric, violations);
+-        }
+-        return types;
+-    }
+-
+-    private void validateMetric(MetricDefinition metric, List<String> violations) {
+-        violations.addAll(metric.violations());
+-    }
+-
+-    private void validateScenarios(
+-            List<EvaluationScenario> scenarios, Set<MetricType> metricTypes, List<String> violations) {
+-        Set<String> ids = new HashSet<>();
+-        Map<String, String> inputOwners = new HashMap<>();
+-        Map<MetricType, Integer> assigned = new HashMap<>();
+-        for (EvaluationScenario scenario : scenarios) {
+-            String id = scenario.id();
+-            if (blank(id)) {
+-                violations.add("시나리오 id가 비어 있다");
+-                continue;
+-            }
+-            if (!ids.add(id)) {
+-                violations.add("시나리오 id 중복: " + id);
+-            }
+-            validateScenario(scenario, metricTypes, violations);
+-            String owner = inputOwners.putIfAbsent(scenario.chatMemory() + "|" + scenario.userMessage(), id);
+-            if (owner != null) {
+-                violations.add(id + ": " + owner + "와 같은 입력이다");
+-            }
+-            if (scenario.metrics() != null) {
+-                new HashSet<>(scenario.metrics()).forEach(metric -> assigned.merge(metric, 1, Integer::sum));
+-            }
+-        }
+-        for (MetricType metricType : metricTypes) {
+-            int count = assigned.getOrDefault(metricType, 0);
+-            if (count != SCENARIOS_PER_METRIC) {
+-                violations.add(metricType.label() + ": 배정 " + count + "개, 기대 " + SCENARIOS_PER_METRIC + "개");
+-            }
+-        }
+-    }
+-
+-    private void validateScenario(EvaluationScenario scenario, Set<MetricType> metricTypes, List<String> violations) {
+-        String id = scenario.id();
+-        if (scenario.schemaVersion() != SUPPORTED_SCHEMA_VERSION) {
+-            violations.add(id + ": 지원하지 않는 schemaVersion " + scenario.schemaVersion());
+-        }
+-        if (blank(scenario.userMessage()) || blank(scenario.referenceAnswer())) {
+-            violations.add(id + ": userMessage, referenceAnswer는 비어 있을 수 없다");
+-        }
+-        if (scenario.expectedRefusal() == null) {
+-            violations.add(id + ": expectedRefusal이 없다");
+-        }
+-        if (scenario.metrics() == null || scenario.metrics().isEmpty()) {
+-            violations.add(id + ": 적용 지표가 없다");
+-        } else {
+-            if (new HashSet<>(scenario.metrics()).size() != scenario.metrics().size()) {
+-                violations.add(id + ": 같은 지표가 중복 지정됐다");
+-            }
+-            scenario.metrics().stream()
+-                    .filter(metric -> !metricTypes.contains(metric))
+-                    .forEach(metric -> violations.add(id + ": 정의되지 않은 지표 " + metric.label()));
+-        }
+-        if (scenario.chatMemory() == null) {
+-            violations.add(id + ": chatMemory는 빈 배열이라도 필요하다");
+-        } else {
+-            scenario.chatMemory().forEach(turn -> {
+-                if (turn.role() == null || blank(turn.content())) {
+-                    violations.add(id + ": chatMemory 항목이 올바르지 않다 " + turn);
+-                }
+-            });
+-        }
+-        if (scenario.expectedToolCalls() == null) {
+-            violations.add(id + ": expectedToolCalls는 빈 배열이라도 필요하다");
+-        } else {
+-            scenario.expectedToolCalls().forEach(call -> {
+-                if (blank(call.name()) || call.arguments() == null) {
+-                    violations.add(id + ": expectedToolCalls 항목이 올바르지 않다 " + call);
+-                }
+-            });
+-        }
+-    }
+-
+-    private boolean blank(String value) {
+-        return value == null || value.isBlank();
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+deleted file mode 100644
+index a0072402cccfbd5b71fb4255e386bfcc31ebc92f..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
++++ /dev/null
+@@ -1,148 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.data;
+-
+-import static org.assertj.core.api.Assertions.assertThatCode;
+-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.ScaleLevel;
+-import com.bibbidi.wedding.chat.evaluation.data.scenario.ChatTurn;
+-import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
+-import com.bibbidi.wedding.chat.evaluation.data.scenario.ExpectedRefusal;
+-import com.bibbidi.wedding.chat.evaluation.data.scenario.ExpectedToolCall;
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.stream.IntStream;
+-import org.junit.jupiter.api.DisplayName;
+-import org.junit.jupiter.api.Test;
+-
+-class EvaluationDataValidatorTest {
+-
+-    private final EvaluationDataValidator validator = new EvaluationDataValidator();
+-
+-    @Test
+-    @DisplayName("지표 하나에 시나리오 10개가 배정되면 통과한다")
+-    void passesValidDataset() {
+-        assertThatCode(() -> validator.validate(dataset(scenarios(10)))).doesNotThrowAnyException();
+-    }
+-
+-    @Test
+-    @DisplayName("지표 배정 수가 10개가 아니면 실패한다")
+-    void rejectsWrongAssignmentCount() {
+-        assertThatThrownBy(() -> validator.validate(dataset(scenarios(9))))
+-                .hasMessageContaining("Correctness: 배정 9개, 기대 10개");
+-    }
+-
+-    @Test
+-    @DisplayName("시나리오 id가 중복되면 실패한다")
+-    void rejectsDuplicateScenarioId() {
+-        List<EvaluationScenario> scenarios = scenarios(10);
+-        scenarios.set(1, withId(scenarios.get(1), "scenario0"));
+-
+-        assertThatThrownBy(() -> validator.validate(dataset(scenarios))).hasMessageContaining("시나리오 id 중복: scenario0");
+-    }
+-
+-    @Test
+-    @DisplayName("정의되지 않은 지표를 참조하면 실패한다")
+-    void rejectsUnknownMetric() {
+-        List<EvaluationScenario> scenarios = scenarios(10);
+-        scenarios.add(scenario("extra", List.of(MetricType.RELEVANCE), "다른 질문"));
+-
+-        assertThatThrownBy(() -> validator.validate(dataset(scenarios)))
+-                .hasMessageContaining("extra: 정의되지 않은 지표 Relevance");
+-    }
+-
+-    @Test
+-    @DisplayName("같은 대화 입력을 복제하면 실패한다")
+-    void rejectsDuplicatedInput() {
+-        List<EvaluationScenario> scenarios = scenarios(10);
+-        scenarios.set(1, scenario("scenario1", List.of(MetricType.CORRECTNESS), "질문 0"));
+-
+-        assertThatThrownBy(() -> validator.validate(dataset(scenarios)))
+-                .hasMessageContaining("scenario1: scenario0와 같은 입력이다");
+-    }
+-
+-    @Test
+-    @DisplayName("기준 데이터가 비어 있거나 허용 값이 아니면 모든 위반을 함께 알린다")
+-    void reportsEveryViolation() {
+-        List<EvaluationScenario> scenarios = scenarios(10);
+-        scenarios.set(0, new EvaluationScenario(
+-                2, "scenario0", List.of(MetricType.CORRECTNESS), " ",
+-                List.of(new ChatTurn(null, "안내")), List.of(new ExpectedToolCall("", null)), "", null));
+-
+-        assertThatThrownBy(() -> validator.validate(dataset(scenarios)))
+-                .hasMessageContaining("지원하지 않는 schemaVersion 2")
+-                .hasMessageContaining("userMessage, referenceAnswer는 비어 있을 수 없다")
+-                .hasMessageContaining("expectedRefusal이 없다")
+-                .hasMessageContaining("chatMemory 항목이 올바르지 않다")
+-                .hasMessageContaining("expectedToolCalls 항목이 올바르지 않다");
+-    }
+-
+-    @Test
+-    @DisplayName("지표 척도 값이 중복되거나 promptOrder가 규칙을 어기면 실패한다")
+-    void rejectsInvalidMetric() {
+-        MetricDefinition broken = new MetricDefinition(
+-                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
+-                List.of(new ScaleLevel(1, "낮음"), new ScaleLevel(1, "높음")),
+-                "높을수록 정확함", true, allInputs(), List.of(PromptSection.INPUT, PromptSection.ROLE),
+-                "https://docs.aws.amazon.com");
+-
+-        assertThatThrownBy(() -> validator.validate(new EvaluationDataset(scenarios(10), List.of(broken))))
+-                .hasMessageContaining("Correctness: 척도 값 중복 1")
+-                .hasMessageContaining("Correctness: promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
+-    }
+-
+-    @Test
+-    @DisplayName("requiredInputs에 userMessage나 modelResponse가 없으면 실패한다")
+-    void rejectsMissingRequiredInputs() {
+-        MetricDefinition broken = new MetricDefinition(
+-                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
+-                List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(1, "충족")),
+-                "높을수록 정확함", true, List.of(EvaluationInput.CHAT_MEMORY), allSections(),
+-                "https://docs.aws.amazon.com");
+-
+-        assertThatThrownBy(() -> validator.validate(new EvaluationDataset(scenarios(10), List.of(broken))))
+-                .hasMessageContaining("Correctness: requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
+-    }
+-
+-    private EvaluationDataset dataset(List<EvaluationScenario> scenarios) {
+-        return new EvaluationDataset(scenarios, List.of(validMetric()));
+-    }
+-
+-    private MetricDefinition validMetric() {
+-        return new MetricDefinition(
+-                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
+-                List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(1, "충족")),
+-                "높을수록 정확함", true, allInputs(), allSections(), "https://docs.aws.amazon.com");
+-    }
+-
+-    private List<EvaluationInput> allInputs() {
+-        return List.of(EvaluationInput.CHAT_MEMORY, EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE,
+-                EvaluationInput.OBSERVED_TOOL_RESULTS);
+-    }
+-
+-    private List<PromptSection> allSections() {
+-        return List.of(PromptSection.ROLE, PromptSection.TASK, PromptSection.RUBRIC, PromptSection.INPUT);
+-    }
+-
+-    private List<EvaluationScenario> scenarios(int count) {
+-        return new ArrayList<>(IntStream.range(0, count)
+-                .mapToObj(i -> scenario("scenario" + i, List.of(MetricType.CORRECTNESS), "질문 " + i))
+-                .toList());
+-    }
+-
+-    private EvaluationScenario scenario(String id, List<MetricType> metrics, String userMessage) {
+-        return new EvaluationScenario(
+-                EvaluationDataValidator.SUPPORTED_SCHEMA_VERSION, id, metrics, userMessage, List.of(),
+-                List.of(new ExpectedToolCall("findCatalog", Map.of())), "기준 답변", ExpectedRefusal.NONE);
+-    }
+-
+-    private EvaluationScenario withId(EvaluationScenario source, String id) {
+-        return new EvaluationScenario(
+-                source.schemaVersion(), id, source.metrics(), source.userMessage(), source.chatMemory(),
+-                source.expectedToolCalls(), source.referenceAnswer(), source.expectedRefusal());
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
+index ee8829580c258d4c944951487ac1f3348207d86b..7f160358ff6f78046408b8c573d697a0d02a4a24 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataset.java
+@@ -4,8 +4,10 @@ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+ import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
+ import java.util.List;
+ 
+-public record EvaluationDataset(
+-        List<EvaluationScenario> scenarios,
+-        List<MetricDefinition> metrics
+-) {
++/** 평가에 쓰는 시나리오와 지표 정의 묶음. */
++public interface EvaluationDataset {
++
++    List<EvaluationScenario> scenarios();
++
++    List<MetricDefinition> metrics();
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDataset.java
+similarity index 66%
+rename from BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+rename to BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDataset.java
+index c1709c309d89bc6e72fd2127cd5143b7dde9006e..fa441ffb7b3dff7f676ddf95ad957ed0900f7283 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDataset.java
+@@ -12,22 +12,26 @@ import org.springframework.core.io.Resource;
+ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+ import tools.jackson.databind.json.JsonMapper;
+ 
+-public class EvaluationDataLoader {
++/** 클래스패스의 {@code ai-evaluation/} 아래 JSON 파일에서 시나리오와 지표 정의를 읽는다. 파일은 부를 때 읽는다. */
++public final class FileEvaluationDataset implements EvaluationDataset {
+ 
+     private static final String ROOT = "classpath:ai-evaluation/";
++    private static final PathMatchingResourcePatternResolver RESOLVER = new PathMatchingResourcePatternResolver();
++    private static final JsonMapper JSON = JsonMapper.builder().build();
+ 
+-    private final PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+-    private final JsonMapper jsonMapper = JsonMapper.builder().build();
++    @Override
++    public List<EvaluationScenario> scenarios() {
++        return read("scenarios/*.json", EvaluationScenario.class);
++    }
+ 
+-    public EvaluationDataset load() {
+-        return new EvaluationDataset(
+-                read("scenarios/*.json", EvaluationScenario.class),
+-                read("metrics/*.json", MetricDefinition.class));
++    @Override
++    public List<MetricDefinition> metrics() {
++        return read("metrics/*.json", MetricDefinition.class);
+     }
+ 
+     private <T> List<T> read(String pattern, Class<T> type) {
+         try {
+-            Resource[] resources = resolver.getResources(ROOT + pattern);
++            Resource[] resources = RESOLVER.getResources(ROOT + pattern);
+             return Arrays.stream(resources)
+                     .sorted(Comparator.comparing(Resource::getFilename))
+                     .map(resource -> parse(resource, type))
+@@ -39,7 +43,7 @@ public class EvaluationDataLoader {
+ 
+     private <T> T parse(Resource resource, Class<T> type) {
+         try (InputStream in = resource.getInputStream()) {
+-            return jsonMapper.readValue(in, type);
++            return JSON.readValue(in, type);
+         } catch (IOException e) {
+             throw new UncheckedIOException("평가 데이터를 읽지 못했습니다: " + resource.getFilename(), e);
+         } catch (RuntimeException e) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDatasetTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDatasetTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d4ead58152f0cf2efb981c4c4052ed60ec5e5c9
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FileEvaluationDatasetTest.java
+@@ -0,0 +1,47 @@
++package com.bibbidi.wedding.chat.evaluation.data;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatCode;
++
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
++import java.util.List;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++
++class FileEvaluationDatasetTest {
++
++    private final EvaluationDataset dataset = new FileEvaluationDataset();
++
++    @Test
++    @DisplayName("저장소의 시나리오 55개와 지표 11개를 읽는다")
++    void readsRepositoryData() {
++        assertThat(dataset.scenarios()).hasSize(55);
++        assertThat(dataset.metrics()).extracting(metric -> metric.metricType().label())
++                .containsExactlyInAnyOrder(
++                        "Correctness", "Completeness", "Faithfulness", "Helpfulness", "Coherence", "Relevance",
++                        "FollowingInstructions", "ProfessionalStyleAndTone", "Harmfulness", "Stereotyping", "Refusal");
++    }
++
++    @Test
++    @DisplayName("저장소의 평가 데이터는 검증을 통과한다")
++    void repositoryDataIsValid() {
++        EvaluationDataset valid = new ValidEvaluationDataset(dataset);
++
++        assertThatCode(valid::scenarios).doesNotThrowAnyException();
++        assertThatCode(valid::metrics).doesNotThrowAnyException();
++    }
++
++    @Test
++    @DisplayName("지표마다 시나리오 10개가 배정돼 총 110개 조합이다")
++    void assignsTenScenariosPerMetric() {
++        List<EvaluationScenario> scenarios = dataset.scenarios();
++
++        long combinations = dataset.metrics().stream()
++                .map(MetricDefinition::metricType)
++                .mapToLong(type -> scenarios.stream().filter(scenario -> scenario.assignedTo(type)).count())
++                .sum();
++
++        assertThat(combinations).isEqualTo(110);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FixedEvaluationDataset.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FixedEvaluationDataset.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ab0d046eab7898b7ea5d0622e8402b6181210ef1
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/FixedEvaluationDataset.java
+@@ -0,0 +1,27 @@
++package com.bibbidi.wedding.chat.evaluation.data;
++
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
++import java.util.List;
++
++/** 건네받은 시나리오와 지표 정의를 그대로 돌려주는 묶음. 파일 없이 평가 데이터를 만들 때 쓴다. */
++public final class FixedEvaluationDataset implements EvaluationDataset {
++
++    private final List<EvaluationScenario> scenarios;
++    private final List<MetricDefinition> metrics;
++
++    public FixedEvaluationDataset(List<EvaluationScenario> scenarios, List<MetricDefinition> metrics) {
++        this.scenarios = scenarios;
++        this.metrics = metrics;
++    }
++
++    @Override
++    public List<EvaluationScenario> scenarios() {
++        return scenarios;
++    }
++
++    @Override
++    public List<MetricDefinition> metrics() {
++        return metrics;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDataset.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDataset.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e56e35f2ead7f3e7e8ca11e3ff02b3bd79eec20
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDataset.java
+@@ -0,0 +1,82 @@
++package com.bibbidi.wedding.chat.evaluation.data;
++
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Objects;
++import java.util.Set;
++
++/**
++ * 규칙에 맞는 평가 데이터만 돌려주는 묶음. 부를 때 감싼 묶음을 검사하고, 어긴 규칙이 있으면 모두 모아 예외로 알린다.
++ *
++ * <p>지표 정의와 시나리오는 스스로 검증하고, 이 묶음은 여럿을 함께 볼 때만 보이는 규칙을 본다: 이름 중복, 같은 입력 복제,
++ * 정의 없는 지표 참조, 지표마다 같은 수의 시나리오 배정.
++ */
++public final class ValidEvaluationDataset implements EvaluationDataset {
++
++    private static final int SCENARIOS_PER_METRIC = 10;
++
++    private final EvaluationDataset origin;
++
++    public ValidEvaluationDataset(EvaluationDataset origin) {
++        this.origin = origin;
++    }
++
++    @Override
++    public List<EvaluationScenario> scenarios() {
++        check();
++        return origin.scenarios();
++    }
++
++    @Override
++    public List<MetricDefinition> metrics() {
++        check();
++        return origin.metrics();
++    }
++
++    private void check() {
++        List<String> violations = violations();
++        if (!violations.isEmpty()) {
++            throw new IllegalStateException("평가 데이터 검증 실패:\n- " + String.join("\n- ", violations));
++        }
++    }
++
++    private List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        Set<MetricType> defined = new HashSet<>();
++        for (MetricDefinition metric : origin.metrics()) {
++            if (metric.metricType() == null) {
++                violations.add("지표 metricType이 비어 있다");
++                continue;
++            }
++            if (!defined.add(metric.metricType())) {
++                violations.add("지표 중복: " + metric.metricType().label());
++            }
++            violations.addAll(metric.violations());
++        }
++        List<EvaluationScenario> scenarios = origin.scenarios();
++        for (int i = 0; i < scenarios.size(); i++) {
++            EvaluationScenario scenario = scenarios.get(i);
++            violations.addAll(scenario.violations(defined));
++            for (int j = i + 1; j < scenarios.size(); j++) {
++                EvaluationScenario other = scenarios.get(j);
++                if (Objects.equals(scenario.id(), other.id())) {
++                    violations.add("시나리오 id 중복: " + scenario.id());
++                }
++                if (scenario.sameInputAs(other)) {
++                    violations.add(other.id() + ": " + scenario.id() + "와 같은 입력이다");
++                }
++            }
++        }
++        for (MetricType metricType : defined) {
++            long count = scenarios.stream().filter(scenario -> scenario.assignedTo(metricType)).count();
++            if (count != SCENARIOS_PER_METRIC) {
++                violations.add(metricType.label() + ": 배정 " + count + "개, 기대 " + SCENARIOS_PER_METRIC + "개");
++            }
++        }
++        return violations;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDatasetTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDatasetTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e254699b51667780e1459263fc0e90e312a025e
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/ValidEvaluationDatasetTest.java
+@@ -0,0 +1,178 @@
++package com.bibbidi.wedding.chat.evaluation.data;
++
++import static org.assertj.core.api.Assertions.assertThatCode;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
++import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
++import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
++import com.bibbidi.wedding.chat.evaluation.data.metric.ScaleLevel;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.ChatRole;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.ChatTurn;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.ExpectedRefusal;
++import com.bibbidi.wedding.chat.evaluation.data.scenario.ExpectedToolCall;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Map;
++import java.util.stream.IntStream;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++
++class ValidEvaluationDatasetTest {
++
++    private static final MetricType CORRECTNESS = new MetricType("Correctness");
++    private static final MetricType RELEVANCE = new MetricType("Relevance");
++
++    @Test
++    @DisplayName("지표 하나에 시나리오 10개가 배정되면 통과한다")
++    void passesValidDataset() {
++        assertThatCode(() -> valid(scenarios(10)).scenarios()).doesNotThrowAnyException();
++        assertThatCode(() -> valid(scenarios(10)).metrics()).doesNotThrowAnyException();
++    }
++
++    @Test
++    @DisplayName("지표 배정 수가 10개가 아니면 실패한다")
++    void rejectsWrongAssignmentCount() {
++        assertThatThrownBy(() -> valid(scenarios(9)).scenarios())
++                .hasMessageContaining("Correctness: 배정 9개, 기대 10개");
++    }
++
++    @Test
++    @DisplayName("시나리오 id가 중복되면 실패한다")
++    void rejectsDuplicateScenarioId() {
++        List<EvaluationScenario> scenarios = scenarios(10);
++        scenarios.set(1, scenario("scenario0", List.of(CORRECTNESS), "질문 1"));
++
++        assertThatThrownBy(() -> valid(scenarios).scenarios()).hasMessageContaining("시나리오 id 중복: scenario0");
++    }
++
++    @Test
++    @DisplayName("정의되지 않은 지표를 참조하면 실패한다")
++    void rejectsUnknownMetric() {
++        List<EvaluationScenario> scenarios = scenarios(10);
++        scenarios.add(scenario("extra", List.of(RELEVANCE), "다른 질문"));
++
++        assertThatThrownBy(() -> valid(scenarios).scenarios())
++                .hasMessageContaining("extra: 정의되지 않은 지표 Relevance");
++    }
++
++    @Test
++    @DisplayName("같은 대화 입력을 복제하면 실패한다")
++    void rejectsDuplicatedInput() {
++        List<EvaluationScenario> scenarios = scenarios(10);
++        scenarios.set(1, scenario("scenario1", List.of(CORRECTNESS), "질문 0"));
++
++        assertThatThrownBy(() -> valid(scenarios).scenarios())
++                .hasMessageContaining("scenario1: scenario0와 같은 입력이다");
++    }
++
++    @Test
++    @DisplayName("같은 지표 정의가 둘이면 실패한다")
++    void rejectsDuplicatedMetric() {
++        EvaluationDataset dataset = new FixedEvaluationDataset(scenarios(10), List.of(metric(), metric()));
++
++        assertThatThrownBy(() -> new ValidEvaluationDataset(dataset).metrics())
++                .hasMessageContaining("지표 중복: Correctness");
++    }
++
++    @Test
++    @DisplayName("기준 데이터가 비어 있거나 허용 값이 아니면 모든 위반을 함께 알린다")
++    void reportsEveryViolation() {
++        List<EvaluationScenario> scenarios = scenarios(10);
++        scenarios.set(0, new EvaluationScenario(
++                2, "scenario0", List.of(CORRECTNESS), " ",
++                List.of(new ChatTurn(null, "안내")), List.of(new ExpectedToolCall("", null)), "", null));
++
++        assertThatThrownBy(() -> valid(scenarios).scenarios())
++                .hasMessageContaining("scenario0: 지원하지 않는 schemaVersion 2")
++                .hasMessageContaining("scenario0: userMessage는 비어 있을 수 없다")
++                .hasMessageContaining("scenario0: referenceAnswer는 비어 있을 수 없다")
++                .hasMessageContaining("scenario0: expectedRefusal이 없다")
++                .hasMessageContaining("scenario0: chatMemory 항목이 올바르지 않다")
++                .hasMessageContaining("scenario0: expectedToolCalls 항목이 올바르지 않다");
++    }
++
++    @Test
++    @DisplayName("허용되지 않은 대화 역할이나 거부 범위는 실패한다")
++    void rejectsUnknownLabels() {
++        List<EvaluationScenario> scenarios = scenarios(10);
++        scenarios.set(0, new EvaluationScenario(
++                1, "scenario0", List.of(CORRECTNESS), "질문 0",
++                List.of(new ChatTurn(new ChatRole("system"), "안내")), List.of(), "기준 답변",
++                new ExpectedRefusal("all")));
++
++        assertThatThrownBy(() -> valid(scenarios).scenarios())
++                .hasMessageContaining("scenario0: chatMemory 항목이 올바르지 않다")
++                .hasMessageContaining("scenario0: expectedRefusal은 none 또는 partial이어야 한다");
++    }
++
++    @Test
++    @DisplayName("지표 척도 값이 중복되거나 promptOrder가 규칙을 어기면 실패한다")
++    void rejectsInvalidMetric() {
++        MetricDefinition broken = new MetricDefinition(
++                CORRECTNESS, "정확한가", "사실 오류를 찾는다",
++                List.of(new ScaleLevel(1, "낮음"), new ScaleLevel(1, "높음")),
++                "높을수록 정확함", true, allInputs(), List.of(new PromptSection("input"), new PromptSection("role")),
++                "https://docs.aws.amazon.com");
++
++        assertThatThrownBy(() -> new ValidEvaluationDataset(new FixedEvaluationDataset(scenarios(10), List.of(broken))).metrics())
++                .hasMessageContaining("Correctness: 척도 값 중복 1")
++                .hasMessageContaining("Correctness: promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
++    }
++
++    @Test
++    @DisplayName("requiredInputs에 userMessage나 modelResponse가 없거나 알 수 없는 항목이 있으면 실패한다")
++    void rejectsInvalidRequiredInputs() {
++        MetricDefinition missing = metricWith(List.of(new EvaluationInput("chatMemory")));
++        MetricDefinition unknown = metricWith(List.of(
++                new EvaluationInput("userMessage"), new EvaluationInput("modelResponse"), new EvaluationInput("memo")));
++
++        assertThatThrownBy(() -> validMetrics(missing).metrics())
++                .hasMessageContaining("Correctness: requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
++        assertThatThrownBy(() -> validMetrics(unknown).metrics())
++                .hasMessageContaining("Correctness: requiredInputs에 알 수 없는 항목이 있다");
++    }
++
++    private ValidEvaluationDataset valid(List<EvaluationScenario> scenarios) {
++        return new ValidEvaluationDataset(new FixedEvaluationDataset(scenarios, List.of(metric())));
++    }
++
++    private ValidEvaluationDataset validMetrics(MetricDefinition metric) {
++        return new ValidEvaluationDataset(new FixedEvaluationDataset(scenarios(10), List.of(metric)));
++    }
++
++    private MetricDefinition metric() {
++        return metricWith(allInputs());
++    }
++
++    private MetricDefinition metricWith(List<EvaluationInput> inputs) {
++        return new MetricDefinition(
++                CORRECTNESS, "정확한가", "사실 오류를 찾는다",
++                List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(1, "충족")),
++                "높을수록 정확함", true, inputs, allSections(), "https://docs.aws.amazon.com");
++    }
++
++    private List<EvaluationInput> allInputs() {
++        return List.of(new EvaluationInput("chatMemory"), new EvaluationInput("userMessage"),
++                new EvaluationInput("modelResponse"), new EvaluationInput("observedToolResults"));
++    }
++
++    private List<PromptSection> allSections() {
++        return List.of(new PromptSection("role"), new PromptSection("task"), new PromptSection("rubric"),
++                new PromptSection("input"));
++    }
++
++    private List<EvaluationScenario> scenarios(int count) {
++        return new ArrayList<>(IntStream.range(0, count)
++                .mapToObj(i -> scenario("scenario" + i, List.of(CORRECTNESS), "질문 " + i))
++                .toList());
++    }
++
++    private EvaluationScenario scenario(String id, List<MetricType> metrics, String userMessage) {
++        return new EvaluationScenario(
++                1, id, metrics, userMessage, List.of(),
++                List.of(new ExpectedToolCall("findCatalog", Map.of())), "기준 답변", new ExpectedRefusal("none"));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
+index cfde3fecf39c77d772401b2ed3492130ade186ae..03edfb64c0c20770ba00006c415d1ceb86be966e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
+@@ -1,18 +1,18 @@
+ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
++import com.fasterxml.jackson.annotation.JsonCreator;
+ import com.fasterxml.jackson.annotation.JsonValue;
+ 
+-/** judge 프롬프트의 입력 데이터로 줄 수 있는 항목. JSON에서는 {@link #label()} 값으로 표기한다. */
+-public enum EvaluationInput {
+-
+-    CHAT_MEMORY("chatMemory"),
+-    USER_MESSAGE("userMessage"),
+-    MODEL_RESPONSE("modelResponse"),
+-    OBSERVED_TOOL_RESULTS("observedToolResults");
++/**
++ * judge 프롬프트의 입력 데이터로 줄 수 있는 항목. 쓸 수 있는 이름은 chatMemory, userMessage, modelResponse,
++ * observedToolResults이며, 지표 정의가 올바른지는 {@link MetricDefinition#violations()}가 확인한다.
++ */
++public final class EvaluationInput {
+ 
+     private final String label;
+ 
+-    EvaluationInput(String label) {
++    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
++    public EvaluationInput(String label) {
+         this.label = label;
+     }
+ 
+@@ -21,6 +21,10 @@ public enum EvaluationInput {
+         return label;
+     }
+ 
++    public boolean is(String name) {
++        return label.equals(name);
++    }
++
+     /** 문서 메타데이터의 종류 표기가 이 항목을 가리키는지 확인한다. */
+     public boolean matches(Object kind) {
+         return label.equals(kind);
+@@ -30,4 +34,19 @@ public enum EvaluationInput {
+     public String wrap(String text) {
+         return "<" + label + ">\n" + text + "\n</" + label + ">";
+     }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof EvaluationInput input && label.equals(input.label);
++    }
++
++    @Override
++    public int hashCode() {
++        return label.hashCode();
++    }
++
++    @Override
++    public String toString() {
++        return label;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricType.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricType.java
+index e79e989c3d72392fd03a514ada973bccd9cd562d..4cd71e15a3f5cfd99e36b9b2eee80fde4f4f7fdc 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricType.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricType.java
+@@ -1,30 +1,19 @@
+ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
++import com.fasterxml.jackson.annotation.JsonCreator;
+ import com.fasterxml.jackson.annotation.JsonValue;
+ 
+ /**
+- * AWS Bedrock 문서를 참고하여서 만든 평가 종류 11가지.
++ * AWS Bedrock 문서를 참고하여서 만든 평가 종류. 어떤 종류가 있는지는 {@code metrics/*.json} 파일이 정한다.
+  *
+  * @link : [AWS Bedrock 지표 정의](https://docs.aws.amazon.com/bedrock/latest/userguide/model-evaluation-metrics.html)
+  */
+-
+-public enum MetricType {
+-
+-    CORRECTNESS("Correctness"),
+-    COMPLETENESS("Completeness"),
+-    FAITHFULNESS("Faithfulness"),
+-    HELPFULNESS("Helpfulness"),
+-    COHERENCE("Coherence"),
+-    RELEVANCE("Relevance"),
+-    FOLLOWING_INSTRUCTIONS("FollowingInstructions"),
+-    PROFESSIONAL_STYLE_AND_TONE("ProfessionalStyleAndTone"),
+-    HARMFULNESS("Harmfulness"),
+-    STEREOTYPING("Stereotyping"),
+-    REFUSAL("Refusal");
++public final class MetricType {
+ 
+     private final String label;
+ 
+-    MetricType(String label) {
++    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
++    public MetricType(String label) {
+         this.label = label;
+     }
+ 
+@@ -32,4 +21,19 @@ public enum MetricType {
+     public String label() {
+         return label;
+     }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof MetricType type && label.equals(type.label);
++    }
++
++    @Override
++    public int hashCode() {
++        return label.hashCode();
++    }
++
++    @Override
++    public String toString() {
++        return label;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java
+index 8651a80a98f88a0c0acc5777278ba4d888819b9c..bdf67868fe53e4fc721e3dfa9ffce2cbb034b30f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java
+@@ -6,6 +6,7 @@ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Optional;
++import java.util.Set;
+ import java.util.stream.Collectors;
+ 
+ /** 프롬프트를 어떻게 배치하는지. 입력 데이터로 넣을 항목과 순서, 구역의 순서를 안다. */
+@@ -13,6 +14,9 @@ final class PromptLayout {
+ 
+     private static final String SECTION_SEPARATOR = "\n\n";
+     private static final String INPUT_SEPARATOR = "\n";
++    private static final Set<String> KNOWN_INPUTS =
++            Set.of("chatMemory", "userMessage", "modelResponse", "observedToolResults");
++    private static final Set<String> KNOWN_SECTIONS = Set.of("role", "task", "rubric", "input");
+ 
+     private final List<EvaluationInput> inputs;
+     private final List<PromptSection> order;
+@@ -33,16 +37,18 @@ final class PromptLayout {
+     List<String> violations() {
+         List<String> violations = new ArrayList<>();
+         if (inputs == null
+-                || !inputs.contains(EvaluationInput.USER_MESSAGE)
+-                || !inputs.contains(EvaluationInput.MODEL_RESPONSE)) {
++                || inputs.stream().noneMatch(input -> input.is("userMessage"))
++                || inputs.stream().noneMatch(input -> input.is("modelResponse"))) {
+             violations.add("requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
+         } else if (new HashSet<>(inputs).size() != inputs.size()) {
+             violations.add("requiredInputs에 같은 항목이 중복됐다");
++        } else if (inputs.stream().anyMatch(input -> !KNOWN_INPUTS.contains(input.label()))) {
++            violations.add("requiredInputs에 알 수 없는 항목이 있다 " + inputs);
+         }
+         if (order == null
+-                || order.size() != PromptSection.values().length
+-                || new HashSet<>(order).size() != order.size()
+-                || order.getLast() != PromptSection.INPUT) {
++                || order.size() != KNOWN_SECTIONS.size()
++                || !KNOWN_SECTIONS.equals(order.stream().map(PromptSection::label).collect(Collectors.toSet()))
++                || !order.getLast().is("input")) {
+             violations.add("promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
+         }
+         return violations;
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptSection.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptSection.java
+index ac19faacdee8f0cf9e586c186c0addef6b114051..e008805ab231211bd10fe0e39074cc01d53bfb12 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptSection.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptSection.java
+@@ -1,18 +1,18 @@
+ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
++import com.fasterxml.jackson.annotation.JsonCreator;
+ import com.fasterxml.jackson.annotation.JsonValue;
+ 
+-/** judge 프롬프트를 이루는 구역. 구역마다 {@code prompts/<label>.st} 템플릿 파일이 하나씩 있다. */
+-public enum PromptSection {
+-
+-    ROLE("role"),
+-    TASK("task"),
+-    RUBRIC("rubric"),
+-    INPUT("input");
++/**
++ * judge 프롬프트를 이루는 구역. 쓸 수 있는 이름은 role, task, rubric, input이며, 구역마다
++ * {@code prompts/<label>.st} 템플릿 파일이 하나씩 있다.
++ */
++public final class PromptSection {
+ 
+     private final String label;
+ 
+-    PromptSection(String label) {
++    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
++    public PromptSection(String label) {
+         this.label = label;
+     }
+ 
+@@ -20,4 +20,23 @@ public enum PromptSection {
+     public String label() {
+         return label;
+     }
++
++    public boolean is(String name) {
++        return label.equals(name);
++    }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof PromptSection section && label.equals(section.label);
++    }
++
++    @Override
++    public int hashCode() {
++        return label.hashCode();
++    }
++
++    @Override
++    public String toString() {
++        return label;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatRole.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatRole.java
+index c382396a7331deafc0749e6fad1df54a24a54041..42c7d4c79ed9a064b7de1debb5e9cb598ea44448 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatRole.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatRole.java
+@@ -1,12 +1,42 @@
+ package com.bibbidi.wedding.chat.evaluation.data.scenario;
+ 
+-import com.fasterxml.jackson.annotation.JsonProperty;
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonValue;
++import java.util.Set;
+ 
+-public enum ChatRole {
++/** 대화에서 말한 쪽. user 또는 assistant이다. */
++public final class ChatRole {
+ 
+-    @JsonProperty("user")
+-    USER,
++    private static final Set<String> KNOWN = Set.of("user", "assistant");
+ 
+-    @JsonProperty("assistant")
+-    ASSISTANT
++    private final String label;
++
++    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
++    public ChatRole(String label) {
++        this.label = label;
++    }
++
++    @JsonValue
++    public String label() {
++        return label;
++    }
++
++    boolean known() {
++        return KNOWN.contains(label);
++    }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof ChatRole role && label.equals(role.label);
++    }
++
++    @Override
++    public int hashCode() {
++        return label.hashCode();
++    }
++
++    @Override
++    public String toString() {
++        return label;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatTurn.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatTurn.java
+index e33c178136aaadf47ddb8cbc8bd70942c430b1ca..78ef6293ff8bdb0c6d6eb5ea98294d82678d35f7 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatTurn.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ChatTurn.java
+@@ -1,3 +1,37 @@
+ package com.bibbidi.wedding.chat.evaluation.data.scenario;
+ 
+-public record ChatTurn(ChatRole role, String content) {}
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonProperty;
++import java.util.Objects;
++
++/** 이전 대화의 한 마디. */
++public final class ChatTurn {
++
++    private final ChatRole role;
++    private final String content;
++
++    @JsonCreator
++    public ChatTurn(@JsonProperty("role") ChatRole role, @JsonProperty("content") String content) {
++        this.role = role;
++        this.content = content;
++    }
++
++    boolean valid() {
++        return role != null && role.known() && content != null && !content.isBlank();
++    }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof ChatTurn turn && Objects.equals(role, turn.role) && Objects.equals(content, turn.content);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hash(role, content);
++    }
++
++    @Override
++    public String toString() {
++        return role + ": " + content;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Conversation.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Conversation.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2fd76124a00d40aef633c51990038cf65c9b53a0
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Conversation.java
+@@ -0,0 +1,36 @@
++package com.bibbidi.wedding.chat.evaluation.data.scenario;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Objects;
++
++/** 챗봇에 다시 들려줄 대화. 이전 대화와 현재 사용자 메시지다. 이전 대화가 비어 있으면 새 대화다. */
++final class Conversation {
++
++    private final List<ChatTurn> memory;
++    private final String userMessage;
++
++    Conversation(List<ChatTurn> memory, String userMessage) {
++        this.memory = memory;
++        this.userMessage = userMessage;
++    }
++
++    boolean sameAs(Conversation other) {
++        return Objects.equals(userMessage, other.userMessage) && Objects.equals(memory, other.memory);
++    }
++
++    List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        if (userMessage == null || userMessage.isBlank()) {
++            violations.add("userMessage는 비어 있을 수 없다");
++        }
++        if (memory == null) {
++            violations.add("chatMemory는 빈 배열이라도 필요하다");
++        } else {
++            memory.stream()
++                    .filter(turn -> !turn.valid())
++                    .forEach(turn -> violations.add("chatMemory 항목이 올바르지 않다 " + turn));
++        }
++        return violations;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/EvaluationScenario.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/EvaluationScenario.java
+index 1d4c1868fe27f899f6454354449bbaf337de5962..0c71d5dbef896184ddd2fe875def10801cc86f2c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/EvaluationScenario.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/EvaluationScenario.java
+@@ -1,16 +1,94 @@
+ package com.bibbidi.wedding.chat.evaluation.data.scenario;
+ 
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonProperty;
++import java.util.ArrayList;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Set;
++import java.util.stream.Stream;
+ 
+-public record EvaluationScenario(
+-        int schemaVersion,
+-        String id,
+-        List<MetricType> metrics,
+-        String userMessage,
+-        List<ChatTurn> chatMemory,
+-        List<ExpectedToolCall> expectedToolCalls,
+-        String referenceAnswer,
+-        ExpectedRefusal expectedRefusal
+-) {
++/**
++ * 평가 시나리오 하나. {@code scenarios/*.json} 파일 하나와 대응한다.
++ *
++ * <p>JSON의 평평한 필드를 식별({@link ScenarioIdentity}), 대화({@link Conversation}), 기대({@link Expectation})
++ * 세 객체로 나눠 맡긴다. 밖에서는 필드를 꺼내 가지 않고 이 객체에 묻는다.
++ */
++public final class EvaluationScenario {
++
++    private final ScenarioIdentity identity;
++    private final List<MetricType> metrics;
++    private final Conversation conversation;
++    private final Expectation expectation;
++
++    /**
++     * @param schemaVersion     파일이 따르는 형식의 버전
++     * @param id                시나리오 이름
++     * @param metrics           이 시나리오에 적용할 지표 종류
++     * @param userMessage       현재 사용자 메시지
++     * @param chatMemory        이전 대화. 비어 있으면 새 대화다
++     * @param expectedToolCalls 기대하는 도구 호출
++     * @param referenceAnswer   답변의 사실관계와 범위를 판단할 기준
++     * @param expectedRefusal   기대하는 거부의 범위 (none 또는 partial)
++     */
++    @JsonCreator
++    public EvaluationScenario(
++            @JsonProperty("schemaVersion") int schemaVersion,
++            @JsonProperty("id") String id,
++            @JsonProperty("metrics") List<MetricType> metrics,
++            @JsonProperty("userMessage") String userMessage,
++            @JsonProperty("chatMemory") List<ChatTurn> chatMemory,
++            @JsonProperty("expectedToolCalls") List<ExpectedToolCall> expectedToolCalls,
++            @JsonProperty("referenceAnswer") String referenceAnswer,
++            @JsonProperty("expectedRefusal") ExpectedRefusal expectedRefusal) {
++        this(
++                new ScenarioIdentity(id, schemaVersion),
++                metrics,
++                new Conversation(chatMemory, userMessage),
++                new Expectation(expectedToolCalls, referenceAnswer, expectedRefusal));
++    }
++
++    private EvaluationScenario(
++            ScenarioIdentity identity, List<MetricType> metrics, Conversation conversation, Expectation expectation) {
++        this.identity = identity;
++        this.metrics = metrics;
++        this.conversation = conversation;
++        this.expectation = expectation;
++    }
++
++    public String id() {
++        return identity.id();
++    }
++
++    public boolean assignedTo(MetricType metricType) {
++        return metrics != null && metrics.contains(metricType);
++    }
++
++    public boolean sameInputAs(EvaluationScenario other) {
++        return conversation.sameAs(other.conversation);
++    }
++
++    /** 시나리오가 규칙에 맞는지 확인하고, 어긴 내용을 시나리오 이름을 붙여 알린다. {@code defined}는 정의가 있는 지표 종류다. */
++    public List<String> violations(Set<MetricType> defined) {
++        return Stream.of(identity.violations(), conversation.violations(), expectation.violations(), metricViolations(defined))
++                .flatMap(List::stream)
++                .map(violation -> identity.name() + ": " + violation)
++                .toList();
++    }
++
++    private List<String> metricViolations(Set<MetricType> defined) {
++        List<String> violations = new ArrayList<>();
++        if (metrics == null || metrics.isEmpty()) {
++            violations.add("적용 지표가 없다");
++            return violations;
++        }
++        if (new HashSet<>(metrics).size() != metrics.size()) {
++            violations.add("같은 지표가 중복 지정됐다");
++        }
++        metrics.stream()
++                .filter(metric -> !defined.contains(metric))
++                .forEach(metric -> violations.add("정의되지 않은 지표 " + metric.label()));
++        return violations;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Expectation.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Expectation.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..81d5c622de59642b8aa582e0d7be3e2fddc9d0d8
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/Expectation.java
+@@ -0,0 +1,38 @@
++package com.bibbidi.wedding.chat.evaluation.data.scenario;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** 챗봇에게 기대하는 것. 도구 호출, 답변의 기준, 거부의 범위다. */
++final class Expectation {
++
++    private final List<ExpectedToolCall> toolCalls;
++    private final String referenceAnswer;
++    private final ExpectedRefusal refusal;
++
++    Expectation(List<ExpectedToolCall> toolCalls, String referenceAnswer, ExpectedRefusal refusal) {
++        this.toolCalls = toolCalls;
++        this.referenceAnswer = referenceAnswer;
++        this.refusal = refusal;
++    }
++
++    List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        if (referenceAnswer == null || referenceAnswer.isBlank()) {
++            violations.add("referenceAnswer는 비어 있을 수 없다");
++        }
++        if (toolCalls == null) {
++            violations.add("expectedToolCalls는 빈 배열이라도 필요하다");
++        } else {
++            toolCalls.stream()
++                    .filter(call -> !call.valid())
++                    .forEach(call -> violations.add("expectedToolCalls 항목이 올바르지 않다 " + call));
++        }
++        if (refusal == null) {
++            violations.add("expectedRefusal이 없다");
++        } else if (!refusal.known()) {
++            violations.add("expectedRefusal은 none 또는 partial이어야 한다");
++        }
++        return violations;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedRefusal.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedRefusal.java
+index 7bc056681465568ab69ca84d9d5e265e21e02725..5c6aa6d4385ec2941322999559a0b878702e4e81 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedRefusal.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedRefusal.java
+@@ -1,13 +1,42 @@
+ package com.bibbidi.wedding.chat.evaluation.data.scenario;
+ 
+-import com.fasterxml.jackson.annotation.JsonProperty;
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonValue;
++import java.util.Set;
+ 
+-/** 시나리오가 기대하는 거부의 범위. 지표 Refusal의 점수를 해석할 때 쓴다. */
+-public enum ExpectedRefusal {
++/** 시나리오가 기대하는 거부의 범위. none 또는 partial이며, 지표 Refusal의 점수를 해석할 때 쓴다. */
++public final class ExpectedRefusal {
+ 
+-    @JsonProperty("none")
+-    NONE,
++    private static final Set<String> KNOWN = Set.of("none", "partial");
+ 
+-    @JsonProperty("partial")
+-    PARTIAL
++    private final String label;
++
++    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
++    public ExpectedRefusal(String label) {
++        this.label = label;
++    }
++
++    @JsonValue
++    public String label() {
++        return label;
++    }
++
++    boolean known() {
++        return KNOWN.contains(label);
++    }
++
++    @Override
++    public boolean equals(Object other) {
++        return other instanceof ExpectedRefusal refusal && label.equals(refusal.label);
++    }
++
++    @Override
++    public int hashCode() {
++        return label.hashCode();
++    }
++
++    @Override
++    public String toString() {
++        return label;
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedToolCall.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedToolCall.java
+index 2e70a55a2c8f921e671b8e0fe28c9b46610c6230..d04a88c976d286a2ffb445ad1478cc7adcc23cdb 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedToolCall.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ExpectedToolCall.java
+@@ -1,5 +1,27 @@
+ package com.bibbidi.wedding.chat.evaluation.data.scenario;
+ 
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonProperty;
+ import java.util.Map;
+ 
+-public record ExpectedToolCall(String name, Map<String, Object> arguments) {}
++/** 챗봇이 호출하기를 기대하는 도구 하나. */
++public final class ExpectedToolCall {
++
++    private final String name;
++    private final Map<String, Object> arguments;
++
++    @JsonCreator
++    public ExpectedToolCall(@JsonProperty("name") String name, @JsonProperty("arguments") Map<String, Object> arguments) {
++        this.name = name;
++        this.arguments = arguments;
++    }
++
++    boolean valid() {
++        return name != null && !name.isBlank() && arguments != null;
++    }
++
++    @Override
++    public String toString() {
++        return name + arguments;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ScenarioIdentity.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ScenarioIdentity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e4744ba136a46a0a1e83ebf7ca9b0e94ecd1e9f3
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/scenario/ScenarioIdentity.java
+@@ -0,0 +1,39 @@
++package com.bibbidi.wedding.chat.evaluation.data.scenario;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** 시나리오를 구분하는 이름과, 파일이 따르는 형식의 버전. */
++final class ScenarioIdentity {
++
++    private static final int SUPPORTED_SCHEMA_VERSION = 1;
++    private static final String UNNAMED = "시나리오";
++
++    private final String id;
++    private final int schemaVersion;
++
++    ScenarioIdentity(String id, int schemaVersion) {
++        this.id = id;
++        this.schemaVersion = schemaVersion;
++    }
++
++    String id() {
++        return id;
++    }
++
++    /** 메시지에 붙일 이름. id가 없으면 일반 이름을 쓴다. */
++    String name() {
++        return id == null || id.isBlank() ? UNNAMED : id;
++    }
++
++    List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        if (id == null || id.isBlank()) {
++            violations.add("id가 비어 있다");
++        }
++        if (schemaVersion != SUPPORTED_SCHEMA_VERSION) {
++            violations.add("지원하지 않는 schemaVersion " + schemaVersion);
++        }
++        return violations;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+index c520569e977dde892ea0f83efa4b4c2507ffe1cc..6c5aa59e9c0dcd0b791a954499c5bf7019f83bf3 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+@@ -2,11 +2,9 @@ package com.bibbidi.wedding.chat.evaluation.evaluator;
+ 
+ import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
+-import java.util.Arrays;
+ import java.util.Map;
+ import java.util.Optional;
+-import java.util.function.Function;
++import java.util.concurrent.ConcurrentHashMap;
+ import java.util.stream.Collectors;
+ import org.springframework.ai.chat.prompt.PromptTemplate;
+ import org.springframework.ai.document.Document;
+@@ -29,14 +27,7 @@ public class MetricEvaluator implements Evaluator {
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+ 
+     /** 구역마다 {@code prompts/<label>.st}를 읽는다. 출력 형식의 JSON 중괄호와 겹치지 않도록 변수 구분자로 {@code <}, {@code >}를 쓴다. */
+-    private static final Map<PromptSection, PromptTemplate> TEMPLATES = Arrays.stream(PromptSection.values())
+-            .collect(Collectors.toMap(Function.identity(), section -> PromptTemplate.builder()
+-                    .resource(new ClassPathResource("ai-evaluation/prompts/" + section.label() + ".st"))
+-                    .renderer(StTemplateRenderer.builder()
+-                            .startDelimiterToken('<')
+-                            .endDelimiterToken('>')
+-                            .build())
+-                    .build()));
++    private static final Map<String, PromptTemplate> TEMPLATES = new ConcurrentHashMap<>();
+ 
+     private final MetricDefinition metric;
+     private final JudgeAdapter judge;
+@@ -55,17 +46,27 @@ public class MetricEvaluator implements Evaluator {
+ 
+     String prompt(EvaluationRequest request) {
+         return metric.prompt(
+-                (section, variables) -> TEMPLATES.get(section).render(variables), input -> text(input, request));
++                (section, variables) -> template(section.label()).render(variables), input -> text(input, request));
++    }
++
++    private PromptTemplate template(String section) {
++        return TEMPLATES.computeIfAbsent(section, label -> PromptTemplate.builder()
++                .resource(new ClassPathResource("ai-evaluation/prompts/" + label + ".st"))
++                .renderer(StTemplateRenderer.builder()
++                        .startDelimiterToken('<')
++                        .endDelimiterToken('>')
++                        .build())
++                .build());
+     }
+ 
+     private Optional<String> text(EvaluationInput input, EvaluationRequest request) {
+-        String text = switch (input) {
+-            case USER_MESSAGE -> request.getUserText();
+-            case MODEL_RESPONSE -> request.getResponseContent();
+-            case CHAT_MEMORY, OBSERVED_TOOL_RESULTS -> documents(input, request);
++        String text = switch (input.label()) {
++            case "userMessage" -> request.getUserText();
++            case "modelResponse" -> request.getResponseContent();
++            default -> documents(input, request);
+         };
+         if (text == null || text.isBlank()) {
+-            if (input == EvaluationInput.USER_MESSAGE || input == EvaluationInput.MODEL_RESPONSE) {
++            if (input.is("userMessage") || input.is("modelResponse")) {
+                 throw new IllegalArgumentException(metric.metricType().label() + ": " + input.label() + "이 비어 있습니다");
+             }
+             // 새 대화이거나 도구를 호출하지 않았다면 해당 입력이 없는 것이 정상이다. 없는 데이터를 있는 것처럼 만들지 않는다.
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+index 509c1cfe8d9f5f4993be27fb50ce07c45277a382..6e3df48d8bd3dee1e9a65d7414e0567869ff2b5a 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.evaluation.evaluator;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+-import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
++import com.bibbidi.wedding.chat.evaluation.data.FileEvaluationDataset;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+@@ -23,12 +23,14 @@ import org.springframework.ai.evaluation.EvaluationResponse;
+ 
+ class MetricEvaluatorTest {
+ 
+-    private static final List<MetricDefinition> METRICS = new EvaluationDataLoader().load().metrics();
+-    private static final MetricDefinition CORRECTNESS = metric(MetricType.CORRECTNESS);
+-    private static final List<EvaluationInput> ALL_INPUTS = List.of(EvaluationInput.CHAT_MEMORY,
+-            EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE, EvaluationInput.OBSERVED_TOOL_RESULTS);
++    private static final List<MetricDefinition> METRICS = new FileEvaluationDataset().metrics();
++    private static final MetricDefinition CORRECTNESS = metric(new MetricType("Correctness"));
++    private static final List<EvaluationInput> ALL_INPUTS = List.of(new EvaluationInput("chatMemory"),
++            new EvaluationInput("userMessage"), new EvaluationInput("modelResponse"),
++            new EvaluationInput("observedToolResults"));
+     private static final List<PromptSection> ALL_SECTIONS =
+-            List.of(PromptSection.ROLE, PromptSection.TASK, PromptSection.RUBRIC, PromptSection.INPUT);
++            List.of(new PromptSection("role"), new PromptSection("task"), new PromptSection("rubric"),
++                    new PromptSection("input"));
+ 
+     private final EvaluationRequest request = new EvaluationRequest(
+             "스튜디오 촬영 준비 항목을 추천해 줘.",
+@@ -105,7 +107,7 @@ class MetricEvaluatorTest {
+     @Test
+     @DisplayName("requiredInputs에 없는 항목은 요청에 있어도 프롬프트에 넣지 않고, 있는 항목은 적힌 순서로 넣는다")
+     void usesRequiredInputsOnly() {
+-        MetricDefinition narrowed = withInputs(List.of(EvaluationInput.MODEL_RESPONSE, EvaluationInput.USER_MESSAGE));
++        MetricDefinition narrowed = withInputs(List.of(new EvaluationInput("modelResponse"), new EvaluationInput("userMessage")));
+ 
+         String prompt = capturePrompt(narrowed);
+ 
+@@ -145,7 +147,8 @@ class MetricEvaluatorTest {
+     @DisplayName("promptOrder대로 프롬프트 구역을 배치한다")
+     void followsPromptOrder() {
+         MetricDefinition reordered = correctness(
+-                ALL_INPUTS, List.of(PromptSection.TASK, PromptSection.ROLE, PromptSection.RUBRIC, PromptSection.INPUT));
++                ALL_INPUTS, List.of(new PromptSection("task"), new PromptSection("role"), new PromptSection("rubric"),
++                        new PromptSection("input")));
+ 
+         String prompt = capturePrompt(reordered);
+ 
+@@ -168,7 +171,7 @@ class MetricEvaluatorTest {
+ 
+     private static MetricDefinition correctness(List<EvaluationInput> inputs, List<PromptSection> order) {
+         return new MetricDefinition(
+-                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
++                new MetricType("Correctness"), "정확한가", "사실 오류를 찾는다",
+                 List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(4, "충족")),
+                 "높을수록 정확함", true, inputs, order, "https://docs.aws.amazon.com");
+     }
+@@ -178,7 +181,7 @@ class MetricEvaluatorTest {
+     }
+ 
+     private static MetricDefinition metric(MetricType metricType) {
+-        return METRICS.stream().filter(metric -> metric.metricType() == metricType).findFirst().orElseThrow();
++        return METRICS.stream().filter(metric -> metric.metricType().equals(metricType)).findFirst().orElseThrow();
+     }
+ 
+     private String json(String metricType, boolean pass, int score, String feedback) {

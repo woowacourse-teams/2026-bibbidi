@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@Sql("/terms-fixture.sql")
+@Sql("/fixtures/terms-fixture.sql")
 class TermsServiceIntegrationTest {
 
     private static final Long REQUIRED_SERVICE_TERMS_ID = 1L;

@@ -1,0 +1,17 @@
+{
+  "name": "scenario13",
+  "metrics": [
+    "Faithfulness",
+    "Correctness"
+  ],
+  "userMessage": "웨딩홀 투어를 다음 주까지 반드시 끝내야 한다는 근거가 있나요? 카탈로그에서 지금 추천할 항목도 알려 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "카탈로그가 정확한 마감일을 제공하지 않음을 밝히고 '웨딩홀 투어'를 추천한다.",
+  "expectedRefusal": "partial"
+}

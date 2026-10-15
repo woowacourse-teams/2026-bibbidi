@@ -1,0 +1,164 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+index b39069a55f721e5fab8f5c0794aad110bed06cdd..847943ef4d557601a549a2051ece53a8147fc829 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluator.java
+@@ -2,14 +2,21 @@ package com.bibbidi.wedding.chat.evaluation;
+ 
+ import com.bibbidi.wedding.chat.evaluation.data.EvaluationScenario;
+ import com.bibbidi.wedding.chat.evaluation.data.MetricInformation;
++import java.util.Map;
+ import java.util.stream.Collectors;
++import org.springframework.ai.chat.prompt.Prompt;
++import org.springframework.ai.chat.prompt.PromptTemplate;
+ import org.springframework.ai.document.Document;
+ import org.springframework.ai.evaluation.EvaluationRequest;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+ import org.springframework.ai.evaluation.Evaluator;
++import org.springframework.core.io.ClassPathResource;
+ 
+ public class BibbidiEvaluator implements Evaluator {
+ 
++    private static final PromptTemplate PROMPT_TEMPLATE = new PromptTemplate(
++            new ClassPathResource("ai-evaluation/prompt/BibbidiEvaluator.st"));
++
+     private final MetricInformation metric;
+     private final EvaluationScenario scenario;
+     private final BibbidiJudge judge;
+@@ -22,25 +29,23 @@ public class BibbidiEvaluator implements Evaluator {
+ 
+     @Override
+     public EvaluationResponse evaluate(EvaluationRequest request) {
+-        StringBuilder prompt = new StringBuilder()
+-                .append(metric.role()).append("\n\n")
+-                .append(metric.task()).append("\n\n")
+-                .append(metric.rubric()).append("\n")
+-                .append("점수 척도 (").append(metric.direction()).append("):\n");
+-
+-        for (MetricInformation.ScoreLevel level : metric.scale()) {
+-            prompt.append(level.value()).append(": ").append(level.definition()).append("\n");
+-        }
+-
+-        prompt.append("\n시나리오 이름: ").append(scenario.name()).append("\n")
+-                .append("지표: ").append(metric.metricType()).append("\n")
+-                .append("JSON으로 시나리오 이름, 지표, 척도에 포함된 점수, 짧은 판정 이유를 반환한다.\n\n")
+-                .append("입력 데이터:\n");
+-        for (String input : metric.requiredInputs()) {
+-            prompt.append(input).append(":\n").append(inputValue(input, request)).append("\n\n");
+-        }
+-
+-        return judge.evaluate(prompt.toString());
++        String scale = metric.scale().stream()
++                .map(level -> level.value() + ": " + level.definition())
++                .collect(Collectors.joining("\n"));
++        String inputs = metric.requiredInputs().stream()
++                .map(input -> input + ":\n" + inputValue(input, request))
++                .collect(Collectors.joining("\n\n"));
++        Prompt prompt = PROMPT_TEMPLATE.create(Map.of(
++                "role", metric.role(),
++                "task", metric.task(),
++                "rubric", metric.rubric(),
++                "direction", metric.direction(),
++                "scale", scale,
++                "scenarioName", scenario.name(),
++                "metricType", metric.metricType(),
++                "inputs", inputs));
++
++        return judge.evaluate(prompt);
+     }
+ 
+     private String inputValue(String input, EvaluationRequest request) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..dafa3f9eb3b10fa674c3cac00f639b9c642da4d7
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiEvaluatorTest.java
+@@ -0,0 +1,41 @@
++package com.bibbidi.wedding.chat.evaluation;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
++import java.io.IOException;
++import java.util.List;
++import java.util.Map;
++import java.util.concurrent.atomic.AtomicReference;
++import org.junit.jupiter.api.Test;
++import org.springframework.ai.chat.prompt.Prompt;
++import org.springframework.ai.document.Document;
++import org.springframework.ai.evaluation.EvaluationRequest;
++import org.springframework.ai.evaluation.EvaluationResponse;
++
++class BibbidiEvaluatorTest {
++
++    @Test
++    void rendersResourceTemplateAsPromptForJudge() throws IOException {
++        EvaluationDataLoader loader = new EvaluationDataLoader();
++        var metric = loader.loadMetrics().stream()
++                .filter(candidate -> candidate.metricType().equals("Correctness"))
++                .findFirst().orElseThrow();
++        var scenario = loader.loadScenarios().getFirst();
++        AtomicReference<Prompt> capturedPrompt = new AtomicReference<>();
++        EvaluationResponse judgeResponse = new EvaluationResponse(false, "test", Map.of());
++        BibbidiEvaluator evaluator = new BibbidiEvaluator(metric, scenario, prompt -> {
++            capturedPrompt.set(prompt);
++            return judgeResponse;
++        });
++
++        EvaluationResponse response = evaluator.evaluate(new EvaluationRequest(
++                "질문", List.of(new Document("실제 조회 결과")), "모델 답변"));
++
++        assertThat(response).isSameAs(judgeResponse);
++        String content = capturedPrompt.get().getContents();
++        assertThat(content).contains(metric.role(), metric.task(), metric.rubric(), "실제 조회 결과", "질문", "모델 답변")
++                .doesNotContain("{role}", "{inputs}");
++        assertThat(content.indexOf(metric.role())).isLessThan(content.indexOf("입력 데이터:"));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
+index 141bdaeadbc125097e03d873d475283f1993df16..5afba8ecec0e0e3fc87322a90f4747904869390e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/BibbidiJudge.java
+@@ -1,9 +1,10 @@
+ package com.bibbidi.wedding.chat.evaluation;
+ 
++import org.springframework.ai.chat.prompt.Prompt;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+ 
+ @FunctionalInterface
+ public interface BibbidiJudge {
+ 
+-    EvaluationResponse evaluate(String prompt);
++    EvaluationResponse evaluate(Prompt prompt);
+ }
+diff --git a/BE/src/test/resources/ai-evaluation/README.md b/BE/src/test/resources/ai-evaluation/README.md
+index 8048e1403d0da5c81bc1a4a70ddb1536935427f5..d4a1dbfa694c63b7036ec0e9e77280aee36e9ef2 100644
+--- a/BE/src/test/resources/ai-evaluation/README.md
++++ b/BE/src/test/resources/ai-evaluation/README.md
+@@ -4,6 +4,7 @@ Issue #427의 현재 평가 범위는 사용자 상황에 맞는 결혼 준비 *
+ 
+ - `scenarios/scenario01.json`~`scenario55.json`: 시나리오별 대화 입력, 기대 도구 호출, 답변 기준. 11개 지표에 각각 10개씩 연결한다.
+ - `metrics/*.json`: AWS Bedrock 지표 이름을 바탕으로 작성한 비비디 채점 기준. 점수는 초기에는 기록 전용이다.
++- `prompt/BibbidiEvaluator.st`: 지표 설정과 시나리오 입력을 조합하는 평가 프롬프트 템플릿이다.
+ - `fixedTestUser.sql`: 이전 시나리오의 사용자 fixture다. 현재 55개 추천 시나리오는 개인 체크리스트를 조회하지 않으므로 이 파일을 사용하지 않는다.
+ 
+ ## 재생 기준
+diff --git a/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st b/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7948f970a0c6dffdb6888dd81c1474e5463926b
+--- /dev/null
++++ b/BE/src/test/resources/ai-evaluation/prompt/BibbidiEvaluator.st
+@@ -0,0 +1,14 @@
++{role}
++
++{task}
++
++{rubric}
++점수 척도 ({direction}):
++{scale}
++
++시나리오 이름: {scenarioName}
++지표: {metricType}
++JSON으로 시나리오 이름, 지표, 척도에 포함된 점수, 짧은 판정 이유를 반환한다.
++
++입력 데이터:
++{inputs}

@@ -1,0 +1,17 @@
+{
+  "name": "scenario16",
+  "metrics": [
+    "Helpfulness",
+    "Relevance"
+  ],
+  "userMessage": "결혼 준비를 막 시작해서 무엇부터 해야 할지 모르겠어요. 우선순위가 높은 항목 세 개를 이유와 함께 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'총예산 수립', '예식 희망 날짜 범위 결정', '예식 지역 결정'을 시작점으로 추천하고 순서의 이유를 짧게 설명한다.",
+  "expectedRefusal": "none"
+}

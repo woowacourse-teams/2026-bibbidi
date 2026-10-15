@@ -33,7 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
-@Sql("/checklist-fixture.sql")
+@Sql("/fixtures/checklist-fixture.sql")
 class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
@@ -97,7 +97,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/appointment-fixture.sql")
+    @Sql("/fixtures/appointment-fixture.sql")
     @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, source_catalog_item_id, title, status, created_at, updated_at) VALUES (2, 1, 1, NULL, '청첩장 제작', 'CONTINUE', '2026-08-01 09:10:11', CURRENT_TIMESTAMP), (3, 1, 1, NULL, '피팅 예약', 'DONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     @Sql(statements = "INSERT INTO appointments (id, checklist_item_id, title, appointment_date, start_time, end_time, place, memo, is_done, done_by_checklist_item, created_at, updated_at) VALUES (100, 1, 'appointment', '2026-09-10', '2026-09-10 10:00:00', '2026-09-10 11:00:00', 'place', 'memo', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
     @DisplayName("로그인한 사용자의 할 일을 상태와 일정과 함께 조회한다")
@@ -235,7 +235,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("일정이 없는 할 일을 준비 목록에서 담은 할 일과 직접 만든 할 일 구분 없이 조회한다")
     void shouldFindUnscheduledItems() throws Exception {
         // given
@@ -284,7 +284,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("일정이 필요한 할 일을 limit 개수만큼만 조회한다")
     void shouldFindUnscheduledItemsUpToLimit() throws Exception {
         // given
@@ -352,7 +352,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-recommendation-fixture.sql")
+    @Sql("/fixtures/checklist-recommendation-fixture.sql")
     @DisplayName("담은 준비 항목의 가장 높은 단계까지 아직 담지 않은 준비 항목을 추천한다")
     void shouldFindRecommendedCatalogItems() throws Exception {
         // given
@@ -547,7 +547,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("선택한 준비 항목을 자신의 체크리스트에 할 일로 추가한다")
     void shouldAddSelectedCatalogItemsToOwnChecklist() throws Exception {
         // when, then
@@ -588,7 +588,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("이미 담은 준비 항목이 포함되면 요청 전체를 거절한다")
     void shouldRejectWhenCatalogItemAlreadyAdded() throws Exception {
         // given
@@ -631,7 +631,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("준비 목록에 없는 항목이 포함되면 요청 전체를 거절한다")
     void shouldRejectWhenCatalogItemDoesNotExist() throws Exception {
         // when, then
@@ -680,7 +680,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("준비 목록에 없는 할 일을 자신의 체크리스트에 직접 추가한다")
     void shouldWriteCustomItemToOwnChecklist() throws Exception {
         // when, then
@@ -727,7 +727,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("직접 만든 할 일은 제목이 같아도 여러 번 추가할 수 있다")
     void shouldAllowDuplicateTitleForCustomItems() throws Exception {
         // given
@@ -749,7 +749,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("준비 목록에 없는 카테고리로는 직접 할 일을 만들 수 없다")
     void shouldRejectWriteWhenCategoryDoesNotExist() throws Exception {
         // when, then
@@ -787,7 +787,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("공백만 있는 제목은 저장하지 않는다")
     void shouldRejectBlankTitle() throws Exception {
         // when, then
@@ -802,7 +802,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
-    @Sql("/checklist-catalog-fixture.sql")
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
     @DisplayName("50자를 넘는 제목은 저장하지 않는다")
     void shouldRejectTooLongTitle() throws Exception {
         // when, then

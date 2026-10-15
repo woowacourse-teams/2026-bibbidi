@@ -1,0 +1,101 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+index c3037b77495e8f34ecafcd19945a1e709d546aa1..ec70dd76375b74b447917990a05b8bc2a14f10fc 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+@@ -5,10 +5,13 @@ import com.bibbidi.wedding.chat.evaluation.data.ScaleLevel;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.stream.Collectors;
++import org.springframework.ai.chat.prompt.PromptTemplate;
+ import org.springframework.ai.document.Document;
+ import org.springframework.ai.evaluation.EvaluationRequest;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+ import org.springframework.ai.evaluation.Evaluator;
++import org.springframework.ai.template.st.StTemplateRenderer;
++import org.springframework.core.io.ClassPathResource;
+ import tools.jackson.databind.JsonNode;
+ import tools.jackson.databind.json.JsonMapper;
+ 
+@@ -22,6 +25,15 @@ public class MetricEvaluator implements Evaluator {
+ 
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+ 
++    /** 출력 형식의 JSON 중괄호와 겹치지 않도록 변수 구분자로 {@code <}, {@code >}를 쓴다. */
++    private static final PromptTemplate PROMPT_TEMPLATE = PromptTemplate.builder()
++            .resource(new ClassPathResource("ai-evaluation/prompts/metric-judge.st"))
++            .renderer(StTemplateRenderer.builder()
++                    .startDelimiterToken('<')
++                    .endDelimiterToken('>')
++                    .build())
++            .build();
++
+     private final MetricDefinition metric;
+     private final JudgeAdapter judge;
+ 
+@@ -41,25 +53,13 @@ public class MetricEvaluator implements Evaluator {
+         String scale = metric.scale().stream()
+                 .map(level -> level.value() + ": " + level.definition())
+                 .collect(Collectors.joining("\n"));
+-        return """
+-                당신은 결혼 준비 챗봇의 답변을 평가하는 평가자입니다.
+-
+-                [평가 작업]
+-                %s
+-
+-                [판정 기준]
+-                %s
+-
+-                [척도] (%s)
+-                %s
+-
+-                [출력 형식]
+-                JSON 객체 하나만 출력합니다. {"metricId": "%s", "pass": <true 또는 false>, "score": <척도의 정수 값>, "feedback": "<짧은 판정 이유>"}
+-
+-                [입력 데이터]
+-                %s
+-                """
+-                .formatted(metric.task(), metric.rubric(), metric.direction(), scale, metric.id(), input(request));
++        return PROMPT_TEMPLATE.render(Map.of(
++                "task", metric.task(),
++                "rubric", metric.rubric(),
++                "direction", metric.direction(),
++                "scale", scale,
++                "metricId", metric.id(),
++                "input", input(request)));
+     }
+ 
+     private String input(EvaluationRequest request) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+index 1d2aa1729c467e9711e11f300276b6e1cd7f034e..95ff50cc4a093691c8a4235f2f89eb17905df0b2 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+@@ -56,6 +56,7 @@ class MetricEvaluatorTest {
+         String prompt = captured.toString();
+         assertThat(prompt.indexOf("[평가 작업]")).isLessThan(prompt.indexOf("[판정 기준]"));
+         assertThat(prompt.indexOf("[판정 기준]")).isLessThan(prompt.indexOf("[입력 데이터]"));
++        assertThat(prompt).contains("{\"metricId\": \"Correctness\", \"pass\": true 또는 false");
+         assertThat(prompt).contains("<observedToolResults>").contains("<modelResponse>");
+         assertThat(prompt.indexOf("<userMessage>")).isGreaterThan(prompt.indexOf("[입력 데이터]"));
+     }
+diff --git a/BE/src/test/resources/ai-evaluation/prompts/metric-judge.st b/BE/src/test/resources/ai-evaluation/prompts/metric-judge.st
+new file mode 100644
+index 0000000000000000000000000000000000000000..906939959dd6fc73388f0f3ba11e7e116ea10dd8
+--- /dev/null
++++ b/BE/src/test/resources/ai-evaluation/prompts/metric-judge.st
+@@ -0,0 +1,16 @@
++당신은 결혼 준비 챗봇의 답변을 평가하는 평가자입니다.
++
++[평가 작업]
++<task>
++
++[판정 기준]
++<rubric>
++
++[척도] (<direction>)
++<scale>
++
++[출력 형식]
++JSON 객체 하나만 출력합니다. {"metricId": "<metricId>", "pass": true 또는 false, "score": 척도의 정수 값, "feedback": "짧은 판정 이유"}
++
++[입력 데이터]
++<input>

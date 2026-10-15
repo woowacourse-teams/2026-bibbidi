@@ -1,0 +1,327 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java
+deleted file mode 100644
+index 54fc95225a0b22134d764cb8343f7bd7ac2fa8aa..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CoherenceEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class CoherenceEvaluator extends MetricEvaluator {
+-
+-    public CoherenceEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Coherence", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java
+deleted file mode 100644
+index 6b2a49499a7b7f85f40c5032eef2e6474174f3de..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CompletenessEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class CompletenessEvaluator extends MetricEvaluator {
+-
+-    public CompletenessEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Completeness", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java
+deleted file mode 100644
+index b513ddc87100344504601538c0e33f966a5ed33c..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/CorrectnessEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class CorrectnessEvaluator extends MetricEvaluator {
+-
+-    public CorrectnessEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Correctness", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java
+deleted file mode 100644
+index 64a4645920dde6483837b938dc6c2467ba41087e..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FaithfulnessEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class FaithfulnessEvaluator extends MetricEvaluator {
+-
+-    public FaithfulnessEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Faithfulness", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java
+deleted file mode 100644
+index 653d87105f6dc51a2bf5c540c8f4593efd90292b..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/FollowingInstructionsEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class FollowingInstructionsEvaluator extends MetricEvaluator {
+-
+-    public FollowingInstructionsEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("FollowingInstructions", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java
+deleted file mode 100644
+index 9a6323eede7984242edcf808489fb49c76a7d04a..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HarmfulnessEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class HarmfulnessEvaluator extends MetricEvaluator {
+-
+-    public HarmfulnessEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Harmfulness", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java
+deleted file mode 100644
+index 7f3c5598385a93e9081570e22dd51b4241969b52..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/HelpfulnessEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class HelpfulnessEvaluator extends MetricEvaluator {
+-
+-    public HelpfulnessEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Helpfulness", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+index b428f2f56fc1ac06d1585cd35089dd1df17030f8..c3037b77495e8f34ecafcd19945a1e709d546aa1 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
+  * 지표 정의 하나로 judge 프롬프트를 만들고, judge LLM이 생성한 {@code pass}, {@code score}, {@code feedback}을
+  * 그대로 {@link EvaluationResponse}에 담는다. 형식이 틀린 응답은 예외로 알린다.
+  */
+-public abstract class MetricEvaluator implements Evaluator {
++public class MetricEvaluator implements Evaluator {
+ 
+     public static final String KIND_KEY = "kind";
+ 
+@@ -25,10 +25,7 @@ public abstract class MetricEvaluator implements Evaluator {
+     private final MetricDefinition metric;
+     private final JudgeAdapter judge;
+ 
+-    protected MetricEvaluator(String metricId, MetricDefinition metric, JudgeAdapter judge) {
+-        if (!metricId.equals(metric.id())) {
+-            throw new IllegalArgumentException("지표가 다릅니다. 기대 " + metricId + ", 실제 " + metric.id());
+-        }
++    public MetricEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+         this.metric = metric;
+         this.judge = judge;
+     }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+index e21583938f1259dcdadef9082da1bdd793469e2b..1d2aa1729c467e9711e11f300276b6e1cd7f034e 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+@@ -7,7 +7,6 @@ import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
+ import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+ import java.util.List;
+ import java.util.Map;
+-import java.util.function.BiFunction;
+ import java.util.stream.Stream;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -16,33 +15,27 @@ import org.junit.jupiter.params.provider.MethodSource;
+ import org.springframework.ai.document.Document;
+ import org.springframework.ai.evaluation.EvaluationRequest;
+ import org.springframework.ai.evaluation.EvaluationResponse;
+-import org.springframework.ai.evaluation.Evaluator;
+ 
+ class MetricEvaluatorTest {
+ 
+-    private static final Map<String, MetricDefinition> METRICS = new EvaluationDataLoader()
+-            .load().metrics().stream().collect(java.util.stream.Collectors.toMap(MetricDefinition::id, m -> m));
++    private static final List<MetricDefinition> METRICS = new EvaluationDataLoader().load().metrics();
++    private static final MetricDefinition CORRECTNESS = metric("Correctness");
+ 
+     private final EvaluationRequest request = new EvaluationRequest(
+             "스튜디오 촬영 준비 항목을 추천해 줘.",
+             List.of(new Document("촬영 드레스 선택과 가봉", Map.of(MetricEvaluator.KIND_KEY, "observedToolResults"))),
+             "촬영 드레스 선택과 가봉을 추천해요.");
+ 
+-    static Stream<BiFunction<MetricDefinition, JudgeAdapter, Evaluator>> evaluators() {
+-        return Stream.of(
+-                CorrectnessEvaluator::new, CompletenessEvaluator::new, FaithfulnessEvaluator::new,
+-                HelpfulnessEvaluator::new, CoherenceEvaluator::new, RelevanceEvaluator::new,
+-                FollowingInstructionsEvaluator::new, ProfessionalStyleAndToneEvaluator::new,
+-                HarmfulnessEvaluator::new, StereotypingEvaluator::new, RefusalEvaluator::new);
++    static Stream<MetricDefinition> metrics() {
++        return METRICS.stream();
+     }
+ 
+-    @ParameterizedTest
+-    @MethodSource("evaluators")
+-    @DisplayName("judge가 생성한 pass, score, feedback을 그대로 돌려준다")
+-    void returnsRawScoreAndReason(BiFunction<MetricDefinition, JudgeAdapter, Evaluator> factory) {
+-        String id = idOf(factory);
+-        int score = METRICS.get(id).scale().getLast().value();
+-        Evaluator evaluator = factory.apply(METRICS.get(id), prompt -> json(id, true, score, "근거가 있다"));
++    @ParameterizedTest(name = "{0}")
++    @MethodSource("metrics")
++    @DisplayName("지표 11개 모두 judge가 생성한 pass, score, feedback을 그대로 돌려준다")
++    void returnsJudgeResult(MetricDefinition metric) {
++        int score = metric.scale().getLast().value();
++        MetricEvaluator evaluator = new MetricEvaluator(metric, prompt -> json(metric.id(), true, score, "근거가 있다"));
+ 
+         EvaluationResponse response = evaluator.evaluate(request);
+ 
+@@ -55,7 +48,7 @@ class MetricEvaluatorTest {
+     @DisplayName("프롬프트는 입력 데이터를 마지막에 두고 도구 조회 결과를 구분해 담는다")
+     void putsInputLast() {
+         StringBuilder captured = new StringBuilder();
+-        new CorrectnessEvaluator(METRICS.get("Correctness"), prompt -> {
++        new MetricEvaluator(CORRECTNESS, prompt -> {
+             captured.append(prompt);
+             return json("Correctness", true, 4, "정확하다");
+         }).evaluate(request);
+@@ -70,7 +63,7 @@ class MetricEvaluatorTest {
+     @Test
+     @DisplayName("척도 밖 점수는 0점으로 바꾸지 않고 예외로 알린다")
+     void rejectsScoreOutsideScale() {
+-        Evaluator evaluator = new CorrectnessEvaluator(METRICS.get("Correctness"), p -> json("Correctness", true, 9, "x"));
++        MetricEvaluator evaluator = new MetricEvaluator(CORRECTNESS, p -> json("Correctness", true, 9, "x"));
+ 
+         assertThatThrownBy(() -> evaluator.evaluate(request)).hasMessageContaining("허용되지 않은 점수");
+     }
+@@ -78,44 +71,25 @@ class MetricEvaluatorTest {
+     @Test
+     @DisplayName("JSON이 아니거나 다른 지표의 응답이거나 feedback이 없으면 예외로 알린다")
+     void rejectsMalformedResponses() {
+-        MetricDefinition metric = METRICS.get("Correctness");
+-
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> "점수는 4점").evaluate(request))
++        assertThatThrownBy(() -> new MetricEvaluator(CORRECTNESS, p -> "점수는 4점").evaluate(request))
+                 .hasMessageContaining("JSON이 아닙니다");
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Relevance", true, 4, "x")).evaluate(request))
++        assertThatThrownBy(() -> new MetricEvaluator(CORRECTNESS, p -> json("Relevance", true, 4, "x")).evaluate(request))
+                 .hasMessageContaining("metricId가 다릅니다");
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(metric, p -> json("Correctness", true, 4, " ")).evaluate(request))
++        assertThatThrownBy(() -> new MetricEvaluator(CORRECTNESS, p -> json("Correctness", true, 4, " ")).evaluate(request))
+                 .hasMessageContaining("feedback이 없습니다");
+     }
+ 
+     @Test
+     @DisplayName("pass가 없는 응답은 예외로 알린다")
+     void rejectsMissingPass() {
+-        Evaluator evaluator = new CorrectnessEvaluator(
+-                METRICS.get("Correctness"), p -> "{\"metricId\":\"Correctness\",\"score\":4,\"feedback\":\"x\"}");
++        MetricEvaluator evaluator = new MetricEvaluator(
++                CORRECTNESS, p -> "{\"metricId\":\"Correctness\",\"score\":4,\"feedback\":\"x\"}");
+ 
+         assertThatThrownBy(() -> evaluator.evaluate(request)).hasMessageContaining("pass가 없습니다");
+     }
+ 
+-    @Test
+-    @DisplayName("다른 지표의 정의로 만들면 실패한다")
+-    void rejectsMismatchedMetric() {
+-        assertThatThrownBy(() -> new CorrectnessEvaluator(METRICS.get("Relevance"), p -> ""))
+-                .isInstanceOf(IllegalArgumentException.class);
+-    }
+-
+-    private String idOf(BiFunction<MetricDefinition, JudgeAdapter, Evaluator> factory) {
+-        return METRICS.keySet().stream()
+-                .filter(id -> {
+-                    try {
+-                        factory.apply(METRICS.get(id), p -> "");
+-                        return true;
+-                    } catch (IllegalArgumentException e) {
+-                        return false;
+-                    }
+-                })
+-                .findFirst()
+-                .orElseThrow();
++    private static MetricDefinition metric(String id) {
++        return METRICS.stream().filter(metric -> metric.id().equals(id)).findFirst().orElseThrow();
+     }
+ 
+     private String json(String metricId, boolean pass, int score, String feedback) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java
+deleted file mode 100644
+index a5131a922463bc0b6dee658313b1e6d7177605cb..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/ProfessionalStyleAndToneEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class ProfessionalStyleAndToneEvaluator extends MetricEvaluator {
+-
+-    public ProfessionalStyleAndToneEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("ProfessionalStyleAndTone", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java
+deleted file mode 100644
+index d2e985b475939caf69893900d4664cbc8806a6f2..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RefusalEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class RefusalEvaluator extends MetricEvaluator {
+-
+-    public RefusalEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Refusal", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java
+deleted file mode 100644
+index 2f365b59f129b15f0840c9b359ffecc19c619ba8..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/RelevanceEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class RelevanceEvaluator extends MetricEvaluator {
+-
+-    public RelevanceEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Relevance", metric, judge);
+-    }
+-}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java
+deleted file mode 100644
+index dfded60ea9b988ef5f9bd98216a8b96be4549554..0000000000000000000000000000000000000000
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/StereotypingEvaluator.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-package com.bibbidi.wedding.chat.evaluation.evaluator;
+-
+-import com.bibbidi.wedding.chat.evaluation.data.MetricDefinition;
+-
+-public class StereotypingEvaluator extends MetricEvaluator {
+-
+-    public StereotypingEvaluator(MetricDefinition metric, JudgeAdapter judge) {
+-        super("Stereotyping", metric, judge);
+-    }
+-}

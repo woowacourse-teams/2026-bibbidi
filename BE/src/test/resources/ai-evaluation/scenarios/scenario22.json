@@ -1,0 +1,34 @@
+{
+  "name": "scenario22",
+  "metrics": [
+    "Coherence",
+    "Completeness"
+  ],
+  "userMessage": "방금 말한 상황을 반영해서 촬영 준비 항목을 추천해 줘.",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "스튜디오를 아직 못 골랐어."
+    },
+    {
+      "role": "assistant",
+      "content": "스튜디오 선택부터 생각해 볼게요."
+    },
+    {
+      "role": "user",
+      "content": "방금 스튜디오를 확정했어. 이제 촬영 날짜도 잡았어."
+    },
+    {
+      "role": "assistant",
+      "content": "최신 상황을 반영할게요."
+    }
+  ],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "가장 최근에 스튜디오와 날짜를 확정했다는 정보를 우선하여 '촬영 시안 제작' 등 남은 항목을 추천한다.",
+  "expectedRefusal": "none"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "scenario01",
+  "metrics": [
+    "Correctness",
+    "Faithfulness"
+  ],
+  "userMessage": "예식장을 아직 정하지 않았고 지역도 미정이에요. 지금 체크리스트에 넣을 준비 항목 두 개를 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'예식 지역 결정'과 '웨딩홀 투어'를 추천하고 지역 결정이 투어 선택보다 먼저라는 이유를 설명한다.",
+  "expectedRefusal": "none"
+}

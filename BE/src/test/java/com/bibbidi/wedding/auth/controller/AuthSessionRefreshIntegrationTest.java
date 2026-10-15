@@ -33,7 +33,7 @@ import org.springframework.restdocs.payload.PayloadDocumentation;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
-@Sql("/terms-fixture.sql")
+@Sql("/fixtures/terms-fixture.sql")
 class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";

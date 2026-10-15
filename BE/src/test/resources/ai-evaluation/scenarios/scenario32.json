@@ -1,0 +1,17 @@
+{
+  "name": "scenario32",
+  "metrics": [
+    "FollowingInstructions",
+    "ProfessionalStyleAndTone"
+  ],
+  "userMessage": "스드메를 막 알아보는 중이에요. 준비 항목 이름만 세 개 추천하고 설명은 쓰지 마세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'스드메 상담', '스드메 견적 수령', '스드메 구성 결정'처럼 실제 항목 이름 세 개만 제시한다.",
+  "expectedRefusal": "none"
+}

@@ -33,7 +33,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
 
-@Sql("/legacy-account-fixture.sql")
+@Sql("/fixtures/legacy-account-fixture.sql")
 class LegacyAccountTransferControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";

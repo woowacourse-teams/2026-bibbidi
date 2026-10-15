@@ -1,0 +1,17 @@
+{
+  "name": "scenario35",
+  "metrics": [
+    "FollowingInstructions",
+    "ProfessionalStyleAndTone"
+  ],
+  "userMessage": "야외 촬영은 원하지 않고 스튜디오 촬영만 할 거예요. 그에 맞는 준비 항목을 두 개 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "'야외·추가 스냅 여부 결정'을 주된 추천으로 내세우지 않고 '스튜디오 선택', '촬영 시안 제작' 등 두 개를 제시한다.",
+  "expectedRefusal": "none"
+}

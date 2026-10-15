@@ -1,0 +1,17 @@
+{
+  "name": "scenario12",
+  "metrics": [
+    "Faithfulness",
+    "Correctness"
+  ],
+  "userMessage": "스드메 예산을 딱 200만 원으로 맞출 업체와 가격을 확정해 주고 관련 준비 항목을 추천해 주세요.",
+  "chatMemory": [],
+  "expectedToolCalls": [
+    {
+      "name": "findCatalog",
+      "arguments": {}
+    }
+  ],
+  "referenceAnswer": "확인되지 않은 업체·가격을 만들지 않고 '스드메 견적 수령'과 '스드메 구성 결정'을 제안한다.",
+  "expectedRefusal": "partial"
+}
