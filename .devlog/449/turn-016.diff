@@ -1,0 +1,13 @@
+diff --git a/Infra/monitoring/grafana/tempo/tempo.yaml b/Infra/monitoring/grafana/tempo/tempo.yaml
+index d48e3588c8f4c800e674a00a6a541b7b47d75fea..0c2fca0bb079d5f5f4a059216a5bd96a46625aa6 100644
+--- a/Infra/monitoring/grafana/tempo/tempo.yaml
++++ b/Infra/monitoring/grafana/tempo/tempo.yaml
+@@ -37,7 +37,7 @@ overrides:
+     compaction:
+       block_retention: 120h # 5일
+     metrics_generator:
+-      processors: ["span-metrics", "service-graphs"]
++      processors: []
+       generate_native_histograms: classic
+       processor:
+         span_metrics:

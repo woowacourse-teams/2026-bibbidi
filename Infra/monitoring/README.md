@@ -15,6 +15,8 @@
 
 적용 후 해당 서비스를 재시작하고 `systemctl status` 및 각 서비스 `/ready`(Grafana는 `/api/health`)를 확인한다. Loki 설정은 조회 결과 캐시를 사용한다.
 
+AI 대화 원문 로그(`ai.chat.content`)는 Alloy가 `log_type="ai_content"` 라벨을 붙이고, Loki는 이 스트림만 7일(`retention_stream`) 보관한다. 나머지 로그는 14일이다. 원문 마스킹은 아직 하지 않는다. 보관 기간을 바꾸려면 `loki.yaml`의 `retention_stream.period`를 고쳐 서버에 다시 설치한다.
+
 ## 모니터링 서버 서비스 설정
 
 systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리한다. 현재 값은 서버에서 `systemctl cat prometheus loki tempo grafana-server`로 확인한다.
