@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.security;
 
-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -9,8 +9,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
@@ -20,15 +22,18 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
     private final BibbidiTokenParser bibbidiTokenParser;
     private final AuthenticationFailureResponseWriter failureResponseWriter;
     private final String headerName;
+    private final SecurityContextRepository securityContextRepository;
 
     public BibbidiTokenAuthenticationFilter(
             BibbidiTokenParser bibbidiTokenParser,
             AuthenticationFailureResponseWriter failureResponseWriter,
-            BibbidiTokenProperties bibbidiTokenProperties
+            BibbidiTokenProperties bibbidiTokenProperties,
+            SecurityContextRepository securityContextRepository
     ) {
         this.bibbidiTokenParser = bibbidiTokenParser;
         this.failureResponseWriter = failureResponseWriter;
         this.headerName = bibbidiTokenProperties.headerName();
+        this.securityContextRepository = securityContextRepository;
     }
 
     @Override
@@ -50,13 +55,7 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
                     claims.nickname(),
                     claims.email()
             );
-            SecurityContextHolder.getContext().setAuthentication(
-                    new PreAuthenticatedAuthenticationToken(
-                            user,
-                            null,
-                            user.getAuthorities()
-                    )
-            );
+            saveAuthenticationForReDispatch(user, request, response);
         } catch (BusinessException exception) {
             SecurityContextHolder.clearContext();
             failureResponseWriter.write(request, response, exception);
@@ -64,6 +63,20 @@ public class BibbidiTokenAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void saveAuthenticationForReDispatch(AuthenticatedUser user, HttpServletRequest request,
+                                                 HttpServletResponse response) {
+        PreAuthenticatedAuthenticationToken authenticatedAuthenticationToken = new PreAuthenticatedAuthenticationToken(
+                user,
+                null,
+                user.getAuthorities()
+        );
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authenticatedAuthenticationToken);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, request, response);
     }
 
     private String bearerToken(HttpServletRequest request) {

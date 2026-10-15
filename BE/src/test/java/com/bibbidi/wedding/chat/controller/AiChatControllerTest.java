@@ -2,22 +2,19 @@ package com.bibbidi.wedding.chat.controller;
 
 import static com.bibbidi.wedding.support.AuthenticationTestSupport.authenticatedUser;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
-import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessRequest;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,15 +24,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-import com.bibbidi.wedding.chat.config.AiChatProperties;
+import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
+import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
+import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
+import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
+import com.bibbidi.wedding.chat.support.FakeChatModel;
+import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
-import com.bibbidi.wedding.chat.infra.sse.config.SseConfig;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.AsyncEvent;
@@ -44,10 +48,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,9 +59,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockAsyncContext;
@@ -70,70 +79,109 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.context.WebApplicationContext;
+import reactor.core.publisher.Flux;
+import reactor.test.publisher.TestPublisher;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+/**
+ * 컨트롤러부터 서비스, 어댑터, 대화 메모리까지 실제 객체로 연결한다. 외부 경계인 Bedrock 모델 호출({@link FakeChatModel})과
+ * DB 조회(카탈로그·체크리스트 포트)만 대역으로 바꾼다.
+ */
 @WebMvcTest(AiChatController.class)
-@Import({SecurityTestConfig.class, SseStreamManager.class, SseConfig.class})
-@EnableConfigurationProperties(AiChatProperties.class)
+@Import({
+        SecurityTestConfig.class, SseStreamManager.class, SseConfig.class,
+        AiChatService.class, SpringAiConversationAdapter.class, JacksonChatAnswerParser.class,
+        AiChatControllerTest.ChatInfrastructure.class
+})
 @ExtendWith(RestDocumentationExtension.class)
 class AiChatControllerTest {
 
     private static final String ID = "7bf4d204-8331-439b-bd8f-271abc0eea99";
+    private static final long USER_ID = 7L;
 
     @Autowired
     private WebApplicationContext context;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private FakeChatModel model;
     @MockitoBean
-    private AiChatService aiChatService;
+    private BibbidiTokenParser bibbidiTokenParser;
+    @MockitoBean
+    private CatalogLookupPort catalogLookup;
+    @MockitoBean
+    private ChecklistLookupPort checklistLookup;
     private MockMvc mockMvc;
+
+    @TestConfiguration
+    static class ChatInfrastructure {
+
+        @Bean
+        FakeChatModel fakeChatModel() {
+            return new FakeChatModel();
+        }
+
+        @Bean
+        ChatClient chatClient(FakeChatModel model) {
+            return ChatClient.create(model);
+        }
+
+        @Bean
+        BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory() {
+            return new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
+        }
+    }
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
+        model.reset();
+        when(catalogLookup.findAllItemDetails()).thenReturn(List.of(
+                new CatalogItemDetailSnapshot(1L, "웨딩홀 후보 정하기", "웨딩홀", 1, "후보"),
+                new CatalogItemDetailSnapshot(2L, "스튜디오 후보 정하기", "촬영", 1, "후보"),
+                new CatalogItemDetailSnapshot(3L, "드레스 후보 정하기", "드레스", 1, "후보")));
+        when(checklistLookup.filterRecommendableCatalogItemIds(USER_ID, List.of(1L, 2L, 3L)))
+                .thenReturn(List.of(1L, 2L, 3L));
         mockMvc = webAppContextSetup(context).apply(springSecurity())
                 .apply(documentationConfiguration(restDocumentation)).build();
     }
 
     @Test
-    @DisplayName("응답이 완료되기 전에도 대화 ID와 답변 조각을 전송한다")
-    void streamsConversationAndAnswerChunksBeforeCompletion() throws Exception {
+    @DisplayName("응답이 완료되기 전에도 대화 ID와 답변 조각 및 추천 카드를 전송한다")
+    void streamsConversationAnswerChunksAndComponentsBeforeCompletion() throws Exception {
         // given
-        CountDownLatch answerChunkAllowed = new CountDownLatch(1);
-        CountDownLatch completionAllowed = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            answerChunkAllowed.await();
-            reply.sendAnswerChunk("웨딩홀 ");
-            completionAllowed.await();
-            reply.complete(new ChatResult(ID, "웨딩홀 "), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
+        TestPublisher<ChatResponse> modelOutput = TestPublisher.create();
+        model.respondWith(modelOutput.flux());
 
         // when
-        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 준비를 알려줘"))))
+                        .content(objectMapper.writeValueAsString(
+                                new ChatRequest(UUID.fromString(ID), "다음 준비를 알려줘"))))
                 .andReturn();
 
         try {
-            await().until(() -> initial.getResponse().getContentAsString(StandardCharsets.UTF_8)
-                    .contains("event:conversation"));
-            answerChunkAllowed.countDown();
+            await().untilAsserted(() -> modelOutput.assertSubscribers(1));
+            modelOutput.next(chunk("{\"answer\":\"웨딩홀 "));
+
+            // then: 모델 응답이 끝나기 전에 앞부분이 먼저 전달된다
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            await().untilAsserted(() -> assertThat(body(initial))
+                    .containsSubsequence("event:conversation", "\"conversationId\":\"" + ID + "\"",
+                            "event:delta", "\"text\":\"웨딩홀 \"")
+                    .doesNotContain("event:component", "event:done", "event:failure"));
+
+            // when
+            modelOutput.next(chunk("계약을 확인하세요.\",\"recommendedItemIds\":[1,2,3]}"));
+            modelOutput.complete();
 
             // then
-            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
-            await().untilAsserted(() -> {
-                String body = initial.getResponse().getContentAsString(StandardCharsets.UTF_8);
-                assertThat(body)
-                        .containsSubsequence("event:conversation", "\"conversationId\":\"" + ID + "\"",
-                                "event:delta", "\"text\":\"웨딩홀 \"")
-                        .doesNotContain("event:done", "event:failure");
-            });
+            await().untilAsserted(() -> assertThat(body(initial))
+                    .containsSubsequence("event:delta", "계약을 확인하세요.", "event:component",
+                            "data:{\"catalogItemIds\":[1,2,3]}", "event:done")
+                    .doesNotContain("event:failure"));
         } finally {
-            answerChunkAllowed.countDown();
-            completionAllowed.countDown();
+            modelOutput.complete();
             initial.getAsyncResult(5000);
             mockMvc.perform(asyncDispatch(initial));
         }
@@ -143,17 +191,12 @@ class AiChatControllerTest {
     @DisplayName("정상 완료 시 SSE 응답 계약을 만족한다")
     void documentsTheCompletedSseResponseContract() throws Exception {
         // given
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.sendAnswerChunk("웨딩홀 ");
-            reply.sendAnswerChunk("계약을 확인하세요.");
-            reply.complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
+        model.respondWith(Flux.just(
+                chunk("{\"answer\":\"웨딩홀 "),
+                chunk("계약을 확인하세요.\",\"recommendedItemIds\":[1,2,3]}")));
 
         // when
-        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 준비를 알려줘"))))
                 .andReturn();
@@ -167,17 +210,21 @@ class AiChatControllerTest {
                 .andDo(document("ai-chat-stream",
                         preprocessRequest(modifyHeaders().set("Authorization", "Bearer <access-token>")),
                         preprocessResponse(), resource(ResourceSnippetParameters.builder()
-                        .tag("AI Chat").summary("결혼 준비 AI 대화")
-                        .description("로그인 사용자의 결혼 준비 질문에 SSE로 답변합니다. "
-                                + "대화 ID와 답변 조각을 전송하고, 정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
-                        .requestSchema(schema("ChatRequest"))
-                        .responseSchema(schema("ChatEventStream"))
-                        .requestHeaders(headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
-                        .requestFields(fieldWithPath("conversationId").type(JsonFieldType.STRING).optional().description("이전 대화 UUID 문자열. 생략 또는 null이면 서버에서 생성"),
-                                fieldWithPath("message").description("사용자 메시지. 공백 제외 필수, 최대 4000자"))
-                        .build()))).andReturn();
-        String body = completed.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(body).containsSubsequence("event:conversation", "event:delta", "웨딩홀 ", "event:delta", "계약을 확인하세요.", "event:done")
+                                .tag("AI Chat").summary("결혼 준비 AI 대화")
+                                .description("로그인 사용자의 결혼 준비 질문에 SSE로 답변합니다. "
+                                        + "대화 ID와 답변 조각을 전송하고, 추천 카드가 있으면 component 이벤트의 catalogItemIds 배열로 전달합니다. "
+                                        + "배열 순서가 추천 순서이며, component는 도구 실행 시 답변 조각 사이에도 올 수 있습니다. "
+                                        + "정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
+                                .requestSchema(schema("ChatRequest"))
+                                .responseSchema(schema("ChatEventStream"))
+                                .requestHeaders(headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
+                                .requestFields(fieldWithPath("conversationId").type(JsonFieldType.STRING).optional()
+                                                .description("이전 대화 UUID 문자열. 생략 또는 null이면 서버에서 생성"),
+                                        fieldWithPath("message").description("사용자 메시지. 공백 제외 필수, 최대 4000자"))
+                                .build()))).andReturn();
+        assertThat(body(completed)).containsSubsequence("event:conversation", "event:delta", "웨딩홀 ",
+                        "event:delta", "계약을 확인하세요.", "event:component", "data:{\"catalogItemIds\":[1,2,3]}",
+                        "event:done")
                 .doesNotContain("event:failure");
     }
 
@@ -185,15 +232,13 @@ class AiChatControllerTest {
     @DisplayName("답변 생성이 실패하면 고정된 공개 오류 메시지를 전송하고 완료 이벤트를 보내지 않는다")
     void streamErrorsSendOnlyTheFixedPublicMessageAndNeverDone() throws Exception {
         // given
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.sendAnswerChunk("일부 답변");
-            throw new IllegalStateException("외부 API 비밀 원문");
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
+        model.respondWith(Flux.concat(
+                Flux.just(chunk("{\"answer\":\"일부 답변")),
+                Flux.error(new IllegalStateException("외부 API 비밀 원문"))));
 
         // when
-        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문"))))
                 .andExpect(request().asyncStarted()).andReturn();
         initial.getAsyncResult(5000);
@@ -204,31 +249,77 @@ class AiChatControllerTest {
                         .summary("AI 대화 생성 실패").description("SSE 시작 이후의 공개 실패 이벤트. 이후 done을 보내지 않습니다.")
                         .responseSchema(schema("ChatEventStream"))
                         .build()))).andReturn();
-        assertThat(completed.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("event:failure", ClientError.INTERNAL_ERROR.message()).doesNotContain("비밀", "event:done");
+        assertThat(body(completed))
+                .contains("event:delta", "일부 답변", "event:failure", ClientError.INTERNAL_ERROR.message())
+                .doesNotContain("비밀", "event:done");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("토큰으로 인증한 SSE는 정상 완료와 실패 후에도 인증을 복원하며 다음 요청에 인증을 넘기지 않는다")
+    void tokenAuthenticationSurvivesAsyncDispatchWithoutCreatingASession(boolean fails) throws Exception {
+        // given
+        String token = "test-access-token";
+        when(bibbidiTokenParser.parseAccessToken(token)).thenReturn(
+                new BibbidiTokenClaims(USER_ID, UserStatus.ACTIVE, UserRole.NORMAL, "테스트회원", null));
+        CountDownLatch answerAllowed = new CountDownLatch(1);
+        model.respondWith(Flux.defer(() -> {
+            awaitLatch(answerAllowed);
+            return fails
+                    ? Flux.concat(Flux.just(chunk("{\"answer\":\"답변")),
+                            Flux.error(new IllegalStateException("테스트 답변 생성 실패")))
+                    : Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}"));
+        }));
+
+        // when
+        MvcResult initial;
+        try {
+            initial = mockMvc.perform(post("/api/ai/chat")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
+                    .andExpect(request().asyncStarted()).andReturn();
+        } finally {
+            answerAllowed.countDown();
+        }
+        initial.getAsyncResult(5000);
+
+        // then
+        MvcResult completed = mockMvc.perform(asyncDispatch(initial))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andReturn();
+        assertThat(body(completed)).contains("event:conversation", "event:delta");
+        if (fails) {
+            assertThat(body(completed)).contains("event:failure").doesNotContain("event:done");
+        } else {
+            assertThat(body(completed)).contains("event:done").doesNotContain("event:failure");
+        }
+        assertThat(completed.getRequest().getSession(false)).isNull();
+        verify(bibbidiTokenParser).parseAccessToken(token);
+
+        // when, then: 이전 요청의 인증은 다음 요청으로 넘어가지 않는다
+        mockMvc.perform(post("/api/ai/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 질문"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(request().asyncNotStarted())
+                .andExpect(jsonPath("$.errorCode").value(ClientError.AUTHENTICATION_REQUIRED.errorCode()));
     }
 
     @Test
-    @DisplayName("클라이언트 연결이 끊기면 응답 작업을 중단한다")
-    void disconnectedClientInterruptsTheResponseWorker() throws Exception {
+    @DisplayName("클라이언트 연결이 끊기면 모델 응답을 중단한다")
+    void disconnectedClientCancelsTheModelResponse() throws Exception {
         // given
-        CountDownLatch started = new CountDownLatch(1);
-        AtomicBoolean cancelled = new AtomicBoolean();
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            started.countDown();
-            try {
-                new CountDownLatch(1).await();
-            } catch (InterruptedException exception) {
-                cancelled.set(true);
-                throw exception;
-            }
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
-        MvcResult result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        CountDownLatch modelSubscribed = new CountDownLatch(1);
+        AtomicBoolean modelCancelled = new AtomicBoolean();
+        model.respondWith(Flux.<ChatResponse>never()
+                .doOnSubscribe(subscription -> modelSubscribed.countDown())
+                .doOnCancel(() -> modelCancelled.set(true)));
+        MvcResult result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
-        await().until(() -> started.getCount() == 0);
+        await().until(() -> modelSubscribed.getCount() == 0);
 
         // when
         AsyncEvent event = new AsyncEvent(result.getRequest().getAsyncContext());
@@ -237,45 +328,35 @@ class AiChatControllerTest {
         }
 
         // then
-        await().untilTrue(cancelled);
-        assertThat(result.getResponse().getContentAsString()).doesNotContain("event:done");
+        await().untilTrue(modelCancelled);
+        assertThat(body(result)).doesNotContain("event:done");
     }
 
     @Test
-    @DisplayName("서블릿 응답 시간이 초과되면 응답 작업을 중단하고 이후 이벤트를 전송하지 않는다")
-    void servletTimeoutInterruptsTheWorkerWithoutSendingLateEvents() throws Exception {
+    @DisplayName("서블릿 응답 시간이 초과되면 모델 응답을 중단하고 이후 이벤트를 전송하지 않는다")
+    void servletTimeoutCancelsTheModelResponseWithoutSendingLateEvents() throws Exception {
         // given
-        AtomicReference<ChatSseHandler> source = new AtomicReference<ChatSseHandler>();
-        AtomicBoolean cancelled = new AtomicBoolean();
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            source.set(reply);
-            try {
-                new CountDownLatch(1).await();
-            } catch (InterruptedException exception) {
-                cancelled.set(true);
-                throw exception;
-            }
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
-        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        CountDownLatch modelSubscribed = new CountDownLatch(1);
+        AtomicBoolean modelCancelled = new AtomicBoolean();
+        model.respondWith(Flux.<ChatResponse>never()
+                .doOnSubscribe(subscription -> modelSubscribed.countDown())
+                .doOnCancel(() -> modelCancelled.set(true)));
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
-        await().until(() -> source.get() != null);
+        await().until(() -> modelSubscribed.getCount() == 0);
 
         // when
         AsyncEvent event = new AsyncEvent(initial.getRequest().getAsyncContext());
-        List<AsyncListener> listeners = ((MockAsyncContext) event.getAsyncContext()).getListeners();
-        for (AsyncListener listener : listeners) {
+        for (AsyncListener listener : ((MockAsyncContext) event.getAsyncContext()).getListeners()) {
             listener.onTimeout(event);
         }
 
         // then
-        assertThatThrownBy(() -> source.get().sendAnswerChunk("늦은 답변")).isInstanceOf(CancellationException.class);
-        await().untilTrue(cancelled);
+        await().untilTrue(modelCancelled);
         String body = mockMvc.perform(asyncDispatch(initial)).andReturn().getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
-        assertThat(body).doesNotContain("늦은 답변", "event:done", "event:delta");
+        assertThat(body).doesNotContain("event:done", "event:delta");
     }
 
     @Test
@@ -289,49 +370,45 @@ class AiChatControllerTest {
                 .andDo(document("ai-chat-unauthenticated", resource(ResourceSnippetParameters.builder().tag("AI Chat")
                         .summary("AI 대화 인증 실패").responseFields(fieldWithPath("errorCode").description("인증 오류 코드"),
                                 fieldWithPath("message").description("공개 인증 오류 메시지")).build())));
-        verifyNoInteractions(aiChatService);
+        assertNothingWasProcessed();
     }
 
     @Test
     @DisplayName("약관에 동의하지 않은 사용자의 요청은 스트리밍 시작 전에 거절한다")
     void pendingUsersCannotStartTheStream() throws Exception {
         // when, then
-        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L, UserStatus.PENDING)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID, UserStatus.PENDING))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
                 .andExpect(status().isForbidden()).andExpect(request().asyncNotStarted())
                 .andDo(document("ai-chat-forbidden", resource(ResourceSnippetParameters.builder().tag("AI Chat")
                         .summary("AI 대화 접근 권한 오류").description("약관 미동의 사용자는 SSE 시작 전에 HTTP 403으로 거절됩니다.")
                         .responseFields(fieldWithPath("errorCode").description("접근 권한 오류 코드"),
                                 fieldWithPath("message").description("공개 접근 권한 오류 메시지")).build())));
-        verifyNoInteractions(aiChatService);
+        assertNothingWasProcessed();
     }
 
     @Test
-    @DisplayName("대화 ID 문자열을 UUID로 변환하여 서비스에 전달한다")
-    void convertsTheConversationIdToUuidBeforeCallingTheService() throws Exception {
+    @DisplayName("대화 ID 문자열을 UUID로 변환하여 같은 대화로 처리한다")
+    void convertsTheConversationIdToUuidBeforeProcessingTheChat() throws Exception {
         // given
-        UUID id = UUID.fromString(ID);
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.complete(new ChatResult(ID, "답변"), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
-        ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(id, "질문"));
+        model.respondWith(Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}")));
+        ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(UUID.fromString(ID), "질문"));
         request.put("conversationId", ID.toUpperCase(Locale.ROOT));
 
         // when
-        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(request().asyncStarted()).andReturn();
         initial.getAsyncResult(5000);
 
         // then
         MvcResult completed = mockMvc.perform(asyncDispatch(initial)).andExpect(status().isOk()).andReturn();
-
-        verify(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
-        assertThat(completed.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("event:done").doesNotContain("event:failure");
+        assertThat(body(completed))
+                .contains("\"conversationId\":\"" + ID + "\"", "event:done")
+                .doesNotContain("event:failure");
+        assertThat(model.lastPrompt().getInstructions().getLast().getText()).isEqualTo("질문");
     }
 
     @ParameterizedTest
@@ -343,15 +420,16 @@ class AiChatControllerTest {
         request.put("conversationId", conversationId);
 
         // when, then
-        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest()).andExpect(request().asyncNotStarted())
                 .andExpect(jsonPath("$.errorCode").value(ClientError.INVALID_REQUEST.errorCode()))
                 .andDo(document("ai-chat-invalid-request", resource(ResourceSnippetParameters.builder().tag("AI Chat")
-                        .summary("AI 대화 요청 값 오류").description("UUID로 변환할 수 없는 대화 ID는 SSE 시작 전에 HTTP 400으로 거절됩니다.")
+                        .summary("AI 대화 요청 값 오류")
+                        .description("UUID로 변환할 수 없는 대화 ID는 SSE 시작 전에 HTTP 400으로 거절됩니다.")
                         .responseFields(fieldWithPath("errorCode").description("요청 오류 코드"),
                                 fieldWithPath("message").description("공개 요청 오류 메시지")).build())));
-        verifyNoInteractions(aiChatService);
+        assertNothingWasProcessed();
     }
 
     @ParameterizedTest
@@ -359,15 +437,37 @@ class AiChatControllerTest {
     @MethodSource("invalidRequests")
     void invalidInputFailsBeforeStreaming(ChatRequest request) throws Exception {
         // when, then
-        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest()).andExpect(request().asyncNotStarted())
                 .andExpect(jsonPath("$.errorCode").value(ClientError.INVALID_REQUEST.errorCode()));
-        verifyNoInteractions(aiChatService);
+        assertNothingWasProcessed();
     }
 
     static Stream<ChatRequest> invalidRequests() {
         return Stream.of(new ChatRequest(null, " "), new ChatRequest(null, null),
                 new ChatRequest(null, "가".repeat(4001)));
+    }
+
+    private void assertNothingWasProcessed() {
+        verifyNoInteractions(catalogLookup, checklistLookup);
+        assertThat(model.prompts()).isEmpty();
+    }
+
+    private static String body(MvcResult result) throws Exception {
+        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    private static ChatResponse chunk(String text) {
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("응답 중단");
+        }
     }
 }

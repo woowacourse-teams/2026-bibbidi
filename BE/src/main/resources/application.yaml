@@ -9,15 +9,13 @@ spring:
   ai:
     model:
       chat: bedrock-converse
-    tools:
-      throw-exception-on-error: true
     bedrock:
       aws:
         region: ap-northeast-1
-        timeout: ${bibbidi.ai.response-timeout}
+        timeout: ${bibbidi.sse.response-timeout-seconds}s
         connection-timeout: 5s
         connection-acquisition-timeout: 5s
-        async-read-timeout: ${bibbidi.ai.response-timeout}
+        async-read-timeout: ${bibbidi.sse.response-timeout-seconds}s
       converse:
         chat:
           model: qwen.qwen3-235b-a22b-2507-v1:0
@@ -32,9 +30,11 @@ spring:
       mode: never
 
 bibbidi:
+  sse:
+    response-timeout-seconds: 10
   ai:
-    response-timeout: 30s
-    memory-max-messages: 20
+    chatbot:
+      memory-max-messages: 20
 
 server:
   shutdown: graceful

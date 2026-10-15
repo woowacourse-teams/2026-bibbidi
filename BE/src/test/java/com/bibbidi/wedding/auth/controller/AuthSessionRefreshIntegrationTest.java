@@ -192,6 +192,14 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
+    @DisplayName("인증 정보가 없으면 약관 오류 대신 인증 필요 오류를 반환한다")
+    void shouldRequireAuthenticationBeforeCheckingTerms() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201));
+    }
+
+    @Test
     @DisplayName("약관에 동의하기 전에는 다른 API를 부를 수 없고, 동의하면 새 token으로 통과한다")
     void shouldBlockPendingUserUntilTermsAgreed() throws Exception {
         UserResult pending = userService.createPendingUser("pending", null);

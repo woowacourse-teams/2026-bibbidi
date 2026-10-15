@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.oidc.verification;
 
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
 import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
