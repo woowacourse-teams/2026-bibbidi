@@ -1,0 +1,23 @@
+diff --git a/Infra/k6/breakpoint-general-test.ts b/Infra/k6/breakpoint-general-test.ts
+index 5d47e602d3ce3d1efb3874dd6832e0f4e0a95c6b..8920d37eb11554c81d26f1be682a0e5aea15dbe3 100644
+--- a/Infra/k6/breakpoint-general-test.ts
++++ b/Infra/k6/breakpoint-general-test.ts
+@@ -28,14 +28,16 @@ const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () =
+ const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
+ const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 50));
+ 
++const preAllocatedVUs = numberFromEnv('PRE_ALLOCATED_VUS', plan.endRate(plan.windows) * 3);
++
+ export const options: Options = {
+   scenarios: {
+     breakpoint: {
+       executor: 'ramping-arrival-rate',
+       startRate: 0,
+       timeUnit: '1s',
+-      preAllocatedVUs: numberFromEnv('PRE_ALLOCATED_VUS', 50),
+-      maxVUs: numberFromEnv('MAX_VUS', 500),
++      preAllocatedVUs,
++      maxVUs: numberFromEnv('MAX_VUS', Math.max(500, preAllocatedVUs * 2)),
+       stages: plan.stages(),
+     },
+   },

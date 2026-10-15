@@ -21,6 +21,10 @@ export class WindowPlan {
     return this.options.windowSeconds;
   }
 
+  get stepRate(): number {
+    return this.options.stepRate;
+  }
+
   endRate(window: number): number {
     return this.options.stepRate * window;
   }

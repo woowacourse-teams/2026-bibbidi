@@ -20,13 +20,15 @@ const plan = new WindowPlan({
 });
 
 const mix = new SessionMix([
-  { session: new NewUserSession(), weight: 3 },
-  { session: new ReturningUserSession(), weight: 7 },
+  { session: new NewUserSession(), weight: 6 },
+  { session: new ReturningUserSession(), weight: 4 },
 ]);
 
 const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () => ({}), [new WindowMetrics(plan)]);
 const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
 const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 50));
+
+const preAllocatedVUs = numberFromEnv('PRE_ALLOCATED_VUS', plan.endRate(plan.windows) * 3);
 
 export const options: Options = {
   scenarios: {
@@ -34,8 +36,8 @@ export const options: Options = {
       executor: 'ramping-arrival-rate',
       startRate: 0,
       timeUnit: '1s',
-      preAllocatedVUs: numberFromEnv('PRE_ALLOCATED_VUS', 50),
-      maxVUs: numberFromEnv('MAX_VUS', 500),
+      preAllocatedVUs,
+      maxVUs: numberFromEnv('MAX_VUS', Math.max(500, preAllocatedVUs * 2)),
       stages: plan.stages(),
     },
   },

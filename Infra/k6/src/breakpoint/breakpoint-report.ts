@@ -1,7 +1,7 @@
 import { SummaryReport, type SummaryData } from '../report/summary.ts';
 import type { WindowPlan } from './windows.ts';
 
-type WindowVerdict = '정상' | '고장' | '미도달';
+type WindowVerdict = '정상' | '고장' | '도달 못함';
 
 interface WindowResult {
   window: number;
@@ -27,6 +27,8 @@ export class BreakpointReport extends SummaryReport {
     return [
       '## k6 Breakpoint 결과',
       '',
+      `> 시나리오 1건은 사용자 한 명이 사용 흐름을 한 번 끝까지 지나가는 것입니다. 신규 사용자는 둘러보기, 체크리스트 담기, 일정 잡기, 홈 순서이고 재방문 사용자는 홈, 일정 완료 순서입니다. 초당 시나리오 수를 ${this.plan.windowSeconds}초 구간마다 ${this.plan.stepRate}씩 올립니다.`,
+      '',
       ...this.conclusion(results, failedWindow),
       '',
       ...this.windowTable(results),
@@ -49,16 +51,16 @@ export class BreakpointReport extends SummaryReport {
       const reached = (this.value(`window_requests{window:${window}}`, 'count') ?? 0) > 0;
       const causes: string[] = [];
 
-      if (this.hasFailedThreshold(latency)) causes.push('조회 p99 > 1초');
-      if (this.hasFailedThreshold(errors)) causes.push('5xx 비율 > 1%');
-      if (dropped && window === lastObserved) causes.push('처리량 포화(누락된 세션)');
+      if (this.hasFailedThreshold(latency)) causes.push('조회 응답 시간(p99)이 1초 초과');
+      if (this.hasFailedThreshold(errors)) causes.push('서버 오류(5xx) 비율이 1% 초과');
+      if (dropped && window === lastObserved) causes.push('서버가 따라가지 못함(건너뛴 시나리오 발생)');
 
       return {
         window,
         endRate: this.plan.endRate(window),
         p99: reached ? latency?.values?.['p(99)'] : undefined,
         errorRate: reached ? errors?.values?.rate : undefined,
-        verdict: causes.length > 0 ? '고장' : reached ? '정상' : '미도달',
+        verdict: causes.length > 0 ? '고장' : reached ? '정상' : '도달 못함',
         causes,
       };
     });
@@ -81,16 +83,20 @@ export class BreakpointReport extends SummaryReport {
   private conclusion(results: WindowResult[], failedWindow: WindowResult | undefined): string[] {
     if (failedWindow === undefined) {
       const last = results.filter((result) => result.verdict === '정상').pop();
-      const reached = last === undefined ? '-' : String(last.endRate);
-      return [`- 판정: 한계 미도달 (최대 ${reached}세션/초까지 정상)`];
+      const reached = last === undefined ? '-' : `초당 ${last.endRate}개 시나리오`;
+      return [`- 판정: 한계에 닿지 않음 (최대 ${reached}까지 정상)`];
     }
 
     const previous = results.find((result) => result.window === failedWindow.window - 1);
-    return [
-      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 윈도우에서 고장)' : `${previous.endRate}세션/초`}`,
-      `- 고장 지점: ${failedWindow.endRate}세션/초 (윈도우 ${failedWindow.window})`,
+    const lines = [
+      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 구간에서 고장)' : `초당 ${previous.endRate}개 시나리오`}`,
+      `- 고장 지점: 초당 ${failedWindow.endRate}개 시나리오 (${failedWindow.window}번째 구간)`,
       `- 처음 걸린 고장 기준: ${failedWindow.causes.join(', ')}`,
     ];
+    if (failedWindow.causes.some((cause) => cause.startsWith('서버가 따라가지 못함'))) {
+      lines.push('- 참고: 건너뛴 시나리오는 테스트 도구(러너)의 한계일 수도 있으므로 같은 시간대의 서버 지표와 함께 확인해야 합니다.');
+    }
+    return lines;
   }
 
   private windowTable(results: WindowResult[]): string[] {
@@ -103,6 +109,10 @@ export class BreakpointReport extends SummaryReport {
         result.verdict,
       ].join(' | '),
     );
-    return ['| 윈도우 | 끝 도착률(세션/초) | 조회 p99(ms) | 5xx 비율 | 판정 |', '| --- | --- | --- | --- | --- |', ...rows.map((row) => `| ${row} |`)];
+    return [
+      '| 구간 | 구간 끝의 초당 시나리오 수 | 조회 응답 시간 p99(ms) | 서버 오류(5xx) 비율 | 판정 |',
+      '| --- | --- | --- | --- | --- |',
+      ...rows.map((row) => `| ${row} |`),
+    ];
   }
 }

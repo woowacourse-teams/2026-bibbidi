@@ -29,7 +29,7 @@ export class SummaryReport {
 
   toMarkdown(): string {
     const failed = this.failedThresholds();
-    const failures = failed.length === 0 ? [] : ['', '실패한 임계값', ...failed.map((entry) => `- ${entry}`)];
+    const failures = failed.length === 0 ? [] : ['', '기준을 넘은 항목', ...failed.map((entry) => `- ${entry}`)];
 
     return [`## k6 결과: ${failed.length === 0 ? '통과' : '실패'}`, '', ...this.overview(failed.length === 0), ...failures, ''].join('\n');
   }
@@ -50,15 +50,15 @@ export class SummaryReport {
       ['판정', passed ? '✅ 통과' : '❌ 실패'],
       ['실행 시간(초)', this.format(durationSeconds, 0)],
       ['요청 수', this.format(this.value('http_reqs', 'count'), 0)],
-      ['요청/초', this.format(this.value('http_reqs', 'rate'))],
-      ['세션(반복) 수', this.format(this.value('iterations', 'count'), 0)],
-      ['체크 통과율', this.format(this.value('checks', 'rate'), 4)],
-      ['5xx 건수', this.format(this.value('server_errors', 'count') ?? 0, 0)],
-      ['응답 시간 avg(ms)', this.format(this.value('http_req_duration', 'avg'))],
-      ['응답 시간 p(95)(ms)', this.format(this.value('http_req_duration', 'p(95)'))],
-      ['응답 시간 p(99)(ms)', this.format(this.value('http_req_duration', 'p(99)'))],
-      ['응답 시간 max(ms)', this.format(this.value('http_req_duration', 'max'))],
-      ['누락된 반복(dropped_iterations)', this.format(this.value('dropped_iterations', 'count') ?? 0, 0)],
+      ['초당 요청 수', this.format(this.value('http_reqs', 'rate'))],
+      ['처리한 시나리오 수', this.format(this.value('iterations', 'count'), 0)],
+      ['응답 검사 통과율', this.format(this.value('checks', 'rate'), 4)],
+      ['서버 오류(5xx) 건수', this.format(this.value('server_errors', 'count') ?? 0, 0)],
+      ['응답 시간 평균(ms)', this.format(this.value('http_req_duration', 'avg'))],
+      ['응답 시간 p95(ms, 느린 5% 경계)', this.format(this.value('http_req_duration', 'p(95)'))],
+      ['응답 시간 p99(ms, 느린 1% 경계)', this.format(this.value('http_req_duration', 'p(99)'))],
+      ['응답 시간 최대(ms)', this.format(this.value('http_req_duration', 'max'))],
+      ['건너뛴 시나리오 수(dropped_iterations)', this.format(this.value('dropped_iterations', 'count') ?? 0, 0)],
     ];
 
     return ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
