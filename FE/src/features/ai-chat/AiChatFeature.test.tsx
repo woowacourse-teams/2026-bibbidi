@@ -379,7 +379,7 @@ describe("실제 AI 채팅", () => {
       const launcher = screen.getByRole("button", { name: "AI와 대화하기" });
       expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
       fireEvent.click(launcher);
-      const dialog = screen.getByRole("dialog");
+      const dialog = await screen.findByRole("dialog");
       expect(within(dialog).queryByText("예시")).toBeNull();
       if (closeName === "Escape")
         fireEvent(dialog, new Event("cancel", { cancelable: true }));

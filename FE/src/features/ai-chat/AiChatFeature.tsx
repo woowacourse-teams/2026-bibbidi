@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useIsMobileLayout } from "../../shared/responsive";
-import { useAiChatConversation } from "./hooks/useAiChatConversation";
-import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
-import type { AiChatView } from "./view/AiChatView";
+import type { AiChatSession } from "./AiChatSession";
 import "./view/AiChat.css";
 
 export function AiChatFeature({
@@ -16,17 +14,19 @@ export function AiChatFeature({
   const isMobile = useIsMobileLayout();
   const [isOpen, setOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
-  const [View, setView] = useState<typeof AiChatView | null>(null);
+  const [Session, setSession] = useState<typeof AiChatSession | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const returnFocusRef = useRef<HTMLButtonElement>(null);
   const shouldLoad = !isMobile || hasOpened;
+  const loading = shouldLoad && !Session && !loadFailed;
 
   useEffect(() => {
-    if (!shouldLoad || View) return;
+    if (!shouldLoad || Session) return;
     let cancelled = false;
-    import("./view/AiChatView").then(
+    import("./AiChatSession").then(
       (module) => {
-        if (!cancelled) setView(() => module.AiChatView);
+        if (!cancelled) setSession(() => module.AiChatSession);
       },
       () => {
         if (!cancelled) setLoadFailed(true);
@@ -35,81 +35,66 @@ export function AiChatFeature({
     return () => {
       cancelled = true;
     };
-  }, [shouldLoad, View, loadAttempt]);
-  const returnFocusRef = useRef<HTMLButtonElement>(null);
-  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
-    useAiChatConversation(onAuthenticationRequired);
-  const openChat = (launcher: HTMLButtonElement) => {
-    returnFocusRef.current = launcher;
-    setHasOpened(true);
-    setOpen(true);
+  }, [shouldLoad, Session, loadAttempt]);
+
+  const retryLoad = () => {
+    setLoadFailed(false);
+    setLoadAttempt((attempt) => attempt + 1);
   };
-  const closeChat = () => setOpen(false);
-  const view = View ? (
-    <View
-      active={!isMobile || isOpen}
-      isAuthenticated={isAuthenticated}
-      draft={isAuthenticated ? draft : ""}
-      messages={isAuthenticated ? messages : []}
-      errorMessage={isAuthenticated ? errorMessage : null}
-      isPending={isAuthenticated && isPending}
-      onDraftChange={(value) => {
-        if (isAuthenticated) setDraft(value);
-      }}
-      onSend={(text) => {
-        if (isAuthenticated) send(text);
-      }}
-      onRetry={() => {
-        if (isAuthenticated) retry();
-      }}
-    />
-  ) : shouldLoad ? (
-    <div className="ai-chat">
-      {loadFailed ? (
-        <div role="alert">
-          <p>채팅을 불러오지 못했어요.</p>
-          <button
-            onClick={() => {
-              setLoadFailed(false);
-              setLoadAttempt((attempt) => attempt + 1);
-            }}
-            type="button"
-          >
-            다시 시도
-          </button>
-        </div>
-      ) : (
-        <p role="status">채팅을 불러오고 있어요.</p>
-      )}
-    </div>
-  ) : null;
 
   return (
     <div className="ai-chat-feature">
       {isMobile ? (
-        <>
-          <div className="ai-chat-launchers">
-            <button
-              className="ai-chat-launchers__action"
-              onClick={(event) => openChat(event.currentTarget)}
-              type="button"
-            >
-              AI와 대화하기
-            </button>
-          </div>
-          <MobileAiChatDialog
-            isOpen={isOpen}
-            onClose={closeChat}
-            returnFocusRef={returnFocusRef}
+        <div
+          className={`ai-chat-launchers${loadFailed ? " ai-chat-launchers--error" : ""}`}
+        >
+          {loadFailed ? <p role="alert">채팅을 불러오지 못했어요.</p> : null}
+          <button
+            className="ai-chat-launchers__action"
+            disabled={loading}
+            onClick={() => {
+              if (loadFailed) retryLoad();
+              setHasOpened(true);
+              setOpen(true);
+            }}
+            ref={returnFocusRef}
+            type="button"
           >
-            {view}
-          </MobileAiChatDialog>
-        </>
-      ) : (
+            {loading ? (
+              <span role="status">채팅을 불러오고 있어요.</span>
+            ) : loadFailed ? (
+              "다시 시도"
+            ) : (
+              "AI와 대화하기"
+            )}
+          </button>
+        </div>
+      ) : null}
+      {Session ? (
+        <Session
+          isAuthenticated={isAuthenticated}
+          isMobile={isMobile}
+          isOpen={isOpen}
+          onAuthenticationRequired={onAuthenticationRequired}
+          onClose={() => setOpen(false)}
+          returnFocusRef={returnFocusRef}
+        />
+      ) : !isMobile ? (
         <aside aria-label="AI 채팅" className="ai-chat-panel">
-          {view}
+          <div className="ai-chat">
+            {loadFailed ? (
+              <div role="alert">
+                <p>채팅을 불러오지 못했어요.</p>
+                <button onClick={retryLoad} type="button">
+                  다시 시도
+                </button>
+              </div>
+            ) : (
+              <p role="status">채팅을 불러오고 있어요.</p>
+            )}
+          </div>
         </aside>
-      )}
+      ) : null}
     </div>
   );
 }
