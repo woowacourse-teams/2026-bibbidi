@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.auth.config;
 
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.SecurityProperties;
 import com.bibbidi.wedding.auth.security.ActiveUserAuthorizationManager;
 import com.bibbidi.wedding.auth.security.AuthenticatedUser;
 import com.bibbidi.wedding.auth.security.AuthenticationFailureResponseWriter;
@@ -18,9 +20,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -28,23 +27,18 @@ import org.springframework.security.config.annotation.web.configurers.ExceptionH
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
-/**
- * 인증은 access token 하나로만 한다. 서버 세션을 만들지 않는다. CORS 헤더는 앞단 nginx가 붙이므로 여기서 켜지 않는다. 켜면 헤더가 겹친다.
- */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
-
-    /**
-     * 약관에 동의하기 전 사용자가 유일하게 부를 수 있는 경로다.
-     */
-    private static final String TERMS_AGREEMENT_PATH = "/api/users/me/terms-agreement";
 
     private final BibbidiTokenParser bibbidiTokenParser;
     private final AuthenticationFailureResponseWriter failureResponseWriter;
@@ -78,9 +72,6 @@ public class SecurityConfig {
         );
     }
 
-    /**
-     * H2 콘솔을 켠 dev 서버에서만 만들어진다. 콘솔 화면이 frame으로 이뤄져 있어서 같은 도메인의 frame은 허용한다.
-     */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     @ConditionalOnBooleanProperty("spring.h2.console.enabled")
@@ -95,6 +86,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+        final String termsAgreementPath = "/api/users/me/terms-agreement";
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -109,9 +101,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(securityProperties.permitPendingUserPatterns()).authenticated()
                         .requestMatchers(securityProperties.permitAllPatterns()).permitAll()
-                        .requestMatchers(TERMS_AGREEMENT_PATH).authenticated()
+                        .requestMatchers(termsAgreementPath).authenticated()
                         .anyRequest().access(new ActiveUserAuthorizationManager()))
-                // 인가를 판단하는 필터가 우리 인증 결과를 보게 그 앞에 둔다.
                 .addFilterBefore(bibbidiTokenAuthenticationFilter(), AuthorizationFilter.class)
                 .exceptionHandling(this::configureExceptionHandling)
                 .build();

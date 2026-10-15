@@ -1,15 +1,15 @@
 package com.bibbidi.wedding.auth.token;
 
-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.Jws;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -102,8 +102,7 @@ public class BibbidiTokenParser {
                     .requireIssuer(properties.issuer())
                     .requireAudience(properties.audience())
                     .build()
-                    .parseSignedClaims(token)
-                    ;
+                    .parseSignedClaims(token);
             if (!properties.signatureAlgorithm().equals(signed.getHeader().getAlgorithm())) {
                 throw new BusinessException(
                         invalidError,

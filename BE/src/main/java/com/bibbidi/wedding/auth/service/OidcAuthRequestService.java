@@ -1,15 +1,15 @@
 package com.bibbidi.wedding.auth.service;
 
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.SessionProperties;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
 import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.oidc.provider.OidcAuthorizationUriFactory;
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
 import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
-import com.bibbidi.wedding.auth.token.SecretValueGenerator;
-import com.bibbidi.wedding.auth.config.SessionProperties;
 import com.bibbidi.wedding.auth.service.dto.SocialAuthorizationResult;
+import com.bibbidi.wedding.auth.token.SecretValueGenerator;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDateTime;

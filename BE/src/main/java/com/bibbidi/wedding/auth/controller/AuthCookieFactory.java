@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.auth.controller;
 
-import com.bibbidi.wedding.auth.config.RefreshCookieProperties;
-import com.bibbidi.wedding.auth.config.SessionProperties;
+import com.bibbidi.wedding.auth.config.properties.RefreshCookieProperties;
+import com.bibbidi.wedding.auth.config.properties.SessionProperties;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.servlet.http.Cookie;
