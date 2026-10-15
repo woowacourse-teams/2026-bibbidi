@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.sse.dto;
+package com.bibbidi.wedding.chat.controller.sse.dto;
 
 public record SseEvent(
         ChatEventType type,

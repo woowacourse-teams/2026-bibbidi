@@ -3,11 +3,11 @@ package com.bibbidi.wedding.chat.controller;
 import com.bibbidi.wedding.chat.config.AiChatProperties;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
-import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
-import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
-import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
+import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
+import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.controller.sse.dto.ChatEventType;
+import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -46,12 +46,12 @@ public class AiChatController {
         return sseStreamManager.stream(
                 Duration.ofSeconds(properties.responseTimeoutSeconds()),
                 failure,
-                connection -> aiChatService.chat(
-                        userId,
-                        request.conversationId(),
-                        request.message(),
-                        new ChatSseHandler(connection)
-                )
+                connection -> {
+                    ChatSseHandler handler = new ChatSseHandler(connection);
+                    aiChatService.chat(userId, request.conversationId(), request.message())
+                            .doOnNext(handler::send)
+                            .blockLast();
+                }
         );
     }
 }

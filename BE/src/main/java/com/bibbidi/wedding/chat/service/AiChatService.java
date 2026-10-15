@@ -1,97 +1,131 @@
 package com.bibbidi.wedding.chat.service;
 
-import com.bibbidi.wedding.chat.infra.ai.ChatAnswerStream;
+import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.service.dto.AiResponseStream;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatPromptContext;
+import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
+import com.bibbidi.wedding.chat.service.port.AiConversationPort;
+import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-import tools.jackson.databind.ObjectMapper;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
+@Slf4j
 public class AiChatService {
 
-    private final ChatClient chatClient;
-    private final ChatMemory chatMemory;
+    private final AiConversationPort conversationPort;
+    private final CatalogService catalogService;
     private final ChecklistService checklistService;
-    private final ObjectMapper objectMapper;
+    private final ChatAnswerParser answerParser;
     private final Set<ConversationKey> activeConversations = ConcurrentHashMap.newKeySet();
 
     public AiChatService(
-            ChatClient chatClient,
-            ChatMemory chatMemory,
+            AiConversationPort conversationPort,
+            CatalogService catalogService,
             ChecklistService checklistService,
-            ObjectMapper objectMapper
+            ChatAnswerParser answerParser
     ) {
-        this.chatClient = chatClient;
-        this.chatMemory = chatMemory;
+        this.conversationPort = conversationPort;
+        this.catalogService = catalogService;
         this.checklistService = checklistService;
-        this.objectMapper = objectMapper;
+        this.answerParser = answerParser;
     }
 
-    public void chat(Long userId, @Nullable UUID conversationId, String message, ChatSseHandler reply) {
+    public Flux<ChatEvent> chat(Long userId, @Nullable UUID conversationId, String message) {
         UUID id = conversationId == null ? UUID.randomUUID() : conversationId;
         ConversationKey key = new ConversationKey(userId, id);
-        reply.conversation(id.toString());
-        if (!activeConversations.add(key)) {
-            throw new BusinessException(ClientError.INTERNAL_ERROR, "같은 대화의 응답이 이미 진행 중입니다.");
-        }
-
-        try {
-            String answer = streamAnswer(key, message, reply);
-            ChatResult result = new ChatResult(id.toString(), answer);
-            reply.complete(result, () -> rememberTurn(key, message, answer));
-        } finally {
-            activeConversations.remove(key);
-        }
+        return Flux.defer(() -> {
+            if (!activeConversations.add(key)) {
+                return Flux.error(new BusinessException(ClientError.INTERNAL_ERROR, "같은 대화의 응답이 이미 진행 중입니다."));
+            }
+            return Flux.concat(
+                            Flux.just(new ChatEvent.Conversation(id.toString())),
+                            Flux.defer(() -> streamAnswer(key, id, message)))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .doFinally(ignored -> activeConversations.remove(key));
+        });
     }
 
-    private String streamAnswer(ConversationKey key, String message, ChatSseHandler reply) {
-        List<Message> memory = chatMemory.get(key.toMemoryKey());
-        Set<?> recommendableIds = findRecommendableIds(memory);
-        Flux<String> answerChunks = chatClient.prompt()
-                .messages(memory)
-                .messages(new UserMessage(message))
-                .stream()
-                .content();
+    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
+        ChatPromptContext context = loadPromptContext(key.userId());
+        AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
+        List<String> deltas = new ArrayList<>();
+        ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
 
-        ChatAnswer answer = new ChatAnswerStream(objectMapper).read(answerChunks.toStream(), reply::sendAnswerChunk);
+        Flux<ChatEvent> answerEvents = response.content()
+                .publishOn(Schedulers.boundedElastic())
+                .concatMap(chunk -> {
+                    deltas.clear();
+                    answer.accept(chunk);
+                    List<ChatEvent> events = new ArrayList<>();
+                    for (String delta : deltas) {
+                        events.add(new ChatEvent.Delta(delta));
+                    }
+                    return Flux.fromIterable(events);
+                });
+        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, message,
+                response.recommendableItemIds(), answer));
+        return Flux.concat(answerEvents, completion);
+    }
+
+    private ChatPromptContext loadPromptContext(Long userId) {
+        List<CatalogItemDetailSnapshot> catalog = catalogService.findAllItemDetails();
+        ChecklistSnapshot checklist = checklistService.findMyChecklistIfPresent(userId)
+                .map(ChecklistSnapshot::from).orElseGet(ChecklistSnapshot::notFound);
+        Set<Long> addedIds = new HashSet<>();
+        checklist.items().forEach(item -> addedIds.add(item.catalogItemId()));
+        Set<Long> recommendableIds = new HashSet<>();
+        catalog.forEach(item -> {
+            if (!addedIds.contains(item.id())) {
+                recommendableIds.add(item.id());
+            }
+        });
+        return new ChatPromptContext(checklist, catalog, recommendableIds);
+    }
+
+    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
+                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
+        ChatAnswer answer = stream.finish();
         List<Long> suggestedIds = answer.recommendedItemIds().stream()
                 .filter(recommendableIds::contains)
                 .distinct()
                 .toList();
+        List<ChatEvent> events = new ArrayList<>();
         if (!suggestedIds.isEmpty()) {
             List<Long> ids = checklistService.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
             if (!ids.isEmpty()) {
-                reply.sendComponent(ids);
+                events.add(new ChatEvent.Component(ids));
             }
         }
-        return answer.answer();
-    }
-
-    private Set<?> findRecommendableIds(List<Message> messages) {
-        for (Message message : messages) {
-            if (message.getMetadata().get("recommendableItemIds") instanceof Set<?> ids) {
-                return ids;
-            }
-        }
-        return Set.of();
+        return Flux.concat(
+                Flux.fromIterable(events),
+                Flux.just(new ChatEvent.Done(id.toString())),
+                Mono.fromRunnable(() -> rememberTurn(key, message, answer.answer()))
+                        .then(Mono.empty())
+        );
     }
 
     private void rememberTurn(ConversationKey key, String message, String answer) {
-        List<Message> turnMessages = List.of(new UserMessage(message), new AssistantMessage(answer));
-        chatMemory.add(key.toMemoryKey(), turnMessages);
+        try {
+            conversationPort.remember(key.toMemoryKey(), message, answer);
+        } catch (RuntimeException exception) {
+            log.error("AI 대화 저장 실패", exception);
+        }
     }
 }

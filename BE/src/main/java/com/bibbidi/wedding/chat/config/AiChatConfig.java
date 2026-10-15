@@ -1,25 +1,21 @@
 package com.bibbidi.wedding.chat.config;
 
-import static org.springframework.ai.chat.client.ChatClient.*;
+import static org.springframework.ai.chat.client.ChatClient.Builder;
 
-import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
-import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AiChatProperties.class)
@@ -48,14 +44,8 @@ public class AiChatConfig {
     }
 
     @Bean
-    ChatMemoryRepository aiChatMemoryRepository() {
-        return new InMemoryChatMemoryRepository();
-    }
-
-    @Bean
-    ChatMemory aiChatMemory(AiChatProperties properties, ChatMemoryRepository repository,
-                            CatalogService catalogService, ChecklistService checklistService, ObjectMapper mapper) {
-        return new BibbidiChatMemory(repository, properties.memoryMaxMessages(), catalogService, checklistService, mapper);
+    ChatMemory aiChatMemory(ChatMemoryRepository repository, AiChatProperties properties) {
+        return new BibbidiInMemoryChatMemory(repository, properties.memoryMaxMessages());
     }
 
 }

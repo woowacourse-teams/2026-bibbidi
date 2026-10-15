@@ -14,8 +14,10 @@ import static org.springframework.transaction.support.TransactionSynchronization
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -35,12 +37,14 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration;
+import org.springframework.ai.model.chat.memory.autoconfigure.ChatMemoryAutoConfiguration;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.autoconfigure.ToolCallingAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -61,13 +65,14 @@ class AiChatConfigTest {
     private final ChecklistService checklist = mock(ChecklistService.class);
     private final JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(ToolCallingAutoConfiguration.class, ChatClientAutoConfiguration.class))
+            .withConfiguration(AutoConfigurations.of(ToolCallingAutoConfiguration.class,
+                    ChatClientAutoConfiguration.class, ChatMemoryAutoConfiguration.class))
             .withUserConfiguration(AiChatConfig.class)
             .withBean(ChatModel.class, () -> model)
             .withBean(ObjectMapper.class, () -> mapper)
             .withBean(CatalogService.class, () -> catalog)
             .withBean(ChecklistService.class, () -> checklist)
-            .withPropertyValues("bibbidi.ai.response-timeout=30s", "bibbidi.ai.memory-max-messages=20",
+            .withPropertyValues("bibbidi.ai.response-timeout-seconds=30", "bibbidi.ai.memory-max-messages=20",
                     "spring.ai.bedrock.converse.chat.model=us.openai.gpt-6.1-sol");
 
     @BeforeEach
@@ -89,13 +94,14 @@ class AiChatConfigTest {
             return Flux.just(chunk("{\"answer\":\"후보를 "), chunk("정해보세요.\",\"recommendedItemIds\":[2,1,999,2]}"));
         });
         runner.run(context -> {
-            ChatMemory memory = context.getBean(ChatMemory.class);
-            AiChatService service = new AiChatService(context.getBean(ChatClient.class), memory, checklist, mapper);
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            AiChatService service = new AiChatService(
+                    new SpringAiConversationAdapter(context.getBean(ChatClient.class), memory, mapper),
+                    catalog, checklist,
+                    new JacksonChatAnswerParser(mapper));
             UUID id = UUID.randomUUID();
-            ChatSseHandler reply = completedReply();
-
             // when
-            service.chat(7L, id, "다음 준비를 추천해줘", reply);
+            List<ChatEvent> events = service.chat(7L, id, "다음 준비를 추천해줘").collectList().block();
 
             // then
             ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
@@ -116,9 +122,8 @@ class AiChatConfigTest {
                     .anySatisfy(text -> assertThat(text).contains("\"exists\":true", "recommendableItemIds"));
             verify(catalog).findAllItemDetails();
             verify(checklist).findMyChecklistIfPresent(7L);
-            verify(reply).sendAnswerChunk("후보를 ");
-            verify(reply).sendAnswerChunk("정해보세요.");
-            verify(reply).sendComponent(List.of(2L));
+            assertThat(events).contains(new ChatEvent.Delta("후보를 "),
+                    new ChatEvent.Delta("정해보세요."), new ChatEvent.Component(List.of(2L)));
             assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("7:" + id))
                     .extracting(message -> message.getText())
                     .containsExactly("다음 준비를 추천해줘", "후보를 정해보세요.");
@@ -132,12 +137,15 @@ class AiChatConfigTest {
         BusinessException failure = new BusinessException(ClientError.INTERNAL_ERROR, "비공개 조회 장애");
         when(checklist.findMyChecklistIfPresent(7L)).thenThrow(failure);
         runner.run(context -> {
-            ChatMemory memory = context.getBean(ChatMemory.class);
-            AiChatService service = new AiChatService(context.getBean(ChatClient.class), memory, checklist, mapper);
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            AiChatService service = new AiChatService(
+                    new SpringAiConversationAdapter(context.getBean(ChatClient.class), memory, mapper),
+                    catalog, checklist,
+                    new JacksonChatAnswerParser(mapper));
             UUID id = UUID.randomUUID();
 
             // when, then
-            assertThatThrownBy(() -> service.chat(7L, id, "질문", completedReply())).isSameAs(failure);
+            assertThatThrownBy(() -> service.chat(7L, id, "질문").blockLast()).isSameAs(failure);
             verify(model, never()).stream(any(Prompt.class));
             assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("7:" + id)).isEmpty();
         });
@@ -149,18 +157,18 @@ class AiChatConfigTest {
         // given
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(chunk("{\"answer\":\"안녕하세요.\",\"recommendedItemIds\":[]}")));
         runner.run(context -> {
-            AiChatService service = new AiChatService(context.getBean(ChatClient.class), context.getBean(ChatMemory.class),
-                    checklist, mapper);
-            ChatSseHandler reply = completedReply();
-
+            AiChatService service = new AiChatService(new SpringAiConversationAdapter(
+                    context.getBean(ChatClient.class), context.getBean(BibbidiInMemoryChatMemory.class), mapper),
+                    catalog, checklist,
+                    new JacksonChatAnswerParser(mapper));
             // when
-            service.chat(7L, UUID.randomUUID(), "안녕", reply);
+            List<ChatEvent> events = service.chat(7L, UUID.randomUUID(), "안녕").collectList().block();
 
             // then
-            verify(reply).sendAnswerChunk("안녕하세요.");
-            verify(reply, never()).sendComponent(any());
+            assertThat(events).contains(new ChatEvent.Delta("안녕하세요."));
+            assertThat(events).noneMatch(event -> event instanceof ChatEvent.Component);
             verify(checklist, never()).filterRecommendableCatalogItemIds(any(), any());
-            verify(reply).complete(any(ChatResult.class), any(Runnable.class));
+            assertThat(events.getLast()).isInstanceOf(ChatEvent.Done.class);
         });
     }
 
@@ -170,16 +178,19 @@ class AiChatConfigTest {
         when(checklist.findMyChecklistIfPresent(7L)).thenReturn(Optional.empty());
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}")));
         runner.run(context -> {
-            ChatMemory memory = context.getBean(ChatMemory.class);
-            AiChatService service = new AiChatService(context.getBean(ChatClient.class), memory, checklist, mapper);
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            AiChatService service = new AiChatService(
+                    new SpringAiConversationAdapter(context.getBean(ChatClient.class), memory, mapper),
+                    catalog, checklist,
+                    new JacksonChatAnswerParser(mapper));
             UUID id = UUID.randomUUID();
 
-            service.chat(7L, id, "첫 질문", completedReply());
+            service.chat(7L, id, "첫 질문").blockLast();
             when(checklist.findMyChecklistIfPresent(7L))
                     .thenReturn(Optional.of(new ChecklistWithAppointmentsResult(10L, List.of())));
             when(catalog.findAllItemDetails())
                     .thenReturn(List.of(new CatalogItemDetailSnapshot(3L, "최신 촬영 항목", "촬영", 1, "후보")));
-            service.chat(7L, id, "다음 질문", completedReply());
+            service.chat(7L, id, "다음 질문").blockLast();
 
             ArgumentCaptor<Prompt> prompts = ArgumentCaptor.forClass(Prompt.class);
             verify(model, times(2)).stream(prompts.capture());
@@ -191,9 +202,27 @@ class AiChatConfigTest {
                     .noneSatisfy(text -> assertThat(text).contains("웨딩홀 후보 정하기"));
             verify(catalog, times(2)).findAllItemDetails();
             verify(checklist, times(2)).findMyChecklistIfPresent(7L);
-            assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7")).hasSize(2);
+            assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7")).isEmpty();
             assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("7:" + id))
                     .extracting(message -> message.getText()).containsExactly("첫 질문", "답변", "다음 질문", "답변");
+        });
+    }
+
+    @Test
+    @DisplayName("대화 메모리는 준비 정보를 저장하지 않고 최근 문답 18개만 유지한다")
+    void memoryStoresOnlyRecentConversationTurns() {
+        runner.run(context -> {
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            String conversationKey = "7:" + UUID.randomUUID();
+
+            for (int turn = 0; turn < 12; turn++) {
+                memory.add(conversationKey, List.of(new UserMessage("질문 " + turn),
+                        new AssistantMessage("답변 " + turn)));
+            }
+
+            assertThat(memory.get(conversationKey)).extracting(message -> message.getText())
+                    .hasSize(20).startsWith("질문 2", "답변 2").endsWith("질문 11", "답변 11");
+            assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7")).isEmpty();
         });
     }
 
@@ -242,12 +271,4 @@ class AiChatConfigTest {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
     }
 
-    private static ChatSseHandler completedReply() {
-        ChatSseHandler reply = mock(ChatSseHandler.class);
-        doAnswer(invocation -> {
-            ((Runnable) invocation.getArgument(1)).run();
-            return null;
-        }).when(reply).complete(any(ChatResult.class), any(Runnable.class));
-        return reply;
-    }
 }

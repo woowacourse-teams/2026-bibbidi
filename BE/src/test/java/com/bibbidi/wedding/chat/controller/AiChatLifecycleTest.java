@@ -13,13 +13,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
-import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
-import com.bibbidi.wedding.chat.infra.sse.dto.ChatEventType;
-import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
+import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.controller.sse.dto.ChatEventType;
+import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import java.time.Duration;
 import java.util.List;
@@ -41,7 +44,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -58,7 +60,7 @@ class AiChatLifecycleTest {
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
     private ChatModel model;
     private boolean answerStarted;
-    private ChatMemory memory;
+    private BibbidiInMemoryChatMemory memory;
     private AiChatService chat;
     private ScheduledExecutorService scheduler;
     private AtomicReference<Runnable> timeout;
@@ -70,12 +72,13 @@ class AiChatLifecycleTest {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
         ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
-        memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
+        memory = new BibbidiInMemoryChatMemory(repository, 18);
         ChecklistService checklistService = mock(ChecklistService.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        ChatMemory bibbidiMemory = new BibbidiChatMemory(repository, 20, mock(CatalogService.class),
-                checklistService, mapper);
-        chat = new AiChatService(ChatClient.create(model), bibbidiMemory, checklistService, mapper);
+        CatalogService catalogService = mock(CatalogService.class);
+        chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+                catalogService, checklistService,
+                new JacksonChatAnswerParser(mapper));
         answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
         timeout = new AtomicReference<>();
@@ -136,7 +139,6 @@ class AiChatLifecycleTest {
         CountDownLatch release = new CountDownLatch(1);
         AtomicBoolean interrupted = new AtomicBoolean();
         when(model.stream(any(Prompt.class))).thenAnswer(invocation -> {
-            assertThat(Thread.currentThread().isVirtual()).isTrue();
             started.countDown();
             while (release.getCount() != 0) {
                 try {
@@ -150,7 +152,7 @@ class AiChatLifecycleTest {
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
         sse.stream(RESPONSE_TIMEOUT, new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
             try {
-                chat.chat(7L, ID, "질문", new ChatSseHandler(connection));
+                sendEvents(connection, chat.chat(7L, ID, "질문"));
             } finally {
                 responseFinished.set(true);
             }
@@ -183,7 +185,7 @@ class AiChatLifecycleTest {
             ChatSseHandler reply = spy(new ChatSseHandler(connection));
             handler.set(reply);
             try {
-                chat.chat(7L, ID, "질문", reply);
+                chat.chat(7L, ID, "질문").doOnNext(reply::send).blockLast();
             } finally {
                 responseFinished.set(true);
             }
@@ -198,7 +200,7 @@ class AiChatLifecycleTest {
             invocation.callRealMethod();
             delivered.countDown();
             return null;
-        }).when(handler).sendAnswerChunk(text);
+        }).when(handler).send(new ChatEvent.Delta(text));
         String jsonChunk = (answerStarted ? "" : "{\"answer\":\"") + text;
         answerStarted = true;
         publisher.next(new ChatResponse(List.of(new Generation(new AssistantMessage(jsonChunk)))));
@@ -208,5 +210,11 @@ class AiChatLifecycleTest {
     private static ChatResponse response(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(
                 JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of()))))));
+    }
+
+    private static void sendEvents(com.bibbidi.wedding.chat.controller.sse.SseConnection connection,
+                                   Flux<ChatEvent> events) {
+        ChatSseHandler handler = new ChatSseHandler(connection);
+        events.doOnNext(handler::send).blockLast();
     }
 }

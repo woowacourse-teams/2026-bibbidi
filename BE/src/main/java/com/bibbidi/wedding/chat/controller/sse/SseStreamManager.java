@@ -1,6 +1,6 @@
-package com.bibbidi.wedding.chat.infra.sse;
+package com.bibbidi.wedding.chat.controller.sse;
 
-import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
+import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;

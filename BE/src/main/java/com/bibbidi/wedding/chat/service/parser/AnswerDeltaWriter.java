@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.ai;
+package com.bibbidi.wedding.chat.service.parser;
 
 import java.io.Writer;
 import java.util.function.Consumer;

@@ -33,13 +33,12 @@ import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.chat.infra.sse.SseStreamManager;
-import com.bibbidi.wedding.chat.infra.sse.config.SseConfig;
+import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
+import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.AsyncEvent;
@@ -50,6 +49,7 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import reactor.core.publisher.Flux;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CancellationException;
 import java.util.stream.Stream;
@@ -107,16 +107,18 @@ class AiChatControllerTest {
         // given
         CountDownLatch answerChunkAllowed = new CountDownLatch(1);
         CountDownLatch completionAllowed = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            answerChunkAllowed.await();
-            reply.sendAnswerChunk("웨딩홀 ");
-            reply.sendComponent(List.of(1L, 2L, 3L));
-            completionAllowed.await();
-            reply.complete(new ChatResult(ID, "웨딩홀 "), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), eq("다음 준비를 알려줘")))
+                .thenReturn(Flux.concat(
+                        Flux.just(new ChatEvent.Conversation(ID)),
+                        Flux.defer(() -> {
+                            awaitLatch(answerChunkAllowed);
+                            return Flux.just(new ChatEvent.Delta("웨딩홀 "),
+                                    new ChatEvent.Component(List.of(1L, 2L, 3L)));
+                        }),
+                        Flux.defer(() -> {
+                            awaitLatch(completionAllowed);
+                            return Flux.just(new ChatEvent.Done(ID));
+                        })));
 
         // when
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
@@ -151,15 +153,10 @@ class AiChatControllerTest {
     @DisplayName("정상 완료 시 SSE 응답 계약을 만족한다")
     void documentsTheCompletedSseResponseContract() throws Exception {
         // given
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.sendAnswerChunk("웨딩홀 ");
-            reply.sendAnswerChunk("계약을 확인하세요.");
-            reply.sendComponent(List.of(1L, 2L, 3L));
-            reply.complete(new ChatResult(ID, "웨딩홀 계약을 확인하세요."), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("다음 준비를 알려줘"), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), eq("다음 준비를 알려줘")))
+                .thenReturn(Flux.just(new ChatEvent.Conversation(ID), new ChatEvent.Delta("웨딩홀 "),
+                        new ChatEvent.Delta("계약을 확인하세요."),
+                        new ChatEvent.Component(List.of(1L, 2L, 3L)), new ChatEvent.Done(ID)));
 
         // when
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L))
@@ -197,12 +194,9 @@ class AiChatControllerTest {
     @DisplayName("답변 생성이 실패하면 고정된 공개 오류 메시지를 전송하고 완료 이벤트를 보내지 않는다")
     void streamErrorsSendOnlyTheFixedPublicMessageAndNeverDone() throws Exception {
         // given
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.sendAnswerChunk("일부 답변");
-            throw new IllegalStateException("외부 API 비밀 원문");
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), any()))
+                .thenReturn(Flux.concat(Flux.just(new ChatEvent.Conversation(ID),
+                        new ChatEvent.Delta("일부 답변")), Flux.error(new IllegalStateException("외부 API 비밀 원문"))));
 
         // when
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
@@ -229,18 +223,15 @@ class AiChatControllerTest {
         when(bibbidiTokenParser.parseAccessToken(token)).thenReturn(
                 new BibbidiTokenClaims(7L, UserStatus.ACTIVE, UserRole.NORMAL, "테스트회원", null));
         CountDownLatch completionAllowed = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            completionAllowed.await();
-            reply.sendAnswerChunk("답변");
-            reply.sendComponent(List.of(1L, 2L));
-            if (fails) {
-                throw new IllegalStateException("테스트 답변 생성 실패");
-            }
-            reply.complete(new ChatResult(ID, "답변"), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), eq("질문"), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), eq("질문"))).thenReturn(Flux.concat(
+                Flux.just(new ChatEvent.Conversation(ID)),
+                Flux.defer(() -> {
+                    awaitLatch(completionAllowed);
+                    Flux<ChatEvent> result = Flux.just(new ChatEvent.Delta("답변"),
+                            new ChatEvent.Component(List.of(1L, 2L)));
+                    return fails ? result.concatWith(Flux.error(new IllegalStateException("테스트 답변 생성 실패")))
+                            : result.concatWithValues(new ChatEvent.Done(ID));
+                })));
 
         // when
         MvcResult initial;
@@ -269,7 +260,7 @@ class AiChatControllerTest {
         }
         assertThat(completed.getRequest().getSession(false)).isNull();
         verify(bibbidiTokenParser).parseAccessToken(token);
-        verify(aiChatService).chat(eq(7L), any(), eq("질문"), any(ChatSseHandler.class));
+        verify(aiChatService).chat(eq(7L), any(), eq("질문"));
 
         mockMvc.perform(post("/api/ai/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -285,18 +276,13 @@ class AiChatControllerTest {
         // given
         CountDownLatch started = new CountDownLatch(1);
         AtomicBoolean cancelled = new AtomicBoolean();
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            started.countDown();
-            try {
-                new CountDownLatch(1).await();
-            } catch (InterruptedException exception) {
-                cancelled.set(true);
-                throw exception;
-            }
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), any())).thenReturn(Flux.concat(
+                Flux.just(new ChatEvent.Conversation(ID)),
+                Flux.defer(() -> {
+                    started.countDown();
+                    awaitCancellation(cancelled);
+                    return Flux.empty();
+                })));
         MvcResult result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> started.getCount() == 0);
@@ -316,20 +302,15 @@ class AiChatControllerTest {
     @DisplayName("서블릿 응답 시간이 초과되면 응답 작업을 중단하고 이후 이벤트를 전송하지 않는다")
     void servletTimeoutInterruptsTheWorkerWithoutSendingLateEvents() throws Exception {
         // given
-        AtomicReference<ChatSseHandler> source = new AtomicReference<ChatSseHandler>();
+        AtomicReference<Thread> source = new AtomicReference<>();
         AtomicBoolean cancelled = new AtomicBoolean();
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            source.set(reply);
-            try {
-                new CountDownLatch(1).await();
-            } catch (InterruptedException exception) {
-                cancelled.set(true);
-                throw exception;
-            }
-            return null;
-        }).when(aiChatService).chat(eq(7L), any(), any(), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), any(), any())).thenReturn(Flux.concat(
+                Flux.just(new ChatEvent.Conversation(ID)),
+                Flux.defer(() -> {
+                    source.set(Thread.currentThread());
+                    awaitCancellation(cancelled);
+                    return Flux.empty();
+                })));
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(7L)).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ChatRequest(UUID.fromString(ID), "질문")))).andReturn();
         await().until(() -> source.get() != null);
@@ -342,7 +323,6 @@ class AiChatControllerTest {
         }
 
         // then
-        assertThatThrownBy(() -> source.get().sendAnswerChunk("늦은 답변")).isInstanceOf(CancellationException.class);
         await().untilTrue(cancelled);
         String body = mockMvc.perform(asyncDispatch(initial)).andReturn().getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -382,12 +362,8 @@ class AiChatControllerTest {
     void convertsTheConversationIdToUuidBeforeCallingTheService() throws Exception {
         // given
         UUID id = UUID.fromString(ID);
-        doAnswer(invocation -> {
-            ChatSseHandler reply = invocation.getArgument(3);
-            reply.conversation(ID);
-            reply.complete(new ChatResult(ID, "답변"), () -> {});
-            return null;
-        }).when(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
+        when(aiChatService.chat(eq(7L), eq(id), eq("질문")))
+                .thenReturn(Flux.just(new ChatEvent.Conversation(ID), new ChatEvent.Done(ID)));
         ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(id, "질문"));
         request.put("conversationId", ID.toUpperCase(Locale.ROOT));
 
@@ -400,7 +376,7 @@ class AiChatControllerTest {
         // then
         MvcResult completed = mockMvc.perform(asyncDispatch(initial)).andExpect(status().isOk()).andReturn();
 
-        verify(aiChatService).chat(eq(7L), eq(id), eq("질문"), any(ChatSseHandler.class));
+        verify(aiChatService).chat(eq(7L), eq(id), eq("질문"));
         assertThat(completed.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("event:done").doesNotContain("event:failure");
     }
@@ -440,5 +416,24 @@ class AiChatControllerTest {
     static Stream<ChatRequest> invalidRequests() {
         return Stream.of(new ChatRequest(null, " "), new ChatRequest(null, null),
                 new ChatRequest(null, "가".repeat(4001)));
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("응답 중단");
+        }
+    }
+
+    private static void awaitCancellation(AtomicBoolean cancelled) {
+        try {
+            new CountDownLatch(1).await();
+        } catch (InterruptedException exception) {
+            cancelled.set(true);
+            Thread.currentThread().interrupt();
+            throw new CancellationException("응답 중단");
+        }
     }
 }

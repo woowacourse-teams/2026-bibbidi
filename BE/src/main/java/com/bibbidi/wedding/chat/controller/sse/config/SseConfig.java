@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.sse.config;
+package com.bibbidi.wedding.chat.controller.sse.config;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

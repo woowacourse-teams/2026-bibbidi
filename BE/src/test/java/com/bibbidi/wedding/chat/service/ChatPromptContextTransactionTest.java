@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.ai;
+package com.bibbidi.wedding.chat.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,8 +16,10 @@ import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatSseHandler;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
 import com.bibbidi.wedding.checklist.service.ChecklistAppointmentService;
@@ -43,6 +45,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,7 +57,7 @@ import reactor.core.publisher.Flux;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-class BibbidiChatMemoryTransactionTest {
+class ChatPromptContextTransactionTest {
 
     private final CatalogRepository catalog = mock(CatalogRepository.class);
     private final ChecklistRepository repository = mock(ChecklistRepository.class);
@@ -90,25 +93,24 @@ class BibbidiChatMemoryTransactionTest {
                     new AssistantMessage("{\"answer\":\"답변\",\"recommendedItemIds\":[]}")))));
         });
         runner.run(context -> {
-            ChatMemory memory = context.getBean(ChatMemory.class);
-            AiChatService chat = new AiChatService(ChatClient.create(model), memory,
-                    context.getBean(ChecklistService.class), context.getBean(ObjectMapper.class));
-            ChatSseHandler reply = mock(ChatSseHandler.class);
-            doAnswer(invocation -> {
-                ((Runnable) invocation.getArgument(1)).run();
-                return null;
-            }).when(reply).complete(any(ChatResult.class), any(Runnable.class));
-
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            ObjectMapper mapper = context.getBean(ObjectMapper.class);
+            ChecklistService checklist = context.getBean(ChecklistService.class);
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+                    context.getBean(CatalogService.class), checklist,
+                    new JacksonChatAnswerParser(mapper));
             // when
-            chat.chat(7L, UUID.randomUUID(), "질문", reply);
+            ChatEvent lastEvent = chat.chat(7L, UUID.randomUUID(), "질문").blockLast();
 
             // then
             assertThat(isActualTransactionActive()).isFalse();
-            assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7").getFirst().getText())
-                    .contains("\"exists\":" + exists);
+            ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+            verify(model).stream(prompt.capture());
+            assertThat(prompt.getValue().getInstructions()).extracting(message -> message.getText())
+                    .anySatisfy(text -> assertThat(text).contains("\"exists\":" + exists));
+            assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7")).isEmpty();
             verify(repository, times(1)).findByOwnerId(7L);
-            verify(model).stream(any(Prompt.class));
-            verify(reply).complete(any(ChatResult.class), any(Runnable.class));
+            assertThat(lastEvent).isInstanceOf(ChatEvent.Done.class);
         });
     }
 
@@ -120,12 +122,15 @@ class BibbidiChatMemoryTransactionTest {
         when(repository.findByOwnerId(7L)).thenThrow(failure);
         runner.run(context -> {
             ChatMemoryRepository memoryRepository = context.getBean(ChatMemoryRepository.class);
-            ChatMemory memory = context.getBean(ChatMemory.class);
-            AiChatService chat = new AiChatService(ChatClient.create(model), memory,
-                    context.getBean(ChecklistService.class), context.getBean(ObjectMapper.class));
+            BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
+            ObjectMapper mapper = context.getBean(ObjectMapper.class);
+            ChecklistService checklist = context.getBean(ChecklistService.class);
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+                    context.getBean(CatalogService.class), checklist,
+                    new JacksonChatAnswerParser(mapper));
 
             // when, then
-            assertThatThrownBy(() -> chat.chat(7L, UUID.randomUUID(), "질문", mock(ChatSseHandler.class)))
+            assertThatThrownBy(() -> chat.chat(7L, UUID.randomUUID(), "질문").blockLast())
                     .isSameAs(failure);
             assertThat(isActualTransactionActive()).isFalse();
             assertThat(memoryRepository.findByConversationId("user-info:7")).isEmpty();
@@ -155,9 +160,8 @@ class BibbidiChatMemoryTransactionTest {
         }
 
         @Bean
-        ChatMemory chatMemory(ChatMemoryRepository repository, CatalogService catalog, ChecklistService checklist,
-                              ObjectMapper mapper) {
-            return new BibbidiChatMemory(repository, 20, catalog, checklist, mapper);
+        BibbidiInMemoryChatMemory chatMemory(ChatMemoryRepository repository) {
+            return new BibbidiInMemoryChatMemory(repository, 18);
         }
 
         @Bean

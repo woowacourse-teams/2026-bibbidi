@@ -4,21 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
@@ -26,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -41,7 +44,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -62,9 +64,10 @@ class AiChatServiceTest {
     private static final UUID ANOTHER_CONVERSATION_ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea98");
 
     private ChatModel model;
-    private ChatMemory memory;
+    private BibbidiInMemoryChatMemory memory;
     private AiChatService service;
-    private ChatSseHandler reply;
+    private List<ChatEvent> received;
+    private CatalogService catalogService;
     private ChecklistService checklistService;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
@@ -74,20 +77,16 @@ class AiChatServiceTest {
         model = mock(ChatModel.class);
         when(model.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
         ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
-        memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
+        memory = new BibbidiInMemoryChatMemory(repository, 18);
+        catalogService = mock(CatalogService.class);
         checklistService = mock(ChecklistService.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        ChatMemory bibbidiMemory = new BibbidiChatMemory(repository, 20, mock(CatalogService.class),
-                checklistService, mapper);
-        service = new AiChatService(ChatClient.create(model), bibbidiMemory, checklistService, mapper);
+        service = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper),
+                catalogService, checklistService,
+                new JacksonChatAnswerParser(mapper));
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
-        reply = mock(ChatSseHandler.class);
-        doAnswer(invocation -> {
-            Runnable rememberTurn = invocation.getArgument(1);
-            rememberTurn.run();
-            return null;
-        }).when(reply).complete(any(ChatResult.class), any(Runnable.class));
+        received = new CopyOnWriteArrayList<>();
     }
 
     @AfterEach
@@ -105,10 +104,10 @@ class AiChatServiceTest {
 
         // when, then: 답변 조각을 받는 동안에는 대화를 저장하지 않는다
         publisher.next(chunk("{\"answer\":\"웨딩홀 "));
-        await().untilAsserted(() -> verify(reply).sendAnswerChunk("웨딩홀 "));
+        await().until(() -> received.contains(new ChatEvent.Delta("웨딩홀 ")));
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
         publisher.next(chunk("계약을 확인하세요.\",\"recommendedItemIds\":[]}"));
-        await().untilAsserted(() -> verify(reply).sendAnswerChunk("계약을 확인하세요."));
+        await().until(() -> received.contains(new ChatEvent.Delta("계약을 확인하세요.")));
 
         // when
         publisher.complete();
@@ -127,13 +126,12 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
         // when
-        service.chat(USER_ID, null, "질문", reply);
+        runChat(USER_ID, null, "질문");
 
         // then
-        ArgumentCaptor<String> conversationId = ArgumentCaptor.forClass(String.class);
-        verify(reply).conversation(conversationId.capture());
-        UUID generatedId = UUID.fromString(conversationId.getValue());
-        assertThat(conversationId.getValue()).isEqualTo(generatedId.toString());
+        ChatEvent.Conversation conversation = (ChatEvent.Conversation) received.getFirst();
+        UUID generatedId = UUID.fromString(conversation.conversationId());
+        assertThat(conversation.conversationId()).isEqualTo(generatedId.toString());
     }
 
     @Test
@@ -143,7 +141,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
         // when
-        service.chat(USER_ID, CONVERSATION_ID, "질문", reply);
+        runChat(USER_ID, CONVERSATION_ID, "질문");
 
         // then
         Prompt prompt = captureModelPrompt();
@@ -151,6 +149,29 @@ class AiChatServiceTest {
         verify(checklistService).findMyChecklistIfPresent(USER_ID);
         assertThat(options.getToolCallbacks()).isNullOrEmpty();
         assertThat(options.getToolContext()).isNullOrEmpty();
+    }
+
+    @Test
+    @DisplayName("대화할 때마다 최신 체크리스트 정보를 다시 조회한다")
+    void refreshesPromptContextForEachRequest() {
+        when(checklistService.findMyChecklistIfPresent(USER_ID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(new ChecklistWithAppointmentsResult(10L, List.of())));
+        when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
+
+        runChat(USER_ID, CONVERSATION_ID, "첫 질문");
+        runChat(USER_ID, CONVERSATION_ID, "둘째 질문");
+
+        ArgumentCaptor<Prompt> prompts = ArgumentCaptor.forClass(Prompt.class);
+        verify(model, times(2)).stream(prompts.capture());
+        assertThat(prompts.getAllValues().get(0).getInstructions())
+                .extracting(message -> message.getText())
+                .anySatisfy(text -> assertThat(text).contains("\"exists\":false"));
+        assertThat(prompts.getAllValues().get(1).getInstructions())
+                .extracting(message -> message.getText())
+                .anySatisfy(text -> assertThat(text).contains("\"exists\":true"));
+        verify(catalogService, times(2)).findAllItemDetails();
+        verify(checklistService, times(2)).findMyChecklistIfPresent(USER_ID);
     }
 
     @Test
@@ -164,7 +185,7 @@ class AiChatServiceTest {
         });
 
         // when
-        Future<?> responseTask = executor.submit(() -> service.chat(USER_ID, CONVERSATION_ID, "질문", reply));
+        Future<?> responseTask = executor.submit(() -> runChat(USER_ID, CONVERSATION_ID, "질문"));
         responseTask.get(5, TimeUnit.SECONDS);
 
         // then
@@ -179,7 +200,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
         // when
-        service.chat(USER_ID, CONVERSATION_ID, "추천해줘", reply);
+        runChat(USER_ID, CONVERSATION_ID, "추천해줘");
 
         // then
         Prompt prompt = captureModelPrompt();
@@ -196,7 +217,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
         // when
-        service.chat(ANOTHER_USER_ID, CONVERSATION_ID, "추천해줘", reply);
+        runChat(ANOTHER_USER_ID, CONVERSATION_ID, "추천해줘");
 
         // then
         Prompt prompt = captureModelPrompt();
@@ -213,7 +234,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("답변")));
 
         // when
-        service.chat(USER_ID, ANOTHER_CONVERSATION_ID, "추천해줘", reply);
+        runChat(USER_ID, ANOTHER_CONVERSATION_ID, "추천해줘");
 
         // then
         Prompt prompt = captureModelPrompt();
@@ -230,12 +251,12 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("확인했어요.")));
 
         // when
-        service.chat(USER_ID, null, question, reply);
+        runChat(USER_ID, null, question);
 
         // then
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions().getLast().getText()).isEqualTo(question);
-        verify(reply).sendAnswerChunk("확인했어요.");
+        assertThat(received).contains(new ChatEvent.Delta("확인했어요."));
     }
 
     @Test
@@ -247,7 +268,7 @@ class AiChatServiceTest {
 
         // when
         publisher.next(chunk("{\"answer\":\"일부 답변"));
-        await().untilAsserted(() -> verify(reply).sendAnswerChunk("일부 답변"));
+        await().until(() -> received.contains(new ChatEvent.Delta("일부 답변")));
         publisher.error(new IllegalStateException("비공개 제공사 오류"));
 
         // then
@@ -259,7 +280,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("새 답변")));
 
         // when
-        service.chat(USER_ID, CONVERSATION_ID, "다시 질문", reply);
+        runChat(USER_ID, CONVERSATION_ID, "다시 질문");
 
         // then
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID))
@@ -275,7 +296,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(answer);
 
         // when, then
-        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "질문", reply))
+        assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "질문"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
@@ -296,37 +317,59 @@ class AiChatServiceTest {
                 chunk("{\"answer\":\"부분 답변\",\"recommendedItemIds\":[\"1\"]}")));
 
         // when, then
-        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "추천해줘", reply))
+        assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "추천해줘"))
                 .isInstanceOf(BusinessException.class);
-        verify(reply).sendAnswerChunk("부분 답변");
-        verify(reply, never()).sendComponent(any());
-        verify(reply, never()).complete(any(), any());
+        assertThat(received).contains(new ChatEvent.Delta("부분 답변"));
+        assertThat(received).noneMatch(event -> event instanceof ChatEvent.Component || event instanceof ChatEvent.Done);
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
     }
 
     @Test
-    @DisplayName("연결이 종료되면 완성된 답변도 대화에 저장하지 않는다")
-    void closedReplyDoesNotRecordTheCompletedAnswer() {
-        // given
-        when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("완성된 답변")));
-        doThrow(new CancellationException("연결 종료"))
-                .when(reply).complete(any(ChatResult.class), any(Runnable.class));
-
-        // when, then
-        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "질문", reply))
-                .isInstanceOf(CancellationException.class);
-        assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("답변 조각 전송이 실패하면 모델 구독을 취소하고 대화를 저장하지 않는다")
-    void sendingAChunkFailureCancelsTheModelAndDiscardsTheTurn() {
+    @DisplayName("구독을 취소하면 완성되지 않은 답변을 저장하지 않는다")
+    void cancelledSubscriptionDoesNotRecordTheAnswer() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
-        doThrow(new CancellationException("SSE 연결 종료")).when(reply).sendAnswerChunk("일부 답변");
-        Future<?> responseTask = startStreamingChat(publisher);
+        when(model.stream(any(Prompt.class))).thenReturn(publisher.flux());
 
-        publisher.assertSubscribers(1);
+        // when
+        service.chat(USER_ID, CONVERSATION_ID, "질문")
+                .take(1)
+                .blockLast();
+
+        // then
+        publisher.assertNoSubscribers();
+        assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("완료 이벤트를 전달하지 못하면 완성된 답변도 저장하지 않는다")
+    void failedDoneDeliveryDoesNotRecordTheAnswer() {
+        when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("완성된 답변")));
+
+        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "질문")
+                .doOnNext(event -> {
+                    if (event instanceof ChatEvent.Done) {
+                        throw new CancellationException("연결 종료");
+                    }
+                }).blockLast()).isInstanceOf(CancellationException.class);
+
+        assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("답변 조각 소비가 실패하면 모델 구독을 취소하고 대화를 저장하지 않는다")
+    void consumingAChunkFailureCancelsTheModelAndDiscardsTheTurn() {
+        // given
+        TestPublisher<ChatResponse> publisher = TestPublisher.create();
+        when(model.stream(any(Prompt.class))).thenReturn(publisher.flux());
+        Future<?> responseTask = executor.submit(() -> service.chat(USER_ID, CONVERSATION_ID, "질문")
+                .doOnNext(event -> {
+                    if (event instanceof ChatEvent.Delta) {
+                        throw new CancellationException("소비 중단");
+                    }
+                }).blockLast());
+
+        await().untilAsserted(() -> publisher.assertSubscribers(1));
 
         // when
         publisher.next(chunk("{\"answer\":\"일부 답변"));
@@ -348,7 +391,7 @@ class AiChatServiceTest {
 
         // when
         publisher.next(chunk("{\"answer\":\"중단할 답변"));
-        await().untilAsserted(() -> verify(reply).sendAnswerChunk("중단할 답변"));
+        await().until(() -> received.contains(new ChatEvent.Delta("중단할 답변")));
         responseTask.cancel(true);
 
         // then
@@ -363,7 +406,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("재시도")));
 
         // when
-        service.chat(USER_ID, CONVERSATION_ID, "재요청", reply);
+        runChat(USER_ID, CONVERSATION_ID, "재요청");
 
         // then
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID))
@@ -379,7 +422,7 @@ class AiChatServiceTest {
         startStreamingChat(publisher);
 
         // when, then
-        assertThatThrownBy(() -> service.chat(USER_ID, CONVERSATION_ID, "중복 요청", reply))
+        assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "중복 요청"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
         assertThat(memory.get(USER_ID + ":" + CONVERSATION_ID)).isEmpty();
@@ -394,7 +437,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("다른 사용자")));
 
         // when
-        service.chat(ANOTHER_USER_ID, CONVERSATION_ID, "질문", reply);
+        runChat(ANOTHER_USER_ID, CONVERSATION_ID, "질문");
 
         // then
         assertThat(memory.get(ANOTHER_USER_ID + ":" + CONVERSATION_ID))
@@ -411,7 +454,7 @@ class AiChatServiceTest {
         when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response("다른 대화 답변")));
 
         // when
-        service.chat(USER_ID, ANOTHER_CONVERSATION_ID, "질문", reply);
+        runChat(USER_ID, ANOTHER_CONVERSATION_ID, "질문");
 
         // then
         assertThat(memory.get(USER_ID + ":" + ANOTHER_CONVERSATION_ID))
@@ -425,7 +468,7 @@ class AiChatServiceTest {
                 .doOnSubscribe(ignored -> subscribed.countDown()));
         Future<?> responseTask = executor.submit(() -> {
             try {
-                service.chat(USER_ID, CONVERSATION_ID, "질문", reply);
+                runChat(USER_ID, CONVERSATION_ID, "질문");
             } finally {
                 responseFinished.set(true);
             }
@@ -437,6 +480,10 @@ class AiChatServiceTest {
     private void givenConversationHistory() {
         memory.add(USER_ID + ":" + CONVERSATION_ID,
                 List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
+    }
+
+    private void runChat(Long userId, UUID conversationId, String message) {
+        service.chat(userId, conversationId, message).doOnNext(received::add).blockLast();
     }
 
     private Prompt captureModelPrompt() {

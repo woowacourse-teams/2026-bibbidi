@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.ai;
+package com.bibbidi.wedding.chat.service.parser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

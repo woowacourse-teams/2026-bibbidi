@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.infra.ai;
+package com.bibbidi.wedding.chat.service.parser;
 
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.common.exception.BusinessException;

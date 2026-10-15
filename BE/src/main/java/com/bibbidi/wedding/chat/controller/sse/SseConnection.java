@@ -1,6 +1,6 @@
-package com.bibbidi.wedding.chat.infra.sse;
+package com.bibbidi.wedding.chat.controller.sse;
 
-import com.bibbidi.wedding.chat.infra.sse.dto.SseEvent;
+import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.concurrent.CancellationException;
