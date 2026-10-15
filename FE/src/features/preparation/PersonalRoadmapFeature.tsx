@@ -26,6 +26,7 @@ function findRevealTarget(
 export function PersonalRoadmapFeature({
   categoryId,
   onCategorySelect,
+  onRevealCategorySelect,
   onShowAll,
   viewSwitcher,
   revealCatalogItemId,
@@ -33,6 +34,7 @@ export function PersonalRoadmapFeature({
 }: {
   categoryId?: string | null;
   onCategorySelect: (id: string) => void;
+  onRevealCategorySelect: (id: string) => void;
   onShowAll: () => void;
   viewSwitcher: ReactNode;
   revealCatalogItemId?: number;
@@ -61,7 +63,7 @@ export function PersonalRoadmapFeature({
     if (displayRequest.status !== "success" || !targetCategoryId) {
       if (displayRequest.status !== "loading") onRevealComplete?.();
     } else if (targetCategoryId !== categoryId) {
-      onCategorySelect(targetCategoryId);
+      onRevealCategorySelect(targetCategoryId);
     }
   }, [
     revealCatalogItemId,
@@ -69,7 +71,7 @@ export function PersonalRoadmapFeature({
     isRefreshing,
     targetCategoryId,
     categoryId,
-    onCategorySelect,
+    onRevealCategorySelect,
     onRevealComplete,
   ]);
   if (displayRequest.status !== "success") {

@@ -290,6 +290,8 @@ describe("AI 할 일 추가 연출", () => {
     expect(
       container.querySelectorAll(".personal-roadmap__title-typing"),
     ).toHaveLength(1);
+    expect(screen.getByRole("log")).toBeTruthy();
+    expect(screen.getByRole("textbox")).toBeTruthy();
     expect(
       container.querySelector(".personal-roadmap__title-reserve")?.textContent,
     ).toBe("서버에 저장된 투어");
@@ -332,6 +334,85 @@ describe("AI 할 일 추가 연출", () => {
       ).not.toBeNull(),
     );
     await screen.findByRole("dialog", { name: "AI 채팅" }, { timeout: 3000 });
+  });
+
+  it("사용자가 카테고리를 바꾸면 진행 중·대기 중인 연출을 취소하고 돌아와도 재생하지 않는다", async () => {
+    const { container } = workspace();
+    fireEvent.click(await recommend());
+    await waitFor(() =>
+      expect(
+        container.querySelector(".personal-roadmap__title-reserve")
+          ?.textContent,
+      ).toBe("서버에 저장된 투어"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "현재 추천: 예식 형태 결정" }),
+    );
+    await screen.findByText("추천을 모두 확인했어요.");
+    await waitFor(() =>
+      expect(
+        container.querySelector(".personal-roadmap__title-typing"),
+      ).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^스드메$/ }));
+    expect(screen.getByRole("heading", { name: "스드메 로드맵" })).toBeTruthy();
+    expect(
+      container.querySelector(".personal-roadmap__title-typing"),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^웨딩홀$/ }));
+    expect(
+      container.querySelector(".personal-roadmap__title-typing"),
+    ).toBeNull();
+    expect(screen.getByText("서버에 저장된 투어")).toBeTruthy();
+    expect(screen.getByText("서버에 저장된 예식")).toBeTruthy();
+  });
+
+  it("연속 저장 후 목록 갱신이 늦어져도 대기 항목을 버리지 않고 모두 연출한다", async () => {
+    const { container } = workspace();
+    fireEvent.click(await recommend());
+    await waitFor(() =>
+      expect(
+        container.querySelector(".personal-roadmap__title-reserve")
+          ?.textContent,
+      ).toBe("서버에 저장된 투어"),
+    );
+    let release!: () => void;
+    mocks.catalog.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(catalog);
+        }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "현재 추천: 예식 형태 결정" }),
+    );
+    await waitFor(() => expect(release).toBeTypeOf("function"));
+    await screen.findByText("추천을 모두 확인했어요.");
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+    });
+    await act(async () => release());
+    await waitFor(() =>
+      expect(
+        container.querySelector(".personal-roadmap__title-reserve")
+          ?.textContent,
+      ).toBe("서버에 저장된 투어"),
+    );
+    await waitFor(
+      () =>
+        expect(
+          container.querySelector(".personal-roadmap__title-reserve")
+            ?.textContent,
+        ).toBe("서버에 저장된 예식"),
+      { timeout: 3000 },
+    );
+    await waitFor(
+      () =>
+        expect(
+          container.querySelector(".personal-roadmap__title-typing"),
+        ).toBeNull(),
+      { timeout: 3000 },
+    );
   });
 
   it("모바일 모션 줄이기는 저장된 제목을 바로 표시하고 다음 추천으로 복귀한다", async () => {

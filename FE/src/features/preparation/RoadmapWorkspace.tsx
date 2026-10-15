@@ -77,6 +77,10 @@ export function RoadmapWorkspace({
     setReveals(null);
     setChoice({ audience, view: nextView });
   };
+  const changeCategory = (id: string) => {
+    setReveals(null);
+    setCategoryId(id);
+  };
   const showAll = () => changeView("all");
   const {
     isMobile,
@@ -121,7 +125,7 @@ export function RoadmapWorkspace({
           {view === "all" || !isAuthenticated ? (
             renderCatalogRoadmap({
               categoryId,
-              onCategorySelect: setCategoryId,
+              onCategorySelect: changeCategory,
               viewSwitcher,
               view,
               onShowAll: showAll,
@@ -130,7 +134,8 @@ export function RoadmapWorkspace({
             <PersonalRoadmapFeature
               key={audience}
               categoryId={categoryId}
-              onCategorySelect={setCategoryId}
+              onCategorySelect={changeCategory}
+              onRevealCategorySelect={setCategoryId}
               onShowAll={showAll}
               viewSwitcher={viewSwitcher}
               revealCatalogItemId={revealCatalogItemId}
