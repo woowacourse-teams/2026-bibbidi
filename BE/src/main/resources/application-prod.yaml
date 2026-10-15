@@ -13,6 +13,9 @@ spring:
       keepalive-time: 30000
       connection-test-query: "SELECT 1"
 
+  flyway:
+    enabled: true
+
   jpa:
     hibernate:
       ddl-auto: validate
