@@ -39,6 +39,10 @@ query_range:
 
 limits_config:
   retention_period: 336h           # 보존 14일
+  retention_stream:
+    - selector: '{log_type="ai_content"}'  # 대화 원문 로그(ai.chat.content)만 짧게 보관
+      priority: 1
+      period: 168h                 # 보존 7일
 
 compactor:
   working_directory: /var/lib/loki/compactor
