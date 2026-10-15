@@ -50,6 +50,7 @@ import reactor.core.publisher.Flux;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeAsyncClient;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -224,8 +225,15 @@ class AiChatConfigTest {
         assertThat(request.getValue().modelId()).isEqualTo("us.openai.gpt-6.1-sol");
         assertThat(request.getValue().inferenceConfig().maxTokens()).isEqualTo(2048);
         assertThat(request.getValue().toolConfig()).isNull();
-        assertThat(request.getValue().outputConfig().textFormat().structure().jsonSchema().schema())
-                .contains("answer", "recommendedItemIds").doesNotContain("minimum");
+        JsonNode schema = mapper.readTree(request.getValue().outputConfig().textFormat().structure().jsonSchema().schema());
+        assertThat(schema.path("type").asString()).isEqualTo("object");
+        assertThat(schema.path("properties").size()).isEqualTo(2);
+        assertThat(schema.at("/properties/answer/type").asString()).isEqualTo("string");
+        assertThat(schema.at("/properties/recommendedItemIds/type").asString()).isEqualTo("array");
+        assertThat(schema.at("/properties/recommendedItemIds/items/type").asString()).isEqualTo("integer");
+        assertThat(schema.path("required")).isEqualTo(mapper.valueToTree(List.of("answer", "recommendedItemIds")));
+        assertThat(schema.path("additionalProperties")).isEqualTo(mapper.valueToTree(false));
+        assertThat(schema.toString()).doesNotContain("minimum", "maximum");
         assertThat(request.getValue().additionalModelRequestFields().asMap().get("text")
                 .asMap().get("format").asMap().get("strict").asBoolean()).isTrue();
     }

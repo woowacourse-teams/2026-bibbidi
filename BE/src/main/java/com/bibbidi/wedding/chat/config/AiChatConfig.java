@@ -4,6 +4,7 @@ import static org.springframework.ai.chat.client.ChatClient.*;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.infra.ai.BibbidiChatMemory;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -23,25 +25,14 @@ import tools.jackson.databind.ObjectMapper;
 @EnableConfigurationProperties(AiChatProperties.class)
 public class AiChatConfig {
 
-    private static final String ANSWER_SCHEMA = """
-            {
-              "type": "object",
-              "properties": {
-                "answer": {"type": "string"},
-                "recommendedItemIds": {"type": "array", "items": {"type": "integer"}}
-              },
-              "required": ["answer", "recommendedItemIds"],
-              "additionalProperties": false
-            }
-            """;
-
     @Bean
     ChatClient aiChatClient(
             Builder builder,
             @Value("${spring.ai.bedrock.converse.chat.model}") String model,
             @Value("classpath:prompts/ai-chat-system.txt") Resource systemPrompt
     ) {
-        BedrockChatOptions.Builder options = BedrockChatOptions.builder().outputSchema(ANSWER_SCHEMA);
+        BeanOutputConverter<ChatAnswer> outputConverter = new BeanOutputConverter<>(ChatAnswer.class);
+        BedrockChatOptions.Builder options = BedrockChatOptions.builder().outputSchema(outputConverter.getJsonSchema());
         if (model.contains("openai.gpt-")) {
             options.requestParameters(strictJsonFormatRequestParameters());
         }
