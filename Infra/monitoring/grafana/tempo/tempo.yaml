@@ -37,7 +37,7 @@ overrides:
     compaction:
       block_retention: 120h # 5일
     metrics_generator:
-      processors: ["span-metrics", "service-graphs"]
+      processors: []
       generate_native_histograms: classic
       processor:
         span_metrics:
