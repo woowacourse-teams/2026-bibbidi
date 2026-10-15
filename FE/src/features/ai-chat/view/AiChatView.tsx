@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 
-import bibbidiLogo from "../../../assets/bibbidi-logo.png";
+import bibbidiLogo from "../../../assets/bibbidi-logo.webp";
 import {
   ChatMessage,
   MAX_CHAT_MESSAGE_LENGTH,

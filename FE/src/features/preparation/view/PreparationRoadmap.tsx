@@ -1,4 +1,4 @@
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { EXPAND_MOTION_STYLE } from "../../../shared/motion";
 import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
 import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
@@ -27,6 +27,44 @@ interface PreparationRoadmapStepsProps {
   onStepSelect: (stepId: string) => void;
   onTaskAdd: (catalogItemId: string) => void;
   viewModel: PreparationRoadmapViewModel;
+}
+
+function PreparationStepIcon({ src }: { src: string }) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [visible, setVisible] = useState(
+    () => typeof IntersectionObserver === "undefined",
+  );
+
+  useEffect(() => {
+    if (visible || !imageRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(imageRef.current);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <img
+      alt=""
+      className="preparation-roadmap__step-icon"
+      decoding="async"
+      draggable={false}
+      height={48}
+      onError={(event) => {
+        event.currentTarget.hidden = true;
+      }}
+      ref={imageRef}
+      src={visible ? src : undefined}
+      width={48}
+    />
+  );
 }
 
 function PreparationRoadmapSteps({
@@ -79,15 +117,7 @@ function PreparationRoadmapSteps({
                 </span>
               ) : null}
               {step.iconUrl ? (
-                <img
-                  alt=""
-                  className="preparation-roadmap__step-icon"
-                  draggable={false}
-                  onError={(event) => {
-                    event.currentTarget.hidden = true;
-                  }}
-                  src={step.iconUrl}
-                />
+                <PreparationStepIcon key={step.iconUrl} src={step.iconUrl} />
               ) : null}
             </button>
             <RoadmapStepDisclosure expanded={isExpanded}>
