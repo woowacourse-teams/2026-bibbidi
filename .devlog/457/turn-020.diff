@@ -1,0 +1,20 @@
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+index e0e7321bb232281921169914e9ab81ffab2a5f58..30b6b76da315961667343430e783054fcfb52edd 100644
+--- a/.github/workflows/load-test.yml
++++ b/.github/workflows/load-test.yml
+@@ -61,12 +61,14 @@ jobs:
+           }
+           jwt_secret="$(pick "$SPRING_ENV_CONTENT" AUTH_JWT_SECRET)"
+           server_name="$(pick "$NGINX_ENV_CONTENT" SERVER_NAME)"
++          # 배포 스크립트(tls-sub-tasks/common.sh)와 같이 SERVER_NAME이 없으면 CERT_DOMAIN을 쓴다.
++          server_name="${server_name:-$(pick "$NGINX_ENV_CONTENT" CERT_DOMAIN)}"
+           ingest_token="$(pick "$ALLOY_ENV_CONTENT" MONITORING_INGEST_TOKEN)"
+           for secret in "$jwt_secret" "$ingest_token"; do
+             if [ -n "$secret" ]; then echo "::add-mask::$secret"; fi
+           done
+           test -n "$jwt_secret" || { echo "::error::BIBBIDI_SPRING_ENV에서 AUTH_JWT_SECRET을 찾지 못했습니다."; exit 1; }
+-          test -n "$server_name" || { echo "::error::BIBBIDI_NGINX_ENV에서 SERVER_NAME을 찾지 못했습니다."; exit 1; }
++          test -n "$server_name" || { echo "::error::BIBBIDI_NGINX_ENV에서 SERVER_NAME과 CERT_DOMAIN을 모두 찾지 못했습니다."; exit 1; }
+           test -n "$ingest_token" || { echo "::error::BIBBIDI_ALLOY_ENV에서 MONITORING_INGEST_TOKEN을 찾지 못했습니다."; exit 1; }
+           {
+             echo "AUTH_JWT_SECRET=$jwt_secret"

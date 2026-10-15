@@ -18,7 +18,6 @@ interface AppointmentResponse {
   id: number;
 }
 
-// 한 사용자의 Access Token으로 부르는 비비디 API. 엔드포인트 이름과 기대 응답을 한곳에 모은다.
 export class BibbidiApi {
   constructor(
     private readonly client: HttpClient,
@@ -76,7 +75,6 @@ export class BibbidiApi {
     return (response.json() as unknown as AppointmentResponse).id;
   }
 
-  // 체크리스트가 아직 없으면 null. 없는 것은 오류가 아니라 정상 응답(404)이다.
   findChecklist(): Checklist | null {
     const response = this.client.send(this.token, {
       name: 'GET /api/checklists/me',
@@ -97,7 +95,6 @@ export class BibbidiApi {
     });
   }
 
-  // 홈 화면이 부르는 조회들
   visitHome(): void {
     const reads: [string, string][] = [
       ['GET /api/checklists/me/progress', '/api/checklists/me/progress'],

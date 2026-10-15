@@ -1,7 +1,6 @@
 import type { ApiFactory } from './api.ts';
 import { pickRandom, UserIds, type PooledUser } from './users.ts';
 
-// setup()이 만들어 모든 가상 사용자에게 나눠 주는 데이터. JSON으로 전달되므로 일반 객체만 담는다.
 export interface SetupData {
   runId: number;
   catalogItemIds: number[];
@@ -14,12 +13,10 @@ export interface SessionContext {
   apis: ApiFactory;
 }
 
-// 사용 흐름도의 한 갈래를 사용자 한 명이 끝까지 지나가는 단위
 export interface Session {
   run(context: SessionContext): void;
 }
 
-// 신규 사용자: 둘러보기 → 체크리스트 담기 → 일정 잡기 → 홈
 export class NewUserSession implements Session {
   run({ data, iteration, apis }: SessionContext): void {
     const api = apis.forUser(UserIds.fresh(data.runId, iteration));
@@ -32,7 +29,6 @@ export class NewUserSession implements Session {
   }
 }
 
-// 재방문 사용자: 홈 → 진행하기
 export class ReturningUserSession implements Session {
   run({ data, iteration, apis }: SessionContext): void {
     const user = data.pool[iteration % data.pool.length];
@@ -44,13 +40,24 @@ export class ReturningUserSession implements Session {
   }
 }
 
+export interface SessionSelector {
+  pick(iteration: number): Session;
+}
+
+export class SessionSequence implements SessionSelector {
+  constructor(private readonly sessions: readonly Session[]) {}
+
+  pick(iteration: number): Session {
+    return this.sessions[iteration % this.sessions.length];
+  }
+}
+
 export interface WeightedSession {
   session: Session;
   weight: number;
 }
 
-// 세션 종류를 가중치 비율로 섞는다. 예: 신규:재방문 3:7
-export class SessionMix {
+export class SessionMix implements SessionSelector {
   private readonly totalWeight: number;
 
   constructor(private readonly entries: readonly WeightedSession[]) {

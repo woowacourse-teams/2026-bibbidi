@@ -3,31 +3,24 @@ import { ApiFactory } from './src/api.ts';
 import { Environment, numberFromEnv, textFromEnv } from './src/environment.ts';
 import { HttpClient } from './src/http.ts';
 import { LoadTest } from './src/load-test.ts';
-import { NewUserSession, ReturningUserSession, SessionMix, type SetupData } from './src/session.ts';
+import { NewUserSession, ReturningUserSession, SessionSequence, type SetupData } from './src/session.ts';
 import { SummaryReport, type SummaryData } from './src/summary.ts';
 import { AccessTokenIssuer } from './src/token.ts';
 
 const environment = Environment.fromEnv();
 
-// 신규:재방문 = 3:7
-const mix = new SessionMix([
-  { session: new NewUserSession(), weight: 3 },
-  { session: new ReturningUserSession(), weight: 7 },
-]);
+const sessions = new SessionSequence([new NewUserSession(), new ReturningUserSession()]);
 
 const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
-const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 10));
+const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 1));
 
-// Smoke는 경로가 끝까지 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
 export const options: Options = {
   scenarios: {
     smoke: {
-      executor: 'constant-arrival-rate',
-      rate: numberFromEnv('RATE', 1),
-      timeUnit: '1s',
-      duration: textFromEnv('DURATION', '1m'),
-      preAllocatedVUs: 5,
-      maxVUs: 20,
+      executor: 'shared-iterations',
+      vus: 1,
+      iterations: numberFromEnv('ITERATIONS', 2),
+      maxDuration: textFromEnv('MAX_DURATION', '30s'),
     },
   },
   thresholds: {

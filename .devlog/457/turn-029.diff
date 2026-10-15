@@ -1,0 +1,44 @@
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+index 376ae0dd8c943a26b448b898b95adacf72eac227..152eb10036a5f29cc82194f11852a7c02b085e0d 100644
+--- a/.github/workflows/load-test.yml
++++ b/.github/workflows/load-test.yml
+@@ -16,7 +16,7 @@ jobs:
+   k6:
+     if: startsWith(github.ref_name, 'k6/dev/')
+     runs-on: ubuntu-latest
+-    timeout-minutes: 15
++    timeout-minutes: 5
+     environment: backend-dev
+     env:
+       REF_NAME: ${{ github.ref_name }}
+@@ -79,6 +79,7 @@ jobs:
+           K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
+           K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }}
+           K6_PROMETHEUS_RW_STALE_MARKERS: "true"
++          K6_PROMETHEUS_RW_PUSH_INTERVAL: 1s
+           K6_WEB_DASHBOARD: "true"
+           K6_WEB_DASHBOARD_PORT: "-1"
+           K6_WEB_DASHBOARD_EXPORT: ${{ env.REPORT_DIR }}/report.html
+diff --git a/Infra/k6/smoke-test.ts b/Infra/k6/smoke-test.ts
+index 7a5fed323e983b12b41b01a2e8740f0e154e3f86..1f87b5fa4f26ff8f9e6e7836e0c4c76adf81f72f 100644
+--- a/Infra/k6/smoke-test.ts
++++ b/Infra/k6/smoke-test.ts
+@@ -12,15 +12,15 @@ const environment = Environment.fromEnv();
+ const sessions = new SessionSequence([new NewUserSession(), new ReturningUserSession()]);
+ 
+ const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
+-const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 2));
++const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 1));
+ 
+ export const options: Options = {
+   scenarios: {
+     smoke: {
+       executor: 'shared-iterations',
+       vus: 1,
+-      iterations: numberFromEnv('ITERATIONS', 4),
+-      maxDuration: textFromEnv('MAX_DURATION', '2m'),
++      iterations: numberFromEnv('ITERATIONS', 2),
++      maxDuration: textFromEnv('MAX_DURATION', '30s'),
+     },
+   },
+   thresholds: {

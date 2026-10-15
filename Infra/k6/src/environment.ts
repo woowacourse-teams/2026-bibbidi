@@ -15,7 +15,6 @@ export function textFromEnv(name: string, fallback: string): string {
   return __ENV[name] ?? fallback;
 }
 
-// 서버 주소와 토큰 서명에 필요한 값. 테스트 종류와 관계없이 모든 스크립트가 같이 쓴다.
 export class Environment {
   private constructor(
     readonly baseUrl: string,

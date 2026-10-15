@@ -1,0 +1,366 @@
+diff --git a/.github/k6-tag-cleanup/cli.ts b/.github/k6-tag-cleanup/cli.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..fef578073a387698c05dcd4ab4a0a4684788a920
+--- /dev/null
++++ b/.github/k6-tag-cleanup/cli.ts
+@@ -0,0 +1,38 @@
++import { pathToFileURL } from "node:url";
++import { GitHubTagRepository } from "./github-tag-repository.ts";
++import { TagCleaner } from "./tag-cleaner.ts";
++
++const requiredEnvironment = ["GITHUB_TOKEN", "GITHUB_REPOSITORY"] as const;
++
++type CleanupEnvironment = Record<(typeof requiredEnvironment)[number], string> & { DRY_RUN?: string };
++
++export function validateEnvironment(environment: NodeJS.ProcessEnv): CleanupEnvironment {
++  const missing = requiredEnvironment.filter((name) => !environment[name]?.trim());
++  if (missing.length > 0) throw new Error(`필수 환경변수가 없습니다: ${missing.join(", ")}`);
++
++  return environment as CleanupEnvironment;
++}
++
++export async function main(environment: NodeJS.ProcessEnv = process.env) {
++  try {
++    const values = validateEnvironment(environment);
++    const cleaner = new TagCleaner(new GitHubTagRepository(values.GITHUB_REPOSITORY, values.GITHUB_TOKEN));
++    const result = await cleaner.clean({ dryRun: values.DRY_RUN === "true" });
++
++    const action = result.dryRun ? "삭제 대상" : "삭제";
++    console.log(`k6 태그 ${action} ${result.deleted.length}건`);
++    for (const name of result.deleted) console.log(`- ${name}`);
++
++    if (result.failed.length > 0) {
++      for (const failure of result.failed) console.error(`::error title=k6 태그 삭제 실패::${failure.name}: ${failure.reason}`);
++      process.exitCode = 1;
++    }
++  } catch (error) {
++    const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
++    console.error(`::error title=k6 태그 정리 실패::${message}`);
++    process.exitCode = 1;
++  }
++}
++
++const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
++if (entrypoint === import.meta.url) await main();
+diff --git a/.github/k6-tag-cleanup/github-tag-repository.ts b/.github/k6-tag-cleanup/github-tag-repository.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a53dc76ffaa13fedc58c5654040655f6ddedc08
+--- /dev/null
++++ b/.github/k6-tag-cleanup/github-tag-repository.ts
+@@ -0,0 +1,50 @@
++import type { TagRepository } from "./tag-cleaner.ts";
++
++const PAGE_SIZE = 100;
++const TAG_REF_PREFIX = "refs/tags/";
++
++export class GitHubTagRepository implements TagRepository {
++  private readonly repository: string;
++  private readonly token: string;
++
++  constructor(repository: string, token: string) {
++    this.repository = repository;
++    this.token = token;
++  }
++
++  async listTagNames(prefix: string): Promise<string[]> {
++    const names: string[] = [];
++
++    for (let page = 1; ; page += 1) {
++      const response = await fetch(
++        `https://api.github.com/repos/${this.repository}/git/matching-refs/tags/${prefix}?per_page=${PAGE_SIZE}&page=${page}`,
++        { headers: this.headers() },
++      );
++      if (!response.ok) {
++        throw new Error(`태그 목록 조회에 실패했습니다. (상태 코드: ${response.status})`);
++      }
++
++      const refs = (await response.json()) as { ref: string }[];
++      names.push(...refs.map((ref) => ref.ref.slice(TAG_REF_PREFIX.length)));
++      if (refs.length < PAGE_SIZE) return names;
++    }
++  }
++
++  async deleteTag(name: string): Promise<void> {
++    const response = await fetch(`https://api.github.com/repos/${this.repository}/git/refs/tags/${name}`, {
++      method: "DELETE",
++      headers: this.headers(),
++    });
++    if (response.status !== 204) {
++      throw new Error(`태그 삭제에 실패했습니다. (상태 코드: ${response.status})`);
++    }
++  }
++
++  private headers(): Record<string, string> {
++    return {
++      Accept: "application/vnd.github+json",
++      Authorization: `Bearer ${this.token}`,
++      "X-GitHub-Api-Version": "2022-11-28",
++    };
++  }
++}
+diff --git a/.github/k6-tag-cleanup/package.json b/.github/k6-tag-cleanup/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e986b24bbae58b2e6d308a8186e3347e92314fe4
+--- /dev/null
++++ b/.github/k6-tag-cleanup/package.json
+@@ -0,0 +1,4 @@
++{
++  "private": true,
++  "type": "module"
++}
+diff --git a/.github/k6-tag-cleanup/tag-cleaner.test.ts b/.github/k6-tag-cleanup/tag-cleaner.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3efa048d9a173a92abba69c14e0325315995830b
+--- /dev/null
++++ b/.github/k6-tag-cleanup/tag-cleaner.test.ts
+@@ -0,0 +1,57 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { validateEnvironment } from "./cli.ts";
++import { TagCleaner, type TagRepository } from "./tag-cleaner.ts";
++
++class FakeTagRepository implements TagRepository {
++  readonly deletedNames: string[] = [];
++  private readonly names: string[];
++  private readonly failing: string[];
++
++  constructor(names: string[], failing: string[] = []) {
++    this.names = names;
++    this.failing = failing;
++  }
++
++  async listTagNames(): Promise<string[]> {
++    return this.names;
++  }
++
++  async deleteTag(name: string): Promise<void> {
++    if (this.failing.includes(name)) throw new Error("삭제 거부");
++    this.deletedNames.push(name);
++  }
++}
++
++test("k6 접두사 태그만 지우고 릴리스 태그는 남긴다", async () => {
++  const repository = new FakeTagRepository(["k6/dev/smoke-test/1", "v1.0.0", "k6/dev/smoke-test/2"]);
++
++  const result = await new TagCleaner(repository).clean({ dryRun: false });
++
++  assert.deepEqual(repository.deletedNames, ["k6/dev/smoke-test/1", "k6/dev/smoke-test/2"]);
++  assert.deepEqual(result.deleted, ["k6/dev/smoke-test/1", "k6/dev/smoke-test/2"]);
++  assert.deepEqual(result.failed, []);
++});
++
++test("모의 실행은 지울 대상만 알려 주고 실제로 지우지 않는다", async () => {
++  const repository = new FakeTagRepository(["k6/dev/smoke-test/1"]);
++
++  const result = await new TagCleaner(repository).clean({ dryRun: true });
++
++  assert.deepEqual(repository.deletedNames, []);
++  assert.deepEqual(result.deleted, ["k6/dev/smoke-test/1"]);
++  assert.equal(result.dryRun, true);
++});
++
++test("한 태그의 삭제가 실패해도 나머지는 계속 지우고 실패를 모아 알린다", async () => {
++  const repository = new FakeTagRepository(["k6/dev/smoke-test/1", "k6/dev/smoke-test/2"], ["k6/dev/smoke-test/1"]);
++
++  const result = await new TagCleaner(repository).clean({ dryRun: false });
++
++  assert.deepEqual(repository.deletedNames, ["k6/dev/smoke-test/2"]);
++  assert.deepEqual(result.failed, [{ name: "k6/dev/smoke-test/1", reason: "삭제 거부" }]);
++});
++
++test("필수 환경변수가 없으면 이름을 알려 주며 실패한다", () => {
++  assert.throws(() => validateEnvironment({ GITHUB_TOKEN: "token" }), /GITHUB_REPOSITORY/);
++});
+diff --git a/.github/k6-tag-cleanup/tag-cleaner.ts b/.github/k6-tag-cleanup/tag-cleaner.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..79d0f5fb11362877c212410970738727b215e512
+--- /dev/null
++++ b/.github/k6-tag-cleanup/tag-cleaner.ts
+@@ -0,0 +1,43 @@
++export const K6_TAG_PREFIX = "k6/";
++
++export interface TagRepository {
++  listTagNames(prefix: string): Promise<string[]>;
++  deleteTag(name: string): Promise<void>;
++}
++
++export type CleanupResult = {
++  dryRun: boolean;
++  deleted: string[];
++  failed: { name: string; reason: string }[];
++};
++
++// 부하 테스트 실행용 태그(k6/...)를 지운다. 다른 태그(v1.0.0 같은 릴리스 태그)는 건드리지 않는다.
++export class TagCleaner {
++  private readonly repository: TagRepository;
++  private readonly prefix: string;
++
++  constructor(repository: TagRepository, prefix: string = K6_TAG_PREFIX) {
++    this.repository = repository;
++    this.prefix = prefix;
++  }
++
++  async clean({ dryRun }: { dryRun: boolean }): Promise<CleanupResult> {
++    const names = (await this.repository.listTagNames(this.prefix)).filter((name) => name.startsWith(this.prefix));
++    const result: CleanupResult = { dryRun, deleted: [], failed: [] };
++
++    for (const name of names) {
++      if (dryRun) {
++        result.deleted.push(name);
++        continue;
++      }
++      try {
++        await this.repository.deleteTag(name);
++        result.deleted.push(name);
++      } catch (error) {
++        result.failed.push({ name, reason: error instanceof Error ? error.message : "알 수 없는 오류" });
++      }
++    }
++
++    return result;
++  }
++}
+diff --git a/.github/k6-tag-cleanup/tsconfig.json b/.github/k6-tag-cleanup/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba4feeb11d51385099391db36cf05cd66508762b
+--- /dev/null
++++ b/.github/k6-tag-cleanup/tsconfig.json
+@@ -0,0 +1,12 @@
++{
++  "compilerOptions": {
++    "allowImportingTsExtensions": true,
++    "module": "NodeNext",
++    "moduleResolution": "NodeNext",
++    "noEmit": true,
++    "strict": true,
++    "target": "ES2023",
++    "types": ["node"]
++  },
++  "include": ["*.ts"]
++}
+diff --git a/.github/workflows/k6-tag-cleanup.yml b/.github/workflows/k6-tag-cleanup.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..08ecff61a97628a01b1ec8241bdfeff6e6b01da1
+--- /dev/null
++++ b/.github/workflows/k6-tag-cleanup.yml
+@@ -0,0 +1,40 @@
++name: 비비디 k6 태그 정리
++
++on:
++  # 스케줄은 default 브랜치(main)의 파일 기준으로 동작한다. 매주 월요일 03:00(KST)에 지운다.
++  schedule:
++    - cron: "0 18 * * 0"
++  workflow_dispatch:
++    inputs:
++      dry-run:
++        description: 지우지 않고 대상만 확인한다
++        type: boolean
++        default: true
++
++# 태그 삭제에 쓰기 권한이 필요하다.
++permissions:
++  contents: write
++
++concurrency:
++  group: k6-tag-cleanup
++  cancel-in-progress: false
++
++jobs:
++  cleanup:
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - uses: actions/checkout@v7
++
++      - uses: actions/setup-node@v6
++        with:
++          node-version: 24.19.0
++
++      - name: 정리 코드 테스트
++        run: node --experimental-strip-types --test .github/k6-tag-cleanup/*.test.ts
++
++      - name: k6 태그 지우기
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
++        run: node --experimental-strip-types .github/k6-tag-cleanup/cli.ts
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+index 30b6b76da315961667343430e783054fcfb52edd..a88363882c8f2fafad4bc3f3a972120c6ba6c496 100644
+--- a/.github/workflows/load-test.yml
++++ b/.github/workflows/load-test.yml
+@@ -1,24 +1,13 @@
+ name: 비비디 부하 테스트
+ 
++# k6/<환경>/<스크립트>/<회차> 형식의 태그를 푸시하면 실행한다. 예: k6/dev/smoke-test/20261015-1
++# 태그가 가리키는 커밋의 워크플로가 실행되므로 default 브랜치에 반영되기 전에도 실행할 수 있다.
++# 환경은 태그 이름으로 정해지고, Environment의 허용 규칙(k6/dev/*, k6/prod/*)이 태그와 시크릿을 묶는다.
++# 태그는 k6-tag-cleanup 워크플로가 주기적으로 지운다.
+ on:
+-  workflow_dispatch:
+-    inputs:
+-      target:
+-        description: 부하를 줄 환경
+-        type: choice
+-        options: [dev]
+-        default: dev
+-      script:
+-        description: 실행할 k6 스크립트
+-        type: choice
+-        options: [smoke-test]
+-        default: smoke-test
+-  # 수동 실행 워크플로는 default 브랜치에 있어야 실행되므로, 머지 전 연결 검증용으로만 푸시에도 실행한다. 검증 뒤 제거한다.
+   push:
+-    branches: [chore/457]
+-    paths:
+-      - "Infra/k6/**"
+-      - ".github/workflows/load-test.yml"
++    tags:
++      - "k6/**"
+ 
+ permissions:
+   contents: read
+@@ -30,16 +19,31 @@ concurrency:
+ 
+ jobs:
+   k6:
++    # 운영 부하(k6/prod/*)는 Spike(#460)에서 열기 전까지 실행하지 않는다.
++    if: startsWith(github.ref_name, 'k6/dev/')
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+-    environment: ${{ inputs.target == 'production' && 'backend-prod' || 'backend-dev' }}
++    environment: backend-dev
+     env:
+-      TARGET_LABEL: ${{ inputs.target == 'production' && 'prod-test' || 'dev-test' }}
+-      SCRIPT: ${{ inputs.script || 'smoke-test' }}
++      REF_NAME: ${{ github.ref_name }}
+       REPORT_DIR: ${{ github.workspace }}/k6-report
+     steps:
+       - uses: actions/checkout@v7
+ 
++      # 태그 이름을 그대로 신뢰하지 않고, 허용한 환경과 스크립트 조합만 통과시킨다.
++      - name: 태그에서 실행 대상 읽기
++        run: |
++          set -euo pipefail
++          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test)/([A-Za-z0-9._-]+)$ ]]; then
++            echo "::error::태그 형식이 k6/dev/<smoke-test>/<회차>와 맞지 않습니다: $REF_NAME"
++            exit 1
++          fi
++          {
++            echo "TARGET_LABEL=${BASH_REMATCH[1]}-test"
++            echo "SCRIPT=${BASH_REMATCH[2]}"
++            echo "TEST_ID=${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
++          } >> "$GITHUB_ENV"
++
+       - uses: grafana/setup-k6-action@v1
+         with:
+           k6-version: 2.2.0
+@@ -76,9 +80,6 @@ jobs:
+             echo "K6_PROMETHEUS_RW_BEARER_TOKEN=$ingest_token"
+           } >> "$GITHUB_ENV"
+ 
+-      - name: testid 정하기
+-        run: echo "TEST_ID=${SCRIPT}-$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_ENV"
+-
+       # 지표는 모니터링 서버로 보내고, 회차별 파일(summary.json, report.md, report.html)은 REPORT_DIR에 남긴다.
+       # url 태그는 보내지 않고 name 태그로만 집계해 시계열 수를 제한한다.
+       - name: k6 실행

@@ -12,8 +12,6 @@ export interface SummaryData {
   state?: { testRunDurationMs?: number };
 }
 
-// handleSummary()가 받는 결과를 깃허브 잡 요약용 판정표와 원본 JSON으로 바꾼다.
-// 문서에 없는 키는 '-'로 두어 요약이 깨지지 않게 한다.
 export class SummaryReport {
   constructor(private readonly data: SummaryData) {}
 
@@ -54,7 +52,6 @@ export class SummaryReport {
     return [`## k6 결과: ${failed.length === 0 ? '통과' : '실패'}`, '', ...table, ...failures, ''].join('\n');
   }
 
-  // handleSummary()의 반환값. 파일 경로를 키로 쓰고, stdout에는 같은 판정표를 출력한다.
   files(directory: string): Record<string, string> {
     const markdown = this.toMarkdown();
     return {
