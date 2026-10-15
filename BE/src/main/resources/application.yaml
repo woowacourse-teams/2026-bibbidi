@@ -21,6 +21,9 @@ spring:
           model: qwen.qwen3-235b-a22b-2507-v1:0
           max-tokens: 2048
 
+  flyway:
+    enabled: false
+
   jpa:
     open-in-view: false
     show-sql: false

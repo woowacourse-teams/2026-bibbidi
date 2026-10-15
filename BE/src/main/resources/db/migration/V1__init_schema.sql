@@ -1,11 +1,4 @@
--- WARNING: This script drops and recreates the bibbidi database.
--- All existing data will be permanently deleted when this script runs.
-
-DROP DATABASE IF EXISTS bibbidi;
-CREATE DATABASE bibbidi;
-USE bibbidi;
-
-SET time_zone = '+09:00';
+-- Flyway 도입 시점의 스키마다. 이후 변경은 새 버전 SQL로 추가한다.
 
 CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT,
