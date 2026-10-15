@@ -2,10 +2,11 @@ package com.bibbidi.wedding.chat.config;
 
 import static org.springframework.ai.chat.client.ChatClient.Builder;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.jspecify.annotations.NonNull;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -27,19 +28,34 @@ public class AiChatConfig {
             @Value("${spring.ai.bedrock.converse.chat.model}") String model,
             @Value("classpath:prompts/ai-chat-system.txt") Resource systemPrompt
     ) {
-        BeanOutputConverter<ChatAnswer> outputConverter = new BeanOutputConverter<>(ChatAnswer.class);
-        BedrockChatOptions.Builder options = BedrockChatOptions.builder().outputSchema(outputConverter.getJsonSchema());
-        if (model.contains("openai.gpt-")) {
-            options.requestParameters(strictJsonFormatRequestParameters());
-        }
+        BedrockChatOptions.Builder options = buildBedrockChatOptions(model);
         return builder.defaultSystem(systemPrompt, StandardCharsets.UTF_8)
                 .defaultOptions(options)
                 .build();
     }
 
+    private BedrockChatOptions.@NonNull Builder buildBedrockChatOptions(String model) {
+        BeanOutputConverter<ChatAnswer> outputConverter = new BeanOutputConverter<>(ChatAnswer.class);
+        BedrockChatOptions.Builder options = BedrockChatOptions.builder()
+                .outputSchema(outputConverter.getJsonSchema());
+
+        if (model.contains("openai.gpt-")) {
+            options.requestParameters(strictJsonFormatRequestParameters());
+        }
+
+        return options;
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static Map<String, String> strictJsonFormatRequestParameters() {
-        Map<String, Object> nestedJsonParameters = Map.of("text", Map.of("format", Map.of("strict", true)));
+        Map<String, Map<String, Boolean>> jsonParamater = Map.of(
+                "format",
+                Map.of("strict", true)
+        );
+
+        Map<String, Object> nestedJsonParameters = Map.of(
+                "text", jsonParamater
+        );
         return (Map) nestedJsonParameters;
     }
 
