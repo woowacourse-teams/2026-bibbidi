@@ -7,7 +7,6 @@ import java.util.Map;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,7 +57,7 @@ public class AiChatConfig {
     }
 
     @Bean
-    ChatMemory aiChatMemory(ChatMemoryRepository repository, AiChatProperties properties) {
+    BibbidiInMemoryChatMemory aiChatMemory(ChatMemoryRepository repository, AiChatProperties properties) {
         return new BibbidiInMemoryChatMemory(repository, properties.memoryMaxMessages());
     }
 

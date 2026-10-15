@@ -29,7 +29,6 @@ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
-import com.bibbidi.wedding.chat.config.AiChatProperties;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
@@ -66,7 +65,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
@@ -96,7 +94,6 @@ import tools.jackson.databind.node.ObjectNode;
         AiChatService.class, SpringAiConversationAdapter.class, JacksonChatAnswerParser.class,
         AiChatControllerTest.ChatInfrastructure.class
 })
-@EnableConfigurationProperties(AiChatProperties.class)
 @ExtendWith(RestDocumentationExtension.class)
 class AiChatControllerTest {
 
