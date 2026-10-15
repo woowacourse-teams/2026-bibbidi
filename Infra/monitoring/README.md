@@ -34,6 +34,30 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
 - 개발 환경 nginx는 요청 횟수와 동시 연결 제한을 적용하지 않는다. 운영 환경에는 기존 제한을 적용한다.
 - Docker 로그는 컨테이너별 최대 10MB 파일 5개를 보관한다.
 
+## 부하 테스트 지표 (k6)
+
+부하 테스트 워크플로(`.github/workflows/load-test.yml`)가 k6 지표를 앱 지표와 같은 수집 경로(`/prometheus/api/v1/write`)로 보낸다. 별도 서버 설정은 필요 없다.
+
+- 인증은 Alloy와 같은 `MONITORING_INGEST_TOKEN`을 공유한다. 워크플로가 `BIBBIDI_ALLOY_ENV`에서 꺼내 쓰므로, 토큰을 교체하면 앱 수집과 부하 테스트가 함께 바뀐다.
+- 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
+- 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
+- 회차가 끝나면 stale marker로 시리즈가 바로 끝난다. 시계열은 Prometheus 보존 기간만큼만 남으므로 회차별 원본은 워크플로 아티팩트(`summary.json`, `report.md`, `report.html`, 90일)를 본다.
+
+수집 확인은 Prometheus에서 한다.
+
+```promql
+count by (testid, target) (k6_http_reqs_total)
+count({__name__=~"k6_.+"})
+```
+
+### 대시보드 가져오기 (수동)
+
+대시보드는 저장소에 두지 않고 Grafana 화면에서 관리하므로 처음 한 번 직접 가져온다.
+
+1. Grafana → Dashboards → New → Import → ID `19665`(k6 Prometheus) → Load.
+2. 데이터소스를 `Prometheus`(uid `prometheus`)로 고르고 Import한다.
+3. 상단 `testid` 변수에서 회차를 고르고 요청 수와 응답 시간이 그려지는지 확인한다. 패널이 비면 `k6_http_req_duration_p99` 같은 지표 이름과 패널 쿼리가 맞는지 확인하고 고친다.
+
 ## 알림과 장애 대응
 
 알림 규칙, 정책, 연락처, 대시보드는 Grafana 화면에서 관리하며 저장소에 보관하지 않는다. 원본은 모니터링 서버의 `/var/lib/grafana/grafana.db` 하나뿐이므로 인스턴스를 잃으면 함께 사라진다. 필요하면 이 파일을 주기적으로 백업한다.
@@ -155,6 +179,7 @@ CloudWatch 조회는 `GetMetricData` 요금이 든다(월 예산 70달러). Clou
 - [ ] Grafana 연락처: Discord, `irm-critical`(Webhook → `bibbidi-grafana`). 각 연락처의 **Test** 버튼으로 수신 확인
 - [ ] 알림 정책: `bibbidi-critical` → `irm-critical`, `bibbidi-warning` → Discord
 - [ ] 알림 규칙 C1~C6, W1~W9 작성. 규칙마다 등급에 맞는 정책을 골랐는지 확인
+- [ ] Grafana에 k6 대시보드(19665) 가져오기와 `testid` 회차 선택 확인
 - [ ] `/var/lib/grafana/grafana.db` 백업
 - [ ] IRM 일정 `bibbidi-oncall`, `bibbidi-oncall-secondary`와 체인 `bibbidi-critical`(1차 → 15분 → 2차 → 15분 → 전원). 담당자마다 IRM 앱 설치와 전화번호 인증
 - [ ] (예정) Grafana Cloud Synthetic Monitoring: `https://monitoring.bibbidi.kr/api/health`와 서비스 주소 HTTP 점검, 실패 알림을 IRM으로 연결

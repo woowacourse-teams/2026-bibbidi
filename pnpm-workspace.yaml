@@ -2,6 +2,7 @@ packages:
   - APP
   - FE
   - .github/ai-review
+  - Infra/k6
   - packages/*
 
 nodeLinker: hoisted
