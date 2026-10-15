@@ -1,0 +1,250 @@
+.ai-recommendations {
+  position: relative;
+  container-type: inline-size;
+  margin-top: 24px;
+  color: var(--color-fg-neutral);
+}
+
+.ai-recommendations--pressed {
+  z-index: 3;
+}
+
+.ai-recommendations--pressed .ai-recommendations__header {
+  opacity: 0.48;
+}
+
+.ai-recommendations__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+}
+
+.ai-recommendations__header > span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 13px;
+}
+
+.ai-recommendations__direction,
+.ai-recommendations__hint {
+  position: relative;
+  margin: 12px 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.ai-recommendations__stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+  overflow: clip;
+}
+
+.ai-recommendations__card,
+.ai-recommendations__peek {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(14px, 5.7cqw, 24px);
+  border: 0;
+  border-radius: 26px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  line-height: 1.5;
+}
+
+.ai-recommendations__card {
+  z-index: 4;
+  width: min(280px, calc(100% - 48px));
+  aspect-ratio: 280 / 272;
+  flex: none;
+  margin: 0;
+  touch-action: pan-y;
+  user-select: none;
+  transform: translateX(var(--recommendation-x))
+    rotate(var(--recommendation-rotation));
+  transition: transform 0.25s ease;
+  animation: ai-recommendation-enter 0.25s ease;
+}
+
+/* 드래그 중인 카드만 스크롤·캐러셀의 잘림 영역 위에서 그린다. */
+.ai-recommendations__card:popover-open {
+  position: fixed;
+  inset: auto;
+  left: var(--recommendation-left);
+  top: var(--recommendation-top);
+  width: var(--recommendation-width);
+  height: var(--recommendation-height);
+}
+
+.ai-recommendations__card::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+
+.ai-recommendations--pressed .ai-recommendations__card {
+  cursor: grabbing;
+  transition: none;
+  animation: none;
+}
+
+.ai-recommendations__surface {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.ai-recommendations__number {
+  margin-bottom: clamp(10px, 4.8cqw, 20px);
+  color: var(--color-bg-brand-solid-pressed);
+  font-size: clamp(18px, 6cqw, 25px);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ai-recommendations__title {
+  display: -webkit-box;
+  width: 100%;
+  margin-bottom: auto;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: clamp(16px, 6cqw, 23px);
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.ai-recommendations__step {
+  position: relative;
+  display: inline-flex;
+  width: 122px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+}
+
+.ai-recommendations__step img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+.ai-recommendations__step > span {
+  overflow: hidden;
+  max-width: 102px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-recommendations__description {
+  margin-top: clamp(8px, 4.8cqw, 20px);
+  color: var(--color-fg-neutral-muted);
+  font-size: clamp(11px, 3.5cqw, 14px);
+}
+
+.ai-recommendations__peek {
+  position: absolute;
+  top: 50%;
+  width: 280px;
+  height: 248px;
+  transform: translateY(-50%);
+  padding: 18px 24px;
+  color: var(--color-fg-neutral);
+  z-index: 1;
+}
+
+.ai-recommendations__peek--previous {
+  right: calc(50% + min(140px, 50cqw - 24px) + 12px);
+}
+.ai-recommendations__peek--next {
+  left: calc(50% + min(140px, 50cqw - 24px) + 12px);
+}
+.ai-recommendations__peek .ai-recommendations__title {
+  font-size: 20px;
+}
+.ai-recommendations__peek .ai-recommendations__number {
+  color: #bd8b7c;
+}
+.ai-recommendations__peek .ai-recommendations__step {
+  width: 130px;
+  height: 26px;
+}
+
+.ai-recommendations__badge {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  display: grid;
+  width: 78px;
+  height: 34px;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ai-recommendations__badge img {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.ai-recommendations__saving {
+  position: absolute;
+  inset: auto 16px 12px auto;
+  font-size: 12px;
+  color: var(--color-fg-brand);
+}
+.ai-recommendations__complete {
+  margin: 24px 0 0;
+  color: var(--color-fg-neutral-muted);
+  font-size: 13px;
+}
+
+.ai-chat-panel:has(.ai-recommendations--pressed)::after,
+.ai-chat-dialog:has(.ai-recommendations--pressed)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgb(50 50 45 / 28%);
+  pointer-events: none;
+}
+
+.ai-recommendations--pressed
+  :is(.ai-recommendations__direction, .ai-recommendations__hint) {
+  z-index: 4;
+  color: var(--color-fg-on-brand);
+}
+.ai-recommendations--pressed .ai-recommendations__peek {
+  opacity: 0.48;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-recommendations__card {
+    transition: none;
+    animation: none;
+  }
+}
+
+@keyframes ai-recommendation-enter {
+  from {
+    opacity: 0.5;
+    transform: translateX(var(--recommendation-enter-x));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

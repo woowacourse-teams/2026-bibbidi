@@ -126,7 +126,11 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
   padding: 16px 4px 8px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.ai-chat__log::-webkit-scrollbar {
+  display: none;
 }
 
 .ai-chat__message {

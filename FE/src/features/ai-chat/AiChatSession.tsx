@@ -1,6 +1,7 @@
 import { RefObject } from "react";
 
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
+import { useAiChatRecommendations } from "./hooks/useAiChatRecommendations";
 import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
 import { AiChatView } from "./view/AiChatView";
 
@@ -21,6 +22,11 @@ export function AiChatSession({
 }) {
   const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
     useAiChatConversation(onAuthenticationRequired);
+  const recommendations = useAiChatRecommendations(
+    messages,
+    isAuthenticated,
+    onAuthenticationRequired,
+  );
   const view = (
     <AiChatView
       active={!isMobile || isOpen}
@@ -29,6 +35,7 @@ export function AiChatSession({
       messages={isAuthenticated ? messages : []}
       errorMessage={isAuthenticated ? errorMessage : null}
       isPending={isAuthenticated && isPending}
+      recommendations={recommendations}
       onDraftChange={(value) => {
         if (isAuthenticated) setDraft(value);
       }}

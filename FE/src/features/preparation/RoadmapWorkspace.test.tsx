@@ -12,6 +12,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { AuthState } from "../auth/model/auth";
 import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
 import { installMatchMedia } from "../../test/matchMedia";
+import { MyChecklistProvider } from "../checklist";
 
 const mocks = vi.hoisted(() => ({
   authState: {
@@ -82,8 +83,10 @@ function render(ui: ReactElement) {
   return renderView(ui, {
     wrapper: ({ children }) => (
       <MemoryRouter>
-        {children}
-        <CurrentUrl />
+        <MyChecklistProvider sessionKey="roadmap-workspace-test">
+          {children}
+          <CurrentUrl />
+        </MyChecklistProvider>
       </MemoryRouter>
     ),
   });
@@ -846,14 +849,16 @@ describe("내 로드맵 할 일 동작", () => {
       mocks.getChecklist.mockResolvedValue(current);
       renderView(
         <MemoryRouter initialEntries={["/preparation"]}>
-          <Routes>
-            <Route
-              path="/preparation"
-              element={<PreparationRoadmapFeature />}
-            />
-            <Route path="/checklist" element={<ChecklistFeature />} />
-          </Routes>
-          <CurrentUrl />
+          <MyChecklistProvider sessionKey="roadmap-detail-test">
+            <Routes>
+              <Route
+                path="/preparation"
+                element={<PreparationRoadmapFeature />}
+              />
+              <Route path="/checklist" element={<ChecklistFeature />} />
+            </Routes>
+            <CurrentUrl />
+          </MyChecklistProvider>
         </MemoryRouter>,
       );
       fireEvent.click(await screen.findByRole("button", { name: "스드메" }));

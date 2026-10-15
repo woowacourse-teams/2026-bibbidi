@@ -29,7 +29,11 @@ function response(chunks: Uint8Array[], cancel = vi.fn()) {
 }
 
 function receive(conversationId?: string) {
-  const receiver = { onConversation: vi.fn(), onDelta: vi.fn() };
+  const receiver = {
+    onConversation: vi.fn(),
+    onDelta: vi.fn(),
+    onRecommendations: vi.fn(),
+  };
   const controller = new AbortController();
   const promise = streamAiChat(
     { message: "준비를 도와줘", conversationId },
@@ -51,6 +55,64 @@ afterEach(() => {
 });
 
 describe("AI 채팅 SSE 통신", () => {
+  it("바이트 단위로 나뉜 추천 ID를 서버 순서대로 중복 제거해 전달한다", async () => {
+    const bytes = encoder.encode(
+      conversation +
+        delta("추천해요") +
+        'event: component\ndata: {"catalogItemIds":[201,101,201]}\n\n' +
+        done,
+    );
+    fetchMock.mockResolvedValue(
+      response(Array.from(bytes, (byte) => new Uint8Array([byte]))),
+    );
+    const { receiver, promise } = receive();
+    await promise;
+    expect(receiver.onRecommendations).toHaveBeenCalledExactlyOnceWith([
+      "201",
+      "101",
+    ]);
+  });
+
+  it.each(
+    [
+      [0],
+      [-1],
+      [1.5],
+      ["101"],
+      [null],
+      [Number.MAX_SAFE_INTEGER + 1],
+      null,
+    ].map((ids) => ({ ids })),
+  )("잘못된 추천 ID $ids는 실패로 처리한다", async ({ ids }) => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          conversation +
+            delta("답변") +
+            `event: component\ndata: ${JSON.stringify({ catalogItemIds: ids })}\n\n` +
+            done,
+        ),
+      ]),
+    );
+    const { receiver, promise } = receive();
+    await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
+    expect(receiver.onRecommendations).not.toHaveBeenCalled();
+  });
+
+  it("대화 시작 전 추천 이벤트는 받지 않는다", async () => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          'event: component\ndata: {"catalogItemIds":[101]}\n\n' +
+            conversation +
+            delta("답변") +
+            done,
+        ),
+      ]),
+    );
+    await expect(receive().promise).rejects.toBeInstanceOf(AiChatApiError);
+  });
+
   it("연결이 열린 동안 도착한 답변을 완료 이벤트보다 먼저 전달한다", async () => {
     let source!: ReadableStreamDefaultController<Uint8Array>;
     fetchMock.mockResolvedValue(

@@ -1,0 +1,1245 @@
+diff --git a/FE/src/features/ai-chat/AiChatRecommendations.test.tsx b/FE/src/features/ai-chat/AiChatRecommendations.test.tsx
+index 128a4604df2903731b3e1ac50ee4d8d6942deb0e..6a859b4781e871bc84b90e96a08162f9651c9c7a 100644
+--- a/FE/src/features/ai-chat/AiChatRecommendations.test.tsx
++++ b/FE/src/features/ai-chat/AiChatRecommendations.test.tsx
+@@ -340,6 +340,54 @@ describe("AI 추천 카드 연결", () => {
+     expect(postCalls()).toHaveLength(1);
+   });
+ 
++  it("중복 저장 뒤 목록 갱신이 실패하면 카드를 유지하고 조회만 재시도한다", async () => {
++    let reads = 0;
++    mocks.fetch.mockImplementation(async (url: string) => {
++      if (url.endsWith("catalog-items"))
++        return json({ errorCode: 403, message: "duplicate" }, 409);
++      reads += 1;
++      if (reads === 2) return json({}, 500);
++      return json({
++        id: 1,
++        items: reads > 2 ? [{ ...addedItem, appointments: [] }] : [],
++      });
++    });
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByRole("button", { name: "저장 다시 시도" });
++    expect(currentCard().getAttribute("aria-label")).toContain("웨딩홀 투어");
++    expect(currentCard().disabled).toBe(false);
++    fireEvent.click(screen.getByRole("button", { name: "저장 다시 시도" }));
++    await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
++    expect(postCalls()).toHaveLength(1);
++    expect(reads).toBe(3);
++    expect(mocks.stream).toHaveBeenCalledOnce();
++  });
++
++  it("중복 저장 뒤 목록 갱신의 인증 만료도 인증 흐름으로 전달한다", async () => {
++    let reads = 0;
++    mocks.fetch.mockImplementation(async (url: string) => {
++      if (url.endsWith("catalog-items"))
++        return json({ errorCode: 403, message: "duplicate" }, 409);
++      return reads++
++        ? json({ errorCode: 201, message: "login" }, 401)
++        : json({ id: 1, items: [] });
++    });
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByText(
++      "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
++    );
++    expect(authRequired).toHaveBeenCalledOnce();
++    expect(currentCard().getAttribute("aria-label")).toContain("웨딩홀 투어");
++  });
++
+   it("화면을 떠나면 저장 요청을 취소하고 늦은 결과를 새 대화에 반영하지 않는다", async () => {
+     let finish!: (response: Response) => void;
+     mocks.fetch.mockImplementation(async (url: string) =>
+@@ -418,6 +466,54 @@ describe("AI 추천 카드 연결", () => {
+ });
+ 
+ describe("추천 카드 포인터 제스처", () => {
++  it("드래그 동안 팝오버를 사용하고 측정한 높이를 유지하다 취소하면 복구한다", () => {
++    class TestPointerEvent extends MouseEvent {
++      pointerId = 1;
++      isPrimary = true;
++    }
++    vi.stubGlobal("PointerEvent", TestPointerEvent);
++    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
++      configurable: true,
++      value: vi.fn(),
++    });
++    render(
++      <AiChatRecommendations
++        tasks={[{ id: "101", title: "추천", stepTitle: "단계", order: 1 }]}
++        status="ready"
++        saving={false}
++        onSelect={vi.fn()}
++        onSkip={vi.fn()}
++        onAdd={vi.fn()}
++        onRetry={vi.fn()}
++      />,
++    );
++    const card = currentCard();
++    const stage = card.parentElement!;
++    const show = vi.fn();
++    const hide = vi.fn();
++    Object.defineProperties(card, {
++      showPopover: { configurable: true, value: show },
++      hidePopover: { configurable: true, value: hide },
++    });
++    vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
++      left: 20,
++      top: 100,
++      width: 280,
++      height: 272,
++    } as DOMRect);
++    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
++      height: 312,
++    } as DOMRect);
++    fireEvent.pointerDown(card, { button: 0, clientX: 150, clientY: 100 });
++    expect(show).toHaveBeenCalledOnce();
++    expect(stage.style.minHeight).toBe("312px");
++    expect(card.style.getPropertyValue("--recommendation-width")).toBe("280px");
++    fireEvent.pointerCancel(card);
++    expect(hide).toHaveBeenCalledOnce();
++    expect(stage.style.minHeight).toBe("");
++    expect(card.closest("section")?.className).not.toContain("pressed");
++  });
++
+   it("짧은 이동·세로 스크롤·취소는 복귀하고 충분한 좌우 이동만 처리한다", () => {
+     class TestPointerEvent extends MouseEvent {
+       pointerId = 1;
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts b/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts
+index 343bc8fb4a0ef4dcfc0b58f939e4d11fccbeca09..2ff664e0de6b3ed040c726b558c571e24c43474f 100644
+--- a/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts
++++ b/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts
+@@ -1,26 +1,26 @@
+ import { useEffect, useMemo, useRef, useState } from "react";
+ 
+ import { catalogRepository, type CatalogModel } from "../../catalog";
+-import { useMyChecklistQueryRepository } from "../../checklist";
++import {
++  useMyChecklistQueryRepository,
++  MyChecklistAuthenticationRequiredError,
++} from "../../checklist";
+ import {
+   usePreparationChecklistRepository,
++  useCatalogTaskAddition,
+   PreparationAuthenticationRequiredError,
+ } from "../../preparation";
+ import { PreparationDuplicateChecklistItemError } from "../../preparation/repository/preparationErrors";
+ import type { ChatMessage } from "../model/aiChat";
+-
+-export interface RecommendedTask {
+-  id: string;
+-  title: string;
+-  stepTitle: string;
+-  order: number;
+-}
++import type {
++  RecommendedTask,
++  RecommendationController,
++} from "../model/recommendation";
+ 
+ interface RecommendationState {
+   dismissed: string[];
+   selectedId?: string;
+-  savingId?: string;
+-  error?: string;
++  additionId?: string;
+ }
+ 
+ const EMPTY_STATE: RecommendationState = { dismissed: [] };
+@@ -29,19 +29,45 @@ export function useAiChatRecommendations(
+   messages: ChatMessage[],
+   isAuthenticated: boolean,
+   onAuthenticationRequired: () => void,
+-) {
++): RecommendationController {
+   const checklist = usePreparationChecklistRepository();
+   const query = useMyChecklistQueryRepository();
+   const [catalogResult, setCatalogResult] = useState<{
+     catalog?: CatalogModel;
+     failed?: boolean;
+   } | null>(null);
+-  const [attempt, setAttempt] = useState(0);
+   const [states, setStates] = useState<Record<number, RecommendationState>>({});
+-  const [added, setAdded] = useState<string[]>([]);
+-  const requests = useRef(
+-    new Map<number, { id: string; controller: AbortController }>(),
+-  );
++  const pendingAnswers = useRef(new Map<number, symbol>());
++  const addition = useCatalogTaskAddition({
++    authScope: isAuthenticated ? "authenticated" : "guest",
++    isAuthenticated,
++    onAuthenticationRequired,
++    repository: checklist,
++    errorMessage: "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
++    saveCatalogItem: async (catalogItemId, signal) => {
++      const id = String(catalogItemId);
++      const existing = await checklist.getCatalogItemIds(
++        "authenticated",
++        signal,
++      );
++      if (signal.aborted || existing.includes(id)) return [];
++      try {
++        return await checklist.addCatalogItemIds("authenticated", [id], signal);
++      } catch (error) {
++        if (!(error instanceof PreparationDuplicateChecklistItemError))
++          throw error;
++        // 목록 동기화까지 성공해야 카드를 제거한다. 실패하면 같은 카드에서 재시도한다.
++        try {
++          await query.refresh(signal);
++        } catch (refreshError) {
++          if (refreshError instanceof MyChecklistAuthenticationRequiredError)
++            throw new PreparationAuthenticationRequiredError();
++          throw refreshError;
++        }
++        return [];
++      }
++    },
++  });
+   const hasRecommendations =
+     isAuthenticated &&
+     messages.some(
+@@ -63,26 +89,11 @@ export function useAiChatRecommendations(
+       },
+     );
+     return () => controller.abort();
+-  }, [hasRecommendations, catalogResult, attempt]);
++  }, [hasRecommendations, catalogResult]);
+ 
+   useEffect(() => {
+-    const pending = requests.current;
+-    return () => {
+-      const cancelled = [...pending.keys()];
+-      for (const { controller } of pending.values()) controller.abort();
+-      pending.clear();
+-      if (cancelled.length)
+-        setStates((current) =>
+-          Object.fromEntries(
+-            Object.entries(current).map(([id, state]) => [
+-              id,
+-              cancelled.includes(Number(id))
+-                ? { ...state, savingId: undefined }
+-                : state,
+-            ]),
+-          ),
+-        );
+-    };
++    const pending = pendingAnswers.current;
++    return () => pending.clear();
+   }, [checklist, isAuthenticated]);
+ 
+   const tasksById = useMemo(() => {
+@@ -116,7 +127,7 @@ export function useAiChatRecommendations(
+     ids.flatMap((id, index) => {
+       const task = tasksById.get(id);
+       return task &&
+-        !added.includes(id) &&
++        !addition.addedCatalogItemIds.includes(Number(id)) &&
+         !states[answerId]?.dismissed.includes(id)
+         ? [
+             {
+@@ -141,7 +152,7 @@ export function useAiChatRecommendations(
+   };
+ 
+   const skip = (answerId: number, id: string) => {
+-    if (!isAuthenticated || requests.current.has(answerId)) return;
++    if (!isAuthenticated || pendingAnswers.current.has(answerId)) return;
+     setStates((current) => {
+       const state = current[answerId] ?? EMPTY_STATE;
+       return {
+@@ -150,79 +161,47 @@ export function useAiChatRecommendations(
+           ...state,
+           dismissed: [...state.dismissed, id],
+           selectedId: nextCardId(answerId, id),
+-          error: undefined,
++          additionId: undefined,
+         },
+       };
+     });
+   };
+ 
+   const add = async (answerId: number, id: string) => {
+-    if (
+-      !isAuthenticated ||
+-      requests.current.has(answerId) ||
+-      [...requests.current.values()].some((request) => request.id === id)
+-    )
+-      return;
+-    const controller = new AbortController();
+-    requests.current.set(answerId, { id, controller });
+-    update(answerId, { savingId: id, error: undefined });
+-    try {
+-      const existing = await checklist.getCatalogItemIds(
+-        "authenticated",
+-        controller.signal,
+-      );
+-      if (controller.signal.aborted) return;
+-      if (!existing.includes(id))
+-        await checklist.addCatalogItemIds(
+-          "authenticated",
+-          [id],
+-          controller.signal,
+-        );
+-      if (!controller.signal.aborted) {
+-        setAdded((current) => [...new Set([...current, id])]);
+-        update(answerId, { selectedId: nextCardId(answerId, id) });
+-      }
+-    } catch (error) {
+-      if (controller.signal.aborted) return;
+-      if (error instanceof PreparationDuplicateChecklistItemError) {
+-        setAdded((current) => [...new Set([...current, id])]);
+-        update(answerId, { selectedId: nextCardId(answerId, id) });
+-        // 다른 화면/기기에서 먼저 추가한 항목도 공통 조회 상태에 반영한다.
+-        void query.refresh(controller.signal).catch(() => {});
+-      } else {
+-        const expired = error instanceof PreparationAuthenticationRequiredError;
+-        update(answerId, {
+-          error: expired
+-            ? "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
+-            : "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
+-        });
+-        if (expired) onAuthenticationRequired();
+-      }
+-    } finally {
+-      if (requests.current.get(answerId)?.controller === controller) {
+-        requests.current.delete(answerId);
+-        update(answerId, { savingId: undefined });
+-      }
+-    }
++    if (!isAuthenticated || pendingAnswers.current.has(answerId)) return;
++    const request = Symbol();
++    pendingAnswers.current.set(answerId, request);
++    update(answerId, { additionId: id });
++    const saved = await addition.add(Number(id));
++    if (pendingAnswers.current.get(answerId) !== request) return;
++    pendingAnswers.current.delete(answerId);
++    if (saved) update(answerId, { selectedId: nextCardId(answerId, id) });
+   };
+ 
+   return {
+-    cards,
+-    states,
++    forAnswer: (answerId, ids) => {
++      const state = states[answerId];
++      const id = Number(state?.additionId);
++      return {
++        tasks: cards(answerId, ids),
++        selectedId: state?.selectedId,
++        saving: addition.addingCatalogItemIds.includes(id),
++        error: addition.additionErrors[id],
++        onSelect: (id) => {
++          if (!pendingAnswers.current.has(answerId))
++            update(answerId, { selectedId: id, additionId: undefined });
++        },
++        onSkip: (id) => skip(answerId, id),
++        onAdd: (id) => {
++          void add(answerId, id);
++        },
++      };
++    },
+     catalogStatus: catalogResult?.catalog
+       ? ("ready" as const)
+       : catalogResult?.failed
+         ? ("error" as const)
+         : ("loading" as const),
+-    retryCatalog: () => {
+-      setCatalogResult(null);
+-      setAttempt((value) => value + 1);
+-    },
+-    select: (answerId: number, id: string) => {
+-      if (!requests.current.has(answerId))
+-        update(answerId, { selectedId: id, error: undefined });
+-    },
+-    skip,
+-    add,
++    retryCatalog: () => setCatalogResult(null),
+   };
+ }
+diff --git a/FE/src/features/ai-chat/hooks/useRecommendationSwipe.ts b/FE/src/features/ai-chat/hooks/useRecommendationSwipe.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3981cc029f4bd38ca9ec02b0e058934ab8a7286a
+--- /dev/null
++++ b/FE/src/features/ai-chat/hooks/useRecommendationSwipe.ts
+@@ -0,0 +1,103 @@
++import {
++  useRef,
++  useState,
++  type CSSProperties,
++  type PointerEvent,
++  type RefObject,
++} from "react";
++
++import {
++  getFloatingCardPosition,
++  getSwipeDirection,
++  type FloatingCardBounds,
++} from "../model/recommendationSwipe";
++
++export function useRecommendationSwipe({
++  cardRef,
++  saving,
++  onSkip,
++  onAdd,
++}: {
++  cardRef: RefObject<HTMLButtonElement | null>;
++  saving: boolean;
++  onSkip: () => void;
++  onAdd: () => void;
++}) {
++  const gesture = useRef<{ pointerId: number; x: number; y: number } | null>(
++    null,
++  );
++  const [drag, setDrag] = useState<number | null>(null);
++  const [bounds, setBounds] = useState<FloatingCardBounds | null>(null);
++  const position = getFloatingCardPosition(drag ?? 0, bounds);
++  const reset = () => {
++    cardRef.current?.hidePopover?.();
++    gesture.current = null;
++    setDrag(null);
++    setBounds(null);
++  };
++  return {
++    drag,
++    direction: drag === null ? null : getSwipeDirection(drag),
++    reset,
++    stageStyle: bounds ? { minHeight: bounds.stageHeight } : undefined,
++    cardStyle: {
++      "--recommendation-x": `${position.x}px`,
++      "--recommendation-rotation": `${position.rotation}deg`,
++      "--recommendation-left": `${bounds?.left ?? 0}px`,
++      "--recommendation-top": `${position.top}px`,
++      "--recommendation-width": `${bounds?.width ?? 0}px`,
++      "--recommendation-height": `${bounds?.height ?? 0}px`,
++    } as CSSProperties,
++    pointerHandlers: {
++      onLostPointerCapture: reset,
++      onPointerCancel: reset,
++      onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
++        if (event.isPrimary === false || event.button !== 0 || saving) return;
++        gesture.current = {
++          pointerId: event.pointerId,
++          x: event.clientX,
++          y: event.clientY,
++        };
++        const card = event.currentTarget;
++        if (card.showPopover) {
++          const { left, top, width, height } = card.getBoundingClientRect();
++          const viewport = card.ownerDocument.documentElement;
++          setBounds({
++            left,
++            top,
++            width,
++            height,
++            viewportWidth: viewport.clientWidth,
++            viewportHeight: viewport.clientHeight,
++            stageHeight:
++              card.parentElement?.getBoundingClientRect().height ?? height,
++          });
++          card.showPopover();
++        }
++        card.setPointerCapture(event.pointerId);
++        setDrag(0);
++      },
++      onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
++        const start = gesture.current;
++        if (!start || event.pointerId !== start.pointerId) return;
++        const dx = event.clientX - start.x;
++        if (Math.abs(event.clientY - start.y) > Math.max(12, Math.abs(dx))) {
++          reset();
++          return;
++        }
++        setDrag(Math.max(-140, Math.min(140, dx)));
++      },
++      onPointerUp: (event: PointerEvent<HTMLButtonElement>) => {
++        const start = gesture.current;
++        if (!start || event.pointerId !== start.pointerId) return;
++        const distance = event.clientX - start.x;
++        const vertical = event.clientY - start.y;
++        reset();
++        if (Math.abs(vertical) > Math.abs(distance)) return;
++        const direction = getSwipeDirection(distance);
++        if (direction === "skip") onSkip();
++        if (direction === "add") onAdd();
++      },
++    },
++  };
++}
+diff --git a/FE/src/features/ai-chat/model/recommendation.ts b/FE/src/features/ai-chat/model/recommendation.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d348d2d054aabe5bf2ae48f2834345ffd3ddf043
+--- /dev/null
++++ b/FE/src/features/ai-chat/model/recommendation.ts
+@@ -0,0 +1,22 @@
++export interface RecommendedTask {
++  id: string;
++  title: string;
++  stepTitle: string;
++  order: number;
++}
++
++export interface AnswerRecommendations {
++  tasks: RecommendedTask[];
++  selectedId?: string;
++  saving: boolean;
++  error?: string;
++  onSelect: (id: string) => void;
++  onSkip: (id: string) => void;
++  onAdd: (id: string) => void;
++}
++
++export interface RecommendationController {
++  catalogStatus: "loading" | "error" | "ready";
++  forAnswer: (answerId: number, ids: string[]) => AnswerRecommendations;
++  retryCatalog: () => void;
++}
+diff --git a/FE/src/features/ai-chat/model/recommendationSwipe.test.ts b/FE/src/features/ai-chat/model/recommendationSwipe.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7be6b006f4d49b3986caca91377974cbe02e8ec0
+--- /dev/null
++++ b/FE/src/features/ai-chat/model/recommendationSwipe.test.ts
+@@ -0,0 +1,49 @@
++import { describe, expect, it } from "vitest";
++import {
++  getFloatingCardPosition,
++  getSwipeDirection,
++  type FloatingCardBounds,
++} from "./recommendationSwipe";
++
++const bounds: FloatingCardBounds = {
++  left: 20,
++  top: 100,
++  width: 280,
++  height: 272,
++  viewportWidth: 360,
++  viewportHeight: 640,
++  stageHeight: 312,
++};
++
++describe("추천 카드 스와이프 경계", () => {
++  it("판정 기준 미만은 복귀하고 기준부터 좌우 동작을 적용한다", () => {
++    expect(getSwipeDirection(-69)).toBeNull();
++    expect(getSwipeDirection(69)).toBeNull();
++    expect(getSwipeDirection(-70)).toBe("skip");
++    expect(getSwipeDirection(70)).toBe("add");
++  });
++
++  it.each([-140, 140])(
++    "%s px로 이동해도 회전한 모서리가 화면을 벗어나지 않는다",
++    (drag) => {
++      const position = getFloatingCardPosition(drag, { ...bounds, top: 600 });
++      const angle = (Math.abs(position.rotation) * Math.PI) / 180;
++      const rotatedWidth =
++        bounds.width * Math.cos(angle) + bounds.height * Math.sin(angle);
++      const rotatedHeight =
++        bounds.height * Math.cos(angle) + bounds.width * Math.sin(angle);
++      const centerX = bounds.left + position.x + bounds.width / 2;
++      const centerY = position.top + bounds.height / 2;
++      expect(centerX - rotatedWidth / 2).toBeGreaterThanOrEqual(8 - 1e-8);
++      expect(centerX + rotatedWidth / 2).toBeLessThanOrEqual(
++        bounds.viewportWidth - 8 + 1e-8,
++      );
++      expect(centerY - rotatedHeight / 2).toBeGreaterThanOrEqual(8 - 1e-8);
++      expect(centerY + rotatedHeight / 2).toBeLessThanOrEqual(
++        bounds.viewportHeight - 8 + 1e-8,
++      );
++      // 화면 안으로 이동을 제한해도 사용자의 실제 이동은 추가·스킵으로 판정한다.
++      expect(getSwipeDirection(drag)).toBe(drag < 0 ? "skip" : "add");
++    },
++  );
++});
+diff --git a/FE/src/features/ai-chat/model/recommendationSwipe.ts b/FE/src/features/ai-chat/model/recommendationSwipe.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c0d4e254769313549da70d904bd5fc460e37107
+--- /dev/null
++++ b/FE/src/features/ai-chat/model/recommendationSwipe.ts
+@@ -0,0 +1,45 @@
++export const RECOMMENDATION_SWIPE_THRESHOLD = 70;
++
++export interface FloatingCardBounds {
++  left: number;
++  top: number;
++  width: number;
++  height: number;
++  viewportWidth: number;
++  viewportHeight: number;
++  stageHeight: number;
++}
++
++export function getSwipeDirection(distance: number) {
++  return Math.abs(distance) >= RECOMMENDATION_SWIPE_THRESHOLD
++    ? distance < 0
++      ? "skip"
++      : "add"
++    : null;
++}
++
++export function getFloatingCardPosition(
++  drag: number,
++  bounds: FloatingCardBounds | null,
++) {
++  const rotation = Math.max(-6, Math.min(6, drag / 12));
++  if (!bounds) return { x: drag, top: 0, rotation };
++  const { left, top, width, height, viewportWidth, viewportHeight } = bounds;
++  const radians = (Math.abs(rotation) * Math.PI) / 180;
++  const extraX =
++    (width * Math.cos(radians) + height * Math.sin(radians) - width) / 2;
++  const extraY =
++    (height * Math.cos(radians) + width * Math.sin(radians) - height) / 2;
++  // 회전한 모서리까지 화면 안에 두되, 동작 판정은 실제 손가락 이동량을 쓴다.
++  return {
++    x: Math.max(
++      8 + extraX - left,
++      Math.min(drag, viewportWidth - left - width - extraX - 8),
++    ),
++    top: Math.max(
++      8 + extraY,
++      Math.min(top, viewportHeight - height - extraY - 8),
++    ),
++    rotation,
++  };
++}
+diff --git a/FE/src/features/ai-chat/view/AiChatRecommendations.tsx b/FE/src/features/ai-chat/view/AiChatRecommendations.tsx
+index 6329de42abb1b4d9b48689c9645a8e66d2251bf3..cacdc411461adb2fc1be4bac7c3703dd0abd0aac 100644
+--- a/FE/src/features/ai-chat/view/AiChatRecommendations.tsx
++++ b/FE/src/features/ai-chat/view/AiChatRecommendations.tsx
+@@ -1,11 +1,4 @@
+-import {
+-  useId,
+-  useEffect,
+-  useRef,
+-  useState,
+-  type CSSProperties,
+-  type PointerEvent,
+-} from "react";
++import { useId, useEffect, useRef, useState, type CSSProperties } from "react";
+ 
+ import cardSurface from "../../../assets/ai-chat/recommendation-card.svg";
+ import peekSurface from "../../../assets/ai-chat/recommendation-peek.svg";
+@@ -13,7 +6,11 @@ import stepSurface from "../../../assets/ai-chat/recommendation-step.svg";
+ import peekStepSurface from "../../../assets/ai-chat/recommendation-peek-step.svg";
+ import skipSurface from "../../../assets/ai-chat/recommendation-skip.svg";
+ import addSurface from "../../../assets/ai-chat/recommendation-add.svg";
+-import type { RecommendedTask } from "../hooks/useAiChatRecommendations";
++import type {
++  RecommendedTask,
++  AnswerRecommendations,
++} from "../model/recommendation";
++import { useRecommendationSwipe } from "../hooks/useRecommendationSwipe";
+ import "./AiChatRecommendations.css";
+ 
+ function CardContent({
+@@ -62,15 +59,8 @@ export function AiChatRecommendations({
+   onSkip,
+   onAdd,
+   onRetry,
+-}: {
+-  tasks: RecommendedTask[];
+-  selectedId?: string;
++}: AnswerRecommendations & {
+   status: "loading" | "error" | "ready";
+-  saving: boolean;
+-  error?: string;
+-  onSelect: (id: string) => void;
+-  onSkip: (id: string) => void;
+-  onAdd: (id: string) => void;
+   onRetry: () => void;
+ }) {
+   const helpId = useId();
+@@ -78,18 +68,6 @@ export function AiChatRecommendations({
+   const completeRef = useRef<HTMLParagraphElement>(null);
+   const errorRef = useRef<HTMLDivElement>(null);
+   const restoreFocus = useRef(false);
+-  const gesture = useRef<{ pointerId: number; x: number; y: number } | null>(
+-    null,
+-  );
+-  const [drag, setDrag] = useState<number | null>(null);
+-  const [floatingBounds, setFloatingBounds] = useState<{
+-    left: number;
+-    top: number;
+-    width: number;
+-    height: number;
+-    viewportWidth: number;
+-    viewportHeight: number;
+-  } | null>(null);
+   const [entryDirection, setEntryDirection] = useState(1);
+   const current = Math.max(
+     0,
+@@ -119,45 +97,8 @@ export function AiChatRecommendations({
+       : undefined;
+   const next =
+     tasks.length > 1 ? tasks[(current + 1) % tasks.length] : undefined;
+-  const direction =
+-    drag !== null && Math.abs(drag) >= 70 ? (drag < 0 ? "skip" : "add") : null;
+-  const rotation = Math.max(-6, Math.min(6, (drag ?? 0) / 12));
+-  let visibleX = drag ?? 0;
+-  let visibleTop = floatingBounds?.top ?? 0;
+-  if (floatingBounds) {
+-    const { left, top, width, height, viewportWidth, viewportHeight } =
+-      floatingBounds;
+-    const radians = (Math.abs(rotation) * Math.PI) / 180;
+-    const extraX =
+-      (width * Math.cos(radians) + height * Math.sin(radians) - width) / 2;
+-    const extraY =
+-      (height * Math.cos(radians) + width * Math.sin(radians) - height) / 2;
+-    // 회전한 모서리까지 화면 안에 두되, 동작 판정은 실제 손가락 이동량을 쓴다.
+-    visibleX = Math.max(
+-      8 + extraX - left,
+-      Math.min(visibleX, viewportWidth - left - width - extraX - 8),
+-    );
+-    visibleTop = Math.max(
+-      8 + extraY,
+-      Math.min(top, viewportHeight - height - extraY - 8),
+-    );
+-  }
+-  const reset = () => {
+-    cardRef.current?.hidePopover?.();
+-    gesture.current = null;
+-    setDrag(null);
+-    setFloatingBounds(null);
+-  };
+-  const move = (event: PointerEvent<HTMLButtonElement>) => {
+-    const start = gesture.current;
+-    if (!start || event.pointerId !== start.pointerId) return;
+-    const dx = event.clientX - start.x;
+-    if (Math.abs(event.clientY - start.y) > Math.max(12, Math.abs(dx))) {
+-      reset();
+-      return;
+-    }
+-    setDrag(Math.max(-140, Math.min(140, dx)));
+-  };
++  const { drag, direction, stageStyle, cardStyle, reset, pointerHandlers } =
++    useRecommendationSwipe({ cardRef, saving, onSkip: skip, onAdd: add });
+ 
+   if (status === "loading")
+     return <p role="status">추천 카드를 불러오고 있어요.</p>;
+@@ -199,12 +140,7 @@ export function AiChatRecommendations({
+           ? "← 스킵 · 좌우로 드래그 · 추가 →"
+           : "옆 카드를 누르면 다른 추천을 볼 수 있어요."}
+       </p>
+-      <div
+-        className="ai-recommendations__stage"
+-        style={
+-          floatingBounds ? { minHeight: floatingBounds.height + 40 } : undefined
+-        }
+-      >
++      <div className="ai-recommendations__stage" style={stageStyle}>
+         {([previous, next] as const).map((side, index) =>
+           side ? (
+             <button
+@@ -248,54 +184,11 @@ export function AiChatRecommendations({
+               skip();
+             } else if (event.key === "Escape") reset();
+           }}
+-          onLostPointerCapture={reset}
+-          onPointerCancel={reset}
+-          onPointerDown={(event) => {
+-            if (event.isPrimary === false || event.button !== 0 || saving)
+-              return;
+-            gesture.current = {
+-              pointerId: event.pointerId,
+-              x: event.clientX,
+-              y: event.clientY,
+-            };
+-            if (event.currentTarget.showPopover) {
+-              const { left, top, width, height } =
+-                event.currentTarget.getBoundingClientRect();
+-              const viewport =
+-                event.currentTarget.ownerDocument.documentElement;
+-              setFloatingBounds({
+-                left,
+-                top,
+-                width,
+-                height,
+-                viewportWidth: viewport.clientWidth,
+-                viewportHeight: viewport.clientHeight,
+-              });
+-              event.currentTarget.showPopover();
+-            }
+-            event.currentTarget.setPointerCapture(event.pointerId);
+-            setDrag(0);
+-          }}
+-          onPointerMove={move}
+-          onPointerUp={(event) => {
+-            const start = gesture.current;
+-            if (!start || event.pointerId !== start.pointerId) return;
+-            const distance = event.clientX - start.x;
+-            const vertical = event.clientY - start.y;
+-            reset();
+-            if (Math.abs(vertical) > Math.abs(distance)) return;
+-            if (distance <= -70) skip();
+-            if (distance >= 70) add();
+-          }}
++          {...pointerHandlers}
+           style={
+             {
+-              "--recommendation-x": `${visibleX}px`,
+-              "--recommendation-rotation": `${rotation}deg`,
++              ...cardStyle,
+               "--recommendation-enter-x": `${entryDirection * 40}px`,
+-              "--recommendation-left": `${floatingBounds?.left ?? 0}px`,
+-              "--recommendation-top": `${visibleTop}px`,
+-              "--recommendation-width": `${floatingBounds?.width ?? 0}px`,
+-              "--recommendation-height": `${floatingBounds?.height ?? 0}px`,
+             } as CSSProperties
+           }
+           type="button"
+diff --git a/FE/src/features/ai-chat/view/AiChatView.tsx b/FE/src/features/ai-chat/view/AiChatView.tsx
+index d01a08c6f66e5f14878c08b5d66fb596dac3f451..e9bd01c770943c10365501bfa17f17f844f833e7 100644
+--- a/FE/src/features/ai-chat/view/AiChatView.tsx
++++ b/FE/src/features/ai-chat/view/AiChatView.tsx
+@@ -9,7 +9,7 @@ import {
+ } from "../model/aiChat";
+ import { AiChatMarkdown } from "./AiChatMarkdown";
+ import { AiChatRecommendations } from "./AiChatRecommendations";
+-import type { useAiChatRecommendations } from "../hooks/useAiChatRecommendations";
++import type { RecommendationController } from "../model/recommendation";
+ 
+ export function AiChatView({
+   active,
+@@ -32,7 +32,7 @@ export function AiChatView({
+   onDraftChange: (value: string) => void;
+   onSend: (text: string) => void;
+   onRetry: () => void;
+-  recommendations: ReturnType<typeof useAiChatRecommendations>;
++  recommendations: RecommendationController;
+ }) {
+   const logRef = useRef<HTMLDivElement>(null);
+   const composing = useRef(false);
+@@ -116,19 +116,11 @@ export function AiChatView({
+               Boolean(message.catalogItemIds?.length) ? (
+                 <AiChatRecommendations
+                   key={String(active)}
+-                  tasks={recommendations.cards(
++                  {...recommendations.forAnswer(
+                     message.id,
+                     message.catalogItemIds!,
+                   )}
+                   status={recommendations.catalogStatus}
+-                  selectedId={recommendations.states[message.id]?.selectedId}
+-                  saving={Boolean(recommendations.states[message.id]?.savingId)}
+-                  error={recommendations.states[message.id]?.error}
+-                  onSelect={(id) => recommendations.select(message.id, id)}
+-                  onSkip={(id) => recommendations.skip(message.id, id)}
+-                  onAdd={(id) => {
+-                    void recommendations.add(message.id, id);
+-                  }}
+                   onRetry={recommendations.retryCatalog}
+                 />
+               ) : null}
+diff --git a/FE/src/features/home/GuestRecommendedTasksFeature.test.tsx b/FE/src/features/home/GuestRecommendedTasksFeature.test.tsx
+index 4523299f598e40eb084ad9716327918f90a31a03..49567ecb978dd4885a5965bf94628b2534ace330 100644
+--- a/FE/src/features/home/GuestRecommendedTasksFeature.test.tsx
++++ b/FE/src/features/home/GuestRecommendedTasksFeature.test.tsx
+@@ -8,9 +8,9 @@ import { preparationCatalogFixture } from "../preparation/test/fixtures/preparat
+ import { GuestRecommendedTasksFeature } from "./GuestRecommendedTasksFeature";
+ 
+ vi.mock("../catalog", () => ({ catalogRepository: { getCatalog: vi.fn() } }));
+-vi.mock("../preparation", () => ({
++vi.mock("../preparation", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("../preparation")>()),
+   usePreparationChecklistRepository: vi.fn(),
+-  PreparationAuthenticationRequiredError: class extends Error {},
+ }));
+ vi.mock("../../infrastructure/analytics", () => ({
+   analytics: { track: vi.fn() },
+diff --git a/FE/src/features/home/GuestRecommendedTasksFeature.tsx b/FE/src/features/home/GuestRecommendedTasksFeature.tsx
+index 72c057e5b7ba7b7183334bf775921ef8871ba440..44a4e67d4859b0e3215a9a1bd1f27e5a8e888cd1 100644
+--- a/FE/src/features/home/GuestRecommendedTasksFeature.tsx
++++ b/FE/src/features/home/GuestRecommendedTasksFeature.tsx
+@@ -5,10 +5,10 @@ import { catalogRepository } from "../catalog";
+ import {
+   PreparationAuthenticationRequiredError,
+   usePreparationChecklistRepository,
++  useCatalogTaskAddition,
+ } from "../preparation";
+ import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
+ import type { RecommendedCatalogItemModel } from "./model/recommendedCatalogItem";
+-import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
+ import { createRecommendedScheduleViewModel } from "./view-model/createRecommendedScheduleViewModel";
+ import { GuestRecommendedTasks } from "./view/GuestRecommendedTasks";
+ import {
+@@ -86,7 +86,7 @@ export function GuestRecommendedTasksFeature({
+     },
+     [state, onAdded],
+   );
+-  const addition = useRecommendedTaskAddition({
++  const addition = useCatalogTaskAddition({
+     allowGuestAddition: true,
+     authScope: audience,
+     isAuthenticated: audience === "authenticated",
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+index fdfa2e96361b512f9480bdada3477cc256b24fea..5a8c0fba3eacadb34d7890afe28c560f403d437f 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+@@ -42,8 +42,8 @@ vi.mock("../checklist", async (importOriginal) => ({
+   useMyChecklistCommandRepository: vi.fn(),
+   useMyChecklistRevision: () => 0,
+ }));
+-vi.mock("../preparation", () => ({
+-  PreparationAuthenticationRequiredError: class extends Error {},
++vi.mock("../preparation", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("../preparation")>()),
+   usePreparationChecklistRepository: vi.fn(),
+ }));
+ vi.mock("../../infrastructure/analytics", () => ({
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+index 65c825239b29a51cf6b07ea23017869fb83b6105..b005d1dd0a4dfe28e92cf0f548d4971076b2a5bb 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.tsx
+@@ -2,7 +2,10 @@ import { useCallback } from "react";
+ 
+ import { analytics } from "../../infrastructure/analytics";
+ import { useAuth } from "../auth";
+-import { usePreparationChecklistRepository } from "../preparation";
++import {
++  usePreparationChecklistRepository,
++  useCatalogTaskAddition,
++} from "../preparation";
+ import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
+ import { recommendedCatalogItemsRepository } from "./homeDependencies";
+ import type { RecommendedCatalogItemsRepository } from "./repository/recommendedCatalogItemsRepository";
+@@ -10,7 +13,6 @@ import {
+   createCalendarPlanningModel,
+   getLocalDate,
+ } from "./model/calendarPlanning";
+-import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
+ import { useCalendarPlanningData } from "./useCalendarPlanningData";
+ import { useCalendarDateAssignment } from "./useCalendarDateAssignment";
+ import { createRecommendedScheduleViewModel } from "./view-model/createRecommendedScheduleViewModel";
+@@ -106,7 +108,7 @@ function CalendarPlanningFeature({
+     },
+     [recommended, refreshChecklist, refreshRecommended],
+   );
+-  const addition = useRecommendedTaskAddition({
++  const addition = useCatalogTaskAddition({
+     authScope: audience ?? authState.status,
+     isAuthenticated: audience === "authenticated",
+     onAuthenticationRequired: refreshAuth,
+diff --git a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+index a6cbdaef973773bb997673192b1ff95336a1bd73..e0ec4a90959e4c8b096790200d05472fe57fb597 100644
+--- a/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
++++ b/FE/src/features/home/view-model/createHomeScheduleDashboardViewModel.ts
+@@ -3,7 +3,7 @@ import type {
+   HomeScheduleDashboardRecommendedModel,
+   HomeScheduleDashboardUnscheduledModel,
+ } from "../model/homeScheduleDashboard";
+-import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
++import type { CatalogTaskAdditionState } from "../../preparation/model/catalogTaskAddition";
+ import {
+   createRecommendedScheduleViewModel,
+   RecommendedScheduleViewModel,
+@@ -126,7 +126,7 @@ function createUnscheduledViewModel(
+ 
+ function createRecommendedViewModel(
+   model: HomeScheduleDashboardRecommendedModel,
+-  addition: RecommendedTaskAdditionState,
++  addition: CatalogTaskAdditionState,
+ ): HomeScheduleDashboardRecommendedViewModel {
+   switch (model.status) {
+     case "loading":
+@@ -176,7 +176,7 @@ function assertNever(value: never): never {
+ export function createHomeScheduleDashboardViewModel(
+   model: HomeScheduleDashboardModel,
+   options: {
+-    recommendedTaskAddition?: RecommendedTaskAdditionState;
++    recommendedTaskAddition?: CatalogTaskAdditionState;
+   } = {},
+ ): HomeScheduleDashboardViewModel {
+   const recommendedTaskAddition = options.recommendedTaskAddition ?? {
+diff --git a/FE/src/features/home/view-model/createRecommendedScheduleViewModel.ts b/FE/src/features/home/view-model/createRecommendedScheduleViewModel.ts
+index 52369a0e79185941cbe0af2840ffa41eb0cd84a9..afceeb54068671dbf5629daec581fa84e5ca6878 100644
+--- a/FE/src/features/home/view-model/createRecommendedScheduleViewModel.ts
++++ b/FE/src/features/home/view-model/createRecommendedScheduleViewModel.ts
+@@ -1,5 +1,5 @@
+ import type { RecommendedCatalogItemListModel } from "../model/recommendedCatalogItem";
+-import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
++import type { CatalogTaskAdditionState } from "../../preparation/model/catalogTaskAddition";
+ 
+ export interface RecommendedScheduleItemViewModel {
+   addActionLabel: string;
+@@ -19,7 +19,7 @@ export interface RecommendedScheduleViewModel {
+ 
+ export function createRecommendedScheduleViewModel(
+   model: RecommendedCatalogItemListModel,
+-  addition: RecommendedTaskAdditionState,
++  addition: CatalogTaskAdditionState,
+ ): RecommendedScheduleViewModel {
+   return {
+     catalogActionLabel: "로드맵 보기",
+diff --git a/FE/src/features/home/useRecommendedTaskAddition.ts b/FE/src/features/preparation/hooks/useCatalogTaskAddition.ts
+similarity index 53%
+rename from FE/src/features/home/useRecommendedTaskAddition.ts
+rename to FE/src/features/preparation/hooks/useCatalogTaskAddition.ts
+index 2b9da6c39450f925e02a0dfaa18c232da8a652c6..f1ddc193ba7b49eca802ba9dfb7d968e6035c739 100644
+--- a/FE/src/features/home/useRecommendedTaskAddition.ts
++++ b/FE/src/features/preparation/hooks/useCatalogTaskAddition.ts
+@@ -6,34 +6,37 @@ import {
+   useState,
+ } from "react";
+ 
+-import { PreparationAuthenticationRequiredError } from "../preparation";
+-import type { ChecklistRepository } from "../preparation";
+-import type { RecommendedTaskAdditionState } from "./model/recommendedTaskAddition";
++import { PreparationAuthenticationRequiredError } from "../repository/preparationErrors";
++import type { ChecklistRepository } from "../repository/checklistRepository";
++import type { CatalogTaskAdditionState } from "../model/catalogTaskAddition";
+ 
+-interface UseRecommendedTaskAdditionOptions {
++interface UseCatalogTaskAdditionOptions {
+   allowGuestAddition?: boolean;
+   authScope: string;
+   isAuthenticated: boolean;
+   onAuthenticationRequired: () => void;
+-  onSuccess: (catalogItemId: number, itemCount: number) => void;
++  onSuccess?: (catalogItemId: number, itemCount: number) => void;
+   repository: ChecklistRepository;
++  saveCatalogItem?: (
++    catalogItemId: number,
++    signal: AbortSignal,
++  ) => Promise<string[]>;
++  errorMessage?: string;
+ }
+ 
+-export interface RecommendedTaskAdditionController extends RecommendedTaskAdditionState {
+-  add: (catalogItemId: number) => void;
++export interface CatalogTaskAdditionController extends CatalogTaskAdditionState {
++  add: (catalogItemId: number) => Promise<boolean>;
+ }
+ 
+ const authenticationErrorMessage =
+   "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.";
+ const additionErrorMessage = "할 일을 추가하지 못했어요. 다시 시도해 주세요.";
+ 
+-interface RecommendedTaskAdditionScopedState extends RecommendedTaskAdditionState {
++interface CatalogTaskAdditionScopedState extends CatalogTaskAdditionState {
+   authScope: string;
+ }
+ 
+-function createEmptyState(
+-  authScope: string,
+-): RecommendedTaskAdditionScopedState {
++function createEmptyState(authScope: string): CatalogTaskAdditionScopedState {
+   return {
+     addedCatalogItemIds: [],
+     addingCatalogItemIds: [],
+@@ -42,14 +45,16 @@ function createEmptyState(
+   };
+ }
+ 
+-export function useRecommendedTaskAddition({
++export function useCatalogTaskAddition({
+   allowGuestAddition = false,
+   authScope,
+   isAuthenticated,
+   onAuthenticationRequired,
+   onSuccess,
+   repository,
+-}: UseRecommendedTaskAdditionOptions): RecommendedTaskAdditionController {
++  saveCatalogItem,
++  errorMessage = additionErrorMessage,
++}: UseCatalogTaskAdditionOptions): CatalogTaskAdditionController {
+   const currentAuthScopeRef = useRef(authScope);
+   const controllersRef = useRef(
+     new Map<number, { authScope: string; controller: AbortController }>(),
+@@ -58,7 +63,7 @@ export function useRecommendedTaskAddition({
+     authScope,
+     ids: new Set<number>(),
+   });
+-  const [state, setState] = useState<RecommendedTaskAdditionScopedState>(() =>
++  const [state, setState] = useState<CatalogTaskAdditionScopedState>(() =>
+     createEmptyState(authScope),
+   );
+   const currentState =
+@@ -82,12 +87,12 @@ export function useRecommendedTaskAddition({
+   }, [authScope]);
+ 
+   const add = useCallback(
+-    (catalogItemId: number) => {
++    async (catalogItemId: number) => {
+       if (
+         (!isAuthenticated && !allowGuestAddition) ||
+         controllersRef.current.get(catalogItemId)?.authScope === authScope
+       ) {
+-        return;
++        return false;
+       }
+ 
+       if (addedCatalogItemIdsRef.current.authScope !== authScope) {
+@@ -98,7 +103,7 @@ export function useRecommendedTaskAddition({
+       }
+ 
+       if (addedCatalogItemIdsRef.current.ids.has(catalogItemId)) {
+-        return;
++        return false;
+       }
+ 
+       const controller = new AbortController();
+@@ -119,72 +124,55 @@ export function useRecommendedTaskAddition({
+         };
+       });
+ 
+-      void repository
+-        .addCatalogItemIds(
+-          isAuthenticated ? "authenticated" : "guest",
+-          [String(catalogItemId)],
+-          controller.signal,
+-        )
+-        .then((addedCatalogItemIds) => {
+-          if (
+-            controller.signal.aborted ||
+-            currentAuthScopeRef.current !== authScope ||
+-            controllersRef.current.get(catalogItemId) !== request
+-          ) {
+-            return;
+-          }
+-
+-          addedCatalogItemIdsRef.current.ids.add(catalogItemId);
+-          setState((current) => {
+-            if (current.authScope !== authScope) {
+-              return current;
+-            }
+-
+-            return {
+-              ...current,
+-              addedCatalogItemIds: [
+-                ...current.addedCatalogItemIds,
+-                catalogItemId,
+-              ],
+-            };
+-          });
+-          onSuccess(catalogItemId, addedCatalogItemIds.length);
+-        })
+-        .catch((error: unknown) => {
+-          if (
+-            controller.signal.aborted ||
+-            currentAuthScopeRef.current !== authScope ||
+-            controllersRef.current.get(catalogItemId) !== request
+-          ) {
+-            return;
+-          }
+-
+-          const requiresAuthentication =
+-            error instanceof PreparationAuthenticationRequiredError;
+-
+-          if (requiresAuthentication) {
+-            onAuthenticationRequired();
+-          }
+-
+-          setState((current) =>
+-            current.authScope === authScope
+-              ? {
+-                  ...current,
+-                  additionErrors: {
+-                    ...current.additionErrors,
+-                    [catalogItemId]: requiresAuthentication
+-                      ? authenticationErrorMessage
+-                      : additionErrorMessage,
+-                  },
+-                }
+-              : current,
+-          );
+-        })
+-        .finally(() => {
+-          if (controllersRef.current.get(catalogItemId) !== request) {
+-            return;
+-          }
+-
++      const isCurrentRequest = () =>
++        !controller.signal.aborted &&
++        currentAuthScopeRef.current === authScope &&
++        controllersRef.current.get(catalogItemId) === request;
++
++      try {
++        const addedCatalogItemIds = await (saveCatalogItem
++          ? saveCatalogItem(catalogItemId, controller.signal)
++          : repository.addCatalogItemIds(
++              isAuthenticated ? "authenticated" : "guest",
++              [String(catalogItemId)],
++              controller.signal,
++            ));
++        if (!isCurrentRequest()) return false;
++        addedCatalogItemIdsRef.current.ids.add(catalogItemId);
++        setState((current) =>
++          current.authScope === authScope
++            ? {
++                ...current,
++                addedCatalogItemIds: [
++                  ...current.addedCatalogItemIds,
++                  catalogItemId,
++                ],
++              }
++            : current,
++        );
++        onSuccess?.(catalogItemId, addedCatalogItemIds.length);
++        return true;
++      } catch (error) {
++        if (!isCurrentRequest()) return false;
++        const requiresAuthentication =
++          error instanceof PreparationAuthenticationRequiredError;
++        if (requiresAuthentication) onAuthenticationRequired();
++        setState((current) =>
++          current.authScope === authScope
++            ? {
++                ...current,
++                additionErrors: {
++                  ...current.additionErrors,
++                  [catalogItemId]: requiresAuthentication
++                    ? authenticationErrorMessage
++                    : errorMessage,
++                },
++              }
++            : current,
++        );
++        return false;
++      } finally {
++        if (controllersRef.current.get(catalogItemId) === request) {
+           controllersRef.current.delete(catalogItemId);
+           setState((current) =>
+             current.authScope === authScope
+@@ -196,7 +184,8 @@ export function useRecommendedTaskAddition({
+                 }
+               : current,
+           );
+-        });
++        }
++      }
+     },
+     [
+       authScope,
+@@ -205,6 +194,8 @@ export function useRecommendedTaskAddition({
+       onAuthenticationRequired,
+       onSuccess,
+       repository,
++      saveCatalogItem,
++      errorMessage,
+     ],
+   );
+ 
+diff --git a/FE/src/features/preparation/index.ts b/FE/src/features/preparation/index.ts
+index e0ccec26bb74a321ac90f12b086804563a31fb9c..318b33ac53c4c9eb0769a44bc8db42f75fbf215d 100644
+--- a/FE/src/features/preparation/index.ts
++++ b/FE/src/features/preparation/index.ts
+@@ -2,3 +2,4 @@ export { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
+ export { usePreparationChecklistRepository } from "./preparationDependencies";
+ export type { ChecklistRepository } from "./repository/checklistRepository";
+ export { PreparationAuthenticationRequiredError } from "./repository/preparationErrors";
++export { useCatalogTaskAddition } from "./hooks/useCatalogTaskAddition";
+diff --git a/FE/src/features/home/model/recommendedTaskAddition.ts b/FE/src/features/preparation/model/catalogTaskAddition.ts
+similarity index 74%
+rename from FE/src/features/home/model/recommendedTaskAddition.ts
+rename to FE/src/features/preparation/model/catalogTaskAddition.ts
+index 84a32b7365fcefa02d275b06d0d453660151f68d..3e35760e88d3ae09a94b65d2f1ba2041888fcd31 100644
+--- a/FE/src/features/home/model/recommendedTaskAddition.ts
++++ b/FE/src/features/preparation/model/catalogTaskAddition.ts
+@@ -1,4 +1,4 @@
+-export interface RecommendedTaskAdditionState {
++export interface CatalogTaskAdditionState {
+   addedCatalogItemIds: readonly number[];
+   addingCatalogItemIds: readonly number[];
+   additionErrors: Readonly<Record<number, string>>;

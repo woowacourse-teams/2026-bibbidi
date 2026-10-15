@@ -1,0 +1,2856 @@
+diff --git a/FE/public/index.html b/FE/public/index.html
+index 7f6910175d2488b3297875094402318da6443cf3..bdf6e3338abefa140a3797d70c2f7b286c5f3db7 100644
+--- a/FE/public/index.html
++++ b/FE/public/index.html
+@@ -36,12 +36,6 @@
+       content="<%= htmlWebpackPlugin.options.siteOrigin %><%= require('../src/assets/bibbidi-share.png') %>"
+     />
+     <meta name="twitter:image:alt" content="비비디 로고" />
+-    <link rel="preconnect" href="https://fonts.googleapis.com" />
+-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+-    <link
+-      href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap"
+-      rel="stylesheet"
+-    />
+     <title>비비디 | 나만의 결혼 체크리스트</title>
+   </head>
+   <body>
+diff --git a/FE/src/app/router.tsx b/FE/src/app/router.tsx
+index f4039ba279f8c47f61bbd653866aff85673b5740..afe5ea26078a04ac688f84d071148920a4a3aa82 100644
+--- a/FE/src/app/router.tsx
++++ b/FE/src/app/router.tsx
+@@ -2,14 +2,8 @@ import { createBrowserRouter, Navigate, RouteObject } from "react-router";
+ 
+ import { AuthLayout } from "../layouts/AuthLayout";
+ import { ServiceLayout } from "../layouts/ServiceLayout";
+-import { AccountSetupPage } from "../pages/AccountSetupPage";
+-import { ChecklistPage } from "../pages/ChecklistPage";
+-import { LoginPage } from "../pages/LoginPage";
+-import { OnboardingPage } from "../pages/OnboardingPage";
+-import { CalendarPage } from "../pages/CalendarPage";
+ import { HomeEntryPage } from "../pages/HomeEntryPage";
+ import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
+-import { SocialLoginCallbackPage } from "../pages/SocialLoginCallbackPage";
+ 
+ export const appRoutes: RouteObject[] = [
+   {
+@@ -32,11 +26,15 @@ export const appRoutes: RouteObject[] = [
+       },
+       {
+         path: "/calendar",
+-        Component: CalendarPage,
++        lazy: async () => ({
++          Component: (await import("../pages/CalendarPage")).CalendarPage,
++        }),
+       },
+       {
+         path: "/checklist",
+-        Component: ChecklistPage,
++        lazy: async () => ({
++          Component: (await import("../pages/ChecklistPage")).ChecklistPage,
++        }),
+       },
+     ],
+   },
+@@ -45,7 +43,9 @@ export const appRoutes: RouteObject[] = [
+     children: [
+       {
+         path: "/login",
+-        Component: LoginPage,
++        lazy: async () => ({
++          Component: (await import("../pages/LoginPage")).LoginPage,
++        }),
+       },
+       {
+         path: "/signup",
+@@ -53,16 +53,24 @@ export const appRoutes: RouteObject[] = [
+       },
+       {
+         path: "/onboarding",
+-        Component: OnboardingPage,
++        lazy: async () => ({
++          Component: (await import("../pages/OnboardingPage")).OnboardingPage,
++        }),
+       },
+       {
+         path: "/onboarding/account",
+-        Component: AccountSetupPage,
++        lazy: async () => ({
++          Component: (await import("../pages/AccountSetupPage"))
++            .AccountSetupPage,
++        }),
+       },
+       {
+         // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.
+         path: "/auth/:provider",
+-        Component: SocialLoginCallbackPage,
++        lazy: async () => ({
++          Component: (await import("../pages/SocialLoginCallbackPage"))
++            .SocialLoginCallbackPage,
++        }),
+       },
+     ],
+   },
+diff --git a/FE/src/assets/ai-chat/recommendation-add.svg b/FE/src/assets/ai-chat/recommendation-add.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..0ded3ffe236f316b3018e85fc610d00794f834de
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-add.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="78" height="34" viewBox="0 0 78 34" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M61 0H17C7.61116 0 0 7.61116 0 17C0 26.3888 7.61116 34 17 34H61C70.3888 34 78 26.3888 78 17C78 7.61116 70.3888 0 61 0Z" fill="#EDF2D9"/>
++</svg>
+diff --git a/FE/src/assets/ai-chat/recommendation-card.svg b/FE/src/assets/ai-chat/recommendation-card.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..8266a42f5b0bdce404cb1c735f6167f2b4ff9d20
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-card.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="281" height="273" viewBox="0 0 281 273" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M254.5 0.5H26.5C12.1406 0.5 0.5 12.1406 0.5 26.5V246.5C0.5 260.859 12.1406 272.5 26.5 272.5H254.5C268.859 272.5 280.5 260.859 280.5 246.5V26.5C280.5 12.1406 268.859 0.5 254.5 0.5Z" fill="white" stroke="#DEDED9"/>
++</svg>
+diff --git a/FE/src/assets/ai-chat/recommendation-peek-step.svg b/FE/src/assets/ai-chat/recommendation-peek-step.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..234894c06765c684186aae69cbed2d5ecb118d50
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-peek-step.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="130" height="26" viewBox="0 0 130 26" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M117 0H13C5.8203 0 0 5.8203 0 13C0 20.1797 5.8203 26 13 26H117C124.18 26 130 20.1797 130 13C130 5.8203 124.18 0 117 0Z" fill="#ECEAE0"/>
++</svg>
+diff --git a/FE/src/assets/ai-chat/recommendation-peek.svg b/FE/src/assets/ai-chat/recommendation-peek.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..c691e3dc8230a889e1ba788b94cefbe9e3065719
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-peek.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="280" height="248" viewBox="0 0 280 248" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M253.5 0.5H26.5C12.1406 0.5 0.5 12.1406 0.5 26.5V221.5C0.5 235.859 12.1406 247.5 26.5 247.5H253.5C267.859 247.5 279.5 235.859 279.5 221.5V26.5C279.5 12.1406 267.859 0.5 253.5 0.5Z" fill="#F7F6F0" stroke="#DEDED9"/>
++</svg>
+diff --git a/FE/src/assets/ai-chat/recommendation-skip.svg b/FE/src/assets/ai-chat/recommendation-skip.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cb4fc8d6ad621b03a3c6c208a9ad90380a36585
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-skip.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="78" height="34" viewBox="0 0 78 34" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M61 0H17C7.61116 0 0 7.61116 0 17C0 26.3888 7.61116 34 17 34H61C70.3888 34 78 26.3888 78 17C78 7.61116 70.3888 0 61 0Z" fill="#EDEDE8"/>
++</svg>
+diff --git a/FE/src/assets/ai-chat/recommendation-step.svg b/FE/src/assets/ai-chat/recommendation-step.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c8aa4489ffb9748e03f8acbc0234808ec35dda5
+--- /dev/null
++++ b/FE/src/assets/ai-chat/recommendation-step.svg
+@@ -0,0 +1,3 @@
++<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="122" height="28" viewBox="0 0 122 28" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path id="Vector" d="M108 0H14C6.26801 0 0 6.26801 0 14C0 21.732 6.26801 28 14 28H108C115.732 28 122 21.732 122 14C122 6.26801 115.732 0 108 0Z" fill="#F7F4EC"/>
++</svg>
+diff --git a/FE/src/assets/bibbidi-favicon-48.png b/FE/src/assets/bibbidi-favicon-48.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..030b56a7ed7a3be3ed4c20e5059c8657ab9ab2d6
+GIT binary patch
+literal 2936
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/FE/src/assets/bibbidi-logo.webp b/FE/src/assets/bibbidi-logo.webp
+new file mode 100644
+index 0000000000000000000000000000000000000000..71100fb90079167f36172431b944798ad31a3b91
+GIT binary patch
+literal 9016
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/FE/src/assets/fonts/OFL.txt b/FE/src/assets/fonts/OFL.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8210f08ca3cece05b4f7baa428afe8e1abe3293
+--- /dev/null
++++ b/FE/src/assets/fonts/OFL.txt
+@@ -0,0 +1,93 @@
++Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
++
++This Font Software is licensed under the SIL Open Font License, Version 1.1.
++This license is copied below, and is also available with a FAQ at:
++http://scripts.sil.org/OFL
++
++
++-----------------------------------------------------------
++SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
++-----------------------------------------------------------
++
++PREAMBLE
++The goals of the Open Font License (OFL) are to stimulate worldwide
++development of collaborative font projects, to support the font creation
++efforts of academic and linguistic communities, and to provide a free and
++open framework in which fonts may be shared and improved in partnership
++with others.
++
++The OFL allows the licensed fonts to be used, studied, modified and
++redistributed freely as long as they are not sold by themselves. The
++fonts, including any derivative works, can be bundled, embedded, 
++redistributed and/or sold with any software provided that any reserved
++names are not used by derivative works. The fonts and derivatives,
++however, cannot be released under any other type of license. The
++requirement for fonts to remain under this license does not apply
++to any document created using the fonts or their derivatives.
++
++DEFINITIONS
++"Font Software" refers to the set of files released by the Copyright
++Holder(s) under this license and clearly marked as such. This may
++include source files, build scripts and documentation.
++
++"Reserved Font Name" refers to any names specified as such after the
++copyright statement(s).
++
++"Original Version" refers to the collection of Font Software components as
++distributed by the Copyright Holder(s).
++
++"Modified Version" refers to any derivative made by adding to, deleting,
++or substituting -- in part or in whole -- any of the components of the
++Original Version, by changing formats or by porting the Font Software to a
++new environment.
++
++"Author" refers to any designer, engineer, programmer, technical
++writer or other person who contributed to the Font Software.
++
++PERMISSION & CONDITIONS
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of the Font Software, to use, study, copy, merge, embed, modify,
++redistribute, and sell modified and unmodified copies of the Font
++Software, subject to the following conditions:
++
++1) Neither the Font Software nor any of its individual components,
++in Original or Modified Versions, may be sold by itself.
++
++2) Original or Modified Versions of the Font Software may be bundled,
++redistributed and/or sold with any software, provided that each copy
++contains the above copyright notice and this license. These can be
++included either as stand-alone text files, human-readable headers or
++in the appropriate machine-readable metadata fields within text or
++binary files as long as those fields can be easily viewed by the user.
++
++3) No Modified Version of the Font Software may use the Reserved Font
++Name(s) unless explicit written permission is granted by the corresponding
++Copyright Holder. This restriction only applies to the primary font name as
++presented to the users.
++
++4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
++Software shall not be used to promote, endorse or advertise any
++Modified Version, except to acknowledge the contribution(s) of the
++Copyright Holder(s) and the Author(s) or with their explicit written
++permission.
++
++5) The Font Software, modified or unmodified, in part or in whole,
++must be distributed entirely under this license, and must not be
++distributed under any other license. The requirement for fonts to
++remain under this license does not apply to any document created
++using the Font Software.
++
++TERMINATION
++This license becomes null and void if any of the above conditions are
++not met.
++
++DISCLAIMER
++THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
++OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
++COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
++DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
++OTHER DEALINGS IN THE FONT SOFTWARE.
+diff --git a/FE/src/assets/fonts/README.md b/FE/src/assets/fonts/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..d666db7d06efc4a1e7f163dce4914f7e4dd7c57a
+--- /dev/null
++++ b/FE/src/assets/fonts/README.md
+@@ -0,0 +1,11 @@
++# Nunito brand subset
++
++The brand name `bibbidi` uses Nunito normal, weight 900. This WOFF2 contains
++only `b`, `d`, and `i` (U+0062, U+0064, U+0069).
++
++- Source: [Google Fonts CSS API](https://fonts.googleapis.com/css2?family=Nunito:wght@900&text=bibbidi&display=swap)
++- License: SIL Open Font License 1.1; see [OFL.txt](./OFL.txt).
++- Downloaded: 2026-10-15. Google Fonts version: v32.
++
++If the brand text or its weight changes, regenerate the subset and update the
++`unicode-range` in `BibidiBrand.css` together.
+diff --git a/FE/src/assets/fonts/nunito-brand-900.woff2 b/FE/src/assets/fonts/nunito-brand-900.woff2
+new file mode 100644
+index 0000000000000000000000000000000000000000..bebd96536b08ed903e18179c1c9ee3feb93d3724
+GIT binary patch
+literal 1076
+zcmV-41k3w(Pew8T0RR9100cAu4*&oF00<BO00Y?o0RR9100000000000000000000
+z0000Q92<cy9ApMyKT}jeR73zw5eN!{e1jhg5&!`<0we<<1Rw>3AO|2Do(9MS9{zRe
+z-zUiwMx|w0K?0k@r=3ER-F{+R0eK>_1&7nd0$DnN0!gv1_SdGdZOjRlrfm(279|>B
+z7{yUb>^f8raR;wljsQX!TSQKVgIzpm==C5pN{}0xItGZDKegs066frO+k^7Iao8wv
+zEUvjRPq33JNSJ*M1dS*{bE!@W67mlc7rmW;0qN1sX<o5S5f%z%PH=)GZkJ`CArXp9
+zXu*!MCweNZqJyn*kM)8W=xbLA@)v8P|5~={^vpZw`V-SkMz3Hwp-3+IV3a`eNh8eG
+zemX9uND+rvcU^}R=s|6Nxzg3$)yQ+G*yLaSzm~Kpg+f;mm!{nJmGnF(H6mC84is}>
+z9Eoo)uWY!Hv~A2f#V?=^P)HIP6{g>%5El911yUr-1A<dPp#&M|ZIw`&V*y*trdv<o
+zo4~b!YXVo`qURYA2oR0}C`IVdQ0XPWea^6^W0y8Ifn`)t(!;1AEaatwrcmQts3~OD
+z_fA?mJ5L4qo)L!KXM_DuL(sMF2K(QBo1M4b8uCB+pxAvQ$oJTN?7Tkcd*>ao`|gim
+zYLEch6uEUG<EppB^k-fW^6rbl{^yZ)o}2Q$B6eR5_P@-|OCLi9-!p37a_6bs2RF~#
+zoXpiDb+&^_M~XhWEmwb8v%ajS>mO^@pY?Y_z8lUju9>MUT<z^HT%W1j-b?mv>GfqN
+zk}u!NtSjf2pz4{*qV?|HqScwo>f+)2?}FdaKelQ=>*@N-R_$ZG^tz8miuRMQSkmju
+zP9$HxC2+}a)?Ux9$bMb3et!I{wISQ8owR1>CZE)jzdWSw<m1PWJ$6#N?bwOiFdl2D
+z851VX)Y_JUz#n`geeqX$-IA|Jz0`U-Z#ul<H?u5%N0NLPfAib<*-!FrF8u$e|35L<
+zl#>*7*-&frHSwfj<Nu%jf74(qcdQ%D;#cw{Cj}E}sz^j*7g*E2c>{NXOU=w-!qb)q
+z*82A258;wJ=vFMF&<%WdQwkDzO(_w^3rd+RE}B<<D-9%ZT4^MKIYk&n=vKk(Dq{+6
+zjM737LClQjp$`u(W^q%8lUe3*(8@;9=)}f6!z>o5WmeeOHE!T#oiehETkFiTh7B(p
+ztdm83Hk|yQ9@bbUn{Jxupo>l1*x0~BriIiHi>$%F_25P&pDc>VA@8DEP8Z#D(Kv<<
+zW?x{L&Bw(xfVyg_rvWdgeAP$tODcKfkV^q71FW!!D%se>8XoK{GC%{hY$AZz)~};-
+u0u5T0Yh7WJIkK3?6(4*aJUr!Ok)=q1)p9m&OLVf2(oQx7?jwaY00009@%qvL
+
+literal 0
+HcmV?d00001
+
+diff --git a/FE/src/components/BibidiBrand/BibidiBrand.css b/FE/src/components/BibidiBrand/BibidiBrand.css
+index 1f13597f76dc7715c72532e31ff3b3ad0dcc712b..76bdb1a41e17dc56d5ef228c48209ea3bd323937 100644
+--- a/FE/src/components/BibidiBrand/BibidiBrand.css
++++ b/FE/src/components/BibidiBrand/BibidiBrand.css
+@@ -24,3 +24,11 @@
+   line-height: 1;
+   letter-spacing: -0.045em;
+ }
++@font-face {
++  font-family: "Nunito";
++  font-style: normal;
++  font-weight: 900;
++  font-display: swap;
++  src: url("../../assets/fonts/nunito-brand-900.woff2") format("woff2");
++  unicode-range: U+62, U+64, U+69;
++}
+diff --git a/FE/src/components/BibidiBrand/BibidiBrand.tsx b/FE/src/components/BibidiBrand/BibidiBrand.tsx
+index 1be84cd31402f814d5fdb65550aff148686dbfd9..02f9cebeb4fe1f05d52e687364a20effb2ade574 100644
+--- a/FE/src/components/BibidiBrand/BibidiBrand.tsx
++++ b/FE/src/components/BibidiBrand/BibidiBrand.tsx
+@@ -1,4 +1,4 @@
+-import bibidiLogo from "../../assets/bibbidi-logo.png";
++import bibidiLogo from "../../assets/bibbidi-logo.webp";
+ import "./BibidiBrand.css";
+ 
+ export function BibidiBrand() {
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index fdc3599b039971b271c34144590f8bbb2d4e5a2a..45f87e8e0a40e4446154c5be33e3733af6d6c13a 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ import { AiChatFeature } from "./AiChatFeature";
+ import { AiChatApiError, streamAiChat } from "./api/streamAiChat";
++import { installMatchMedia } from "../../test/matchMedia";
++import { MyChecklistProvider } from "../checklist";
+ 
+ const mocks = vi.hoisted(() => ({ stream: vi.fn() }));
+ vi.mock("./api/streamAiChat", async (importOriginal) => ({
+@@ -26,14 +28,18 @@ const authRequired = vi.fn();
+ 
+ function chat(isAuthenticated = true) {
+   return (
+-    <AiChatFeature
+-      isAuthenticated={isAuthenticated}
+-      onAuthenticationRequired={authRequired}
+-    />
++    <MyChecklistProvider sessionKey="ai-chat-test">
++      <AiChatFeature
++        isAuthenticated={isAuthenticated}
++        onAuthenticationRequired={authRequired}
++      />
++    </MyChecklistProvider>
+   );
+ }
+-function send(text: string) {
+-  fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
++async function send(text: string) {
++  fireEvent.change(await screen.findByRole("textbox"), {
++    target: { value: text },
++  });
+   fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
+ }
+ function mockMobileDialog() {
+@@ -118,10 +124,38 @@ afterEach(() => {
+ });
+ 
+ describe("실제 AI 채팅", () => {
++  it("모바일은 처음 열 때 채팅을 표시하고 데스크톱으로 전환해도 대화와 입력을 유지한다", async () => {
++    mockMobileDialog();
++    const media = installMatchMedia("(max-width: 760px)", true);
++    render(chat());
++    expect(screen.queryByText("어떤 준비를 도와드릴까요?")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
++    await send("준비 순서");
++    await screen.findByText("실제 AI 답변이에요.");
++    fireEvent.change(screen.getByRole("textbox"), {
++      target: { value: "다음 질문 작성 중" },
++    });
++    act(() => media.setMatches(false));
++    expect(screen.getByRole("log").textContent).toContain(
++      "실제 AI 답변이에요.",
++    );
++    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(
++      "다음 질문 작성 중",
++    );
++    act(() => media.setMatches(true));
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
++    expect(screen.getByRole("log").textContent).toContain(
++      "실제 AI 답변이에요.",
++    );
++    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(
++      "다음 질문 작성 중",
++    );
++  });
++
+   it("추천 질문으로 실제 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
+     render(chat());
+     const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
+-    fireEvent.click(screen.getByRole("button", { name: question }));
++    fireEvent.click(await screen.findByRole("button", { name: question }));
+     await screen.findByText("실제 AI 답변이에요.");
+     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+     expect(within(screen.getByRole("log")).getByText(question)).toBeTruthy();
+@@ -135,7 +169,7 @@ describe("실제 AI 채팅", () => {
+       message: question,
+       conversationId: undefined,
+     });
+-    send("그 다음은?");
++    await send("그 다음은?");
+     await waitFor(() => expect(mocks.stream).toHaveBeenCalledTimes(2));
+     expect(mocks.stream.mock.calls[1][0]).toEqual({
+       message: "그 다음은?",
+@@ -147,7 +181,7 @@ describe("실제 AI 채팅", () => {
+   it("생성 중 받은 조각을 표시하고 전송을 막되 다음 메시지는 작성할 수 있다", async () => {
+     const reply = pendingReply();
+     render(chat());
+-    send("촬영 준비");
++    await send("촬영 준비");
+     reply.delta("촬영 전에 ");
+     reply.delta("준비해요.");
+     expect(screen.getByText("촬영 전에 준비해요.")).toBeTruthy();
+@@ -174,7 +208,7 @@ describe("실제 AI 채팅", () => {
+ 
+   it("공백·4000자 초과·한글 조합 중 Enter는 보내지 않고 완성된 줄바꿈 입력만 보낸다", async () => {
+     render(chat());
+-    const input = screen.getByRole("textbox");
++    const input = await screen.findByRole("textbox");
+     expect(input.getAttribute("maxlength")).toBe("4000");
+     for (const value of [" \n ", "가".repeat(4001)]) {
+       fireEvent.change(input, { target: { value } });
+@@ -204,7 +238,7 @@ describe("실제 AI 채팅", () => {
+       render(chat());
+       if (isMobile)
+         fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+-      send("**준비** 알려줘");
++      await send("**준비** 알려줘");
+       expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
+       reply.delta("## 준비 순서\n\n**웨딩");
+       expect(screen.getByRole("heading", { name: "준비 순서" })).toBeTruthy();
+@@ -231,7 +265,7 @@ describe("실제 AI 채팅", () => {
+   it("중간 실패는 받은 내용을 미완료로 남기고 같은 질문을 중복 표시하지 않고 재시도한다", async () => {
+     const reply = pendingReply();
+     render(chat());
+-    send("질문");
++    await send("질문");
+     reply.delta("**중간 답변**");
+     await reply.fail();
+     expect(screen.getByText("중간 답변")).toBeTruthy();
+@@ -259,7 +293,7 @@ describe("실제 AI 채팅", () => {
+   it("인증 만료는 안전하게 안내하고 기존 인증 상태를 다시 확인한다", async () => {
+     mocks.stream.mockRejectedValueOnce(new AiChatApiError(401));
+     render(chat());
+-    send("질문");
++    await send("질문");
+     await screen.findByRole("alert");
+     expect(screen.getByRole("alert").textContent).toContain(
+       "로그인이 만료됐어요",
+@@ -269,16 +303,18 @@ describe("실제 AI 채팅", () => {
+ 
+   it.each([false, true])(
+     "모바일 여부 %s에서 비로그인 사용자에게 채팅 UI와 로그인 placeholder를 표시하고 전송을 막는다",
+-    (isMobile) => {
++    async (isMobile) => {
+       if (isMobile) mockMobileDialog();
+       render(chat(false));
+       if (isMobile)
+         fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+ 
+       expect(
+-        screen.getByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
++        await screen.findByRole("heading", {
++          name: "어떤 준비를 도와드릴까요?",
++        }),
+       ).toBeTruthy();
+-      const input = screen.getByRole<HTMLTextAreaElement>("textbox");
++      const input = await screen.findByRole<HTMLTextAreaElement>("textbox");
+       expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
+       expect(input.disabled).toBe(true);
+       for (const question of [
+@@ -307,10 +343,10 @@ describe("실제 AI 채팅", () => {
+   it("로그인하면 채팅 입력을 활성화하고 로그아웃하면 대화 대신 로그인 placeholder를 표시한다", async () => {
+     const { rerender } = render(chat(false));
+     rerender(chat());
+-    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
++    const input = await screen.findByRole<HTMLTextAreaElement>("textbox");
+     expect(input.disabled).toBe(false);
+     expect(input.placeholder).toBe("궁금한 준비를 이야기해요");
+-    send("질문");
++    await send("질문");
+     await screen.findByText("실제 AI 답변이에요.");
+     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+     rerender(chat(false));
+@@ -324,7 +360,7 @@ describe("실제 AI 채팅", () => {
+   it("화면을 떠나면 진행 요청을 취소하고 새 화면에 이전 결과를 반영하지 않는다", async () => {
+     const reply = pendingReply();
+     const { unmount } = render(chat());
+-    send("이전 질문");
++    await send("이전 질문");
+     unmount();
+     expect(reply.signal().aborted).toBe(true);
+     render(chat());
+@@ -332,7 +368,7 @@ describe("실제 AI 채팅", () => {
+     await reply.complete();
+     expect(screen.queryByRole("log")).toBeNull();
+     expect(screen.queryByText("늦은 답변")).toBeNull();
+-    send("새 질문");
++    await send("새 질문");
+     await screen.findByText("실제 AI 답변이에요.");
+     expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
+     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+@@ -346,7 +382,7 @@ describe("실제 AI 채팅", () => {
+       const launcher = screen.getByRole("button", { name: "AI와 대화하기" });
+       expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
+       fireEvent.click(launcher);
+-      const dialog = screen.getByRole("dialog");
++      const dialog = await screen.findByRole("dialog");
+       expect(within(dialog).queryByText("예시")).toBeNull();
+       if (closeName === "Escape")
+         fireEvent(dialog, new Event("cancel", { cancelable: true }));
+@@ -366,7 +402,7 @@ describe("실제 AI 채팅", () => {
+     vi.stubGlobal("visualViewport", viewport);
+     render(chat());
+     fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+-    send("질문");
++    await send("질문");
+     reply.delta("앞부분 ");
+     fireEvent.change(screen.getByRole("textbox"), {
+       target: { value: "작성 중" },
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index eb5d1371ef9b9c66856fff8c16547a9b04dcf293..2a95149182a8c0663d4d103291a5e89944b892f1 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -1,9 +1,7 @@
+-import { useRef, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ 
+ import { useIsMobileLayout } from "../../shared/responsive";
+-import { useAiChatConversation } from "./hooks/useAiChatConversation";
+-import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
+-import { AiChatView } from "./view/AiChatView";
++import type { AiChatSession } from "./AiChatSession";
+ import "./view/AiChat.css";
+ 
+ export function AiChatFeature({
+@@ -15,60 +13,88 @@ export function AiChatFeature({
+ }) {
+   const isMobile = useIsMobileLayout();
+   const [isOpen, setOpen] = useState(false);
++  const [hasOpened, setHasOpened] = useState(false);
++  const [Session, setSession] = useState<typeof AiChatSession | null>(null);
++  const [loadFailed, setLoadFailed] = useState(false);
++  const [loadAttempt, setLoadAttempt] = useState(0);
+   const returnFocusRef = useRef<HTMLButtonElement>(null);
+-  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
+-    useAiChatConversation(onAuthenticationRequired);
+-  const openChat = (launcher: HTMLButtonElement) => {
+-    returnFocusRef.current = launcher;
+-    setOpen(true);
++  const shouldLoad = !isMobile || hasOpened;
++  const loading = shouldLoad && !Session && !loadFailed;
++
++  useEffect(() => {
++    if (!shouldLoad || Session) return;
++    let cancelled = false;
++    import("./AiChatSession").then(
++      (module) => {
++        if (!cancelled) setSession(() => module.AiChatSession);
++      },
++      () => {
++        if (!cancelled) setLoadFailed(true);
++      },
++    );
++    return () => {
++      cancelled = true;
++    };
++  }, [shouldLoad, Session, loadAttempt]);
++
++  const retryLoad = () => {
++    setLoadFailed(false);
++    setLoadAttempt((attempt) => attempt + 1);
+   };
+-  const closeChat = () => setOpen(false);
+-  const view = (
+-    <AiChatView
+-      active={!isMobile || isOpen}
+-      isAuthenticated={isAuthenticated}
+-      draft={isAuthenticated ? draft : ""}
+-      messages={isAuthenticated ? messages : []}
+-      errorMessage={isAuthenticated ? errorMessage : null}
+-      isPending={isAuthenticated && isPending}
+-      onDraftChange={(value) => {
+-        if (isAuthenticated) setDraft(value);
+-      }}
+-      onSend={(text) => {
+-        if (isAuthenticated) send(text);
+-      }}
+-      onRetry={() => {
+-        if (isAuthenticated) retry();
+-      }}
+-    />
+-  );
+ 
+   return (
+     <div className="ai-chat-feature">
+       {isMobile ? (
+-        <>
+-          <div className="ai-chat-launchers">
+-            <button
+-              className="ai-chat-launchers__action"
+-              onClick={(event) => openChat(event.currentTarget)}
+-              type="button"
+-            >
+-              AI와 대화하기
+-            </button>
+-          </div>
+-          <MobileAiChatDialog
+-            isOpen={isOpen}
+-            onClose={closeChat}
+-            returnFocusRef={returnFocusRef}
++        <div
++          className={`ai-chat-launchers${loadFailed ? " ai-chat-launchers--error" : ""}`}
++        >
++          {loadFailed ? <p role="alert">채팅을 불러오지 못했어요.</p> : null}
++          <button
++            className="ai-chat-launchers__action"
++            disabled={loading}
++            onClick={() => {
++              if (loadFailed) retryLoad();
++              setHasOpened(true);
++              setOpen(true);
++            }}
++            ref={returnFocusRef}
++            type="button"
+           >
+-            {view}
+-          </MobileAiChatDialog>
+-        </>
+-      ) : (
++            {loading ? (
++              <span role="status">채팅을 불러오고 있어요.</span>
++            ) : loadFailed ? (
++              "다시 시도"
++            ) : (
++              "AI와 대화하기"
++            )}
++          </button>
++        </div>
++      ) : null}
++      {Session ? (
++        <Session
++          isAuthenticated={isAuthenticated}
++          isMobile={isMobile}
++          isOpen={isOpen}
++          onAuthenticationRequired={onAuthenticationRequired}
++          onClose={() => setOpen(false)}
++          returnFocusRef={returnFocusRef}
++        />
++      ) : !isMobile ? (
+         <aside aria-label="AI 채팅" className="ai-chat-panel">
+-          {view}
++          <div className="ai-chat">
++            {loadFailed ? (
++              <div role="alert">
++                <p>채팅을 불러오지 못했어요.</p>
++                <button onClick={retryLoad} type="button">
++                  다시 시도
++                </button>
++              </div>
++            ) : (
++              <p role="status">채팅을 불러오고 있어요.</p>
++            )}
++          </div>
+         </aside>
+-      )}
++      ) : null}
+     </div>
+   );
+ }
+diff --git a/FE/src/features/ai-chat/AiChatRecommendations.test.tsx b/FE/src/features/ai-chat/AiChatRecommendations.test.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..128a4604df2903731b3e1ac50ee4d8d6942deb0e
+--- /dev/null
++++ b/FE/src/features/ai-chat/AiChatRecommendations.test.tsx
+@@ -0,0 +1,468 @@
++import {
++  act,
++  fireEvent,
++  render,
++  screen,
++  waitFor,
++  within,
++} from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { useEffect, useState } from "react";
++
++import { AiChatFeature } from "./AiChatFeature";
++import type { streamAiChat } from "./api/streamAiChat";
++import {
++  MyChecklistProvider,
++  useMyChecklistQueryRepository,
++  useMyChecklistRevision,
++} from "../checklist";
++import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
++import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
++import { installMatchMedia } from "../../test/matchMedia";
++import { AiChatRecommendations } from "./view/AiChatRecommendations";
++
++const mocks = vi.hoisted(() => ({
++  stream: vi.fn(),
++  catalog: vi.fn(),
++  fetch: vi.fn(),
++}));
++vi.mock("./api/streamAiChat", async (original) => ({
++  ...(await original<typeof import("./api/streamAiChat")>()),
++  streamAiChat: mocks.stream,
++}));
++vi.mock("../catalog", () => ({
++  catalogRepository: { getCatalog: mocks.catalog },
++}));
++
++const authRequired = vi.fn();
++const dialogDescriptors = Object.getOwnPropertyDescriptors(
++  HTMLDialogElement.prototype,
++);
++const captureDescriptor = Object.getOwnPropertyDescriptor(
++  HTMLElement.prototype,
++  "setPointerCapture",
++);
++
++function ChecklistObserver() {
++  const query = useMyChecklistQueryRepository();
++  const revision = useMyChecklistRevision();
++  const [titles, setTitles] = useState("");
++  useEffect(() => {
++    if (!revision) return;
++    const controller = new AbortController();
++    void query.getChecklist(controller.signal).then((result) => {
++      if (!controller.signal.aborted)
++        setTitles(result.items.map((item) => item.title).join(", "));
++    });
++    return () => controller.abort();
++  }, [query, revision]);
++  return <output aria-label="공유 로드맵 항목">{titles}</output>;
++}
++
++function chat(observe = false) {
++  return (
++    <MyChecklistProvider sessionKey="recommendation-test">
++      <AiChatFeature isAuthenticated onAuthenticationRequired={authRequired} />
++      {observe ? <ChecklistObserver /> : null}
++    </MyChecklistProvider>
++  );
++}
++async function send() {
++  fireEvent.change(await screen.findByRole("textbox"), {
++    target: { value: "추천해줘" },
++  });
++  fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
++}
++const currentCard = () =>
++  screen.getByRole<HTMLButtonElement>("button", { name: /^현재 추천:/ });
++const json = (value: unknown, status = 200) =>
++  new Response(JSON.stringify(value), { status });
++const addedItem = {
++  id: 1,
++  catalogItemId: 101,
++  categoryId: 10,
++  status: "prev",
++  title: "웨딩홀 투어",
++  createdAt: "2026-10-15T12:00:00",
++};
++const postCalls = () =>
++  mocks.fetch.mock.calls.filter(([, init]) => init?.method === "POST");
++
++beforeEach(() => {
++  vi.resetAllMocks();
++  installMatchMedia("(max-width: 760px)", false);
++  mocks.catalog.mockResolvedValue(preparationCatalogFixture);
++  mocks.stream.mockImplementation(
++    async (_request, receiver: Parameters<typeof streamAiChat>[1]) => {
++      receiver.onConversation("d67a9265-3f45-4d7f-99f1-b5823054c8d9");
++      receiver.onDelta("마음에 드는 일을 담아보세요.");
++      receiver.onRecommendations?.(["101", "201", "301"]);
++    },
++  );
++  mocks.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
++    if (url === "/api/checklists/me" && init?.method === "GET")
++      return json({ id: 1, items: [] });
++    if (url === "/api/checklists/me/catalog-items")
++      return json({ items: [addedItem] });
++    throw new Error(`Unexpected request: ${url}`);
++  });
++  vi.stubGlobal("fetch", mocks.fetch);
++});
++
++afterEach(() => {
++  resetWebAuthSessionForTest();
++  vi.unstubAllGlobals();
++  vi.restoreAllMocks();
++  for (const method of ["showModal", "close"] as const) {
++    if (dialogDescriptors[method])
++      Object.defineProperty(
++        HTMLDialogElement.prototype,
++        method,
++        dialogDescriptors[method],
++      );
++    else
++      delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
++        method
++      ];
++  }
++  if (captureDescriptor)
++    Object.defineProperty(
++      HTMLElement.prototype,
++      "setPointerCapture",
++      captureDescriptor,
++    );
++  else delete (HTMLElement.prototype as Partial<HTMLElement>).setPointerCapture;
++});
++
++describe("AI 추천 카드 연결", () => {
++  it("완료 전에는 카드를 숨기고 완료 후 서버 순서와 카탈로그 정보를 표시한다", async () => {
++    let finish!: () => void;
++    mocks.stream.mockImplementationOnce(
++      async (_request, receiver: Parameters<typeof streamAiChat>[1]) => {
++        receiver.onDelta("추천 답변");
++        receiver.onRecommendations?.(["201", "999999", "101"]);
++        await new Promise<void>((resolve) => {
++          finish = resolve;
++        });
++      },
++    );
++    render(chat());
++    await send();
++    expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
++    expect(mocks.catalog).not.toHaveBeenCalled();
++    await act(async () => finish());
++    await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
++    expect(
++      within(currentCard()).getByText("예식 형태·식순·입장 방식 결정"),
++    ).toBeTruthy();
++    expect(screen.getByText("1 / 2")).toBeTruthy();
++    expect(mocks.catalog).toHaveBeenCalledOnce();
++    expect(mocks.fetch).not.toHaveBeenCalled();
++  });
++
++  it("미완료 답변에서는 추천을 숨기고 재시도 답변의 추천만 보여준다", async () => {
++    mocks.stream.mockImplementationOnce(
++      async (_request, receiver: Parameters<typeof streamAiChat>[1]) => {
++        receiver.onDelta("중간 답변");
++        receiver.onRecommendations?.(["201"]);
++        throw new Error("failure");
++      },
++    );
++    render(chat());
++    await send();
++    await screen.findByText("미완료 답변");
++    expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
++    await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
++    expect(screen.queryByText("미완료 답변")).toBeNull();
++  });
++
++  it("카탈로그 조회만 재시도하고 텍스트와 AI 호출 횟수를 유지한다", async () => {
++    mocks.catalog.mockRejectedValueOnce(new Error("network"));
++    render(chat());
++    await send();
++    await screen.findByRole("button", { name: "카드 다시 불러오기" });
++    expect(screen.getByText("마음에 드는 일을 담아보세요.")).toBeTruthy();
++    fireEvent.click(screen.getByRole("button", { name: "카드 다시 불러오기" }));
++    await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
++    expect(mocks.stream).toHaveBeenCalledOnce();
++  });
++
++  it("옆 카드 선택과 키보드 이동·스킵을 지원하고 모두 처리하면 완료 안내를 남긴다", async () => {
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "다음 추천: 예식 형태 결정" }),
++    );
++    expect(currentCard().getAttribute("aria-label")).toContain(
++      "예식 형태 결정",
++    );
++    fireEvent.keyDown(currentCard(), { key: "Delete" });
++    expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");
++    fireEvent.keyDown(currentCard(), { key: "ArrowRight" });
++    expect(currentCard().getAttribute("aria-label")).toContain("웨딩홀 투어");
++    fireEvent.keyDown(currentCard(), { key: "Delete" });
++    fireEvent.keyDown(currentCard(), { key: "Delete" });
++    expect(screen.getByText("추천을 모두 확인했어요.")).toBeTruthy();
++    expect(mocks.fetch).not.toHaveBeenCalled();
++    await send();
++    await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
++  });
++
++  it("프론트가 저장 API를 한 번만 호출하고 성공 전에는 현재 카드를 유지한다", async () => {
++    let finish!: (response: Response) => void;
++    mocks.fetch.mockImplementation(async (url: string) =>
++      url.endsWith("catalog-items")
++        ? new Promise<Response>((resolve) => {
++            finish = resolve;
++          })
++        : json({ id: 1, items: [] }),
++    );
++    render(chat(true));
++    await send();
++    await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
++    fireEvent.click(currentCard());
++    fireEvent.click(currentCard());
++    await waitFor(() => expect(postCalls()).toHaveLength(1));
++    expect(currentCard().disabled).toBe(true);
++    expect(screen.getByText("저장 중…")).toBeTruthy();
++    expect(postCalls()[0][0]).toBe("/api/checklists/me/catalog-items");
++    expect(JSON.parse(postCalls()[0][1].body)).toEqual([101]);
++    await act(async () => finish(json({ items: [addedItem] })));
++    expect(currentCard().getAttribute("aria-label")).toContain(
++      "예식 형태 결정",
++    );
++    await waitFor(() =>
++      expect(screen.getByLabelText("공유 로드맵 항목").textContent).toBe(
++        "웨딩홀 투어",
++      ),
++    );
++    expect(
++      mocks.fetch.mock.calls.filter(([, init]) => init?.method === "GET"),
++    ).toHaveLength(1);
++    expect(mocks.stream).toHaveBeenCalledOnce();
++    await send();
++    await waitFor(() =>
++      expect(
++        screen.getAllByRole("region", { name: "추천 할 일" }),
++      ).toHaveLength(2),
++    );
++    expect(
++      screen.queryByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    ).toBeNull();
++  });
++
++  it("저장 실패 후 현재 카드를 복구하고 저장 API만 재시도한다", async () => {
++    let fail = true;
++    mocks.fetch.mockImplementation(async (url: string) =>
++      url.endsWith("catalog-items")
++        ? fail
++          ? json({}, 500)
++          : json({ items: [addedItem] })
++        : json({ id: 1, items: [] }),
++    );
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByRole("button", { name: "저장 다시 시도" });
++    expect(currentCard().disabled).toBe(false);
++    expect(currentCard().getAttribute("aria-label")).toContain("웨딩홀 투어");
++    fail = false;
++    fireEvent.click(screen.getByRole("button", { name: "저장 다시 시도" }));
++    await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
++    expect(postCalls()).toHaveLength(2);
++    expect(mocks.stream).toHaveBeenCalledOnce();
++  });
++
++  it("이미 저장된 항목은 추가 API를 호출하지 않고 다음으로 이동한다", async () => {
++    mocks.fetch.mockResolvedValue(
++      json({ id: 1, items: [{ ...addedItem, appointments: [] }] }),
++    );
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
++    expect(postCalls()).toHaveLength(0);
++  });
++
++  it("다른 답변에 같은 카드가 있어도 동시에 한 번만 저장한다", async () => {
++    let finish!: (response: Response) => void;
++    mocks.fetch.mockImplementation(async (url: string) =>
++      url.endsWith("catalog-items")
++        ? new Promise<Response>((resolve) => {
++            finish = resolve;
++          })
++        : json({ id: 1, items: [] }),
++    );
++    render(chat());
++    await send();
++    await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
++    await send();
++    await waitFor(() =>
++      expect(
++        screen.getAllByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++      ).toHaveLength(2),
++    );
++    const cards = screen.getAllByRole("button", {
++      name: "현재 추천: 웨딩홀 투어",
++    });
++    fireEvent.click(cards[0]);
++    fireEvent.click(cards[1]);
++    await waitFor(() => expect(postCalls()).toHaveLength(1));
++    await act(async () => finish(json({ items: [addedItem] })));
++    expect(
++      screen.queryByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    ).toBeNull();
++  });
++
++  it("서버 중복 응답은 재시도 대신 추천에서 제외하고 공유 목록을 갱신한다", async () => {
++    let reads = 0;
++    mocks.fetch.mockImplementation(async (url: string) =>
++      url.endsWith("catalog-items")
++        ? json({ errorCode: 403, message: "duplicate" }, 409)
++        : json({
++            id: 1,
++            items: reads++ ? [{ ...addedItem, appointments: [] }] : [],
++          }),
++    );
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
++    await waitFor(() => expect(reads).toBe(2));
++    expect(screen.queryByRole("button", { name: "저장 다시 시도" })).toBeNull();
++    expect(postCalls()).toHaveLength(1);
++  });
++
++  it("화면을 떠나면 저장 요청을 취소하고 늦은 결과를 새 대화에 반영하지 않는다", async () => {
++    let finish!: (response: Response) => void;
++    mocks.fetch.mockImplementation(async (url: string) =>
++      url.endsWith("catalog-items")
++        ? new Promise<Response>((resolve) => {
++            finish = resolve;
++          })
++        : json({ id: 1, items: [] }),
++    );
++    const view = render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await waitFor(() => expect(postCalls()).toHaveLength(1));
++    const signal = postCalls()[0][1].signal as AbortSignal;
++    view.unmount();
++    expect(signal.aborted).toBe(true);
++    render(chat());
++    await act(async () => finish(json({ items: [addedItem] })));
++    expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
++    expect(
++      await screen.findByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
++    ).toBeTruthy();
++  });
++
++  it("저장 인증 만료는 카드를 유지하고 인증 상태를 다시 확인한다", async () => {
++    mocks.fetch.mockResolvedValue(
++      json({ errorCode: 201, message: "login" }, 401),
++    );
++    render(chat());
++    await send();
++    fireEvent.click(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++    );
++    await screen.findByText(
++      "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
++    );
++    expect(authRequired).toHaveBeenCalledOnce();
++    expect(currentCard().disabled).toBe(false);
++  });
++
++  it("모바일 닫기·재열기와 PC 전환에서 선택·스킵 상태를 유지한다", async () => {
++    const media = installMatchMedia("(max-width: 760px)", true);
++    Object.defineProperties(HTMLDialogElement.prototype, {
++      showModal: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.setAttribute("open", "");
++        },
++      },
++      close: {
++        configurable: true,
++        value(this: HTMLDialogElement) {
++          this.removeAttribute("open");
++        },
++      },
++    });
++    render(chat());
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
++    await send();
++    fireEvent.keyDown(
++      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
++      { key: "Delete" },
++    );
++    fireEvent.click(
++      screen.getByRole("button", { name: "다음 추천: 사회자 섭외" }),
++    );
++    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
++    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
++    expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");
++    act(() => media.setMatches(false));
++    expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");
++    expect(screen.getByText("2 / 2")).toBeTruthy();
++  });
++});
++
++describe("추천 카드 포인터 제스처", () => {
++  it("짧은 이동·세로 스크롤·취소는 복귀하고 충분한 좌우 이동만 처리한다", () => {
++    class TestPointerEvent extends MouseEvent {
++      pointerId = 1;
++      isPrimary = true;
++    }
++    vi.stubGlobal("PointerEvent", TestPointerEvent);
++    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
++      configurable: true,
++      value: vi.fn(),
++    });
++    const skip = vi.fn();
++    const add = vi.fn();
++    render(
++      <AiChatRecommendations
++        tasks={[{ id: "101", title: "추천", stepTitle: "단계", order: 1 }]}
++        status="ready"
++        saving={false}
++        onSelect={vi.fn()}
++        onSkip={skip}
++        onAdd={add}
++        onRetry={vi.fn()}
++      />,
++    );
++    const card = currentCard();
++    const down = () =>
++      fireEvent.pointerDown(card, { button: 0, clientX: 150, clientY: 100 });
++    down();
++    fireEvent.pointerUp(card, { clientX: 180, clientY: 100 });
++    down();
++    fireEvent.pointerMove(card, { clientX: 155, clientY: 180 });
++    fireEvent.pointerUp(card, { clientX: 250, clientY: 180 });
++    down();
++    fireEvent.pointerCancel(card);
++    fireEvent.pointerUp(card, { clientX: 250, clientY: 100 });
++    expect(skip).not.toHaveBeenCalled();
++    expect(add).not.toHaveBeenCalled();
++    down();
++    fireEvent.pointerMove(card, { clientX: 50, clientY: 100 });
++    expect(screen.getByText("손을 떼면 이 추천을 스킵해요")).toBeTruthy();
++    fireEvent.pointerUp(card, { clientX: 50, clientY: 100 });
++    expect(skip).toHaveBeenCalledExactlyOnceWith("101");
++    down();
++    fireEvent.pointerMove(card, { clientX: 250, clientY: 100 });
++    fireEvent.pointerUp(card, { clientX: 250, clientY: 100 });
++    expect(add).toHaveBeenCalledExactlyOnceWith("101");
++    expect(card.closest("section")?.className).not.toContain("pressed");
++  });
++});
+diff --git a/FE/src/features/ai-chat/AiChatSession.tsx b/FE/src/features/ai-chat/AiChatSession.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..2d39a7a2e27511b62f9f578003a958d84c454836
+--- /dev/null
++++ b/FE/src/features/ai-chat/AiChatSession.tsx
+@@ -0,0 +1,64 @@
++import { RefObject } from "react";
++
++import { useAiChatConversation } from "./hooks/useAiChatConversation";
++import { useAiChatRecommendations } from "./hooks/useAiChatRecommendations";
++import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
++import { AiChatView } from "./view/AiChatView";
++
++export function AiChatSession({
++  isAuthenticated,
++  isMobile,
++  isOpen,
++  onAuthenticationRequired,
++  onClose,
++  returnFocusRef,
++}: {
++  isAuthenticated: boolean;
++  isMobile: boolean;
++  isOpen: boolean;
++  onAuthenticationRequired: () => void;
++  onClose: () => void;
++  returnFocusRef: RefObject<HTMLButtonElement | null>;
++}) {
++  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
++    useAiChatConversation(onAuthenticationRequired);
++  const recommendations = useAiChatRecommendations(
++    messages,
++    isAuthenticated,
++    onAuthenticationRequired,
++  );
++  const view = (
++    <AiChatView
++      active={!isMobile || isOpen}
++      isAuthenticated={isAuthenticated}
++      draft={isAuthenticated ? draft : ""}
++      messages={isAuthenticated ? messages : []}
++      errorMessage={isAuthenticated ? errorMessage : null}
++      isPending={isAuthenticated && isPending}
++      recommendations={recommendations}
++      onDraftChange={(value) => {
++        if (isAuthenticated) setDraft(value);
++      }}
++      onSend={(text) => {
++        if (isAuthenticated) send(text);
++      }}
++      onRetry={() => {
++        if (isAuthenticated) retry();
++      }}
++    />
++  );
++
++  return isMobile ? (
++    <MobileAiChatDialog
++      isOpen={isOpen}
++      onClose={onClose}
++      returnFocusRef={returnFocusRef}
++    >
++      {view}
++    </MobileAiChatDialog>
++  ) : (
++    <aside aria-label="AI 채팅" className="ai-chat-panel">
++      {view}
++    </aside>
++  );
++}
+diff --git a/FE/src/features/ai-chat/api/streamAiChat.test.ts b/FE/src/features/ai-chat/api/streamAiChat.test.ts
+index ce87a9c0faed6ad4d44d3c1e1bed0b2195100d8e..d580ff308a67838287601a18f4cf967d781f9035 100644
+--- a/FE/src/features/ai-chat/api/streamAiChat.test.ts
++++ b/FE/src/features/ai-chat/api/streamAiChat.test.ts
+@@ -29,7 +29,11 @@ function response(chunks: Uint8Array[], cancel = vi.fn()) {
+ }
+ 
+ function receive(conversationId?: string) {
+-  const receiver = { onConversation: vi.fn(), onDelta: vi.fn() };
++  const receiver = {
++    onConversation: vi.fn(),
++    onDelta: vi.fn(),
++    onRecommendations: vi.fn(),
++  };
+   const controller = new AbortController();
+   const promise = streamAiChat(
+     { message: "준비를 도와줘", conversationId },
+@@ -51,6 +55,64 @@ afterEach(() => {
+ });
+ 
+ describe("AI 채팅 SSE 통신", () => {
++  it("바이트 단위로 나뉜 추천 ID를 서버 순서대로 중복 제거해 전달한다", async () => {
++    const bytes = encoder.encode(
++      conversation +
++        delta("추천해요") +
++        'event: component\ndata: {"catalogItemIds":[201,101,201]}\n\n' +
++        done,
++    );
++    fetchMock.mockResolvedValue(
++      response(Array.from(bytes, (byte) => new Uint8Array([byte]))),
++    );
++    const { receiver, promise } = receive();
++    await promise;
++    expect(receiver.onRecommendations).toHaveBeenCalledExactlyOnceWith([
++      "201",
++      "101",
++    ]);
++  });
++
++  it.each(
++    [
++      [0],
++      [-1],
++      [1.5],
++      ["101"],
++      [null],
++      [Number.MAX_SAFE_INTEGER + 1],
++      null,
++    ].map((ids) => ({ ids })),
++  )("잘못된 추천 ID $ids는 실패로 처리한다", async ({ ids }) => {
++    fetchMock.mockResolvedValue(
++      response([
++        encoder.encode(
++          conversation +
++            delta("답변") +
++            `event: component\ndata: ${JSON.stringify({ catalogItemIds: ids })}\n\n` +
++            done,
++        ),
++      ]),
++    );
++    const { receiver, promise } = receive();
++    await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
++    expect(receiver.onRecommendations).not.toHaveBeenCalled();
++  });
++
++  it("대화 시작 전 추천 이벤트는 받지 않는다", async () => {
++    fetchMock.mockResolvedValue(
++      response([
++        encoder.encode(
++          'event: component\ndata: {"catalogItemIds":[101]}\n\n' +
++            conversation +
++            delta("답변") +
++            done,
++        ),
++      ]),
++    );
++    await expect(receive().promise).rejects.toBeInstanceOf(AiChatApiError);
++  });
++
+   it("연결이 열린 동안 도착한 답변을 완료 이벤트보다 먼저 전달한다", async () => {
+     let source!: ReadableStreamDefaultController<Uint8Array>;
+     fetchMock.mockResolvedValue(
+diff --git a/FE/src/features/ai-chat/api/streamAiChat.ts b/FE/src/features/ai-chat/api/streamAiChat.ts
+index ea9cdeb72f5b06ca93e7b3d42bbf196830ba6f41..f3fd274fb27a327fb3225deeeb2f6769e709c46f 100644
+--- a/FE/src/features/ai-chat/api/streamAiChat.ts
++++ b/FE/src/features/ai-chat/api/streamAiChat.ts
+@@ -26,21 +26,45 @@ interface ChatRequest {
+ interface ChatReceiver {
+   onConversation: (id: string) => void;
+   onDelta: (text: string) => void;
++  onRecommendations?: (catalogItemIds: string[]) => void;
+ }
+ 
+ function createChatEventHandler(request: ChatRequest, receiver: ChatReceiver) {
+   let conversationId: string | undefined;
+   let hasAnswer = false;
++  let hasComponent = false;
+ 
+   return (event: SseEvent): boolean => {
+-    if (!["conversation", "delta", "done", "failure"].includes(event.type))
++    if (
++      !["conversation", "delta", "component", "done", "failure"].includes(
++        event.type,
++      )
++    )
+       return false;
+     if (event.type === "failure") throw new AiChatApiError();
+     const value: unknown = JSON.parse(event.data);
+     if (typeof value !== "object" || value === null) throw new AiChatApiError();
+-    if (event.type === "delta") {
++    if (event.type === "component") {
++      if (
++        !conversationId ||
++        !hasAnswer ||
++        hasComponent ||
++        !("catalogItemIds" in value) ||
++        !Array.isArray(value.catalogItemIds) ||
++        !value.catalogItemIds.every(
++          (id: unknown) =>
++            typeof id === "number" && Number.isSafeInteger(id) && id > 0,
++        )
++      )
++        throw new AiChatApiError();
++      hasComponent = true;
++      receiver.onRecommendations?.(
++        [...new Set<number>(value.catalogItemIds)].map(String),
++      );
++    } else if (event.type === "delta") {
+       if (
+         !conversationId ||
++        hasComponent ||
+         !("text" in value) ||
+         typeof value.text !== "string"
+       ) {
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+index f6464225de0330f8718b974c1c9eeb312bcfae2a..77263d17b52fa8fb6e3192362624e99b74935371 100644
+--- a/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
++++ b/FE/src/features/ai-chat/hooks/useAiChatConversation.ts
+@@ -58,6 +58,8 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
+               ...message,
+               text: message.text + delta,
+             })),
++          onRecommendations: (catalogItemIds) =>
++            updateCurrentAnswer((message) => ({ ...message, catalogItemIds })),
+         },
+         controller.signal,
+       );
+@@ -65,7 +67,11 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
+     } catch (error) {
+       if (requestRef.current !== controller) return;
+       failedTurn.current = { text, answerId };
+-      updateCurrentAnswer((message) => ({ ...message, status: "failed" }));
++      updateCurrentAnswer((message) => ({
++        ...message,
++        catalogItemIds: undefined,
++        status: "failed",
++      }));
+       const authenticationRequired =
+         error instanceof AiChatApiError && error.authenticationRequired;
+       setErrorMessage(
+@@ -104,6 +110,7 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
+     updateAnswer(turn.answerId, (message) => ({
+       ...message,
+       text: "",
++      catalogItemIds: undefined,
+       status: "streaming",
+     }));
+     void receive(turn.text, turn.answerId);
+diff --git a/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts b/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..343bc8fb4a0ef4dcfc0b58f939e4d11fccbeca09
+--- /dev/null
++++ b/FE/src/features/ai-chat/hooks/useAiChatRecommendations.ts
+@@ -0,0 +1,228 @@
++import { useEffect, useMemo, useRef, useState } from "react";
++
++import { catalogRepository, type CatalogModel } from "../../catalog";
++import { useMyChecklistQueryRepository } from "../../checklist";
++import {
++  usePreparationChecklistRepository,
++  PreparationAuthenticationRequiredError,
++} from "../../preparation";
++import { PreparationDuplicateChecklistItemError } from "../../preparation/repository/preparationErrors";
++import type { ChatMessage } from "../model/aiChat";
++
++export interface RecommendedTask {
++  id: string;
++  title: string;
++  stepTitle: string;
++  order: number;
++}
++
++interface RecommendationState {
++  dismissed: string[];
++  selectedId?: string;
++  savingId?: string;
++  error?: string;
++}
++
++const EMPTY_STATE: RecommendationState = { dismissed: [] };
++
++export function useAiChatRecommendations(
++  messages: ChatMessage[],
++  isAuthenticated: boolean,
++  onAuthenticationRequired: () => void,
++) {
++  const checklist = usePreparationChecklistRepository();
++  const query = useMyChecklistQueryRepository();
++  const [catalogResult, setCatalogResult] = useState<{
++    catalog?: CatalogModel;
++    failed?: boolean;
++  } | null>(null);
++  const [attempt, setAttempt] = useState(0);
++  const [states, setStates] = useState<Record<number, RecommendationState>>({});
++  const [added, setAdded] = useState<string[]>([]);
++  const requests = useRef(
++    new Map<number, { id: string; controller: AbortController }>(),
++  );
++  const hasRecommendations =
++    isAuthenticated &&
++    messages.some(
++      (message) =>
++        message.role === "assistant" &&
++        message.status === "complete" &&
++        Boolean(message.catalogItemIds?.length),
++    );
++
++  useEffect(() => {
++    if (!hasRecommendations || catalogResult) return;
++    const controller = new AbortController();
++    catalogRepository.getCatalog(controller.signal).then(
++      (catalog) => {
++        if (!controller.signal.aborted) setCatalogResult({ catalog });
++      },
++      () => {
++        if (!controller.signal.aborted) setCatalogResult({ failed: true });
++      },
++    );
++    return () => controller.abort();
++  }, [hasRecommendations, catalogResult, attempt]);
++
++  useEffect(() => {
++    const pending = requests.current;
++    return () => {
++      const cancelled = [...pending.keys()];
++      for (const { controller } of pending.values()) controller.abort();
++      pending.clear();
++      if (cancelled.length)
++        setStates((current) =>
++          Object.fromEntries(
++            Object.entries(current).map(([id, state]) => [
++              id,
++              cancelled.includes(Number(id))
++                ? { ...state, savingId: undefined }
++                : state,
++            ]),
++          ),
++        );
++    };
++  }, [checklist, isAuthenticated]);
++
++  const tasksById = useMemo(() => {
++    const catalog = catalogResult?.catalog;
++    const steps = new Map(
++      catalog?.roadmaps.flatMap((roadmap) =>
++        roadmap.steps.map((step) => [step.id, step.title] as const),
++      ),
++    );
++    return new Map(
++      catalog?.stepDetails.flatMap((detail) =>
++        detail.tasks.map(
++          (task) =>
++            [
++              task.id,
++              { ...task, stepTitle: steps.get(detail.stepId) ?? "" },
++            ] as const,
++        ),
++      ),
++    );
++  }, [catalogResult]);
++
++  const update = (answerId: number, change: Partial<RecommendationState>) => {
++    setStates((current) => ({
++      ...current,
++      [answerId]: { ...(current[answerId] ?? EMPTY_STATE), ...change },
++    }));
++  };
++
++  const cards = (answerId: number, ids: string[]): RecommendedTask[] =>
++    ids.flatMap((id, index) => {
++      const task = tasksById.get(id);
++      return task &&
++        !added.includes(id) &&
++        !states[answerId]?.dismissed.includes(id)
++        ? [
++            {
++              id,
++              title: task.title,
++              stepTitle: task.stepTitle,
++              order: index + 1,
++            },
++          ]
++        : [];
++    });
++
++  const nextCardId = (answerId: number, id: string) => {
++    const message = messages.find((message) => message.id === answerId);
++    const current = cards(
++      answerId,
++      message?.role === "assistant" ? (message.catalogItemIds ?? []) : [],
++    );
++    const index = current.findIndex((task) => task.id === id);
++    const remaining = current.filter((task) => task.id !== id);
++    return remaining[Math.min(Math.max(0, index), remaining.length - 1)]?.id;
++  };
++
++  const skip = (answerId: number, id: string) => {
++    if (!isAuthenticated || requests.current.has(answerId)) return;
++    setStates((current) => {
++      const state = current[answerId] ?? EMPTY_STATE;
++      return {
++        ...current,
++        [answerId]: {
++          ...state,
++          dismissed: [...state.dismissed, id],
++          selectedId: nextCardId(answerId, id),
++          error: undefined,
++        },
++      };
++    });
++  };
++
++  const add = async (answerId: number, id: string) => {
++    if (
++      !isAuthenticated ||
++      requests.current.has(answerId) ||
++      [...requests.current.values()].some((request) => request.id === id)
++    )
++      return;
++    const controller = new AbortController();
++    requests.current.set(answerId, { id, controller });
++    update(answerId, { savingId: id, error: undefined });
++    try {
++      const existing = await checklist.getCatalogItemIds(
++        "authenticated",
++        controller.signal,
++      );
++      if (controller.signal.aborted) return;
++      if (!existing.includes(id))
++        await checklist.addCatalogItemIds(
++          "authenticated",
++          [id],
++          controller.signal,
++        );
++      if (!controller.signal.aborted) {
++        setAdded((current) => [...new Set([...current, id])]);
++        update(answerId, { selectedId: nextCardId(answerId, id) });
++      }
++    } catch (error) {
++      if (controller.signal.aborted) return;
++      if (error instanceof PreparationDuplicateChecklistItemError) {
++        setAdded((current) => [...new Set([...current, id])]);
++        update(answerId, { selectedId: nextCardId(answerId, id) });
++        // 다른 화면/기기에서 먼저 추가한 항목도 공통 조회 상태에 반영한다.
++        void query.refresh(controller.signal).catch(() => {});
++      } else {
++        const expired = error instanceof PreparationAuthenticationRequiredError;
++        update(answerId, {
++          error: expired
++            ? "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
++            : "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
++        });
++        if (expired) onAuthenticationRequired();
++      }
++    } finally {
++      if (requests.current.get(answerId)?.controller === controller) {
++        requests.current.delete(answerId);
++        update(answerId, { savingId: undefined });
++      }
++    }
++  };
++
++  return {
++    cards,
++    states,
++    catalogStatus: catalogResult?.catalog
++      ? ("ready" as const)
++      : catalogResult?.failed
++        ? ("error" as const)
++        : ("loading" as const),
++    retryCatalog: () => {
++      setCatalogResult(null);
++      setAttempt((value) => value + 1);
++    },
++    select: (answerId: number, id: string) => {
++      if (!requests.current.has(answerId))
++        update(answerId, { selectedId: id, error: undefined });
++    },
++    skip,
++    add,
++  };
++}
+diff --git a/FE/src/features/ai-chat/model/aiChat.ts b/FE/src/features/ai-chat/model/aiChat.ts
+index ddef2b07cb6c6705fb5bd20034270a9f6acc2cab..cd4e03aa3ec426248cb455661b05e3e24707d635 100644
+--- a/FE/src/features/ai-chat/model/aiChat.ts
++++ b/FE/src/features/ai-chat/model/aiChat.ts
+@@ -16,4 +16,5 @@ export type ChatMessage =
+       role: "assistant";
+       text: string;
+       status: "streaming" | "complete" | "failed";
++      catalogItemIds?: string[];
+     };
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+index 7ce91f27244c6e39ad51da8e291ff831ba2e751f..a84a817fbeb8528b372d839be1759e70221fda96 100644
+--- a/FE/src/features/ai-chat/view/AiChat.css
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -126,7 +126,11 @@
+   overflow-y: auto;
+   overscroll-behavior-y: contain;
+   padding: 16px 4px 8px;
+-  scrollbar-width: thin;
++  scrollbar-width: none;
++}
++
++.ai-chat__log::-webkit-scrollbar {
++  display: none;
+ }
+ 
+ .ai-chat__message {
+@@ -263,6 +267,15 @@
+     padding: 8px 16px 0;
+   }
+ 
++  .ai-chat-launchers--error {
++    flex-direction: column;
++    gap: 8px;
++  }
++
++  .ai-chat-launchers--error p {
++    margin: 0;
++  }
++
+   .ai-chat-launchers button {
+     display: grid;
+     min-height: 44px;
+diff --git a/FE/src/features/ai-chat/view/AiChatRecommendations.css b/FE/src/features/ai-chat/view/AiChatRecommendations.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e75d41fc4115e7c9289559da009b8c6c6f88beb
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/AiChatRecommendations.css
+@@ -0,0 +1,250 @@
++.ai-recommendations {
++  position: relative;
++  container-type: inline-size;
++  margin-top: 24px;
++  color: var(--color-fg-neutral);
++}
++
++.ai-recommendations--pressed {
++  z-index: 3;
++}
++
++.ai-recommendations--pressed .ai-recommendations__header {
++  opacity: 0.48;
++}
++
++.ai-recommendations__header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  font-size: 15px;
++}
++
++.ai-recommendations__header > span {
++  color: var(--color-fg-neutral-muted);
++  font-size: 13px;
++}
++
++.ai-recommendations__direction,
++.ai-recommendations__hint {
++  position: relative;
++  margin: 12px 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++  text-align: center;
++}
++
++.ai-recommendations__stage {
++  position: relative;
++  display: flex;
++  justify-content: center;
++  padding: 20px 0;
++  overflow: clip;
++}
++
++.ai-recommendations__card,
++.ai-recommendations__peek {
++  position: relative;
++  display: flex;
++  flex-direction: column;
++  align-items: flex-start;
++  padding: clamp(14px, 5.7cqw, 24px);
++  border: 0;
++  border-radius: 26px;
++  background: transparent;
++  text-align: left;
++  color: inherit;
++  line-height: 1.5;
++}
++
++.ai-recommendations__card {
++  z-index: 4;
++  width: min(280px, calc(100% - 48px));
++  aspect-ratio: 280 / 272;
++  flex: none;
++  margin: 0;
++  touch-action: pan-y;
++  user-select: none;
++  transform: translateX(var(--recommendation-x))
++    rotate(var(--recommendation-rotation));
++  transition: transform 0.25s ease;
++  animation: ai-recommendation-enter 0.25s ease;
++}
++
++/* 드래그 중인 카드만 스크롤·캐러셀의 잘림 영역 위에서 그린다. */
++.ai-recommendations__card:popover-open {
++  position: fixed;
++  inset: auto;
++  left: var(--recommendation-left);
++  top: var(--recommendation-top);
++  width: var(--recommendation-width);
++  height: var(--recommendation-height);
++}
++
++.ai-recommendations__card::backdrop {
++  background: transparent;
++  pointer-events: none;
++}
++
++.ai-recommendations--pressed .ai-recommendations__card {
++  cursor: grabbing;
++  transition: none;
++  animation: none;
++}
++
++.ai-recommendations__surface {
++  position: absolute;
++  inset: 0;
++  z-index: -1;
++  width: 100%;
++  height: auto;
++  pointer-events: none;
++}
++
++.ai-recommendations__number {
++  margin-bottom: clamp(10px, 4.8cqw, 20px);
++  color: var(--color-bg-brand-solid-pressed);
++  font-size: clamp(18px, 6cqw, 25px);
++  font-weight: 700;
++  line-height: 1.2;
++}
++
++.ai-recommendations__title {
++  display: -webkit-box;
++  width: 100%;
++  margin-bottom: auto;
++  overflow: hidden;
++  -webkit-box-orient: vertical;
++  -webkit-line-clamp: 3;
++  font-size: clamp(16px, 6cqw, 23px);
++  line-height: 1.4;
++  word-break: keep-all;
++  overflow-wrap: anywhere;
++}
++
++.ai-recommendations__step {
++  position: relative;
++  display: inline-flex;
++  width: 122px;
++  height: 28px;
++  flex: none;
++  align-items: center;
++  justify-content: center;
++  margin-top: 12px;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++}
++
++.ai-recommendations__step img {
++  position: absolute;
++  top: 0;
++  left: 0;
++  z-index: -1;
++}
++
++.ai-recommendations__step > span {
++  overflow: hidden;
++  max-width: 102px;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.ai-recommendations__description {
++  margin-top: clamp(8px, 4.8cqw, 20px);
++  color: var(--color-fg-neutral-muted);
++  font-size: clamp(11px, 3.5cqw, 14px);
++}
++
++.ai-recommendations__peek {
++  position: absolute;
++  top: 50%;
++  width: 280px;
++  height: 248px;
++  transform: translateY(-50%);
++  padding: 18px 24px;
++  color: var(--color-fg-neutral);
++  z-index: 1;
++}
++
++.ai-recommendations__peek--previous {
++  right: calc(50% + min(140px, 50cqw - 24px) + 12px);
++}
++.ai-recommendations__peek--next {
++  left: calc(50% + min(140px, 50cqw - 24px) + 12px);
++}
++.ai-recommendations__peek .ai-recommendations__title {
++  font-size: 20px;
++}
++.ai-recommendations__peek .ai-recommendations__number {
++  color: #bd8b7c;
++}
++.ai-recommendations__peek .ai-recommendations__step {
++  width: 130px;
++  height: 26px;
++}
++
++.ai-recommendations__badge {
++  position: absolute;
++  top: 12px;
++  right: 18px;
++  display: grid;
++  width: 78px;
++  height: 34px;
++  place-items: center;
++  font-size: 13px;
++  font-weight: 700;
++}
++
++.ai-recommendations__badge img {
++  position: absolute;
++  inset: 0;
++  z-index: -1;
++}
++.ai-recommendations__saving {
++  position: absolute;
++  inset: auto 16px 12px auto;
++  font-size: 12px;
++  color: var(--color-fg-brand);
++}
++.ai-recommendations__complete {
++  margin: 24px 0 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 13px;
++}
++
++.ai-chat-panel:has(.ai-recommendations--pressed)::after,
++.ai-chat-dialog:has(.ai-recommendations--pressed)::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  z-index: 2;
++  background: rgb(50 50 45 / 28%);
++  pointer-events: none;
++}
++
++.ai-recommendations--pressed
++  :is(.ai-recommendations__direction, .ai-recommendations__hint) {
++  z-index: 4;
++  color: var(--color-fg-on-brand);
++}
++.ai-recommendations--pressed .ai-recommendations__peek {
++  opacity: 0.48;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .ai-recommendations__card {
++    transition: none;
++    animation: none;
++  }
++}
++
++@keyframes ai-recommendation-enter {
++  from {
++    opacity: 0.5;
++    transform: translateX(var(--recommendation-enter-x));
++  }
++  to {
++    opacity: 1;
++    transform: translateX(0);
++  }
++}
+diff --git a/FE/src/features/ai-chat/view/AiChatRecommendations.tsx b/FE/src/features/ai-chat/view/AiChatRecommendations.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..6329de42abb1b4d9b48689c9645a8e66d2251bf3
+--- /dev/null
++++ b/FE/src/features/ai-chat/view/AiChatRecommendations.tsx
+@@ -0,0 +1,344 @@
++import {
++  useId,
++  useEffect,
++  useRef,
++  useState,
++  type CSSProperties,
++  type PointerEvent,
++} from "react";
++
++import cardSurface from "../../../assets/ai-chat/recommendation-card.svg";
++import peekSurface from "../../../assets/ai-chat/recommendation-peek.svg";
++import stepSurface from "../../../assets/ai-chat/recommendation-step.svg";
++import peekStepSurface from "../../../assets/ai-chat/recommendation-peek-step.svg";
++import skipSurface from "../../../assets/ai-chat/recommendation-skip.svg";
++import addSurface from "../../../assets/ai-chat/recommendation-add.svg";
++import type { RecommendedTask } from "../hooks/useAiChatRecommendations";
++import "./AiChatRecommendations.css";
++
++function CardContent({
++  task,
++  peek = false,
++}: {
++  task: RecommendedTask;
++  peek?: boolean;
++}) {
++  return (
++    <>
++      <img
++        alt=""
++        className="ai-recommendations__surface"
++        draggable={false}
++        src={peek ? peekSurface : cardSurface}
++      />
++      <span className="ai-recommendations__number">
++        {String(task.order).padStart(2, "0")}
++      </span>
++      <strong className="ai-recommendations__title">{task.title}</strong>
++      <span className="ai-recommendations__step">
++        <img
++          alt=""
++          draggable={false}
++          src={peek ? peekStepSurface : stepSurface}
++        />
++        <span title={task.stepTitle}>{task.stepTitle}</span>
++      </span>
++      <span className="ai-recommendations__description">
++        내 로드맵의 세부 할 일로
++        <br />
++        추가할 수 있어요.
++      </span>
++    </>
++  );
++}
++
++export function AiChatRecommendations({
++  tasks,
++  selectedId,
++  status,
++  saving,
++  error,
++  onSelect,
++  onSkip,
++  onAdd,
++  onRetry,
++}: {
++  tasks: RecommendedTask[];
++  selectedId?: string;
++  status: "loading" | "error" | "ready";
++  saving: boolean;
++  error?: string;
++  onSelect: (id: string) => void;
++  onSkip: (id: string) => void;
++  onAdd: (id: string) => void;
++  onRetry: () => void;
++}) {
++  const helpId = useId();
++  const cardRef = useRef<HTMLButtonElement>(null);
++  const completeRef = useRef<HTMLParagraphElement>(null);
++  const errorRef = useRef<HTMLDivElement>(null);
++  const restoreFocus = useRef(false);
++  const gesture = useRef<{ pointerId: number; x: number; y: number } | null>(
++    null,
++  );
++  const [drag, setDrag] = useState<number | null>(null);
++  const [floatingBounds, setFloatingBounds] = useState<{
++    left: number;
++    top: number;
++    width: number;
++    height: number;
++    viewportWidth: number;
++    viewportHeight: number;
++  } | null>(null);
++  const [entryDirection, setEntryDirection] = useState(1);
++  const current = Math.max(
++    0,
++    tasks.findIndex((task) => task.id === selectedId),
++  );
++  const task = tasks[current];
++  useEffect(() => {
++    if (!saving && restoreFocus.current) {
++      (cardRef.current ?? completeRef.current)?.focus();
++      restoreFocus.current = false;
++    }
++  }, [saving, task?.id]);
++  useEffect(() => {
++    errorRef.current?.scrollIntoView?.({ block: "nearest" });
++  }, [error, status]);
++  const add = () => {
++    restoreFocus.current = true;
++    onAdd(task.id);
++  };
++  const skip = () => {
++    restoreFocus.current = true;
++    onSkip(task.id);
++  };
++  const previous =
++    tasks.length > 1
++      ? tasks[(current - 1 + tasks.length) % tasks.length]
++      : undefined;
++  const next =
++    tasks.length > 1 ? tasks[(current + 1) % tasks.length] : undefined;
++  const direction =
++    drag !== null && Math.abs(drag) >= 70 ? (drag < 0 ? "skip" : "add") : null;
++  const rotation = Math.max(-6, Math.min(6, (drag ?? 0) / 12));
++  let visibleX = drag ?? 0;
++  let visibleTop = floatingBounds?.top ?? 0;
++  if (floatingBounds) {
++    const { left, top, width, height, viewportWidth, viewportHeight } =
++      floatingBounds;
++    const radians = (Math.abs(rotation) * Math.PI) / 180;
++    const extraX =
++      (width * Math.cos(radians) + height * Math.sin(radians) - width) / 2;
++    const extraY =
++      (height * Math.cos(radians) + width * Math.sin(radians) - height) / 2;
++    // 회전한 모서리까지 화면 안에 두되, 동작 판정은 실제 손가락 이동량을 쓴다.
++    visibleX = Math.max(
++      8 + extraX - left,
++      Math.min(visibleX, viewportWidth - left - width - extraX - 8),
++    );
++    visibleTop = Math.max(
++      8 + extraY,
++      Math.min(top, viewportHeight - height - extraY - 8),
++    );
++  }
++  const reset = () => {
++    cardRef.current?.hidePopover?.();
++    gesture.current = null;
++    setDrag(null);
++    setFloatingBounds(null);
++  };
++  const move = (event: PointerEvent<HTMLButtonElement>) => {
++    const start = gesture.current;
++    if (!start || event.pointerId !== start.pointerId) return;
++    const dx = event.clientX - start.x;
++    if (Math.abs(event.clientY - start.y) > Math.max(12, Math.abs(dx))) {
++      reset();
++      return;
++    }
++    setDrag(Math.max(-140, Math.min(140, dx)));
++  };
++
++  if (status === "loading")
++    return <p role="status">추천 카드를 불러오고 있어요.</p>;
++  if (status === "error")
++    return (
++      <div className="ai-chat__error" role="alert" ref={errorRef}>
++        <p>추천 카드를 불러오지 못했어요.</p>
++        <button onClick={onRetry} type="button">
++          카드 다시 불러오기
++        </button>
++      </div>
++    );
++  if (!task)
++    return (
++      <p
++        className="ai-recommendations__complete"
++        role="status"
++        ref={completeRef}
++        tabIndex={-1}
++      >
++        추천을 모두 확인했어요.
++      </p>
++    );
++
++  return (
++    <section
++      aria-label="추천 할 일"
++      aria-busy={saving}
++      className={`ai-recommendations${drag !== null ? " ai-recommendations--pressed" : ""}`}
++    >
++      <header className="ai-recommendations__header">
++        <strong>추천 할 일</strong>
++        <span aria-live="polite">
++          {current + 1} / {tasks.length}
++        </span>
++      </header>
++      <p className="ai-recommendations__direction" aria-hidden="true">
++        {drag !== null
++          ? "← 스킵 · 좌우로 드래그 · 추가 →"
++          : "옆 카드를 누르면 다른 추천을 볼 수 있어요."}
++      </p>
++      <div
++        className="ai-recommendations__stage"
++        style={
++          floatingBounds ? { minHeight: floatingBounds.height + 40 } : undefined
++        }
++      >
++        {([previous, next] as const).map((side, index) =>
++          side ? (
++            <button
++              aria-label={`${index === 0 ? "이전" : "다음"} 추천: ${side.title}`}
++              className={`ai-recommendations__peek ai-recommendations__peek--${index === 0 ? "previous" : "next"}`}
++              disabled={saving}
++              key={index}
++              onClick={() => {
++                setEntryDirection(index === 0 ? -1 : 1);
++                onSelect(side.id);
++              }}
++              type="button"
++            >
++              <CardContent task={side} peek />
++            </button>
++          ) : null,
++        )}
++        <button
++          aria-label={`현재 추천: ${task.title}`}
++          aria-describedby={helpId}
++          aria-keyshortcuts="ArrowLeft ArrowRight Delete Enter"
++          className="ai-recommendations__card"
++          popover="manual"
++          key={task.id}
++          ref={cardRef}
++          disabled={saving}
++          onClick={(event) => {
++            if (event.detail === 0) add();
++          }}
++          onKeyDown={(event) => {
++            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
++              event.preventDefault();
++              const target = event.key === "ArrowLeft" ? previous : next;
++              if (target) {
++                restoreFocus.current = true;
++                setEntryDirection(event.key === "ArrowLeft" ? -1 : 1);
++                onSelect(target.id);
++              }
++            } else if (event.key === "Delete") {
++              event.preventDefault();
++              skip();
++            } else if (event.key === "Escape") reset();
++          }}
++          onLostPointerCapture={reset}
++          onPointerCancel={reset}
++          onPointerDown={(event) => {
++            if (event.isPrimary === false || event.button !== 0 || saving)
++              return;
++            gesture.current = {
++              pointerId: event.pointerId,
++              x: event.clientX,
++              y: event.clientY,
++            };
++            if (event.currentTarget.showPopover) {
++              const { left, top, width, height } =
++                event.currentTarget.getBoundingClientRect();
++              const viewport =
++                event.currentTarget.ownerDocument.documentElement;
++              setFloatingBounds({
++                left,
++                top,
++                width,
++                height,
++                viewportWidth: viewport.clientWidth,
++                viewportHeight: viewport.clientHeight,
++              });
++              event.currentTarget.showPopover();
++            }
++            event.currentTarget.setPointerCapture(event.pointerId);
++            setDrag(0);
++          }}
++          onPointerMove={move}
++          onPointerUp={(event) => {
++            const start = gesture.current;
++            if (!start || event.pointerId !== start.pointerId) return;
++            const distance = event.clientX - start.x;
++            const vertical = event.clientY - start.y;
++            reset();
++            if (Math.abs(vertical) > Math.abs(distance)) return;
++            if (distance <= -70) skip();
++            if (distance >= 70) add();
++          }}
++          style={
++            {
++              "--recommendation-x": `${visibleX}px`,
++              "--recommendation-rotation": `${rotation}deg`,
++              "--recommendation-enter-x": `${entryDirection * 40}px`,
++              "--recommendation-left": `${floatingBounds?.left ?? 0}px`,
++              "--recommendation-top": `${visibleTop}px`,
++              "--recommendation-width": `${floatingBounds?.width ?? 0}px`,
++              "--recommendation-height": `${floatingBounds?.height ?? 0}px`,
++            } as CSSProperties
++          }
++          type="button"
++        >
++          <CardContent task={task} />
++          {direction ? (
++            <span className="ai-recommendations__badge" aria-hidden="true">
++              <img
++                alt=""
++                draggable={false}
++                src={direction === "skip" ? skipSurface : addSurface}
++              />
++              <span>{direction === "skip" ? "스킵 ←" : "추가 ✓"}</span>
++            </span>
++          ) : null}
++          {saving ? (
++            <span className="ai-recommendations__saving" role="status">
++              저장 중…
++            </span>
++          ) : null}
++        </button>
++      </div>
++      <p className="ai-recommendations__hint" aria-hidden="true">
++        {drag !== null
++          ? direction === "skip"
++            ? "손을 떼면 이 추천을 스킵해요"
++            : direction === "add"
++              ? "손을 떼면 내 로드맵에 추가해요"
++              : "손을 떼면 원래 위치로 돌아와요"
++          : "중앙 카드를 누른 채 좌우로 드래그하세요"}
++      </p>
++      <p className="ai-chat__sr-only" id={helpId}>
++        좌우 방향키로 추천 이동, Delete로 스킵, Enter 또는 스페이스로 내
++        로드맵에 추가합니다.
++      </p>
++      {error ? (
++        <div className="ai-chat__error" role="alert" ref={errorRef}>
++          <p>{error}</p>
++          <button disabled={saving} onClick={add} type="button">
++            저장 다시 시도
++          </button>
++        </div>
++      ) : null}
++    </section>
++  );
++}
+diff --git a/FE/src/features/ai-chat/view/AiChatView.tsx b/FE/src/features/ai-chat/view/AiChatView.tsx
+index a5d616a83765ad39cf259e02783c30e1d243eaae..d01a08c6f66e5f14878c08b5d66fb596dac3f451 100644
+--- a/FE/src/features/ai-chat/view/AiChatView.tsx
++++ b/FE/src/features/ai-chat/view/AiChatView.tsx
+@@ -1,6 +1,6 @@
+ import { useEffect, useId, useRef } from "react";
+ 
+-import bibbidiLogo from "../../../assets/bibbidi-logo.png";
++import bibbidiLogo from "../../../assets/bibbidi-logo.webp";
+ import {
+   ChatMessage,
+   MAX_CHAT_MESSAGE_LENGTH,
+@@ -8,6 +8,8 @@ import {
+   suggestedQuestions,
+ } from "../model/aiChat";
+ import { AiChatMarkdown } from "./AiChatMarkdown";
++import { AiChatRecommendations } from "./AiChatRecommendations";
++import type { useAiChatRecommendations } from "../hooks/useAiChatRecommendations";
+ 
+ export function AiChatView({
+   active,
+@@ -19,6 +21,7 @@ export function AiChatView({
+   onDraftChange,
+   onSend,
+   onRetry,
++  recommendations,
+ }: {
+   active: boolean;
+   isAuthenticated: boolean;
+@@ -29,6 +32,7 @@ export function AiChatView({
+   onDraftChange: (value: string) => void;
+   onSend: (text: string) => void;
+   onRetry: () => void;
++  recommendations: ReturnType<typeof useAiChatRecommendations>;
+ }) {
+   const logRef = useRef<HTMLDivElement>(null);
+   const composing = useRef(false);
+@@ -48,7 +52,7 @@ export function AiChatView({
+       viewport?.removeEventListener("resize", scrollToEnd);
+       viewport?.removeEventListener("scroll", scrollToEnd);
+     };
+-  }, [active, messages]);
++  }, [active, messages, recommendations.catalogStatus]);
+ 
+   return (
+     <div className="ai-chat">
+@@ -107,6 +111,27 @@ export function AiChatView({
+               ) : message.status === "failed" ? (
+                 <span className="ai-chat__incomplete">미완료 답변</span>
+               ) : null}
++              {message.role === "assistant" &&
++              message.status === "complete" &&
++              Boolean(message.catalogItemIds?.length) ? (
++                <AiChatRecommendations
++                  key={String(active)}
++                  tasks={recommendations.cards(
++                    message.id,
++                    message.catalogItemIds!,
++                  )}
++                  status={recommendations.catalogStatus}
++                  selectedId={recommendations.states[message.id]?.selectedId}
++                  saving={Boolean(recommendations.states[message.id]?.savingId)}
++                  error={recommendations.states[message.id]?.error}
++                  onSelect={(id) => recommendations.select(message.id, id)}
++                  onSkip={(id) => recommendations.skip(message.id, id)}
++                  onAdd={(id) => {
++                    void recommendations.add(message.id, id);
++                  }}
++                  onRetry={recommendations.retryCatalog}
++                />
++              ) : null}
+             </div>
+           ))}
+         </div>
+diff --git a/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx b/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
+index 528a31090e7afa81acbe8c137eff5793ffa0c90c..9e99d256cec404603b13b1755b5760331463e91f 100644
+--- a/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
++++ b/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
+@@ -118,6 +118,51 @@ describe("AllPreparationStepsFeature Analytics", () => {
+     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+   });
+ 
++  it("단계 아이콘은 화면 근처에 들어올 때 요청하고 관찰을 해제한다", async () => {
++    let notify!: IntersectionObserverCallback;
++    const observe = vi.fn();
++    const disconnect = vi.fn();
++    vi.stubGlobal(
++      "IntersectionObserver",
++      class {
++        constructor(callback: IntersectionObserverCallback) {
++          notify = callback;
++        }
++        observe = observe;
++        disconnect = disconnect;
++      },
++    );
++    try {
++      const { container, unmount } = await renderFeature();
++      const icon = container.querySelector<HTMLImageElement>(
++        ".preparation-roadmap__step-icon",
++      )!;
++      expect(icon.getAttribute("src")).toBeNull();
++      expect(observe).toHaveBeenCalledWith(icon);
++      act(() =>
++        notify(
++          [
++            {
++              boundingClientRect: icon.getBoundingClientRect(),
++              intersectionRatio: 1,
++              intersectionRect: icon.getBoundingClientRect(),
++              isIntersecting: true,
++              rootBounds: null,
++              target: icon,
++              time: 0,
++            },
++          ],
++          {} as IntersectionObserver,
++        ),
++      );
++      expect(icon.src).toBe("https://example.com/wedding-hall.png");
++      unmount();
++      expect(disconnect).toHaveBeenCalled();
++    } finally {
++      vi.unstubAllGlobals();
++    }
++  });
++
+   it("StrictMode에서도 준비 목록 최초 진입 이벤트를 한 번 전송한다", async () => {
+     await renderFeature({ strictMode: true });
+ 
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index cb20ae5fd4386754d9a57f3089088fe3ccdbdfcd..d7394688696476549776e23c93139a2a53047556 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -12,6 +12,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+ import { AuthState } from "../auth/model/auth";
+ import { ChecklistQueryModel } from "../checklist/model/checklistQuery";
+ import { installMatchMedia } from "../../test/matchMedia";
++import { MyChecklistProvider } from "../checklist";
+ 
+ const mocks = vi.hoisted(() => ({
+   authState: {
+@@ -82,8 +83,10 @@ function render(ui: ReactElement) {
+   return renderView(ui, {
+     wrapper: ({ children }) => (
+       <MemoryRouter>
+-        {children}
+-        <CurrentUrl />
++        <MyChecklistProvider sessionKey="roadmap-workspace-test">
++          {children}
++          <CurrentUrl />
++        </MyChecklistProvider>
+       </MemoryRouter>
+     ),
+   });
+@@ -317,7 +320,9 @@ describe("준비 로드맵 보기 전환", () => {
+     render(<PreparationRoadmapFeature />);
+     await screen.findByText("내 웨딩홀 투어");
+     fireEvent.click(
+-      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
++      await screen.findByRole("button", {
++        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
++      }),
+     );
+     await screen.findByText("실제 준비 안내");
+     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+@@ -336,7 +341,7 @@ describe("준비 로드맵 보기 전환", () => {
+     render(<PreparationRoadmapFeature />);
+     await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" });
+     const chat = screen.getByRole("complementary", { name: "AI 채팅" });
+-    const input = within(chat).getByRole<HTMLTextAreaElement>("textbox");
++    const input = await within(chat).findByRole<HTMLTextAreaElement>("textbox");
+     expect(input.placeholder).toBe("로그인 후 AI와 대화할 수 있어요");
+     expect(input.disabled).toBe(true);
+     fireEvent.click(screen.getByRole("button", { name: "스드메" }));
+@@ -354,7 +359,9 @@ describe("준비 로드맵 보기 전환", () => {
+     const { rerender } = render(<PreparationRoadmapFeature />);
+     await screen.findByText("내 웨딩홀 투어");
+     fireEvent.click(
+-      screen.getByRole("button", { name: "웨딩홀을 정한 다음엔 뭘 준비할까?" }),
++      await screen.findByRole("button", {
++        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
++      }),
+     );
+     const previousReceiver = mocks.stream.mock.calls[0][1];
+     const previousSignal = mocks.stream.mock.calls[0][2] as AbortSignal;
+@@ -369,7 +376,9 @@ describe("준비 로드맵 보기 전환", () => {
+     act(() => previousReceiver.onDelta("늦은 답변"));
+     expect(screen.queryByText("늦은 답변")).toBeNull();
+     fireEvent.click(
+-      screen.getByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
++      await screen.findByRole("button", {
++        name: "촬영 전에 준비할 일을 정리해줘",
++      }),
+     );
+     await screen.findByText("실제 준비 안내");
+     expect(mocks.stream.mock.calls[1][0].conversationId).toBeUndefined();
+@@ -678,7 +687,7 @@ describe("준비 로드맵 보기 전환", () => {
+     mocks.getChecklist.mockReturnValue(new Promise(() => {}));
+     rerender(<PreparationRoadmapFeature />);
+     expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
+-    expect(screen.getByRole("status").textContent).toContain("불러오고");
++    expect(screen.getByText("로드맵을 불러오고 있어요.")).toBeTruthy();
+   });
+ });
+ 
+@@ -840,14 +849,16 @@ describe("내 로드맵 할 일 동작", () => {
+       mocks.getChecklist.mockResolvedValue(current);
+       renderView(
+         <MemoryRouter initialEntries={["/preparation"]}>
+-          <Routes>
+-            <Route
+-              path="/preparation"
+-              element={<PreparationRoadmapFeature />}
+-            />
+-            <Route path="/checklist" element={<ChecklistFeature />} />
+-          </Routes>
+-          <CurrentUrl />
++          <MyChecklistProvider sessionKey="roadmap-detail-test">
++            <Routes>
++              <Route
++                path="/preparation"
++                element={<PreparationRoadmapFeature />}
++              />
++              <Route path="/checklist" element={<ChecklistFeature />} />
++            </Routes>
++            <CurrentUrl />
++          </MyChecklistProvider>
+         </MemoryRouter>,
+       );
+       fireEvent.click(await screen.findByRole("button", { name: "스드메" }));
+diff --git a/FE/src/features/preparation/view/PreparationRoadmap.tsx b/FE/src/features/preparation/view/PreparationRoadmap.tsx
+index 60b6ffb607182bb941adeee6442f9990e8cb25ad..0b0f35d841427b36723c4cab548abb1640afffaa 100644
+--- a/FE/src/features/preparation/view/PreparationRoadmap.tsx
++++ b/FE/src/features/preparation/view/PreparationRoadmap.tsx
+@@ -1,4 +1,4 @@
+-import { ReactNode, useRef, useState } from "react";
++import { ReactNode, useEffect, useRef, useState } from "react";
+ import { EXPAND_MOTION_STYLE } from "../../../shared/motion";
+ import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
+ import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
+@@ -29,6 +29,44 @@ interface PreparationRoadmapStepsProps {
+   viewModel: PreparationRoadmapViewModel;
+ }
+ 
++function PreparationStepIcon({ src }: { src: string }) {
++  const imageRef = useRef<HTMLImageElement>(null);
++  const [visible, setVisible] = useState(
++    () => typeof IntersectionObserver === "undefined",
++  );
++
++  useEffect(() => {
++    if (visible || !imageRef.current) return;
++    const observer = new IntersectionObserver(
++      (entries) => {
++        if (entries.some((entry) => entry.isIntersecting)) {
++          setVisible(true);
++          observer.disconnect();
++        }
++      },
++      { rootMargin: "200px" },
++    );
++    observer.observe(imageRef.current);
++    return () => observer.disconnect();
++  }, [visible]);
++
++  return (
++    <img
++      alt=""
++      className="preparation-roadmap__step-icon"
++      decoding="async"
++      draggable={false}
++      height={48}
++      onError={(event) => {
++        event.currentTarget.hidden = true;
++      }}
++      ref={imageRef}
++      src={visible ? src : undefined}
++      width={48}
++    />
++  );
++}
++
+ function PreparationRoadmapSteps({
+   additionErrorMessage,
+   addingCatalogItemIds,
+@@ -79,15 +117,7 @@ function PreparationRoadmapSteps({
+                 </span>
+               ) : null}
+               {step.iconUrl ? (
+-                <img
+-                  alt=""
+-                  className="preparation-roadmap__step-icon"
+-                  draggable={false}
+-                  onError={(event) => {
+-                    event.currentTarget.hidden = true;
+-                  }}
+-                  src={step.iconUrl}
+-                />
++                <PreparationStepIcon key={step.iconUrl} src={step.iconUrl} />
+               ) : null}
+             </button>
+             <RoadmapStepDisclosure expanded={isExpanded}>
+diff --git a/FE/src/types/assets.d.ts b/FE/src/types/assets.d.ts
+index bb041ca5fdcae376a0942031dca8dfb7641203ce..1abee7af88a4f63e2133192230d37761fe42ce14 100644
+--- a/FE/src/types/assets.d.ts
++++ b/FE/src/types/assets.d.ts
+@@ -1,5 +1,10 @@
+ declare module "*.css";
+ 
++declare module "*.webp" {
++  const source: string;
++  export default source;
++}
++
+ declare module "*.gif" {
+   const source: string;
+   export default source;
+diff --git a/FE/webpack.config.js b/FE/webpack.config.js
+index 4ef278aba0bd8f0f16c83a9f668b837d2a6ee2dd..3d22aad7ef074d25c3ab8c5379fc7cda4a7c372b 100644
+--- a/FE/webpack.config.js
++++ b/FE/webpack.config.js
+@@ -95,7 +95,7 @@ module.exports = (_environment, arguments_) => {
+           ],
+         },
+         {
+-          test: /\.(png|jpe?g|gif|svg)$/i,
++          test: /\.(png|jpe?g|gif|svg|webp|woff2)$/i,
+           type: "asset/resource",
+           generator: {
+             filename: "assets/[name].[contenthash:8][ext][query]",
+@@ -106,7 +106,7 @@ module.exports = (_environment, arguments_) => {
+ 
+     plugins: [
+       new HtmlWebpackPlugin({
+-        favicon: "./src/assets/bibbidi-favicon.png",
++        favicon: "./src/assets/bibbidi-favicon-48.png",
+         siteOrigin: getSiteOrigin(),
+         template: "./public/index.html",
+         minify: isProduction,

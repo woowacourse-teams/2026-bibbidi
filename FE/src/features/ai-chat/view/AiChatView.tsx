@@ -8,6 +8,8 @@ import {
   suggestedQuestions,
 } from "../model/aiChat";
 import { AiChatMarkdown } from "./AiChatMarkdown";
+import { AiChatRecommendations } from "./AiChatRecommendations";
+import type { RecommendationController } from "../model/recommendation";
 
 export function AiChatView({
   active,
@@ -19,6 +21,7 @@ export function AiChatView({
   onDraftChange,
   onSend,
   onRetry,
+  recommendations,
 }: {
   active: boolean;
   isAuthenticated: boolean;
@@ -29,6 +32,7 @@ export function AiChatView({
   onDraftChange: (value: string) => void;
   onSend: (text: string) => void;
   onRetry: () => void;
+  recommendations: RecommendationController;
 }) {
   const logRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
@@ -48,7 +52,7 @@ export function AiChatView({
       viewport?.removeEventListener("resize", scrollToEnd);
       viewport?.removeEventListener("scroll", scrollToEnd);
     };
-  }, [active, messages]);
+  }, [active, messages, recommendations.catalogStatus]);
 
   return (
     <div className="ai-chat">
@@ -106,6 +110,19 @@ export function AiChatView({
                 <time>{message.time}</time>
               ) : message.status === "failed" ? (
                 <span className="ai-chat__incomplete">미완료 답변</span>
+              ) : null}
+              {message.role === "assistant" &&
+              message.status === "complete" &&
+              Boolean(message.catalogItemIds?.length) ? (
+                <AiChatRecommendations
+                  key={String(active)}
+                  {...recommendations.forAnswer(
+                    message.id,
+                    message.catalogItemIds!,
+                  )}
+                  status={recommendations.catalogStatus}
+                  onRetry={recommendations.retryCatalog}
+                />
               ) : null}
             </div>
           ))}
