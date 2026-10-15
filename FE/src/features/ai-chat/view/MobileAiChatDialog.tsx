@@ -20,22 +20,26 @@ export function MobileAiChatDialog({
   returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const programmaticCloses = useRef(0);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const launcher = returnFocusRef.current;
+    const close = () => {
+      if (!dialog.open) return;
+      programmaticCloses.current += 1;
+      dialog.close();
+    };
     if (isOpen) {
       dialog.showModal();
-    } else if (dialog.open) {
-      dialog.close();
-    }
+    } else close();
     const handleKeyDown = (event: KeyboardEvent) =>
       containTabFocus(event, dialog);
     dialog.addEventListener("keydown", handleKeyDown);
     return () => {
       dialog.removeEventListener("keydown", handleKeyDown);
-      if (dialog.open) dialog.close();
+      close();
       if (isOpen) {
         queueMicrotask(() => {
           if (launcher?.isConnected && !dialog.open) launcher.focus();
@@ -69,7 +73,13 @@ export function MobileAiChatDialog({
         event.preventDefault();
         onClose();
       }}
-      onClose={onClose}
+      onClose={(event) => {
+        if (programmaticCloses.current > 0) {
+          programmaticCloses.current -= 1;
+          return;
+        }
+        if (isOpen && !event.currentTarget.open) onClose();
+      }}
       ref={dialogRef}
     >
       <header className="ai-chat-dialog__header">

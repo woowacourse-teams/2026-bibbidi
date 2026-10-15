@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ChecklistStatusConfirmationDialog } from "../checklist/view/ChecklistStatusConfirmationDialog";
 import { useRoadmapChecklist } from "./hooks/useRoadmapChecklist";
@@ -6,12 +6,37 @@ import { useRoadmapTaskCompletion } from "./hooks/useRoadmapTaskCompletion";
 import { createPersonalRoadmapViewModel } from "./view-model/createPersonalRoadmapViewModel";
 import { PersonalRoadmap } from "./view/PersonalRoadmap";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+import {
+  getChecklistCategoryItems,
+  type ChecklistQueryModel,
+} from "../checklist/model/checklistQuery";
 
-export function PersonalRoadmapFeature(props: {
+function findRevealTarget(
+  checklist: ChecklistQueryModel,
+  catalogItemId: number,
+) {
+  for (const category of checklist.categories) {
+    const task = getChecklistCategoryItems(category).find(
+      (item) => item.sourceCatalogItemId === catalogItemId,
+    );
+    if (task) return { categoryId: category.id, taskId: task.id };
+  }
+}
+
+export function PersonalRoadmapFeature({
+  categoryId,
+  onCategorySelect,
+  onShowAll,
+  viewSwitcher,
+  revealCatalogItemId,
+  onRevealComplete,
+}: {
   categoryId?: string | null;
   onCategorySelect: (id: string) => void;
   onShowAll: () => void;
   viewSwitcher: ReactNode;
+  revealCatalogItemId?: number;
+  onRevealComplete?: () => void;
 }) {
   const { request, isRefreshing, retry } = useRoadmapChecklist();
   const navigate = useNavigate();
@@ -22,10 +47,35 @@ export function PersonalRoadmapFeature(props: {
   );
   const displayRequest = refreshError ? { status: "error" as const } : request;
   const confirmation = completion.statusConfirmation;
+  const revealTarget =
+    displayRequest.status === "success" && revealCatalogItemId !== undefined
+      ? findRevealTarget(displayRequest.checklist, revealCatalogItemId)
+      : undefined;
+  const targetCategoryId = revealTarget?.categoryId;
+  useEffect(() => {
+    if (
+      revealCatalogItemId === undefined ||
+      (isRefreshing && displayRequest.status === "success")
+    )
+      return;
+    if (displayRequest.status !== "success" || !targetCategoryId) {
+      if (displayRequest.status !== "loading") onRevealComplete?.();
+    } else if (targetCategoryId !== categoryId) {
+      onCategorySelect(targetCategoryId);
+    }
+  }, [
+    revealCatalogItemId,
+    displayRequest.status,
+    isRefreshing,
+    targetCategoryId,
+    categoryId,
+    onCategorySelect,
+    onRevealComplete,
+  ]);
   if (displayRequest.status !== "success") {
     return (
       <>
-        {props.viewSwitcher}
+        {viewSwitcher}
         <PreparationRoadmapState
           status={displayRequest.status}
           errorMessage={refreshError}
@@ -44,8 +94,17 @@ export function PersonalRoadmapFeature(props: {
         <p role="alert">{completion.errorMessage}</p>
       ) : null}
       <PersonalRoadmap
-        {...props}
+        categoryId={categoryId}
+        onCategorySelect={onCategorySelect}
+        onShowAll={onShowAll}
+        viewSwitcher={viewSwitcher}
+        onRevealComplete={onRevealComplete}
         categories={createPersonalRoadmapViewModel(displayRequest.checklist)}
+        revealTaskId={
+          !isRefreshing && targetCategoryId === categoryId
+            ? revealTarget?.taskId
+            : undefined
+        }
         isChangingStatus={
           completion.isPending || isRefreshing || confirmation !== null
         }

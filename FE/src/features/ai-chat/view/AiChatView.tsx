@@ -35,6 +35,8 @@ export function AiChatView({
   recommendations: RecommendationController;
 }) {
   const logRef = useRef<HTMLDivElement>(null);
+  const scrollPosition = useRef<number | undefined>(undefined);
+  const lastMessages = useRef(messages);
   const composing = useRef(false);
   const inputId = useId();
   useEffect(() => {
@@ -42,9 +44,19 @@ export function AiChatView({
     const scrollToEnd = () => {
       if (logRef.current) {
         logRef.current.scrollTop = logRef.current.scrollHeight;
+        scrollPosition.current = logRef.current.scrollTop;
       }
     };
-    scrollToEnd();
+    const log = logRef.current;
+    if (log) {
+      log.scrollTop =
+        lastMessages.current !== messages ||
+        scrollPosition.current === undefined
+          ? log.scrollHeight
+          : scrollPosition.current;
+      scrollPosition.current = log.scrollTop;
+    }
+    lastMessages.current = messages;
     const viewport = window.visualViewport;
     viewport?.addEventListener("resize", scrollToEnd);
     viewport?.addEventListener("scroll", scrollToEnd);
@@ -87,6 +99,9 @@ export function AiChatView({
           aria-live="polite"
           className="ai-chat__log"
           ref={logRef}
+          onScroll={(event) => {
+            if (active) scrollPosition.current = event.currentTarget.scrollTop;
+          }}
           role="log"
           // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 대화 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
           tabIndex={0}

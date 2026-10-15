@@ -10,6 +10,7 @@ export function AiChatSession({
   isMobile,
   isOpen,
   onAuthenticationRequired,
+  onTaskAdded,
   onClose,
   returnFocusRef,
 }: {
@@ -17,6 +18,7 @@ export function AiChatSession({
   isMobile: boolean;
   isOpen: boolean;
   onAuthenticationRequired: () => void;
+  onTaskAdded?: (catalogItemId: number) => void;
   onClose: () => void;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -26,6 +28,7 @@ export function AiChatSession({
     messages,
     isAuthenticated,
     onAuthenticationRequired,
+    onTaskAdded,
   );
   const view = (
     <AiChatView

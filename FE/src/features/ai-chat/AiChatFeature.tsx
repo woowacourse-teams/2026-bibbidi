@@ -7,9 +7,13 @@ import "./view/AiChat.css";
 export function AiChatFeature({
   isAuthenticated,
   onAuthenticationRequired,
+  onTaskAdded,
+  isRevealingTask = false,
 }: {
   isAuthenticated: boolean;
   onAuthenticationRequired: () => void;
+  onTaskAdded?: (catalogItemId: number) => void;
+  isRevealingTask?: boolean;
 }) {
   const isMobile = useIsMobileLayout();
   const [isOpen, setOpen] = useState(false);
@@ -51,7 +55,7 @@ export function AiChatFeature({
           {loadFailed ? <p role="alert">채팅을 불러오지 못했어요.</p> : null}
           <button
             className="ai-chat-launchers__action"
-            disabled={loading}
+            disabled={loading || isRevealingTask}
             onClick={() => {
               if (loadFailed) retryLoad();
               setHasOpened(true);
@@ -74,8 +78,9 @@ export function AiChatFeature({
         <Session
           isAuthenticated={isAuthenticated}
           isMobile={isMobile}
-          isOpen={isOpen}
+          isOpen={isOpen && !isRevealingTask}
           onAuthenticationRequired={onAuthenticationRequired}
+          onTaskAdded={onTaskAdded}
           onClose={() => setOpen(false)}
           returnFocusRef={returnFocusRef}
         />
