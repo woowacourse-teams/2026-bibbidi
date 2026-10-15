@@ -1,4 +1,4 @@
-import type { ApiFactory } from './api.ts';
+import type { ApiFactory } from '../api/api.ts';
 import { pickRandom, UserIds, type PooledUser } from './users.ts';
 
 export interface SetupData {

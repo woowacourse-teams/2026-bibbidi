@@ -16,7 +16,7 @@ jobs:
   k6:
     if: startsWith(github.ref_name, 'k6/dev/')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
     environment: backend-dev
     env:
       REF_NAME: ${{ github.ref_name }}
@@ -27,8 +27,8 @@ jobs:
       - name: 태그에서 실행 대상 읽기
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test)/([A-Za-z0-9._-]+)$ ]]; then
-            echo "::error::태그 형식이 k6/dev/<smoke-test>/<회차>와 맞지 않습니다: $REF_NAME"
+          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test)/([A-Za-z0-9._-]+)$ ]]; then
+            echo "::error::태그 형식이 k6/dev/<smoke-test|breakpoint-general-test>/<회차>와 맞지 않습니다: $REF_NAME"
             exit 1
           fi
           {
@@ -86,7 +86,15 @@ jobs:
           SUMMARY_DIR: ${{ env.REPORT_DIR }}
         run: |
           mkdir -p "$REPORT_DIR"
+          set +e
           k6 run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
+          status=$?
+          set -e
+          if [ "$status" -eq 99 ] && [[ "$SCRIPT" == breakpoint-* ]]; then
+            echo "임계값 중단은 Breakpoint의 정상 결과입니다."
+            exit 0
+          fi
+          exit "$status"
 
       - name: 잡 요약에 판정표 남기기
         if: always()

@@ -32,11 +32,16 @@ export class ExpectationWithExtras implements ExpectationPolicy {
 
 export type TagProvider = () => Record<string, string>;
 
+export interface ResponseObserver {
+  observe(spec: RequestSpec, response: RefinedResponse<'text'>): void;
+}
+
 export class HttpClient {
   constructor(
     private readonly baseUrl: string,
     private readonly expectation: ExpectationPolicy = new StrictExpectation(),
     private readonly extraTags: TagProvider = () => ({}),
+    private readonly observers: readonly ResponseObserver[] = [],
   ) {}
 
   send(token: string, spec: RequestSpec): RefinedResponse<'text'> {
@@ -61,6 +66,10 @@ export class HttpClient {
     check(response, {
       [`${spec.name} -> ${acceptable.join('|')}`]: (r) => acceptable.includes(r.status),
     });
+
+    for (const observer of this.observers) {
+      observer.observe(spec, response);
+    }
 
     return response;
   }

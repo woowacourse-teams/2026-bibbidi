@@ -1,11 +1,11 @@
 import type { Options } from 'k6/options';
-import { ApiFactory } from './src/api.ts';
-import { Environment, numberFromEnv, textFromEnv } from './src/environment.ts';
-import { HttpClient } from './src/http.ts';
-import { LoadTest } from './src/load-test.ts';
-import { NewUserSession, ReturningUserSession, SessionSequence, type SetupData } from './src/session.ts';
-import { SummaryReport, type SummaryData } from './src/summary.ts';
-import { AccessTokenIssuer } from './src/token.ts';
+import { ApiFactory } from './src/api/api.ts';
+import { Environment, numberFromEnv, textFromEnv } from './src/common/environment.ts';
+import { HttpClient } from './src/http/http.ts';
+import { LoadTest } from './src/scenario/load-test.ts';
+import { NewUserSession, ReturningUserSession, SessionSequence, type SetupData } from './src/session/session.ts';
+import { SummaryReport, type SummaryData } from './src/report/summary.ts';
+import { AccessTokenIssuer } from './src/common/token.ts';
 
 const environment = Environment.fromEnv();
 

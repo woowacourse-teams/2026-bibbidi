@@ -1,0 +1,74 @@
+diff --git a/Infra/k6/src/breakpoint/breakpoint-report.ts b/Infra/k6/src/breakpoint/breakpoint-report.ts
+index 011d5165dcddf139034041b99101095b3424317e..c9cd892ab8bbc9dcc5c6abf7d1b571d5ba50d1f0 100644
+--- a/Infra/k6/src/breakpoint/breakpoint-report.ts
++++ b/Infra/k6/src/breakpoint/breakpoint-report.ts
+@@ -6,6 +6,7 @@ type WindowVerdict = '정상' | '고장' | '도달 못함';
+ interface WindowResult {
+   window: number;
+   endRate: number;
++  rps: number | undefined;
+   p99: number | undefined;
+   errorRate: number | undefined;
+   verdict: WindowVerdict;
+@@ -48,7 +49,8 @@ export class BreakpointReport extends SummaryReport {
+       const window = index + 1;
+       const latency = this.metric(`window_latency{window:${window}}`);
+       const errors = this.metric(`window_server_error{window:${window}}`);
+-      const reached = (this.value(`window_requests{window:${window}}`, 'count') ?? 0) > 0;
++      const requestCount = this.value(`window_requests{window:${window}}`, 'count') ?? 0;
++      const reached = requestCount > 0;
+       const causes: string[] = [];
+ 
+       if (this.hasFailedThreshold(latency)) causes.push('조회 응답 시간(p99)이 1초 초과');
+@@ -58,6 +60,7 @@ export class BreakpointReport extends SummaryReport {
+       return {
+         window,
+         endRate: this.plan.endRate(window),
++        rps: reached ? requestCount / this.plan.windowSeconds : undefined,
+         p99: reached ? latency?.values?.['p(99)'] : undefined,
+         errorRate: reached ? errors?.values?.rate : undefined,
+         verdict: causes.length > 0 ? '고장' : reached ? '정상' : '도달 못함',
+@@ -83,14 +86,14 @@ export class BreakpointReport extends SummaryReport {
+   private conclusion(results: WindowResult[], failedWindow: WindowResult | undefined): string[] {
+     if (failedWindow === undefined) {
+       const last = results.filter((result) => result.verdict === '정상').pop();
+-      const reached = last === undefined ? '-' : `초당 ${last.endRate}개 시나리오`;
++      const reached = last === undefined ? '-' : this.load(last);
+       return [`- 판정: 한계에 닿지 않음 (최대 ${reached}까지 정상)`];
+     }
+ 
+     const previous = results.find((result) => result.window === failedWindow.window - 1);
+     const lines = [
+-      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 구간에서 고장)' : `초당 ${previous.endRate}개 시나리오`}`,
+-      `- 고장 지점: 초당 ${failedWindow.endRate}개 시나리오 (${failedWindow.window}번째 구간)`,
++      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 구간에서 고장)' : this.load(previous)}`,
++      `- 고장 지점: ${this.load(failedWindow)} (${failedWindow.window}번째 구간)`,
+       `- 처음 걸린 고장 기준: ${failedWindow.causes.join(', ')}`,
+     ];
+     if (failedWindow.causes.some((cause) => cause.startsWith('서버가 따라가지 못함'))) {
+@@ -104,15 +107,23 @@ export class BreakpointReport extends SummaryReport {
+       [
+         result.window,
+         result.endRate,
++        this.format(result.rps, 1),
+         this.format(result.p99),
+         result.errorRate === undefined ? '-' : `${(result.errorRate * 100).toFixed(2)}%`,
+         result.verdict,
+       ].join(' | '),
+     );
+     return [
+-      '| 구간 | 구간 끝의 초당 시나리오 수 | 조회 응답 시간 p99(ms) | 서버 오류(5xx) 비율 | 판정 |',
+-      '| --- | --- | --- | --- | --- |',
++      '| 구간 | 구간 끝의 초당 시나리오 수 | 구간 평균 RPS(초당 요청 수) | 조회 응답 시간 p99(ms) | 서버 오류(5xx) 비율 | 판정 |',
++      '| --- | --- | --- | --- | --- | --- |',
+       ...rows.map((row) => `| ${row} |`),
++      '',
++      'RPS는 구간 안에서 보낸 요청 수를 구간 길이로 나눈 평균입니다. 구간 안에서 초당 시나리오 수가 계속 오르므로 구간 끝의 순간 값보다 낮게 나오고, 도중에 멈춘 구간은 더 낮게 나옵니다.',
+     ];
+   }
++
++  private load(result: WindowResult): string {
++    const rps = result.rps === undefined ? '-' : this.format(result.rps, 0);
++    return `초당 ${result.endRate}개 시나리오 (구간 평균 ${rps} RPS)`;
++  }
+ }

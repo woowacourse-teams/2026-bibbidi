@@ -1,5 +1,5 @@
-import type { HttpClient } from './http.ts';
-import type { AccessTokenIssuer } from './token.ts';
+import type { HttpClient } from '../http/http.ts';
+import type { AccessTokenIssuer } from '../common/token.ts';
 
 interface CatalogResponse {
   categories: { steps: { items: { id: number }[] }[] }[];
