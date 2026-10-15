@@ -1,0 +1,15 @@
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+index 44f1a42d5013b805a03cffa5e378a3b8fc574d8c..edc024d04383b5cc05cee433d55bc2c8be47640a 100644
+--- a/.github/workflows/load-test.yml
++++ b/.github/workflows/load-test.yml
+@@ -27,8 +27,8 @@ jobs:
+       - name: 태그에서 실행 대상 읽기
+         run: |
+           set -euo pipefail
+-          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general)/([A-Za-z0-9._-]+)$ ]]; then
+-            echo "::error::태그 형식이 k6/dev/<smoke-test|breakpoint-general>/<회차>와 맞지 않습니다: $REF_NAME"
++          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test)/([A-Za-z0-9._-]+)$ ]]; then
++            echo "::error::태그 형식이 k6/dev/<smoke-test|breakpoint-general-test>/<회차>와 맞지 않습니다: $REF_NAME"
+             exit 1
+           fi
+           {
