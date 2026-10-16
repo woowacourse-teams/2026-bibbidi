@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiChatFeature } from "./AiChatFeature";
 import { AiChatApiError, streamAiChat } from "./api/streamAiChat";
 import { installMatchMedia } from "../../test/matchMedia";
+import { installDialogMock } from "../../test/dialog";
 import { MyChecklistProvider } from "../checklist";
 
 const mocks = vi.hoisted(() => ({ stream: vi.fn() }));
@@ -21,9 +22,7 @@ vi.mock("./api/streamAiChat", async (importOriginal) => ({
 }));
 
 const id = "d67a9265-3f45-4d7f-99f1-b5823054c8d9";
-const dialogMethods = Object.getOwnPropertyDescriptors(
-  HTMLDialogElement.prototype,
-);
+let restoreDialog: (() => void) | undefined;
 const authRequired = vi.fn();
 
 function chat(isAuthenticated = true) {
@@ -48,20 +47,7 @@ function mockMobileDialog() {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   } as unknown as MediaQueryList);
-  Object.defineProperties(HTMLDialogElement.prototype, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute("open", "");
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.removeAttribute("open");
-      },
-    },
-  });
+  restoreDialog = installDialogMock();
 }
 function pendingReply() {
   let receiver: Parameters<typeof streamAiChat>[1];
@@ -106,21 +92,11 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  restoreDialog?.();
+  restoreDialog = undefined;
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  for (const method of ["showModal", "close"] as const) {
-    if (dialogMethods[method])
-      Object.defineProperty(
-        HTMLDialogElement.prototype,
-        method,
-        dialogMethods[method],
-      );
-    else
-      delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
-        method
-      ];
-  }
 });
 
 describe("실제 AI 채팅", () => {
@@ -427,6 +403,46 @@ describe("실제 AI 채팅", () => {
       await waitFor(() => expect(document.activeElement).toBe(launcher));
     },
   );
+
+  it("모바일 화면 높이가 줄어들면 새 높이를 반영한 뒤 대화 하단으로 이동한다", async () => {
+    mockMobileDialog();
+    const viewport = Object.assign(new EventTarget(), {
+      height: 844,
+      offsetTop: 0,
+    });
+    vi.stubGlobal("visualViewport", viewport);
+    render(chat());
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    await send("질문");
+    await screen.findByText("실제 AI 답변이에요.");
+    const dialog = screen.getByRole("dialog");
+    const log = screen.getByRole("log");
+    let position = 0;
+    Object.defineProperties(log, {
+      scrollHeight: { configurable: true, value: 1000 },
+      scrollTop: {
+        configurable: true,
+        get: () => position,
+        set: (value: number) => {
+          position = Math.max(
+            0,
+            Math.min(value, 1000 - Number.parseFloat(dialog.style.height)),
+          );
+        },
+      },
+    });
+    log.scrollTop = log.scrollHeight;
+    expect(log.scrollTop).toBe(156);
+
+    viewport.height = 400;
+    viewport.dispatchEvent(new Event("resize"));
+    expect(dialog.style.height).toBe("400px");
+    expect(log.scrollTop).toBe(600);
+
+    viewport.height = 844;
+    viewport.dispatchEvent(new Event("resize"));
+    expect(log.scrollTop).toBe(156);
+  });
 
   it("모바일을 닫아도 답변을 계속 받고 다시 열면 대화와 작성 중 입력을 유지한다", async () => {
     const reply = pendingReply();

@@ -38,8 +38,26 @@ export function AiChatView({
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
   const lastMessages = useRef(messages);
+  const lastCatalogStatus = useRef(recommendations.catalogStatus);
   const composing = useRef(false);
   const inputId = useId();
+  useEffect(() => {
+    if (!active) return;
+    const log = logRef.current;
+    if (log) {
+      log.scrollTop =
+        lastMessages.current !== messages ||
+        scrollPosition.current === undefined ||
+        (lastCatalogStatus.current !== "ready" &&
+          recommendations.catalogStatus === "ready")
+          ? log.scrollHeight
+          : scrollPosition.current;
+      scrollPosition.current = log.scrollTop;
+    }
+    lastMessages.current = messages;
+    lastCatalogStatus.current = recommendations.catalogStatus;
+  }, [active, messages, recommendations.catalogStatus]);
+
   useEffect(() => {
     if (!active) return;
     const scrollToEnd = () => {
@@ -48,16 +66,6 @@ export function AiChatView({
         scrollPosition.current = logRef.current.scrollTop;
       }
     };
-    const log = logRef.current;
-    if (log) {
-      log.scrollTop =
-        lastMessages.current !== messages ||
-        scrollPosition.current === undefined
-          ? log.scrollHeight
-          : scrollPosition.current;
-      scrollPosition.current = log.scrollTop;
-    }
-    lastMessages.current = messages;
     const viewport = window.visualViewport;
     viewport?.addEventListener("resize", scrollToEnd);
     viewport?.addEventListener("scroll", scrollToEnd);
@@ -65,7 +73,7 @@ export function AiChatView({
       viewport?.removeEventListener("resize", scrollToEnd);
       viewport?.removeEventListener("scroll", scrollToEnd);
     };
-  }, [active, messages, recommendations.catalogStatus]);
+  }, [active]);
 
   return (
     <div className="ai-chat">

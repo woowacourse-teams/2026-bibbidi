@@ -78,7 +78,7 @@ export function AiChatRecommendations({
   const task = tasks[current];
   useEffect(() => {
     if (!saving && restoreFocus.current) {
-      (cardRef.current ?? completeRef.current)?.focus();
+      (cardRef.current ?? completeRef.current)?.focus({ preventScroll: true });
       restoreFocus.current = false;
     }
   }, [saving, task?.id]);
@@ -166,7 +166,6 @@ export function AiChatRecommendations({
             aria-describedby={helpId}
             aria-keyshortcuts="ArrowLeft ArrowRight Delete Enter"
             className="ai-recommendations__card"
-            key={task.id}
             ref={cardRef}
             disabled={saving}
             onClick={(event) => {
@@ -195,7 +194,9 @@ export function AiChatRecommendations({
             }
             type="button"
           >
-            <CardContent task={task} />
+            <span className="ai-recommendations__card-content" key={task.id}>
+              <CardContent task={task} />
+            </span>
             {direction ? (
               <span className="ai-recommendations__badge" aria-hidden="true">
                 <img
