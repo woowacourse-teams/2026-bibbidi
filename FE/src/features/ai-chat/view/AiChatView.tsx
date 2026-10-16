@@ -9,6 +9,7 @@ import {
 } from "../model/aiChat";
 import { AiChatMarkdown } from "./AiChatMarkdown";
 import { AiChatRecommendations } from "./AiChatRecommendations";
+import { AiChatAssistantMessage } from "./AiChatAssistantMessage";
 import type { RecommendationController } from "../model/recommendation";
 
 export function AiChatView({
@@ -82,7 +83,6 @@ export function AiChatView({
           <div className="ai-chat__questions">
             {suggestedQuestions.map((question) => (
               <button
-                disabled={!isAuthenticated}
                 key={question}
                 onClick={() => onSend(question)}
                 type="button"
@@ -106,41 +106,51 @@ export function AiChatView({
           // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 대화 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
           tabIndex={0}
         >
-          {messages.map((message) => (
-            <div
-              className={`ai-chat__message ai-chat__message--${message.role}`}
-              key={message.id}
-            >
-              {message.role === "assistant" ? (
-                <strong className="ai-chat__author">Bibbidi</strong>
-              ) : null}
-              {message.text ? (
-                message.role === "assistant" ? (
-                  <AiChatMarkdown text={message.text} />
-                ) : (
-                  <p>{message.text}</p>
-                )
-              ) : null}
-              {message.role === "user" ? (
-                <time>{message.time}</time>
-              ) : message.status === "failed" ? (
-                <span className="ai-chat__incomplete">미완료 답변</span>
-              ) : null}
-              {message.role === "assistant" &&
-              message.status === "complete" &&
-              Boolean(message.catalogItemIds?.length) ? (
-                <AiChatRecommendations
-                  key={String(active)}
-                  {...recommendations.forAnswer(
-                    message.id,
-                    message.catalogItemIds!,
-                  )}
-                  status={recommendations.catalogStatus}
-                  onRetry={recommendations.retryCatalog}
-                />
-              ) : null}
-            </div>
-          ))}
+          {messages.map((message) => {
+            const Message =
+              message.role === "assistant" ? AiChatAssistantMessage : "div";
+            return (
+              <Message
+                className={
+                  message.role === "user"
+                    ? "ai-chat__message ai-chat__message--user"
+                    : undefined
+                }
+                key={message.id}
+              >
+                {message.text ? (
+                  message.role === "assistant" ? (
+                    <AiChatMarkdown text={message.text} />
+                  ) : (
+                    <p>{message.text}</p>
+                  )
+                ) : null}
+                {message.role === "user" ? (
+                  <time>{message.time}</time>
+                ) : message.status === "failed" ? (
+                  <span className="ai-chat__incomplete">미완료 답변</span>
+                ) : null}
+                {message.role === "assistant" && message.loginRequired ? (
+                  <a className="ai-chat__login" href="/login">
+                    로그인하기
+                  </a>
+                ) : null}
+                {message.role === "assistant" &&
+                message.status === "complete" &&
+                Boolean(message.catalogItemIds?.length) ? (
+                  <AiChatRecommendations
+                    key={String(active)}
+                    {...recommendations.forAnswer(
+                      message.id,
+                      message.catalogItemIds!,
+                    )}
+                    status={recommendations.catalogStatus}
+                    onRetry={recommendations.retryCatalog}
+                  />
+                ) : null}
+              </Message>
+            );
+          })}
         </div>
       )}
       {isPending ? (

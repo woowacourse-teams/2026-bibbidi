@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AiChatApiError, streamAiChat } from "../api/streamAiChat";
-import { ChatMessage, isValidChatMessage } from "../model/aiChat";
+import {
+  type ChatMessage,
+  createUserChatMessage,
+  isValidChatMessage,
+} from "../model/aiChat";
 
 type AssistantMessage = Extract<ChatMessage, { role: "assistant" }>;
 
@@ -90,14 +94,10 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
     if (!isValidChatMessage(text) || requestRef.current) return;
     const id = nextId.current;
     nextId.current += 2;
-    const time = new Date().toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    const userMessage = createUserChatMessage(id, content);
     setMessages((current) => [
       ...current,
-      { id, role: "user", text: content, time },
+      userMessage,
       { id: id + 1, role: "assistant", text: "", status: "streaming" },
     ]);
     setDraft("");

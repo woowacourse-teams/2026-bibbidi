@@ -169,6 +169,26 @@
   font-size: 13px;
 }
 
+.ai-chat__recommendation-complete {
+  margin: 24px 0 0;
+}
+
+.ai-chat__recommendation-complete p {
+  margin: 0;
+}
+
+.ai-chat__login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+  text-decoration: none;
+}
+
 .ai-chat__status,
 .ai-chat__incomplete {
   margin: 0;

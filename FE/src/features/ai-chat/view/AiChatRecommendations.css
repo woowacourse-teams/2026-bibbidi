@@ -1,7 +1,17 @@
+.ai-recommendations-slot {
+  margin-top: 24px;
+}
+
 .ai-recommendations {
   position: relative;
+  display: block;
   container-type: inline-size;
-  margin-top: 24px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
   color: var(--color-fg-neutral);
 }
 
@@ -63,7 +73,7 @@
   aspect-ratio: 280 / 272;
   flex: none;
   margin: 0;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
   transform: translateX(var(--recommendation-x))
     rotate(var(--recommendation-rotation));
@@ -71,17 +81,16 @@
   animation: ai-recommendation-enter 0.25s ease;
 }
 
-/* 드래그 중인 카드만 스크롤·캐러셀의 잘림 영역 위에서 그린다. */
-.ai-recommendations__card:popover-open {
+/* 카드와 안내를 함께 띄우고 바깥 슬롯이 원래 높이를 유지한다. */
+.ai-recommendations:popover-open {
   position: fixed;
   inset: auto;
-  left: var(--recommendation-left);
-  top: var(--recommendation-top);
-  width: var(--recommendation-width);
-  height: var(--recommendation-height);
+  left: var(--recommendation-layer-left);
+  top: var(--recommendation-layer-top);
+  width: var(--recommendation-layer-width);
 }
 
-.ai-recommendations__card::backdrop {
+.ai-recommendations::backdrop {
   background: transparent;
   pointer-events: none;
 }
@@ -90,6 +99,10 @@
   cursor: grabbing;
   transition: none;
   animation: none;
+}
+
+.ai-recommendations--pressed .ai-recommendations__stage {
+  overflow: visible;
 }
 
 .ai-recommendations__surface {
@@ -206,12 +219,6 @@
   font-size: 12px;
   color: var(--color-fg-brand);
 }
-.ai-recommendations__complete {
-  margin: 24px 0 0;
-  color: var(--color-fg-neutral-muted);
-  font-size: 13px;
-}
-
 .ai-chat-panel:has(.ai-recommendations--pressed)::after,
 .ai-chat-dialog:has(.ai-recommendations--pressed)::after {
   content: "";
@@ -228,7 +235,7 @@
   color: var(--color-fg-on-brand);
 }
 .ai-recommendations--pressed .ai-recommendations__peek {
-  opacity: 0.48;
+  visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

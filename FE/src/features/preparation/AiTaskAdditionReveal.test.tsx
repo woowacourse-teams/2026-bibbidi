@@ -270,7 +270,9 @@ describe("AI 할 일 추가 연출", () => {
       expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
     );
     await screen.findByRole("dialog", { name: "AI 채팅" }, { timeout: 3000 });
-    expect(screen.getByText("추천을 모두 확인했어요.")).toBeTruthy();
+    expect(
+      screen.getByText("추천을 모두 확인했어요. 더 궁금한 준비가 있나요?"),
+    ).toBeTruthy();
     expect(mocks.stream).toHaveBeenCalledOnce();
   });
 
@@ -286,7 +288,7 @@ describe("AI 할 일 추가 연출", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" }),
     );
-    await screen.findByText("추천을 모두 확인했어요.");
+    await screen.findByText("추천을 모두 확인했어요. 더 궁금한 준비가 있나요?");
     expect(
       container.querySelectorAll(".personal-roadmap__title-typing"),
     ).toHaveLength(1);
@@ -348,7 +350,7 @@ describe("AI 할 일 추가 연출", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "현재 추천: 예식 형태 결정" }),
     );
-    await screen.findByText("추천을 모두 확인했어요.");
+    await screen.findByText("추천을 모두 확인했어요. 더 궁금한 준비가 있나요?");
     await waitFor(() =>
       expect(
         container.querySelector(".personal-roadmap__title-typing"),
@@ -387,7 +389,7 @@ describe("AI 할 일 추가 연출", () => {
       screen.getByRole("button", { name: "현재 추천: 예식 형태 결정" }),
     );
     await waitFor(() => expect(release).toBeTypeOf("function"));
-    await screen.findByText("추천을 모두 확인했어요.");
+    await screen.findByText("추천을 모두 확인했어요. 더 궁금한 준비가 있나요?");
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 1200));
     });

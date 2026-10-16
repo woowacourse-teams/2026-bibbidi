@@ -1,9 +1,38 @@
-import { RefObject } from "react";
+import { RefObject, useState } from "react";
 
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
 import { useAiChatRecommendations } from "./hooks/useAiChatRecommendations";
 import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
 import { AiChatView } from "./view/AiChatView";
+import { createGuestChatMessages, type ChatMessage } from "./model/aiChat";
+import type { RecommendationController } from "./model/recommendation";
+
+function GuestAiChatView({
+  active,
+  recommendations,
+}: {
+  active: boolean;
+  recommendations: RecommendationController;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  return (
+    <AiChatView
+      active={active}
+      isAuthenticated={false}
+      draft=""
+      messages={messages}
+      errorMessage={null}
+      isPending={false}
+      recommendations={recommendations}
+      onDraftChange={() => {}}
+      onRetry={() => {}}
+      onSend={(question) => {
+        const nextMessages = createGuestChatMessages(question);
+        if (nextMessages) setMessages(nextMessages);
+      }}
+    />
+  );
+}
 
 export function AiChatSession({
   isAuthenticated,
@@ -30,25 +59,22 @@ export function AiChatSession({
     onAuthenticationRequired,
     onTaskAdded,
   );
-  const view = (
+  const active = !isMobile || isOpen;
+  const view = isAuthenticated ? (
     <AiChatView
-      active={!isMobile || isOpen}
-      isAuthenticated={isAuthenticated}
-      draft={isAuthenticated ? draft : ""}
-      messages={isAuthenticated ? messages : []}
-      errorMessage={isAuthenticated ? errorMessage : null}
-      isPending={isAuthenticated && isPending}
+      active={active}
+      isAuthenticated
+      draft={draft}
+      messages={messages}
+      errorMessage={errorMessage}
+      isPending={isPending}
       recommendations={recommendations}
-      onDraftChange={(value) => {
-        if (isAuthenticated) setDraft(value);
-      }}
-      onSend={(text) => {
-        if (isAuthenticated) send(text);
-      }}
-      onRetry={() => {
-        if (isAuthenticated) retry();
-      }}
+      onDraftChange={setDraft}
+      onSend={send}
+      onRetry={retry}
     />
+  ) : (
+    <GuestAiChatView active={active} recommendations={recommendations} />
   );
 
   return isMobile ? (
