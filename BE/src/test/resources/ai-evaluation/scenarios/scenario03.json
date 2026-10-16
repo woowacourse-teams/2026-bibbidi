@@ -6,12 +6,6 @@
   ],
   "userMessage": "스튜디오 촬영 날짜를 잡았지만 촬영 드레스는 고르지 않았어요. 필요한 준비 항목을 추천해 주세요.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "'촬영 드레스 선택과 가봉'을 추천하고 촬영 일정과 연결한다. 이미 끝난 '촬영 날짜 확정'을 새로 추천하지 않는다.",
   "expectedRefusal": "none"
 }

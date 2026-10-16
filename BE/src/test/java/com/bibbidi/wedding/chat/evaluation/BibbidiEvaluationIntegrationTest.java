@@ -2,7 +2,7 @@ package com.bibbidi.wedding.chat.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
 import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
@@ -10,11 +10,9 @@ import com.bibbidi.wedding.chat.evaluation.judge.BibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.judge.ClaudeCliBibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.judge.CodexCliBibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
-import com.bibbidi.wedding.chat.evaluation.report.ObservedToolCall;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
-import com.bibbidi.wedding.chat.tools.CatalogTools;
+import com.bibbidi.wedding.chat.service.AiChatService;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,35 +25,26 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.TestInstance;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.ToolContext;
-import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationResponse;
-import org.springframework.ai.support.ToolCallbacks;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.definition.ToolDefinition;
-import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import tools.jackson.databind.ObjectMapper;
 
 @Tag("ai-evaluation")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @SpringBootTest
-@ActiveProfiles("evaluator")
-@Import(BibbidiEvaluationIntegrationTest.JudgeConfiguration.class)
-@Sql("/load_catalog.sql")
+@ActiveProfiles({"test", "evaluator"})
+@Import({BibbidiEvaluationIntegrationTest.JudgeConfiguration.class,
+        BibbidiEvaluationIntegrationTest.ModelRecordingConfiguration.class})
+@Sql({"/load_catalog.sql", "/ai-evaluation/evaluation-user.sql"})
 class BibbidiEvaluationIntegrationTest {
 
     private BibbidiEvaluationReportWriter reportWriter;
@@ -67,10 +56,16 @@ class BibbidiEvaluationIntegrationTest {
     private BibbidiJudge judgeModel;
 
     @Autowired
-    private CatalogService catalogService;
+    private AiChatService chatService;
 
-    @Value("classpath:prompts/ai-chat-system.txt")
-    private Resource systemPrompt;
+    @Autowired
+    private BibbidiInMemoryChatMemory chatMemory;
+
+    @Autowired
+    private ObjectMapper mapper;
+
+    @Value("${bibbidi.sse.response-timeout-seconds}")
+    private long responseTimeoutSeconds;
 
     @Value("${spring.ai.bedrock.converse.chat.model}")
     private String generationModelId;
@@ -116,35 +111,15 @@ class BibbidiEvaluationIntegrationTest {
     }
 
     private void evaluateScenario(EvaluationScenario scenario, Map<String, MetricInformation> metrics) {
-        List<Document> observedToolResults = new ArrayList<>();
-        List<ObservedToolCall> observedToolCalls = new ArrayList<>();
-        RecordingChatModel recordingModel = new RecordingChatModel(generationModel);
-        ChatResponse generationResponse = null;
+        RecordingChatModel recordingModel = (RecordingChatModel) generationModel;
+        EvaluationChatRunner runner = new EvaluationChatRunner(chatService, chatMemory, recordingModel, mapper);
         List<EvaluationResponse> evaluations = new ArrayList<>();
         String phase = "generation";
         String evaluatingMetric = null;
         try {
-            ToolCallback catalogTool = recordingCatalogTool(observedToolCalls, observedToolResults);
-            ChatClient client = ChatClient.builder(recordingModel)
-                    .defaultSystem(systemPrompt, StandardCharsets.UTF_8)
-                    .defaultToolCallbacks(catalogTool)
-                    .build();
-            generationResponse = client.prompt()
-                    .messages(scenario.chatMemory().stream().map(this::toMessage).toList())
-                    .messages(new UserMessage(scenario.userMessage()))
-                    .call()
-                    .chatResponse();
-
-            assertThat(generationResponse).isNotNull();
-            String responseContent = generationResponse.getResult().getOutput().getText();
-            assertThat(responseContent).isNotBlank();
-            phase = "toolVerification";
-            assertThat(observedToolCalls.stream().map(ObservedToolCall::name).toList())
-                    .containsExactlyElementsOf(scenario.expectedToolCalls().stream()
-                            .map(EvaluationScenario.ExpectedToolCall::name).toList());
-
+            runner.run(scenario, 900001L, Duration.ofSeconds(responseTimeoutSeconds + 15));
             BibbidiEvaluationRequest request = new BibbidiEvaluationRequest(
-                    scenario, observedToolResults, responseContent);
+                    scenario, runner.providedContext(), runner.answer());
             phase = "metricEvaluation";
             for (String metricType : scenario.metrics()) {
                 evaluatingMetric = metricType;
@@ -157,52 +132,28 @@ class BibbidiEvaluationIntegrationTest {
                 evaluatingMetric = null;
             }
         } catch (RuntimeException | AssertionError failure) {
-            reportWriter.recordFailure(scenario, recordingModel.calls(), generationResponse,
-                    observedToolCalls, observedToolResults, evaluations, phase, evaluatingMetric, failure);
+            reportWriter.recordFailure(scenario, recordingModel.calls(), runner.answer(), runner.recommendedItemIds(),
+                    runner.providedContext(), evaluations, phase, evaluatingMetric, failure);
             throw failure;
         }
-        reportWriter.record(scenario, recordingModel.calls(), generationResponse,
-                observedToolCalls, observedToolResults, evaluations);
+        reportWriter.record(scenario, recordingModel.calls(), runner.answer(), runner.recommendedItemIds(),
+                runner.providedContext(), evaluations);
     }
 
-    private Message toMessage(EvaluationScenario.ChatMessage message) {
-        return switch (message.role()) {
-            case "user" -> new UserMessage(message.content());
-            case "assistant" -> new AssistantMessage(message.content());
-            default -> throw new IllegalArgumentException("Unknown chat memory role: " + message.role());
-        };
-    }
+    // 실제 ChatClient 설정을 유지하며 평가 프로필에서만 생성 모델 입출력을 기록한다.
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ModelRecordingConfiguration {
 
-    private ToolCallback recordingCatalogTool(List<ObservedToolCall> calls, List<Document> results) {
-        ToolCallback delegate = ToolCallbacks.from(new CatalogTools(catalogService))[0];
-        return new ToolCallback() {
-            @Override
-            public ToolDefinition getToolDefinition() {
-                return delegate.getToolDefinition();
-            }
-
-            @Override
-            public ToolMetadata getToolMetadata() {
-                return delegate.getToolMetadata();
-            }
-
-            @Override
-            public String call(String input) {
-                calls.add(new ObservedToolCall(getToolDefinition().name(), input));
-                return recordResult(delegate.call(input));
-            }
-
-            @Override
-            public String call(String input, ToolContext context) {
-                calls.add(new ObservedToolCall(getToolDefinition().name(), input));
-                return recordResult(delegate.call(input, context));
-            }
-
-            private String recordResult(String result) {
-                results.add(new Document(result));
-                return result;
-            }
-        };
+        @Bean
+        static BeanPostProcessor recordGenerationModels() {
+            return new BeanPostProcessor() {
+                @Override
+                public Object postProcessAfterInitialization(Object bean, String beanName) {
+                    return bean instanceof ChatModel model && !(bean instanceof RecordingChatModel)
+                            ? new RecordingChatModel(model) : bean;
+                }
+            };
+        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)

@@ -6,12 +6,6 @@
   ],
   "userMessage": "촬영이 한 달 남았고 드레스는 정했지만 어떤 분위기로 찍을지 못 정했어요. 지금 필요한 항목을 추천해 주세요.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "'촬영 시안 제작'과 '참고 사진·레퍼런스 전달'을 우선 제안한다.",
   "expectedRefusal": "none"
 }

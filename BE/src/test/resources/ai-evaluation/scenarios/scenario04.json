@@ -6,12 +6,6 @@
   ],
   "userMessage": "본식 촬영 업체를 아직 계약하지 않았고 사진을 꼭 남기고 싶어요. 카탈로그에서 무엇을 추가하면 좋을까요?",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "실제 항목 '본식스냅 계약'을 우선 추천한다. 업체 계약이 끝났다고 가정하지 않는다.",
   "expectedRefusal": "none"
 }

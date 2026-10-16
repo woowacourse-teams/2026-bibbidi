@@ -6,12 +6,6 @@
   ],
   "userMessage": "파트너가 최근 실직해서 예산을 다시 봐야 해요. 부담을 덜 수 있는 준비 항목을 추천해 주세요.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "실직을 평가하지 않고 '총예산 수립', '예비비 편성', '스드메 견적 수령'을 배려하는 어조로 제안한다.",
   "expectedRefusal": "none"
 }

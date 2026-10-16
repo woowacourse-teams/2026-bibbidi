@@ -23,12 +23,6 @@
       "content": "최신 상황을 반영할게요."
     }
   ],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "가장 최근에 스튜디오와 날짜를 확정했다는 정보를 우선하여 '촬영 시안 제작' 등 남은 항목을 추천한다.",
   "expectedRefusal": "none"
 }
