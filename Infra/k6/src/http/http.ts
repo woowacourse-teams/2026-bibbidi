@@ -57,7 +57,7 @@ export class HttpClient {
           'Content-Type': 'application/json',
         },
         tags: { ...this.extraTags(), name: spec.name },
-        timeout: spec.timeout,
+        ...(spec.timeout === undefined ? {} : { timeout: spec.timeout }),
         responseCallback: http.expectedStatuses(...acceptable),
       },
     );
