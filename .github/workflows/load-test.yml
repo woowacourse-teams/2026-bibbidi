@@ -31,15 +31,34 @@ jobs:
             echo "::error::태그 형식이 k6/dev/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
+          needs_sse=false
+          case "${BASH_REMATCH[2]}" in
+            smoke-ai-test|breakpoint-ai-*) needs_sse=true ;;
+          esac
           {
             echo "TARGET_LABEL=${BASH_REMATCH[1]}-test"
             echo "SCRIPT=${BASH_REMATCH[2]}"
             echo "TEST_ID=${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
+            echo "NEEDS_SSE=$needs_sse"
           } >> "$GITHUB_ENV"
 
       - uses: grafana/setup-k6-action@v1
         with:
           k6-version: 2.2.0
+
+      - uses: actions/setup-go@v6
+        if: env.NEEDS_SSE == 'true'
+        with:
+          go-version: "1.26"
+
+      - name: SSE 확장이 들어간 k6 빌드
+        if: env.NEEDS_SSE == 'true'
+        run: |
+          set -euo pipefail
+          go install go.k6.io/xk6/cmd/xk6@v1.4.14
+          "$(go env GOPATH)/bin/xk6" build v2.2.0             --with github.com/phymbert/xk6-sse@v0.2.0             --output "$RUNNER_TEMP/k6-sse"
+          "$RUNNER_TEMP/k6-sse" version
+          echo "K6_BIN=$RUNNER_TEMP/k6-sse" >> "$GITHUB_ENV"
 
       - name: 기존 시크릿에서 필요한 값만 꺼내기
         env:
@@ -87,7 +106,7 @@ jobs:
         run: |
           mkdir -p "$REPORT_DIR"
           set +e
-          k6 run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
+          "${K6_BIN:-k6}" run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
           status=$?
           set -e
           if { [ "$status" -eq 99 ] || [ "$status" -eq 108 ]; } && [[ "$SCRIPT" == breakpoint-* ]]; then
