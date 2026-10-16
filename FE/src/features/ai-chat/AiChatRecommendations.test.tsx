@@ -203,7 +203,14 @@ describe("AI 추천 카드 연결", () => {
     expect(currentCard().getAttribute("aria-label")).toContain("웨딩홀 투어");
     fireEvent.keyDown(currentCard(), { key: "Delete" });
     fireEvent.keyDown(currentCard(), { key: "Delete" });
-    expect(screen.getByText("추천을 모두 확인했어요.")).toBeTruthy();
+    const complete = screen.getByRole("status");
+    expect(within(complete).getByText("Bibbidi")).toBeTruthy();
+    expect(
+      within(complete).getByText(
+        "추천을 모두 확인했어요. 더 궁금한 준비가 있나요?",
+      ),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(complete);
     expect(mocks.fetch).not.toHaveBeenCalled();
     await send();
     await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
@@ -466,55 +473,83 @@ describe("AI 추천 카드 연결", () => {
 });
 
 describe("추천 카드 포인터 제스처", () => {
-  it("드래그 동안 팝오버를 사용하고 측정한 높이를 유지하다 취소하면 복구한다", () => {
-    class TestPointerEvent extends MouseEvent {
-      pointerId = 1;
-      isPrimary = true;
-    }
-    vi.stubGlobal("PointerEvent", TestPointerEvent);
-    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    render(
-      <AiChatRecommendations
-        tasks={[{ id: "101", title: "추천", stepTitle: "단계", order: 1 }]}
-        status="ready"
-        saving={false}
-        onSelect={vi.fn()}
-        onSkip={vi.fn()}
-        onAdd={vi.fn()}
-        onRetry={vi.fn()}
-      />,
-    );
-    const card = currentCard();
-    const stage = card.parentElement!;
-    const show = vi.fn();
-    const hide = vi.fn();
-    Object.defineProperties(card, {
-      showPopover: { configurable: true, value: show },
-      hidePopover: { configurable: true, value: hide },
-    });
-    vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
-      left: 20,
-      top: 100,
-      width: 280,
-      height: 272,
-    } as DOMRect);
-    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
-      height: 312,
-    } as DOMRect);
-    fireEvent.pointerDown(card, { button: 0, clientX: 150, clientY: 100 });
-    expect(show).toHaveBeenCalledOnce();
-    expect(stage.style.minHeight).toBe("312px");
-    expect(card.style.getPropertyValue("--recommendation-width")).toBe("280px");
-    fireEvent.pointerCancel(card);
-    expect(hide).toHaveBeenCalledOnce();
-    expect(stage.style.minHeight).toBe("");
-    expect(card.closest("section")?.className).not.toContain("pressed");
-  });
+  it.each(["pointerCancel", "lostPointerCapture", "Escape", "unmount"])(
+    "%s 시 카드·안내 레이어와 채팅 스크롤을 복구한다",
+    (ending) => {
+      class TestPointerEvent extends MouseEvent {
+        pointerId = 1;
+        isPrimary = true;
+      }
+      vi.stubGlobal("PointerEvent", TestPointerEvent);
+      Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+        configurable: true,
+        value: vi.fn(),
+      });
+      const view = render(
+        <div
+          className="ai-chat__log"
+          style={{ overflowY: "auto", overflowAnchor: "auto" }}
+        >
+          <AiChatRecommendations
+            tasks={[{ id: "101", title: "추천", stepTitle: "단계", order: 1 }]}
+            status="ready"
+            saving={false}
+            onSelect={vi.fn()}
+            onSkip={vi.fn()}
+            onAdd={vi.fn()}
+            onRetry={vi.fn()}
+          />
+        </div>,
+      );
+      const card = currentCard();
+      const layer = card.closest("section")!;
+      const slot = layer.parentElement!;
+      const log = slot.parentElement!;
+      log.scrollTop = 120;
+      const show = vi.fn();
+      const hide = vi.fn();
+      Object.defineProperties(layer, {
+        showPopover: { configurable: true, value: show },
+        hidePopover: { configurable: true, value: hide },
+      });
+      vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
+        left: 20,
+        top: 100,
+        width: 280,
+        height: 272,
+      } as DOMRect);
+      vi.spyOn(layer, "getBoundingClientRect").mockReturnValue({
+        left: 10,
+        top: 40,
+        width: 300,
+        height: 420,
+      } as DOMRect);
+      fireEvent.pointerDown(card, { button: 0, clientX: 150, clientY: 100 });
+      expect(show).toHaveBeenCalledOnce();
+      expect(slot.style.height).toBe("420px");
+      expect(layer.style.getPropertyValue("--recommendation-layer-top")).toBe(
+        "40px",
+      );
+      expect(log.style.overflowY).toBe("hidden");
+      log.scrollTop = 200;
+      fireEvent.scroll(log);
+      expect(log.scrollTop).toBe(120);
+      if (ending === "Escape") fireEvent.keyDown(card, { key: "Escape" });
+      else if (ending === "unmount") view.unmount();
+      else if (ending === "pointerCancel") fireEvent.pointerCancel(card);
+      else fireEvent.lostPointerCapture(card);
+      if (ending !== "unmount") expect(hide).toHaveBeenCalledOnce();
+      expect(log.style.overflowY).toBe("auto");
+      expect(log.style.overflowAnchor).toBe("auto");
+      expect(log.scrollTop).toBe(120);
+      if (ending !== "unmount") {
+        expect(slot.style.height).toBe("");
+        expect(layer.className).not.toContain("pressed");
+      }
+    },
+  );
 
-  it("짧은 이동·세로 스크롤·취소는 복귀하고 충분한 좌우 이동만 처리한다", () => {
+  it("위아래로 벗어나도 좌우 드래그를 유지하고 세로 이동만으로는 처리하지 않는다", () => {
     class TestPointerEvent extends MouseEvent {
       pointerId = 1;
       isPrimary = true;
@@ -544,20 +579,22 @@ describe("추천 카드 포인터 제스처", () => {
     fireEvent.pointerUp(card, { clientX: 180, clientY: 100 });
     down();
     fireEvent.pointerMove(card, { clientX: 155, clientY: 180 });
-    fireEvent.pointerUp(card, { clientX: 250, clientY: 180 });
+    expect(card.closest("section")?.className).toContain("pressed");
+    expect(card.style.getPropertyValue("--recommendation-x")).toBe("5px");
+    fireEvent.pointerUp(card, { clientX: 155, clientY: 500 });
     down();
     fireEvent.pointerCancel(card);
     fireEvent.pointerUp(card, { clientX: 250, clientY: 100 });
     expect(skip).not.toHaveBeenCalled();
     expect(add).not.toHaveBeenCalled();
     down();
-    fireEvent.pointerMove(card, { clientX: 50, clientY: 100 });
+    fireEvent.pointerMove(card, { clientX: 50, clientY: 400 });
     expect(screen.getByText("손을 떼면 이 추천을 스킵해요")).toBeTruthy();
-    fireEvent.pointerUp(card, { clientX: 50, clientY: 100 });
+    fireEvent.pointerUp(card, { clientX: 50, clientY: 900 });
     expect(skip).toHaveBeenCalledExactlyOnceWith("101");
     down();
-    fireEvent.pointerMove(card, { clientX: 250, clientY: 100 });
-    fireEvent.pointerUp(card, { clientX: 250, clientY: 100 });
+    fireEvent.pointerMove(card, { clientX: 250, clientY: -200 });
+    fireEvent.pointerUp(card, { clientX: 250, clientY: -500 });
     expect(add).toHaveBeenCalledExactlyOnceWith("101");
     expect(card.closest("section")?.className).not.toContain("pressed");
   });
