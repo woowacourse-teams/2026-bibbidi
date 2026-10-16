@@ -4,7 +4,6 @@ import type { WindowPlan } from './windows.ts';
 
 export interface AiReportOptions {
   describeLoad: (perUnit: number) => string;
-  maxCalls: number;
 }
 
 const DROPPED_CAUSE = '서버가 따라가지 못함(시작하지 못한 대화 발생)';
@@ -42,9 +41,6 @@ export class AiBreakpointReport extends WindowedReport {
     const lines: string[] = [];
     if (failedWindow?.causes.includes(DROPPED_CAUSE)) {
       lines.push('- 참고: 시작하지 못한 대화는 테스트 도구(러너)의 한계일 수도 있으므로 같은 시간대의 서버 지표와 함께 확인해야 합니다.');
-    }
-    if ((this.value('ai_call_budget_exhausted', 'count') ?? 0) > 0) {
-      lines.push(`- 중단 사유: AI 호출 ${this.options.maxCalls}건 상한에 닿아 멈췄습니다. 한계에 닿기 전이므로 \`MAX_TOTAL_CALLS\`를 올려 다시 실행해야 합니다.`);
     }
     return lines;
   }

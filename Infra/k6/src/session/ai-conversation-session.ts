@@ -1,5 +1,4 @@
 import { sleep } from 'k6';
-import type { CallBudget } from '../scenario/call-budget.ts';
 import type { Session, SessionContext } from './session.ts';
 import { UserIds } from './users.ts';
 
@@ -20,17 +19,12 @@ export interface AiConversationOptions {
   turns: number;
   thinkSeconds: number;
   restSeconds: number;
-  budget: CallBudget;
 }
 
 export class AiConversationSession implements Session {
   constructor(private readonly options: AiConversationOptions) {}
 
   run({ data, iteration, apis }: SessionContext): void {
-    if (!this.options.budget.available(iteration)) {
-      return;
-    }
-
     const chat = apis.chatFor(UserIds.fresh(data.runId, iteration));
     let conversationId: string | undefined;
 

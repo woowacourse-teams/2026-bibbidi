@@ -9,7 +9,6 @@ import { Environment, numberFromEnv, textFromEnv } from './src/common/environmen
 import { AccessTokenIssuer } from './src/common/token.ts';
 import { HttpClient } from './src/http/http.ts';
 import type { SummaryData } from './src/report/summary.ts';
-import { CallBudget } from './src/scenario/call-budget.ts';
 import { LoadTest } from './src/scenario/load-test.ts';
 import { AiConversationSession } from './src/session/ai-conversation-session.ts';
 import { SessionSequence, type SetupData } from './src/session/session.ts';
@@ -25,12 +24,10 @@ const plan = new WindowPlan({
 });
 
 const turns = numberFromEnv('TURNS_PER_CONVERSATION', 3);
-const budget = new CallBudget(numberFromEnv('MAX_TOTAL_CALLS', 1000), turns);
 const session = new AiConversationSession({
   turns,
   thinkSeconds: numberFromEnv('THINK_SECONDS', 3),
   restSeconds: 0,
-  budget,
 });
 
 const chatClient = new AiChatClient(environment.baseUrl, [new AiWindowMetrics(plan)]);
@@ -70,6 +67,5 @@ export default function (data: SetupData): void {
 export function handleSummary(data: SummaryData): Record<string, string> {
   return new AiBreakpointReport(data, plan, {
     describeLoad: (perSecond) => `초당 ${Number(perSecond.toFixed(2))}건의 대화 시작`,
-    maxCalls: budget.limit,
   }).files(textFromEnv('SUMMARY_DIR', '.'));
 }

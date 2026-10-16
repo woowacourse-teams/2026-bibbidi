@@ -8,7 +8,6 @@ import { AccessTokenIssuer } from './src/common/token.ts';
 import { HttpClient } from './src/http/http.ts';
 import { AiSmokeReport } from './src/report/ai-smoke-report.ts';
 import type { SummaryData } from './src/report/summary.ts';
-import { CallBudget } from './src/scenario/call-budget.ts';
 import { LoadTest } from './src/scenario/load-test.ts';
 import { AiConversationSession } from './src/session/ai-conversation-session.ts';
 import { SessionSequence, type SetupData } from './src/session/session.ts';
@@ -21,7 +20,6 @@ const session = new AiConversationSession({
   turns,
   thinkSeconds: numberFromEnv('THINK_SECONDS', 3),
   restSeconds: 0,
-  budget: new CallBudget(turns, turns),
 });
 
 const chatClient = new AiChatClient(environment.baseUrl, [new AiWindowMetrics(plan)]);
