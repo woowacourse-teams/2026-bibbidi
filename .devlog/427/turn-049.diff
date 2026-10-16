@@ -1,0 +1,705 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+index b450d0a8ae27d95880cda0eb127248532bf358bc..db48446798a9162dff0a2ec69ebc41114e995695 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidator.java
+@@ -1,10 +1,7 @@
+ package com.bibbidi.wedding.chat.evaluation.data;
+ 
+-import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.ScaleLevel;
+ import com.bibbidi.wedding.chat.evaluation.data.scenario.EvaluationScenario;
+ import java.util.ArrayList;
+ import java.util.EnumSet;
+@@ -44,36 +41,7 @@ public class EvaluationDataValidator {
+     }
+ 
+     private void validateMetric(MetricDefinition metric, List<String> violations) {
+-        String id = metric.metricType().label();
+-        if (blank(metric.task()) || blank(metric.rubric()) || blank(metric.direction()) || blank(metric.source())) {
+-            violations.add(id + ": task, rubric, direction, source는 비어 있을 수 없다");
+-        }
+-        if (metric.scale() == null || metric.scale().size() < 2) {
+-            violations.add(id + ": 척도는 두 단계 이상이어야 한다");
+-        } else {
+-            Set<Integer> values = new HashSet<>();
+-            for (ScaleLevel level : metric.scale()) {
+-                if (!values.add(level.value())) {
+-                    violations.add(id + ": 척도 값 중복 " + level.value());
+-                }
+-                if (blank(level.definition())) {
+-                    violations.add(id + ": 척도 " + level.value() + "의 뜻이 비어 있다");
+-                }
+-            }
+-        }
+-        List<EvaluationInput> inputs = metric.requiredInputs();
+-        if (inputs == null || !inputs.containsAll(List.of(EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE))) {
+-            violations.add(id + ": requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
+-        } else if (new HashSet<>(inputs).size() != inputs.size()) {
+-            violations.add(id + ": requiredInputs에 같은 항목이 중복됐다");
+-        }
+-        List<PromptSection> order = metric.promptOrder();
+-        if (order == null
+-                || order.size() != PromptSection.values().length
+-                || new HashSet<>(order).size() != order.size()
+-                || order.getLast() != PromptSection.INPUT) {
+-            violations.add(id + ": promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
+-        }
++        violations.addAll(metric.violations());
+     }
+ 
+     private void validateScenarios(
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+index f0f86fc1de5c6c83e777d1953016f57dfa6502c8..a0072402cccfbd5b71fb4255e386bfcc31ebc92f 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataValidatorTest.java
+@@ -15,7 +15,6 @@ import com.bibbidi.wedding.chat.evaluation.data.scenario.ExpectedToolCall;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Map;
+-import java.util.function.UnaryOperator;
+ import java.util.stream.IntStream;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -85,28 +84,48 @@ class EvaluationDataValidatorTest {
+     @Test
+     @DisplayName("지표 척도 값이 중복되거나 promptOrder가 규칙을 어기면 실패한다")
+     void rejectsInvalidMetric() {
+-        MetricDefinition broken = metric(m -> new MetricDefinition(
+-                m.metricType(), m.task(), m.rubric(),
++        MetricDefinition broken = new MetricDefinition(
++                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
+                 List.of(new ScaleLevel(1, "낮음"), new ScaleLevel(1, "높음")),
+-                m.direction(), true, m.requiredInputs(), List.of(PromptSection.INPUT, PromptSection.ROLE), m.source()));
++                "높을수록 정확함", true, allInputs(), List.of(PromptSection.INPUT, PromptSection.ROLE),
++                "https://docs.aws.amazon.com");
+ 
+         assertThatThrownBy(() -> validator.validate(new EvaluationDataset(scenarios(10), List.of(broken))))
+                 .hasMessageContaining("Correctness: 척도 값 중복 1")
+                 .hasMessageContaining("Correctness: promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
+     }
+ 
++    @Test
++    @DisplayName("requiredInputs에 userMessage나 modelResponse가 없으면 실패한다")
++    void rejectsMissingRequiredInputs() {
++        MetricDefinition broken = new MetricDefinition(
++                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
++                List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(1, "충족")),
++                "높을수록 정확함", true, List.of(EvaluationInput.CHAT_MEMORY), allSections(),
++                "https://docs.aws.amazon.com");
++
++        assertThatThrownBy(() -> validator.validate(new EvaluationDataset(scenarios(10), List.of(broken))))
++                .hasMessageContaining("Correctness: requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
++    }
++
+     private EvaluationDataset dataset(List<EvaluationScenario> scenarios) {
+-        return new EvaluationDataset(scenarios, List.of(metric(UnaryOperator.identity())));
++        return new EvaluationDataset(scenarios, List.of(validMetric()));
+     }
+ 
+-    private MetricDefinition metric(UnaryOperator<MetricDefinition> customizer) {
+-        return customizer.apply(new MetricDefinition(
++    private MetricDefinition validMetric() {
++        return new MetricDefinition(
+                 MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
+                 List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(1, "충족")),
+-                "높을수록 정확함", true,
+-                List.of(EvaluationInput.CHAT_MEMORY, EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE,
+-                        EvaluationInput.OBSERVED_TOOL_RESULTS),
+-                List.of(PromptSection.ROLE, PromptSection.TASK, PromptSection.RUBRIC, PromptSection.INPUT), "https://docs.aws.amazon.com"));
++                "높을수록 정확함", true, allInputs(), allSections(), "https://docs.aws.amazon.com");
++    }
++
++    private List<EvaluationInput> allInputs() {
++        return List.of(EvaluationInput.CHAT_MEMORY, EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE,
++                EvaluationInput.OBSERVED_TOOL_RESULTS);
++    }
++
++    private List<PromptSection> allSections() {
++        return List.of(PromptSection.ROLE, PromptSection.TASK, PromptSection.RUBRIC, PromptSection.INPUT);
+     }
+ 
+     private List<EvaluationScenario> scenarios(int count) {
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Criterion.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Criterion.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..66fc81b43fe3dc54c7cbdbe8b6025143207f5dc0
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Criterion.java
+@@ -0,0 +1,33 @@
++package com.bibbidi.wedding.chat.evaluation.data.metric;
++
++import java.util.List;
++import java.util.Map;
++
++/** 무엇을 어떤 기준으로 평가하는지와 그 출처. */
++final class Criterion {
++
++    private final String task;
++    private final String rubric;
++    private final String source;
++
++    Criterion(String task, String rubric, String source) {
++        this.task = task;
++        this.rubric = rubric;
++        this.source = source;
++    }
++
++    Map<String, Object> variables() {
++        return Map.of("task", task, "rubric", rubric);
++    }
++
++    List<String> violations() {
++        if (blank(task) || blank(rubric) || blank(source)) {
++            return List.of("task, rubric, source는 비어 있을 수 없다");
++        }
++        return List.of();
++    }
++
++    private boolean blank(String value) {
++        return value == null || value.isBlank();
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
+index 610a5cc4154c0f0e6a380e6362ffca0ecef8c07c..cfde3fecf39c77d772401b2ed3492130ade186ae 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/EvaluationInput.java
+@@ -2,7 +2,7 @@ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
+ import com.fasterxml.jackson.annotation.JsonValue;
+ 
+-/** judge 프롬프트의 입력 데이터로 줄 수 있는 항목. JSON과 문서 메타데이터에서는 {@link #label()} 값으로 표기한다. */
++/** judge 프롬프트의 입력 데이터로 줄 수 있는 항목. JSON에서는 {@link #label()} 값으로 표기한다. */
+ public enum EvaluationInput {
+ 
+     CHAT_MEMORY("chatMemory"),
+@@ -20,4 +20,14 @@ public enum EvaluationInput {
+     public String label() {
+         return label;
+     }
++
++    /** 문서 메타데이터의 종류 표기가 이 항목을 가리키는지 확인한다. */
++    public boolean matches(Object kind) {
++        return label.equals(kind);
++    }
++
++    /** 내용을 이 항목의 태그로 감싸 judge가 항목을 구분하게 한다. */
++    public String wrap(String text) {
++        return "<" + label + ">\n" + text + "\n</" + label + ">";
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/InputSource.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/InputSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4d16130f0cd006c91e2928dadbf94ba02ad41c2
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/InputSource.java
+@@ -0,0 +1,9 @@
++package com.bibbidi.wedding.chat.evaluation.data.metric;
++
++import java.util.Optional;
++
++/** 평가 대상에서 입력 항목의 내용을 찾아 준다. 해당 항목이 없으면 비어 있다. */
++public interface InputSource {
++
++    Optional<String> text(EvaluationInput input);
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricDefinition.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricDefinition.java
+index 1f46ff8856f250476101582abc3dac00f8f85bd9..a3a122cda90a6a782d2506029b5eac7edba6c85c 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricDefinition.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/MetricDefinition.java
+@@ -1,29 +1,91 @@
+ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonProperty;
++import java.util.HashMap;
+ import java.util.List;
++import java.util.Map;
++import java.util.stream.Stream;
+ 
+ /**
+- * 평가 지표 하나의 정의. {@code metrics/*.json} 파일 하나와 대응한다.
++ * 평가 지표 하나. {@code metrics/*.json} 파일 하나와 대응한다.
+  *
+- * @param metricType     지표 종류. 시나리오의 {@code metrics}가 참조하는 키 (예: Correctness)
+- * @param task           judge에게 주는 평가 작업. 무엇을 평가하는지 한 문장으로 설명한다
+- * @param rubric         판정 기준. judge가 점수를 매길 때 따르는 세부 규칙
+- * @param scale          채점 척도. 허용하는 점수 값과 각 값의 뜻이며, judge가 이 값 밖의 점수를 주면 오류다
+- * @param direction      점수 방향. 높은 점수가 좋은 것인지 나쁜 것인지 (예: "높을수록 정확함")
+- * @param reportOnly     점수를 보고서에 기록만 하고 합격 판정에는 쓰지 않는 지표인지. 평가 결과의 metadata에 실어 보낸다
+- * @param requiredInputs 프롬프트의 입력 데이터에 넣을 항목과 그 순서. 여기 없는 항목은 요청에 있어도 judge에게 주지 않는다
+- * @param promptOrder    프롬프트 구역의 배치 순서. 모든 구역을 한 번씩 담고 input으로 끝나야 한다
+- * @param source         참고한 지표 정의·프롬프트의 출처 URL
++ * <p>JSON의 평평한 필드를 기준({@link Criterion}), 척도({@link Scale}), 프롬프트 배치({@link PromptLayout}) 세 객체로 나눠
++ * 맡긴다. 밖에서는 필드를 꺼내 가지 않고 이 객체에 일을 시킨다: 프롬프트 만들기, 점수 확인, 결과에 붙일 속성, 스스로 검증.
+  */
+-public record MetricDefinition(
+-        MetricType metricType,
+-        String task,
+-        String rubric,
+-        List<ScaleLevel> scale,
+-        String direction,
+-        boolean reportOnly,
+-        List<EvaluationInput> requiredInputs,
+-        List<PromptSection> promptOrder,
+-        String source
+-) {
++public final class MetricDefinition {
++
++    private final MetricType metricType;
++    private final Criterion criterion;
++    private final Scale scale;
++    private final PromptLayout layout;
++
++    /**
++     * @param metricType     지표 종류. 시나리오의 {@code metrics}가 참조하는 키
++     * @param task           judge에게 주는 평가 작업
++     * @param rubric         판정 기준
++     * @param scale          채점 척도의 단계. judge가 이 점수 밖의 값을 주면 오류다
++     * @param direction      점수 방향 (예: "높을수록 정확함")
++     * @param reportOnly     점수를 보고서에 기록만 하고 합격 판정에는 쓰지 않는 지표인지
++     * @param requiredInputs 프롬프트의 입력 데이터에 넣을 항목과 순서
++     * @param promptOrder    프롬프트 구역의 배치 순서. 모든 구역을 한 번씩 담고 input으로 끝나야 한다
++     * @param source         참고한 지표 정의·프롬프트의 출처 URL
++     */
++    @JsonCreator
++    public MetricDefinition(
++            @JsonProperty("metricType") MetricType metricType,
++            @JsonProperty("task") String task,
++            @JsonProperty("rubric") String rubric,
++            @JsonProperty("scale") List<ScaleLevel> scale,
++            @JsonProperty("direction") String direction,
++            @JsonProperty("reportOnly") boolean reportOnly,
++            @JsonProperty("requiredInputs") List<EvaluationInput> requiredInputs,
++            @JsonProperty("promptOrder") List<PromptSection> promptOrder,
++            @JsonProperty("source") String source) {
++        this(
++                metricType,
++                new Criterion(task, rubric, source),
++                new Scale(scale, direction, reportOnly),
++                new PromptLayout(requiredInputs, promptOrder));
++    }
++
++    private MetricDefinition(MetricType metricType, Criterion criterion, Scale scale, PromptLayout layout) {
++        this.metricType = metricType;
++        this.criterion = criterion;
++        this.scale = scale;
++        this.layout = layout;
++    }
++
++    public MetricType metricType() {
++        return metricType;
++    }
++
++    /** judge에게 보낼 프롬프트를 배치 순서대로 만든다. */
++    public String prompt(SectionTemplate template, InputSource inputs) {
++        Map<String, Object> variables = new HashMap<>();
++        variables.putAll(criterion.variables());
++        variables.putAll(scale.variables());
++        variables.put("metricType", metricType.label());
++        return layout.render(template, variables, inputs);
++    }
++
++    public boolean accepts(int score) {
++        return scale.accepts(score);
++    }
++
++    /** 평가 결과를 해석할 때 필요한 이 지표의 성질. */
++    public Map<String, Object> attributes() {
++        Map<String, Object> attributes = new HashMap<>(scale.attributes());
++        attributes.put("metricType", metricType.label());
++        return attributes;
++    }
++
++    /** 정의가 규칙에 맞는지 확인하고, 어긴 내용을 지표 이름을 붙여 알린다. */
++    public List<String> violations() {
++        String name = metricType == null ? "지표" : metricType.label();
++        return Stream.of(criterion.violations(), scale.violations(), layout.violations())
++                .flatMap(List::stream)
++                .map(violation -> name + ": " + violation)
++                .toList();
++    }
+ }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8651a80a98f88a0c0acc5777278ba4d888819b9c
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/PromptLayout.java
+@@ -0,0 +1,57 @@
++package com.bibbidi.wedding.chat.evaluation.data.metric;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.Optional;
++import java.util.stream.Collectors;
++
++/** 프롬프트를 어떻게 배치하는지. 입력 데이터로 넣을 항목과 순서, 구역의 순서를 안다. */
++final class PromptLayout {
++
++    private static final String SECTION_SEPARATOR = "\n\n";
++    private static final String INPUT_SEPARATOR = "\n";
++
++    private final List<EvaluationInput> inputs;
++    private final List<PromptSection> order;
++
++    PromptLayout(List<EvaluationInput> inputs, List<PromptSection> order) {
++        this.inputs = inputs;
++        this.order = order;
++    }
++
++    String render(SectionTemplate template, Map<String, Object> variables, InputSource source) {
++        Map<String, Object> all = new HashMap<>(variables);
++        all.put("input", input(source));
++        return order.stream()
++                .map(section -> template.render(section, all))
++                .collect(Collectors.joining(SECTION_SEPARATOR));
++    }
++
++    List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        if (inputs == null
++                || !inputs.contains(EvaluationInput.USER_MESSAGE)
++                || !inputs.contains(EvaluationInput.MODEL_RESPONSE)) {
++            violations.add("requiredInputs에는 userMessage와 modelResponse가 있어야 한다");
++        } else if (new HashSet<>(inputs).size() != inputs.size()) {
++            violations.add("requiredInputs에 같은 항목이 중복됐다");
++        }
++        if (order == null
++                || order.size() != PromptSection.values().length
++                || new HashSet<>(order).size() != order.size()
++                || order.getLast() != PromptSection.INPUT) {
++            violations.add("promptOrder는 role, task, rubric, input을 한 번씩 담고 input으로 끝나야 한다");
++        }
++        return violations;
++    }
++
++    private String input(InputSource source) {
++        return inputs.stream()
++                .map(input -> source.text(input).map(input::wrap))
++                .flatMap(Optional::stream)
++                .collect(Collectors.joining(INPUT_SEPARATOR));
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Scale.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Scale.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..729f64e46086d360fdab5ac1ce50cc9c78f65a64
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/Scale.java
+@@ -0,0 +1,57 @@
++package com.bibbidi.wedding.chat.evaluation.data.metric;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Map;
++import java.util.stream.Collectors;
++
++/** 점수를 매기는 척도. 허용하는 점수 단계, 점수 방향, 보고서 기록 전용 여부를 함께 안다. */
++final class Scale {
++
++    private final List<ScaleLevel> levels;
++    private final String direction;
++    private final boolean reportOnly;
++
++    Scale(List<ScaleLevel> levels, String direction, boolean reportOnly) {
++        this.levels = levels;
++        this.direction = direction;
++        this.reportOnly = reportOnly;
++    }
++
++    boolean accepts(int score) {
++        return levels.stream().anyMatch(level -> level.accepts(score));
++    }
++
++    Map<String, Object> variables() {
++        return Map.of(
++                "direction", direction,
++                "scale", levels.stream().map(ScaleLevel::describe).collect(Collectors.joining("\n")));
++    }
++
++    Map<String, Object> attributes() {
++        return Map.of("direction", direction, "reportOnly", reportOnly);
++    }
++
++    List<String> violations() {
++        List<String> violations = new ArrayList<>();
++        if (levels == null || levels.size() < 2) {
++            violations.add("척도는 두 단계 이상이어야 한다");
++        } else {
++            for (int i = 0; i < levels.size(); i++) {
++                ScaleLevel level = levels.get(i);
++                if (level.undefined()) {
++                    violations.add("척도 " + level.name() + "의 뜻이 비어 있다");
++                }
++                for (int j = i + 1; j < levels.size(); j++) {
++                    if (level.sameScoreAs(levels.get(j))) {
++                        violations.add("척도 값 중복 " + level.name());
++                    }
++                }
++            }
++        }
++        if (direction == null || direction.isBlank()) {
++            violations.add("direction은 비어 있을 수 없다");
++        }
++        return violations;
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/ScaleLevel.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/ScaleLevel.java
+index c26ee0b90cedc541b44b410511ff4d6ba79faaed..36a492a39ee04ea5ef7155e2a000381dd371638b 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/ScaleLevel.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/ScaleLevel.java
+@@ -1,3 +1,37 @@
+ package com.bibbidi.wedding.chat.evaluation.data.metric;
+ 
+-public record ScaleLevel(int value, String definition) {}
++import com.fasterxml.jackson.annotation.JsonCreator;
++import com.fasterxml.jackson.annotation.JsonProperty;
++
++/** 채점 척도의 한 단계. 점수 값 하나와 그 뜻이다. */
++public final class ScaleLevel {
++
++    private final int score;
++    private final String definition;
++
++    @JsonCreator
++    public ScaleLevel(@JsonProperty("value") int score, @JsonProperty("definition") String definition) {
++        this.score = score;
++        this.definition = definition;
++    }
++
++    boolean accepts(int other) {
++        return score == other;
++    }
++
++    boolean sameScoreAs(ScaleLevel other) {
++        return score == other.score;
++    }
++
++    boolean undefined() {
++        return definition == null || definition.isBlank();
++    }
++
++    String describe() {
++        return score + ": " + definition;
++    }
++
++    String name() {
++        return String.valueOf(score);
++    }
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/SectionTemplate.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/SectionTemplate.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..22a43694a47c73f0bec5f62493f906c4fe2c9891
+--- /dev/null
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/metric/SectionTemplate.java
+@@ -0,0 +1,9 @@
++package com.bibbidi.wedding.chat.evaluation.data.metric;
++
++import java.util.Map;
++
++/** 프롬프트 구역 하나를 변수로 채워 글로 만든다. */
++public interface SectionTemplate {
++
++    String render(PromptSection section, Map<String, Object> variables);
++}
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+index fc65b175f3d3ecfb07c85bc055402a4133f4f4ba..c520569e977dde892ea0f83efa4b4c2507ffe1cc 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluator.java
+@@ -3,9 +3,7 @@ package com.bibbidi.wedding.chat.evaluation.evaluator;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
+-import com.bibbidi.wedding.chat.evaluation.data.metric.ScaleLevel;
+ import java.util.Arrays;
+-import java.util.List;
+ import java.util.Map;
+ import java.util.Optional;
+ import java.util.function.Function;
+@@ -30,8 +28,6 @@ public class MetricEvaluator implements Evaluator {
+ 
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+ 
+-    private static final String SECTION_SEPARATOR = "\n\n";
+-
+     /** 구역마다 {@code prompts/<label>.st}를 읽는다. 출력 형식의 JSON 중괄호와 겹치지 않도록 변수 구분자로 {@code <}, {@code >}를 쓴다. */
+     private static final Map<PromptSection, PromptTemplate> TEMPLATES = Arrays.stream(PromptSection.values())
+             .collect(Collectors.toMap(Function.identity(), section -> PromptTemplate.builder()
+@@ -54,59 +50,33 @@ public class MetricEvaluator implements Evaluator {
+     public EvaluationResponse evaluate(EvaluationRequest request) {
+         String raw = judge.judge(prompt(request));
+         JsonNode result = parse(raw);
+-        return new EvaluationResponse(
+-                pass(result),
+-                score(result),
+-                feedback(result),
+-                Map.of(
+-                        "metricType", metric.metricType().label(),
+-                        "direction", metric.direction(),
+-                        "reportOnly", metric.reportOnly()));
++        return new EvaluationResponse(pass(result), score(result), feedback(result), metric.attributes());
+     }
+ 
+     String prompt(EvaluationRequest request) {
+-        String scale = metric.scale().stream()
+-                .map(level -> level.value() + ": " + level.definition())
+-                .collect(Collectors.joining("\n"));
+-        Map<String, Object> variables = Map.of(
+-                "task", metric.task(),
+-                "rubric", metric.rubric(),
+-                "direction", metric.direction(),
+-                "scale", scale,
+-                "metricType", metric.metricType().label(),
+-                "input", input(request));
+-        return metric.promptOrder().stream()
+-                .map(section -> TEMPLATES.get(section).render(variables))
+-                .collect(Collectors.joining(SECTION_SEPARATOR));
+-    }
+-
+-    private String input(EvaluationRequest request) {
+-        return metric.requiredInputs().stream()
+-                .map(required -> section(required, request))
+-                .flatMap(Optional::stream)
+-                .collect(Collectors.joining("\n"));
++        return metric.prompt(
++                (section, variables) -> TEMPLATES.get(section).render(variables), input -> text(input, request));
+     }
+ 
+-    private Optional<String> section(EvaluationInput required, EvaluationRequest request) {
+-        String text = switch (required) {
++    private Optional<String> text(EvaluationInput input, EvaluationRequest request) {
++        String text = switch (input) {
+             case USER_MESSAGE -> request.getUserText();
+             case MODEL_RESPONSE -> request.getResponseContent();
+-            case CHAT_MEMORY, OBSERVED_TOOL_RESULTS -> documents(required, request);
++            case CHAT_MEMORY, OBSERVED_TOOL_RESULTS -> documents(input, request);
+         };
+         if (text == null || text.isBlank()) {
+-            if (required == EvaluationInput.USER_MESSAGE || required == EvaluationInput.MODEL_RESPONSE) {
+-                throw new IllegalArgumentException(metric.metricType().label() + ": " + required.label() + "이 비어 있습니다");
++            if (input == EvaluationInput.USER_MESSAGE || input == EvaluationInput.MODEL_RESPONSE) {
++                throw new IllegalArgumentException(metric.metricType().label() + ": " + input.label() + "이 비어 있습니다");
+             }
+             // 새 대화이거나 도구를 호출하지 않았다면 해당 입력이 없는 것이 정상이다. 없는 데이터를 있는 것처럼 만들지 않는다.
+             return Optional.empty();
+         }
+-        String tag = required.label();
+-        return Optional.of("<" + tag + ">\n" + text + "\n</" + tag + ">");
++        return Optional.of(text);
+     }
+ 
+-    private String documents(EvaluationInput required, EvaluationRequest request) {
++    private String documents(EvaluationInput input, EvaluationRequest request) {
+         return request.getDataList().stream()
+-                .filter(document -> required.label().equals(document.getMetadata().get(KIND_KEY)))
++                .filter(document -> input.matches(document.getMetadata().get(KIND_KEY)))
+                 .map(Document::getText)
+                 .collect(Collectors.joining("\n"));
+     }
+@@ -132,9 +102,8 @@ public class MetricEvaluator implements Evaluator {
+             throw new IllegalStateException(metric.metricType().label() + ": judge 응답의 metricType이 다릅니다");
+         }
+         JsonNode score = result.path("score");
+-        List<Integer> allowed = metric.scale().stream().map(ScaleLevel::value).toList();
+-        if (!score.isIntegralNumber() || !allowed.contains(score.asInt())) {
+-            throw new IllegalStateException(metric.metricType().label() + ": 허용되지 않은 점수입니다. 허용 값 " + allowed);
++        if (!score.isIntegralNumber() || !metric.accepts(score.asInt())) {
++            throw new IllegalStateException(metric.metricType().label() + ": 허용되지 않은 점수입니다: " + score);
+         }
+         return score.asInt();
+     }
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+index 19387111e15bcdbf6da9a06e8431033eb2ade65f..509c1cfe8d9f5f4993be27fb50ce07c45277a382 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/evaluator/MetricEvaluatorTest.java
+@@ -8,8 +8,10 @@ import com.bibbidi.wedding.chat.evaluation.data.metric.EvaluationInput;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricDefinition;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.MetricType;
+ import com.bibbidi.wedding.chat.evaluation.data.metric.PromptSection;
++import com.bibbidi.wedding.chat.evaluation.data.metric.ScaleLevel;
+ import java.util.List;
+ import java.util.Map;
++import java.util.stream.IntStream;
+ import java.util.stream.Stream;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
+@@ -23,6 +25,10 @@ class MetricEvaluatorTest {
+ 
+     private static final List<MetricDefinition> METRICS = new EvaluationDataLoader().load().metrics();
+     private static final MetricDefinition CORRECTNESS = metric(MetricType.CORRECTNESS);
++    private static final List<EvaluationInput> ALL_INPUTS = List.of(EvaluationInput.CHAT_MEMORY,
++            EvaluationInput.USER_MESSAGE, EvaluationInput.MODEL_RESPONSE, EvaluationInput.OBSERVED_TOOL_RESULTS);
++    private static final List<PromptSection> ALL_SECTIONS =
++            List.of(PromptSection.ROLE, PromptSection.TASK, PromptSection.RUBRIC, PromptSection.INPUT);
+ 
+     private final EvaluationRequest request = new EvaluationRequest(
+             "스튜디오 촬영 준비 항목을 추천해 줘.",
+@@ -39,18 +45,16 @@ class MetricEvaluatorTest {
+     @MethodSource("metrics")
+     @DisplayName("지표 11개 모두 judge가 생성한 pass, score, feedback을 그대로 돌려준다")
+     void returnsJudgeResult(MetricDefinition metric) {
+-        int score = metric.scale().getLast().value();
+-        MetricEvaluator evaluator = new MetricEvaluator(metric, prompt -> json(metric.metricType().label(), true, score, "근거가 있다"));
++        int score = highestScore(metric);
++        MetricEvaluator evaluator =
++                new MetricEvaluator(metric, prompt -> json(metric.metricType().label(), true, score, "근거가 있다"));
+ 
+         EvaluationResponse response = evaluator.evaluate(request);
+ 
+         assertThat(response.isPass()).isTrue();
+         assertThat(response.getScore()).isEqualTo(score);
+         assertThat(response.getFeedback()).isEqualTo("근거가 있다");
+-        assertThat(response.getMetadata())
+-                .containsEntry("metricType", metric.metricType().label())
+-                .containsEntry("direction", metric.direction())
+-                .containsEntry("reportOnly", metric.reportOnly());
++        assertThat(response.getMetadata()).isEqualTo(metric.attributes());
+     }
+ 
+     @Test
+@@ -140,11 +144,8 @@ class MetricEvaluatorTest {
+     @Test
+     @DisplayName("promptOrder대로 프롬프트 구역을 배치한다")
+     void followsPromptOrder() {
+-        MetricDefinition reordered = new MetricDefinition(
+-                CORRECTNESS.metricType(), CORRECTNESS.task(), CORRECTNESS.rubric(), CORRECTNESS.scale(),
+-                CORRECTNESS.direction(), CORRECTNESS.reportOnly(), CORRECTNESS.requiredInputs(),
+-                List.of(PromptSection.TASK, PromptSection.ROLE, PromptSection.RUBRIC, PromptSection.INPUT),
+-                CORRECTNESS.source());
++        MetricDefinition reordered = correctness(
++                ALL_INPUTS, List.of(PromptSection.TASK, PromptSection.ROLE, PromptSection.RUBRIC, PromptSection.INPUT));
+ 
+         String prompt = capturePrompt(reordered);
+ 
+@@ -156,16 +157,24 @@ class MetricEvaluatorTest {
+         StringBuilder captured = new StringBuilder();
+         new MetricEvaluator(definition, prompt -> {
+             captured.append(prompt);
+-            return json(definition.metricType().label(), true, definition.scale().getLast().value(), "근거");
++            return json(definition.metricType().label(), true, highestScore(definition), "근거");
+         }).evaluate(request);
+         return captured.toString();
+     }
+ 
+     private MetricDefinition withInputs(List<EvaluationInput> inputs) {
++        return correctness(inputs, ALL_SECTIONS);
++    }
++
++    private static MetricDefinition correctness(List<EvaluationInput> inputs, List<PromptSection> order) {
+         return new MetricDefinition(
+-                CORRECTNESS.metricType(), CORRECTNESS.task(), CORRECTNESS.rubric(), CORRECTNESS.scale(),
+-                CORRECTNESS.direction(), CORRECTNESS.reportOnly(), inputs, CORRECTNESS.promptOrder(),
+-                CORRECTNESS.source());
++                MetricType.CORRECTNESS, "정확한가", "사실 오류를 찾는다",
++                List.of(new ScaleLevel(0, "미충족"), new ScaleLevel(4, "충족")),
++                "높을수록 정확함", true, inputs, order, "https://docs.aws.amazon.com");
++    }
++
++    private static int highestScore(MetricDefinition metric) {
++        return IntStream.rangeClosed(0, 10).filter(metric::accepts).max().orElseThrow();
+     }
+ 
+     private static MetricDefinition metric(MetricType metricType) {

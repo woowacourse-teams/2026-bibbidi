@@ -1,0 +1,79 @@
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+index fd61d639ac24dfefd5144c77bc36d7d7d021f827..3f19a36e93abc530b0f587b5af49a26de34aa059 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoader.java
+@@ -8,7 +8,6 @@ import java.util.Comparator;
+ import java.util.List;
+ import org.springframework.core.io.Resource;
+ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+-import tools.jackson.core.JacksonException;
+ import tools.jackson.databind.ObjectMapper;
+ 
+ public class EvaluationDataLoader {
+@@ -18,32 +17,22 @@ public class EvaluationDataLoader {
+     private final ObjectMapper objectMapper = new ObjectMapper();
+     private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
+ 
+-    public List<EvaluationScenario> loadScenarios() {
++    public List<EvaluationScenario> loadScenarios() throws IOException {
+         return load("scenarios/*.json", EvaluationScenario.class);
+     }
+ 
+-    public List<MetricConfig> loadMetrics() {
++    public List<MetricConfig> loadMetrics() throws IOException {
+         return load("metrics/*.json", MetricConfig.class);
+     }
+ 
+-    private <T> List<T> load(String pattern, Class<T> type) {
+-        Resource[] resources;
+-        try {
+-            resources = resourceResolver.getResources(BASE_PATH + pattern);
+-        } catch (IOException exception) {
+-            throw new IllegalStateException("평가 데이터 목록을 읽을 수 없습니다: " + BASE_PATH + pattern, exception);
+-        }
+-        if (resources.length == 0) {
+-            throw new IllegalStateException("평가 데이터를 찾을 수 없습니다: " + BASE_PATH + pattern);
+-        }
++    private <T> List<T> load(String pattern, Class<T> type) throws IOException {
++        Resource[] resources = resourceResolver.getResources(BASE_PATH + pattern);
+         Arrays.sort(resources, Comparator.comparing(Resource::getFilename));
+ 
+         List<T> result = new ArrayList<>(resources.length);
+         for (Resource resource : resources) {
+             try (InputStream input = resource.getInputStream()) {
+                 result.add(objectMapper.readValue(input, type));
+-            } catch (IOException | JacksonException exception) {
+-                throw new IllegalStateException("평가 데이터를 읽을 수 없습니다: " + resource.getDescription(), exception);
+             }
+         }
+         return List.copyOf(result);
+diff --git a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+index 3e1a37364928d1cd7eec3bd9c67fe189d560cbe7..b6b7c7e88590dbdaaf1d6316d7c4651b74a94bab 100644
+--- a/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
++++ b/BE/src/test/java/com/bibbidi/wedding/chat/evaluation/data/EvaluationDataLoaderTest.java
+@@ -2,6 +2,7 @@ package com.bibbidi.wedding.chat.evaluation.data;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
++import java.io.IOException;
+ import org.junit.jupiter.api.Test;
+ 
+ class EvaluationDataLoaderTest {
+@@ -9,7 +10,7 @@ class EvaluationDataLoaderTest {
+     private final EvaluationDataLoader loader = new EvaluationDataLoader();
+ 
+     @Test
+-    void loadsAllScenariosInFilenameOrder() {
++    void loadsAllScenariosInFilenameOrder() throws IOException {
+         var scenarios = loader.loadScenarios();
+ 
+         assertThat(scenarios).hasSize(55);
+@@ -19,7 +20,7 @@ class EvaluationDataLoaderTest {
+     }
+ 
+     @Test
+-    void loadsAllMetrics() {
++    void loadsAllMetrics() throws IOException {
+         var metrics = loader.loadMetrics();
+ 
+         assertThat(metrics).hasSize(11);

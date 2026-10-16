@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.token;
 
-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;

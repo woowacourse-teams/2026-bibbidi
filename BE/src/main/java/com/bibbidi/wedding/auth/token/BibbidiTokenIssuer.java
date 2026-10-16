@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.token;
 
-import com.bibbidi.wedding.auth.config.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.MacAlgorithm;
 import java.time.Duration;

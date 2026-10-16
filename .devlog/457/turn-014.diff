@@ -1,0 +1,902 @@
+diff --git a/Infra/k6/smoke-test.ts b/Infra/k6/smoke-test.ts
+index 654e7305b9e75933438193ff263f0cca701f130b..591e649ce86c466b6dfa05e471c265246bfbda2f 100644
+--- a/Infra/k6/smoke-test.ts
++++ b/Infra/k6/smoke-test.ts
+@@ -1,31 +1,31 @@
+-import exec from 'k6/execution';
+-import http from 'k6/http';
+ import type { Options } from 'k6/options';
+-import { config } from './src/config.ts';
+-import {
+-  isNewUserSession,
+-  loadCatalogItemIds,
+-  newUserSession,
+-  poolUserId,
+-  prepareReturningUser,
+-  returningUserSession,
+-  type SetupData,
+-} from './src/session.ts';
+-import { signAccessToken } from './src/token.ts';
++import { ApiFactory } from './src/api.ts';
++import { Environment, numberFromEnv, textFromEnv } from './src/environment.ts';
++import { HttpClient } from './src/http.ts';
++import { LoadTest } from './src/load-test.ts';
++import { NewUserSession, ReturningUserSession, SessionMix, type SetupData } from './src/session.ts';
++import { SummaryReport, type SummaryData } from './src/summary.ts';
++import { AccessTokenIssuer } from './src/token.ts';
+ 
+-export { handleSummary } from './src/summary.ts';
++const environment = Environment.fromEnv();
+ 
+-// 체크리스트 조회의 404(아직 데이터 없음)는 setup()이 예상하는 응답이라 실패로 세지 않는다.
+-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 404));
++// 신규:재방문 = 3:7
++const mix = new SessionMix([
++  { session: new NewUserSession(), weight: 3 },
++  { session: new ReturningUserSession(), weight: 7 },
++]);
++
++const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
++const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 10));
+ 
+ // Smoke는 경로가 끝까지 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
+ export const options: Options = {
+   scenarios: {
+     smoke: {
+       executor: 'constant-arrival-rate',
+-      rate: config.rate,
++      rate: numberFromEnv('RATE', 1),
+       timeUnit: '1s',
+-      duration: config.duration,
++      duration: textFromEnv('DURATION', '1m'),
+       preAllocatedVUs: 5,
+       maxVUs: 20,
+     },
+@@ -38,18 +38,13 @@ export const options: Options = {
+ };
+ 
+ export function setup(): SetupData {
+-  const catalogItemIds = loadCatalogItemIds(signAccessToken(poolUserId(0)));
+-  const pool = Array.from({ length: config.poolSize }, (_, index) =>
+-    prepareReturningUser(poolUserId(index), catalogItemIds),
+-  );
+-  return { runId: Math.floor(Date.now() / 1000), catalogItemIds, pool };
++  return test.setup();
+ }
+ 
+ export default function (data: SetupData): void {
+-  const iteration = exec.scenario.iterationInTest;
+-  if (isNewUserSession()) {
+-    newUserSession(data, iteration);
+-  } else {
+-    returningUserSession(data, iteration);
+-  }
++  test.run(data);
++}
++
++export function handleSummary(data: SummaryData): Record<string, string> {
++  return new SummaryReport(data).files(textFromEnv('SUMMARY_DIR', '.'));
+ }
+diff --git a/Infra/k6/src/api.ts b/Infra/k6/src/api.ts
+index ee9735113f91724f940c3e0aa097617a6f1e3a1d..7b3ad7fe60aee9978e43afc3e3ffc42eda5363d5 100644
+--- a/Infra/k6/src/api.ts
++++ b/Infra/k6/src/api.ts
+@@ -1,43 +1,127 @@
+-import { check } from 'k6';
+-import http, { type RefinedResponse } from 'k6/http';
+-import { Counter } from 'k6/metrics';
+-import { config } from './config.ts';
+-
+-export const serverErrors = new Counter('server_errors');
+-
+-export interface RequestSpec {
+-  // 지표의 name 태그. 경로 변수는 {id}처럼 묶어 시계열 수를 제한한다.
+-  name: string;
+-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+-  path: string;
+-  expected: number[];
+-  body?: unknown;
++import type { HttpClient } from './http.ts';
++import type { AccessTokenIssuer } from './token.ts';
++
++interface CatalogResponse {
++  categories: { steps: { items: { id: number }[] }[] }[];
++}
++
++export interface Checklist {
++  id: number;
++  items: { id: number; appointments: { id: number }[] }[];
+ }
+ 
+-export function call(token: string, spec: RequestSpec): RefinedResponse<'text'> {
+-  const response = http.request(
+-    spec.method,
+-    `${config.baseUrl}${spec.path}`,
+-    spec.body === undefined ? null : JSON.stringify(spec.body),
+-    {
+-      headers: {
+-        Authorization: `Bearer ${token}`,
+-        'Content-Type': 'application/json',
++interface AddCatalogItemsResponse {
++  items: { id: number }[];
++}
++
++interface AppointmentResponse {
++  id: number;
++}
++
++// 한 사용자의 Access Token으로 부르는 비비디 API. 엔드포인트 이름과 기대 응답을 한곳에 모은다.
++export class BibbidiApi {
++  constructor(
++    private readonly client: HttpClient,
++    private readonly token: string,
++  ) {}
++
++  catalogItemIds(): number[] {
++    const response = this.client.send(this.token, {
++      name: 'GET /api/catalog',
++      method: 'GET',
++      path: '/api/catalog',
++      expected: [200],
++    });
++    return (response.json() as unknown as CatalogResponse).categories.flatMap((category) =>
++      category.steps.flatMap((step) => step.items.map((item) => item.id)),
++    );
++  }
++
++  createChecklist(): void {
++    this.client.send(this.token, {
++      name: 'POST /api/checklists',
++      method: 'POST',
++      path: '/api/checklists',
++      expected: [201],
++    });
++  }
++
++  addCatalogItems(catalogItemIds: number[]): number[] {
++    const response = this.client.send(this.token, {
++      name: 'POST /api/checklists/me/catalog-items',
++      method: 'POST',
++      path: '/api/checklists/me/catalog-items',
++      body: catalogItemIds,
++      expected: [201],
++    });
++    return (response.json() as unknown as AddCatalogItemsResponse).items.map((item) => item.id);
++  }
++
++  createAppointment(checklistItemId: number, daysAfter: number): number {
++    const date = this.dateAfter(daysAfter);
++    const response = this.client.send(this.token, {
++      name: 'POST /api/checklist-items/{id}/appointments',
++      method: 'POST',
++      path: `/api/checklist-items/${checklistItemId}/appointments`,
++      body: {
++        title: '부하 테스트 일정',
++        date,
++        startTime: `${date}T10:00:00`,
++        endTime: `${date}T11:00:00`,
++        place: '부하 테스트 장소',
++        memo: 'k6',
+       },
+-      tags: { name: spec.name },
+-    },
+-  );
++      expected: [201],
++    });
++    return (response.json() as unknown as AppointmentResponse).id;
++  }
++
++  // 체크리스트가 아직 없으면 null. 없는 것은 오류가 아니라 정상 응답(404)이다.
++  findChecklist(): Checklist | null {
++    const response = this.client.send(this.token, {
++      name: 'GET /api/checklists/me',
++      method: 'GET',
++      path: '/api/checklists/me',
++      expected: [200, 404],
++    });
++    return response.status === 200 ? (response.json() as unknown as Checklist) : null;
++  }
+ 
+-  if (response.status >= 500) {
+-    serverErrors.add(1);
++  changeAppointmentCompletion(appointmentId: number, isDone: boolean): void {
++    this.client.send(this.token, {
++      name: 'PUT /api/appointments/{id}/complete',
++      method: 'PUT',
++      path: `/api/appointments/${appointmentId}/complete`,
++      body: isDone,
++      expected: [200],
++    });
+   }
+-  check(response, {
+-    [`${spec.name} -> ${spec.expected.join('|')}`]: (r) => spec.expected.includes(r.status),
+-  });
+ 
+-  return response;
++  // 홈 화면이 부르는 조회들
++  visitHome(): void {
++    const reads: [string, string][] = [
++      ['GET /api/checklists/me/progress', '/api/checklists/me/progress'],
++      ['GET /api/appointments/me/nearby', '/api/appointments/me/nearby?limit=6'],
++      ['GET /api/checklists/me/unscheduled-items', '/api/checklists/me/unscheduled-items?limit=4'],
++      ['GET /api/checklists/me/recommended-catalog-items', '/api/checklists/me/recommended-catalog-items?limit=4'],
++    ];
++    for (const [name, path] of reads) {
++      this.client.send(this.token, { name, method: 'GET', path, expected: [200] });
++    }
++  }
++
++  private dateAfter(days: number): string {
++    return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
++  }
+ }
+ 
+-export function jsonOf<T>(response: RefinedResponse<'text'>): T {
+-  return response.json() as unknown as T;
++export class ApiFactory {
++  constructor(
++    private readonly client: HttpClient,
++    private readonly tokens: AccessTokenIssuer,
++  ) {}
++
++  forUser(userId: number): BibbidiApi {
++    return new BibbidiApi(this.client, this.tokens.issue(userId));
++  }
+ }
+diff --git a/Infra/k6/src/config.ts b/Infra/k6/src/config.ts
+deleted file mode 100644
+index b53050bafc3f009cb6e05dc99f4c3b6ddd90ea81..0000000000000000000000000000000000000000
+--- a/Infra/k6/src/config.ts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-function required(name: string): string {
+-  const value = __ENV[name];
+-  if (!value) {
+-    throw new Error(`환경 변수 ${name}가 필요합니다.`);
+-  }
+-  return value;
+-}
+-
+-function numberOf(name: string, fallback: number): number {
+-  const value = __ENV[name];
+-  return value ? Number(value) : fallback;
+-}
+-
+-export const config = {
+-  baseUrl: required('BASE_URL').replace(/\/+$/, ''),
+-  jwtSecret: required('AUTH_JWT_SECRET'),
+-  jwtIssuer: __ENV.AUTH_JWT_ISSUER ?? 'bibbidi',
+-  jwtAudience: __ENV.AUTH_JWT_AUDIENCE ?? 'bibbidi-client',
+-  tokenLifetimeSeconds: numberOf('TOKEN_LIFETIME_SECONDS', 1800),
+-  rate: numberOf('RATE', 1),
+-  duration: __ENV.DURATION ?? '1m',
+-  poolSize: numberOf('POOL_SIZE', 10),
+-  newUserRatio: numberOf('NEW_USER_RATIO', 0.3),
+-};
+diff --git a/Infra/k6/src/environment.ts b/Infra/k6/src/environment.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b598e80e36426303115e991be2188083e63dc7f
+--- /dev/null
++++ b/Infra/k6/src/environment.ts
+@@ -0,0 +1,37 @@
++function required(name: string): string {
++  const value = __ENV[name];
++  if (!value) {
++    throw new Error(`환경 변수 ${name}가 필요합니다.`);
++  }
++  return value;
++}
++
++export function numberFromEnv(name: string, fallback: number): number {
++  const value = __ENV[name];
++  return value ? Number(value) : fallback;
++}
++
++export function textFromEnv(name: string, fallback: string): string {
++  return __ENV[name] ?? fallback;
++}
++
++// 서버 주소와 토큰 서명에 필요한 값. 테스트 종류와 관계없이 모든 스크립트가 같이 쓴다.
++export class Environment {
++  private constructor(
++    readonly baseUrl: string,
++    readonly jwtSecret: string,
++    readonly jwtIssuer: string,
++    readonly jwtAudience: string,
++    readonly tokenLifetimeSeconds: number,
++  ) {}
++
++  static fromEnv(): Environment {
++    return new Environment(
++      required('BASE_URL').replace(/\/+$/, ''),
++      required('AUTH_JWT_SECRET'),
++      textFromEnv('AUTH_JWT_ISSUER', 'bibbidi'),
++      textFromEnv('AUTH_JWT_AUDIENCE', 'bibbidi-client'),
++      numberFromEnv('TOKEN_LIFETIME_SECONDS', 1800),
++    );
++  }
++}
+diff --git a/Infra/k6/src/http.ts b/Infra/k6/src/http.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..278f3b90b61a8bb875bf41278cb7f2041d51ecc9
+--- /dev/null
++++ b/Infra/k6/src/http.ts
+@@ -0,0 +1,71 @@
++import { check } from 'k6';
++import http, { type RefinedResponse } from 'k6/http';
++import { Counter } from 'k6/metrics';
++
++export const serverErrors = new Counter('server_errors');
++
++export interface RequestSpec {
++  // 지표의 name 태그. 경로 변수는 {id}처럼 묶어 시계열 수를 제한한다.
++  name: string;
++  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
++  path: string;
++  body?: unknown;
++  // 이 요청이 정상으로 보는 상태 코드
++  expected: readonly number[];
++}
++
++// 테스트마다 정상 응답의 기준이 다르다. 예: Spike는 요청 제한으로 429가 나와도 정상이다.
++export interface ExpectationPolicy {
++  acceptable(spec: RequestSpec): number[];
++}
++
++export class StrictExpectation implements ExpectationPolicy {
++  acceptable(spec: RequestSpec): number[] {
++    return [...spec.expected];
++  }
++}
++
++export class ExpectationWithExtras implements ExpectationPolicy {
++  constructor(private readonly extraStatuses: readonly number[]) {}
++
++  acceptable(spec: RequestSpec): number[] {
++    return [...spec.expected, ...this.extraStatuses];
++  }
++}
++
++// 요청마다 붙일 추가 태그. 예: Breakpoint가 현재 구간을 태그로 붙인다.
++export type TagProvider = () => Record<string, string>;
++
++export class HttpClient {
++  constructor(
++    private readonly baseUrl: string,
++    private readonly expectation: ExpectationPolicy = new StrictExpectation(),
++    private readonly extraTags: TagProvider = () => ({}),
++  ) {}
++
++  send(token: string, spec: RequestSpec): RefinedResponse<'text'> {
++    const acceptable = this.expectation.acceptable(spec);
++    const response = http.request(
++      spec.method,
++      `${this.baseUrl}${spec.path}`,
++      spec.body === undefined ? null : JSON.stringify(spec.body),
++      {
++        headers: {
++          Authorization: `Bearer ${token}`,
++          'Content-Type': 'application/json',
++        },
++        tags: { ...this.extraTags(), name: spec.name },
++        responseCallback: http.expectedStatuses(...acceptable),
++      },
++    );
++
++    if (response.status >= 500) {
++      serverErrors.add(1);
++    }
++    check(response, {
++      [`${spec.name} -> ${acceptable.join('|')}`]: (r) => acceptable.includes(r.status),
++    });
++
++    return response;
++  }
++}
+diff --git a/Infra/k6/src/load-test.ts b/Infra/k6/src/load-test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf6695a63547be0362ca6c93a8a2028c0d3f3325
+--- /dev/null
++++ b/Infra/k6/src/load-test.ts
+@@ -0,0 +1,31 @@
++import exec from 'k6/execution';
++import type { ApiFactory } from './api.ts';
++import type { SessionMix, SetupData } from './session.ts';
++import { UserIds, ReturningUserPool } from './users.ts';
++
++// 테스트 종류와 관계없는 실행 틀. setup()에서 데이터를 준비하고, 반복마다 세션 하나를 골라 실행한다.
++// 도착률, 임계값, 세션 구성은 각 테스트 파일이 정한다.
++export class LoadTest {
++  private readonly pool: ReturningUserPool;
++
++  constructor(
++    private readonly apis: ApiFactory,
++    private readonly mix: SessionMix,
++    poolSize: number,
++  ) {
++    this.pool = new ReturningUserPool(apis, poolSize);
++  }
++
++  setup(): SetupData {
++    const catalogItemIds = this.apis.forUser(UserIds.pooled(0)).catalogItemIds();
++    return {
++      runId: Math.floor(Date.now() / 1000),
++      catalogItemIds,
++      pool: this.pool.prepare(catalogItemIds),
++    };
++  }
++
++  run(data: SetupData): void {
++    this.mix.pick().run({ data, iteration: exec.scenario.iterationInTest, apis: this.apis });
++  }
++}
+diff --git a/Infra/k6/src/session.ts b/Infra/k6/src/session.ts
+index 50a8fb6593eff6e0e8a7e97cdff3106732670d6a..1453792e44da3a7bd3d8f345a22d024d2a9c2a68 100644
+--- a/Infra/k6/src/session.ts
++++ b/Infra/k6/src/session.ts
+@@ -1,168 +1,70 @@
+-import { call, jsonOf } from './api.ts';
+-import { config } from './config.ts';
+-import { LOAD_TEST_USER_ID_BASE, signAccessToken } from './token.ts';
+-
+-interface CatalogResponse {
+-  categories: { steps: { items: { id: number }[] }[] }[];
+-}
+-
+-interface ChecklistResponse {
+-  id: number;
+-  items: { id: number; appointments: { id: number }[] }[];
+-}
+-
+-interface AddCatalogItemsResponse {
+-  items: { id: number }[];
+-}
+-
+-interface AppointmentResponse {
+-  id: number;
+-}
+-
+-export interface PoolUser {
+-  userId: number;
+-  appointmentId: number;
+-}
++import type { ApiFactory } from './api.ts';
++import { pickRandom, UserIds, type PooledUser } from './users.ts';
+ 
++// setup()이 만들어 모든 가상 사용자에게 나눠 주는 데이터. JSON으로 전달되므로 일반 객체만 담는다.
+ export interface SetupData {
+   runId: number;
+   catalogItemIds: number[];
+-  pool: PoolUser[];
++  pool: PooledUser[];
+ }
+ 
+-// 재방문 사용자는 setup()이 미리 만든 고정 사용자 풀에서 고른다.
+-export function poolUserId(index: number): number {
+-  return LOAD_TEST_USER_ID_BASE + 1 + index;
++export interface SessionContext {
++  data: SetupData;
++  iteration: number;
++  apis: ApiFactory;
+ }
+ 
+-// 신규 사용자는 회차마다 겹치지 않는 ID를 쓴다. 이전 회차 데이터와 부딪히지 않고 정리 대역(900000000 이상)에 들어간다.
+-function newUserId(runId: number, iteration: number): number {
+-  return LOAD_TEST_USER_ID_BASE + 100_000_000_000 + runId * 100_000 + iteration;
++// 사용 흐름도의 한 갈래를 사용자 한 명이 끝까지 지나가는 단위
++export interface Session {
++  run(context: SessionContext): void;
+ }
+ 
+-function pickRandom(ids: number[], count: number): number[] {
+-  const pool = [...ids];
+-  const picked: number[] = [];
+-  while (picked.length < count && pool.length > 0) {
+-    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
++// 신규 사용자: 둘러보기 → 체크리스트 담기 → 일정 잡기 → 홈
++export class NewUserSession implements Session {
++  run({ data, iteration, apis }: SessionContext): void {
++    const api = apis.forUser(UserIds.fresh(data.runId, iteration));
++
++    api.catalogItemIds();
++    api.createChecklist();
++    const [firstItemId] = api.addCatalogItems(pickRandom(data.catalogItemIds, 3));
++    api.createAppointment(firstItemId, 1 + (iteration % 28));
++    api.visitHome();
+   }
+-  return picked;
+-}
+-
+-function dateAfter(days: number): string {
+-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+-}
+-
+-export function loadCatalogItemIds(token: string): number[] {
+-  const response = call(token, { name: 'GET /api/catalog', method: 'GET', path: '/api/catalog', expected: [200] });
+-  return jsonOf<CatalogResponse>(response).categories.flatMap((category) =>
+-    category.steps.flatMap((step) => step.items.map((item) => item.id)),
+-  );
+-}
+-
+-function createChecklist(token: string): void {
+-  call(token, { name: 'POST /api/checklists', method: 'POST', path: '/api/checklists', expected: [201] });
+ }
+ 
+-function addCatalogItems(token: string, catalogItemIds: number[]): number[] {
+-  const response = call(token, {
+-    name: 'POST /api/checklists/me/catalog-items',
+-    method: 'POST',
+-    path: '/api/checklists/me/catalog-items',
+-    body: catalogItemIds,
+-    expected: [201],
+-  });
+-  return jsonOf<AddCatalogItemsResponse>(response).items.map((item) => item.id);
++// 재방문 사용자: 홈 → 진행하기
++export class ReturningUserSession implements Session {
++  run({ data, iteration, apis }: SessionContext): void {
++    const user = data.pool[iteration % data.pool.length];
++    const api = apis.forUser(user.userId);
++
++    api.visitHome();
++    api.findChecklist();
++    api.changeAppointmentCompletion(user.appointmentId, iteration % 2 === 0);
++  }
+ }
+ 
+-function createAppointment(token: string, checklistItemId: number, daysAfter: number): number {
+-  const date = dateAfter(daysAfter);
+-  const response = call(token, {
+-    name: 'POST /api/checklist-items/{id}/appointments',
+-    method: 'POST',
+-    path: `/api/checklist-items/${checklistItemId}/appointments`,
+-    body: {
+-      title: '부하 테스트 일정',
+-      date,
+-      startTime: `${date}T10:00:00`,
+-      endTime: `${date}T11:00:00`,
+-      place: '부하 테스트 장소',
+-      memo: 'k6',
+-    },
+-    expected: [201],
+-  });
+-  return jsonOf<AppointmentResponse>(response).id;
++export interface WeightedSession {
++  session: Session;
++  weight: number;
+ }
+ 
+-function findChecklist(token: string): ChecklistResponse | null {
+-  const response = call(token, {
+-    name: 'GET /api/checklists/me',
+-    method: 'GET',
+-    path: '/api/checklists/me',
+-    expected: [200, 404],
+-  });
+-  return response.status === 200 ? jsonOf<ChecklistResponse>(response) : null;
+-}
++// 세션 종류를 가중치 비율로 섞는다. 예: 신규:재방문 3:7
++export class SessionMix {
++  private readonly totalWeight: number;
+ 
+-// 홈 화면이 부르는 조회들.
+-function visitHome(token: string): void {
+-  const reads: [string, string][] = [
+-    ['GET /api/checklists/me/progress', '/api/checklists/me/progress'],
+-    ['GET /api/appointments/me/nearby', '/api/appointments/me/nearby?limit=6'],
+-    ['GET /api/checklists/me/unscheduled-items', '/api/checklists/me/unscheduled-items?limit=4'],
+-    ['GET /api/checklists/me/recommended-catalog-items', '/api/checklists/me/recommended-catalog-items?limit=4'],
+-  ];
+-  for (const [name, path] of reads) {
+-    call(token, { name, method: 'GET', path, expected: [200] });
++  constructor(private readonly entries: readonly WeightedSession[]) {
++    this.totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+   }
+-}
+-
+-// 이미 데이터가 있으면 그대로 쓰고, 없을 때만 체크리스트와 일정을 만든다. 같은 서버에 다시 실행해도 데이터가 불어나지 않는다.
+-export function prepareReturningUser(userId: number, catalogItemIds: number[]): PoolUser {
+-  const token = signAccessToken(userId);
+-  let checklist = findChecklist(token);
+ 
+-  if (checklist === null) {
+-    createChecklist(token);
+-    addCatalogItems(token, pickRandom(catalogItemIds, 3));
+-    checklist = findChecklist(token);
++  pick(): Session {
++    let point = Math.random() * this.totalWeight;
++    for (const entry of this.entries) {
++      point -= entry.weight;
++      if (point < 0) {
++        return entry.session;
++      }
++    }
++    return this.entries[this.entries.length - 1].session;
+   }
+-  if (checklist === null || checklist.items.length === 0) {
+-    throw new Error(`재방문 사용자 ${userId}의 체크리스트를 준비하지 못했습니다.`);
+-  }
+-
+-  const item = checklist.items[0];
+-  const appointmentId = item.appointments[0]?.id ?? createAppointment(token, item.id, 1);
+-  return { userId, appointmentId };
+-}
+-
+-// 신규 사용자: 둘러보기 → 체크리스트 담기 → 일정 잡기 → 홈
+-export function newUserSession(data: SetupData, iteration: number): void {
+-  const token = signAccessToken(newUserId(data.runId, iteration));
+-
+-  loadCatalogItemIds(token);
+-  createChecklist(token);
+-  const [firstItemId] = addCatalogItems(token, pickRandom(data.catalogItemIds, 3));
+-  createAppointment(token, firstItemId, 1 + (iteration % 28));
+-  visitHome(token);
+-}
+-
+-// 재방문 사용자: 홈 → 진행하기
+-export function returningUserSession(data: SetupData, iteration: number): void {
+-  const user = data.pool[iteration % data.pool.length];
+-  const token = signAccessToken(user.userId);
+-
+-  visitHome(token);
+-  findChecklist(token);
+-  call(token, {
+-    name: 'PUT /api/appointments/{id}/complete',
+-    method: 'PUT',
+-    path: `/api/appointments/${user.appointmentId}/complete`,
+-    body: iteration % 2 === 0,
+-    expected: [200],
+-  });
+-}
+-
+-export function isNewUserSession(): boolean {
+-  return Math.random() < config.newUserRatio;
+ }
+diff --git a/Infra/k6/src/summary.ts b/Infra/k6/src/summary.ts
+index 62e152fc81147f88f9df71753734ceb31062fc5b..04320df59012c7e0992cd256e12bc5d0b1073a4f 100644
+--- a/Infra/k6/src/summary.ts
++++ b/Infra/k6/src/summary.ts
+@@ -12,61 +12,63 @@ export interface SummaryData {
+   state?: { testRunDurationMs?: number };
+ }
+ 
+-function value(data: SummaryData, metric: string, stat: string): number | undefined {
+-  return data.metrics?.[metric]?.values?.[stat];
+-}
+-
+-function format(number: number | undefined, digits = 2): string {
+-  return number === undefined ? '-' : number.toFixed(digits);
+-}
++// handleSummary()가 받는 결과를 깃허브 잡 요약용 판정표와 원본 JSON으로 바꾼다.
++// 문서에 없는 키는 '-'로 두어 요약이 깨지지 않게 한다.
++export class SummaryReport {
++  constructor(private readonly data: SummaryData) {}
+ 
+-function failedThresholds(data: SummaryData): string[] {
+-  const failed: string[] = [];
+-  for (const [metric, summary] of Object.entries(data.metrics ?? {})) {
+-    for (const [expression, result] of Object.entries(summary.thresholds ?? {})) {
+-      if (!result.ok) {
+-        failed.push(`${metric}: ${expression}`);
++  failedThresholds(): string[] {
++    const failed: string[] = [];
++    for (const [metric, summary] of Object.entries(this.data.metrics ?? {})) {
++      for (const [expression, result] of Object.entries(summary.thresholds ?? {})) {
++        if (!result.ok) {
++          failed.push(`${metric}: ${expression}`);
++        }
+       }
+     }
++    return failed;
+   }
+-  return failed;
+-}
+ 
+-// 깃허브 잡 요약에 그대로 보여 줄 판정표. 문서에 없는 키는 '-'로 두어 요약이 깨지지 않게 한다.
+-export function toMarkdown(data: SummaryData): string {
+-  const failed = failedThresholds(data);
+-  const verdict = failed.length === 0 ? '통과' : '실패';
+-  const durationSeconds = (data.state?.testRunDurationMs ?? 0) / 1000;
++  toMarkdown(): string {
++    const failed = this.failedThresholds();
++    const durationSeconds = (this.data.state?.testRunDurationMs ?? 0) / 1000;
+ 
+-  const rows: [string, string][] = [
+-    ['판정', failed.length === 0 ? '✅ 통과' : '❌ 실패'],
+-    ['실행 시간(초)', format(durationSeconds, 0)],
+-    ['요청 수', format(value(data, 'http_reqs', 'count'), 0)],
+-    ['요청/초', format(value(data, 'http_reqs', 'rate'))],
+-    ['세션(반복) 수', format(value(data, 'iterations', 'count'), 0)],
+-    ['체크 통과율', format(value(data, 'checks', 'rate'), 4)],
+-    ['5xx 건수', format(value(data, 'server_errors', 'count') ?? 0, 0)],
+-    ['응답 시간 avg(ms)', format(value(data, 'http_req_duration', 'avg'))],
+-    ['응답 시간 p(95)(ms)', format(value(data, 'http_req_duration', 'p(95)'))],
+-    ['응답 시간 p(99)(ms)', format(value(data, 'http_req_duration', 'p(99)'))],
+-    ['응답 시간 max(ms)', format(value(data, 'http_req_duration', 'max'))],
+-    ['누락된 반복(dropped_iterations)', format(value(data, 'dropped_iterations', 'count') ?? 0, 0)],
+-  ];
++    const rows: [string, string][] = [
++      ['판정', failed.length === 0 ? '✅ 통과' : '❌ 실패'],
++      ['실행 시간(초)', this.format(durationSeconds, 0)],
++      ['요청 수', this.format(this.value('http_reqs', 'count'), 0)],
++      ['요청/초', this.format(this.value('http_reqs', 'rate'))],
++      ['세션(반복) 수', this.format(this.value('iterations', 'count'), 0)],
++      ['체크 통과율', this.format(this.value('checks', 'rate'), 4)],
++      ['5xx 건수', this.format(this.value('server_errors', 'count') ?? 0, 0)],
++      ['응답 시간 avg(ms)', this.format(this.value('http_req_duration', 'avg'))],
++      ['응답 시간 p(95)(ms)', this.format(this.value('http_req_duration', 'p(95)'))],
++      ['응답 시간 p(99)(ms)', this.format(this.value('http_req_duration', 'p(99)'))],
++      ['응답 시간 max(ms)', this.format(this.value('http_req_duration', 'max'))],
++      ['누락된 반복(dropped_iterations)', this.format(this.value('dropped_iterations', 'count') ?? 0, 0)],
++    ];
+ 
+-  const table = ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
+-  const failures =
+-    failed.length === 0 ? [] : ['', '실패한 임계값', ...failed.map((entry) => `- ${entry}`)];
++    const table = ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
++    const failures = failed.length === 0 ? [] : ['', '실패한 임계값', ...failed.map((entry) => `- ${entry}`)];
+ 
+-  return [`## k6 결과: ${verdict}`, '', ...table, ...failures, ''].join('\n');
+-}
++    return [`## k6 결과: ${failed.length === 0 ? '통과' : '실패'}`, '', ...table, ...failures, ''].join('\n');
++  }
+ 
+-export function handleSummary(data: SummaryData): Record<string, string> {
+-  const directory = __ENV.SUMMARY_DIR ?? '.';
+-  const markdown = toMarkdown(data);
++  // handleSummary()의 반환값. 파일 경로를 키로 쓰고, stdout에는 같은 판정표를 출력한다.
++  files(directory: string): Record<string, string> {
++    const markdown = this.toMarkdown();
++    return {
++      [`${directory}/summary.json`]: JSON.stringify(this.data, null, 2),
++      [`${directory}/report.md`]: markdown,
++      stdout: markdown,
++    };
++  }
+ 
+-  return {
+-    [`${directory}/summary.json`]: JSON.stringify(data, null, 2),
+-    [`${directory}/report.md`]: markdown,
+-    stdout: markdown,
+-  };
++  private value(metric: string, stat: string): number | undefined {
++    return this.data.metrics?.[metric]?.values?.[stat];
++  }
++
++  private format(number: number | undefined, digits = 2): string {
++    return number === undefined ? '-' : number.toFixed(digits);
++  }
+ }
+diff --git a/Infra/k6/src/token.ts b/Infra/k6/src/token.ts
+index 0171d24d7a11474d99505e43a814b56e0901e763..ab484452df5fbd53ba82b369dafd991204516d88 100644
+--- a/Infra/k6/src/token.ts
++++ b/Infra/k6/src/token.ts
+@@ -1,33 +1,34 @@
+ import { hmac } from 'k6/crypto';
+ import { b64encode } from 'k6/encoding';
+-import { config } from './config.ts';
++import type { Environment } from './environment.ts';
+ 
+-// 부하 테스트 전용 사용자 ID 대역. 이 값 이상의 owner_id는 정리 SQL이 테스트 데이터로 본다.
+-export const LOAD_TEST_USER_ID_BASE = 900_000_000;
++// 서버(BibbidiTokenIssuer)가 만드는 Access Token과 같은 클레임을 같은 시크릿(UTF-8 바이트)으로 서명한다.
++export class AccessTokenIssuer {
++  constructor(private readonly environment: Environment) {}
+ 
+-function base64Url(input: string | ArrayBuffer): string {
+-  return b64encode(input, 'rawurl');
+-}
++  issue(userId: number): string {
++    const issuedAt = Math.floor(Date.now() / 1000);
++    const header = { alg: 'HS256', typ: 'JWT' };
++    const payload = {
++      jti: `${userId}-${issuedAt}-${Math.random().toString(36).slice(2)}`,
++      iss: this.environment.jwtIssuer,
++      aud: [this.environment.jwtAudience],
++      sub: String(userId),
++      iat: issuedAt,
++      exp: issuedAt + this.environment.tokenLifetimeSeconds,
++      category: 'ACCESS',
++      status: 'ACTIVE',
++      role: 'NORMAL',
++      nickname: `k6-${userId}`,
++      email: `k6-${userId}@loadtest.invalid`,
++    };
+ 
+-// 서버(BibbidiTokenIssuer)가 만드는 Access Token과 같은 클레임을 같은 시크릿(UTF-8 바이트)으로 서명한다.
+-export function signAccessToken(userId: number): string {
+-  const issuedAt = Math.floor(Date.now() / 1000);
+-  const header = { alg: 'HS256', typ: 'JWT' };
+-  const payload = {
+-    jti: `${userId}-${issuedAt}-${Math.random().toString(36).slice(2)}`,
+-    iss: config.jwtIssuer,
+-    aud: [config.jwtAudience],
+-    sub: String(userId),
+-    iat: issuedAt,
+-    exp: issuedAt + config.tokenLifetimeSeconds,
+-    category: 'ACCESS',
+-    status: 'ACTIVE',
+-    role: 'NORMAL',
+-    nickname: `k6-${userId}`,
+-    email: `k6-${userId}@loadtest.invalid`,
+-  };
++    const signingInput = `${this.encode(JSON.stringify(header))}.${this.encode(JSON.stringify(payload))}`;
++    const signature = hmac('sha256', this.environment.jwtSecret, signingInput, 'binary');
++    return `${signingInput}.${this.encode(signature)}`;
++  }
+ 
+-  const signingInput = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(payload))}`;
+-  const signature = hmac('sha256', config.jwtSecret, signingInput, 'binary');
+-  return `${signingInput}.${base64Url(signature)}`;
++  private encode(input: string | ArrayBuffer): string {
++    return b64encode(input, 'rawurl');
++  }
+ }
+diff --git a/Infra/k6/src/users.ts b/Infra/k6/src/users.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..792e0ab0c34ab3e2dfc3f29e5ae529db079198e2
+--- /dev/null
++++ b/Infra/k6/src/users.ts
+@@ -0,0 +1,63 @@
++import type { ApiFactory } from './api.ts';
++
++// 부하 테스트 전용 사용자 ID 대역. 이 값 이상의 owner_id는 정리 SQL이 테스트 데이터로 본다.
++const LOAD_TEST_USER_ID_BASE = 900_000_000;
++const NEW_USER_ID_OFFSET = 100_000_000_000;
++const IDS_PER_RUN = 100_000;
++
++export class UserIds {
++  // 재방문 사용자 풀의 ID. 회차와 관계없이 같은 사용자를 가리킨다.
++  static pooled(index: number): number {
++    return LOAD_TEST_USER_ID_BASE + 1 + index;
++  }
++
++  // 신규 사용자 ID. 회차(runId)마다 대역이 달라 이전 회차 데이터와 부딪히지 않는다.
++  static fresh(runId: number, iteration: number): number {
++    return LOAD_TEST_USER_ID_BASE + NEW_USER_ID_OFFSET + runId * IDS_PER_RUN + iteration;
++  }
++}
++
++export interface PooledUser {
++  userId: number;
++  appointmentId: number;
++}
++
++export function pickRandom(ids: readonly number[], count: number): number[] {
++  const candidates = [...ids];
++  const picked: number[] = [];
++  while (picked.length < count && candidates.length > 0) {
++    picked.push(candidates.splice(Math.floor(Math.random() * candidates.length), 1)[0]);
++  }
++  return picked;
++}
++
++// 재방문 사용자는 이미 체크리스트와 일정이 있는 고정 풀로 준비한다.
++export class ReturningUserPool {
++  constructor(
++    private readonly apis: ApiFactory,
++    private readonly size: number,
++  ) {}
++
++  // 데이터가 이미 있으면 그대로 쓰고 없을 때만 만든다. 같은 서버에 다시 실행해도 데이터가 불어나지 않는다.
++  prepare(catalogItemIds: number[]): PooledUser[] {
++    return Array.from({ length: this.size }, (_, index) => this.prepareOne(UserIds.pooled(index), catalogItemIds));
++  }
++
++  private prepareOne(userId: number, catalogItemIds: number[]): PooledUser {
++    const api = this.apis.forUser(userId);
++    let checklist = api.findChecklist();
++
++    if (checklist === null) {
++      api.createChecklist();
++      api.addCatalogItems(pickRandom(catalogItemIds, 3));
++      checklist = api.findChecklist();
++    }
++    if (checklist === null || checklist.items.length === 0) {
++      throw new Error(`재방문 사용자 ${userId}의 체크리스트를 준비하지 못했습니다.`);
++    }
++
++    const item = checklist.items[0];
++    const appointmentId = item.appointments[0]?.id ?? api.createAppointment(item.id, 1);
++    return { userId, appointmentId };
++  }
++}

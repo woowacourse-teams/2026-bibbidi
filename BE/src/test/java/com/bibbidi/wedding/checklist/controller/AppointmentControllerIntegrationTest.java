@@ -31,7 +31,7 @@ import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@Sql("/appointment-fixture.sql")
+@Sql("/fixtures/appointment-fixture.sql")
 class AppointmentControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final Long USER_ID = 1L;

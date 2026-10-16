@@ -1,14 +1,14 @@
 package com.bibbidi.wedding.auth.service;
 
+import com.bibbidi.wedding.auth.config.properties.SessionProperties;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.RefreshSession;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+import com.bibbidi.wedding.auth.service.dto.IssuedSession;
+import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
 import com.bibbidi.wedding.auth.token.IssuedRefreshToken;
-import com.bibbidi.wedding.auth.config.SessionProperties;
-import com.bibbidi.wedding.auth.service.dto.IssuedSession;
-import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import java.time.LocalDateTime;
 import java.util.UUID;

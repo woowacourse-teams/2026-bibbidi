@@ -1,0 +1,11 @@
+{
+  "name": "scenario20",
+  "metrics": [
+    "Helpfulness",
+    "Relevance"
+  ],
+  "userMessage": "상견례 장소는 예약했지만 양가 이동이 걱정돼요. 다음으로 할 준비 항목을 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "'상견례 교통·숙박 준비'를 추천하고 이동 방식 확인 같은 실천 이유를 짧게 제시한다.",
+  "expectedRefusal": "none"
+}

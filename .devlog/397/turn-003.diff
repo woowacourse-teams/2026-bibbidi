@@ -1,0 +1,12 @@
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index ca51e0b035c1e6b9d2b2268d162c1b578f5ff47d..5297d3b70b4d47f840fa29114bb022542f1cc824 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -1,6 +1,7 @@
+ packages:
+   - APP
+   - FE
++  - .github/ai-review
+   - packages/*
+ 
+ nodeLinker: hoisted

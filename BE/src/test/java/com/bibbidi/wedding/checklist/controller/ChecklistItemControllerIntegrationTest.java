@@ -28,7 +28,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlMergeMode;
 import tools.jackson.databind.ObjectMapper;
 
-@Sql("/checklist-item-fixture.sql")
+@Sql("/fixtures/checklist-item-fixture.sql")
 @SqlMergeMode(SqlMergeMode.MergeMode.MERGE)
 class ChecklistItemControllerIntegrationTest extends BibbidiIntegrationTest {
 

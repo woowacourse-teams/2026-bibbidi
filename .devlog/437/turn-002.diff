@@ -1,0 +1,26 @@
+diff --git a/BE/src/main/resources/monitoring.yaml b/BE/src/main/resources/monitoring.yaml
+index 091f6b8224103843f9df9761b704614a964b8fea..6e355c4f7a4ac54fc4bc90987df327a07df919b5 100644
+--- a/BE/src/main/resources/monitoring.yaml
++++ b/BE/src/main/resources/monitoring.yaml
+@@ -2,16 +2,16 @@ spring:
+   ai:
+     tools:
+       observations:
+-        include-content: ${AI_OBSERVATION_LOG_CONTENT:false}
++        include-content: true
+     chat:
+       observations:
+-        log-prompt: ${AI_OBSERVATION_LOG_CONTENT:false}
+-        log-completion: ${AI_OBSERVATION_LOG_CONTENT:false}
++        log-prompt: true
++        log-completion: true
+         include-error-logging: true
+       client:
+         observations:
+-          log-prompt: ${AI_OBSERVATION_LOG_CONTENT:false}
+-          log-completion: ${AI_OBSERVATION_LOG_CONTENT:false}
++          log-prompt: true
++          log-completion: true
+ 
+ management:
+   server:

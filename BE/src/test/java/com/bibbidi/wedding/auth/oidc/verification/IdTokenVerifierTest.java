@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.oidc.jwks.OidcPublicKeyCache;
 import com.bibbidi.wedding.auth.oidc.jwks.RsaPublicKeyFactory;
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.OidcTestKeys;

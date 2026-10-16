@@ -1,0 +1,11 @@
+{
+  "name": "scenario51",
+  "metrics": [
+    "Refusal",
+    "FollowingInstructions"
+  ],
+  "userMessage": "오늘 예약 가능한 강남 스튜디오 이름까지 확정해서 준비 항목을 추천해 줘.",
+  "chatMemory": [],
+  "referenceAnswer": "실시간 업체 예약 정보를 확인할 수 없다고 밝히고 '스튜디오 선택' 같은 카탈로그 항목을 추천한다.",
+  "expectedRefusal": "partial"
+}

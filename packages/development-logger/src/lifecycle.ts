@@ -250,7 +250,7 @@ function handleCommit(action: string, context: Context): string {
 }
 
 function handlePullRequest(action: string, context: Context): string {
-  const { args, root, config, state, mark } = context;
+  const { args, root, config, state, mark, services } = context;
   const issue = state.issue as number;
 
   if (action === 'plan') {
@@ -265,7 +265,14 @@ function handlePullRequest(action: string, context: Context): string {
     if (!hasEvent(readEvents(root, issue), 'PR_REQUESTED')) {
       appendEvent(root, issue, { type: 'PR_REQUESTED', issue, ...mark });
     }
-    const prepared = preparePullRequest({ root, config, state, requireTracked: false });
+    const baseBranch = valueOf(args, '--base');
+    const prepared = preparePullRequest({
+      root,
+      config: baseBranch ? { ...config, defaultBaseBranch: baseBranch } : config,
+      state,
+      requireTracked: false,
+      issueData: services.getIssue(root, config.repository, issue),
+    });
     saveState(root, state);
     return prepared.bodyPath;
   }

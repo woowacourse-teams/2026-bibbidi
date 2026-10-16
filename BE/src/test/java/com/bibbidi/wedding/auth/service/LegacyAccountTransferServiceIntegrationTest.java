@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@Sql("/legacy-account-fixture.sql")
+@Sql("/fixtures/legacy-account-fixture.sql")
 class LegacyAccountTransferServiceIntegrationTest {
 
     private static final String LEGACY_NICKNAME = "기존회원";
@@ -90,7 +90,7 @@ class LegacyAccountTransferServiceIntegrationTest {
     }
 
     @Test
-    @Sql({"/legacy-account-fixture.sql", "/terms-fixture.sql"})
+    @Sql({"/fixtures/legacy-account-fixture.sql", "/fixtures/terms-fixture.sql"})
     @DisplayName("옮기면 소셜 회원으로 동의한 약관이 기존 회원의 동의로 옮겨진다")
     void shouldMoveTermsAgreementToLegacyUser() {
         PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();

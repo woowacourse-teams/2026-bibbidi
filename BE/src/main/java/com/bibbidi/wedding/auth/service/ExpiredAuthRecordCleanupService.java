@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.service;
 
-import com.bibbidi.wedding.auth.config.AuthCleanupProperties;
+import com.bibbidi.wedding.auth.config.properties.AuthCleanupProperties;
 import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
 import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;

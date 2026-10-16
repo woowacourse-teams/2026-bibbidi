@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.context.jdbc.Sql;
 
-@Sql("/catalog-fixture.sql")
+@Sql("/fixtures/catalog-fixture.sql")
 class CatalogControllerIntegrationTest extends BibbidiIntegrationTest {
 
     private static final long WEDDING_HALL_CATEGORY_ID = 2L;

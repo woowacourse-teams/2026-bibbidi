@@ -417,6 +417,53 @@ test('GitHub MCP로 PR을 만들면 gh pr create를 쓰도록 막는다', () => 
   }
 });
 
+test('APP PR은 명시한 base를 기준으로 검증하고 기본 base는 유지한다', () => {
+  const root = setupRepository();
+  const session = 'app-pr-base-session';
+  const issue = { ...issueWithoutAdr(), labels: [{ name: 'type: chore' }] };
+  const options = { agent: 'claude', cwd: root, services: { getIssue: () => issue } };
+  try {
+    const config = JSON.parse(readFileSync(join(root, '.devlogger.json'), 'utf8'));
+    config.pullRequestTemplate = 'pr-template.md';
+    config.validation = [{ key: 'be-test', paths: ['BE/'], commands: ['BE/gradlew test'] }];
+    writeFileSync(join(root, '.devlogger.json'), JSON.stringify(config));
+    writeFileSync(join(root, 'pr-template.md'), '## 관련 Issue\n');
+    run('git', ['add', '.'], { cwd: root });
+    run('git', ['commit', '-m', 'validation setup'], { cwd: root });
+    run('git', ['checkout', '-b', 'dev-app'], { cwd: root });
+    mkdirSync(join(root, 'BE'));
+    writeFileSync(join(root, 'BE', 'existing.txt'), 'already integrated\n');
+    run('git', ['add', '.'], { cwd: root });
+    run('git', ['commit', '-m', 'existing BE change'], { cwd: root });
+    run('git', ['checkout', '-b', 'chore/106'], { cwd: root });
+
+    startSession(options, session);
+    preToolUse(options, session, 'Edit', { file_path: 'tracked.txt' });
+    writeFileSync(join(root, 'tracked.txt'), 'APP work\n');
+    stop(options, session, '1');
+    runLifecycle(['commit', 'explain', '--session', session, '--text', 'APP work'], root, options.services);
+    prompt(options, session, '2', '커밋해');
+    runLifecycle(['commit', 'confirm', '--session', session], root, options.services);
+    run('git', ['add', '.'], { cwd: root });
+    run('git', ['commit', '-m', 'APP work with log'], { cwd: root });
+    runLifecycle(['pr', 'plan', '--session', session, '--summary', 'APP work'], root, options.services);
+
+    const fallback = preToolUse(options, session, 'Bash', { command: 'gh pr create' });
+    assert.equal(fallback.permissionDecision, 'deny');
+    assert.match(String(fallback.permissionDecisionReason), /be-test/);
+    for (const baseOption of ['--base dev-app', '-B dev-app']) {
+      const allowed = preToolUse(options, session, 'Bash', { command: `gh pr create ${baseOption}` });
+      assert.equal(allowed.permissionDecision, 'allow');
+    }
+    assert.throws(() => runLifecycle(['pr', 'prepare', '--session', session], root, options.services), /be-test/);
+    const bodyPath = runLifecycle(['pr', 'prepare', '--session', session, '--base', 'dev-app'], root, options.services);
+    assert.match(String(bodyPath), /pr-body-106\.md$/);
+    assert.equal(JSON.parse(readFileSync(join(root, '.devlogger.json'), 'utf8')).defaultBaseBranch, 'release-be');
+  } finally {
+    removeDirectory(root);
+  }
+});
+
 test('Agent의 Issue 생성은 Type Label을 정확히 하나 요구한다', () => {
   const root = setupRepository();
   const options = { agent: 'codex', cwd: root };

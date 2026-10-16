@@ -1,0 +1,114 @@
+diff --git a/BE/src/main/resources/application.yaml b/BE/src/main/resources/application.yaml
+index f5743ade1085dcc0e926ef97c9e7f791e8449fc2..0e5fa9f5434d4b4a08671b9a61024c810ca586c3 100644
+--- a/BE/src/main/resources/application.yaml
++++ b/BE/src/main/resources/application.yaml
+@@ -1,4 +1,6 @@
+ spring:
++  config:
++    import: classpath:monitoring.yaml
+   application:
+     name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+   lifecycle:
+@@ -131,41 +133,3 @@ auth:
+       - /actuator/prometheus
+       - /swagger-ui/**
+       - /docs/**
+-
+-management:
+-  server:
+-    port: 8081
+-  endpoints:
+-    web:
+-      exposure:
+-        include: health,info,prometheus
+-  endpoint:
+-    health:
+-      probes:
+-        enabled: true
+-  metrics:
+-    tags:
+-      service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+-      deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
+-  tracing:
+-    sampling:
+-      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+-  opentelemetry:
+-    tracing:
+-      export:
+-        otlp:
+-          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}/v1/traces
+-  otlp:
+-    metrics:
+-      export:
+-        enabled: false
+-  logging:
+-    export:
+-      otlp:
+-        enabled: false
+-
+-logging:
+-  structured:
+-    format:
+-      console: ecs
+-  include-application-name: false
+diff --git a/BE/src/main/resources/monitoring.yaml b/BE/src/main/resources/monitoring.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..091f6b8224103843f9df9761b704614a964b8fea
+--- /dev/null
++++ b/BE/src/main/resources/monitoring.yaml
+@@ -0,0 +1,55 @@
++spring:
++  ai:
++    tools:
++      observations:
++        include-content: ${AI_OBSERVATION_LOG_CONTENT:false}
++    chat:
++      observations:
++        log-prompt: ${AI_OBSERVATION_LOG_CONTENT:false}
++        log-completion: ${AI_OBSERVATION_LOG_CONTENT:false}
++        include-error-logging: true
++      client:
++        observations:
++          log-prompt: ${AI_OBSERVATION_LOG_CONTENT:false}
++          log-completion: ${AI_OBSERVATION_LOG_CONTENT:false}
++
++management:
++  server:
++    port: 8081
++  endpoints:
++    web:
++      exposure:
++        include: health,info,prometheus
++  endpoint:
++    health:
++      probes:
++        enabled: true
++  observations:
++    enable:
++      db.vector.client.operation: false
++  metrics:
++    tags:
++      service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
++      deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
++  tracing:
++    sampling:
++      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
++  opentelemetry:
++    tracing:
++      export:
++        otlp:
++          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}/v1/traces
++  otlp:
++    metrics:
++      export:
++        enabled: false
++  logging:
++    export:
++      otlp:
++        enabled: false
++
++logging:
++  structured:
++    format:
++      console: ecs
++  include-application-name: false

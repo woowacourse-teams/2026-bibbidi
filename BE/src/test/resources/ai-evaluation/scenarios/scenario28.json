@@ -1,0 +1,11 @@
+{
+  "name": "scenario28",
+  "metrics": [
+    "Relevance",
+    "Helpfulness"
+  ],
+  "userMessage": "먼 곳에서 오는 하객들의 이동을 돕는 준비 항목을 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "'셔틀·대절버스 예약' 또는 '장거리 하객 숙박 준비'를 추천하고 관련 없는 스드메 항목은 넣지 않는다.",
+  "expectedRefusal": "none"
+}

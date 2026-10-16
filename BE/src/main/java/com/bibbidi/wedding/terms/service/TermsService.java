@@ -8,6 +8,7 @@ import com.bibbidi.wedding.terms.repository.TermsRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,7 +82,7 @@ public class TermsService {
     }
 
     private void validateAllRequiredAgreed(Long userId, List<Terms> agreedTerms) {
-        Set<Long> agreedIds = agreedTerms.stream().map(Terms::id).collect(java.util.stream.Collectors.toSet());
+        Set<Long> agreedIds = agreedTerms.stream().map(Terms::id).collect(Collectors.toSet());
         List<Terms> notAgreed = termsRepository.findAllRequired().stream()
                 .filter(required -> !agreedIds.contains(required.id()))
                 .toList();

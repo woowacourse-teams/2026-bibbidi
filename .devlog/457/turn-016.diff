@@ -1,0 +1,108 @@
+diff --git a/Infra/k6/smoke-test.ts b/Infra/k6/smoke-test.ts
+index 591e649ce86c466b6dfa05e471c265246bfbda2f..e1a9828d5fcaebc1c8933d12db37280fcbfcca81 100644
+--- a/Infra/k6/smoke-test.ts
++++ b/Infra/k6/smoke-test.ts
+@@ -3,31 +3,26 @@ import { ApiFactory } from './src/api.ts';
+ import { Environment, numberFromEnv, textFromEnv } from './src/environment.ts';
+ import { HttpClient } from './src/http.ts';
+ import { LoadTest } from './src/load-test.ts';
+-import { NewUserSession, ReturningUserSession, SessionMix, type SetupData } from './src/session.ts';
++import { NewUserSession, ReturningUserSession, SessionSequence, type SetupData } from './src/session.ts';
+ import { SummaryReport, type SummaryData } from './src/summary.ts';
+ import { AccessTokenIssuer } from './src/token.ts';
+ 
+ const environment = Environment.fromEnv();
+ 
+-// 신규:재방문 = 3:7
+-const mix = new SessionMix([
+-  { session: new NewUserSession(), weight: 3 },
+-  { session: new ReturningUserSession(), weight: 7 },
+-]);
++// 신규와 재방문 세션을 번갈아 실행해 두 흐름이 모두 끝까지 지나가는지 본다.
++const sessions = new SessionSequence([new NewUserSession(), new ReturningUserSession()]);
+ 
+ const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
+-const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 10));
++const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 2));
+ 
+-// Smoke는 경로가 끝까지 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
++// Smoke는 부하를 주지 않고 경로가 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
+ export const options: Options = {
+   scenarios: {
+     smoke: {
+-      executor: 'constant-arrival-rate',
+-      rate: numberFromEnv('RATE', 1),
+-      timeUnit: '1s',
+-      duration: textFromEnv('DURATION', '1m'),
+-      preAllocatedVUs: 5,
+-      maxVUs: 20,
++      executor: 'shared-iterations',
++      vus: 1,
++      iterations: numberFromEnv('ITERATIONS', 4),
++      maxDuration: textFromEnv('MAX_DURATION', '2m'),
+     },
+   },
+   thresholds: {
+diff --git a/Infra/k6/src/load-test.ts b/Infra/k6/src/load-test.ts
+index bf6695a63547be0362ca6c93a8a2028c0d3f3325..99b7fc2a40c8f3e9e6d51a4877604694cea7e64e 100644
+--- a/Infra/k6/src/load-test.ts
++++ b/Infra/k6/src/load-test.ts
+@@ -1,6 +1,6 @@
+ import exec from 'k6/execution';
+ import type { ApiFactory } from './api.ts';
+-import type { SessionMix, SetupData } from './session.ts';
++import type { SessionSelector, SetupData } from './session.ts';
+ import { UserIds, ReturningUserPool } from './users.ts';
+ 
+ // 테스트 종류와 관계없는 실행 틀. setup()에서 데이터를 준비하고, 반복마다 세션 하나를 골라 실행한다.
+@@ -10,7 +10,7 @@ export class LoadTest {
+ 
+   constructor(
+     private readonly apis: ApiFactory,
+-    private readonly mix: SessionMix,
++    private readonly selector: SessionSelector,
+     poolSize: number,
+   ) {
+     this.pool = new ReturningUserPool(apis, poolSize);
+@@ -26,6 +26,7 @@ export class LoadTest {
+   }
+ 
+   run(data: SetupData): void {
+-    this.mix.pick().run({ data, iteration: exec.scenario.iterationInTest, apis: this.apis });
++    const iteration = exec.scenario.iterationInTest;
++    this.selector.pick(iteration).run({ data, iteration, apis: this.apis });
+   }
+ }
+diff --git a/Infra/k6/src/session.ts b/Infra/k6/src/session.ts
+index 1453792e44da3a7bd3d8f345a22d024d2a9c2a68..21663ebc3c4d24ac0408b1f2b506ab7338633219 100644
+--- a/Infra/k6/src/session.ts
++++ b/Infra/k6/src/session.ts
+@@ -44,13 +44,27 @@ export class ReturningUserSession implements Session {
+   }
+ }
+ 
++// 반복마다 어떤 세션을 실행할지 고르는 방식
++export interface SessionSelector {
++  pick(iteration: number): Session;
++}
++
++// 세션을 순서대로 돌려 가며 고른다. 모든 세션이 확실히 한 번씩 실행되어야 하는 Smoke에 쓴다.
++export class SessionSequence implements SessionSelector {
++  constructor(private readonly sessions: readonly Session[]) {}
++
++  pick(iteration: number): Session {
++    return this.sessions[iteration % this.sessions.length];
++  }
++}
++
+ export interface WeightedSession {
+   session: Session;
+   weight: number;
+ }
+ 
+ // 세션 종류를 가중치 비율로 섞는다. 예: 신규:재방문 3:7
+-export class SessionMix {
++export class SessionMix implements SessionSelector {
+   private readonly totalWeight: number;
+ 
+   constructor(private readonly entries: readonly WeightedSession[]) {

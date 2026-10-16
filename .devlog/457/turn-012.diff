@@ -1,0 +1,682 @@
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..e0e7321bb232281921169914e9ab81ffab2a5f58
+--- /dev/null
++++ b/.github/workflows/load-test.yml
+@@ -0,0 +1,112 @@
++name: 비비디 부하 테스트
++
++on:
++  workflow_dispatch:
++    inputs:
++      target:
++        description: 부하를 줄 환경
++        type: choice
++        options: [dev]
++        default: dev
++      script:
++        description: 실행할 k6 스크립트
++        type: choice
++        options: [smoke-test]
++        default: smoke-test
++  # 수동 실행 워크플로는 default 브랜치에 있어야 실행되므로, 머지 전 연결 검증용으로만 푸시에도 실행한다. 검증 뒤 제거한다.
++  push:
++    branches: [chore/457]
++    paths:
++      - "Infra/k6/**"
++      - ".github/workflows/load-test.yml"
++
++permissions:
++  contents: read
++
++# 같은 IP에서 나가는 부하가 겹치면 결과가 섞이므로 한 번에 하나만 실행한다.
++concurrency:
++  group: load-test
++  cancel-in-progress: false
++
++jobs:
++  k6:
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    environment: ${{ inputs.target == 'production' && 'backend-prod' || 'backend-dev' }}
++    env:
++      TARGET_LABEL: ${{ inputs.target == 'production' && 'prod-test' || 'dev-test' }}
++      SCRIPT: ${{ inputs.script || 'smoke-test' }}
++      REPORT_DIR: ${{ github.workspace }}/k6-report
++    steps:
++      - uses: actions/checkout@v7
++
++      - uses: grafana/setup-k6-action@v1
++        with:
++          k6-version: 2.2.0
++
++      # 배포가 쓰는 시크릿을 새로 만들지 않고 재사용한다. 덩어리 전체가 아니라 필요한 키만 꺼내 가린 뒤 환경 변수로 넘긴다.
++      - name: 기존 시크릿에서 필요한 값만 꺼내기
++        env:
++          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
++          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
++          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
++        run: |
++          set -euo pipefail
++          pick() {
++            printf '%s\n' "$1" \
++              | tr -d '\r' \
++              | sed -n -E "s/^(export )?$2=//p" \
++              | head -n 1 \
++              | sed -E "s/^(\"|')//; s/(\"|')$//"
++          }
++          jwt_secret="$(pick "$SPRING_ENV_CONTENT" AUTH_JWT_SECRET)"
++          server_name="$(pick "$NGINX_ENV_CONTENT" SERVER_NAME)"
++          ingest_token="$(pick "$ALLOY_ENV_CONTENT" MONITORING_INGEST_TOKEN)"
++          for secret in "$jwt_secret" "$ingest_token"; do
++            if [ -n "$secret" ]; then echo "::add-mask::$secret"; fi
++          done
++          test -n "$jwt_secret" || { echo "::error::BIBBIDI_SPRING_ENV에서 AUTH_JWT_SECRET을 찾지 못했습니다."; exit 1; }
++          test -n "$server_name" || { echo "::error::BIBBIDI_NGINX_ENV에서 SERVER_NAME을 찾지 못했습니다."; exit 1; }
++          test -n "$ingest_token" || { echo "::error::BIBBIDI_ALLOY_ENV에서 MONITORING_INGEST_TOKEN을 찾지 못했습니다."; exit 1; }
++          {
++            echo "AUTH_JWT_SECRET=$jwt_secret"
++            echo "BASE_URL=https://$server_name"
++            echo "K6_PROMETHEUS_RW_BEARER_TOKEN=$ingest_token"
++          } >> "$GITHUB_ENV"
++
++      - name: testid 정하기
++        run: echo "TEST_ID=${SCRIPT}-$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_ENV"
++
++      # 지표는 모니터링 서버로 보내고, 회차별 파일(summary.json, report.md, report.html)은 REPORT_DIR에 남긴다.
++      # url 태그는 보내지 않고 name 태그로만 집계해 시계열 수를 제한한다.
++      - name: k6 실행
++        env:
++          K6_NO_USAGE_REPORT: "true"
++          K6_SYSTEM_TAGS: proto,status,method,name,group,check,error,error_code,tls_version,scenario,expected_response
++          K6_PROMETHEUS_RW_SERVER_URL: https://monitoring.bibbidi.kr/prometheus/api/v1/write
++          K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
++          K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }}
++          K6_PROMETHEUS_RW_STALE_MARKERS: "true"
++          K6_WEB_DASHBOARD: "true"
++          K6_WEB_DASHBOARD_PORT: "-1"
++          K6_WEB_DASHBOARD_EXPORT: ${{ env.REPORT_DIR }}/report.html
++          SUMMARY_DIR: ${{ env.REPORT_DIR }}
++        run: |
++          mkdir -p "$REPORT_DIR"
++          k6 run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
++
++      - name: 잡 요약에 판정표 남기기
++        if: always()
++        run: |
++          if [ -f "$REPORT_DIR/report.md" ]; then
++            cat "$REPORT_DIR/report.md" >> "$GITHUB_STEP_SUMMARY"
++          fi
++
++      - name: 보고서 아티팩트 올리기
++        if: always()
++        uses: actions/upload-artifact@v7
++        with:
++          name: k6-${{ env.TEST_ID }}
++          path: ${{ env.REPORT_DIR }}
++          retention-days: 90
++          if-no-files-found: warn
+diff --git a/Infra/k6/package.json b/Infra/k6/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b0cdc7fd41e025cd7a0d72de427cd4bf7ae6281a
+--- /dev/null
++++ b/Infra/k6/package.json
+@@ -0,0 +1,13 @@
++{
++  "name": "@bibbidi/k6",
++  "version": "0.1.0",
++  "private": true,
++  "type": "module",
++  "scripts": {
++    "typecheck": "tsc --noEmit"
++  },
++  "devDependencies": {
++    "@types/k6": "2.2.0",
++    "typescript": "6.0.3"
++  }
++}
+diff --git a/Infra/k6/smoke-test.ts b/Infra/k6/smoke-test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..654e7305b9e75933438193ff263f0cca701f130b
+--- /dev/null
++++ b/Infra/k6/smoke-test.ts
+@@ -0,0 +1,55 @@
++import exec from 'k6/execution';
++import http from 'k6/http';
++import type { Options } from 'k6/options';
++import { config } from './src/config.ts';
++import {
++  isNewUserSession,
++  loadCatalogItemIds,
++  newUserSession,
++  poolUserId,
++  prepareReturningUser,
++  returningUserSession,
++  type SetupData,
++} from './src/session.ts';
++import { signAccessToken } from './src/token.ts';
++
++export { handleSummary } from './src/summary.ts';
++
++// 체크리스트 조회의 404(아직 데이터 없음)는 setup()이 예상하는 응답이라 실패로 세지 않는다.
++http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 404));
++
++// Smoke는 경로가 끝까지 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
++export const options: Options = {
++  scenarios: {
++    smoke: {
++      executor: 'constant-arrival-rate',
++      rate: config.rate,
++      timeUnit: '1s',
++      duration: config.duration,
++      preAllocatedVUs: 5,
++      maxVUs: 20,
++    },
++  },
++  thresholds: {
++    checks: ['rate==1'],
++    server_errors: ['count==0'],
++  },
++  summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
++};
++
++export function setup(): SetupData {
++  const catalogItemIds = loadCatalogItemIds(signAccessToken(poolUserId(0)));
++  const pool = Array.from({ length: config.poolSize }, (_, index) =>
++    prepareReturningUser(poolUserId(index), catalogItemIds),
++  );
++  return { runId: Math.floor(Date.now() / 1000), catalogItemIds, pool };
++}
++
++export default function (data: SetupData): void {
++  const iteration = exec.scenario.iterationInTest;
++  if (isNewUserSession()) {
++    newUserSession(data, iteration);
++  } else {
++    returningUserSession(data, iteration);
++  }
++}
+diff --git a/Infra/k6/src/api.ts b/Infra/k6/src/api.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee9735113f91724f940c3e0aa097617a6f1e3a1d
+--- /dev/null
++++ b/Infra/k6/src/api.ts
+@@ -0,0 +1,43 @@
++import { check } from 'k6';
++import http, { type RefinedResponse } from 'k6/http';
++import { Counter } from 'k6/metrics';
++import { config } from './config.ts';
++
++export const serverErrors = new Counter('server_errors');
++
++export interface RequestSpec {
++  // 지표의 name 태그. 경로 변수는 {id}처럼 묶어 시계열 수를 제한한다.
++  name: string;
++  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
++  path: string;
++  expected: number[];
++  body?: unknown;
++}
++
++export function call(token: string, spec: RequestSpec): RefinedResponse<'text'> {
++  const response = http.request(
++    spec.method,
++    `${config.baseUrl}${spec.path}`,
++    spec.body === undefined ? null : JSON.stringify(spec.body),
++    {
++      headers: {
++        Authorization: `Bearer ${token}`,
++        'Content-Type': 'application/json',
++      },
++      tags: { name: spec.name },
++    },
++  );
++
++  if (response.status >= 500) {
++    serverErrors.add(1);
++  }
++  check(response, {
++    [`${spec.name} -> ${spec.expected.join('|')}`]: (r) => spec.expected.includes(r.status),
++  });
++
++  return response;
++}
++
++export function jsonOf<T>(response: RefinedResponse<'text'>): T {
++  return response.json() as unknown as T;
++}
+diff --git a/Infra/k6/src/config.ts b/Infra/k6/src/config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b53050bafc3f009cb6e05dc99f4c3b6ddd90ea81
+--- /dev/null
++++ b/Infra/k6/src/config.ts
+@@ -0,0 +1,24 @@
++function required(name: string): string {
++  const value = __ENV[name];
++  if (!value) {
++    throw new Error(`환경 변수 ${name}가 필요합니다.`);
++  }
++  return value;
++}
++
++function numberOf(name: string, fallback: number): number {
++  const value = __ENV[name];
++  return value ? Number(value) : fallback;
++}
++
++export const config = {
++  baseUrl: required('BASE_URL').replace(/\/+$/, ''),
++  jwtSecret: required('AUTH_JWT_SECRET'),
++  jwtIssuer: __ENV.AUTH_JWT_ISSUER ?? 'bibbidi',
++  jwtAudience: __ENV.AUTH_JWT_AUDIENCE ?? 'bibbidi-client',
++  tokenLifetimeSeconds: numberOf('TOKEN_LIFETIME_SECONDS', 1800),
++  rate: numberOf('RATE', 1),
++  duration: __ENV.DURATION ?? '1m',
++  poolSize: numberOf('POOL_SIZE', 10),
++  newUserRatio: numberOf('NEW_USER_RATIO', 0.3),
++};
+diff --git a/Infra/k6/src/session.ts b/Infra/k6/src/session.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a8fb6593eff6e0e8a7e97cdff3106732670d6a
+--- /dev/null
++++ b/Infra/k6/src/session.ts
+@@ -0,0 +1,168 @@
++import { call, jsonOf } from './api.ts';
++import { config } from './config.ts';
++import { LOAD_TEST_USER_ID_BASE, signAccessToken } from './token.ts';
++
++interface CatalogResponse {
++  categories: { steps: { items: { id: number }[] }[] }[];
++}
++
++interface ChecklistResponse {
++  id: number;
++  items: { id: number; appointments: { id: number }[] }[];
++}
++
++interface AddCatalogItemsResponse {
++  items: { id: number }[];
++}
++
++interface AppointmentResponse {
++  id: number;
++}
++
++export interface PoolUser {
++  userId: number;
++  appointmentId: number;
++}
++
++export interface SetupData {
++  runId: number;
++  catalogItemIds: number[];
++  pool: PoolUser[];
++}
++
++// 재방문 사용자는 setup()이 미리 만든 고정 사용자 풀에서 고른다.
++export function poolUserId(index: number): number {
++  return LOAD_TEST_USER_ID_BASE + 1 + index;
++}
++
++// 신규 사용자는 회차마다 겹치지 않는 ID를 쓴다. 이전 회차 데이터와 부딪히지 않고 정리 대역(900000000 이상)에 들어간다.
++function newUserId(runId: number, iteration: number): number {
++  return LOAD_TEST_USER_ID_BASE + 100_000_000_000 + runId * 100_000 + iteration;
++}
++
++function pickRandom(ids: number[], count: number): number[] {
++  const pool = [...ids];
++  const picked: number[] = [];
++  while (picked.length < count && pool.length > 0) {
++    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
++  }
++  return picked;
++}
++
++function dateAfter(days: number): string {
++  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
++}
++
++export function loadCatalogItemIds(token: string): number[] {
++  const response = call(token, { name: 'GET /api/catalog', method: 'GET', path: '/api/catalog', expected: [200] });
++  return jsonOf<CatalogResponse>(response).categories.flatMap((category) =>
++    category.steps.flatMap((step) => step.items.map((item) => item.id)),
++  );
++}
++
++function createChecklist(token: string): void {
++  call(token, { name: 'POST /api/checklists', method: 'POST', path: '/api/checklists', expected: [201] });
++}
++
++function addCatalogItems(token: string, catalogItemIds: number[]): number[] {
++  const response = call(token, {
++    name: 'POST /api/checklists/me/catalog-items',
++    method: 'POST',
++    path: '/api/checklists/me/catalog-items',
++    body: catalogItemIds,
++    expected: [201],
++  });
++  return jsonOf<AddCatalogItemsResponse>(response).items.map((item) => item.id);
++}
++
++function createAppointment(token: string, checklistItemId: number, daysAfter: number): number {
++  const date = dateAfter(daysAfter);
++  const response = call(token, {
++    name: 'POST /api/checklist-items/{id}/appointments',
++    method: 'POST',
++    path: `/api/checklist-items/${checklistItemId}/appointments`,
++    body: {
++      title: '부하 테스트 일정',
++      date,
++      startTime: `${date}T10:00:00`,
++      endTime: `${date}T11:00:00`,
++      place: '부하 테스트 장소',
++      memo: 'k6',
++    },
++    expected: [201],
++  });
++  return jsonOf<AppointmentResponse>(response).id;
++}
++
++function findChecklist(token: string): ChecklistResponse | null {
++  const response = call(token, {
++    name: 'GET /api/checklists/me',
++    method: 'GET',
++    path: '/api/checklists/me',
++    expected: [200, 404],
++  });
++  return response.status === 200 ? jsonOf<ChecklistResponse>(response) : null;
++}
++
++// 홈 화면이 부르는 조회들.
++function visitHome(token: string): void {
++  const reads: [string, string][] = [
++    ['GET /api/checklists/me/progress', '/api/checklists/me/progress'],
++    ['GET /api/appointments/me/nearby', '/api/appointments/me/nearby?limit=6'],
++    ['GET /api/checklists/me/unscheduled-items', '/api/checklists/me/unscheduled-items?limit=4'],
++    ['GET /api/checklists/me/recommended-catalog-items', '/api/checklists/me/recommended-catalog-items?limit=4'],
++  ];
++  for (const [name, path] of reads) {
++    call(token, { name, method: 'GET', path, expected: [200] });
++  }
++}
++
++// 이미 데이터가 있으면 그대로 쓰고, 없을 때만 체크리스트와 일정을 만든다. 같은 서버에 다시 실행해도 데이터가 불어나지 않는다.
++export function prepareReturningUser(userId: number, catalogItemIds: number[]): PoolUser {
++  const token = signAccessToken(userId);
++  let checklist = findChecklist(token);
++
++  if (checklist === null) {
++    createChecklist(token);
++    addCatalogItems(token, pickRandom(catalogItemIds, 3));
++    checklist = findChecklist(token);
++  }
++  if (checklist === null || checklist.items.length === 0) {
++    throw new Error(`재방문 사용자 ${userId}의 체크리스트를 준비하지 못했습니다.`);
++  }
++
++  const item = checklist.items[0];
++  const appointmentId = item.appointments[0]?.id ?? createAppointment(token, item.id, 1);
++  return { userId, appointmentId };
++}
++
++// 신규 사용자: 둘러보기 → 체크리스트 담기 → 일정 잡기 → 홈
++export function newUserSession(data: SetupData, iteration: number): void {
++  const token = signAccessToken(newUserId(data.runId, iteration));
++
++  loadCatalogItemIds(token);
++  createChecklist(token);
++  const [firstItemId] = addCatalogItems(token, pickRandom(data.catalogItemIds, 3));
++  createAppointment(token, firstItemId, 1 + (iteration % 28));
++  visitHome(token);
++}
++
++// 재방문 사용자: 홈 → 진행하기
++export function returningUserSession(data: SetupData, iteration: number): void {
++  const user = data.pool[iteration % data.pool.length];
++  const token = signAccessToken(user.userId);
++
++  visitHome(token);
++  findChecklist(token);
++  call(token, {
++    name: 'PUT /api/appointments/{id}/complete',
++    method: 'PUT',
++    path: `/api/appointments/${user.appointmentId}/complete`,
++    body: iteration % 2 === 0,
++    expected: [200],
++  });
++}
++
++export function isNewUserSession(): boolean {
++  return Math.random() < config.newUserRatio;
++}
+diff --git a/Infra/k6/src/summary.ts b/Infra/k6/src/summary.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..62e152fc81147f88f9df71753734ceb31062fc5b
+--- /dev/null
++++ b/Infra/k6/src/summary.ts
+@@ -0,0 +1,72 @@
++interface ThresholdResult {
++  ok: boolean;
++}
++
++interface MetricSummary {
++  values?: Record<string, number>;
++  thresholds?: Record<string, ThresholdResult>;
++}
++
++export interface SummaryData {
++  metrics?: Record<string, MetricSummary>;
++  state?: { testRunDurationMs?: number };
++}
++
++function value(data: SummaryData, metric: string, stat: string): number | undefined {
++  return data.metrics?.[metric]?.values?.[stat];
++}
++
++function format(number: number | undefined, digits = 2): string {
++  return number === undefined ? '-' : number.toFixed(digits);
++}
++
++function failedThresholds(data: SummaryData): string[] {
++  const failed: string[] = [];
++  for (const [metric, summary] of Object.entries(data.metrics ?? {})) {
++    for (const [expression, result] of Object.entries(summary.thresholds ?? {})) {
++      if (!result.ok) {
++        failed.push(`${metric}: ${expression}`);
++      }
++    }
++  }
++  return failed;
++}
++
++// 깃허브 잡 요약에 그대로 보여 줄 판정표. 문서에 없는 키는 '-'로 두어 요약이 깨지지 않게 한다.
++export function toMarkdown(data: SummaryData): string {
++  const failed = failedThresholds(data);
++  const verdict = failed.length === 0 ? '통과' : '실패';
++  const durationSeconds = (data.state?.testRunDurationMs ?? 0) / 1000;
++
++  const rows: [string, string][] = [
++    ['판정', failed.length === 0 ? '✅ 통과' : '❌ 실패'],
++    ['실행 시간(초)', format(durationSeconds, 0)],
++    ['요청 수', format(value(data, 'http_reqs', 'count'), 0)],
++    ['요청/초', format(value(data, 'http_reqs', 'rate'))],
++    ['세션(반복) 수', format(value(data, 'iterations', 'count'), 0)],
++    ['체크 통과율', format(value(data, 'checks', 'rate'), 4)],
++    ['5xx 건수', format(value(data, 'server_errors', 'count') ?? 0, 0)],
++    ['응답 시간 avg(ms)', format(value(data, 'http_req_duration', 'avg'))],
++    ['응답 시간 p(95)(ms)', format(value(data, 'http_req_duration', 'p(95)'))],
++    ['응답 시간 p(99)(ms)', format(value(data, 'http_req_duration', 'p(99)'))],
++    ['응답 시간 max(ms)', format(value(data, 'http_req_duration', 'max'))],
++    ['누락된 반복(dropped_iterations)', format(value(data, 'dropped_iterations', 'count') ?? 0, 0)],
++  ];
++
++  const table = ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
++  const failures =
++    failed.length === 0 ? [] : ['', '실패한 임계값', ...failed.map((entry) => `- ${entry}`)];
++
++  return [`## k6 결과: ${verdict}`, '', ...table, ...failures, ''].join('\n');
++}
++
++export function handleSummary(data: SummaryData): Record<string, string> {
++  const directory = __ENV.SUMMARY_DIR ?? '.';
++  const markdown = toMarkdown(data);
++
++  return {
++    [`${directory}/summary.json`]: JSON.stringify(data, null, 2),
++    [`${directory}/report.md`]: markdown,
++    stdout: markdown,
++  };
++}
+diff --git a/Infra/k6/src/token.ts b/Infra/k6/src/token.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0171d24d7a11474d99505e43a814b56e0901e763
+--- /dev/null
++++ b/Infra/k6/src/token.ts
+@@ -0,0 +1,33 @@
++import { hmac } from 'k6/crypto';
++import { b64encode } from 'k6/encoding';
++import { config } from './config.ts';
++
++// 부하 테스트 전용 사용자 ID 대역. 이 값 이상의 owner_id는 정리 SQL이 테스트 데이터로 본다.
++export const LOAD_TEST_USER_ID_BASE = 900_000_000;
++
++function base64Url(input: string | ArrayBuffer): string {
++  return b64encode(input, 'rawurl');
++}
++
++// 서버(BibbidiTokenIssuer)가 만드는 Access Token과 같은 클레임을 같은 시크릿(UTF-8 바이트)으로 서명한다.
++export function signAccessToken(userId: number): string {
++  const issuedAt = Math.floor(Date.now() / 1000);
++  const header = { alg: 'HS256', typ: 'JWT' };
++  const payload = {
++    jti: `${userId}-${issuedAt}-${Math.random().toString(36).slice(2)}`,
++    iss: config.jwtIssuer,
++    aud: [config.jwtAudience],
++    sub: String(userId),
++    iat: issuedAt,
++    exp: issuedAt + config.tokenLifetimeSeconds,
++    category: 'ACCESS',
++    status: 'ACTIVE',
++    role: 'NORMAL',
++    nickname: `k6-${userId}`,
++    email: `k6-${userId}@loadtest.invalid`,
++  };
++
++  const signingInput = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(payload))}`;
++  const signature = hmac('sha256', config.jwtSecret, signingInput, 'binary');
++  return `${signingInput}.${base64Url(signature)}`;
++}
+diff --git a/Infra/k6/tsconfig.json b/Infra/k6/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a27752d4287b442504d66f520027108d04298b3b
+--- /dev/null
++++ b/Infra/k6/tsconfig.json
+@@ -0,0 +1,14 @@
++{
++  "compilerOptions": {
++    "target": "ES2020",
++    "module": "ESNext",
++    "moduleResolution": "Bundler",
++    "lib": ["ES2020"],
++    "types": ["k6"],
++    "strict": true,
++    "noEmit": true,
++    "allowImportingTsExtensions": true,
++    "skipLibCheck": true
++  },
++  "include": ["*.ts", "src/**/*.ts"]
++}
+diff --git a/Infra/monitoring/README.md b/Infra/monitoring/README.md
+index 739d76aec8be95ad9f3d9886373f3c9c0f19541c..8312bdf9fcb7bdb5bae8e2e5c33c89809f330980 100644
+--- a/Infra/monitoring/README.md
++++ b/Infra/monitoring/README.md
+@@ -34,6 +34,30 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
+ - 개발 환경 nginx는 요청 횟수와 동시 연결 제한을 적용하지 않는다. 운영 환경에는 기존 제한을 적용한다.
+ - Docker 로그는 컨테이너별 최대 10MB 파일 5개를 보관한다.
+ 
++## 부하 테스트 지표 (k6)
++
++부하 테스트 워크플로(`.github/workflows/load-test.yml`)가 k6 지표를 앱 지표와 같은 수집 경로(`/prometheus/api/v1/write`)로 보낸다. 별도 서버 설정은 필요 없다.
++
++- 인증은 Alloy와 같은 `MONITORING_INGEST_TOKEN`을 공유한다. 워크플로가 `BIBBIDI_ALLOY_ENV`에서 꺼내 쓰므로, 토큰을 교체하면 앱 수집과 부하 테스트가 함께 바뀐다.
++- 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
++- 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
++- 회차가 끝나면 stale marker로 시리즈가 바로 끝난다. 시계열은 Prometheus 보존 기간만큼만 남으므로 회차별 원본은 워크플로 아티팩트(`summary.json`, `report.md`, `report.html`, 90일)를 본다.
++
++수집 확인은 Prometheus에서 한다.
++
++```promql
++count by (testid, target) (k6_http_reqs_total)
++count({__name__=~"k6_.+"})
++```
++
++### 대시보드 가져오기 (수동)
++
++대시보드는 저장소에 두지 않고 Grafana 화면에서 관리하므로 처음 한 번 직접 가져온다.
++
++1. Grafana → Dashboards → New → Import → ID `19665`(k6 Prometheus) → Load.
++2. 데이터소스를 `Prometheus`(uid `prometheus`)로 고르고 Import한다.
++3. 상단 `testid` 변수에서 회차를 고르고 요청 수와 응답 시간이 그려지는지 확인한다. 패널이 비면 `k6_http_req_duration_p99` 같은 지표 이름과 패널 쿼리가 맞는지 확인하고 고친다.
++
+ ## 알림과 장애 대응
+ 
+ 알림 규칙, 정책, 연락처, 대시보드는 Grafana 화면에서 관리하며 저장소에 보관하지 않는다. 원본은 모니터링 서버의 `/var/lib/grafana/grafana.db` 하나뿐이므로 인스턴스를 잃으면 함께 사라진다. 필요하면 이 파일을 주기적으로 백업한다.
+@@ -155,6 +179,7 @@ CloudWatch 조회는 `GetMetricData` 요금이 든다(월 예산 70달러). Clou
+ - [ ] Grafana 연락처: Discord, `irm-critical`(Webhook → `bibbidi-grafana`). 각 연락처의 **Test** 버튼으로 수신 확인
+ - [ ] 알림 정책: `bibbidi-critical` → `irm-critical`, `bibbidi-warning` → Discord
+ - [ ] 알림 규칙 C1~C6, W1~W9 작성. 규칙마다 등급에 맞는 정책을 골랐는지 확인
++- [ ] Grafana에 k6 대시보드(19665) 가져오기와 `testid` 회차 선택 확인
+ - [ ] `/var/lib/grafana/grafana.db` 백업
+ - [ ] IRM 일정 `bibbidi-oncall`, `bibbidi-oncall-secondary`와 체인 `bibbidi-critical`(1차 → 15분 → 2차 → 15분 → 전원). 담당자마다 IRM 앱 설치와 전화번호 인증
+ - [ ] (예정) Grafana Cloud Synthetic Monitoring: `https://monitoring.bibbidi.kr/api/health`와 서비스 주소 HTTP 점검, 실패 알림을 IRM으로 연결
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index cf104c8082f6d6855d9544ffe4361bb2a13aa6fe..9613d61b505b823c4fb095ee6f3514a16e60de78 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -190,6 +190,15 @@ importers:
+         specifier: ^6.0.0
+         version: 6.0.0(supports-color@8.1.1)(webpack-cli@7.2.2)(webpack@5.109.2)
+ 
++  Infra/k6:
++    devDependencies:
++      '@types/k6':
++        specifier: 2.2.0
++        version: 2.2.0
++      typescript:
++        specifier: 6.0.3
++        version: 6.0.3
++
+   packages/development-logger:
+     devDependencies:
+       '@types/node':
+@@ -1677,6 +1686,9 @@ packages:
+   '@types/json5@0.0.29':
+     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
+ 
++  '@types/k6@2.2.0':
++    resolution: {integrity: sha512-wuHM+JLcpV0VL2G8ltu0N3ZDbbq1GHkP5ypeMzTZcFFqpN8ioV0DojxQFKvlbnVzuhgnY7Yy+Hhl8LzstdplhQ==}
++
+   '@types/node@24.9.2':
+     resolution: {integrity: sha512-uWN8YqxXxqFMX2RqGOrumsKeti4LlmIMIyV0lgut4jx7KQBcBiW6vkDtIBvHnHIquwNfJhk8v2OtmO8zXWHfPA==}
+ 
+@@ -7412,6 +7424,8 @@ snapshots:
+ 
+   '@types/json5@0.0.29': {}
+ 
++  '@types/k6@2.2.0': {}
++
+   '@types/node@24.9.2':
+     dependencies:
+       undici-types: 7.16.0
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 5297d3b70b4d47f840fa29114bb022542f1cc824..24c13ef9de7def6f471f10c771798bf6edfabc8d 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -2,6 +2,7 @@ packages:
+   - APP
+   - FE
+   - .github/ai-review
++  - Infra/k6
+   - packages/*
+ 
+ nodeLinker: hoisted

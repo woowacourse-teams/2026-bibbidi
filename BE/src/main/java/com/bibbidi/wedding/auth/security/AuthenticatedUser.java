@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.security;
 
-import com.bibbidi.wedding.auth.config.SecurityProperties;
+import com.bibbidi.wedding.auth.config.properties.SecurityProperties;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import java.util.Collection;

@@ -15,6 +15,8 @@
 
 적용 후 해당 서비스를 재시작하고 `systemctl status` 및 각 서비스 `/ready`(Grafana는 `/api/health`)를 확인한다. Loki 설정은 조회 결과 캐시를 사용한다.
 
+AI 대화 원문 로그(`ai.chat.content`)는 Alloy가 `log_type="ai_content"` 라벨을 붙이고, Loki는 이 스트림만 7일(`retention_stream`) 보관한다. 나머지 로그는 14일이다. 원문 마스킹은 아직 하지 않는다. 보관 기간을 바꾸려면 `loki.yaml`의 `retention_stream.period`를 고쳐 서버에 다시 설치한다.
+
 ## 모니터링 서버 서비스 설정
 
 systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리한다. 현재 값은 서버에서 `systemctl cat prometheus loki tempo grafana-server`로 확인한다.
@@ -31,6 +33,33 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
 - Spring 종료 대기 30초보다 Docker 종료 유예 40초를 길게 둔다.
 - 개발 환경 nginx는 요청 횟수와 동시 연결 제한을 적용하지 않는다. 운영 환경에는 기존 제한을 적용한다.
 - Docker 로그는 컨테이너별 최대 10MB 파일 5개를 보관한다.
+
+## 부하 테스트 지표 (k6)
+
+부하 테스트 워크플로(`.github/workflows/load-test.yml`)가 k6 지표를 앱 지표와 같은 수집 경로(`/prometheus/api/v1/write`)로 보낸다. 별도 서버 설정은 필요 없다.
+
+- 인증은 Alloy와 같은 `MONITORING_INGEST_TOKEN`을 공유한다. 워크플로가 `BIBBIDI_ALLOY_ENV`에서 꺼내 쓰므로, 토큰을 교체하면 앱 수집과 부하 테스트가 함께 바뀐다.
+- 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
+- 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
+- Breakpoint는 요청 지표에 윈도우 번호를 붙이지 않고, 윈도우별 보조 지표(`window_latency`, `window_server_error`, `window_requests`)에만 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 3종 × 윈도우 수만큼 늘어난다.
+- AI 채팅 테스트는 SSE를 받으려고 k6 커뮤니티 확장 `xk6-sse`(`k6/x/sse`)를 쓴다. 레지스트리에 k6 v2용 빌드가 없어 자동 제공을 쓰지 못하고, AI 스크립트를 실행할 때 워크플로가 `xk6`로 k6 `2.2.0`과 `xk6-sse v0.2.0`을 직접 빌드한다.
+- AI 채팅 Breakpoint는 `window_ai_completed`, `window_ai_server_error`, `window_ai_requests`, `window_ai_duration`, `window_ai_ttft`(첫 토큰 시간)에 같은 방식으로 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 5종 × 윈도우 수만큼 늘어난다.
+- 회차가 끝나면 stale marker로 시리즈가 바로 끝난다. 시계열은 Prometheus 보존 기간만큼만 남으므로 회차별 원본은 워크플로 아티팩트(`summary.json`, `report.md`, `report.html`, 90일)를 본다.
+
+수집 확인은 Prometheus에서 한다.
+
+```promql
+count by (testid, target) (k6_http_reqs_total)
+count({__name__=~"k6_.+"})
+```
+
+### 대시보드 가져오기 (수동)
+
+대시보드는 저장소에 두지 않고 Grafana 화면에서 관리하므로 처음 한 번 직접 가져온다.
+
+1. Grafana → Dashboards → New → Import → ID `19665`(k6 Prometheus) → Load.
+2. 데이터소스를 `Prometheus`(uid `prometheus`)로 고르고 Import한다.
+3. 상단 `testid` 변수에서 회차를 고르고 요청 수와 응답 시간이 그려지는지 확인한다. 패널이 비면 `k6_http_req_duration_p99` 같은 지표 이름과 패널 쿼리가 맞는지 확인하고 고친다.
 
 ## 알림과 장애 대응
 
@@ -153,6 +182,7 @@ CloudWatch 조회는 `GetMetricData` 요금이 든다(월 예산 70달러). Clou
 - [ ] Grafana 연락처: Discord, `irm-critical`(Webhook → `bibbidi-grafana`). 각 연락처의 **Test** 버튼으로 수신 확인
 - [ ] 알림 정책: `bibbidi-critical` → `irm-critical`, `bibbidi-warning` → Discord
 - [ ] 알림 규칙 C1~C6, W1~W9 작성. 규칙마다 등급에 맞는 정책을 골랐는지 확인
+- [ ] Grafana에 k6 대시보드(19665) 가져오기와 `testid` 회차 선택 확인
 - [ ] `/var/lib/grafana/grafana.db` 백업
 - [ ] IRM 일정 `bibbidi-oncall`, `bibbidi-oncall-secondary`와 체인 `bibbidi-critical`(1차 → 15분 → 2차 → 15분 → 전원). 담당자마다 IRM 앱 설치와 전화번호 인증
 - [ ] (예정) Grafana Cloud Synthetic Monitoring: `https://monitoring.bibbidi.kr/api/health`와 서비스 주소 HTTP 점검, 실패 알림을 IRM으로 연결

@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -157,7 +158,7 @@ class WithdrawalControllerIntegrationTest extends BibbidiIntegrationTest {
                         .content(objectMapper.writeValueAsString(
                                 new WithdrawalRequest(bibbidiTokenIssuer.issueDeleteGrantToken(userId)))))
                 .andExpect(status().isNoContent())
-                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")))
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")))
                 .andDo(document(
                         "users-withdraw",
                         resource(ResourceSnippetParameters.builder()

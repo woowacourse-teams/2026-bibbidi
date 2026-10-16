@@ -1,0 +1,22 @@
+diff --git a/Infra/nginx/nginx.conf.template b/Infra/nginx/nginx.conf.template
+index 447dede4067f951f0977cff6dbfd594cc35817f2..9e0ece79021db73f96e959d54c3efd61b9db9da6 100644
+--- a/Infra/nginx/nginx.conf.template
++++ b/Infra/nginx/nginx.conf.template
+@@ -120,7 +120,7 @@ http {
+         }
+ 
+         # AI chat streams SSE. Pass each event through without buffering, and wait
+-        # longer than the app's own 30s response timeout so its failure event arrives first.
++        # longer than the app's own 60s response timeout so its failure event arrives first.
+         location ^~ /api/ai/ {
+             ${NGINX_API_RATE_LIMIT}
+             ${NGINX_API_CONN_LIMIT}
+@@ -144,7 +144,7 @@ http {
+             proxy_cache off;
+             proxy_http_version 1.1;
+             proxy_set_header Connection "";
+-            proxy_read_timeout 60s;
++            proxy_read_timeout 75s;
+ 
+             proxy_pass http://backend:8080;
+             proxy_hide_header Access-Control-Allow-Origin;

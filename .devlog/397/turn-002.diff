@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/fe-ci.yml b/.github/workflows/fe-ci.yml
+index 1cb5c137072e980e645c809a9d516e2a56eef1c6..5e3d213b5e7f7f364c28b02afbd1285bf787effd 100644
+--- a/.github/workflows/fe-ci.yml
++++ b/.github/workflows/fe-ci.yml
+@@ -3,6 +3,7 @@ name: Frontend CI
+ on:
+   pull_request:
+     branches:
++      - dev-fe
+       - release-fe
+     paths:
+       - FE/**

@@ -20,8 +20,8 @@ import org.springframework.test.context.jdbc.Sql;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Sql("/checklist-catalog-fixture.sql")
-@Sql(scripts = "/checklist-catalog-cleanup.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Sql("/fixtures/checklist-catalog-fixture.sql")
+@Sql(scripts = "/fixtures/checklist-catalog-cleanup.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class ChecklistItemAdditionConcurrencyIntegrationTest {
 
     private static final Long OWNER_ID = 7L;

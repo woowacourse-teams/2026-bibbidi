@@ -1,0 +1,175 @@
+diff --git a/Infra/k6/smoke-test.ts b/Infra/k6/smoke-test.ts
+index e1a9828d5fcaebc1c8933d12db37280fcbfcca81..7a5fed323e983b12b41b01a2e8740f0e154e3f86 100644
+--- a/Infra/k6/smoke-test.ts
++++ b/Infra/k6/smoke-test.ts
+@@ -9,13 +9,11 @@ import { AccessTokenIssuer } from './src/token.ts';
+ 
+ const environment = Environment.fromEnv();
+ 
+-// 신규와 재방문 세션을 번갈아 실행해 두 흐름이 모두 끝까지 지나가는지 본다.
+ const sessions = new SessionSequence([new NewUserSession(), new ReturningUserSession()]);
+ 
+ const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
+ const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 2));
+ 
+-// Smoke는 부하를 주지 않고 경로가 동작하는지만 본다. 성공 기준은 모든 check 통과와 5xx 0건이고, 응답 시간 기준은 걸지 않는다.
+ export const options: Options = {
+   scenarios: {
+     smoke: {
+diff --git a/Infra/k6/src/api.ts b/Infra/k6/src/api.ts
+index 7b3ad7fe60aee9978e43afc3e3ffc42eda5363d5..2003e6c3a6c0fc1e77d524eaf0dd0d069684a466 100644
+--- a/Infra/k6/src/api.ts
++++ b/Infra/k6/src/api.ts
+@@ -18,7 +18,6 @@ interface AppointmentResponse {
+   id: number;
+ }
+ 
+-// 한 사용자의 Access Token으로 부르는 비비디 API. 엔드포인트 이름과 기대 응답을 한곳에 모은다.
+ export class BibbidiApi {
+   constructor(
+     private readonly client: HttpClient,
+@@ -76,7 +75,6 @@ export class BibbidiApi {
+     return (response.json() as unknown as AppointmentResponse).id;
+   }
+ 
+-  // 체크리스트가 아직 없으면 null. 없는 것은 오류가 아니라 정상 응답(404)이다.
+   findChecklist(): Checklist | null {
+     const response = this.client.send(this.token, {
+       name: 'GET /api/checklists/me',
+@@ -97,7 +95,6 @@ export class BibbidiApi {
+     });
+   }
+ 
+-  // 홈 화면이 부르는 조회들
+   visitHome(): void {
+     const reads: [string, string][] = [
+       ['GET /api/checklists/me/progress', '/api/checklists/me/progress'],
+diff --git a/Infra/k6/src/environment.ts b/Infra/k6/src/environment.ts
+index 8b598e80e36426303115e991be2188083e63dc7f..c5a2e0443712dc833dd43f18d01f2f543faefae9 100644
+--- a/Infra/k6/src/environment.ts
++++ b/Infra/k6/src/environment.ts
+@@ -15,7 +15,6 @@ export function textFromEnv(name: string, fallback: string): string {
+   return __ENV[name] ?? fallback;
+ }
+ 
+-// 서버 주소와 토큰 서명에 필요한 값. 테스트 종류와 관계없이 모든 스크립트가 같이 쓴다.
+ export class Environment {
+   private constructor(
+     readonly baseUrl: string,
+diff --git a/Infra/k6/src/http.ts b/Infra/k6/src/http.ts
+index 278f3b90b61a8bb875bf41278cb7f2041d51ecc9..78e725e17204359af5247468b406d4246378d7b1 100644
+--- a/Infra/k6/src/http.ts
++++ b/Infra/k6/src/http.ts
+@@ -5,16 +5,13 @@ import { Counter } from 'k6/metrics';
+ export const serverErrors = new Counter('server_errors');
+ 
+ export interface RequestSpec {
+-  // 지표의 name 태그. 경로 변수는 {id}처럼 묶어 시계열 수를 제한한다.
+   name: string;
+   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+   path: string;
+   body?: unknown;
+-  // 이 요청이 정상으로 보는 상태 코드
+   expected: readonly number[];
+ }
+ 
+-// 테스트마다 정상 응답의 기준이 다르다. 예: Spike는 요청 제한으로 429가 나와도 정상이다.
+ export interface ExpectationPolicy {
+   acceptable(spec: RequestSpec): number[];
+ }
+@@ -33,7 +30,6 @@ export class ExpectationWithExtras implements ExpectationPolicy {
+   }
+ }
+ 
+-// 요청마다 붙일 추가 태그. 예: Breakpoint가 현재 구간을 태그로 붙인다.
+ export type TagProvider = () => Record<string, string>;
+ 
+ export class HttpClient {
+diff --git a/Infra/k6/src/load-test.ts b/Infra/k6/src/load-test.ts
+index 99b7fc2a40c8f3e9e6d51a4877604694cea7e64e..c2a531b3889971cb1e67a8c19003d201340e096f 100644
+--- a/Infra/k6/src/load-test.ts
++++ b/Infra/k6/src/load-test.ts
+@@ -3,8 +3,6 @@ import type { ApiFactory } from './api.ts';
+ import type { SessionSelector, SetupData } from './session.ts';
+ import { UserIds, ReturningUserPool } from './users.ts';
+ 
+-// 테스트 종류와 관계없는 실행 틀. setup()에서 데이터를 준비하고, 반복마다 세션 하나를 골라 실행한다.
+-// 도착률, 임계값, 세션 구성은 각 테스트 파일이 정한다.
+ export class LoadTest {
+   private readonly pool: ReturningUserPool;
+ 
+diff --git a/Infra/k6/src/session.ts b/Infra/k6/src/session.ts
+index 21663ebc3c4d24ac0408b1f2b506ab7338633219..026818d6e2837e83728f9d9b1aaefd3717c43304 100644
+--- a/Infra/k6/src/session.ts
++++ b/Infra/k6/src/session.ts
+@@ -1,7 +1,6 @@
+ import type { ApiFactory } from './api.ts';
+ import { pickRandom, UserIds, type PooledUser } from './users.ts';
+ 
+-// setup()이 만들어 모든 가상 사용자에게 나눠 주는 데이터. JSON으로 전달되므로 일반 객체만 담는다.
+ export interface SetupData {
+   runId: number;
+   catalogItemIds: number[];
+@@ -14,12 +13,10 @@ export interface SessionContext {
+   apis: ApiFactory;
+ }
+ 
+-// 사용 흐름도의 한 갈래를 사용자 한 명이 끝까지 지나가는 단위
+ export interface Session {
+   run(context: SessionContext): void;
+ }
+ 
+-// 신규 사용자: 둘러보기 → 체크리스트 담기 → 일정 잡기 → 홈
+ export class NewUserSession implements Session {
+   run({ data, iteration, apis }: SessionContext): void {
+     const api = apis.forUser(UserIds.fresh(data.runId, iteration));
+@@ -32,7 +29,6 @@ export class NewUserSession implements Session {
+   }
+ }
+ 
+-// 재방문 사용자: 홈 → 진행하기
+ export class ReturningUserSession implements Session {
+   run({ data, iteration, apis }: SessionContext): void {
+     const user = data.pool[iteration % data.pool.length];
+@@ -44,12 +40,10 @@ export class ReturningUserSession implements Session {
+   }
+ }
+ 
+-// 반복마다 어떤 세션을 실행할지 고르는 방식
+ export interface SessionSelector {
+   pick(iteration: number): Session;
+ }
+ 
+-// 세션을 순서대로 돌려 가며 고른다. 모든 세션이 확실히 한 번씩 실행되어야 하는 Smoke에 쓴다.
+ export class SessionSequence implements SessionSelector {
+   constructor(private readonly sessions: readonly Session[]) {}
+ 
+@@ -63,7 +57,6 @@ export interface WeightedSession {
+   weight: number;
+ }
+ 
+-// 세션 종류를 가중치 비율로 섞는다. 예: 신규:재방문 3:7
+ export class SessionMix implements SessionSelector {
+   private readonly totalWeight: number;
+ 
+diff --git a/Infra/k6/src/summary.ts b/Infra/k6/src/summary.ts
+index 04320df59012c7e0992cd256e12bc5d0b1073a4f..78c559c4213c28ad10f2928b3f53b76bb2bd7679 100644
+--- a/Infra/k6/src/summary.ts
++++ b/Infra/k6/src/summary.ts
+@@ -12,8 +12,6 @@ export interface SummaryData {
+   state?: { testRunDurationMs?: number };
+ }
+ 
+-// handleSummary()가 받는 결과를 깃허브 잡 요약용 판정표와 원본 JSON으로 바꾼다.
+-// 문서에 없는 키는 '-'로 두어 요약이 깨지지 않게 한다.
+ export class SummaryReport {
+   constructor(private readonly data: SummaryData) {}
+ 
+@@ -54,7 +52,6 @@ export class SummaryReport {
+     return [`## k6 결과: ${failed.length === 0 ? '통과' : '실패'}`, '', ...table, ...failures, ''].join('\n');
+   }
+ 
+-  // handleSummary()의 반환값. 파일 경로를 키로 쓰고, stdout에는 같은 판정표를 출력한다.
+   files(directory: string): Record<string, string> {
+     const markdown = this.toMarkdown();
+     return {

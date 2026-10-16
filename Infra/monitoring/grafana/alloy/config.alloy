@@ -75,6 +75,16 @@ loki.process "normalize" {
     }
   }
 
+  stage.match {
+    selector = `{service_name="bibbidi-backend"} |= "\"logger\":\"ai.chat.content\""`
+
+    stage.static_labels {
+      values = {
+        log_type = "ai_content",
+      }
+    }
+  }
+
   stage.drop {
     source     = "level"
     expression = "(?i)^(trace|debug)$"
