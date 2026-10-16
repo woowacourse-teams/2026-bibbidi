@@ -1,5 +1,6 @@
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -19,6 +20,7 @@ import {
 import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
 import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
 import { installMatchMedia } from "../../test/matchMedia";
+import { installDialogMock } from "../../test/dialog";
 import { AiChatRecommendations } from "./view/AiChatRecommendations";
 
 const mocks = vi.hoisted(() => ({
@@ -35,9 +37,7 @@ vi.mock("../catalog", () => ({
 }));
 
 const authRequired = vi.fn();
-const dialogDescriptors = Object.getOwnPropertyDescriptors(
-  HTMLDialogElement.prototype,
-);
+let restoreDialog: (() => void) | undefined;
 const captureDescriptor = Object.getOwnPropertyDescriptor(
   HTMLElement.prototype,
   "setPointerCapture",
@@ -88,6 +88,33 @@ const addedItem = {
 const postCalls = () =>
   mocks.fetch.mock.calls.filter(([, init]) => init?.method === "POST");
 
+function mockChatScrollHeight() {
+  vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(
+    function (this: Element) {
+      return this.getAttribute("role") === "log"
+        ? 600 + this.querySelectorAll('[aria-label="추천 할 일"]').length * 400
+        : 0;
+    },
+  );
+}
+
+function mockMobileDialog() {
+  const media = installMatchMedia("(max-width: 760px)", true);
+  restoreDialog = installDialogMock();
+  return media;
+}
+
+function pendingCatalog() {
+  let finish!: (catalog: typeof preparationCatalogFixture) => void;
+  mocks.catalog.mockImplementationOnce(
+    () =>
+      new Promise<typeof preparationCatalogFixture>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  return () => act(async () => finish(preparationCatalogFixture));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   installMatchMedia("(max-width: 760px)", false);
@@ -110,21 +137,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
+  restoreDialog?.();
+  restoreDialog = undefined;
   resetWebAuthSessionForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  for (const method of ["showModal", "close"] as const) {
-    if (dialogDescriptors[method])
-      Object.defineProperty(
-        HTMLDialogElement.prototype,
-        method,
-        dialogDescriptors[method],
-      );
-    else
-      delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[
-        method
-      ];
-  }
   if (captureDescriptor)
     Object.defineProperty(
       HTMLElement.prototype,
@@ -135,6 +153,56 @@ afterEach(() => {
 });
 
 describe("AI 추천 카드 연결", () => {
+  it("첫 추천 데이터가 늦게 도착하면 카드 아래까지 내리고 다음 추천도 하단에 표시한다", async () => {
+    mockChatScrollHeight();
+    const finishCatalog = pendingCatalog();
+    render(chat());
+    await send();
+    await screen.findByText("추천 카드를 불러오고 있어요.");
+    const log = screen.getByRole("log");
+    expect(log.scrollTop).toBe(600);
+
+    await finishCatalog();
+    expect(currentCard()).toBeTruthy();
+    expect(log.scrollTop).toBe(1000);
+
+    await send();
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("region", { name: "추천 할 일" }),
+      ).toHaveLength(2),
+    );
+    await waitFor(() => expect(log.scrollTop).toBe(1400));
+    expect(mocks.catalog).toHaveBeenCalledOnce();
+  });
+
+  it("닫힌 모바일에서 첫 추천이 도착하면 다시 열 때 하단으로 내리고 이후에는 읽던 위치를 복원한다", async () => {
+    mockMobileDialog();
+    mockChatScrollHeight();
+    const finishCatalog = pendingCatalog();
+    render(chat());
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    await send();
+    await screen.findByText("추천 카드를 불러오고 있어요.");
+    const log = screen.getByRole("log");
+    expect(log.scrollTop).toBe(600);
+    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+
+    await finishCatalog();
+    expect(log.querySelector('[aria-label="추천 할 일"]')).toBeTruthy();
+    expect(log.scrollTop).toBe(600);
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    expect(log.scrollTop).toBe(1000);
+
+    log.scrollTop = 250;
+    fireEvent.scroll(log);
+    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+    log.scrollTop = 0;
+    fireEvent.scroll(log);
+    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    expect(log.scrollTop).toBe(250);
+  });
+
   it("완료 전에는 카드를 숨기고 완료 후 서버 순서와 카탈로그 정보를 표시한다", async () => {
     let finish!: () => void;
     mocks.stream.mockImplementationOnce(
@@ -215,6 +283,67 @@ describe("AI 추천 카드 연결", () => {
     await send();
     await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
   });
+
+  it("옆 카드를 바꿔도 현재 카드의 키보드 조작 대상과 읽던 위치를 유지한다", async () => {
+    mockChatScrollHeight();
+    render(chat());
+    await send();
+    const card = await screen.findByRole("button", {
+      name: "현재 추천: 웨딩홀 투어",
+    });
+    const log = screen.getByRole("log");
+    await waitFor(() => expect(log.scrollTop).toBe(1000));
+    log.scrollTop = 120;
+    fireEvent.scroll(log);
+    card.focus({ preventScroll: true });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "다음 추천: 예식 형태 결정" }),
+    );
+
+    expect(currentCard().getAttribute("aria-label")).toContain(
+      "예식 형태 결정",
+    );
+    expect(document.activeElement).toBe(currentCard());
+    expect(log.scrollTop).toBe(120);
+  });
+
+  it.each(["ArrowRight", "Delete", "Enter"])(
+    "%s로 새 추천에 포커스를 옮겨도 대화 스크롤을 움직이지 않는다",
+    async (key) => {
+      mockChatScrollHeight();
+      render(chat());
+      await send();
+      const card = await screen.findByRole("button", {
+        name: "현재 추천: 웨딩홀 투어",
+      });
+      const log = screen.getByRole("log");
+      await waitFor(() => expect(log.scrollTop).toBe(1000));
+      const focus = HTMLElement.prototype.focus;
+      vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (
+        this: HTMLElement,
+        options?: FocusOptions,
+      ) {
+        if (this.closest(".ai-chat__log") && !options?.preventScroll)
+          log.scrollTop = 0;
+        focus.call(this, options);
+      });
+      log.scrollTop = 120;
+      fireEvent.scroll(log);
+
+      if (key === "Enter") fireEvent.click(card, { detail: 0 });
+      else fireEvent.keyDown(card, { key });
+
+      await screen.findByRole("button", { name: "현재 추천: 예식 형태 결정" });
+      await waitFor(() => expect(document.activeElement).toBe(currentCard()));
+      expect(log.scrollTop).toBe(120);
+
+      while (screen.queryByRole("button", { name: /^현재 추천:/ }))
+        fireEvent.keyDown(currentCard(), { key: "Delete" });
+      expect(document.activeElement).toBe(screen.getByRole("status"));
+      expect(log.scrollTop).toBe(120);
+    },
+  );
 
   it("프론트가 저장 API를 한 번만 호출하고 성공 전에는 현재 카드를 유지한다", async () => {
     let finish!: (response: Response) => void;
@@ -438,21 +567,7 @@ describe("AI 추천 카드 연결", () => {
   });
 
   it("모바일 닫기·재열기와 PC 전환에서 선택·스킵 상태를 유지한다", async () => {
-    const media = installMatchMedia("(max-width: 760px)", true);
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.setAttribute("open", "");
-        },
-      },
-      close: {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.removeAttribute("open");
-        },
-      },
-    });
+    const media = mockMobileDialog();
     render(chat());
     fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
     await send();

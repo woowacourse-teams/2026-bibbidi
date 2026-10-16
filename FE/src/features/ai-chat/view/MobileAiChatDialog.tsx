@@ -1,10 +1,4 @@
-import {
-  ReactNode,
-  RefObject,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from "react";
+import { ReactNode, RefObject, useLayoutEffect, useRef } from "react";
 
 import { containTabFocus } from "../../../shared/focus/containTabFocus";
 
@@ -48,7 +42,7 @@ export function MobileAiChatDialog({
     };
   }, [isOpen, returnFocusRef]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const viewport = window.visualViewport;
     const dialog = dialogRef.current;
     if (!viewport || !dialog || !isOpen) return;
