@@ -1,5 +1,7 @@
 import type { HttpClient } from '../http/http.ts';
 import type { AccessTokenIssuer } from '../common/token.ts';
+import { AiChatApi } from './ai-chat-api.ts';
+import type { AiChatClient } from './ai-chat-client.ts';
 
 interface CatalogResponse {
   categories: { steps: { items: { id: number }[] }[] }[];
@@ -116,9 +118,17 @@ export class ApiFactory {
   constructor(
     private readonly client: HttpClient,
     private readonly tokens: AccessTokenIssuer,
+    private readonly chatClient?: AiChatClient,
   ) {}
 
   forUser(userId: number): BibbidiApi {
     return new BibbidiApi(this.client, this.tokens.issue(userId));
+  }
+
+  chatFor(userId: number): AiChatApi {
+    if (this.chatClient === undefined) {
+      throw new Error('AI 채팅 클라이언트가 설정되지 않았습니다.');
+    }
+    return new AiChatApi(this.chatClient, this.tokens.issue(userId));
   }
 }

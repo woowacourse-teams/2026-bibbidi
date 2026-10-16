@@ -42,6 +42,8 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
 - 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
 - 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
 - Breakpoint는 요청 지표에 윈도우 번호를 붙이지 않고, 윈도우별 보조 지표(`window_latency`, `window_server_error`, `window_requests`)에만 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 3종 × 윈도우 수만큼 늘어난다.
+- AI 채팅 테스트는 SSE를 받으려고 k6 커뮤니티 확장 `xk6-sse`(`k6/x/sse`)를 쓴다. 레지스트리에 k6 v2용 빌드가 없어 자동 제공을 쓰지 못하고, AI 스크립트를 실행할 때 워크플로가 `xk6`로 k6 `2.2.0`과 `xk6-sse v0.2.0`을 직접 빌드한다.
+- AI 채팅 Breakpoint는 `window_ai_completed`, `window_ai_server_error`, `window_ai_requests`, `window_ai_duration`, `window_ai_ttft`(첫 토큰 시간)에 같은 방식으로 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 5종 × 윈도우 수만큼 늘어난다.
 - 회차가 끝나면 stale marker로 시리즈가 바로 끝난다. 시계열은 Prometheus 보존 기간만큼만 남으므로 회차별 원본은 워크플로 아티팩트(`summary.json`, `report.md`, `report.html`, 90일)를 본다.
 
 수집 확인은 Prometheus에서 한다.

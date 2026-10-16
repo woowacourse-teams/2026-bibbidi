@@ -1,0 +1,973 @@
+diff --git a/.github/workflows/load-test.yml b/.github/workflows/load-test.yml
+index edc024d04383b5cc05cee433d55bc2c8be47640a..eba51785c4760aca8b30127c0c8743d7715f0f55 100644
+--- a/.github/workflows/load-test.yml
++++ b/.github/workflows/load-test.yml
+@@ -27,8 +27,8 @@ jobs:
+       - name: 태그에서 실행 대상 읽기
+         run: |
+           set -euo pipefail
+-          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test)/([A-Za-z0-9._-]+)$ ]]; then
+-            echo "::error::태그 형식이 k6/dev/<smoke-test|breakpoint-general-test>/<회차>와 맞지 않습니다: $REF_NAME"
++          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([A-Za-z0-9._-]+)$ ]]; then
++            echo "::error::태그 형식이 k6/dev/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
+             exit 1
+           fi
+           {
+@@ -90,8 +90,8 @@ jobs:
+           k6 run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
+           status=$?
+           set -e
+-          if [ "$status" -eq 99 ] && [[ "$SCRIPT" == breakpoint-* ]]; then
+-            echo "임계값 중단은 Breakpoint의 정상 결과입니다."
++          if { [ "$status" -eq 99 ] || [ "$status" -eq 108 ]; } && [[ "$SCRIPT" == breakpoint-* ]]; then
++            echo "임계값 또는 호출 상한으로 인한 중단(종료 코드 $status)은 Breakpoint의 정상 결과입니다."
+             exit 0
+           fi
+           exit "$status"
+diff --git a/Infra/k6/breakpoint-ai-arrival-test.ts b/Infra/k6/breakpoint-ai-arrival-test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..667a4ce8f1cc95525970d47843feebc81ab35e81
+--- /dev/null
++++ b/Infra/k6/breakpoint-ai-arrival-test.ts
+@@ -0,0 +1,74 @@
++import type { Options } from 'k6/options';
++import { ApiFactory } from './src/api/api.ts';
++import { AiBreakpointReport } from './src/breakpoint/ai-breakpoint-report.ts';
++import { AiWindowMetrics } from './src/breakpoint/ai-window-metrics.ts';
++import { aiRules } from './src/breakpoint/window-rules.ts';
++import { WindowPlan } from './src/breakpoint/windows.ts';
++import { Environment, numberFromEnv, textFromEnv } from './src/common/environment.ts';
++import { AccessTokenIssuer } from './src/common/token.ts';
++import { HttpClient, StrictExpectation } from './src/http/http.ts';
++import type { SummaryData } from './src/report/summary.ts';
++import { CallBudget } from './src/scenario/call-budget.ts';
++import { LoadTest } from './src/scenario/load-test.ts';
++import { AiConversationSession } from './src/session/ai-conversation-session.ts';
++import { SessionSequence, type SetupData } from './src/session/session.ts';
++
++const environment = Environment.fromEnv();
++
++const windowSeconds = numberFromEnv('WINDOW_SECONDS', 60);
++const plan = new WindowPlan({
++  windowSeconds,
++  stepRate: numberFromEnv('STEP_RATE', 5),
++  windows: numberFromEnv('WINDOWS', 20),
++  unitSeconds: 10,
++});
++
++const turns = numberFromEnv('TURNS_PER_CONVERSATION', 3);
++const budget = new CallBudget(numberFromEnv('MAX_TOTAL_CALLS', 1000), turns);
++const session = new AiConversationSession({
++  turns,
++  thinkSeconds: numberFromEnv('THINK_SECONDS', 3),
++  restSeconds: 0,
++  budget,
++});
++
++const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () => ({}), [new AiWindowMetrics(plan)]);
++const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
++const test = new LoadTest(apis, new SessionSequence([session]), 0);
++
++const expectedConversationSeconds = numberFromEnv('EXPECTED_CONVERSATION_SECONDS', 60);
++const preAllocatedVUs = numberFromEnv(
++  'PRE_ALLOCATED_VUS',
++  Math.ceil(plan.perSecond(plan.windows) * expectedConversationSeconds),
++);
++
++export const options: Options = {
++  scenarios: {
++    breakpoint: {
++      executor: 'ramping-arrival-rate',
++      startRate: 0,
++      timeUnit: `${plan.unitSeconds}s`,
++      preAllocatedVUs,
++      maxVUs: numberFromEnv('MAX_VUS', preAllocatedVUs * 2),
++      stages: plan.stages(),
++      gracefulStop: '75s',
++    },
++  },
++  thresholds: plan.thresholds(aiRules(numberFromEnv('EVAL_DELAY_SECONDS', windowSeconds + 60), true)),
++  summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
++};
++
++export function setup(): SetupData {
++  return test.setup();
++}
++
++export default function (data: SetupData): void {
++  test.run(data);
++}
++
++export function handleSummary(data: SummaryData): Record<string, string> {
++  return new AiBreakpointReport(data, plan, {
++    describeLoad: (perSecond) => `초당 ${Number(perSecond.toFixed(2))}건의 대화 시작`,
++    maxCalls: budget.limit,
++  }).files(textFromEnv('SUMMARY_DIR', '.'));
++}
+diff --git a/Infra/k6/breakpoint-ai-concurrency-test.ts b/Infra/k6/breakpoint-ai-concurrency-test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1e94110b172faaaef815215a83f06a073f3e8ee
+--- /dev/null
++++ b/Infra/k6/breakpoint-ai-concurrency-test.ts
+@@ -0,0 +1,65 @@
++import type { Options } from 'k6/options';
++import { ApiFactory } from './src/api/api.ts';
++import { AiBreakpointReport } from './src/breakpoint/ai-breakpoint-report.ts';
++import { AiWindowMetrics } from './src/breakpoint/ai-window-metrics.ts';
++import { aiRules } from './src/breakpoint/window-rules.ts';
++import { WindowPlan } from './src/breakpoint/windows.ts';
++import { Environment, numberFromEnv, textFromEnv } from './src/common/environment.ts';
++import { AccessTokenIssuer } from './src/common/token.ts';
++import { HttpClient, StrictExpectation } from './src/http/http.ts';
++import type { SummaryData } from './src/report/summary.ts';
++import { CallBudget } from './src/scenario/call-budget.ts';
++import { LoadTest } from './src/scenario/load-test.ts';
++import { AiConversationSession } from './src/session/ai-conversation-session.ts';
++import { SessionSequence, type SetupData } from './src/session/session.ts';
++
++const environment = Environment.fromEnv();
++
++const windowSeconds = numberFromEnv('WINDOW_SECONDS', 60);
++const plan = new WindowPlan({
++  windowSeconds,
++  stepRate: numberFromEnv('STEP_RATE', 5),
++  windows: numberFromEnv('WINDOWS', 20),
++});
++
++const turns = numberFromEnv('TURNS_PER_CONVERSATION', 3);
++const budget = new CallBudget(numberFromEnv('MAX_TOTAL_CALLS', 1000), turns);
++const session = new AiConversationSession({
++  turns,
++  thinkSeconds: numberFromEnv('THINK_SECONDS', 3),
++  restSeconds: numberFromEnv('REST_SECONDS', 5),
++  budget,
++});
++
++const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () => ({}), [new AiWindowMetrics(plan)]);
++const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
++const test = new LoadTest(apis, new SessionSequence([session]), 0);
++
++export const options: Options = {
++  scenarios: {
++    breakpoint: {
++      executor: 'ramping-vus',
++      startVUs: 0,
++      stages: plan.stages(),
++      gracefulRampDown: '75s',
++      gracefulStop: '75s',
++    },
++  },
++  thresholds: plan.thresholds(aiRules(numberFromEnv('EVAL_DELAY_SECONDS', windowSeconds + 60), false)),
++  summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
++};
++
++export function setup(): SetupData {
++  return test.setup();
++}
++
++export default function (data: SetupData): void {
++  test.run(data);
++}
++
++export function handleSummary(data: SummaryData): Record<string, string> {
++  return new AiBreakpointReport(data, plan, {
++    describeLoad: (concurrent) => `동시 ${Number(concurrent.toFixed(2))}건의 대화`,
++    maxCalls: budget.limit,
++  }).files(textFromEnv('SUMMARY_DIR', '.'));
++}
+diff --git a/Infra/k6/breakpoint-general-test.ts b/Infra/k6/breakpoint-general-test.ts
+index 43d16c72ce53e7dba0b765174fc3bfd120590847..c1fb42e046209aa05bb0913112be7a81e66982d3 100644
+--- a/Infra/k6/breakpoint-general-test.ts
++++ b/Infra/k6/breakpoint-general-test.ts
+@@ -9,6 +9,7 @@ import type { SummaryData } from './src/report/summary.ts';
+ import { AccessTokenIssuer } from './src/common/token.ts';
+ import { WindowMetrics } from './src/breakpoint/window-metrics.ts';
+ import { WindowPlan } from './src/breakpoint/windows.ts';
++import { generalRules } from './src/breakpoint/window-rules.ts';
+ 
+ const environment = Environment.fromEnv();
+ 
+@@ -16,7 +17,6 @@ const plan = new WindowPlan({
+   windowSeconds: numberFromEnv('WINDOW_SECONDS', 30),
+   stepRate: numberFromEnv('STEP_RATE', 3),
+   windows: numberFromEnv('WINDOWS', 20),
+-  evalDelaySeconds: numberFromEnv('EVAL_DELAY_SECONDS', 20),
+ });
+ 
+ const mix = new SessionMix([
+@@ -41,7 +41,7 @@ export const options: Options = {
+       stages: plan.stages(),
+     },
+   },
+-  thresholds: plan.thresholds(),
++  thresholds: plan.thresholds(generalRules(numberFromEnv('EVAL_DELAY_SECONDS', 20))),
+   setupTimeout: '5m',
+   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
+ };
+diff --git a/Infra/k6/src/api/ai-chat-api.ts b/Infra/k6/src/api/ai-chat-api.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b32c28bc7605d2456e4d56ad5fde8e15380dc672
+--- /dev/null
++++ b/Infra/k6/src/api/ai-chat-api.ts
+@@ -0,0 +1,45 @@
++import type { HttpClient } from '../http/http.ts';
++import { isChatCompleted, parseSseEvents } from './sse.ts';
++
++export const AI_CHAT_REQUEST_NAME = 'POST /api/ai/chat';
++
++export interface ChatReply {
++  completed: boolean;
++  conversationId: string | undefined;
++}
++
++export class AiChatApi {
++  constructor(
++    private readonly client: HttpClient,
++    private readonly token: string,
++  ) {}
++
++  ask(message: string, conversationId?: string): ChatReply {
++    const response = this.client.send(this.token, {
++      name: AI_CHAT_REQUEST_NAME,
++      method: 'POST',
++      path: '/api/ai/chat',
++      body: conversationId === undefined ? { message } : { conversationId, message },
++      expected: [200],
++      timeout: '75s',
++    });
++
++    const body = typeof response.body === 'string' ? response.body : null;
++    return {
++      completed: isChatCompleted(response.status, body),
++      conversationId: this.conversationIdOf(body),
++    };
++  }
++
++  private conversationIdOf(body: string | null): string | undefined {
++    const event = parseSseEvents(body).find((candidate) => candidate.name === 'conversation');
++    if (event === undefined) {
++      return undefined;
++    }
++    try {
++      return (JSON.parse(event.data) as { conversationId?: string }).conversationId;
++    } catch {
++      return undefined;
++    }
++  }
++}
+diff --git a/Infra/k6/src/api/api.ts b/Infra/k6/src/api/api.ts
+index e476830a2930a186f8177300e142fef29c7aadb4..0d4f21bef5449840d780f6be6d6a7d34fd579524 100644
+--- a/Infra/k6/src/api/api.ts
++++ b/Infra/k6/src/api/api.ts
+@@ -1,5 +1,6 @@
+ import type { HttpClient } from '../http/http.ts';
+ import type { AccessTokenIssuer } from '../common/token.ts';
++import { AiChatApi } from './ai-chat-api.ts';
+ 
+ interface CatalogResponse {
+   categories: { steps: { items: { id: number }[] }[] }[];
+@@ -121,4 +122,8 @@ export class ApiFactory {
+   forUser(userId: number): BibbidiApi {
+     return new BibbidiApi(this.client, this.tokens.issue(userId));
+   }
++
++  chatFor(userId: number): AiChatApi {
++    return new AiChatApi(this.client, this.tokens.issue(userId));
++  }
+ }
+diff --git a/Infra/k6/src/api/sse.ts b/Infra/k6/src/api/sse.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ab401ed68c67060b4cac0054d5e8344d7abdbea
+--- /dev/null
++++ b/Infra/k6/src/api/sse.ts
+@@ -0,0 +1,35 @@
++export interface SseEvent {
++  name: string;
++  data: string;
++}
++
++export function parseSseEvents(body: string | null): SseEvent[] {
++  if (!body) {
++    return [];
++  }
++
++  const events: SseEvent[] = [];
++  for (const block of body.replace(/\r\n/g, '\n').split('\n\n')) {
++    let name = 'message';
++    const data: string[] = [];
++    for (const line of block.split('\n')) {
++      if (line.startsWith('event:')) {
++        name = line.slice('event:'.length).trim();
++      } else if (line.startsWith('data:')) {
++        data.push(line.slice('data:'.length).trim());
++      }
++    }
++    if (data.length > 0 || name !== 'message') {
++      events.push({ name, data: data.join('\n') });
++    }
++  }
++  return events;
++}
++
++export function isChatCompleted(status: number, body: string | null): boolean {
++  if (status !== 200) {
++    return false;
++  }
++  const names = parseSseEvents(body).map((event) => event.name);
++  return names.includes('done') && !names.includes('failure');
++}
+diff --git a/Infra/k6/src/breakpoint/ai-breakpoint-report.ts b/Infra/k6/src/breakpoint/ai-breakpoint-report.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..403a1ce54fd68dedf81e181c2955329bc2b28246
+--- /dev/null
++++ b/Infra/k6/src/breakpoint/ai-breakpoint-report.ts
+@@ -0,0 +1,96 @@
++import type { SummaryData } from '../report/summary.ts';
++import { WindowedReport, type WindowResult } from './window-report.ts';
++import type { WindowPlan } from './windows.ts';
++
++export interface AiReportOptions {
++  describeLoad: (perUnit: number) => string;
++  maxCalls: number;
++}
++
++const DROPPED_CAUSE = '서버가 따라가지 못함(시작하지 못한 대화 발생)';
++
++export class AiBreakpointReport extends WindowedReport {
++  constructor(
++    data: SummaryData,
++    plan: WindowPlan,
++    private readonly options: AiReportOptions,
++  ) {
++    super(data, plan);
++  }
++
++  protected title(): string {
++    return 'k6 AI 채팅 Breakpoint 결과';
++  }
++
++  protected intro(): string {
++    return `대화 1건은 새 사용자 한 명이 같은 대화로 질문을 이어서 보내는 것입니다. 질문 1번을 호출 1건으로 셉니다. ${this.options.describeLoad(this.plan.stepRate / this.plan.unitSeconds)}씩 ${this.plan.windowSeconds}초 구간마다 올립니다. 응답은 요청을 시작한 구간에 반영하고, 응답이 끝난 뒤 완료율을 판정하므로 중단이 구간 1~2개 늦을 수 있습니다.`;
++  }
++
++  protected columns(): string[] {
++    return ['구간 끝의 부하', '시작한 질문 수', '완료율', '서버 오류(5xx) 비율', '응답 시간 평균(초)', '응답 시간 p95(초)'];
++  }
++
++  protected footnote(): string {
++    return '완료율은 HTTP 200으로 응답하고 `done` 이벤트가 도착한 질문의 비율입니다. `failure` 이벤트, 오류 응답, 60초 초과는 미완료로 셉니다. 응답 시간은 판정 기준이 아니라 참고 값입니다.';
++  }
++
++  protected requestsMetric(): string {
++    return 'window_ai_requests';
++  }
++
++  protected extraConclusion(failedWindow: WindowResult | undefined): string[] {
++    const lines: string[] = [];
++    if (failedWindow?.causes.includes(DROPPED_CAUSE)) {
++      lines.push('- 참고: 시작하지 못한 대화는 테스트 도구(러너)의 한계일 수도 있으므로 같은 시간대의 서버 지표와 함께 확인해야 합니다.');
++    }
++    if ((this.value('ai_call_budget_exhausted', 'count') ?? 0) > 0) {
++      lines.push(`- 중단 사유: AI 호출 ${this.options.maxCalls}건 상한에 닿아 멈췄습니다. 한계에 닿기 전이므로 \`MAX_TOTAL_CALLS\`를 올려 다시 실행해야 합니다.`);
++    }
++    return lines;
++  }
++
++  protected windowResults(): WindowResult[] {
++    const lastObserved = this.lastObservedWindow();
++    const dropped = (this.value('dropped_iterations', 'count') ?? 0) > 0;
++
++    return Array.from({ length: this.plan.windows }, (_, index) => {
++      const window = index + 1;
++      const requestCount = this.requestCount(window);
++      const reached = requestCount > 0;
++      const causes: string[] = [];
++
++      if (this.hasFailedThreshold(`window_ai_completed{window:${window}}`)) causes.push('완료율이 90% 미만');
++      if (this.hasFailedThreshold(`window_ai_server_error{window:${window}}`)) causes.push('서버 오류(5xx) 비율이 1% 초과');
++      if (dropped && window === lastObserved) causes.push(DROPPED_CAUSE);
++
++      const load = this.options.describeLoad(this.plan.perSecond(window));
++      const completed = this.value(`window_ai_completed{window:${window}}`, 'rate');
++      const errorRate = this.value(`window_ai_server_error{window:${window}}`, 'rate');
++      const average = this.value(`window_ai_duration{window:${window}}`, 'avg');
++      const p95 = this.value(`window_ai_duration{window:${window}}`, 'p(95)');
++
++      return {
++        window,
++        load,
++        cells: [
++          load,
++          reached ? String(requestCount) : '-',
++          reached ? this.percent(completed) : '-',
++          reached ? this.percent(errorRate) : '-',
++          reached ? this.seconds(average) : '-',
++          reached ? this.seconds(p95) : '-',
++        ],
++        verdict: causes.length > 0 ? '고장' : reached ? '정상' : '도달 못함',
++        causes,
++      };
++    });
++  }
++
++  private percent(rate: number | undefined): string {
++    return rate === undefined ? '-' : `${(rate * 100).toFixed(1)}%`;
++  }
++
++  private seconds(milliseconds: number | undefined): string {
++    return milliseconds === undefined ? '-' : (milliseconds / 1000).toFixed(1);
++  }
++}
+diff --git a/Infra/k6/src/breakpoint/ai-window-metrics.ts b/Infra/k6/src/breakpoint/ai-window-metrics.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a1019732f4561497b9a0a7ad2d46e978003dd4
+--- /dev/null
++++ b/Infra/k6/src/breakpoint/ai-window-metrics.ts
+@@ -0,0 +1,31 @@
++import type { RefinedResponse } from 'k6/http';
++import exec from 'k6/execution';
++import { Counter, Rate, Trend } from 'k6/metrics';
++import { AI_CHAT_REQUEST_NAME } from '../api/ai-chat-api.ts';
++import { isChatCompleted } from '../api/sse.ts';
++import type { RequestSpec, ResponseObserver } from '../http/http.ts';
++import type { WindowPlan } from './windows.ts';
++
++export class AiWindowMetrics implements ResponseObserver {
++  private readonly completed = new Rate('window_ai_completed');
++  private readonly serverError = new Rate('window_ai_server_error');
++  private readonly requests = new Counter('window_ai_requests');
++  private readonly duration = new Trend('window_ai_duration', true);
++
++  constructor(private readonly plan: WindowPlan) {}
++
++  observe(spec: RequestSpec, response: RefinedResponse<'text'>): void {
++    if (__VU === 0 || spec.name !== AI_CHAT_REQUEST_NAME) {
++      return;
++    }
++
++    const startedAt = Date.now() - response.timings.duration;
++    const tags = { window: String(this.plan.windowAt(startedAt - exec.scenario.startTime)) };
++    const body = typeof response.body === 'string' ? response.body : null;
++
++    this.completed.add(isChatCompleted(response.status, body), tags);
++    this.serverError.add(response.status >= 500, tags);
++    this.requests.add(1, tags);
++    this.duration.add(response.timings.duration, tags);
++  }
++}
+diff --git a/Infra/k6/src/breakpoint/breakpoint-report.ts b/Infra/k6/src/breakpoint/breakpoint-report.ts
+index c9cd892ab8bbc9dcc5c6abf7d1b571d5ba50d1f0..626c28539f96e924077ba3c6d4795c79cc4c5334 100644
+--- a/Infra/k6/src/breakpoint/breakpoint-report.ts
++++ b/Infra/k6/src/breakpoint/breakpoint-report.ts
+@@ -1,129 +1,65 @@
+-import { SummaryReport, type SummaryData } from '../report/summary.ts';
+-import type { WindowPlan } from './windows.ts';
++import { WindowedReport, type WindowResult } from './window-report.ts';
+ 
+-type WindowVerdict = '정상' | '고장' | '도달 못함';
++const DROPPED_CAUSE = '서버가 따라가지 못함(건너뛴 시나리오 발생)';
+ 
+-interface WindowResult {
+-  window: number;
+-  endRate: number;
+-  rps: number | undefined;
+-  p99: number | undefined;
+-  errorRate: number | undefined;
+-  verdict: WindowVerdict;
+-  causes: string[];
+-}
++export class BreakpointReport extends WindowedReport {
++  protected title(): string {
++    return 'k6 Breakpoint 결과';
++  }
++
++  protected intro(): string {
++    return `시나리오 1건은 사용자 한 명이 사용 흐름을 한 번 끝까지 지나가는 것입니다. 신규 사용자는 둘러보기, 체크리스트 담기, 일정 잡기, 홈 순서이고 재방문 사용자는 홈, 일정 완료 순서입니다. 초당 시나리오 수를 ${this.plan.windowSeconds}초 구간마다 ${this.plan.stepRate}씩 올립니다.`;
++  }
++
++  protected columns(): string[] {
++    return ['구간 끝의 초당 시나리오 수', '구간 평균 RPS(초당 요청 수)', '조회 응답 시간 p99(ms)', '서버 오류(5xx) 비율'];
++  }
+ 
+-export class BreakpointReport extends SummaryReport {
+-  constructor(
+-    data: SummaryData,
+-    private readonly plan: WindowPlan,
+-  ) {
+-    super(data);
++  protected footnote(): string {
++    return 'RPS는 구간 안에서 보낸 요청 수를 구간 길이로 나눈 평균입니다. 구간 안에서 초당 시나리오 수가 계속 오르므로 구간 끝의 순간 값보다 낮게 나오고, 도중에 멈춘 구간은 더 낮게 나옵니다.';
+   }
+ 
+-  toMarkdown(): string {
+-    const results = this.windowResults();
+-    const failedWindow = results.find((result) => result.verdict === '고장');
++  protected requestsMetric(): string {
++    return 'window_requests';
++  }
+ 
+-    return [
+-      '## k6 Breakpoint 결과',
+-      '',
+-      `> 시나리오 1건은 사용자 한 명이 사용 흐름을 한 번 끝까지 지나가는 것입니다. 신규 사용자는 둘러보기, 체크리스트 담기, 일정 잡기, 홈 순서이고 재방문 사용자는 홈, 일정 완료 순서입니다. 초당 시나리오 수를 ${this.plan.windowSeconds}초 구간마다 ${this.plan.stepRate}씩 올립니다.`,
+-      '',
+-      ...this.conclusion(results, failedWindow),
+-      '',
+-      ...this.windowTable(results),
+-      '',
+-      '### 전체 요약',
+-      '',
+-      ...this.overview(failedWindow === undefined),
+-      '',
+-    ].join('\n');
++  protected extraConclusion(failedWindow: WindowResult | undefined): string[] {
++    if (failedWindow?.causes.includes(DROPPED_CAUSE)) {
++      return ['- 참고: 건너뛴 시나리오는 테스트 도구(러너)의 한계일 수도 있으므로 같은 시간대의 서버 지표와 함께 확인해야 합니다.'];
++    }
++    return [];
+   }
+ 
+-  private windowResults(): WindowResult[] {
++  protected windowResults(): WindowResult[] {
+     const lastObserved = this.lastObservedWindow();
+     const dropped = (this.value('dropped_iterations', 'count') ?? 0) > 0;
+ 
+     return Array.from({ length: this.plan.windows }, (_, index) => {
+       const window = index + 1;
++      const requestCount = this.requestCount(window);
++      const reached = requestCount > 0;
+       const latency = this.metric(`window_latency{window:${window}}`);
+       const errors = this.metric(`window_server_error{window:${window}}`);
+-      const requestCount = this.value(`window_requests{window:${window}}`, 'count') ?? 0;
+-      const reached = requestCount > 0;
+       const causes: string[] = [];
+ 
+-      if (this.hasFailedThreshold(latency)) causes.push('조회 응답 시간(p99)이 1초 초과');
+-      if (this.hasFailedThreshold(errors)) causes.push('서버 오류(5xx) 비율이 1% 초과');
+-      if (dropped && window === lastObserved) causes.push('서버가 따라가지 못함(건너뛴 시나리오 발생)');
++      if (this.hasFailedThreshold(`window_latency{window:${window}}`)) causes.push('조회 응답 시간(p99)이 1초 초과');
++      if (this.hasFailedThreshold(`window_server_error{window:${window}}`)) causes.push('서버 오류(5xx) 비율이 1% 초과');
++      if (dropped && window === lastObserved) causes.push(DROPPED_CAUSE);
+ 
++      const rps = reached ? requestCount / this.plan.windowSeconds : undefined;
++      const errorRate = reached ? errors?.values?.rate : undefined;
+       return {
+         window,
+-        endRate: this.plan.endRate(window),
+-        rps: reached ? requestCount / this.plan.windowSeconds : undefined,
+-        p99: reached ? latency?.values?.['p(99)'] : undefined,
+-        errorRate: reached ? errors?.values?.rate : undefined,
++        load: `초당 ${this.plan.endRate(window)}개 시나리오 (구간 평균 ${rps === undefined ? '-' : this.format(rps, 0)} RPS)`,
++        cells: [
++          String(this.plan.endRate(window)),
++          this.format(rps, 1),
++          this.format(reached ? latency?.values?.['p(99)'] : undefined),
++          errorRate === undefined ? '-' : `${(errorRate * 100).toFixed(2)}%`,
++        ],
+         verdict: causes.length > 0 ? '고장' : reached ? '정상' : '도달 못함',
+         causes,
+       };
+     });
+   }
+-
+-  private lastObservedWindow(): number {
+-    let last = 0;
+-    for (let window = 1; window <= this.plan.windows; window += 1) {
+-      if ((this.value(`window_requests{window:${window}}`, 'count') ?? 0) > 0) {
+-        last = window;
+-      }
+-    }
+-    return last;
+-  }
+-
+-  private hasFailedThreshold(metric: ReturnType<SummaryReport['metric']>): boolean {
+-    return Object.values(metric?.thresholds ?? {}).some((result) => !result.ok);
+-  }
+-
+-  private conclusion(results: WindowResult[], failedWindow: WindowResult | undefined): string[] {
+-    if (failedWindow === undefined) {
+-      const last = results.filter((result) => result.verdict === '정상').pop();
+-      const reached = last === undefined ? '-' : this.load(last);
+-      return [`- 판정: 한계에 닿지 않음 (최대 ${reached}까지 정상)`];
+-    }
+-
+-    const previous = results.find((result) => result.window === failedWindow.window - 1);
+-    const lines = [
+-      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 구간에서 고장)' : this.load(previous)}`,
+-      `- 고장 지점: ${this.load(failedWindow)} (${failedWindow.window}번째 구간)`,
+-      `- 처음 걸린 고장 기준: ${failedWindow.causes.join(', ')}`,
+-    ];
+-    if (failedWindow.causes.some((cause) => cause.startsWith('서버가 따라가지 못함'))) {
+-      lines.push('- 참고: 건너뛴 시나리오는 테스트 도구(러너)의 한계일 수도 있으므로 같은 시간대의 서버 지표와 함께 확인해야 합니다.');
+-    }
+-    return lines;
+-  }
+-
+-  private windowTable(results: WindowResult[]): string[] {
+-    const rows = results.map((result) =>
+-      [
+-        result.window,
+-        result.endRate,
+-        this.format(result.rps, 1),
+-        this.format(result.p99),
+-        result.errorRate === undefined ? '-' : `${(result.errorRate * 100).toFixed(2)}%`,
+-        result.verdict,
+-      ].join(' | '),
+-    );
+-    return [
+-      '| 구간 | 구간 끝의 초당 시나리오 수 | 구간 평균 RPS(초당 요청 수) | 조회 응답 시간 p99(ms) | 서버 오류(5xx) 비율 | 판정 |',
+-      '| --- | --- | --- | --- | --- | --- |',
+-      ...rows.map((row) => `| ${row} |`),
+-      '',
+-      'RPS는 구간 안에서 보낸 요청 수를 구간 길이로 나눈 평균입니다. 구간 안에서 초당 시나리오 수가 계속 오르므로 구간 끝의 순간 값보다 낮게 나오고, 도중에 멈춘 구간은 더 낮게 나옵니다.',
+-    ];
+-  }
+-
+-  private load(result: WindowResult): string {
+-    const rps = result.rps === undefined ? '-' : this.format(result.rps, 0);
+-    return `초당 ${result.endRate}개 시나리오 (구간 평균 ${rps} RPS)`;
+-  }
+ }
+diff --git a/Infra/k6/src/breakpoint/window-report.ts b/Infra/k6/src/breakpoint/window-report.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c5effb2873ce134dcfc19b46a21c2bf04a444b4
+--- /dev/null
++++ b/Infra/k6/src/breakpoint/window-report.ts
+@@ -0,0 +1,97 @@
++import { SummaryReport, type SummaryData } from '../report/summary.ts';
++import type { WindowPlan } from './windows.ts';
++
++export type WindowVerdict = '정상' | '고장' | '도달 못함';
++
++export interface WindowResult {
++  window: number;
++  load: string;
++  cells: string[];
++  verdict: WindowVerdict;
++  causes: string[];
++}
++
++export abstract class WindowedReport extends SummaryReport {
++  constructor(
++    data: SummaryData,
++    protected readonly plan: WindowPlan,
++  ) {
++    super(data);
++  }
++
++  protected abstract title(): string;
++  protected abstract intro(): string;
++  protected abstract columns(): string[];
++  protected abstract footnote(): string;
++  protected abstract requestsMetric(): string;
++  protected abstract windowResults(): WindowResult[];
++
++  protected extraConclusion(_failedWindow: WindowResult | undefined): string[] {
++    return [];
++  }
++
++  toMarkdown(): string {
++    const results = this.windowResults();
++    const failedWindow = results.find((result) => result.verdict === '고장');
++
++    return [
++      `## ${this.title()}`,
++      '',
++      `> ${this.intro()}`,
++      '',
++      ...this.conclusion(results, failedWindow),
++      ...this.extraConclusion(failedWindow),
++      '',
++      ...this.windowTable(results),
++      '',
++      '### 전체 요약',
++      '',
++      ...this.overview(failedWindow === undefined),
++      '',
++    ].join('\n');
++  }
++
++  protected requestCount(window: number): number {
++    return this.value(`${this.requestsMetric()}{window:${window}}`, 'count') ?? 0;
++  }
++
++  protected lastObservedWindow(): number {
++    let last = 0;
++    for (let window = 1; window <= this.plan.windows; window += 1) {
++      if (this.requestCount(window) > 0) {
++        last = window;
++      }
++    }
++    return last;
++  }
++
++  protected hasFailedThreshold(metricName: string): boolean {
++    return Object.values(this.metric(metricName)?.thresholds ?? {}).some((result) => !result.ok);
++  }
++
++  private conclusion(results: WindowResult[], failedWindow: WindowResult | undefined): string[] {
++    if (failedWindow === undefined) {
++      const last = results.filter((result) => result.verdict === '정상').pop();
++      return [`- 판정: 한계에 닿지 않음 (최대 ${last === undefined ? '-' : last.load}까지 정상)`];
++    }
++
++    const previous = results.find((result) => result.window === failedWindow.window - 1);
++    return [
++      `- 한계 용량: ${previous === undefined ? '측정 불가(첫 구간에서 고장)' : previous.load}`,
++      `- 고장 지점: ${failedWindow.load} (${failedWindow.window}번째 구간)`,
++      `- 처음 걸린 고장 기준: ${failedWindow.causes.join(', ')}`,
++    ];
++  }
++
++  private windowTable(results: WindowResult[]): string[] {
++    const columns = ['구간', ...this.columns(), '판정'];
++    const rows = results.map((result) => [result.window, ...result.cells, result.verdict].join(' | '));
++    return [
++      `| ${columns.join(' | ')} |`,
++      `| ${columns.map(() => '---').join(' | ')} |`,
++      ...rows.map((row) => `| ${row} |`),
++      '',
++      this.footnote(),
++    ];
++  }
++}
+diff --git a/Infra/k6/src/breakpoint/window-rules.ts b/Infra/k6/src/breakpoint/window-rules.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc517cb03d6234001382eb854f2d9f619dba3380
+--- /dev/null
++++ b/Infra/k6/src/breakpoint/window-rules.ts
+@@ -0,0 +1,26 @@
++import type { ThresholdSpec } from './windows.ts';
++
++export function generalRules(evalDelaySeconds: number): ThresholdSpec {
++  return {
++    rules: [
++      { metric: 'window_latency', expression: 'p(99)<1000', evalDelaySeconds },
++      { metric: 'window_server_error', expression: 'rate<0.01', evalDelaySeconds },
++    ],
++    tracked: [{ metric: 'window_requests', expression: 'count>=0' }],
++    global: { dropped_iterations: [{ threshold: 'count==0', abortOnFail: true }] },
++  };
++}
++
++export function aiRules(evalDelaySeconds: number, abortOnDropped: boolean): ThresholdSpec {
++  return {
++    rules: [
++      { metric: 'window_ai_completed', expression: 'rate>=0.9', evalDelaySeconds },
++      { metric: 'window_ai_server_error', expression: 'rate<0.01', evalDelaySeconds },
++    ],
++    tracked: [
++      { metric: 'window_ai_requests', expression: 'count>=0' },
++      { metric: 'window_ai_duration', expression: 'max>=0' },
++    ],
++    global: abortOnDropped ? { dropped_iterations: [{ threshold: 'count==0', abortOnFail: true }] } : {},
++  };
++}
+diff --git a/Infra/k6/src/breakpoint/windows.ts b/Infra/k6/src/breakpoint/windows.ts
+index d4c122629b6a662118cdbe44335cf6a5f273cd68..0991a2f4dd5f85b3a14493d72f41f2936f084769 100644
+--- a/Infra/k6/src/breakpoint/windows.ts
++++ b/Infra/k6/src/breakpoint/windows.ts
+@@ -4,11 +4,25 @@ export interface WindowPlanOptions {
+   windowSeconds: number;
+   stepRate: number;
+   windows: number;
++  unitSeconds?: number;
++}
++
++export interface WindowRule {
++  metric: string;
++  expression: string;
+   evalDelaySeconds: number;
+ }
+ 
+-export const WINDOW_LATENCY_LIMIT_MS = 1000;
+-export const WINDOW_SERVER_ERROR_LIMIT = 0.01;
++export interface TrackedMetric {
++  metric: string;
++  expression: string;
++}
++
++export interface ThresholdSpec {
++  rules: readonly WindowRule[];
++  tracked: readonly TrackedMetric[];
++  global?: Record<string, Threshold[]>;
++}
+ 
+ export class WindowPlan {
+   constructor(private readonly options: WindowPlanOptions) {}
+@@ -25,10 +39,18 @@ export class WindowPlan {
+     return this.options.stepRate;
+   }
+ 
++  get unitSeconds(): number {
++    return this.options.unitSeconds ?? 1;
++  }
++
+   endRate(window: number): number {
+     return this.options.stepRate * window;
+   }
+ 
++  perSecond(window: number): number {
++    return this.endRate(window) / this.unitSeconds;
++  }
++
+   windowAt(elapsedMs: number): number {
+     const index = Math.floor(elapsedMs / (this.options.windowSeconds * 1000)) + 1;
+     return Math.min(Math.max(index, 1), this.options.windows);
+@@ -41,20 +63,19 @@ export class WindowPlan {
+     }));
+   }
+ 
+-  thresholds(): NonNullable<Options['thresholds']> {
+-    const thresholds: Record<string, Threshold[]> = {
+-      dropped_iterations: [{ threshold: 'count==0', abortOnFail: true }],
+-    };
++  thresholds(spec: ThresholdSpec): NonNullable<Options['thresholds']> {
++    const thresholds: Record<string, Threshold[]> = { ...spec.global };
+ 
+     for (let window = 1; window <= this.options.windows; window += 1) {
+-      const delay = `${(window - 1) * this.options.windowSeconds + this.options.evalDelaySeconds}s`;
+-      thresholds[`window_latency{window:${window}}`] = [
+-        { threshold: `p(99)<${WINDOW_LATENCY_LIMIT_MS}`, abortOnFail: true, delayAbortEval: delay },
+-      ];
+-      thresholds[`window_requests{window:${window}}`] = ['count>=0'];
+-      thresholds[`window_server_error{window:${window}}`] = [
+-        { threshold: `rate<${WINDOW_SERVER_ERROR_LIMIT}`, abortOnFail: true, delayAbortEval: delay },
+-      ];
++      const windowStart = (window - 1) * this.options.windowSeconds;
++      for (const rule of spec.rules) {
++        thresholds[`${rule.metric}{window:${window}}`] = [
++          { threshold: rule.expression, abortOnFail: true, delayAbortEval: `${windowStart + rule.evalDelaySeconds}s` },
++        ];
++      }
++      for (const tracked of spec.tracked) {
++        thresholds[`${tracked.metric}{window:${window}}`] = [tracked.expression];
++      }
+     }
+ 
+     return thresholds;
+diff --git a/Infra/k6/src/http/http.ts b/Infra/k6/src/http/http.ts
+index 3ed3a288f9b3e866412e5761d3c20c80433e4e04..72819b6f4423110075b49f1ca495c6c357944f2b 100644
+--- a/Infra/k6/src/http/http.ts
++++ b/Infra/k6/src/http/http.ts
+@@ -10,6 +10,7 @@ export interface RequestSpec {
+   path: string;
+   body?: unknown;
+   expected: readonly number[];
++  timeout?: string;
+ }
+ 
+ export interface ExpectationPolicy {
+@@ -56,6 +57,7 @@ export class HttpClient {
+           'Content-Type': 'application/json',
+         },
+         tags: { ...this.extraTags(), name: spec.name },
++        timeout: spec.timeout,
+         responseCallback: http.expectedStatuses(...acceptable),
+       },
+     );
+diff --git a/Infra/k6/src/scenario/call-budget.ts b/Infra/k6/src/scenario/call-budget.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..83173f3e21098a9fd7b92c619a7e29c7b88608c1
+--- /dev/null
++++ b/Infra/k6/src/scenario/call-budget.ts
+@@ -0,0 +1,25 @@
++import exec from 'k6/execution';
++import { Counter } from 'k6/metrics';
++
++export const callBudgetExhausted = new Counter('ai_call_budget_exhausted');
++
++export class CallBudget {
++  constructor(
++    private readonly maxCalls: number,
++    private readonly callsPerConversation: number,
++  ) {}
++
++  get limit(): number {
++    return this.maxCalls;
++  }
++
++  available(conversationIndex: number): boolean {
++    if (conversationIndex * this.callsPerConversation < this.maxCalls) {
++      return true;
++    }
++
++    callBudgetExhausted.add(1);
++    exec.test.abort(`AI 호출 ${this.maxCalls}건 상한에 닿아 중단했습니다.`);
++    return false;
++  }
++}
+diff --git a/Infra/k6/src/session/ai-conversation-session.ts b/Infra/k6/src/session/ai-conversation-session.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c1c0a9bd9102d29528a6e42c446c7f8dd8f5791
+--- /dev/null
++++ b/Infra/k6/src/session/ai-conversation-session.ts
+@@ -0,0 +1,56 @@
++import { sleep } from 'k6';
++import type { CallBudget } from '../scenario/call-budget.ts';
++import type { Session, SessionContext } from './session.ts';
++import { UserIds } from './users.ts';
++
++const QUESTIONS = [
++  '결혼 준비를 언제부터 시작하면 좋을까요?',
++  '웨딩홀 예약은 보통 몇 개월 전에 하나요?',
++  '스드메는 어떤 순서로 알아보면 되나요?',
++  '예산이 5천만 원인데 항목별로 어떻게 나누면 좋을까요?',
++  '신혼여행지는 언제까지 정해야 하나요?',
++  '예식 두 달 전에 꼭 해야 할 일이 뭐예요?',
++  '청첩장은 언제 맞추고 언제 돌리나요?',
++  '혼수는 어떤 것부터 준비해야 하나요?',
++  '상견례는 보통 언제 하나요?',
++  '하객 수는 어떻게 가늠하고 식사는 어떻게 정하나요?',
++];
++
++export interface AiConversationOptions {
++  turns: number;
++  thinkSeconds: number;
++  restSeconds: number;
++  budget: CallBudget;
++}
++
++export class AiConversationSession implements Session {
++  constructor(private readonly options: AiConversationOptions) {}
++
++  run({ data, iteration, apis }: SessionContext): void {
++    if (!this.options.budget.available(iteration)) {
++      return;
++    }
++
++    const chat = apis.chatFor(UserIds.fresh(data.runId, iteration));
++    let conversationId: string | undefined;
++
++    for (let turn = 0; turn < this.options.turns; turn += 1) {
++      const reply = chat.ask(this.question(), conversationId);
++      conversationId = reply.conversationId ?? conversationId;
++      if (!reply.completed) {
++        break;
++      }
++      if (turn < this.options.turns - 1) {
++        sleep(this.options.thinkSeconds);
++      }
++    }
++
++    if (this.options.restSeconds > 0) {
++      sleep(this.options.restSeconds);
++    }
++  }
++
++  private question(): string {
++    return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
++  }
++}
+diff --git a/Infra/monitoring/README.md b/Infra/monitoring/README.md
+index 3ffee403c8df1a92c6a27c75be14b2d632f81f7a..1405acea11020e1417d4737b3a27fcd077b7a97b 100644
+--- a/Infra/monitoring/README.md
++++ b/Infra/monitoring/README.md
+@@ -42,6 +42,7 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
+ - 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
+ - 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
+ - Breakpoint는 요청 지표에 윈도우 번호를 붙이지 않고, 윈도우별 보조 지표(`window_latency`, `window_server_error`, `window_requests`)에만 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 3종 × 윈도우 수만큼 늘어난다.
++- AI 채팅 Breakpoint는 `window_ai_completed`, `window_ai_server_error`, `window_ai_requests`, `window_ai_duration`에 같은 방식으로 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 4종 × 윈도우 수만큼 늘어난다.
+ - 회차가 끝나면 stale marker로 시리즈가 바로 끝난다. 시계열은 Prometheus 보존 기간만큼만 남으므로 회차별 원본은 워크플로 아티팩트(`summary.json`, `report.md`, `report.html`, 90일)를 본다.
+ 
+ 수집 확인은 Prometheus에서 한다.

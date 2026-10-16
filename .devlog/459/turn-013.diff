@@ -1,0 +1,13 @@
+diff --git a/Infra/k6/src/http/http.ts b/Infra/k6/src/http/http.ts
+index 72819b6f4423110075b49f1ca495c6c357944f2b..b8c490adc42e92ab62193ffe081523bd40cffc99 100644
+--- a/Infra/k6/src/http/http.ts
++++ b/Infra/k6/src/http/http.ts
+@@ -57,7 +57,7 @@ export class HttpClient {
+           'Content-Type': 'application/json',
+         },
+         tags: { ...this.extraTags(), name: spec.name },
+-        timeout: spec.timeout,
++        ...(spec.timeout === undefined ? {} : { timeout: spec.timeout }),
+         responseCallback: http.expectedStatuses(...acceptable),
+       },
+     );

@@ -59,9 +59,14 @@ export class SummaryReport {
       ['응답 시간 p99(ms, 느린 1% 경계)', this.format(this.value('http_req_duration', 'p(99)'))],
       ['응답 시간 최대(ms)', this.format(this.value('http_req_duration', 'max'))],
       ['건너뛴 시나리오 수(dropped_iterations)', this.format(this.value('dropped_iterations', 'count') ?? 0, 0)],
+      ...this.extraRows(),
     ];
 
     return ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
+  }
+
+  protected extraRows(): [string, string][] {
+    return [];
   }
 
   protected value(metric: string, stat: string): number | undefined {
