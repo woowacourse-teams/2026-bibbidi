@@ -1,5 +1,6 @@
 import type { HttpClient } from '../http/http.ts';
 import type { AccessTokenIssuer } from '../common/token.ts';
+import { AiChatApi } from './ai-chat-api.ts';
 
 interface CatalogResponse {
   categories: { steps: { items: { id: number }[] }[] }[];
@@ -120,5 +121,9 @@ export class ApiFactory {
 
   forUser(userId: number): BibbidiApi {
     return new BibbidiApi(this.client, this.tokens.issue(userId));
+  }
+
+  chatFor(userId: number): AiChatApi {
+    return new AiChatApi(this.client, this.tokens.issue(userId));
   }
 }

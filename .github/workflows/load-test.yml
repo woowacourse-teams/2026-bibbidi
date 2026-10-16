@@ -27,8 +27,8 @@ jobs:
       - name: 태그에서 실행 대상 읽기
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test)/([A-Za-z0-9._-]+)$ ]]; then
-            echo "::error::태그 형식이 k6/dev/<smoke-test|breakpoint-general-test>/<회차>와 맞지 않습니다: $REF_NAME"
+          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([A-Za-z0-9._-]+)$ ]]; then
+            echo "::error::태그 형식이 k6/dev/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
           {
@@ -90,8 +90,8 @@ jobs:
           k6 run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
           status=$?
           set -e
-          if [ "$status" -eq 99 ] && [[ "$SCRIPT" == breakpoint-* ]]; then
-            echo "임계값 중단은 Breakpoint의 정상 결과입니다."
+          if { [ "$status" -eq 99 ] || [ "$status" -eq 108 ]; } && [[ "$SCRIPT" == breakpoint-* ]]; then
+            echo "임계값 또는 호출 상한으로 인한 중단(종료 코드 $status)은 Breakpoint의 정상 결과입니다."
             exit 0
           fi
           exit "$status"

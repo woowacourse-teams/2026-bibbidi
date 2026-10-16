@@ -9,6 +9,7 @@ import type { SummaryData } from './src/report/summary.ts';
 import { AccessTokenIssuer } from './src/common/token.ts';
 import { WindowMetrics } from './src/breakpoint/window-metrics.ts';
 import { WindowPlan } from './src/breakpoint/windows.ts';
+import { generalRules } from './src/breakpoint/window-rules.ts';
 
 const environment = Environment.fromEnv();
 
@@ -16,7 +17,6 @@ const plan = new WindowPlan({
   windowSeconds: numberFromEnv('WINDOW_SECONDS', 30),
   stepRate: numberFromEnv('STEP_RATE', 3),
   windows: numberFromEnv('WINDOWS', 20),
-  evalDelaySeconds: numberFromEnv('EVAL_DELAY_SECONDS', 20),
 });
 
 const mix = new SessionMix([
@@ -41,7 +41,7 @@ export const options: Options = {
       stages: plan.stages(),
     },
   },
-  thresholds: plan.thresholds(),
+  thresholds: plan.thresholds(generalRules(numberFromEnv('EVAL_DELAY_SECONDS', 20))),
   setupTimeout: '5m',
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
 };

@@ -4,11 +4,25 @@ export interface WindowPlanOptions {
   windowSeconds: number;
   stepRate: number;
   windows: number;
+  unitSeconds?: number;
+}
+
+export interface WindowRule {
+  metric: string;
+  expression: string;
   evalDelaySeconds: number;
 }
 
-export const WINDOW_LATENCY_LIMIT_MS = 1000;
-export const WINDOW_SERVER_ERROR_LIMIT = 0.01;
+export interface TrackedMetric {
+  metric: string;
+  expression: string;
+}
+
+export interface ThresholdSpec {
+  rules: readonly WindowRule[];
+  tracked: readonly TrackedMetric[];
+  global?: Record<string, Threshold[]>;
+}
 
 export class WindowPlan {
   constructor(private readonly options: WindowPlanOptions) {}
@@ -25,8 +39,16 @@ export class WindowPlan {
     return this.options.stepRate;
   }
 
+  get unitSeconds(): number {
+    return this.options.unitSeconds ?? 1;
+  }
+
   endRate(window: number): number {
     return this.options.stepRate * window;
+  }
+
+  perSecond(window: number): number {
+    return this.endRate(window) / this.unitSeconds;
   }
 
   windowAt(elapsedMs: number): number {
@@ -41,20 +63,19 @@ export class WindowPlan {
     }));
   }
 
-  thresholds(): NonNullable<Options['thresholds']> {
-    const thresholds: Record<string, Threshold[]> = {
-      dropped_iterations: [{ threshold: 'count==0', abortOnFail: true }],
-    };
+  thresholds(spec: ThresholdSpec): NonNullable<Options['thresholds']> {
+    const thresholds: Record<string, Threshold[]> = { ...spec.global };
 
     for (let window = 1; window <= this.options.windows; window += 1) {
-      const delay = `${(window - 1) * this.options.windowSeconds + this.options.evalDelaySeconds}s`;
-      thresholds[`window_latency{window:${window}}`] = [
-        { threshold: `p(99)<${WINDOW_LATENCY_LIMIT_MS}`, abortOnFail: true, delayAbortEval: delay },
-      ];
-      thresholds[`window_requests{window:${window}}`] = ['count>=0'];
-      thresholds[`window_server_error{window:${window}}`] = [
-        { threshold: `rate<${WINDOW_SERVER_ERROR_LIMIT}`, abortOnFail: true, delayAbortEval: delay },
-      ];
+      const windowStart = (window - 1) * this.options.windowSeconds;
+      for (const rule of spec.rules) {
+        thresholds[`${rule.metric}{window:${window}}`] = [
+          { threshold: rule.expression, abortOnFail: true, delayAbortEval: `${windowStart + rule.evalDelaySeconds}s` },
+        ];
+      }
+      for (const tracked of spec.tracked) {
+        thresholds[`${tracked.metric}{window:${window}}`] = [tracked.expression];
+      }
     }
 
     return thresholds;
