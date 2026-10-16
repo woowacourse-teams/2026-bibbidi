@@ -1,0 +1,55 @@
+diff --git a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
+index 90adfd3171beac39aed088547c772d280c685f5d..b0b9431d1e5420d05bf24ef002a0b98239026a4c 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
++++ b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.css
+@@ -45,10 +45,6 @@
+ .checklist-title-editor__edit svg {
+   width: 18px;
+   height: 18px;
+-  stroke: currentColor;
+-  stroke-linecap: round;
+-  stroke-linejoin: round;
+-  stroke-width: 1.8;
+ }
+ 
+ .checklist-title-editor__form {
+diff --git a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
+index fed5e0df1cc9d8e0e77b7fd5f98b10847b0c61a6..53a687c28ece37d59ea771e7dab6d25a13be00c9 100644
+--- a/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
++++ b/FE/src/features/checklist/view/ChecklistTaskTitleEditor.tsx
+@@ -17,11 +17,12 @@ interface ChecklistTaskTitleEditorProps {
+   titleId: string;
+ }
+ 
+-function PencilIcon() {
++function MoreIcon() {
+   return (
+-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+-      <path d="m4 20 4.2-1 9.9-9.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
+-      <path d="m13.8 7.4 2.8 2.8" />
++    <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
++      <circle cx="5" cy="12" r="1.7" />
++      <circle cx="12" cy="12" r="1.7" />
++      <circle cx="19" cy="12" r="1.7" />
+     </svg>
+   );
+ }
+@@ -202,7 +203,6 @@ export function ChecklistTaskTitleEditor({
+ 
+   return (
+     <div className="checklist-title-editor checklist-title-editor--read">
+-      <h2 id={titleId}>{task.title}</h2>
+       <button
+         aria-label="할 일 제목 수정"
+         className="checklist-title-editor__edit"
+@@ -211,8 +211,9 @@ export function ChecklistTaskTitleEditor({
+         ref={editButtonRef}
+         type="button"
+       >
+-        <PencilIcon />
++        <MoreIcon />
+       </button>
++      <h2 id={titleId}>{task.title}</h2>
+     </div>
+   );
+ }

@@ -10,6 +10,7 @@ function createItem(
     appointments: [],
     categoryId: "10",
     checklistItemId: 1,
+    createdAt: "2026-09-23T09:00:00",
     sourceCatalogItemId: 101,
     status: "prev",
     title: "할 일",
@@ -195,6 +196,83 @@ describe("createChecklistViewModel", () => {
     ]);
   });
 
+  it("빈 중분류를 제외하고 첫 미완료 중분류와 마지막 커스텀 묶음을 구성한다", () => {
+    const completedItem = createItem({
+      id: "checklist-item-1",
+      status: "done",
+      title: "완료한 일",
+    });
+    const incompleteItem = createItem({
+      id: "checklist-item-2",
+      status: "prev",
+      title: "남은 일",
+    });
+    const customItem = createItem({
+      id: "checklist-item-3",
+      sourceCatalogItemId: null,
+      title: "직접 추가한 일",
+    });
+    const [category] = createChecklistViewModel({
+      categories: [
+        {
+          customItems: [customItem],
+          id: "10",
+          items: [completedItem, incompleteItem, customItem],
+          steps: [
+            {
+              id: "step-1",
+              items: [completedItem],
+              order: 1,
+              title: "계약하기",
+            },
+            { id: "step-2", items: [], order: 2, title: "빈 단계" },
+            {
+              id: "step-3",
+              items: [incompleteItem],
+              order: 3,
+              title: "준비하기",
+            },
+          ],
+          title: "예식장",
+        },
+      ],
+    });
+
+    expect(
+      category?.groups.map(
+        ({ countLabel, expanded, numberLabel, progressLabel, title }) => ({
+          countLabel,
+          expanded,
+          numberLabel,
+          progressLabel,
+          title,
+        }),
+      ),
+    ).toEqual([
+      {
+        countLabel: "1/1",
+        expanded: false,
+        numberLabel: "01",
+        progressLabel: "100%",
+        title: "계약하기",
+      },
+      {
+        countLabel: "0/1",
+        expanded: true,
+        numberLabel: "03",
+        progressLabel: "0%",
+        title: "준비하기",
+      },
+      {
+        countLabel: "0/1",
+        expanded: false,
+        numberLabel: "+",
+        progressLabel: "0%",
+        title: "내가 추가한 일",
+      },
+    ]);
+  });
+
   it("전체 카테고리 순서와 항목 순서를 유지하고 진행률을 반올림한다", () => {
     const viewModel = createChecklistViewModel({
       categories: [
@@ -220,8 +298,8 @@ describe("createChecklistViewModel", () => {
       "항목 카테고리",
     ]);
     expect(viewModel[0]).toMatchObject({
-      countLabel: "0개",
-      expanded: false,
+      countLabel: "0/0",
+      groups: [],
       progress: 0,
       progressLabel: "0%",
     });
@@ -231,8 +309,7 @@ describe("createChecklistViewModel", () => {
       "두 번째",
     ]);
     expect(viewModel[1]).toMatchObject({
-      countLabel: "3개",
-      expanded: true,
+      countLabel: "1/3",
       progress: 33,
       progressLabel: "33%",
     });

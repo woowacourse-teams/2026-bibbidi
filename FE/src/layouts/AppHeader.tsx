@@ -1,9 +1,9 @@
-import { MouseEventHandler, ReactNode } from "react";
-import { NavLink } from "react-router";
+import { ReactNode } from "react";
+import { Link, NavLink, useLocation } from "react-router";
 
 import "./AppHeader.css";
 import { HeaderBrandLink } from "./HeaderBrandLink";
-import { appNavigationItems } from "./AppNavigation";
+import { appNavigationItems, isAppNavigationItemActive } from "./AppNavigation";
 
 interface AuthenticatedUser {
   kind: "authenticated";
@@ -23,11 +23,11 @@ interface PendingUser {
 }
 
 interface AppHeaderProps {
-  onPlannerNavigation?: MouseEventHandler<HTMLAnchorElement>;
   user: AuthenticatedUser | GuestUser | PendingUser;
 }
 
-export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
+export function AppHeader({ user }: AppHeaderProps) {
+  const { pathname } = useLocation();
   return (
     <header className="app-header">
       <div className="app-header__inner">
@@ -38,17 +38,18 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
             {appNavigationItems
               .filter((item) => item.showInDesktopHeader)
               .map((item) => (
-                <NavLink
-                  className="app-header__navigation-item"
-                  end={item.to === "/"}
-                  key={item.to}
-                  onClick={
-                    item.to === "/planner" ? onPlannerNavigation : undefined
+                <Link
+                  aria-current={
+                    isAppNavigationItemActive(pathname, item.to)
+                      ? "page"
+                      : undefined
                   }
+                  className="app-header__navigation-item"
+                  key={item.to}
                   to={item.to}
                 >
                   {item.label}
-                </NavLink>
+                </Link>
               ))}
           </nav>
         </div>
@@ -98,9 +99,6 @@ export function AppHeader({ onPlannerNavigation, user }: AppHeaderProps) {
           <nav aria-label="계정 메뉴" className="app-header__guest-actions">
             <NavLink className="app-header__login" to="/login">
               로그인
-            </NavLink>
-            <NavLink className="app-header__signup" to="/signup">
-              회원가입
             </NavLink>
           </nav>
         ) : (

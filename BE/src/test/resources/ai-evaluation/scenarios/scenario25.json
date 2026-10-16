@@ -15,12 +15,6 @@
       "content": "주례 없는 예식을 기준으로 준비를 살펴볼게요."
     }
   ],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "주례 섭외를 강요하지 않고 '예식 형태 결정'과 '식순 준비' 같은 일관된 항목을 제안한다.",
   "expectedRefusal": "none"
 }

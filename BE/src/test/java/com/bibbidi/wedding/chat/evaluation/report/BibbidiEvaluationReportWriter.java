@@ -13,7 +13,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationResponse;
@@ -21,8 +20,8 @@ import tools.jackson.databind.ObjectMapper;
 
 public class BibbidiEvaluationReportWriter {
 
-    private static final Path REPORT_PATH = Path.of("build/reports/ai-evaluation/result.json");
-    private static final Path SUMMARY_PATH = Path.of("build/reports/ai-evaluation/summary.md");
+    private final Path reportPath;
+    private final Path summaryPath;
 
     private final String generationModel;
     private final JudgeInfo judge;
@@ -31,37 +30,44 @@ public class BibbidiEvaluationReportWriter {
 
     public BibbidiEvaluationReportWriter(String generationModel, String judgeProvider, String judgeModel,
                                          String reasoningEffort) {
+        this(generationModel, judgeProvider, judgeModel, reasoningEffort, Path.of("build/reports/ai-evaluation"));
+    }
+
+    public BibbidiEvaluationReportWriter(String generationModel, String judgeProvider, String judgeModel,
+                                         String reasoningEffort, Path directory) {
+        this.reportPath = directory.resolve("result.json");
+        this.summaryPath = directory.resolve("summary.md");
         this.generationModel = generationModel;
         this.judge = new JudgeInfo(judgeProvider, judgeModel,
                 "codex".equals(judgeProvider) ? reasoningEffort : null);
     }
 
-    public void record(EvaluationScenario scenario, List<ModelCall> modelCalls, ChatResponse generationResponse,
-                       List<ObservedToolCall> observedToolCalls, List<Document> observedToolResults,
+    public void record(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer, List<Long> recommendedItemIds,
+                       List<Document> providedContext,
                        List<EvaluationResponse> evaluations) {
-        scenarios.add(scenarioResult(scenario, modelCalls, generationResponse, observedToolCalls,
-                observedToolResults, evaluations, "completed", null, null, null));
+        scenarios.add(scenarioResult(scenario, modelCalls, answer, recommendedItemIds,
+                providedContext, evaluations, "completed", null, null, null));
     }
 
-    public void recordFailure(EvaluationScenario scenario, List<ModelCall> modelCalls, ChatResponse generationResponse,
-                              List<ObservedToolCall> observedToolCalls, List<Document> observedToolResults,
+    public void recordFailure(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer, List<Long> recommendedItemIds,
+                              List<Document> providedContext,
                               List<EvaluationResponse> evaluations, String phase, String metricType,
                               Throwable failure) {
         String status = failure instanceof BibbidiUnscorableException ? "unscorable" : "error";
-        scenarios.add(scenarioResult(scenario, modelCalls, generationResponse, observedToolCalls,
-                observedToolResults, evaluations, status, phase, metricType, failure));
+        scenarios.add(scenarioResult(scenario, modelCalls, answer, recommendedItemIds,
+                providedContext, evaluations, status, phase, metricType, failure));
     }
 
     private ScenarioResult scenarioResult(EvaluationScenario scenario, List<ModelCall> modelCalls,
-                                          ChatResponse generationResponse, List<ObservedToolCall> observedToolCalls,
-                                          List<Document> observedToolResults, List<EvaluationResponse> evaluations,
+                                          String answer, List<Long> recommendedItemIds,
+                                          List<Document> providedContext, List<EvaluationResponse> evaluations,
                                           String status, String phase, String metricType, Throwable failure) {
         List<GenerationCall> calls = modelCalls.stream().map(this::generationCall).toList();
         ModelTokenUsage totalUsage = ModelTokenUsage.total(
                 calls.stream().map(GenerationCall::tokenUsage).toList());
         GenerationInfo generation = new GenerationInfo(
-                generationResponse == null ? null : generationResponse.getResult().getOutput().getText(),
-                calls, totalUsage);
+                answer, List.copyOf(recommendedItemIds),
+                providedContext.stream().map(Document::getText).toList(), calls, totalUsage);
         List<MetricResult> metricResults = new ArrayList<>(evaluations.stream().map(this::metricResult).toList());
         if (metricType != null) {
             metricResults.add(failedMetricResult(metricType, failure));
@@ -70,20 +76,17 @@ public class BibbidiEvaluationReportWriter {
                 phase, metricType, failure.getClass().getSimpleName(), failure.getMessage());
         return new ScenarioResult(scenario.name(), status, failureInfo, generation,
                 scenario.metrics(),
-                scenario.expectedToolCalls(),
-                List.copyOf(observedToolCalls),
-                observedToolResults.stream().map(Document::getText).toList(),
                 List.copyOf(metricResults));
     }
 
     public void write() throws IOException {
-        Files.createDirectories(REPORT_PATH.getParent());
+        Files.createDirectories(reportPath.getParent());
         Summary summary = summary();
         EvaluationReport report = new EvaluationReport(executedAt, generationModel, judge,
                 summary, List.copyOf(scenarios));
         String json = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(report);
-        Files.writeString(REPORT_PATH, json + System.lineSeparator(), StandardCharsets.UTF_8);
-        Files.writeString(SUMMARY_PATH, summaryMarkdown(summary), StandardCharsets.UTF_8);
+        Files.writeString(reportPath, json + System.lineSeparator(), StandardCharsets.UTF_8);
+        Files.writeString(summaryPath, summaryMarkdown(summary), StandardCharsets.UTF_8);
     }
 
     private Summary summary() {
@@ -141,18 +144,10 @@ public class BibbidiEvaluationReportWriter {
         ModelTokenUsage usage = ModelTokenUsage.fromSpring(
                 response.getMetadata() == null ? null : response.getMetadata().getUsage());
         return new GenerationCall(question, response.getResult().getOutput().getText(),
-                response.getResult().getOutput().getToolCalls().stream()
-                        .map(tool -> new ObservedToolCall(tool.name(), tool.arguments())).toList(),
                 usage);
     }
 
     private MessageInfo messageInfo(Message message) {
-        if (message instanceof ToolResponseMessage toolResponse) {
-            String content = toolResponse.getResponses().stream()
-                    .map(result -> result.name() + ": " + result.responseData())
-                    .reduce((first, second) -> first + "\n" + second).orElse("");
-            return new MessageInfo("tool", content);
-        }
         return new MessageInfo(message.getMessageType().getValue(), message.getText());
     }
 
@@ -170,19 +165,17 @@ public class BibbidiEvaluationReportWriter {
 
     private record ScenarioResult(String name, String status, FailureInfo failure, GenerationInfo generation,
                                   List<String> plannedMetrics,
-                                  List<EvaluationScenario.ExpectedToolCall> expectedToolCalls,
-                                  List<ObservedToolCall> observedToolCalls, List<String> observedToolResults,
                                   List<MetricResult> metrics) {
     }
 
     private record FailureInfo(String phase, String metricType, String type, String message) {
     }
 
-    private record GenerationInfo(String answer, List<GenerationCall> calls, ModelTokenUsage totalTokenUsage) {
+    private record GenerationInfo(String answer, List<Long> recommendedItemIds, List<String> providedContext,
+                                  List<GenerationCall> calls, ModelTokenUsage totalTokenUsage) {
     }
 
     private record GenerationCall(List<MessageInfo> question, String answer,
-                                  List<ObservedToolCall> requestedToolCalls,
                                   ModelTokenUsage tokenUsage) {
     }
 

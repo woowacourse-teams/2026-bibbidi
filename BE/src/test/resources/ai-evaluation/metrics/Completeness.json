@@ -30,7 +30,7 @@
     "chatMemory",
     "userMessage",
     "modelResponse",
-    "observedToolResults",
+    "providedContext",
     "referenceAnswer"
   ]
 }

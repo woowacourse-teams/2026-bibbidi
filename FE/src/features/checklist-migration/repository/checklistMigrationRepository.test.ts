@@ -30,6 +30,7 @@ function createChecklist(
     items: catalogItemIds.map((sourceCatalogItemId, index) => ({
       appointments: [],
       categoryId: 1,
+      createdAt: `2026-09-23T09:${String(index).padStart(2, "0")}:00`,
       id: index + 1,
       sourceCatalogItemId,
       status: "prev",
@@ -71,6 +72,7 @@ function createAddedItems(
   return catalogItemIds.map((catalogItemId) => ({
     catalogItemId,
     categoryId: 1,
+    createdAt: "2026-09-23T09:00:00",
     id: catalogItemId,
     status: "prev",
     title: `추가 항목 ${catalogItemId}`,
@@ -129,11 +131,11 @@ function createRepository(
 }
 
 describe("ChecklistMigrationRepository", () => {
-  it("로컬 ID가 없으면 서버 API를 호출하지 않는다", async () => {
+  it("로컬 ID가 없으면 추가 조회 없이 병합을 마친다", async () => {
     const local = createLocalDataSource();
     const dependencies = createRepository(local.dataSource);
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([]));
 
     expect(dependencies.queryRepository.getChecklist).not.toHaveBeenCalled();
     expect(
@@ -151,9 +153,9 @@ describe("ChecklistMigrationRepository", () => {
       createAddedItems([102]),
     );
     const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([101, null, 103]))
-      .mockResolvedValueOnce(createChecklist([101, 102, null, 103]));
+    vi.mocked(queryRepository.getChecklist).mockResolvedValueOnce(
+      createChecklist([101, 102, null, 103]),
+    );
     const dependencies = createRepository(
       local.dataSource,
       remoteDataSource,
@@ -161,7 +163,7 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([101, null, 103]));
 
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledWith(
       [102],
@@ -169,7 +171,7 @@ describe("ChecklistMigrationRepository", () => {
     );
     expect(local.getCatalogItemIds()).toEqual([]);
     expect(queryRepository.applyAddedItems).toHaveBeenCalledOnce();
-    expect(queryRepository.getChecklist).toHaveBeenCalledTimes(2);
+    expect(queryRepository.getChecklist).toHaveBeenCalledOnce();
   });
 
   it("모든 로컬 ID가 서버에 있으면 추가 요청 없이 정리한다", async () => {
@@ -185,40 +187,11 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([101, 102]));
 
     expect(
       dependencies.remoteDataSource.addCatalogItemIds,
     ).not.toHaveBeenCalled();
-    expect(local.getCatalogItemIds()).toEqual([]);
-  });
-
-  it("체크리스트가 없으면 생성한 뒤 전체 로컬 ID를 추가한다", async () => {
-    const local = createLocalDataSource([101, 102]);
-    const remoteDataSource = createRemoteDataSource();
-    vi.mocked(remoteDataSource.addCatalogItemIds).mockResolvedValue(
-      createAddedItems([101, 102]),
-    );
-    const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([], false))
-      .mockResolvedValueOnce(createChecklist([]))
-      .mockResolvedValueOnce(createChecklist([101, 102]));
-    const commandRepository = createCommandRepository();
-    const dependencies = createRepository(
-      local.dataSource,
-      remoteDataSource,
-      commandRepository,
-      queryRepository,
-    );
-
-    await dependencies.repository.migrate();
-
-    expect(commandRepository.ensureChecklist).toHaveBeenCalledOnce();
-    expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledWith(
-      [101, 102],
-      expect.any(AbortSignal),
-    );
     expect(local.getCatalogItemIds()).toEqual([]);
   });
 
@@ -230,7 +203,6 @@ describe("ChecklistMigrationRepository", () => {
       .mockResolvedValueOnce(createAddedItems([102]));
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([]))
       .mockResolvedValueOnce(createChecklist([101]))
       .mockResolvedValueOnce(createChecklist([101, 102]));
     const dependencies = createRepository(
@@ -240,7 +212,7 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([]));
 
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenNthCalledWith(
       1,
@@ -262,9 +234,9 @@ describe("ChecklistMigrationRepository", () => {
       .mockResolvedValueOnce(createAddedItems([101]))
       .mockResolvedValueOnce([]);
     const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([]))
-      .mockResolvedValue(createChecklist([101]));
+    vi.mocked(queryRepository.getChecklist).mockResolvedValue(
+      createChecklist([101]),
+    );
     const dependencies = createRepository(
       local.dataSource,
       remoteDataSource,
@@ -272,9 +244,9 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await expect(dependencies.repository.migrate()).rejects.toThrow(
-      "로컬 체크리스트를 서버에 병합하지 못했습니다.",
-    );
+    await expect(
+      dependencies.repository.migrate(createChecklist([])),
+    ).rejects.toThrow("로컬 체크리스트를 서버에 병합하지 못했습니다.");
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledTimes(2);
     expect(local.getCatalogItemIds()).toEqual([102]);
   });
@@ -295,32 +267,13 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await expect(dependencies.repository.migrate()).resolves.toBeUndefined();
+    await expect(
+      dependencies.repository.migrate(createChecklist([101])),
+    ).resolves.toBeUndefined();
     expect(local.getCatalogItemIds()).toEqual([101]);
     expect(
       dependencies.remoteDataSource.addCatalogItemIds,
     ).not.toHaveBeenCalled();
-  });
-
-  it("로컬 저장소 오류가 아닌 구현 오류는 숨기지 않는다", async () => {
-    const local = createLocalDataSource([101]);
-    vi.mocked(local.dataSource.removeCatalogItemIds).mockImplementation(() => {
-      throw new TypeError("unexpected implementation error");
-    });
-    const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist).mockResolvedValue(
-      createChecklist([101]),
-    );
-    const dependencies = createRepository(
-      local.dataSource,
-      createRemoteDataSource(),
-      createCommandRepository(),
-      queryRepository,
-    );
-
-    await expect(dependencies.repository.migrate()).rejects.toThrow(
-      "unexpected implementation error",
-    );
   });
 
   it("중복 충돌 후 서버 차집합을 다시 계산해 누락 ID만 재시도한다", async () => {
@@ -331,7 +284,6 @@ describe("ChecklistMigrationRepository", () => {
       .mockResolvedValueOnce(createAddedItems([102]));
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([]))
       .mockResolvedValueOnce(createChecklist([101]))
       .mockResolvedValueOnce(createChecklist([101, 102]));
     const dependencies = createRepository(
@@ -341,7 +293,7 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([]));
 
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenNthCalledWith(
       1,
@@ -365,7 +317,6 @@ describe("ChecklistMigrationRepository", () => {
     const queryRepository = createQueryRepository();
     vi.mocked(queryRepository.getChecklist)
       .mockResolvedValueOnce(createChecklist([]))
-      .mockResolvedValueOnce(createChecklist([]))
       .mockResolvedValueOnce(createChecklist([101]));
     const commandRepository = createCommandRepository();
     const dependencies = createRepository(
@@ -375,7 +326,7 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await dependencies.repository.migrate();
+    await dependencies.repository.migrate(createChecklist([]));
 
     expect(commandRepository.reconcileMissingChecklist).toHaveBeenCalledOnce();
     expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledTimes(2);
@@ -390,28 +341,23 @@ describe("ChecklistMigrationRepository", () => {
     );
     const dependencies = createRepository(local.dataSource, remoteDataSource);
 
-    await expect(dependencies.repository.migrate()).rejects.toThrow(
-      "로컬 체크리스트를 서버에 병합하지 못했습니다.",
-    );
+    await expect(
+      dependencies.repository.migrate(createChecklist([])),
+    ).rejects.toThrow("로컬 체크리스트를 서버에 병합하지 못했습니다.");
     expect(local.getCatalogItemIds()).toEqual([101]);
   });
 
-  it("인증 오류를 인증 재확인용 오류로 변환한다", async () => {
+  it("추가 요청의 인증 오류를 인증 재확인용 오류로 변환한다", async () => {
     const local = createLocalDataSource([101]);
-    const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist).mockRejectedValue(
-      new MyChecklistAuthenticationRequiredError(),
+    const remoteDataSource = createRemoteDataSource();
+    vi.mocked(remoteDataSource.addCatalogItemIds).mockRejectedValue(
+      new RemoteChecklistApiError(201, 401),
     );
-    const dependencies = createRepository(
-      local.dataSource,
-      createRemoteDataSource(),
-      createCommandRepository(),
-      queryRepository,
-    );
+    const dependencies = createRepository(local.dataSource, remoteDataSource);
 
-    await expect(dependencies.repository.migrate()).rejects.toBeInstanceOf(
-      ChecklistMigrationAuthenticationRequiredError,
-    );
+    await expect(
+      dependencies.repository.migrate(createChecklist([])),
+    ).rejects.toBeInstanceOf(ChecklistMigrationAuthenticationRequiredError);
     expect(local.getCatalogItemIds()).toEqual([101]);
   });
 
@@ -422,9 +368,9 @@ describe("ChecklistMigrationRepository", () => {
       createAddedItems([101]),
     );
     const queryRepository = createQueryRepository();
-    vi.mocked(queryRepository.getChecklist)
-      .mockResolvedValueOnce(createChecklist([]))
-      .mockRejectedValueOnce(new MyChecklistAuthenticationRequiredError());
+    vi.mocked(queryRepository.getChecklist).mockRejectedValueOnce(
+      new MyChecklistAuthenticationRequiredError(),
+    );
     const dependencies = createRepository(
       local.dataSource,
       remoteDataSource,
@@ -432,9 +378,9 @@ describe("ChecklistMigrationRepository", () => {
       queryRepository,
     );
 
-    await expect(dependencies.repository.migrate()).rejects.toBeInstanceOf(
-      ChecklistMigrationAuthenticationRequiredError,
-    );
+    await expect(
+      dependencies.repository.migrate(createChecklist([])),
+    ).rejects.toBeInstanceOf(ChecklistMigrationAuthenticationRequiredError);
   });
 
   it("호출자 취소 시 미반영 ID를 보존한다", async () => {
@@ -448,7 +394,10 @@ describe("ChecklistMigrationRepository", () => {
     );
     const dependencies = createRepository(local.dataSource, remoteDataSource);
     const controller = new AbortController();
-    const migration = dependencies.repository.migrate(controller.signal);
+    const migration = dependencies.repository.migrate(
+      createChecklist([]),
+      controller.signal,
+    );
 
     await vi.waitFor(() =>
       expect(remoteDataSource.addCatalogItemIds).toHaveBeenCalledOnce(),

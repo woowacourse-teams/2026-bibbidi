@@ -4,8 +4,10 @@ import { RemoteCatalogRequestAbortedError } from "../../catalog/data-source/remo
 import { LocalChecklistDataSource } from "../data-source/localChecklistDataSource";
 import {
   ChecklistAudience,
+  ChecklistQueryCategoryModel,
   ChecklistQueryItemModel,
   ChecklistQueryModel,
+  ChecklistQueryStepModel,
 } from "../model/checklistQuery";
 import { MyChecklistItemModel } from "../model/myChecklist";
 import {
@@ -47,6 +49,15 @@ export class UnknownChecklistCategoryError extends ChecklistQueryLoadError {
   }
 }
 
+export class UnknownChecklistCatalogItemError extends ChecklistQueryLoadError {
+  constructor(readonly catalogItemId: number) {
+    super(
+      `체크리스트 항목의 원본 항목을 Catalog에서 찾을 수 없습니다: ${catalogItemId}`,
+    );
+    this.name = "UnknownChecklistCatalogItemError";
+  }
+}
+
 export interface ChecklistQueryRepository {
   getChecklist(
     audience: ChecklistAudience,
@@ -78,49 +89,26 @@ function toChecklistQueryError(error: unknown, signal?: AbortSignal): Error {
   return new ChecklistQueryLoadError(undefined, { cause: error });
 }
 
-function getCatalogItemsByCategory(
-  catalog: CatalogModel,
-  selectedCatalogItemIds: ReadonlySet<number>,
-) {
+function getCatalogStructure(catalog: CatalogModel) {
   const stepDetailsById = new Map(
     catalog.stepDetails.map((stepDetail) => [stepDetail.stepId, stepDetail]),
   );
 
-  return new Map(
-    catalog.categories.map((category) => {
-      const roadmap = catalog.roadmaps.find(
-        (candidate) => candidate.categoryId === category.id,
-      );
-      const items =
-        roadmap?.steps.flatMap((step) => {
-          const stepDetail = stepDetailsById.get(step.id);
+  return catalog.categories.map((category) => {
+    const roadmap = catalog.roadmaps.find(
+      (candidate) => candidate.categoryId === category.id,
+    );
 
-          return (
-            stepDetail?.tasks.flatMap((task): ChecklistQueryItemModel[] => {
-              const catalogItemId = Number(task.id);
-
-              if (!selectedCatalogItemIds.has(catalogItemId)) {
-                return [];
-              }
-
-              return [
-                {
-                  appointments: [],
-                  categoryId: category.id,
-                  checklistItemId: null,
-                  id: `catalog-item-${catalogItemId}`,
-                  sourceCatalogItemId: catalogItemId,
-                  status: "prev",
-                  title: task.title,
-                },
-              ];
-            }) ?? []
-          );
-        }) ?? [];
-
-      return [category.id, items] as const;
-    }),
-  );
+    return {
+      category,
+      steps: [...(roadmap?.steps ?? [])]
+        .sort((left, right) => left.order - right.order)
+        .map((step) => ({
+          ...step,
+          catalogItems: stepDetailsById.get(step.id)?.tasks ?? [],
+        })),
+    };
+  });
 }
 
 function toAuthenticatedItem(item: MyChecklistItemModel) {
@@ -128,6 +116,7 @@ function toAuthenticatedItem(item: MyChecklistItemModel) {
     appointments: item.appointments.map((appointment) => ({ ...appointment })),
     categoryId: String(item.categoryId),
     checklistItemId: item.id,
+    createdAt: item.createdAt,
     id: `checklist-item-${item.id}`,
     sourceCatalogItemId: item.sourceCatalogItemId,
     status: item.status,
@@ -135,21 +124,83 @@ function toAuthenticatedItem(item: MyChecklistItemModel) {
   } satisfies ChecklistQueryItemModel;
 }
 
+function requireCustomItemCreatedAt(
+  item: MyChecklistItemModel,
+): MyChecklistItemModel & { createdAt: string } {
+  if (item.createdAt === null) {
+    throw new ChecklistQueryLoadError(
+      `직접 추가한 체크리스트 항목의 생성 시각이 없습니다: ${item.id}`,
+    );
+  }
+
+  return { ...item, createdAt: item.createdAt };
+}
+
+function createGroupedCategory(
+  id: string,
+  title: string,
+  steps: ChecklistQueryStepModel[],
+  customItems: ChecklistQueryItemModel[],
+): ChecklistQueryCategoryModel {
+  return {
+    customItems,
+    id,
+    get items() {
+      return [...steps.flatMap((step) => step.items), ...customItems];
+    },
+    steps,
+    title,
+  };
+}
+
 function assembleGuestChecklist(
   catalog: CatalogModel,
   catalogItemIds: number[],
 ): ChecklistQueryModel {
-  const itemsByCategory = getCatalogItemsByCategory(
-    catalog,
-    new Set(catalogItemIds),
+  const selectedCatalogItemIds = new Set(catalogItemIds);
+  const catalogStructure = getCatalogStructure(catalog);
+  const knownCatalogItemIds = new Set(
+    catalogStructure.flatMap(({ steps }) =>
+      steps.flatMap((step) => step.catalogItems.map((item) => Number(item.id))),
+    ),
   );
 
+  for (const catalogItemId of selectedCatalogItemIds) {
+    if (!knownCatalogItemIds.has(catalogItemId)) {
+      throw new UnknownChecklistCatalogItemError(catalogItemId);
+    }
+  }
+
   return {
-    categories: catalog.categories.map((category) => ({
-      id: category.id,
-      items: itemsByCategory.get(category.id) ?? [],
-      title: category.label,
-    })),
+    categories: catalogStructure.map(({ category, steps }) => {
+      const querySteps = steps.map((step) => ({
+        id: step.id,
+        items: step.catalogItems.flatMap((item): ChecklistQueryItemModel[] => {
+          const catalogItemId = Number(item.id);
+
+          if (!selectedCatalogItemIds.has(catalogItemId)) {
+            return [];
+          }
+
+          return [
+            {
+              appointments: [],
+              categoryId: category.id,
+              checklistItemId: null,
+              createdAt: null,
+              id: `catalog-item-${catalogItemId}`,
+              sourceCatalogItemId: catalogItemId,
+              status: "prev",
+              title: item.title,
+            },
+          ];
+        }),
+        order: step.order,
+        title: step.title,
+      }));
+
+      return createGroupedCategory(category.id, category.label, querySteps, []);
+    }),
   };
 }
 
@@ -167,14 +218,70 @@ function assembleAuthenticatedChecklist(
     }
   }
 
+  const catalogStructure = getCatalogStructure(catalog);
+  const catalogLocationByItemId = new Map(
+    catalogStructure.flatMap(({ category, steps }) =>
+      steps.flatMap((step) =>
+        step.catalogItems.map(
+          (item) =>
+            [
+              Number(item.id),
+              { categoryId: category.id, stepId: step.id },
+            ] as const,
+        ),
+      ),
+    ),
+  );
+
+  for (const item of checklistItems) {
+    if (item.sourceCatalogItemId === null) {
+      continue;
+    }
+
+    const location = catalogLocationByItemId.get(item.sourceCatalogItemId);
+
+    if (!location || location.categoryId !== String(item.categoryId)) {
+      throw new UnknownChecklistCatalogItemError(item.sourceCatalogItemId);
+    }
+  }
+
   return {
-    categories: catalog.categories.map((category) => ({
-      id: category.id,
-      items: checklistItems
-        .filter((item) => String(item.categoryId) === category.id)
-        .map(toAuthenticatedItem),
-      title: category.label,
-    })),
+    categories: catalogStructure.map(({ category, steps }) => {
+      const customItems = checklistItems
+        .filter(
+          (item) =>
+            String(item.categoryId) === category.id &&
+            item.sourceCatalogItemId === null,
+        )
+        .map(requireCustomItemCreatedAt)
+        .sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) || left.id - right.id,
+        )
+        .map(toAuthenticatedItem);
+      const querySteps = steps.map((step) => ({
+        id: step.id,
+        items: step.catalogItems.flatMap(
+          (catalogItem): ChecklistQueryItemModel[] => {
+            const item = checklistItems.find(
+              (candidate) =>
+                candidate.sourceCatalogItemId === Number(catalogItem.id),
+            );
+
+            return item ? [toAuthenticatedItem(item)] : [];
+          },
+        ),
+        order: step.order,
+        title: step.title,
+      }));
+
+      return createGroupedCategory(
+        category.id,
+        category.label,
+        querySteps,
+        customItems,
+      );
+    }),
   };
 }
 

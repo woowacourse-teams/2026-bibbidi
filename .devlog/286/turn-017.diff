@@ -1,0 +1,12 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index d4663d684b061ccb44a38e328e24cd0e4a80269e..a34e3c5d3785239f6c0176a4c1f7e749becb441d 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -183,6 +183,7 @@
+ 
+ @media (max-width: 520px) {
+   .social-login-form {
++    margin-top: clamp(20px, 6vh, 48px);
+     border-color: var(--color-stroke-neutral-weak);
+     border-radius: 18px;
+     box-shadow: 0 10px 28px rgb(103 75 55 / 8%);

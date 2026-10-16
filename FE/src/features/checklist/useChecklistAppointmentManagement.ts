@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import {
+  addErrorAction,
+  reportHandledError,
+} from "../../infrastructure/error-tracking";
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
   ChecklistAppointmentFormDraft,
@@ -215,6 +219,7 @@ export function useChecklistAppointmentManagement({
     requestControllerRef.current = controller;
     inFlightRef.current = true;
     setOperationFeedback({ appointmentId, operation, status: "pending" });
+    addErrorAction(`appointment.${operation}`);
 
     try {
       await command(controller.signal);
@@ -232,6 +237,18 @@ export function useChecklistAppointmentManagement({
       }
       if (error instanceof MyChecklistAuthenticationRequiredError) {
         refreshAuth();
+      } else if (
+        !(error instanceof AppointmentManagementError) ||
+        error.reason === "unknown"
+      ) {
+        reportHandledError(error, {
+          feature: "checklist",
+          operation: `appointment_${operation}`,
+          failureKind:
+            error instanceof AppointmentManagementError
+              ? error.reason
+              : "unknown",
+        });
       }
       setOperationFeedback({
         appointmentId,

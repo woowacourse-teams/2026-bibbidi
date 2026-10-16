@@ -6,12 +6,6 @@
   ],
   "userMessage": "웨딩홀 계약 전 준비 항목을 정확히 두 개, 항목명과 이유 한 문장씩 추천해 주세요.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "'예식 지역 결정'과 '웨딩홀 투어' 등 실제 항목을 정확히 두 개 제시하고 각 이유를 한 문장으로 적는다.",
   "expectedRefusal": "none"
 }

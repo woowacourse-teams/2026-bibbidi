@@ -1,0 +1,22 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index 5cfd7438ce9de01e51ad998a228f0ddb49d20c53..6f2f5fa2f53701296aeaf60266660aab7aacf798 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -6,7 +6,7 @@
+ }
+ 
+ .social-login-form__intro {
+-  margin-bottom: 32px;
++  margin-bottom: 56px;
+ }
+ 
+ .social-login-form__headline {
+@@ -181,7 +181,7 @@
+   }
+ 
+   .social-login-form__intro {
+-    margin-bottom: 28px;
++    margin-bottom: 48px;
+   }
+ 
+   .social-login-form__headline {

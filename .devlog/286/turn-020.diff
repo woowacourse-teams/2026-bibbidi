@@ -1,0 +1,91 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index 6f2f5fa2f53701296aeaf60266660aab7aacf798..15253cdab851a2865f08649addbd57c2a4dcf888 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -2,17 +2,17 @@
+   display: flex;
+   width: min(100%, 440px);
+   flex-direction: column;
+-  padding: 48px 44px 40px;
++  padding: 0 44px 40px;
+ }
+ 
+ .social-login-form__intro {
+-  margin-bottom: 56px;
++  margin-bottom: 128px;
+ }
+ 
+ .social-login-form__headline {
+   display: flex;
+   flex-direction: column;
+-  gap: 6px;
++  gap: 10px;
+   margin: 0;
+   color: var(--color-fg-neutral);
+   font-size: clamp(25px, 3vw, 31px);
+@@ -176,12 +176,11 @@
+ 
+ @media (max-width: 520px) {
+   .social-login-form {
+-    margin-top: clamp(20px, 6vh, 48px);
+-    padding: 36px 24px 32px;
++    padding: 0 24px 32px;
+   }
+ 
+   .social-login-form__intro {
+-    margin-bottom: 48px;
++    margin-bottom: 120px;
+   }
+ 
+   .social-login-form__headline {
+@@ -194,4 +193,4 @@
+     padding-right: 20px;
+     padding-left: 20px;
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/FE/src/layouts/AuthLayout.css b/FE/src/layouts/AuthLayout.css
+index 2102f139a74280faa78e6eab14826d503e1ef10c..39706aafccb2def72a6dd86c43432f2592eb4a32 100644
+--- a/FE/src/layouts/AuthLayout.css
++++ b/FE/src/layouts/AuthLayout.css
+@@ -13,9 +13,18 @@
+   padding: 56px 24px 96px;
+ }
+ 
++.auth-page--login {
++  align-items: start;
++  padding-top: 48px;
++}
++
+ @media (max-width: 760px) {
+   .auth-page {
+     align-items: start;
+     padding: 42px 16px 48px;
+   }
++
++  .auth-page--login {
++    padding-top: 48px;
++  }
+ }
+diff --git a/FE/src/layouts/AuthLayout.tsx b/FE/src/layouts/AuthLayout.tsx
+index 73cfab43632a41500bf9ae4c1406eb1ac545ab03..553c785a7edf9707ad49202a2abc5506223ce174 100644
+--- a/FE/src/layouts/AuthLayout.tsx
++++ b/FE/src/layouts/AuthLayout.tsx
+@@ -7,6 +7,7 @@ import "./AuthLayout.css";
+ export function AuthLayout() {
+   const { authState } = useAuth();
+   const { pathname, search } = useLocation();
++  const isLoginPath = pathname === "/login";
+   const isOnboardingPath =
+     pathname === "/onboarding" || pathname === "/onboarding/account";
+ 
+@@ -33,7 +34,7 @@ export function AuthLayout() {
+     <div className="auth-layout">
+       <BrandHeader />
+ 
+-      <main className="auth-page">
++      <main className={`auth-page${isLoginPath ? " auth-page--login" : ""}`}>
+         {authState.status === "loading" ||
+         authState.status === "synchronizing" ? (
+           <p role="status">로그인 상태를 확인하고 있습니다.</p>

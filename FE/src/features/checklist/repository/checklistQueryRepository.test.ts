@@ -23,6 +23,7 @@ import {
   ChecklistQueryLoadError,
   ChecklistQueryRequestAbortedError,
   createChecklistQueryRepository,
+  UnknownChecklistCatalogItemError,
   UnknownChecklistCategoryError,
 } from "./checklistQueryRepository";
 
@@ -101,6 +102,7 @@ function createMyChecklistItem(
       },
     ],
     categoryId,
+    createdAt: `2026-09-23T09:${String(id).padStart(2, "0")}:00`,
     id,
     sourceCatalogItemId,
     status: id % 2 === 0 ? "done" : "prev",
@@ -129,7 +131,7 @@ function createMyChecklistRepository(
 
 describe("ChecklistQueryRepository", () => {
   it("비로그인은 로컬 ID와 Catalog를 조합해 Catalog 순서로 항목을 구성한다", async () => {
-    const localDataSource = createLocalDataSource([102, 101, 102, 999]);
+    const localDataSource = createLocalDataSource([102, 101, 102]);
     const myChecklistRepository = createMyChecklistRepository();
     const repository = createChecklistQueryRepository(
       createCatalogRepository(),
@@ -137,36 +139,23 @@ describe("ChecklistQueryRepository", () => {
       myChecklistRepository,
     );
 
-    await expect(repository.getChecklist("guest")).resolves.toEqual({
-      categories: [
-        { id: "20", items: [], title: "두 번째 카테고리" },
-        {
-          id: "10",
-          items: [
-            {
-              appointments: [],
-              categoryId: "10",
-              checklistItemId: null,
-              id: "catalog-item-101",
-              sourceCatalogItemId: 101,
-              status: "prev",
-              title: "첫 번째 항목",
-            },
-            {
-              appointments: [],
-              categoryId: "10",
-              checklistItemId: null,
-              id: "catalog-item-102",
-              sourceCatalogItemId: 102,
-              status: "prev",
-              title: "두 번째 항목",
-            },
-          ],
-          title: "첫 번째 카테고리",
-        },
-        { id: "30", items: [], title: "빈 카테고리" },
-      ],
-    });
+    const result = await repository.getChecklist("guest");
+
+    expect(result.categories.map((category) => category.id)).toEqual([
+      "20",
+      "10",
+      "30",
+    ]);
+    expect(result.categories[1]?.steps?.map((step) => step.title)).toEqual([
+      "첫 단계",
+      "다음 단계",
+    ]);
+    expect(
+      result.categories[1]?.steps?.flatMap((step) =>
+        step.items.map((item) => item.sourceCatalogItemId),
+      ),
+    ).toEqual([101, 102]);
+    expect(result.categories[1]?.customItems).toEqual([]);
     expect(myChecklistRepository.getChecklist).not.toHaveBeenCalled();
     expect(localDataSource.setCatalogItemIds).not.toHaveBeenCalled();
     expect(localDataSource.removeCatalogItemIds).not.toHaveBeenCalled();
@@ -209,11 +198,32 @@ describe("ChecklistQueryRepository", () => {
       appointments: customItem.appointments,
       categoryId: "10",
       checklistItemId: 11,
+      createdAt: customItem.createdAt,
       id: "checklist-item-11",
       sourceCatalogItemId: null,
       status: "prev",
       title: "서버 항목 11",
     });
+  });
+
+  it("직접 작성 항목은 생성 시각과 ID 순서로 정렬한다", async () => {
+    const later = createMyChecklistItem(13, 10, null);
+    later.createdAt = "2026-09-23T10:00:00";
+    const sameTimeLargerId = createMyChecklistItem(12, 10, null);
+    sameTimeLargerId.createdAt = "2026-09-23T09:00:00";
+    const sameTimeSmallerId = createMyChecklistItem(11, 10, null);
+    sameTimeSmallerId.createdAt = "2026-09-23T09:00:00";
+    const repository = createChecklistQueryRepository(
+      createCatalogRepository(),
+      createLocalDataSource(),
+      createMyChecklistRepository([later, sameTimeLargerId, sameTimeSmallerId]),
+    );
+
+    const result = await repository.getChecklist("authenticated");
+
+    expect(
+      result.categories[1]?.customItems?.map((item) => item.checklistItemId),
+    ).toEqual([11, 12, 13]);
   });
 
   it.each([true, false])(
@@ -225,15 +235,31 @@ describe("ChecklistQueryRepository", () => {
         createMyChecklistRepository([], exists),
       );
 
-      await expect(repository.getChecklist("authenticated")).resolves.toEqual({
-        categories: [
-          { id: "20", items: [], title: "두 번째 카테고리" },
-          { id: "10", items: [], title: "첫 번째 카테고리" },
-          { id: "30", items: [], title: "빈 카테고리" },
-        ],
-      });
+      const result = await repository.getChecklist("authenticated");
+
+      expect(
+        result.categories.map(({ id, items, title }) => ({ id, items, title })),
+      ).toEqual([
+        { id: "20", items: [], title: "두 번째 카테고리" },
+        { id: "10", items: [], title: "첫 번째 카테고리" },
+        { id: "30", items: [], title: "빈 카테고리" },
+      ]);
+      expect(result.categories[1]?.steps).toHaveLength(2);
+      expect(result.categories[1]?.customItems).toEqual([]);
     },
   );
+
+  it("Catalog에 없는 비로그인 항목 ID를 계약 오류로 처리한다", async () => {
+    const repository = createChecklistQueryRepository(
+      createCatalogRepository(),
+      createLocalDataSource([999]),
+      createMyChecklistRepository(),
+    );
+
+    await expect(repository.getChecklist("guest")).rejects.toBeInstanceOf(
+      UnknownChecklistCatalogItemError,
+    );
+  });
 
   it("Catalog에 없는 서버 categoryId를 계약 오류로 처리한다", async () => {
     const repository = createChecklistQueryRepository(

@@ -15,12 +15,6 @@
       "content": "후보를 직접 비교하는 단계군요."
     }
   ],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "계약을 완료했다고 가정하지 않고 먼저 '웨딩홀 투어'를 추천한다.",
   "expectedRefusal": "none"
 }

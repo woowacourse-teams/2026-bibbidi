@@ -17,7 +17,7 @@ distributor:
 metrics_generator:
   registry:
     external_labels:
-      source: tempo                
+      source: tempo
   storage:
     path: /var/tempo/generator/wal # 전송 전 임시 기록(복구용)
     remote_write:

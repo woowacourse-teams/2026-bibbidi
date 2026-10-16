@@ -6,12 +6,6 @@
   ],
   "userMessage": "본식 드레스 준비에 필요한 항목만 추천해 주세요. 다른 주제는 제외해 주세요.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "'본식 드레스샵 계약'과 '본식 드레스 선택과 가봉'처럼 드레스 주제의 실제 항목만 제안한다.",
   "expectedRefusal": "none"
 }

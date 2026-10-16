@@ -64,13 +64,13 @@ type CreatePreparationItemAddEventParameters =
       categoryName: string;
       itemCount: number;
       phase: number;
-      source: "planner_recommendation";
+      source: "calendar_recommendation";
     };
 
 export function createPreparationItemAddEvent(
   parameters: CreatePreparationItemAddEventParameters,
 ): AnalyticsEvent {
-  if (parameters.source === "planner_recommendation") {
+  if (parameters.source === "calendar_recommendation") {
     return {
       name: "preparation_item_add",
       parameters: {

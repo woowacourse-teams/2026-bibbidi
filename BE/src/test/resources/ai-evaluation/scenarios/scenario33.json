@@ -6,12 +6,6 @@
   ],
   "userMessage": "Please recommend two wedding preparation items for someone who has just booked a venue. Answer only in English.",
   "chatMemory": [],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "한국어로 실제 항목 두 개를 추천해 시스템의 언어 지침을 지키고 이미 예약한 웨딩홀은 제외한다.",
   "expectedRefusal": "none"
 }

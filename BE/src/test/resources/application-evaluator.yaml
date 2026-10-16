@@ -1,6 +1,6 @@
 spring:
-  config:
-    import: classpath:application-test.yaml
+  datasource:
+    url: jdbc:h2:mem:bibbidi-evaluation;IGNORECASE=TRUE
   ai:
     bedrock:
       converse:

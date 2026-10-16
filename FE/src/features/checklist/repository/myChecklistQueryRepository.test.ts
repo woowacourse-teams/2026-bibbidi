@@ -20,6 +20,7 @@ const checklist: MyChecklistModel = {
     {
       appointments: [],
       categoryId: 1,
+      createdAt: "2026-09-23T09:00:00",
       id: 10,
       sourceCatalogItemId: 101,
       status: "done",
@@ -228,6 +229,7 @@ describe("MyChecklistQueryRepository", () => {
       {
         appointments: [],
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 11,
         sourceCatalogItemId: 102,
         status: "prev",
@@ -236,6 +238,7 @@ describe("MyChecklistQueryRepository", () => {
       {
         appointments: [],
         categoryId: 3,
+        createdAt: "2026-09-23T09:00:00",
         id: 12,
         sourceCatalogItemId: 103,
         status: "continue",
@@ -250,6 +253,7 @@ describe("MyChecklistQueryRepository", () => {
         {
           appointments: [],
           categoryId: 2,
+          createdAt: "2026-09-23T09:00:00",
           id: 11,
           sourceCatalogItemId: 102,
           status: "prev",
@@ -258,6 +262,7 @@ describe("MyChecklistQueryRepository", () => {
         {
           appointments: [],
           categoryId: 3,
+          createdAt: "2026-09-23T09:00:00",
           id: 12,
           sourceCatalogItemId: 103,
           status: "continue",
@@ -290,6 +295,7 @@ describe("MyChecklistQueryRepository", () => {
     const secondItem = {
       appointments: [],
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 11,
       sourceCatalogItemId: 102,
       status: "continue" as const,
@@ -342,6 +348,7 @@ describe("MyChecklistQueryRepository", () => {
     const secondItem = {
       appointments: [],
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 11,
       sourceCatalogItemId: 102,
       status: "continue" as const,
@@ -489,6 +496,7 @@ describe("MyChecklistQueryRepository", () => {
     const addedItem = {
       appointments: [],
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 11,
       sourceCatalogItemId: 102,
       status: "prev" as const,
@@ -517,6 +525,7 @@ describe("MyChecklistQueryRepository", () => {
     const newItem = {
       appointments: [],
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 11,
       sourceCatalogItemId: 102,
       status: "prev" as const,
@@ -565,6 +574,7 @@ describe("MyChecklistQueryRepository", () => {
       {
         appointments: [],
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 11,
         sourceCatalogItemId: 102,
         status: "prev",

@@ -12,10 +12,10 @@ public class BibbidiEvaluationRequest extends EvaluationRequest {
 
     public BibbidiEvaluationRequest(
             EvaluationScenario scenario,
-            List<Document> observedToolResults,
+            List<Document> providedContext,
             String responseContent
     ) {
-        super(scenario.userMessage(), observedToolResults, responseContent);
+        super(scenario.userMessage(), providedContext, responseContent);
         this.scenario = scenario;
     }
 
@@ -30,7 +30,7 @@ public class BibbidiEvaluationRequest extends EvaluationRequest {
                     .collect(Collectors.joining("\n"));
             case "userMessage" -> getUserText();
             case "modelResponse" -> getResponseContent();
-            case "observedToolResults" -> getDataList().stream()
+            case "providedContext" -> getDataList().stream()
                     .map(Document::getText)
                     .collect(Collectors.joining("\n"));
             case "referenceAnswer" -> scenario.referenceAnswer();

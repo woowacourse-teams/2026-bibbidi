@@ -23,12 +23,6 @@
       "content": "그다음 단계를 찾아볼게요."
     }
   ],
-  "expectedToolCalls": [
-    {
-      "name": "findCatalog",
-      "arguments": {}
-    }
-  ],
   "referenceAnswer": "이미 완료한 '촬영 사진 셀렉'과 '보정본 수령'을 제외하고 '앨범 구성 결정과 주문'을 추천한다.",
   "expectedRefusal": "none"
 }

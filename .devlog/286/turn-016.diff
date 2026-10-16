@@ -1,0 +1,123 @@
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.css b/FE/src/features/social-login/view/SocialLoginForm.css
+index 566cbf7c0f61ca58064885dbb31b552293afd8d5..d4663d684b061ccb44a38e328e24cd0e4a80269e 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.css
++++ b/FE/src/features/social-login/view/SocialLoginForm.css
+@@ -19,8 +19,8 @@
+ .social-login-form__headline {
+   display: flex;
+   flex-direction: column;
+-  gap: 2px;
+-  margin: 0 0 28px;
++  gap: 6px;
++  margin: 0;
+   color: var(--color-fg-neutral);
+   font-size: clamp(25px, 3vw, 31px);
+   font-weight: 800;
+@@ -37,15 +37,6 @@
+   letter-spacing: -0.065em;
+ }
+ 
+-.social-login-form__title {
+-  margin: 0;
+-  color: var(--color-fg-neutral);
+-  font-size: 19px;
+-  font-weight: 800;
+-  line-height: 1.4;
+-  letter-spacing: -0.03em;
+-}
+-
+ .social-login-form__buttons {
+   display: flex;
+   flex-direction: column;
+@@ -203,13 +194,8 @@
+   }
+ 
+   .social-login-form__headline {
+-    margin-bottom: 24px;
+     font-size: clamp(23px, 7.2vw, 28px);
+   }
+-
+-  .social-login-form__title {
+-    font-size: 18px;
+-  }
+ }
+ 
+ @media (max-width: 360px) {
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.test.tsx b/FE/src/features/social-login/view/SocialLoginForm.test.tsx
+index ec170df80f9cf5042134e955bc47bc6f74e979dd..8fa8440609857c8c84e9661b54c55f6cc0389cab 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.test.tsx
++++ b/FE/src/features/social-login/view/SocialLoginForm.test.tsx
+@@ -14,9 +14,8 @@ describe("SocialLoginForm", () => {
+     const heading = screen.getByRole("heading", { level: 1 });
+ 
+     expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서bibbidi");
+-    expect(
+-      screen.getByRole("heading", { level: 2, name: "로그인" }),
+-    ).toBeTruthy();
++    expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
++    expect(screen.queryByRole("heading", { name: "로그인" })).toBeNull();
+   });
+ 
+   it("세 소셜 로그인 버튼과 기존 계정 연동 안내를 표시한다", () => {
+@@ -29,7 +28,7 @@ describe("SocialLoginForm", () => {
+       name: "기존 계정이 있으신가요?",
+     });
+     expect(guide.textContent).toContain(
+-      "소셜 로그인을 진행하면 기존 계정과 연동할 수 있어요.",
++      "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
+     );
+   });
+ 
+diff --git a/FE/src/features/social-login/view/SocialLoginForm.tsx b/FE/src/features/social-login/view/SocialLoginForm.tsx
+index ff4237841b63f5642433c38a27a3d108f796e4ac..849a1dcda1ab6f4fca01e655693f95f803fc312b 100644
+--- a/FE/src/features/social-login/view/SocialLoginForm.tsx
++++ b/FE/src/features/social-login/view/SocialLoginForm.tsx
+@@ -91,15 +91,12 @@ export function SocialLoginForm() {
+   };
+ 
+   return (
+-    <section aria-labelledby="social-login-title" className="social-login-form">
++    <section aria-label="소셜 로그인" className="social-login-form">
+       <header className="social-login-form__intro">
+         <h1 className="social-login-form__headline">
+           <span>모든 결혼 준비를 한 곳에서</span>
+           <span className="social-login-form__brand">bibbidi</span>
+         </h1>
+-        <h2 className="social-login-form__title" id="social-login-title">
+-          로그인
+-        </h2>
+       </header>
+ 
+       <div className="social-login-form__buttons">
+@@ -132,7 +129,7 @@ export function SocialLoginForm() {
+           <strong id="legacy-account-guide-title">
+             기존 계정이 있으신가요?
+           </strong>
+-          <span>소셜 로그인을 진행하면 기존 계정과 연동할 수 있어요.</span>
++          <span>소셜 로그인 후 기존 계정과 연동할 수 있어요.</span>
+         </span>
+       </aside>
+ 
+diff --git a/FE/src/pages/LoginPage.test.tsx b/FE/src/pages/LoginPage.test.tsx
+index b35b3871e23b8441457526db3396c50fa536f472..35978f67ef43812d55d7f76d4e121895afc9ab8d 100644
+--- a/FE/src/pages/LoginPage.test.tsx
++++ b/FE/src/pages/LoginPage.test.tsx
+@@ -7,7 +7,8 @@ describe("LoginPage", () => {
+   it("일반 로그인과 회원가입 없이 소셜 로그인과 기존 계정 안내를 표시한다", () => {
+     render(<LoginPage />);
+ 
+-    expect(screen.getByRole("heading", { name: "로그인" })).toBeTruthy();
++    expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
++    expect(screen.queryByRole("heading", { name: "로그인" })).toBeNull();
+     expect(screen.queryByLabelText("닉네임")).toBeNull();
+     expect(screen.queryByLabelText("비밀번호")).toBeNull();
+     expect(screen.queryByRole("link", { name: "회원가입" })).toBeNull();
+@@ -22,7 +23,7 @@ describe("LoginPage", () => {
+     ).toBeTruthy();
+     expect(screen.getByText("기존 계정이 있으신가요?")).toBeTruthy();
+     expect(
+-      screen.getByText("소셜 로그인을 진행하면 기존 계정과 연동할 수 있어요."),
++      screen.getByText("소셜 로그인 후 기존 계정과 연동할 수 있어요."),
+     ).toBeTruthy();
+   });
+ });

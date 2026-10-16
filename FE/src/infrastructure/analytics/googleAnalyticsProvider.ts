@@ -66,6 +66,16 @@ export function createGoogleAnalyticsProvider(
       googleTag("config", measurementId, { send_page_view: false });
     },
     track(event: AnalyticsEvent) {
+      if (event.name.startsWith("social_login_callback_")) {
+        // 콜백 첫 로드에는 page_view가 없으므로 GA 기본 URL에 code/state가 붙지 않게 한다.
+        googleTag?.("event", event.name, {
+          ...event.parameters,
+          page_location: `${window.location.origin}/auth/callback`,
+          page_referrer: "",
+          page_title: "소셜 로그인 결과",
+        });
+        return;
+      }
       const pageContext = createPageContext(event);
 
       if (pageContext) {

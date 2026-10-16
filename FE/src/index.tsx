@@ -7,8 +7,16 @@ import { router } from "./app/router";
 import { AuthProvider } from "./features/auth";
 import { ChecklistMigrationProvider } from "./features/checklist-migration";
 import { analytics } from "./infrastructure/analytics";
+import { preventLinkDrag } from "./infrastructure/browser/preventLinkDrag";
+import {
+  initializeErrorTracking,
+  reportHandledError,
+} from "./infrastructure/error-tracking";
 import "./styles/colors.css";
 import "./index.css";
+
+document.addEventListener("dragstart", preventLinkDrag);
+initializeErrorTracking();
 
 const rootElement = document.getElementById("root");
 
@@ -18,16 +26,35 @@ if (!rootElement) {
 
 analytics.initialize();
 
-createRoot(rootElement).render(
+createRoot(rootElement, {
+  onCaughtError: (error) =>
+    reportHandledError(error, {
+      feature: "app",
+      operation: "render",
+      level: "fatal",
+    }),
+  onUncaughtError: (error) =>
+    reportHandledError(error, {
+      feature: "app",
+      operation: "render",
+      level: "fatal",
+    }),
+}).render(
   <StrictMode>
     <AuthProvider>
       <ChecklistMigrationProvider>
-        <RouterProvider router={router} />
         <AppPageViewTracker
           analytics={analytics}
+          landingPage={{
+            pathname: window.location.pathname,
+            search: window.location.search,
+            referrer: document.referrer,
+          }}
           origin={window.location.origin}
           router={router}
-        />
+        >
+          <RouterProvider router={router} />
+        </AppPageViewTracker>
       </ChecklistMigrationProvider>
     </AuthProvider>
   </StrictMode>,
