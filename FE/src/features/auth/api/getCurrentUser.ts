@@ -1,10 +1,12 @@
 import { CurrentUser } from "../model/auth";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CURRENT_USER_ENDPOINT = `${apiBaseUrl}/api/users/me`;
 const CURRENT_USER_TIMEOUT_MS = 10_000;
 
 interface CurrentUserResponse {
+  id: number;
   nickname: string;
 }
 
@@ -43,7 +45,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isCurrentUserResponse(value: unknown): value is CurrentUserResponse {
-  return isRecord(value) && typeof value.nickname === "string";
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    Number.isSafeInteger(value.id) &&
+    value.id > 0 &&
+    typeof value.nickname === "string"
+  );
 }
 
 function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
@@ -68,6 +76,7 @@ function toRequestError(error: unknown, didTimeout: boolean): Error {
 
 export async function getCurrentUser(
   signal?: AbortSignal,
+  retryUnauthorized = true,
 ): Promise<CurrentUser> {
   const controller = new AbortController();
   let didTimeout = false;
@@ -87,11 +96,15 @@ export async function getCurrentUser(
     let response: Response;
 
     try {
-      response = await fetch(CURRENT_USER_ENDPOINT, {
-        credentials: "include",
-        method: "GET",
-        signal: controller.signal,
-      });
+      response = await authenticatedFetch(
+        CURRENT_USER_ENDPOINT,
+        {
+          credentials: "include",
+          method: "GET",
+          signal: controller.signal,
+        },
+        { retryUnauthorized },
+      );
     } catch (error) {
       throw toRequestError(error, didTimeout);
     }
@@ -137,6 +150,7 @@ export async function getCurrentUser(
     }
 
     return {
+      id: body.id,
       nickname: body.nickname,
     };
   } finally {

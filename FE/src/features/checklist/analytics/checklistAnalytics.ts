@@ -1,6 +1,6 @@
 import type { AnalyticsEvent } from "../../../infrastructure/analytics";
 
-export type AppointmentCreationSource = "checklist" | "planner";
+export type AppointmentCreationSource = "checklist" | "calendar";
 
 export function createChecklistTaskCreateEvent(
   categoryId: string,
@@ -46,12 +46,12 @@ export function createChecklistTaskCategoryUpdateEvent(
   };
 }
 
-export function createPlannerAppointmentStartEvent(): AnalyticsEvent {
+export function createCalendarAppointmentStartEvent(): AnalyticsEvent {
   return {
-    name: "planner_appointment_start",
+    name: "calendar_appointment_start",
     parameters: {
       entry_type: "unscheduled_task",
-      source: "planner",
+      source: "calendar",
     },
   };
 }

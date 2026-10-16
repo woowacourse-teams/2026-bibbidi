@@ -1,5 +1,7 @@
+import { clearWebAccessToken } from "../../../infrastructure/auth/webSessionManager";
+
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
-const LOGOUT_ENDPOINT = `${apiBaseUrl}/api/logout`;
+const LOGOUT_ENDPOINT = `${apiBaseUrl}/api/auth/web/sessions/current`;
 const LOGOUT_TIMEOUT_MS = 10_000;
 
 export class LogoutApiError extends Error {
@@ -78,6 +80,7 @@ export async function logout(signal?: AbortSignal): Promise<void> {
     }
 
     if (response.status === 204) {
+      clearWebAccessToken();
       return;
     }
 

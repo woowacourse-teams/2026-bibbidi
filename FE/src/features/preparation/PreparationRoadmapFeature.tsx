@@ -46,7 +46,11 @@ type CatalogRequestState =
       status: "success";
     };
 
-export function PreparationRoadmapFeature() {
+export function PreparationRoadmapFeature({
+  initialCategoryId,
+}: {
+  initialCategoryId?: string | null;
+} = {}) {
   const { authState, refreshAuth } = useAuth();
   const checklistRepository = usePreparationChecklistRepository();
   const [additionErrorMessage, setAdditionErrorMessage] = useState<
@@ -59,6 +63,7 @@ export function PreparationRoadmapFeature() {
     status: "loading",
   });
   const [requestRevision, setRequestRevision] = useState(0);
+  const [requestedInitialCategoryId] = useState(initialCategoryId);
   const additionControllerRef = useRef<AbortController | null>(null);
   const hasTrackedCatalogViewRef = useRef(false);
   const audience: PreparationAudience | undefined =
@@ -97,10 +102,20 @@ export function PreparationRoadmapFeature() {
           return;
         }
 
+        const initialSelection =
+          createInitialPreparationRoadmapSelection(nextCatalog);
+        const selection = requestedInitialCategoryId
+          ? selectPreparationCategory(
+              nextCatalog,
+              initialSelection,
+              requestedInitialCategoryId,
+            )
+          : initialSelection;
+
         setRequestState({
           audience,
           catalog: nextCatalog,
-          selection: createInitialPreparationRoadmapSelection(nextCatalog),
+          selection,
           status: "success",
         });
       })
@@ -126,7 +141,13 @@ export function PreparationRoadmapFeature() {
       ignoresResult = true;
       controller.abort();
     };
-  }, [audience, checklistRepository, refreshAuth, requestRevision]);
+  }, [
+    audience,
+    checklistRepository,
+    refreshAuth,
+    requestRevision,
+    requestedInitialCategoryId,
+  ]);
 
   useEffect(
     () => () => {

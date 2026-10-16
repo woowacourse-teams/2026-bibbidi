@@ -16,11 +16,11 @@ import { installMatchMedia } from "../../test/matchMedia";
 
 const authMocks = vi.hoisted(() => ({
   authState: { status: "guest" } as
-    | { status: "authenticated"; user: { nickname: string } }
+    | { status: "authenticated"; user: { id: number; nickname: string } }
     | { status: "error" }
     | { status: "guest" }
     | { status: "loading" }
-    | { status: "synchronizing"; user: { nickname: string } },
+    | { status: "synchronizing"; user: { id: number; nickname: string } },
   refreshAuth: vi.fn(),
 }));
 const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
@@ -108,7 +108,6 @@ import { ChecklistAppointmentCreationInput } from "./useChecklistAppointmentCrea
 function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQueryModel {
   return {
     categories: [
-      { id: "20", items: [], title: "두 번째 카테고리" },
       {
         id: "10",
         items: [
@@ -124,6 +123,7 @@ function createChecklist(title = "로컬 체크리스트 항목"): ChecklistQuer
         ],
         title: "첫 번째 카테고리",
       },
+      { id: "20", items: [], title: "두 번째 카테고리" },
     ],
   };
 }
@@ -263,7 +263,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     authMocks.authState = {
       status: "synchronizing",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 
@@ -303,7 +303,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue({
       categories: [
@@ -337,8 +337,11 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     renderChecklistFeature();
 
     await screen.findByText("직접 작성 항목");
+    const taskList = screen.getByRole("list", {
+      name: "첫 번째 카테고리 할 일",
+    });
     expect(
-      screen
+      within(taskList)
         .getAllByRole("listitem")
         .map((item) => within(item).getByText(/항목$/).textContent),
     ).toEqual(["서버 Catalog 항목", "직접 작성 항목"]);
@@ -542,7 +545,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("로그인 사용자는 같은 일정 추가 진입점에서 데스크톱 입력 패널을 연다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -586,7 +589,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("검증을 통과한 일정 값을 로컬 날짜·시간 문자열로 submit 경계에 전달한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -661,7 +664,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("생성 성공 후 기존 체크리스트 revision으로 상세 목록과 대표 날짜를 갱신한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -734,7 +737,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("401은 refreshAuth로 연결하고 내부 메시지를 입력 UI에 표시하지 않는다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -761,7 +764,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("생성 후 체크리스트 재조회에서 401이면 인증을 갱신하고 POST를 반복하지 않는다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -789,7 +792,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("생성 후 조회만 실패하면 입력을 유지하고 재시도에서 POST를 반복하지 않는다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -829,7 +832,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("일정 입력 오류를 각 필드에 연결하고 첫 오류 입력으로 초점을 이동한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -883,7 +886,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("제출 중 상태를 입력 View에 전달해 취소와 중복 저장을 막는다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -949,7 +952,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("제출 실패 시 alert와 별도의 오류 요약에 초점을 이동하고 입력을 유지한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -996,7 +999,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("일정 입력 취소 시 draft를 버리고 진입점으로 초점을 복원한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1025,7 +1028,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("일정 입력 중 다른 할 일을 선택하면 새 선택 항목의 초점을 유지하고 draft를 버린다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     const checklist = createAuthenticatedChecklist();
     checklist.categories[0].items.push({
@@ -1074,7 +1077,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1122,7 +1125,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("로그인 사용자는 CTA에서 공통 draft를 쓰는 추가 패널을 연다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1151,7 +1154,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("실제 생성 명령을 연결하고 성공 후 작성 상태와 URL을 초기화한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1173,7 +1176,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       target: { value: "  청첩장 문구 확정  " },
     });
     fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
+      target: { value: "20" },
     });
 
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
@@ -1181,7 +1184,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     await waitFor(() =>
       expect(repositoryMocks.createCustomItem).toHaveBeenCalledWith(
         "청첩장 문구 확정",
-        "10",
+        "20",
         expect.any(AbortSignal),
       ),
     );
@@ -1193,8 +1196,29 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "추가 중" }));
     expect(repositoryMocks.createCustomItem).toHaveBeenCalledOnce();
 
+    const updatedChecklist = createAuthenticatedChecklist();
+    const createdItem = {
+      appointments: [],
+      categoryId: "20",
+      checklistItemId: 501,
+      createdAt: "2026-09-23T10:00:00",
+      id: "checklist-item-501",
+      sourceCatalogItemId: null,
+      status: "prev" as const,
+      title: "청첩장 문구 확정",
+    };
+    updatedChecklist.categories[1] = {
+      customItems: [createdItem],
+      id: "20",
+      items: [createdItem],
+      steps: [],
+      title: "예복 준비",
+    };
+    repositoryMocks.getChecklist.mockResolvedValue(updatedChecklist);
+
     await act(async () => {
       resolveCreation();
+      repositoryMocks.publishRevision();
     });
 
     await waitFor(() =>
@@ -1204,7 +1228,18 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       screen.queryByRole("complementary", { name: "할 일 추가" }),
     ).toBeNull();
     expect(document.activeElement).toBe(addTaskButton);
-    expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
+    expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
+    expect(
+      screen
+        .getByRole("button", { name: "예복 준비 0/1" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: /내가 추가한 일/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(screen.getByText("청첩장 문구 확정")).toBeTruthy();
 
     fireEvent.click(addTaskButton);
     const reopenedPanel = screen.getByRole("complementary", {
@@ -1221,7 +1256,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("생성 실패 시 작성값과 패널을 유지하고 오류를 지운 뒤 재시도한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1263,7 +1298,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("생성 인증 오류를 refreshAuth에 연결하고 인증 확인 중 draft와 URL을 유지한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1289,7 +1324,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 
@@ -1304,7 +1339,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("인증 사용자가 바뀌면 이전 작성 세션과 addTask URL을 초기화한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "first" },
+      user: { id: 1, nickname: "first" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1321,7 +1356,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "second" },
+      user: { id: 2, nickname: "second" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 
@@ -1338,7 +1373,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
   it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1377,7 +1412,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 describe("ChecklistFeature 상세 URL 선택", () => {
   it("할 일 클릭과 닫기·Escape를 URL에 반영하고 다른 query와 포커스를 유지한다", async () => {
     const checklist = createChecklist("URL 인코딩 할 일");
-    checklist.categories[1]!.items[0]!.id = "task-한글";
+    checklist.categories[0]!.items[0]!.id = "task-한글";
     repositoryMocks.getChecklist.mockResolvedValue(checklist);
     renderChecklistFeature(["/checklist?filter=remaining"]);
 
@@ -1411,8 +1446,8 @@ describe("ChecklistFeature 상세 URL 선택", () => {
 
   it("브라우저 뒤로가기로 이전 선택과 목록 상태를 복원한다", async () => {
     const checklist = createChecklist("첫 번째 할 일");
-    checklist.categories[1]!.items.push({
-      ...checklist.categories[1]!.items[0]!,
+    checklist.categories[0]!.items.push({
+      ...checklist.categories[0]!.items[0]!,
       id: "catalog-item-102",
       sourceCatalogItemId: 102,
       title: "두 번째 할 일",
@@ -1613,10 +1648,10 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
   });
 
-  it("플래너 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
+  it("캘린더 일정 요청 URL을 직접 열거나 새로고침하면 해당 상세의 일정 입력을 한 번 연다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1630,10 +1665,14 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     await waitFor(() =>
       expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500"),
     );
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event.name === "calendar_appointment_start",
+      ),
+    ).toHaveLength(1);
     expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "planner_appointment_start",
-      parameters: { entry_type: "unscheduled_task", source: "planner" },
+      name: "calendar_appointment_start",
+      parameters: { entry_type: "unscheduled_task", source: "calendar" },
     });
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(
@@ -1646,19 +1685,23 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     expect(
       await screen.findByRole("complementary", { name: "일정 추가" }),
     ).toBeTruthy();
-    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event.name === "calendar_appointment_start",
+      ),
+    ).toHaveLength(2);
   });
 
-  it("플래너에서 연 일정 입력을 취소한 뒤 뒤로 가면 플래너로 돌아간다", async () => {
+  it("캘린더에서 연 일정 입력을 취소한 뒤 뒤로 가면 캘린더로 돌아간다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
     );
     renderChecklistFeature([
-      "/planner",
+      "/calendar",
       "/checklist?taskId=checklist-item-500&addAppointment=true",
     ]);
 
@@ -1670,20 +1713,20 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     fireEvent.click(screen.getByRole("button", { name: "브라우저 뒤로가기" }));
-    expect(getCurrentUrl()).toBe("/planner");
+    expect(getCurrentUrl()).toBe("/calendar");
   });
 
-  it("모바일에서 자동 일정 입력을 닫고 상세 뒤로 가기를 누르면 플래너로 돌아간다", async () => {
+  it("모바일에서 자동 일정 입력을 닫고 상세 뒤로 가기를 누르면 캘린더로 돌아간다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
     );
     renderChecklistFeature([
-      "/planner",
+      "/calendar",
       {
         pathname: "/checklist",
         search: "?taskId=checklist-item-500&addAppointment=true",
@@ -1707,13 +1750,13 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     });
     closeMobileTaskDetail(detailSheet);
 
-    expect(getCurrentUrl()).toBe("/planner");
+    expect(getCurrentUrl()).toBe("/calendar");
   });
 
-  it("존재하지 않는 플래너 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
+  it("존재하지 않는 캘린더 일정 대상은 자동 입력 없이 요청 파라미터와 선택을 정리한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -1804,7 +1847,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
   it("일정 수정 중 캐시 revision이 바뀌어도 새 조회 전까지 입력을 유지한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     const checklist = createAuthenticatedChecklist();
     checklist.categories[0].items[0].appointments = [
@@ -1861,10 +1904,16 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
 
     renderChecklistFeature();
 
-    expect(await screen.findByText("등록된 할 일이 없어요.")).toBeTruthy();
+    expect(await screen.findByText("아직 담은 할 일이 없어요")).toBeTruthy();
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "빈 카테고리" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "로드맵에서 추가" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "빈 카테고리" })).toBeTruthy();
     expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "로드맵에서 추가" }));
+    expect(getCurrentUrl()).toBe("/?categoryId=10");
   });
 
   it("일반 오류를 화면 안에서 안내하고 다시 조회한다", async () => {
@@ -1886,7 +1935,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
   it("인증 오류를 refreshAuth 흐름에 연결한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockRejectedValue(
       new ChecklistQueryAuthenticationRequiredError(),
@@ -1941,7 +1990,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 
@@ -1960,7 +2009,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
   it("인증 대상의 Repository가 바뀌면 이전 요청을 취소한다", async () => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "first" },
+      user: { id: 1, nickname: "first" },
     };
     let firstSignal: AbortSignal | undefined;
     const firstGetChecklist = vi.fn(
@@ -1975,7 +2024,7 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "second" },
+      user: { id: 2, nickname: "second" },
     };
     const secondGetChecklist = vi
       .fn()
@@ -2004,30 +2053,33 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
   });
 });
 
-describe("ChecklistFeature 기존 UI", () => {
-  it("카테고리를 기존 순서대로 표시하고 accordion을 열고 닫는다", async () => {
+describe("ChecklistFeature 대분류와 중분류 UI", () => {
+  it("대분류를 로드맵 순서대로 표시하고 중분류를 열고 닫는다", async () => {
     renderChecklistFeature();
     await screen.findByText("로컬 체크리스트 항목");
 
-    expect(
-      screen
-        .getAllByRole("heading", { level: 2 })
-        .map((heading) => within(heading).getByText(/카테고리$/).textContent),
-    ).toEqual(["두 번째 카테고리", "첫 번째 카테고리"]);
-    const categoryButton = screen.getByRole("button", {
-      name: "첫 번째 카테고리",
+    const categoryNavigation = screen.getByRole("navigation", {
+      name: "체크리스트 대분류",
     });
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
-    expect(categoryButton.getAttribute("aria-controls")).toBeTruthy();
+    expect(
+      within(categoryNavigation)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["첫 번째 카테고리0/1", "두 번째 카테고리0/0"]);
+    const groupButton = screen
+      .getAllByRole("button", { name: /첫 번째 카테고리/ })
+      .find((button) => button.hasAttribute("aria-expanded"));
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("true");
+    expect(groupButton?.getAttribute("aria-controls")).toBeTruthy();
 
-    fireEvent.click(categoryButton);
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(groupButton as HTMLButtonElement);
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("false");
     expect(
       screen.queryByRole("list", { name: "첫 번째 카테고리 할 일" }),
     ).toBeNull();
 
-    fireEvent.click(categoryButton);
-    expect(categoryButton.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(groupButton as HTMLButtonElement);
+    expect(groupButton?.getAttribute("aria-expanded")).toBe("true");
     expect(
       screen.getByRole("list", { name: "첫 번째 카테고리 할 일" }),
     ).toBeTruthy();
@@ -2038,7 +2090,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
   beforeEach(() => {
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     repositoryMocks.getChecklist.mockResolvedValue(
       createAuthenticatedChecklist(),
@@ -2093,7 +2145,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 
@@ -2114,6 +2166,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "할 일 제목 수정" }),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "  청첩장 문구 확정  " } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -2178,6 +2231,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "할 일 제목 수정" }),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "로그인 만료 후 유지" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -2189,7 +2243,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
 
     authMocks.authState = {
       status: "authenticated",
-      user: { nickname: "bibbidi" },
+      user: { id: 1, nickname: "bibbidi" },
     };
     view.rerender(<ChecklistFeatureTestApp />);
 

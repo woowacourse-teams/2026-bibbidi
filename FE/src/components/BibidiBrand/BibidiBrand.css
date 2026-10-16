@@ -18,7 +18,9 @@
 }
 
 .bibidi-brand__name {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-family: "Nunito", sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }

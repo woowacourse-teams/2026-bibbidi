@@ -1,0 +1,44 @@
+diff --git a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+index 81695a4dc514a84f657f356097722b4b5660b80b..07edbf58a04e64833a98531b3c5581f7b81456dc 100644
+--- a/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
++++ b/FE/src/features/home/HomeScheduleDashboardFeature.test.tsx
+@@ -178,12 +178,9 @@ describe("HomeScheduleDashboardFeature", () => {
+     expect(myChecklistRepository.getChecklist).not.toHaveBeenCalled();
+   });
+ 
+-  it.each([
+-    ["일정이 필요한 할 일", "로드맵에서 할 일 찾기"],
+-    ["추천 할 일", "로드맵 보기"],
+-  ])(
+-    "비로그인 사용자는 %s 잠금 카드의 %s 링크로 로드맵에 이동한다",
+-    (sectionName, linkName) => {
++  it.each(["일정이 필요한 할 일", "추천 할 일"])(
++    "비로그인 사용자는 %s 잠금 카드의 링크로 로드맵에 이동한다",
++    (sectionName) => {
+       vi.mocked(useAuth).mockReturnValue({
+         authState: { status: "guest" },
+         beginAuthentication: vi.fn(),
+@@ -203,7 +200,9 @@ describe("HomeScheduleDashboardFeature", () => {
+       );
+ 
+       const section = screen.getByRole("region", { name: sectionName });
+-      const link = within(section).getByRole("link", { name: linkName });
++      const link = within(section).getByRole("link", {
++        name: "로드맵에서 할 일 찾기",
++      });
+ 
+       expect(link.getAttribute("href")).toBe("/preparation");
+       fireEvent.click(link);
+diff --git a/FE/src/features/home/view/HomeScheduleDashboard.tsx b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+index f24cd772779f53e0f7f7e08d06f999af98a3dc7c..3f491ad6fd423f897b2d208b4e2087fe56b1a358 100644
+--- a/FE/src/features/home/view/HomeScheduleDashboard.tsx
++++ b/FE/src/features/home/view/HomeScheduleDashboard.tsx
+@@ -364,7 +364,7 @@ const guestUnscheduledViewModel: HomeScheduleDashboardResultSectionViewModel<"au
+ const guestRecommendedViewModel: HomeScheduleDashboardResultSectionViewModel<"authentication-required"> =
+   {
+     result: {
+-      actionLabel: "로드맵 보기",
++      actionLabel: "로드맵에서 할 일 찾기",
+       actionTo: "/preparation",
+       actionVariant: "link",
+       description: "로드맵에서 필요한 할 일을 체크리스트에 추가할 수 있어요.",

@@ -11,6 +11,7 @@ import type { ChecklistRepository } from "../preparation";
 import type { RecommendedTaskAdditionState } from "./model/recommendedTaskAddition";
 
 interface UseRecommendedTaskAdditionOptions {
+  allowGuestAddition?: boolean;
   authScope: string;
   isAuthenticated: boolean;
   onAuthenticationRequired: () => void;
@@ -42,6 +43,7 @@ function createEmptyState(
 }
 
 export function useRecommendedTaskAddition({
+  allowGuestAddition = false,
   authScope,
   isAuthenticated,
   onAuthenticationRequired,
@@ -82,7 +84,7 @@ export function useRecommendedTaskAddition({
   const add = useCallback(
     (catalogItemId: number) => {
       if (
-        !isAuthenticated ||
+        (!isAuthenticated && !allowGuestAddition) ||
         controllersRef.current.get(catalogItemId)?.authScope === authScope
       ) {
         return;
@@ -119,7 +121,7 @@ export function useRecommendedTaskAddition({
 
       void repository
         .addCatalogItemIds(
-          "authenticated",
+          isAuthenticated ? "authenticated" : "guest",
           [String(catalogItemId)],
           controller.signal,
         )
@@ -198,6 +200,7 @@ export function useRecommendedTaskAddition({
     },
     [
       authScope,
+      allowGuestAddition,
       isAuthenticated,
       onAuthenticationRequired,
       onSuccess,

@@ -35,9 +35,7 @@ describe("AppHeader", () => {
     expect(
       screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
     ).toBe("/login");
-    expect(
-      screen.getByRole("link", { name: "회원가입" }).getAttribute("href"),
-    ).toBe("/signup");
+    expect(screen.queryByRole("link", { name: "회원가입" })).toBeNull();
     expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
   });
 
@@ -137,7 +135,7 @@ describe("AppHeader", () => {
     expect(onLogout).toHaveBeenCalledOnce();
   });
 
-  it("하단 메뉴를 로드맵, 체크리스트, 플래너 순서로 표시한다", () => {
+  it("하단 메뉴를 로드맵, 체크리스트, 캘린더 순서로 표시한다", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppBottomNavigation />
@@ -147,10 +145,10 @@ describe("AppHeader", () => {
     const links = screen.getByRole("navigation", { name: "하단 메뉴" });
     expect(
       Array.from(links.querySelectorAll("a"), (link) => link.textContent),
-    ).toEqual(["로드맵", "체크리스트", "플래너"]);
+    ).toEqual(["로드맵", "체크리스트", "캘린더"]);
     expect(
       screen.getByRole("link", { name: "로드맵" }).getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/preparation");
     expect(
       screen.getByRole("link", { name: "로드맵" }).getAttribute("aria-current"),
     ).toBe("page");
@@ -159,9 +157,13 @@ describe("AppHeader", () => {
   it("브랜드와 데스크톱 메뉴를 실제 경로에 연결한다", () => {
     renderHeader({ kind: "guest" });
 
-    expect(
-      screen.getByRole("link", { name: "비비디 홈" }).getAttribute("href"),
-    ).toBe("/");
+    const brandLink = screen.getByRole("link", { name: "비비디 홈" });
+    expect(brandLink.getAttribute("href")).toBe("/");
+    expect(brandLink.textContent).toBe("bibbidi");
+    expect((brandLink as HTMLAnchorElement).draggable).toBe(false);
+    expect(brandLink.querySelector<HTMLImageElement>("img")?.draggable).toBe(
+      false,
+    );
     const desktopLinks = Array.from(
       screen
         .getByRole("navigation", { name: "주요 메뉴" })
@@ -169,9 +171,9 @@ describe("AppHeader", () => {
       (link) => [link.textContent, link.getAttribute("href")],
     );
     expect(desktopLinks).toEqual([
-      ["로드맵", "/"],
+      ["로드맵", "/preparation"],
       ["체크리스트", "/checklist"],
-      ["플래너", "/planner"],
+      ["캘린더", "/calendar"],
     ]);
     expect(screen.queryByRole("link", { name: "준비 목록" })).toBeNull();
   });

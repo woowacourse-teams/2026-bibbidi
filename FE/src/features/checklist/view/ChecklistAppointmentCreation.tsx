@@ -15,6 +15,7 @@ interface ChecklistAppointmentCreationProps {
     | ChecklistAppointmentEditingController;
   heading?: "일정 수정" | "일정 추가";
   taskTitle: string;
+  embedded?: boolean;
 }
 
 function BackIcon() {
@@ -29,6 +30,7 @@ export function ChecklistAppointmentCreation({
   controller,
   heading = "일정 추가",
   taskTitle,
+  embedded = false,
 }: ChecklistAppointmentCreationProps) {
   const isMobileLayout = useIsMobileLayout();
   const formRef = useRef<HTMLFormElement>(null);
@@ -107,11 +109,11 @@ export function ChecklistAppointmentCreation({
   return (
     <aside
       aria-labelledby="checklist-appointment-creation-title"
-      aria-modal={isMobileLayout ? "true" : undefined}
+      aria-modal={!embedded && isMobileLayout ? "true" : undefined}
       className={`checklist-appointment-creation checklist-appointment-creation--${
         isMobileLayout ? "mobile" : "desktop"
       }`}
-      role={isMobileLayout ? "dialog" : "complementary"}
+      role={embedded ? undefined : isMobileLayout ? "dialog" : "complementary"}
     >
       <form
         className="checklist-appointment-creation__form"
@@ -122,7 +124,9 @@ export function ChecklistAppointmentCreation({
         <header className="checklist-appointment-creation__header">
           {isMobileLayout ? (
             <button
-              aria-label="할 일 상세로 돌아가기"
+              aria-label={
+                embedded ? "캘린더로 돌아가기" : "할 일 상세로 돌아가기"
+              }
               disabled={isSubmitting}
               onClick={controller.cancel}
               type="button"

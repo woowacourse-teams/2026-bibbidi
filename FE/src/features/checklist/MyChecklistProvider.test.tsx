@@ -168,6 +168,7 @@ describe("MyChecklistProvider", () => {
                 {
                   appointments: [],
                   categoryId: 10,
+                  createdAt: "2026-09-23T09:00:00",
                   id: 10,
                   sourceCatalogItemId: 1001,
                   status: "prev",
@@ -227,6 +228,7 @@ describe("MyChecklistProvider", () => {
       {
         appointments: [],
         categoryId: 1,
+        createdAt: "2026-09-23T09:00:00",
         id: 10,
         sourceCatalogItemId: 101,
         status: "prev",

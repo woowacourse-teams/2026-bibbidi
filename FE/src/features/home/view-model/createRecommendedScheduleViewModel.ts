@@ -22,7 +22,7 @@ export function createRecommendedScheduleViewModel(
   addition: RecommendedTaskAdditionState,
 ): RecommendedScheduleViewModel {
   return {
-    catalogActionLabel: "준비 목록 보기",
+    catalogActionLabel: "로드맵 보기",
     items: model.items.map((item) => {
       const isAdding = addition.addingCatalogItemIds.includes(
         item.catalogItemId,

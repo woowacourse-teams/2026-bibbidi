@@ -3,6 +3,7 @@ import { MyChecklistItemModel } from "./myChecklist";
 export interface AddedChecklistCatalogItemModel {
   catalogItemId: number;
   categoryId: number;
+  createdAt: string | null;
   id: number;
   status: "prev";
   title: string;
@@ -14,6 +15,7 @@ export function toMyChecklistItemModel(
   return {
     appointments: [],
     categoryId: item.categoryId,
+    createdAt: item.createdAt,
     id: item.id,
     sourceCatalogItemId: item.catalogItemId,
     status: item.status,

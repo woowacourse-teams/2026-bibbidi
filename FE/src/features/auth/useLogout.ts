@@ -42,8 +42,8 @@ export function useLogout({ onSuccess }: UseLogoutOptions) {
       await logout(controller.signal);
 
       if (isMountedRef.current && !controller.signal.aborted) {
-        onSuccess();
         analytics.track(createLogoutEvent());
+        onSuccess();
       }
     } catch (error) {
       if (

@@ -5,11 +5,11 @@ import { createPageViewEvent, normalizePagePath } from "./pageView";
 describe("normalizePagePath", () => {
   it.each([
     ["/", "/"],
-    ["/planner", "/planner"],
-    ["/planner/", "/planner"],
+    ["/preparation", "/preparation"],
+    ["/calendar", "/calendar"],
+    ["/calendar/", "/calendar"],
     ["/checklist", "/checklist"],
     ["/login", "/login"],
-    ["/signup", "/signup"],
   ] as const)(
     "허용된 경로 %s를 화면 경로로 정규화한다",
     (pathname, expected) => {
@@ -17,7 +17,7 @@ describe("normalizePagePath", () => {
     },
   );
 
-  it.each(["/preparation", "/unknown", "/checklist/task-123"])(
+  it.each(["/planner", "/signup", "/unknown", "/checklist/task-123"])(
     "리다이렉트·식별자 경로 %s는 화면으로 측정하지 않는다",
     (pathname) => {
       expect(normalizePagePath(pathname)).toBeNull();
@@ -31,14 +31,14 @@ describe("createPageViewEvent", () => {
       createPageViewEvent({
         origin: "https://bibbidi.example",
         pagePath: "/checklist",
-        referrerPath: "/planner",
+        referrerPath: "/calendar",
       }),
     ).toEqual({
       name: "page_view",
       parameters: {
         page_location: "https://bibbidi.example/checklist",
         page_path: "/checklist",
-        page_referrer: "https://bibbidi.example/planner",
+        page_referrer: "https://bibbidi.example/calendar",
         page_title: "체크리스트",
         screen_name: "checklist",
       },
@@ -53,5 +53,27 @@ describe("createPageViewEvent", () => {
         referrerPath: null,
       }).parameters.page_referrer,
     ).toBe("");
+  });
+
+  it("첫 진입 주소의 쿼리와 외부 referrer를 GA 기본 수집처럼 그대로 담는다", () => {
+    expect(
+      createPageViewEvent({
+        origin: "https://bibbidi.example",
+        pagePath: "/",
+        referrerPath: null,
+        landingPage: {
+          pathname: "/",
+          search:
+            "?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+          referrer: "https://l.instagram.com/",
+        },
+      }).parameters,
+    ).toEqual(
+      expect.objectContaining({
+        page_location:
+          "https://bibbidi.example/?utm_source=instagram&utm_medium=organic_social&utm_campaign=instagram_profile&utm_content=profile_bio",
+        page_referrer: "https://l.instagram.com/",
+      }),
+    );
   });
 });

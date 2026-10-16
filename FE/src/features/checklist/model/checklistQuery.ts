@@ -9,18 +9,41 @@ export interface ChecklistQueryItemModel {
   appointments: MyChecklistAppointmentModel[];
   categoryId: string;
   checklistItemId: number | null;
+  createdAt?: string | null;
   id: string;
   sourceCatalogItemId: number | null;
   status: ChecklistItemStatus;
   title: string;
 }
 
-export interface ChecklistQueryCategoryModel {
+export interface ChecklistQueryStepModel {
   id: string;
   items: ChecklistQueryItemModel[];
+  order: number;
+  title: string;
+}
+
+export interface ChecklistQueryCategoryModel {
+  customItems?: ChecklistQueryItemModel[];
+  id: string;
+  readonly items: ChecklistQueryItemModel[];
+  steps?: ChecklistQueryStepModel[];
   title: string;
 }
 
 export interface ChecklistQueryModel {
   categories: ChecklistQueryCategoryModel[];
+}
+
+export function getChecklistCategoryItems(
+  category: ChecklistQueryCategoryModel,
+): ChecklistQueryItemModel[] {
+  if (!category.steps) {
+    return category.items;
+  }
+
+  return [
+    ...category.steps.flatMap((step) => step.items),
+    ...(category.customItems ?? []),
+  ];
 }

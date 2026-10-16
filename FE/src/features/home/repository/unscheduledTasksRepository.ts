@@ -72,7 +72,7 @@ export function createUnscheduledTasksRepository(
   return {
     async getUnscheduledTasks(signal) {
       try {
-        const tasks = await dataSource.getUnscheduledTasks(3, signal);
+        const tasks = await dataSource.getUnscheduledTasks(2, signal);
 
         return tasks.map(toUnscheduledTask);
       } catch (error) {

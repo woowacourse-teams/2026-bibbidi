@@ -35,6 +35,9 @@ export function useChecklistItemEditing(
   onRefreshFailed?: (message: string) => void,
   activeCategoryId?: string | null,
 ): ChecklistItemEditingController {
+  const [deletionConfirmation, setDeletionConfirmation] = useState<
+    number | null
+  >(null);
   const [categoryEditSession, setCategoryEditSession] =
     useState<ChecklistItemCategoryEditSession | null>(null);
   const [titleEditSession, setTitleEditSession] =
@@ -79,6 +82,7 @@ export function useChecklistItemEditing(
         setStatusEditSession(null);
         setStatusConfirmation(null);
         setTitleEditSession(null);
+        setDeletionConfirmation(null);
         setChangeFeedback(idleFeedback);
       }
     });
@@ -237,6 +241,34 @@ export function useChecklistItemEditing(
       [commandRepository, runRequest],
     ),
     changeFeedback,
+    cancelDelete: () => {
+      if (changeFeedback.status !== "pending") {
+        setDeletionConfirmation(null);
+        setChangeFeedback(idleFeedback);
+      }
+    },
+    confirmDelete: useCallback(async () => {
+      if (deletionConfirmation === null) {
+        return false;
+      }
+
+      const result = await runRequest(
+        deletionConfirmation,
+        "delete",
+        (signal) =>
+          commandRepository.deleteItem
+            ? commandRepository.deleteItem(deletionConfirmation, signal)
+            : Promise.reject(
+                new Error("Checklist item deletion is unavailable"),
+              ),
+      );
+
+      if (result.ok) {
+        setDeletionConfirmation(null);
+      }
+
+      return result.ok;
+    }, [commandRepository, deletionConfirmation, runRequest]),
     changeTitle: useCallback(
       async (itemId: number, title: string) => {
         const result = await runRequest(itemId, "title", (signal) =>
@@ -251,6 +283,7 @@ export function useChecklistItemEditing(
       },
       [commandRepository, runRequest],
     ),
+    deletionConfirmation,
     confirmStatusChange: useCallback(
       async (itemId: number) => {
         if (statusConfirmation?.itemId !== itemId) {
@@ -333,6 +366,15 @@ export function useChecklistItemEditing(
         current?.itemId === itemId ? null : current,
       );
     }, []),
+    requestDelete: useCallback(
+      (itemId: number) => {
+        if (changeFeedback.status !== "pending") {
+          setDeletionConfirmation(itemId);
+          setChangeFeedback(idleFeedback);
+        }
+      },
+      [changeFeedback.status],
+    ),
     startCategoryEditing: useCallback((itemId: number) => {
       setTitleEditSession(null);
       setStatusEditSession(null);

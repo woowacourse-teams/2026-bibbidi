@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  acceptWebAccessToken,
+  hasWebAccessToken,
+  resetWebAuthSessionForTest,
+} from "../../../infrastructure/auth/webSessionManager";
 import {
   logout,
   LogoutApiError,
@@ -8,6 +13,10 @@ import {
   LogoutRequestAbortedError,
   LogoutTimeoutError,
 } from "./logout";
+
+beforeEach(() => {
+  resetWebAuthSessionForTest();
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -25,12 +34,24 @@ describe("logout", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(logout()).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledWith("/api/logout", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/web/sessions/current", {
       credentials: "include",
       method: "DELETE",
       signal: expect.any(AbortSignal),
     });
     expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it("로그아웃이 성공하면 메모리 access token을 제거한다", async () => {
+    acceptWebAccessToken("header.payload.signature");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
+
+    await logout();
+
+    expect(hasWebAccessToken()).toBe(false);
   });
 
   it("API 오류와 예상하지 못한 성공 상태를 구분한다", async () => {
