@@ -10,7 +10,6 @@ export interface RequestSpec {
   path: string;
   body?: unknown;
   expected: readonly number[];
-  timeout?: string;
 }
 
 export interface ExpectationPolicy {
@@ -57,7 +56,6 @@ export class HttpClient {
           'Content-Type': 'application/json',
         },
         tags: { ...this.extraTags(), name: spec.name },
-        ...(spec.timeout === undefined ? {} : { timeout: spec.timeout }),
         responseCallback: http.expectedStatuses(...acceptable),
       },
     );

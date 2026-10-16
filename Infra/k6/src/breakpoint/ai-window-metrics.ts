@@ -1,31 +1,30 @@
-import type { RefinedResponse } from 'k6/http';
 import exec from 'k6/execution';
 import { Counter, Rate, Trend } from 'k6/metrics';
-import { AI_CHAT_REQUEST_NAME } from '../api/ai-chat-api.ts';
-import { isChatCompleted } from '../api/sse.ts';
-import type { RequestSpec, ResponseObserver } from '../http/http.ts';
+import type { ChatCallResult, ChatObserver } from '../api/ai-chat-client.ts';
 import type { WindowPlan } from './windows.ts';
 
-export class AiWindowMetrics implements ResponseObserver {
+export class AiWindowMetrics implements ChatObserver {
   private readonly completed = new Rate('window_ai_completed');
   private readonly serverError = new Rate('window_ai_server_error');
   private readonly requests = new Counter('window_ai_requests');
   private readonly duration = new Trend('window_ai_duration', true);
+  private readonly ttft = new Trend('window_ai_ttft', true);
 
   constructor(private readonly plan: WindowPlan) {}
 
-  observe(spec: RequestSpec, response: RefinedResponse<'text'>): void {
-    if (__VU === 0 || spec.name !== AI_CHAT_REQUEST_NAME) {
+  observe(result: ChatCallResult): void {
+    if (__VU === 0) {
       return;
     }
 
-    const startedAt = Date.now() - response.timings.duration;
-    const tags = { window: String(this.plan.windowAt(startedAt - exec.scenario.startTime)) };
-    const body = typeof response.body === 'string' ? response.body : null;
+    const tags = { window: String(this.plan.windowAt(result.startedAt - exec.scenario.startTime)) };
 
-    this.completed.add(isChatCompleted(response.status, body), tags);
-    this.serverError.add(response.status >= 500, tags);
+    this.completed.add(result.completed, tags);
+    this.serverError.add(result.status >= 500, tags);
     this.requests.add(1, tags);
-    this.duration.add(response.timings.duration, tags);
+    this.duration.add(result.durationMs, tags);
+    if (result.ttftMs !== undefined) {
+      this.ttft.add(result.ttftMs, tags);
+    }
   }
 }

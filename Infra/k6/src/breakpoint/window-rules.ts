@@ -20,6 +20,7 @@ export function aiRules(evalDelaySeconds: number, abortOnDropped: boolean): Thre
     tracked: [
       { metric: 'window_ai_requests', expression: 'count>=0' },
       { metric: 'window_ai_duration', expression: 'max>=0' },
+      { metric: 'window_ai_ttft', expression: 'max>=0' },
     ],
     global: abortOnDropped ? { dropped_iterations: [{ threshold: 'count==0', abortOnFail: true }] } : {},
   };

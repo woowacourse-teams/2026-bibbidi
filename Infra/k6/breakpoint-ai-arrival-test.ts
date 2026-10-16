@@ -1,12 +1,13 @@
 import type { Options } from 'k6/options';
 import { ApiFactory } from './src/api/api.ts';
+import { AiChatClient } from './src/api/ai-chat-client.ts';
 import { AiBreakpointReport } from './src/breakpoint/ai-breakpoint-report.ts';
 import { AiWindowMetrics } from './src/breakpoint/ai-window-metrics.ts';
 import { aiRules } from './src/breakpoint/window-rules.ts';
 import { WindowPlan } from './src/breakpoint/windows.ts';
 import { Environment, numberFromEnv, textFromEnv } from './src/common/environment.ts';
 import { AccessTokenIssuer } from './src/common/token.ts';
-import { HttpClient, StrictExpectation } from './src/http/http.ts';
+import { HttpClient } from './src/http/http.ts';
 import type { SummaryData } from './src/report/summary.ts';
 import { CallBudget } from './src/scenario/call-budget.ts';
 import { LoadTest } from './src/scenario/load-test.ts';
@@ -32,8 +33,8 @@ const session = new AiConversationSession({
   budget,
 });
 
-const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () => ({}), [new AiWindowMetrics(plan)]);
-const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
+const chatClient = new AiChatClient(environment.baseUrl, [new AiWindowMetrics(plan)]);
+const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment), chatClient);
 const test = new LoadTest(apis, new SessionSequence([session]), 0);
 
 const expectedConversationSeconds = numberFromEnv('EXPECTED_CONVERSATION_SECONDS', 60);

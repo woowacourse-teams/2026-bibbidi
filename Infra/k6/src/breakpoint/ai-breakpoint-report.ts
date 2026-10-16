@@ -27,11 +27,11 @@ export class AiBreakpointReport extends WindowedReport {
   }
 
   protected columns(): string[] {
-    return ['구간 끝의 부하', '시작한 질문 수', '완료율', '서버 오류(5xx) 비율', '응답 시간 평균(초)', '응답 시간 p95(초)'];
+    return ['구간 끝의 부하', '시작한 질문 수', '완료율', '서버 오류(5xx) 비율', '응답 시간 평균(초)', '응답 시간 p95(초)', '첫 토큰 시간 평균(초)', '첫 토큰 시간 p95(초)'];
   }
 
   protected footnote(): string {
-    return '완료율은 HTTP 200으로 응답하고 `done` 이벤트가 도착한 질문의 비율입니다. `failure` 이벤트, 오류 응답, 60초 초과는 미완료로 셉니다. 응답 시간은 판정 기준이 아니라 참고 값입니다.';
+    return '완료율은 HTTP 200으로 응답하고 `done` 이벤트가 도착한 질문의 비율입니다. `failure` 이벤트, 오류 응답, 60초 초과는 미완료로 셉니다. 응답 시간과 첫 토큰 시간(TTFT, 요청에서 첫 `delta` 이벤트까지)은 판정 기준이 아니라 참고 값입니다.';
   }
 
   protected requestsMetric(): string {
@@ -68,6 +68,8 @@ export class AiBreakpointReport extends WindowedReport {
       const errorRate = this.value(`window_ai_server_error{window:${window}}`, 'rate');
       const average = this.value(`window_ai_duration{window:${window}}`, 'avg');
       const p95 = this.value(`window_ai_duration{window:${window}}`, 'p(95)');
+      const ttftAverage = this.value(`window_ai_ttft{window:${window}}`, 'avg');
+      const ttftP95 = this.value(`window_ai_ttft{window:${window}}`, 'p(95)');
 
       return {
         window,
@@ -79,6 +81,8 @@ export class AiBreakpointReport extends WindowedReport {
           reached ? this.percent(errorRate) : '-',
           reached ? this.seconds(average) : '-',
           reached ? this.seconds(p95) : '-',
+          reached ? this.seconds(ttftAverage) : '-',
+          reached ? this.seconds(ttftP95) : '-',
         ],
         verdict: causes.length > 0 ? '고장' : reached ? '정상' : '도달 못함',
         causes,
