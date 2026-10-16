@@ -183,17 +183,18 @@ function assertDevlogCommitted(root: string, issue: number): void {
   }
 }
 
-export function preparePullRequest({ root, config, state, requireTracked = true }: {
+export function preparePullRequest({ root, config, state, requireTracked = true, issueData: suppliedIssueData }: {
   root: string;
   config: LoggerConfig;
   state: SessionState;
   requireTracked?: boolean;
+  issueData?: IssueData;
 }): PreparedPullRequest {
   const issue = state.issue as number;
   const events = readEvents(root, issue);
   const { adrRequired } = assertPullRequestEvents(events);
 
-  const issueData = getIssue(root, config.repository, issue);
+  const issueData = suppliedIssueData ?? getIssue(root, config.repository, issue);
   if (adrRequired && !hasInitialAdr(issueData.body)) {
     throw new Error('Issue 본문에 ADR(결정, 이유, 근거, 검증)이 없습니다. ADR이 필요 없다고 정했다면 `adr skip`으로 기록해 주세요.');
   }

@@ -159,9 +159,3 @@
   min-height: 32px;
   align-items: center;
 }
-
-@media (min-width: 761px) {
-  .preparation-step-inline-detail {
-    display: none;
-  }
-}

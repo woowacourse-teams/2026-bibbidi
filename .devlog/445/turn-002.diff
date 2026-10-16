@@ -1,0 +1,267 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index fd7506d1c760b7a4e6cc645b2761b9810f79ffa0..f09d5934ddeb18670ebecdb8af1cacde2c0cd94c 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -379,7 +379,7 @@ describe("실제 AI 채팅", () => {
+       const launcher = screen.getByRole("button", { name: "AI와 대화하기" });
+       expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
+       fireEvent.click(launcher);
+-      const dialog = screen.getByRole("dialog");
++      const dialog = await screen.findByRole("dialog");
+       expect(within(dialog).queryByText("예시")).toBeNull();
+       if (closeName === "Escape")
+         fireEvent(dialog, new Event("cancel", { cancelable: true }));
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index 9c3069beb33181d309405dc86e55ddda577c2aa8..2a95149182a8c0663d4d103291a5e89944b892f1 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -1,9 +1,7 @@
+ import { useEffect, useRef, useState } from "react";
+ 
+ import { useIsMobileLayout } from "../../shared/responsive";
+-import { useAiChatConversation } from "./hooks/useAiChatConversation";
+-import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
+-import type { AiChatView } from "./view/AiChatView";
++import type { AiChatSession } from "./AiChatSession";
+ import "./view/AiChat.css";
+ 
+ export function AiChatFeature({
+@@ -16,17 +14,19 @@ export function AiChatFeature({
+   const isMobile = useIsMobileLayout();
+   const [isOpen, setOpen] = useState(false);
+   const [hasOpened, setHasOpened] = useState(false);
+-  const [View, setView] = useState<typeof AiChatView | null>(null);
++  const [Session, setSession] = useState<typeof AiChatSession | null>(null);
+   const [loadFailed, setLoadFailed] = useState(false);
+   const [loadAttempt, setLoadAttempt] = useState(0);
++  const returnFocusRef = useRef<HTMLButtonElement>(null);
+   const shouldLoad = !isMobile || hasOpened;
++  const loading = shouldLoad && !Session && !loadFailed;
+ 
+   useEffect(() => {
+-    if (!shouldLoad || View) return;
++    if (!shouldLoad || Session) return;
+     let cancelled = false;
+-    import("./view/AiChatView").then(
++    import("./AiChatSession").then(
+       (module) => {
+-        if (!cancelled) setView(() => module.AiChatView);
++        if (!cancelled) setSession(() => module.AiChatSession);
+       },
+       () => {
+         if (!cancelled) setLoadFailed(true);
+@@ -35,81 +35,66 @@ export function AiChatFeature({
+     return () => {
+       cancelled = true;
+     };
+-  }, [shouldLoad, View, loadAttempt]);
+-  const returnFocusRef = useRef<HTMLButtonElement>(null);
+-  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
+-    useAiChatConversation(onAuthenticationRequired);
+-  const openChat = (launcher: HTMLButtonElement) => {
+-    returnFocusRef.current = launcher;
+-    setHasOpened(true);
+-    setOpen(true);
++  }, [shouldLoad, Session, loadAttempt]);
++
++  const retryLoad = () => {
++    setLoadFailed(false);
++    setLoadAttempt((attempt) => attempt + 1);
+   };
+-  const closeChat = () => setOpen(false);
+-  const view = View ? (
+-    <View
+-      active={!isMobile || isOpen}
+-      isAuthenticated={isAuthenticated}
+-      draft={isAuthenticated ? draft : ""}
+-      messages={isAuthenticated ? messages : []}
+-      errorMessage={isAuthenticated ? errorMessage : null}
+-      isPending={isAuthenticated && isPending}
+-      onDraftChange={(value) => {
+-        if (isAuthenticated) setDraft(value);
+-      }}
+-      onSend={(text) => {
+-        if (isAuthenticated) send(text);
+-      }}
+-      onRetry={() => {
+-        if (isAuthenticated) retry();
+-      }}
+-    />
+-  ) : shouldLoad ? (
+-    <div className="ai-chat">
+-      {loadFailed ? (
+-        <div role="alert">
+-          <p>채팅을 불러오지 못했어요.</p>
++
++  return (
++    <div className="ai-chat-feature">
++      {isMobile ? (
++        <div
++          className={`ai-chat-launchers${loadFailed ? " ai-chat-launchers--error" : ""}`}
++        >
++          {loadFailed ? <p role="alert">채팅을 불러오지 못했어요.</p> : null}
+           <button
++            className="ai-chat-launchers__action"
++            disabled={loading}
+             onClick={() => {
+-              setLoadFailed(false);
+-              setLoadAttempt((attempt) => attempt + 1);
++              if (loadFailed) retryLoad();
++              setHasOpened(true);
++              setOpen(true);
+             }}
++            ref={returnFocusRef}
+             type="button"
+           >
+-            다시 시도
++            {loading ? (
++              <span role="status">채팅을 불러오고 있어요.</span>
++            ) : loadFailed ? (
++              "다시 시도"
++            ) : (
++              "AI와 대화하기"
++            )}
+           </button>
+         </div>
+-      ) : (
+-        <p role="status">채팅을 불러오고 있어요.</p>
+-      )}
+-    </div>
+-  ) : null;
+-
+-  return (
+-    <div className="ai-chat-feature">
+-      {isMobile ? (
+-        <>
+-          <div className="ai-chat-launchers">
+-            <button
+-              className="ai-chat-launchers__action"
+-              onClick={(event) => openChat(event.currentTarget)}
+-              type="button"
+-            >
+-              AI와 대화하기
+-            </button>
+-          </div>
+-          <MobileAiChatDialog
+-            isOpen={isOpen}
+-            onClose={closeChat}
+-            returnFocusRef={returnFocusRef}
+-          >
+-            {view}
+-          </MobileAiChatDialog>
+-        </>
+-      ) : (
++      ) : null}
++      {Session ? (
++        <Session
++          isAuthenticated={isAuthenticated}
++          isMobile={isMobile}
++          isOpen={isOpen}
++          onAuthenticationRequired={onAuthenticationRequired}
++          onClose={() => setOpen(false)}
++          returnFocusRef={returnFocusRef}
++        />
++      ) : !isMobile ? (
+         <aside aria-label="AI 채팅" className="ai-chat-panel">
+-          {view}
++          <div className="ai-chat">
++            {loadFailed ? (
++              <div role="alert">
++                <p>채팅을 불러오지 못했어요.</p>
++                <button onClick={retryLoad} type="button">
++                  다시 시도
++                </button>
++              </div>
++            ) : (
++              <p role="status">채팅을 불러오고 있어요.</p>
++            )}
++          </div>
+         </aside>
+-      )}
++      ) : null}
+     </div>
+   );
+ }
+diff --git a/FE/src/features/ai-chat/AiChatSession.tsx b/FE/src/features/ai-chat/AiChatSession.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..c124fe5a321566aec8c82a7734881ae44cb974b2
+--- /dev/null
++++ b/FE/src/features/ai-chat/AiChatSession.tsx
+@@ -0,0 +1,57 @@
++import { RefObject } from "react";
++
++import { useAiChatConversation } from "./hooks/useAiChatConversation";
++import { MobileAiChatDialog } from "./view/MobileAiChatDialog";
++import { AiChatView } from "./view/AiChatView";
++
++export function AiChatSession({
++  isAuthenticated,
++  isMobile,
++  isOpen,
++  onAuthenticationRequired,
++  onClose,
++  returnFocusRef,
++}: {
++  isAuthenticated: boolean;
++  isMobile: boolean;
++  isOpen: boolean;
++  onAuthenticationRequired: () => void;
++  onClose: () => void;
++  returnFocusRef: RefObject<HTMLButtonElement | null>;
++}) {
++  const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
++    useAiChatConversation(onAuthenticationRequired);
++  const view = (
++    <AiChatView
++      active={!isMobile || isOpen}
++      isAuthenticated={isAuthenticated}
++      draft={isAuthenticated ? draft : ""}
++      messages={isAuthenticated ? messages : []}
++      errorMessage={isAuthenticated ? errorMessage : null}
++      isPending={isAuthenticated && isPending}
++      onDraftChange={(value) => {
++        if (isAuthenticated) setDraft(value);
++      }}
++      onSend={(text) => {
++        if (isAuthenticated) send(text);
++      }}
++      onRetry={() => {
++        if (isAuthenticated) retry();
++      }}
++    />
++  );
++
++  return isMobile ? (
++    <MobileAiChatDialog
++      isOpen={isOpen}
++      onClose={onClose}
++      returnFocusRef={returnFocusRef}
++    >
++      {view}
++    </MobileAiChatDialog>
++  ) : (
++    <aside aria-label="AI 채팅" className="ai-chat-panel">
++      {view}
++    </aside>
++  );
++}
+diff --git a/FE/src/features/ai-chat/view/AiChat.css b/FE/src/features/ai-chat/view/AiChat.css
+index 7ce91f27244c6e39ad51da8e291ff831ba2e751f..e417ae5414ba68b05f456088c04e67db8311a3db 100644
+--- a/FE/src/features/ai-chat/view/AiChat.css
++++ b/FE/src/features/ai-chat/view/AiChat.css
+@@ -263,6 +263,15 @@
+     padding: 8px 16px 0;
+   }
+ 
++  .ai-chat-launchers--error {
++    flex-direction: column;
++    gap: 8px;
++  }
++
++  .ai-chat-launchers--error p {
++    margin: 0;
++  }
++
+   .ai-chat-launchers button {
+     display: grid;
+     min-height: 44px;

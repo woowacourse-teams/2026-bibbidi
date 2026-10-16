@@ -42,8 +42,8 @@ vi.mock("../checklist", async (importOriginal) => ({
   useMyChecklistCommandRepository: vi.fn(),
   useMyChecklistRevision: () => 0,
 }));
-vi.mock("../preparation", () => ({
-  PreparationAuthenticationRequiredError: class extends Error {},
+vi.mock("../preparation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../preparation")>()),
   usePreparationChecklistRepository: vi.fn(),
 }));
 vi.mock("../../infrastructure/analytics", () => ({

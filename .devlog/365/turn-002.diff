@@ -1,0 +1,207 @@
+diff --git a/FE/src/features/ai-chat/AiChatFeature.test.tsx b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+index 70fd0509dc25a095696bcb397bb8c691adf70eb4..64819b69d71d6a51860741cd97de24e4e4f0b7a3 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.test.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.test.tsx
+@@ -4,6 +4,7 @@ import {
+   render,
+   screen,
+   within,
++  waitFor,
+ } from "@testing-library/react";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+@@ -25,6 +26,28 @@ function showCards() {
+   send("주례 없이 편안한 분위기로 하고 싶어");
+ }
+ 
++function mockMobileDialog() {
++  vi.mocked(window.matchMedia).mockReturnValue({
++    matches: true,
++    addEventListener: vi.fn(),
++    removeEventListener: vi.fn(),
++  } as unknown as MediaQueryList);
++  Object.defineProperties(HTMLDialogElement.prototype, {
++    showModal: {
++      configurable: true,
++      value(this: HTMLDialogElement) {
++        this.setAttribute("open", "");
++      },
++    },
++    close: {
++      configurable: true,
++      value(this: HTMLDialogElement) {
++        this.removeAttribute("open");
++      },
++    },
++  });
++}
++
+ beforeEach(() => {
+   vi.stubGlobal(
+     "matchMedia",
+@@ -57,6 +80,33 @@ afterEach(() => {
+ });
+ 
+ describe("AI 채팅 예시", () => {
++  it.each(
++    ["AI와 할 일 만들기", "AI 채팅 열기"].flatMap((launcher) =>
++      ["AI 채팅 닫기", "로드맵으로 돌아가기", "Escape"].map((close) => [
++        launcher,
++        close,
++      ]),
++    ),
++  )(
++    "%s로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
++    async (launcherName, closeName) => {
++      mockMobileDialog();
++      render(<AiChatFeature />);
++      const launcher = screen.getByRole("button", { name: launcherName });
++      // 클릭이 실행 버튼을 포커스하지 않는 경우에도 복원할 대상을 기억해야 한다.
++      fireEvent.click(launcher);
++      const dialog = screen.getByRole("dialog");
++      screen.getByRole("textbox").focus();
++      if (closeName === "Escape") {
++        fireEvent(dialog, new Event("cancel", { cancelable: true }));
++      } else {
++        fireEvent.click(screen.getByRole("button", { name: closeName }));
++      }
++      expect(screen.queryByRole("dialog")).toBeNull();
++      await waitFor(() => expect(document.activeElement).toBe(launcher));
++    },
++  );
++
+   it("추천 질문을 전송하고 시간과 고정 안내를 표시한다", () => {
+     vi.useFakeTimers();
+     vi.setSystemTime(new Date("2026-10-08T14:20:00+09:00"));
+@@ -169,25 +219,7 @@ describe("AI 채팅 예시", () => {
+       offsetTop: 0,
+     });
+     vi.stubGlobal("visualViewport", viewport);
+-    vi.mocked(window.matchMedia).mockReturnValue({
+-      matches: true,
+-      addEventListener: vi.fn(),
+-      removeEventListener: vi.fn(),
+-    } as unknown as MediaQueryList);
+-    Object.defineProperties(HTMLDialogElement.prototype, {
+-      showModal: {
+-        configurable: true,
+-        value(this: HTMLDialogElement) {
+-          this.setAttribute("open", "");
+-        },
+-      },
+-      close: {
+-        configurable: true,
+-        value(this: HTMLDialogElement) {
+-          this.removeAttribute("open");
+-        },
+-      },
+-    });
++    mockMobileDialog();
+     const { unmount } = render(<AiChatFeature />);
+     fireEvent.click(screen.getByRole("button", { name: "AI와 할 일 만들기" }));
+     showCards();
+diff --git a/FE/src/features/ai-chat/AiChatFeature.tsx b/FE/src/features/ai-chat/AiChatFeature.tsx
+index 359de690eb74d896f5596bb25e55d19a240a362a..ed2b6468e6a804caa8fea2672423bd16628c73c7 100644
+--- a/FE/src/features/ai-chat/AiChatFeature.tsx
++++ b/FE/src/features/ai-chat/AiChatFeature.tsx
+@@ -1,4 +1,4 @@
+-import { useState } from "react";
++import { useRef, useState } from "react";
+ 
+ import { useIsMobileLayout } from "../../shared/responsive";
+ import { useAiChatConversation } from "./hooks/useAiChatConversation";
+@@ -9,9 +9,15 @@ import "./view/AiChat.css";
+ export function AiChatFeature() {
+   const isMobile = useIsMobileLayout();
+   const [isOpen, setIsOpen] = useState(false);
++  const returnFocusRef = useRef<HTMLButtonElement>(null);
+   const { draft, messages, setDraft, send, chooseCard } =
+     useAiChatConversation();
+ 
++  const openChat = (launcher: HTMLButtonElement) => {
++    returnFocusRef.current = launcher;
++    setIsOpen(true);
++  };
++
+   const view = (
+     <AiChatView
+       active={!isMobile || isOpen}
+@@ -30,7 +36,7 @@ export function AiChatFeature() {
+           <div className="ai-chat-launchers">
+             <button
+               className="ai-chat-launchers__action"
+-              onClick={() => setIsOpen(true)}
++              onClick={(event) => openChat(event.currentTarget)}
+               type="button"
+             >
+               AI와 할 일 만들기
+@@ -38,13 +44,17 @@ export function AiChatFeature() {
+             <button
+               aria-label="AI 채팅 열기"
+               className="ai-chat-launchers__icon"
+-              onClick={() => setIsOpen(true)}
++              onClick={(event) => openChat(event.currentTarget)}
+               type="button"
+             >
+               <ChatIcon />
+             </button>
+           </div>
+-          <MobileAiChatDialog isOpen={isOpen} onClose={() => setIsOpen(false)}>
++          <MobileAiChatDialog
++            isOpen={isOpen}
++            onClose={() => setIsOpen(false)}
++            returnFocusRef={returnFocusRef}
++          >
+             {view}
+           </MobileAiChatDialog>
+         </>
+diff --git a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+index 580873c7ad53568a2e4d07fda611db1a3100b28b..119e601607f1e29b47f89bffec6f310f0b642aa7 100644
+--- a/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
++++ b/FE/src/features/ai-chat/view/MobileAiChatDialog.tsx
+@@ -1,4 +1,10 @@
+-import { ReactNode, useEffect, useLayoutEffect, useRef } from "react";
++import {
++  ReactNode,
++  RefObject,
++  useEffect,
++  useLayoutEffect,
++  useRef,
++} from "react";
+ 
+ import { containTabFocus } from "../../../shared/focus/containTabFocus";
+ 
+@@ -6,15 +12,18 @@ export function MobileAiChatDialog({
+   children,
+   isOpen,
+   onClose,
++  returnFocusRef,
+ }: {
+   children: ReactNode;
+   isOpen: boolean;
+   onClose: () => void;
++  returnFocusRef: RefObject<HTMLButtonElement | null>;
+ }) {
+   const dialogRef = useRef<HTMLDialogElement>(null);
+ 
+   useLayoutEffect(() => {
+     const dialog = dialogRef.current;
++    const launcher = returnFocusRef.current;
+     if (!dialog) return;
+     if (isOpen) {
+       dialog.showModal();
+@@ -27,8 +36,13 @@ export function MobileAiChatDialog({
+     return () => {
+       dialog.removeEventListener("keydown", handleKeyDown);
+       if (dialog.open) dialog.close();
++      if (isOpen) {
++        queueMicrotask(() => {
++          if (launcher?.isConnected && !dialog.open) launcher.focus();
++        });
++      }
+     };
+-  }, [isOpen]);
++  }, [isOpen, returnFocusRef]);
+ 
+   useEffect(() => {
+     const viewport = window.visualViewport;

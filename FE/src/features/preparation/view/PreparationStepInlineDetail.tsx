@@ -76,7 +76,6 @@ export function PreparationStepInlineDetail({
               isLoading={addingCatalogItemIds.length > 0}
               label="모두 추가"
               onClick={onAddAllTasks}
-              size="compact"
             />
           </footer>
         ) : null}
@@ -84,7 +83,6 @@ export function PreparationStepInlineDetail({
 
       <PreparationStepChecklist
         emptyDescription="위의 아직 안 담은 일에서 필요한 항목을 골라보세요."
-        isScrollable={false}
         tasks={detail.checklistTasks}
       />
     </aside>

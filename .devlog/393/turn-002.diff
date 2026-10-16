@@ -1,0 +1,342 @@
+diff --git a/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx b/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
+index 94892670f057d9b31d57826d8ccc462286eaadaf..528a31090e7afa81acbe8c137eff5793ffa0c90c 100644
+--- a/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
++++ b/FE/src/features/preparation/AllPreparationStepsFeature.test.tsx
+@@ -14,7 +14,7 @@ const analyticsMocks = vi.hoisted(() => ({
+ }));
+ const authMocks = vi.hoisted(() => ({
+   authState: { status: "guest" } as
+-    | { status: "authenticated"; user: { nickname: string } }
++    | { status: "authenticated"; user: { id: number; nickname: string } }
+     | { status: "guest" }
+     | { status: "loading" },
+   refreshAuth: vi.fn(),
+@@ -244,7 +244,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+   it("로그인 사용자는 단일 준비 목록과 서버 체크리스트를 요청한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+ 
+@@ -269,7 +269,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+   it("로그인 사용자는 내 체크리스트의 원본 준비 항목 ID로 included를 계산한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
+     checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
+@@ -302,7 +302,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     rerender(<AllPreparationStepsFeature />);
+ 
+@@ -325,7 +325,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+ 
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     rerender(<AllPreparationStepsFeature />);
+ 
+@@ -335,6 +335,93 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+     );
+   });
+ 
++  it("authenticated 상태에서 계정이 바뀌면 이전 목록을 즉시 숨기고 다시 조회한다", async () => {
++    authMocks.authState = {
++      status: "authenticated",
++      user: { id: 1, nickname: "A" },
++    };
++    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
++    let resolveNext: ((ids: string[]) => void) | undefined;
++    checklistRepositoryMocks.getCatalogItemIds
++      .mockResolvedValueOnce(["101"])
++      .mockReturnValueOnce(
++        new Promise<string[]>((resolve) => {
++          resolveNext = resolve;
++        }),
++      );
++    const { rerender } = await renderFeature({ expandFirstStep: true });
++    expect(
++      within(
++        screen.getByRole("region", { name: "이 단계의 체크리스트" }),
++      ).getByText("웨딩홀 투어"),
++    ).toBeTruthy();
++
++    authMocks.authState = {
++      status: "authenticated",
++      user: { id: 2, nickname: "B" },
++    };
++    rerender(
++      <div data-page-scroll-container>
++        <AllPreparationStepsFeature />
++      </div>,
++    );
++
++    expect(
++      screen.queryByRole("region", { name: "이 단계의 체크리스트" }),
++    ).toBeNull();
++    expect(
++      screen.queryByRole("heading", { name: ROADMAP_TITLE_PATTERN }),
++    ).toBeNull();
++    expect(screen.getByRole("status").textContent).toBe(
++      "로드맵을 불러오고 있어요.",
++    );
++    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
++    await act(async () => resolveNext?.(["102"]));
++    fireEvent.click(
++      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
++    );
++    const checklist = within(
++      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
++    );
++    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
++    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
++  });
++
++  it("계정 전환 후 늦게 도착한 이전 계정의 조회 응답을 무시한다", async () => {
++    authMocks.authState = {
++      status: "authenticated",
++      user: { id: 1, nickname: "A" },
++    };
++    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
++    let resolvePrevious: ((ids: string[]) => void) | undefined;
++    let previousSignal: AbortSignal | undefined;
++    checklistRepositoryMocks.getCatalogItemIds
++      .mockImplementationOnce((_audience: string, signal: AbortSignal) => {
++        previousSignal = signal;
++        return new Promise<string[]>((resolve) => {
++          resolvePrevious = resolve;
++        });
++      })
++      .mockResolvedValueOnce(["102"]);
++    const { rerender } = render(<AllPreparationStepsFeature />);
++    authMocks.authState = {
++      status: "authenticated",
++      user: { id: 2, nickname: "B" },
++    };
++    rerender(<AllPreparationStepsFeature />);
++    expect(previousSignal?.aborted).toBe(true);
++    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
++    await act(async () => resolvePrevious?.(["101"]));
++    fireEvent.click(
++      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
++    );
++    const checklist = within(
++      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
++    );
++    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
++    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
++  });
++
+   it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
+     let requestSignal: AbortSignal | undefined;
+     repositoryMocks.getCatalog.mockImplementation((signal?: AbortSignal) => {
+@@ -383,7 +470,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+   it("내 체크리스트의 401 응답을 로그인 만료로 안내한다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
+       new PreparationAuthenticationRequiredError(),
+@@ -402,7 +489,7 @@ describe("AllPreparationStepsFeature 서버 상태", () => {
+   it("인증 상태 재조회 중에도 로그인 만료 안내에서 다시 시도할 수 있다", async () => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
+       new PreparationAuthenticationRequiredError(),
+@@ -424,7 +511,7 @@ describe("AllPreparationStepsFeature 로그인 체크리스트 추가", () => {
+   beforeEach(() => {
+     authMocks.authState = {
+       status: "authenticated",
+-      user: { nickname: "bibbidi" },
++      user: { id: 1, nickname: "bibbidi" },
+     };
+     authMocks.refreshAuth.mockReset();
+     analyticsMocks.track.mockReset();
+@@ -556,6 +643,54 @@ describe("AllPreparationStepsFeature 로그인 체크리스트 추가", () => {
+     expect(analyticsMocks.track).not.toHaveBeenCalled();
+   });
+ 
++  it("authenticated 상태에서 계정이 바뀌면 이전 담기를 취소하고 새 계정은 담기를 계속할 수 있다", async () => {
++    let previousSignal: AbortSignal | undefined;
++    let resolvePrevious: ((ids: string[]) => void) | undefined;
++    checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
++      (_audience: string, _ids: string[], signal: AbortSignal) => {
++        previousSignal = signal;
++        return new Promise<string[]>((resolve) => {
++          resolvePrevious = resolve;
++        });
++      },
++    );
++    const { rerender } = await renderFeature({ expandFirstStep: true });
++    fireEvent.click(
++      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
++    );
++    authMocks.authState = {
++      status: "authenticated",
++      user: { id: 2, nickname: "B" },
++    };
++    rerender(
++      <div data-page-scroll-container>
++        <AllPreparationStepsFeature />
++      </div>,
++    );
++    expect(previousSignal?.aborted).toBe(true);
++    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
++    fireEvent.click(
++      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
++    );
++    const button = screen.getByRole("button", {
++      name: "웨딩홀 견적 비교 추가",
++    });
++    expect(button.hasAttribute("disabled")).toBe(false);
++    analyticsMocks.track.mockClear();
++    await act(async () => resolvePrevious?.(["102"]));
++    expect(analyticsMocks.track).not.toHaveBeenCalled();
++    expect(
++      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
++    ).toBeTruthy();
++    fireEvent.click(button);
++    await waitFor(() =>
++      expect(
++        screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
++      ).toBeNull(),
++    );
++    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledTimes(2);
++  });
++
+   it("추가 실패 시 화면을 유지하고 같은 동작을 다시 시도한다", async () => {
+     checklistRepositoryMocks.addCatalogItemIds
+       .mockRejectedValueOnce(
+diff --git a/FE/src/features/preparation/AllPreparationStepsFeature.tsx b/FE/src/features/preparation/AllPreparationStepsFeature.tsx
+index 5a193efe999c0c40d5b72dbf2ec952d7e146f919..3cf0fb14a0abcbcb85c947ec0a6dd946c0aa9e3c 100644
+--- a/FE/src/features/preparation/AllPreparationStepsFeature.tsx
++++ b/FE/src/features/preparation/AllPreparationStepsFeature.tsx
+@@ -33,7 +33,7 @@ import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
+ import { RoadmapSectionHeader } from "./view/RoadmapSectionHeader";
+ import { AllPreparationStepsSummaryFeature } from "./AllPreparationStepsSummaryFeature";
+ 
+-type CatalogRequestState =
++type CatalogRequestState = { owner: string | undefined } & (
+   | { audience?: PreparationAudience; status: "loading" }
+   | { audience: PreparationAudience; status: "empty" }
+   | {
+@@ -46,7 +46,8 @@ type CatalogRequestState =
+       catalog: PreparationCatalogModel;
+       selection: PreparationRoadmapSelection;
+       status: "success";
+-    };
++    }
++);
+ 
+ export function AllPreparationStepsFeature({
+   initialCategoryId,
+@@ -66,6 +67,7 @@ export function AllPreparationStepsFeature({
+     [],
+   );
+   const [requestState, setRequestState] = useState<CatalogRequestState>({
++    owner: undefined,
+     status: "loading",
+   });
+   const [requestRevision, setRequestRevision] = useState(0);
+@@ -78,6 +80,10 @@ export function AllPreparationStepsFeature({
+       : authState.status === "guest"
+         ? "guest"
+         : undefined;
++  const owner =
++    authState.status === "authenticated"
++      ? `authenticated:${authState.user.id}`
++      : audience;
+ 
+   useEffect(() => {
+     if (!audience) {
+@@ -102,9 +108,10 @@ export function AllPreparationStepsFeature({
+         );
+ 
+         setAdditionErrorMessage(null);
++        setAddingCatalogItemIds([]);
+ 
+         if (!hasSelectablePreparationSteps(nextCatalog)) {
+-          setRequestState({ audience, status: "empty" });
++          setRequestState({ audience, owner, status: "empty" });
+           return;
+         }
+ 
+@@ -120,6 +127,7 @@ export function AllPreparationStepsFeature({
+ 
+         setRequestState({
+           audience,
++          owner,
+           catalog: nextCatalog,
+           selection,
+           status: "success",
+@@ -136,6 +144,7 @@ export function AllPreparationStepsFeature({
+ 
+           setRequestState({
+             audience,
++            owner,
+             status: requiresAuthentication
+               ? "authentication-required"
+               : "error",
+@@ -149,6 +158,7 @@ export function AllPreparationStepsFeature({
+     };
+   }, [
+     audience,
++    owner,
+     checklistRepository,
+     refreshAuth,
+     requestRevision,
+@@ -158,8 +168,9 @@ export function AllPreparationStepsFeature({
+   useEffect(
+     () => () => {
+       additionControllerRef.current?.abort();
++      additionControllerRef.current = null;
+     },
+-    [audience],
++    [audience, owner],
+   );
+ 
+   useEffect(() => {
+@@ -179,7 +190,7 @@ export function AllPreparationStepsFeature({
+       return;
+     }
+ 
+-    setRequestState({ audience, status: "loading" });
++    setRequestState({ audience, owner, status: "loading" });
+     setRequestRevision((value) => value + 1);
+   };
+ 
+@@ -200,7 +211,7 @@ export function AllPreparationStepsFeature({
+     );
+   }
+ 
+-  if (requestState.audience !== audience) {
++  if (requestState.audience !== audience || requestState.owner !== owner) {
+     return <PreparationRoadmapState status="loading" />;
+   }
+ 
+@@ -311,7 +322,8 @@ export function AllPreparationStepsFeature({
+       setRequestState((currentState) => {
+         if (
+           currentState.status !== "success" ||
+-          currentState.audience !== audience
++          currentState.audience !== audience ||
++          currentState.owner !== owner
+         ) {
+           return currentState;
+         }

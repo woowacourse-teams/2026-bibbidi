@@ -6,7 +6,7 @@ import {
   ChecklistAppointmentCreationController,
 } from "../useChecklistAppointmentCreation";
 import { ChecklistAppointmentEditingController } from "../useChecklistAppointmentManagement";
-import { containTabFocus } from "./containTabFocus";
+import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import "./ChecklistAppointmentCreation.css";
 
 interface ChecklistAppointmentCreationProps {

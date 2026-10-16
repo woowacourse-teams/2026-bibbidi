@@ -5,10 +5,10 @@ import { catalogRepository } from "../catalog";
 import {
   PreparationAuthenticationRequiredError,
   usePreparationChecklistRepository,
+  useCatalogTaskAddition,
 } from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import type { RecommendedCatalogItemModel } from "./model/recommendedCatalogItem";
-import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
 import { createRecommendedScheduleViewModel } from "./view-model/createRecommendedScheduleViewModel";
 import { GuestRecommendedTasks } from "./view/GuestRecommendedTasks";
 import {
@@ -86,7 +86,7 @@ export function GuestRecommendedTasksFeature({
     },
     [state, onAdded],
   );
-  const addition = useRecommendedTaskAddition({
+  const addition = useCatalogTaskAddition({
     allowGuestAddition: true,
     authScope: audience,
     isAuthenticated: audience === "authenticated",

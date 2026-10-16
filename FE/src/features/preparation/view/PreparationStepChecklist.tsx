@@ -4,13 +4,11 @@ import "./PreparationStepChecklist.css";
 
 interface PreparationStepChecklistProps {
   emptyDescription?: string;
-  isScrollable?: boolean;
   tasks: PreparationStepTaskViewModel[];
 }
 
 export function PreparationStepChecklist({
   emptyDescription,
-  isScrollable = true,
   tasks,
 }: PreparationStepChecklistProps) {
   return (
@@ -27,7 +25,6 @@ export function PreparationStepChecklist({
       </header>
       <PreparationTaskList
         emptyDescription={emptyDescription}
-        isScrollable={isScrollable}
         tasks={tasks}
         variant="checklist"
       />

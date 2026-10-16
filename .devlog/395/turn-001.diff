@@ -1,0 +1,737 @@
+diff --git a/FE/src/features/preparation/RoadmapWorkspace.test.tsx b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+index e2062c692291239ee2c10c916069bd39d86ffe60..948a663b144e4681660dfcd31bebcfbd90184bb5 100644
+--- a/FE/src/features/preparation/RoadmapWorkspace.test.tsx
++++ b/FE/src/features/preparation/RoadmapWorkspace.test.tsx
+@@ -134,6 +134,33 @@ describe("준비 로드맵 보기 전환", () => {
+     await screen.findByText(/내 할 일 0개 · 완료 0개/);
+   });
+ 
++  it("각 카드에 완료 상태와 일정을 조회용으로 표시하고 변경 뒤 갱신한다", async () => {
++    mocks.getChecklist.mockResolvedValue({
++      categories: [
++        {
++          ...checklist.categories[0],
++          customItems: [{ ...item(2, "우리만의 준비", true), status: "done" }],
++        },
++      ],
++    });
++    const { rerender } = render(<PreparationRoadmapFeature />);
++    const card = await screen.findByRole("article", { name: "내가 추가한 일" });
++    expect(within(card).getByText("내 할 일 1개 · 완료 1개")).toBeTruthy();
++    expect(within(card).getByText("완료 · 일정 없음")).toBeTruthy();
++    expect(within(card).queryByRole("checkbox")).toBeNull();
++    expect(within(card).queryByRole("button")).toBeNull();
++    mocks.getChecklist.mockResolvedValue(checklist);
++    mocks.revision += 1;
++    rerender(<PreparationRoadmapFeature />);
++    const refreshedCard = await screen.findByRole("article", {
++      name: "내가 추가한 일",
++    });
++    expect(
++      within(refreshedCard).getByText("내 할 일 1개 · 완료 0개"),
++    ).toBeTruthy();
++    expect(within(refreshedCard).getByText("예정 · 일정 없음")).toBeTruthy();
++  });
++
+   it("전체 단계의 준비 현황은 체크리스트 변경 뒤 다시 조회한다", async () => {
+     const { rerender } = render(<PreparationRoadmapFeature />);
+     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
+@@ -152,15 +179,16 @@ describe("준비 로드맵 보기 전환", () => {
+     await screen.findByRole("heading", { name: "웨딩홀 로드맵" });
+     const cards = screen.getByRole("list", { name: "내 할 일이 있는 단계" });
+     expect(
+-      within(cards).queryByRole("button", { name: /예식 형태 결정/ }),
++      within(cards).queryByRole("article", { name: "예식 형태 결정" }),
+     ).toBeNull();
+     expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
+     expect(screen.queryByText("웨딩홀 견적 비교")).toBeNull();
+-    fireEvent.click(
+-      within(cards).getByRole("button", { name: /내가 추가한 일/ }),
+-    );
+-    expect(screen.getByText("우리만의 준비")).toBeTruthy();
+-    expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
++    expect(
++      within(
++        within(cards).getByRole("article", { name: "내가 추가한 일" }),
++      ).getByText("우리만의 준비"),
++    ).toBeTruthy();
++    expect(screen.getByText("내 웨딩홀 투어")).toBeTruthy();
+   });
+ 
+   it("빈 카테고리에서 전체 단계로 전환하며 카테고리를 유지한다", async () => {
+diff --git a/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.test.ts b/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f893d797d0961270efe940c13e6b456e88b890d
+--- /dev/null
++++ b/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.test.ts
+@@ -0,0 +1,98 @@
++import { describe, expect, it } from "vitest";
++import {
++  ChecklistQueryItemModel,
++  ChecklistQueryModel,
++} from "../../checklist/model/checklistQuery";
++import { createPersonalRoadmapViewModel } from "./createPersonalRoadmapViewModel";
++
++function item(
++  id: number,
++  status: ChecklistQueryItemModel["status"],
++): ChecklistQueryItemModel {
++  return {
++    id: String(id),
++    title: `할 일 ${id}`,
++    categoryId: "wedding-hall",
++    checklistItemId: id,
++    sourceCatalogItemId: id,
++    status,
++    appointments: [],
++  };
++}
++
++function checklist(
++  statuses: ChecklistQueryItemModel["status"][],
++): ChecklistQueryModel {
++  return {
++    categories: [
++      {
++        id: "wedding-hall",
++        title: "웨딩홀",
++        items: [],
++        steps: statuses.map((status, index) => ({
++          id: `step-${index + 1}`,
++          order: index + 1,
++          title: `단계 ${index + 1}`,
++          items: [item(index + 1, status)],
++        })),
++        customItems: [],
++      },
++    ],
++  };
++}
++
++describe("내 로드맵 뷰 모델", () => {
++  it("완료한 단계 다음의 첫 미완료 카드만 현재 단계로 강조한다", () => {
++    const [category] = createPersonalRoadmapViewModel(
++      checklist(["done", "continue", "prev"]),
++    );
++    expect(category.groups.map((group) => group.isCurrent)).toEqual([
++      false,
++      true,
++      false,
++    ]);
++    expect(category.completedCount).toBe(1);
++    expect(category.groups[0].tasks[0].isComplete).toBe(true);
++    expect(category.groups[1].tasks[0].statusLabel).toBe("진행 중");
++  });
++
++  it("모든 할 일이 완료됐으면 첫 번째 카드를 강조한다", () => {
++    const [category] = createPersonalRoadmapViewModel(
++      checklist(["done", "done"]),
++    );
++    expect(category.groups.map((group) => group.isCurrent)).toEqual([
++      true,
++      false,
++    ]);
++  });
++
++  it("빈 단계는 카드에서 제외하되 전체 단계 수에 포함하고 직접 추가한 일을 강조한다", () => {
++    const source = checklist(["done"]);
++    source.categories[0].steps!.push({
++      id: "step-2",
++      order: 2,
++      title: "빈 단계",
++      items: [],
++    });
++    source.categories[0].customItems = [
++      { ...item(3, "prev"), sourceCatalogItemId: null },
++    ];
++    const [category] = createPersonalRoadmapViewModel(source);
++    expect(category.stepCount).toBe(2);
++    expect(category.groups.map((group) => group.title)).toEqual([
++      "단계 1",
++      "내가 추가한 일",
++    ]);
++    expect(category.groups.map((group) => group.isCurrent)).toEqual([
++      false,
++      true,
++    ]);
++    expect(category.totalCount).toBe(2);
++  });
++
++  it("할 일이 없는 카테고리는 빈 카드 목록을 반환한다", () => {
++    const [category] = createPersonalRoadmapViewModel(checklist([]));
++    expect(category.groups).toEqual([]);
++    expect(category.totalCount).toBe(0);
++  });
++});
+diff --git a/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.ts b/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.ts
+index 3d84e968e70dc7aa42536aebfe0de1d69ebda2b7..9c4efd32ea1cd084017b6a9c238ca04c71f40e38 100644
+--- a/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.ts
++++ b/FE/src/features/preparation/view-model/createPersonalRoadmapViewModel.ts
+@@ -1,18 +1,63 @@
+ import { ChecklistQueryModel } from "../../checklist/model/checklistQuery";
+-import {
+-  ChecklistCategoryViewModel,
+-  createChecklistViewModel,
+-} from "../../checklist/view-model/createChecklistViewModel";
++import { createChecklistViewModel } from "../../checklist/view-model/createChecklistViewModel";
+ 
+-export interface PersonalRoadmapCategoryViewModel extends ChecklistCategoryViewModel {
++export interface PersonalRoadmapTaskViewModel {
++  id: string;
++  title: string;
++  schedule: string;
++  isComplete: boolean;
++  statusLabel: string;
++}
++
++export interface PersonalRoadmapGroupViewModel {
++  id: string;
++  title: string;
++  numberLabel: string;
++  totalCount: number;
++  completedCount: number;
++  isCurrent: boolean;
++  tasks: PersonalRoadmapTaskViewModel[];
++}
++
++export interface PersonalRoadmapCategoryViewModel {
++  id: string;
++  title: string;
+   stepCount: number;
++  totalCount: number;
++  completedCount: number;
++  groups: PersonalRoadmapGroupViewModel[];
+ }
+ 
+ export function createPersonalRoadmapViewModel(
+   checklist: ChecklistQueryModel,
+ ): PersonalRoadmapCategoryViewModel[] {
+-  return createChecklistViewModel(checklist).map((category, index) => ({
+-    ...category,
+-    stepCount: checklist.categories[index].steps?.length ?? 0,
+-  }));
++  return createChecklistViewModel(checklist).map((category, index) => {
++    const currentGroup =
++      category.groups.find(
++        (group) => group.completedCount < group.totalCount,
++      ) ?? category.groups[0];
++
++    return {
++      id: category.id,
++      title: category.title,
++      stepCount: checklist.categories[index].steps?.length ?? 0,
++      totalCount: category.totalCount,
++      completedCount: category.completedCount,
++      groups: category.groups.map((group) => ({
++        id: group.id,
++        title: group.title,
++        numberLabel: group.numberLabel,
++        totalCount: group.totalCount,
++        completedCount: group.completedCount,
++        isCurrent: group.id === currentGroup?.id,
++        tasks: group.tasks.map((task) => ({
++          id: task.id,
++          title: task.title,
++          schedule: task.schedule,
++          isComplete: task.status === "complete",
++          statusLabel: task.statusLabel,
++        })),
++      })),
++    };
++  });
+ }
+diff --git a/FE/src/features/preparation/view/PersonalRoadmap.css b/FE/src/features/preparation/view/PersonalRoadmap.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..4dd42ed1d35312861eac9f81463499d3989ea73f
+--- /dev/null
++++ b/FE/src/features/preparation/view/PersonalRoadmap.css
+@@ -0,0 +1,207 @@
++.personal-roadmap {
++  display: flex;
++  flex-direction: column;
++  flex: 1;
++  min-height: 0;
++  width: 100%;
++  padding: 0 32px 28px;
++  overflow-y: auto;
++  max-width: 1440px;
++  margin: 0 auto;
++}
++
++.personal-roadmap > section {
++  display: flex;
++  flex-direction: column;
++  flex: 1;
++  min-height: 0;
++}
++
++.personal-roadmap__categories {
++  display: flex;
++  flex: none;
++  justify-content: center;
++  overflow-x: auto;
++  border-bottom: 1px solid var(--color-stroke-neutral-weak);
++  background: transparent;
++}
++
++.personal-roadmap__categories button {
++  display: flex;
++  flex: none;
++  align-items: center;
++  justify-content: center;
++  width: auto;
++  height: auto;
++  padding: 10px 24px;
++  border: 0;
++  border-bottom: 3px solid transparent;
++  border-radius: 0;
++  background: transparent;
++  color: var(--color-fg-neutral-muted);
++  cursor: pointer;
++  font: inherit;
++  font-size: 15px;
++  white-space: nowrap;
++}
++
++.personal-roadmap__categories button[aria-pressed="true"] {
++  border-bottom-color: var(--color-stroke-brand-solid);
++  color: var(--color-fg-brand);
++  font-weight: 700;
++}
++
++.personal-roadmap__cards {
++  display: flex;
++  flex: 1;
++  gap: 16px;
++  min-height: 280px;
++  overflow: auto;
++  overscroll-behavior-x: contain;
++  scroll-snap-type: x proximity;
++  scrollbar-width: none;
++  padding: 4px 0;
++  margin: 0;
++  list-style: none;
++}
++
++.personal-roadmap__cards::-webkit-scrollbar {
++  display: none;
++}
++
++.personal-roadmap__cards > li {
++  display: flex;
++  flex: 0 0 min(360px, 85%);
++  min-width: 0;
++  scroll-snap-align: start;
++}
++
++.personal-roadmap__card {
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  min-width: 0;
++  padding: 20px;
++  border: 1px solid var(--color-stroke-neutral-weak);
++  border-radius: 16px;
++  background: var(--color-bg-layer-default);
++}
++
++.personal-roadmap__card--current {
++  border-color: var(--color-stroke-brand-solid);
++}
++
++.personal-roadmap__card-header {
++  padding-bottom: 16px;
++  border-bottom: 1px solid var(--color-stroke-neutral-weak);
++}
++
++.personal-roadmap__number {
++  color: var(--color-fg-brand);
++  font-size: 20px;
++  font-weight: 700;
++}
++
++.personal-roadmap__card-header h3 {
++  margin: 10px 0 6px;
++  color: var(--color-fg-neutral);
++  font-size: 17px;
++  line-height: 1.5;
++  overflow-wrap: anywhere;
++}
++
++.personal-roadmap__card-header p,
++.personal-roadmap__task-meta {
++  margin: 0;
++  color: var(--color-fg-neutral-muted);
++  font-size: 12px;
++  line-height: 1.6;
++}
++
++.personal-roadmap__tasks {
++  flex: 1;
++  min-height: 0;
++  overflow-y: auto;
++  overscroll-behavior-y: contain;
++  padding: 16px 0 0;
++  margin: 0;
++  list-style: none;
++  scrollbar-width: thin;
++}
++
++.personal-roadmap__task {
++  display: flex;
++  align-items: flex-start;
++  gap: 10px;
++  padding-bottom: 24px;
++}
++
++.personal-roadmap__task > div {
++  min-width: 0;
++}
++
++.personal-roadmap__task-title {
++  margin: 0 0 4px;
++  color: var(--color-fg-neutral);
++  font-size: 14px;
++  line-height: 1.5;
++  overflow-wrap: anywhere;
++}
++
++.personal-roadmap__status {
++  display: flex;
++  flex: none;
++  align-items: center;
++  justify-content: center;
++  width: 16px;
++  height: 16px;
++  margin-top: 3px;
++  border: 1px solid var(--color-stroke-neutral);
++  border-radius: 4px;
++}
++
++.personal-roadmap__status--complete {
++  border-color: var(--color-stroke-brand-solid);
++  background: var(--color-bg-brand-solid);
++  color: var(--color-fg-on-brand);
++}
++
++.personal-roadmap__status svg {
++  width: 14px;
++  height: 14px;
++  stroke: currentColor;
++  stroke-width: 2;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
++.personal-roadmap :is(ol, ul):focus-visible {
++  outline: 3px solid var(--color-stroke-focus-ring);
++  outline-offset: -3px;
++}
++
++@media (max-width: 760px) {
++  .personal-roadmap {
++    padding: 0 16px 16px;
++  }
++
++  .personal-roadmap__cards {
++    gap: 12px;
++  }
++
++  .personal-roadmap__cards > li {
++    flex-basis: min(300px, 85%);
++  }
++
++  .personal-roadmap__card {
++    padding: 16px;
++  }
++
++  .personal-roadmap__categories {
++    justify-content: flex-start;
++  }
++
++  .personal-roadmap__categories button {
++    padding: 10px 18px;
++  }
++}
+diff --git a/FE/src/features/preparation/view/PersonalRoadmap.tsx b/FE/src/features/preparation/view/PersonalRoadmap.tsx
+index 6f102688b08fdc6a29382340eec68cd7af4ab514..11167901d50cf12519e9b328498af96ee9528069 100644
+--- a/FE/src/features/preparation/view/PersonalRoadmap.tsx
++++ b/FE/src/features/preparation/view/PersonalRoadmap.tsx
+@@ -1,7 +1,8 @@
+-import { ReactNode, useState } from "react";
++import { ReactNode } from "react";
+ import { PersonalRoadmapCategoryViewModel } from "../view-model/createPersonalRoadmapViewModel";
+ import { RoadmapSectionHeader } from "./RoadmapSectionHeader";
+-import { PreparationStepChecklist } from "./PreparationStepChecklist";
++import { PersonalRoadmapCard } from "./PersonalRoadmapCard";
++import "./PersonalRoadmap.css";
+ 
+ export function PersonalRoadmap({
+   categories,
+@@ -16,12 +17,8 @@ export function PersonalRoadmap({
+   onShowAll: () => void;
+   viewSwitcher: ReactNode;
+ }) {
+-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+   const category =
+     categories.find((item) => item.id === categoryId) ?? categories[0];
+-  const group =
+-    category?.groups.find((item) => item.id === selectedGroupId) ??
+-    category?.groups[0];
+ 
+   return (
+     <div className="personal-roadmap">
+@@ -32,10 +29,7 @@ export function PersonalRoadmap({
+             key={item.id}
+             aria-pressed={item.id === category?.id}
+             aria-controls="personal-roadmap-content"
+-            onClick={() => {
+-              setSelectedGroupId(null);
+-              onCategorySelect(item.id);
+-            }}
++            onClick={() => onCategorySelect(item.id)}
+           >
+             {item.title}
+           </button>
+@@ -51,44 +45,19 @@ export function PersonalRoadmap({
+           summary={`${category?.stepCount ?? 0}개 단계 · 내 할 일 ${category?.totalCount ?? 0}개 · 완료 ${category?.completedCount ?? 0}개`}
+           viewSwitcher={viewSwitcher}
+         />
+-        {group ? (
+-          <>
+-            <ol
+-              className="personal-roadmap__cards"
+-              aria-label="내 할 일이 있는 단계"
+-            >
+-              {category.groups.map((item) => (
+-                <li key={item.id}>
+-                  <button
+-                    type="button"
+-                    aria-pressed={item.id === group.id}
+-                    aria-controls="personal-roadmap-detail"
+-                    onClick={() => setSelectedGroupId(item.id)}
+-                  >
+-                    <span className="personal-roadmap__number">
+-                      {item.numberLabel}
+-                    </span>
+-                    <span>{item.title}</span>
+-                  </button>
+-                </li>
+-              ))}
+-            </ol>
+-            <section
+-              id="personal-roadmap-detail"
+-              className="personal-roadmap__detail"
+-              aria-labelledby="personal-roadmap-detail-title"
+-              aria-live="polite"
+-            >
+-              <h2 id="personal-roadmap-detail-title">{group.title}</h2>
+-              <PreparationStepChecklist
+-                tasks={group.tasks.map((task) => ({
+-                  id: task.id,
+-                  title: task.title,
+-                  isEssential: false,
+-                }))}
+-              />
+-            </section>
+-          </>
++        {category && category.groups.length > 0 ? (
++          <ol
++            className="personal-roadmap__cards"
++            aria-label="내 할 일이 있는 단계"
++            // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
++            tabIndex={0}
++          >
++            {category.groups.map((group) => (
++              <li key={group.id}>
++                <PersonalRoadmapCard group={group} />
++              </li>
++            ))}
++          </ol>
+         ) : (
+           <div className="preparation-roadmap-state" role="status">
+             <p>아직 담은 할 일이 없어요.</p>
+diff --git a/FE/src/features/preparation/view/PersonalRoadmapCard.tsx b/FE/src/features/preparation/view/PersonalRoadmapCard.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..5182ee118d48ed7f1198b1ffcc0a993fa22b855c
+--- /dev/null
++++ b/FE/src/features/preparation/view/PersonalRoadmapCard.tsx
+@@ -0,0 +1,49 @@
++import { PersonalRoadmapGroupViewModel } from "../view-model/createPersonalRoadmapViewModel";
++
++export function PersonalRoadmapCard({
++  group,
++}: {
++  group: PersonalRoadmapGroupViewModel;
++}) {
++  return (
++    <article
++      className={`personal-roadmap__card${group.isCurrent ? " personal-roadmap__card--current" : ""}`}
++      aria-labelledby={`personal-roadmap-group-${group.id}`}
++    >
++      <header className="personal-roadmap__card-header">
++        <span className="personal-roadmap__number">{group.numberLabel}</span>
++        <h3 id={`personal-roadmap-group-${group.id}`}>{group.title}</h3>
++        <p>
++          내 할 일 {group.totalCount}개 · 완료 {group.completedCount}개
++        </p>
++      </header>
++      <ul
++        className="personal-roadmap__tasks"
++        aria-label={`${group.title}의 할 일`}
++        // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 카드 안의 긴 할 일 목록을 키보드로 스크롤한다.
++        tabIndex={0}
++      >
++        {group.tasks.map((task) => (
++          <li className="personal-roadmap__task" key={task.id}>
++            <span
++              aria-hidden="true"
++              className={`personal-roadmap__status${task.isComplete ? " personal-roadmap__status--complete" : ""}`}
++            >
++              {task.isComplete ? (
++                <svg viewBox="0 0 16 16" fill="none">
++                  <path d="m3 8 3 3 7-7" />
++                </svg>
++              ) : null}
++            </span>
++            <div>
++              <p className="personal-roadmap__task-title">{task.title}</p>
++              <p className="personal-roadmap__task-meta">
++                {task.statusLabel} · {task.schedule}
++              </p>
++            </div>
++          </li>
++        ))}
++      </ul>
++    </article>
++  );
++}
+diff --git a/FE/src/features/preparation/view/RoadmapWorkspace.css b/FE/src/features/preparation/view/RoadmapWorkspace.css
+index acd20f83237e47bb6ab27a471388c58bb72db433..8f38e8a3617a4322d39586642c7b64ac666d2359 100644
+--- a/FE/src/features/preparation/view/RoadmapWorkspace.css
++++ b/FE/src/features/preparation/view/RoadmapWorkspace.css
+@@ -144,25 +144,6 @@
+   outline-offset: -3px;
+ }
+ 
+-.personal-roadmap {
+-  display: flex;
+-  flex-direction: column;
+-  flex: 1;
+-  min-height: 0;
+-  width: 100%;
+-  padding: 0 32px 28px;
+-  max-width: 1440px;
+-  margin: 0 auto;
+-}
+-
+-.personal-roadmap > section {
+-  display: flex;
+-  flex-direction: column;
+-  flex: 1;
+-  min-height: 0;
+-}
+-
+-.personal-roadmap__categories,
+ .preparation-roadmap .preparation-roadmap__categories {
+   display: flex;
+   flex: none;
+@@ -172,7 +153,6 @@
+   background: transparent;
+ }
+ 
+-.personal-roadmap__categories button,
+ .preparation-roadmap .preparation-roadmap__category {
+   display: flex;
+   flex: none;
+@@ -192,73 +172,12 @@
+   white-space: nowrap;
+ }
+ 
+-.personal-roadmap__categories button[aria-pressed="true"],
+ .preparation-roadmap .preparation-roadmap__category--current {
+   border-bottom-color: var(--color-stroke-brand-solid);
+   color: var(--color-fg-brand);
+   font-weight: 700;
+ }
+ 
+-.personal-roadmap__cards {
+-  display: flex;
+-  flex: none;
+-  gap: 16px;
+-  overflow-x: auto;
+-  overscroll-behavior-x: contain;
+-  scroll-snap-type: x proximity;
+-  padding: 4px 0 16px;
+-  list-style: none;
+-}
+-
+-.personal-roadmap__cards li {
+-  flex: 0 0 min(260px, 80%);
+-  scroll-snap-align: start;
+-}
+-
+-.personal-roadmap__cards button {
+-  display: flex;
+-  flex-direction: column;
+-  gap: 12px;
+-  width: 100%;
+-  min-height: 160px;
+-  padding: 20px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 14px;
+-  background: var(--color-bg-layer-default);
+-  color: var(--color-fg-neutral);
+-  font: inherit;
+-  font-weight: 700;
+-  text-align: left;
+-  cursor: pointer;
+-}
+-
+-.personal-roadmap__cards button[aria-pressed="true"],
+-.personal-roadmap__cards button:hover {
+-  border-color: var(--color-stroke-brand-solid);
+-  background: var(--color-bg-brand-weak);
+-}
+-
+-.personal-roadmap__number {
+-  color: var(--color-fg-brand);
+-  font-size: 20px;
+-}
+-
+-.personal-roadmap__detail {
+-  min-height: 0;
+-  overflow-y: auto;
+-  overscroll-behavior-y: contain;
+-  padding: 20px;
+-  border: 1px solid var(--color-stroke-neutral-weak);
+-  border-radius: 14px;
+-  background: var(--color-bg-layer-default);
+-}
+-
+-.personal-roadmap__detail h2 {
+-  margin-top: 0;
+-  color: var(--color-fg-neutral);
+-  font-size: 20px;
+-}
+-
+ @media (max-width: 760px) {
+   .roadmap-workspace__hero {
+     padding: 12px 16px 8px;
+@@ -272,16 +191,10 @@
+     font-size: 13px;
+   }
+ 
+-  .personal-roadmap {
+-    padding: 0 16px 16px;
+-  }
+-
+-  .personal-roadmap__categories,
+   .preparation-roadmap .preparation-roadmap__categories {
+     justify-content: flex-start;
+   }
+ 
+-  .personal-roadmap__categories button,
+   .preparation-roadmap .preparation-roadmap__category {
+     padding: 10px 18px;
+   }
