@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.oidc.client;
 
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.net.URI;

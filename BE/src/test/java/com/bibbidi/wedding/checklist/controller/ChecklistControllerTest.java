@@ -15,8 +15,10 @@ import com.bibbidi.wedding.checklist.service.dto.RecommendedCatalogItemResult;
 import com.bibbidi.wedding.checklist.service.dto.UnscheduledChecklistItemResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.util.List;
 import com.bibbidi.wedding.support.SecurityTestConfig;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Import(SecurityTestConfig.class)
 @WebMvcTest(ChecklistController.class)
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class ChecklistControllerTest {
 
     private static final Long USER_ID = 7L;

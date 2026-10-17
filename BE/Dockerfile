@@ -1,8 +1,17 @@
+FROM eclipse-temurin:25-jre-noble AS extract
+
+WORKDIR /workspace
+COPY build/libs/app.jar app.jar
+RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
+
 FROM eclipse-temurin:25-jre-noble
 
 WORKDIR /app
 
-COPY --chown=10001:10001 build/libs/app.jar /app/app.jar
+COPY --from=extract --chown=10001:10001 /workspace/extracted/dependencies/ ./
+COPY --from=extract --chown=10001:10001 /workspace/extracted/spring-boot-loader/ ./
+COPY --from=extract --chown=10001:10001 /workspace/extracted/snapshot-dependencies/ ./
+COPY --from=extract --chown=10001:10001 /workspace/extracted/application/ ./
 
 USER 10001:10001
 

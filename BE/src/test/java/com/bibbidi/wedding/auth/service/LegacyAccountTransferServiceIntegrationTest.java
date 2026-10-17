@@ -10,12 +10,14 @@ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -25,7 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@Sql("/legacy-account-fixture.sql")
+@Sql("/fixtures/legacy-account-fixture.sql")
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class LegacyAccountTransferServiceIntegrationTest {
 
     private static final String LEGACY_NICKNAME = "기존회원";
@@ -90,7 +93,7 @@ class LegacyAccountTransferServiceIntegrationTest {
     }
 
     @Test
-    @Sql({"/legacy-account-fixture.sql", "/terms-fixture.sql"})
+    @Sql({"/fixtures/legacy-account-fixture.sql", "/fixtures/terms-fixture.sql"})
     @DisplayName("옮기면 소셜 회원으로 동의한 약관이 기존 회원의 동의로 옮겨진다")
     void shouldMoveTermsAgreementToLegacyUser() {
         PasswordLoginInfo legacyAccount = userService.findPasswordLoginInfo(LEGACY_NICKNAME).orElseThrow();

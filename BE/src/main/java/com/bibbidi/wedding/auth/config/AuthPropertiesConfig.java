@@ -1,5 +1,9 @@
 package com.bibbidi.wedding.auth.config;
 
+import com.bibbidi.wedding.auth.config.properties.AuthCleanupProperties;
+import com.bibbidi.wedding.auth.config.properties.BibbidiTokenProperties;
+import com.bibbidi.wedding.auth.config.properties.RefreshCookieProperties;
+import com.bibbidi.wedding.auth.config.properties.SessionProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 

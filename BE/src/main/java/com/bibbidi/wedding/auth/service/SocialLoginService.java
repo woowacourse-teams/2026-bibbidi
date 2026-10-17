@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.auth.service;
 
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
 import com.bibbidi.wedding.auth.domain.ClientType;
 import com.bibbidi.wedding.auth.domain.OidcAuthRequest;
 import com.bibbidi.wedding.auth.domain.SocialAuthPurpose;

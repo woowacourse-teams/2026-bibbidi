@@ -3,12 +3,14 @@ package com.bibbidi.wedding.user.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.common.domain.UserStatus;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.bibbidi.wedding.user.domain.User;
 import com.bibbidi.wedding.user.domain.WeddingDate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -18,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class UserRepositoryIntegrationTest {
 
     private static final LocalDate WEDDING_DATE = LocalDate.of(

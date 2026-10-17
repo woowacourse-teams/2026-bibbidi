@@ -1,0 +1,96 @@
+name: 비비디 AI 리뷰 실행
+
+on:
+  workflow_run:
+    workflows:
+      - 비비디 AI 리뷰 사전 검사
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: ai-review-job-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: PR 변경사항을 AI로 검토
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # 이미 리뷰한 PR이면 아래 설치 단계를 건너뛴다. 모델 리뷰는 PR당 최초 한 번만 한다.
+      - name: 리뷰 대상 PR 확인과 중복 리뷰 확인
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_PULL_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          number="$EVENT_PULL_NUMBER"
+          if [ -z "$number" ]; then
+            number=$(gh api "repos/$REPOSITORY/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')
+          fi
+          case "$number" in
+            ''|*[!0-9]*)
+              echo "리뷰할 PR 번호를 찾지 못했습니다."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          reviewed=$(gh api "repos/$REPOSITORY/issues/$number/comments" --paginate \
+            --jq '[.[] | select(.user.type == "Bot" and ((.body // "") | contains("<!-- bibbidi-ai-review:summary -->")) and ((.body // "") | contains("<!-- bibbidi-ai-review:sha=")))] | length' \
+            | awk '{ total += $1 } END { print total + 0 }')
+          if [ "$reviewed" -gt 0 ]; then
+            echo "PR #$number는 이미 AI 리뷰를 마쳤습니다."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      # pull_request_target이 아니므로 PR의 head가 아니라 기본 브랜치의 리뷰 코드를 쓴다.
+      - name: 기본 브랜치의 AI 리뷰 코드 체크아웃
+        if: steps.target.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Node.js 버전을 24.19.0으로 설정
+        if: steps.target.outputs.skip != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: pnpm 버전을 11.20.0으로 설정
+        if: steps.target.outputs.skip != 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+
+      - name: AI 리뷰 의존성 설치
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm --dir .github/ai-review install --frozen-lockfile
+
+      - name: PR 변경사항을 AI로 리뷰하고 댓글 작성
+        if: steps.target.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REVIEW_REPOSITORY: ${{ github.repository }}
+          REVIEW_PULL_NUMBER: ${{ steps.target.outputs.number }}
+          REVIEW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DISCORD_WEBHOOK_GITHUB_ACTION: ${{ secrets.DISCORD_WEBHOOK_GITHUB_ACTION }}
+        run: node --experimental-strip-types .github/ai-review/job/cli.ts

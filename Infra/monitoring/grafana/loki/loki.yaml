@@ -5,33 +5,33 @@ server:
   http_listen_port: 3100           # 로그 수신·조회·/ready·/metrics 창구
   grpc_listen_address: 127.0.0.1
   grpc_listen_port: 9096           # 내부 통신
-  log_level: warn                  
+  log_level: warn
 
 common:
-  instance_addr: 127.0.0.1         
-  path_prefix: /var/lib/loki       
+  instance_addr: 127.0.0.1
+  path_prefix: /var/lib/loki
   storage:
     filesystem:
       chunks_directory: /var/lib/loki/chunks   # 로그 본문 묶음(청크) 저장 위치
       rules_directory: /var/lib/loki/rules     # 사용 X
-  replication_factor: 1            
+  replication_factor: 1
   ring:
     kvstore:
       store: inmemory
 
 schema_config:
   configs:
-    - from: 2026-10-01             
-      store: tsdb                  
-      object_store: filesystem     
+    - from: 2026-10-01
+      store: tsdb
+      object_store: filesystem
       schema: v13                  # 구조화 메타데이터·OTLP 수신에 필요
       index:
         prefix: index_
-        period: 24h                
+        period: 24h
 
 query_range:
   cache_results: true
-  results_cache: # 조회 결과 메모리 캐싱 -> 기본 전략 : 
+  results_cache: # 조회 결과 메모리 캐싱 -> 기본 전략 :
     cache:
       embedded_cache:
         enabled: true
@@ -39,6 +39,10 @@ query_range:
 
 limits_config:
   retention_period: 336h           # 보존 14일
+  retention_stream:
+    - selector: '{log_type="ai_content"}'  # 대화 원문 로그(ai.chat.content)만 짧게 보관
+      priority: 1
+      period: 168h                 # 보존 7일
 
 compactor:
   working_directory: /var/lib/loki/compactor

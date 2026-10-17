@@ -7,6 +7,7 @@ import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -32,7 +33,7 @@ import org.springframework.restdocs.payload.PayloadDocumentation;
 import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.ObjectMapper;
 
-@Sql("/terms-fixture.sql")
+@Sql("/fixtures/terms-fixture.sql")
 class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
 
     private static final String REFRESH_COOKIE = "BIBBIDI_REFRESH";
@@ -191,6 +192,14 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
     }
 
     @Test
+    @DisplayName("인증 정보가 없으면 약관 오류 대신 인증 필요 오류를 반환한다")
+    void shouldRequireAuthenticationBeforeCheckingTerms() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(201));
+    }
+
+    @Test
     @DisplayName("약관에 동의하기 전에는 다른 API를 부를 수 없고, 동의하면 새 token으로 통과한다")
     void shouldBlockPendingUserUntilTermsAgreed() throws Exception {
         UserResult pending = userService.createPendingUser("pending", null);
@@ -202,8 +211,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 pending.email());
         IssuedSession issued = sessionIssueService.issueForNewFamily(pendingOwner, ClientType.WEB);
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/users/me")
+        mockMvc.perform(get("/api/users/me")
                         .header(AUTHORIZATION, "Bearer " + issued.accessToken()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(211));
@@ -239,8 +247,7 @@ class AuthSessionRefreshIntegrationTest extends BibbidiIntegrationTest {
                 .getContentAsString();
 
         String newAccessToken = objectMapper.readTree(reissued).get("accessToken").asString();
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/users/me")
+        mockMvc.perform(get("/api/users/me")
                         .header(AUTHORIZATION, "Bearer " + newAccessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nickname").value("pending"));

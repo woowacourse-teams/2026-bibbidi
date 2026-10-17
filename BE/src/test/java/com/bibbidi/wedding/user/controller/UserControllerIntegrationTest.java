@@ -5,6 +5,7 @@ import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.docume
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static com.epages.restdocs.apispec.Schema.schema;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -283,7 +284,7 @@ class UserControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldAllowDuplicatedNickname() {
         Long duplicated = createActiveUser("current");
 
-        org.assertj.core.api.Assertions.assertThat(duplicated).isNotEqualTo(currentUserId);
+        assertThat(duplicated).isNotEqualTo(currentUserId);
     }
 
     private Long createActiveUser(String nickname) {

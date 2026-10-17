@@ -1,13 +1,13 @@
 packages:
   - FE
   - .github/ai-review
-  - packages/*
+  - Infra/k6
 
 nodeLinker: hoisted
 
 allowBuilds:
   '@sentry/cli': true
-  '@swc/core': true
   core-js: false
+  '@swc/core': true
   esbuild: true
   unrs-resolver: true

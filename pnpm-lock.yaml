@@ -111,11 +111,11 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)(webpack-cli@7.2.2)(webpack@5.109.2)
 
-  packages/development-logger:
+  Infra/k6:
     devDependencies:
-      '@types/node':
-        specifier: 24.9.2
-        version: 24.9.2
+      '@types/k6':
+        specifier: 2.2.0
+        version: 2.2.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -829,8 +829,8 @@ packages:
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
-  '@types/node@24.9.2':
-    resolution: {integrity: sha512-uWN8YqxXxqFMX2RqGOrumsKeti4LlmIMIyV0lgut4jx7KQBcBiW6vkDtIBvHnHIquwNfJhk8v2OtmO8zXWHfPA==}
+  '@types/k6@2.2.0':
+    resolution: {integrity: sha512-wuHM+JLcpV0VL2G8ltu0N3ZDbbq1GHkP5ypeMzTZcFFqpN8ioV0DojxQFKvlbnVzuhgnY7Yy+Hhl8LzstdplhQ==}
 
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
@@ -2675,9 +2675,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  undici-types@7.16.0:
-    resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
-
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
@@ -3726,9 +3723,7 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
-  '@types/node@24.9.2':
-    dependencies:
-      undici-types: 7.16.0
+  '@types/k6@2.2.0': {}
 
   '@types/node@26.2.0':
     dependencies:
@@ -5601,8 +5596,6 @@ snapshots:
       - supports-color
 
   typescript@6.0.3: {}
-
-  undici-types@7.16.0: {}
 
   undici-types@8.3.0: {}
 

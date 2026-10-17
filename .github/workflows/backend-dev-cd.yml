@@ -5,13 +5,14 @@ on:
     branches: [dev-be]
     paths:
       - "BE/**"
-      - "Infra/monitoring/**"
+      - "Infra/monitoring/grafana/alloy/**"
       - "Infra/nginx/**"
       - "Infra/scripts/**"
       - ".github/workflows/backend-*-cd.yml"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: backend-dev-deploy

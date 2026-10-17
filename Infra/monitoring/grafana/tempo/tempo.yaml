@@ -17,7 +17,7 @@ distributor:
 metrics_generator:
   registry:
     external_labels:
-      source: tempo                
+      source: tempo
   storage:
     path: /var/tempo/generator/wal # 전송 전 임시 기록(복구용)
     remote_write:
@@ -37,7 +37,7 @@ overrides:
     compaction:
       block_retention: 120h # 5일
     metrics_generator:
-      processors: ["span-metrics", "service-graphs"]
+      processors: []
       generate_native_histograms: classic
       processor:
         span_metrics:

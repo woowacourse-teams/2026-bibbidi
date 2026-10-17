@@ -21,16 +21,21 @@ const hotfix: MergedPullRequest = {
   labels: ["type: hotfix"],
 };
 
-const decide = (pullRequests: MergedPullRequest[], isDevelopmentCommit = true) =>
+const decide = (pullRequests: MergedPullRequest[], isDevelopmentCommit = true, hasDevelopmentImage = true) =>
   decideImage({
     releaseSha,
     repository,
     pullRequests,
     isDevelopmentCommit: async () => isDevelopmentCommit,
+    hasDevelopmentImage: async () => hasDevelopmentImage,
   });
 
 test("dev-be 승격 PR은 PR의 마지막 커밋 이미지를 재사용한다", async () => {
   assert.deepEqual(await decide([promotion]), { buildImage: false, imageTag: "dev-tip-sha" });
+});
+
+test("승격 PR의 마지막 커밋에 개발 이미지가 없으면 release-be 커밋으로 이미지를 새로 빌드한다", async () => {
+  assert.deepEqual(await decide([promotion], true, false), { buildImage: true, imageTag: releaseSha });
 });
 
 test("승격 PR의 마지막 커밋이 dev-be에 없으면 거부한다", async () => {

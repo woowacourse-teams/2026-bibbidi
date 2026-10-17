@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.auth.oidc.jwks;
 
-import com.bibbidi.wedding.auth.config.OidcProviderProperties;
-import com.bibbidi.wedding.auth.config.OidcPublicKeyCacheProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcPublicKeyCacheProperties;
 import com.bibbidi.wedding.auth.domain.SocialProvider;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;

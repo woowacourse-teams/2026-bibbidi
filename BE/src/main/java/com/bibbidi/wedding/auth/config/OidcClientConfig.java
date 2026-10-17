@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.auth.config;
 
+import com.bibbidi.wedding.auth.config.properties.OidcProviderProperties;
+import com.bibbidi.wedding.auth.config.properties.OidcPublicKeyCacheProperties;
 import com.bibbidi.wedding.auth.oidc.client.OidcApiClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
