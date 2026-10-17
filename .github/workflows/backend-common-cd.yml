@@ -69,7 +69,11 @@ jobs:
           file: ./BE/Dockerfile
           push: true
           platforms: linux/arm64
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-${{ inputs.deployment-name }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-${{ inputs.deployment-name }}
+          cache-to: type=inline
 
   deploy:
     needs: build-and-push
