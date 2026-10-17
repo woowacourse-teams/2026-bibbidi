@@ -35,8 +35,8 @@ jobs:
             - name: Gradle 실행 환경과 의존성 캐시 설정
               uses: gradle/actions/setup-gradle@v6
 
-            - name: Gradle test로 테스트와 JaCoCo 검사 실행
-              run: ./gradlew test
+            - name: Gradle check로 테스트와 JaCoCo 커버리지 검증 실행
+              run: ./gradlew check
 
             - name: 테스트 실패 시 테스트와 JaCoCo 보고서 기록
               if: failure()
