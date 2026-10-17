@@ -10,12 +10,13 @@ export class CiArtifactFinder {
     this.api = api;
   }
 
-  async findArtifactId(fingerprint: string) {
+  async findArtifact(fingerprint: string) {
     const repositoryId = await this.api.getRepositoryId();
     const artifacts = await this.api.listArtifactsByName(`${ARTIFACT_NAME_PREFIX}${fingerprint}`);
     const trusted = artifacts.find(
       (artifact) => !artifact.expired && artifact.workflow_run?.head_repository_id === repositoryId,
     );
-    return trusted?.id;
+    if (!trusted?.workflow_run) return undefined;
+    return { id: trusted.id, runId: trusted.workflow_run.id };
   }
 }
