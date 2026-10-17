@@ -1,7 +1,7 @@
 import type { ReviewResult } from "../../common/ai-review-types.ts";
 import type { ModelRequest, ReviewModel } from "./review-model.ts";
 import { reviewOutputSchema } from "./review-output-schema.ts";
-import type { RetryingHttp } from "../../common/github/retrying-http.ts";
+import type { RetryingHttp } from "../../../github/retrying-http.ts";
 
 export class OpenAiApi implements ReviewModel {
   private readonly http: RetryingHttp;

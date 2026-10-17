@@ -119,3 +119,28 @@ export async function sendWebhook(webhook: string, payload: unknown): Promise<vo
     throw new Error(`Discord 웹훅 요청에 실패했습니다. (상태 코드: ${response.status})`);
   }
 }
+
+const WEBHOOK_RETRY_COUNT = 3;
+const WEBHOOK_RETRY_DELAY_MS = 2_000;
+
+/** 웹훅 전송을 실패하면 잠시 기다렸다가 몇 번 더 시도한다. */
+export async function sendWebhookWithRetry(webhook: string, payload: unknown): Promise<void> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= WEBHOOK_RETRY_COUNT; attempt += 1) {
+    try {
+      await sendWebhook(webhook, payload);
+      return;
+    } catch (error) {
+      lastError = error instanceof Error
+        ? error
+        : new Error("Discord 웹훅 요청 중 네트워크 오류가 발생했습니다.");
+    }
+
+    if (attempt < WEBHOOK_RETRY_COUNT) {
+      await new Promise((resolve) => setTimeout(resolve, WEBHOOK_RETRY_DELAY_MS));
+    }
+  }
+
+  throw lastError ?? new Error("Discord 웹훅 요청에 실패했습니다.");
+}

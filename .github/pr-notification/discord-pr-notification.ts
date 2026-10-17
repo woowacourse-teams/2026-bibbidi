@@ -1,5 +1,5 @@
 import { loadMembers, type Member } from "./member-configuration-parser.ts";
-import { sendDirectMessageOnce, sendWebhook } from "./discord-client.ts";
+import { sendDirectMessageOnce, sendWebhook, sendWebhookWithRetry } from "../discord/discord-client.ts";
 
 const WEBHOOK_CHANNELS: Record<string, string> = {
   "dev-be": "BE",
@@ -9,9 +9,6 @@ const WEBHOOK_CHANNELS: Record<string, string> = {
   "release-fe": "FE",
   "release-app": "APP",
 };
-
-const RETRY_COUNT = 3;
-const RETRY_DELAY_MS = 2_000;
 
 export function channelForBaseBranch(baseBranch: string): string | undefined {
   return WEBHOOK_CHANNELS[baseBranch];
@@ -184,24 +181,7 @@ function inputFromEnvironment(environment: NodeJS.ProcessEnv): NotificationInput
 
 export async function sendPayload(webhook: string, payload: DiscordPayload | undefined): Promise<void> {
   if (!payload) return;
-  let lastError: Error | undefined;
-
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt += 1) {
-    try {
-      await sendWebhook(webhook, payload);
-      return;
-    } catch (error) {
-      lastError = error instanceof Error
-        ? error
-        : new Error("Discord 웹훅 요청 중 네트워크 오류가 발생했습니다.");
-    }
-
-    if (attempt < RETRY_COUNT) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    }
-  }
-
-  throw lastError ?? new Error("Discord 웹훅 요청에 실패했습니다.");
+  await sendWebhookWithRetry(webhook, payload);
 }
 
 function immediateReviewMarker(input: NotificationInput, reviewer: string) {

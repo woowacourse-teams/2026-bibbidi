@@ -1,4 +1,4 @@
-import type { GitHubApi } from "../github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 import { LinkedIssue } from "./linked-issue.ts";
 
 /** PR 제목이나 본문에 적힌 Issue 번호. */

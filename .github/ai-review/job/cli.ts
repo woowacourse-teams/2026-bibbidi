@@ -1,10 +1,12 @@
 import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { BotComments } from "../common/comment/bot-comments.ts";
-import { GitHubApi } from "../common/github/github-api.ts";
-import { RetryingHttp } from "../common/github/retrying-http.ts";
-import { ReviewEnvironment } from "../common/review-environment.ts";
+import { GitHubApi } from "../../github/github-api.ts";
+import { RetryingHttp } from "../../github/retrying-http.ts";
+import { ReviewEnvironment, type ReviewEnvironmentValues } from "../common/review-environment.ts";
+import { ReviewStageError } from "../common/review-stage-error.ts";
 import { StaleHeadError } from "../common/stale-head-error.ts";
+import { ReviewFailureAlert } from "./alert/review-failure-alert.ts";
 import { OpenAiApi } from "./model/openai-api.ts";
 import { PromptFile } from "./model/prompt-file.ts";
 import { PullRequestReview } from "./review/pull-request-review.ts";
@@ -57,12 +59,42 @@ class ReviewJobCommand {
       // 리뷰 봇 실패가 머지를 막지 않도록 워크플로는 성공으로 두고 PR에 안내만 남긴다.
       console.warn(`::warning title=AI code review failed::${message}`);
       await status.failed("리뷰 봇 오류");
-      try {
-        const comments = await github.getIssueComments(pullNumber);
-        await new BotComments(github, pullNumber, comments).reportFailure(message);
-      } catch (reportError) {
-        console.warn(`::warning title=AI code review failure notice failed::${this.errorMessage(reportError)}`);
-      }
+      const stage = error instanceof ReviewStageError ? error.stage : "알 수 없음";
+      await this.reportFailure(github, values, pullNumber, stage, message);
+    }
+  }
+
+  /** PR에 안내 댓글을 남기고, 처음 발생한 실패만 Discord로 알린다. 둘 다 실패해도 리뷰 결과에는 영향을 주지 않는다. */
+  private async reportFailure(
+    github: GitHubApi,
+    values: ReviewEnvironmentValues,
+    pullNumber: number,
+    stage: string,
+    message: string,
+  ) {
+    let alreadyReported = false;
+    try {
+      const botComments = new BotComments(github, pullNumber, await github.getIssueComments(pullNumber));
+      alreadyReported = botComments.hasOpenFailure();
+      await botComments.reportFailure(message);
+    } catch (reportError) {
+      console.warn(`::warning title=AI code review failure notice failed::${this.errorMessage(reportError)}`);
+    }
+    if (alreadyReported) return;
+
+    try {
+      const pullRequest = await github.getPullRequest(pullNumber);
+      await new ReviewFailureAlert(this.environment).send({
+        pullNumber,
+        title: pullRequest.title,
+        baseBranch: pullRequest.base.ref,
+        pullRequestUrl: `https://github.com/${values.REVIEW_REPOSITORY}/pull/${pullNumber}`,
+        runUrl: values.REVIEW_RUN_URL || undefined,
+        stage,
+        reason: message,
+      });
+    } catch (alertError) {
+      console.warn(`::warning title=AI review alert failed::${this.errorMessage(alertError)}`);
     }
   }
 

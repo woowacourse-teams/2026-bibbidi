@@ -2,13 +2,21 @@ import type {
   CommitStatusState,
   Issue,
   IssueComment,
+  IssueEvent,
   PullRequest,
   PullRequestFile,
+  PullRequestReview,
   RepositoryTreeItem,
-} from "../ai-review-types.ts";
+  WorkflowJob,
+} from "./github-types.ts";
 import { HttpError } from "./http-error.ts";
 import type { RetryingHttp } from "./retrying-http.ts";
 
+const API_VERSION = "2022-11-28";
+const PAGE_SIZE = 100;
+const TAG_REF_PREFIX = "refs/tags/";
+
+/** 이 저장소의 GitHub REST API 호출을 한곳에서 맡는다. 인증, API 버전, 재시도, 페이지 순회를 중복해서 쓰지 않기 위해 둔다. */
 export class GitHubApi {
   private readonly http: RetryingHttp;
   private readonly token: string;
@@ -28,6 +36,22 @@ export class GitHubApi {
     return this.getPages<PullRequestFile>(`/pulls/${number}/files`, 30);
   }
 
+  async listOpenPullRequests() {
+    return this.getPages<PullRequest>("/pulls?state=open&sort=created&direction=desc", 10);
+  }
+
+  async getPullRequestReviews(number: number) {
+    return this.getPages<PullRequestReview>(`/pulls/${number}/reviews`, 10);
+  }
+
+  async getCommitPullRequests(sha: string) {
+    return this.getPages<PullRequest>(`/commits/${encodeURIComponent(sha)}/pulls`, 10);
+  }
+
+  async requestReviewers(number: number, reviewers: string[]) {
+    await this.write(`/pulls/${number}/requested_reviewers`, "POST", { reviewers }, "GitHub reviewer request");
+  }
+
   async getIssue(number: number) {
     try {
       return (await this.getJson(`/issues/${number}`)) as Issue;
@@ -39,6 +63,10 @@ export class GitHubApi {
 
   async getIssueComments(number: number) {
     return this.getPages<IssueComment>(`/issues/${number}/comments`, 10);
+  }
+
+  async getIssueEvents(number: number) {
+    return this.getPages<IssueEvent>(`/issues/${number}/events`, 10);
   }
 
   async getRepositoryFile(path: string, ref: string) {
@@ -62,6 +90,20 @@ export class GitHubApi {
       truncated?: boolean;
     };
     return { items: payload.tree ?? [], truncated: payload.truncated === true };
+  }
+
+  async listTagNames(prefix: string) {
+    const refs = await this.getPages<{ ref: string }>(`/git/matching-refs/tags/${this.encodePath(prefix)}`, 100);
+    return refs.map((ref) => ref.ref.slice(TAG_REF_PREFIX.length));
+  }
+
+  async deleteTag(name: string) {
+    await this.write(`/git/refs/tags/${this.encodePath(name)}`, "DELETE", undefined, "GitHub tag delete");
+  }
+
+  async getWorkflowRunJobs(runId: number) {
+    const payload = await this.getJson(`/actions/runs/${runId}/jobs?per_page=${PAGE_SIZE}`) as { jobs?: WorkflowJob[] };
+    return payload.jobs ?? [];
   }
 
   async createReview(number: number, review: object) {
@@ -98,8 +140,8 @@ export class GitHubApi {
     return {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${this.token}`,
-      "X-GitHub-Api-Version": "2026-03-10",
-      "User-Agent": "bibbidi-ai-reviewer",
+      "X-GitHub-Api-Version": API_VERSION,
+      "User-Agent": "bibbidi-github-scripts",
     };
   }
 
@@ -107,20 +149,21 @@ export class GitHubApi {
     return (await this.http.send(`${this.baseUrl}${path}`, { headers: this.headers }, "GitHub API")).json();
   }
 
-  private write(path: string, method: string, payload: object, label: string) {
+  private write(path: string, method: string, payload: object | undefined, label: string) {
     return this.http.send(`${this.baseUrl}${path}`, {
       method,
-      headers: { ...this.headers, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: { ...this.headers, ...(payload ? { "Content-Type": "application/json" } : {}) },
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
     }, label);
   }
 
   private async getPages<T>(path: string, maxPages: number) {
+    const separator = path.includes("?") ? "&" : "?";
     const items: T[] = [];
     for (let page = 1; page <= maxPages; page += 1) {
-      const batch = (await this.getJson(`${path}?per_page=100&page=${page}`)) as T[];
+      const batch = (await this.getJson(`${path}${separator}per_page=${PAGE_SIZE}&page=${page}`)) as T[];
       items.push(...batch);
-      if (batch.length < 100) break;
+      if (batch.length < PAGE_SIZE) break;
     }
     return items;
   }

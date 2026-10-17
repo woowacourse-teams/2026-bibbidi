@@ -4,7 +4,8 @@ import { HeadMarker } from "../../common/comment/head-marker.ts";
 import { NoticeComment } from "../../common/comment/notice-comment.ts";
 import { ReviewPrecheck } from "../../common/gate/review-precheck.ts";
 import { SecretScan } from "../../common/gate/secret-scan.ts";
-import type { GitHubApi } from "../../common/github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
+import { ReviewStageError } from "../../common/review-stage-error.ts";
 import { StaleHeadError } from "../../common/stale-head-error.ts";
 import { InlineComment } from "../comment/inline-comment.ts";
 import { SummaryComment } from "../comment/summary-comment.ts";
@@ -35,12 +36,23 @@ export type ReviewOutcome = "already-reviewed" | "not-applicable" | "stopped" | 
 /** PR 하나에 대한 리뷰 한 번의 전체 흐름. */
 export class PullRequestReview {
   private readonly target: ReviewTarget;
+  private stage = "PR 정보 조회";
 
   constructor(target: ReviewTarget) {
     this.target = target;
   }
 
+  /** 실패하면 어느 단계에서 실패했는지 함께 알린다. */
   async run(): Promise<ReviewOutcome> {
+    try {
+      return await this.execute();
+    } catch (error) {
+      if (error instanceof StaleHeadError) throw error;
+      throw new ReviewStageError(this.stage, error);
+    }
+  }
+
+  private async execute(): Promise<ReviewOutcome> {
     const { github, model, status, pullNumber, expectedHeadSha, prompts } = this.target;
     const headMarker = new HeadMarker(expectedHeadSha);
     const precheck = new ReviewPrecheck(github, pullNumber, expectedHeadSha);
@@ -50,6 +62,7 @@ export class PullRequestReview {
     // 비용 때문에 모델 리뷰는 PR당 최초 한 번만 한다. 이후 커밋에서는 모델을 부르지 않는다.
     if (botComments.hasCompletedReview()) return "already-reviewed";
 
+    this.stage = "사전 검사";
     // pre 단계는 PR 코드로 실행되어 믿을 수 없으므로 같은 검사를 여기서 다시 한다.
     const decision = precheck.decide(context);
     if (!decision.proceed) {
@@ -70,6 +83,7 @@ export class PullRequestReview {
     }
 
     await status.pending();
+    this.stage = "모델 호출";
     const diff = new ChunkedDiff(files);
     const chunks = diff.chunks();
     const tree = await github.getRepositoryTree(expectedHeadSha);
@@ -123,6 +137,7 @@ export class PullRequestReview {
       throw new StaleHeadError("리뷰 중에 새 커밋이 올라왔습니다. 최신 커밋에서 다시 실행해 주세요.");
     }
 
+    this.stage = "리뷰 등록";
     const commentable = new CommentableLines(files);
     const selection = new FindingSelection(candidateFindings);
     const inlineCandidates = selection.inline(commentable);

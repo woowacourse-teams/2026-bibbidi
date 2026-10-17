@@ -1,41 +1,13 @@
-export type BotUser = { login?: string; type?: string };
-
-export type PullRequest = {
-  title: string;
-  body?: string | null;
-  draft?: boolean;
-  user?: BotUser;
-  labels?: Array<{ name: string }>;
-  base: { ref: string; sha?: string };
-  head: { ref: string; sha?: string };
-};
-
-export type PullRequestFile = {
-  filename: string;
-  previous_filename?: string;
-  status: string;
-  additions: number;
-  deletions: number;
-  patch?: string;
-};
-
-export type Issue = {
-  number: number;
-  title: string;
-  body?: string | null;
-  labels?: Array<{ name: string }>;
-};
-
-export type IssueComment = {
-  id?: number;
-  body?: string | null;
-  user?: BotUser;
-};
-
-export type RepositoryTreeItem = {
-  path: string;
-  type: "blob" | "tree" | string;
-};
+export type {
+  BotUser,
+  CommitStatusState,
+  Issue,
+  IssueComment,
+  PullRequest,
+  PullRequestFile,
+  RepositoryTreeItem,
+} from "../../github/github-types.ts";
+import type { PullRequestFile } from "../../github/github-types.ts";
 
 export type Finding = {
   kind: "DEFECT" | "QUESTION";
@@ -96,4 +68,3 @@ export type ScanHit = {
   kind: string;
 };
 
-export type CommitStatusState = "pending" | "success" | "failure" | "error";

@@ -1,5 +1,5 @@
 import type { PullRequest, PullRequestFile, RepositoryTreeItem } from "../../common/ai-review-types.ts";
-import type { GitHubApi } from "../../common/github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 
 const MAX_CONTEXT_CHARACTERS = 80_000;
 const EXCERPT_RADIUS = 25;
