@@ -1,0 +1,41 @@
+name: 병합된 PR의 Issue와 작업 브랜치 정리
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev-be, dev-fe, dev-app]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 기존 PR의 Issue와 작업 브랜치를 실제로 정리한다
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: pr-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: Issue와 작업 브랜치 정리
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          APPLY: ${{ inputs.apply && 'true' || 'false' }}
+        run: node --experimental-strip-types .github/pr-lifecycle/cli.ts

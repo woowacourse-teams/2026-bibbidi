@@ -20,10 +20,12 @@ import com.bibbidi.wedding.checklist.service.AppointmentService;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentCreationCommand;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentResult;
 import com.bibbidi.wedding.checklist.service.dto.AppointmentUpdateCommand;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import com.bibbidi.wedding.support.SecurityTestConfig;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Import(SecurityTestConfig.class)
 @WebMvcTest(AppointmentController.class)
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class AppointmentControllerTest {
 
     private static final Long USER_ID = 1L;

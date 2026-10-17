@@ -65,8 +65,29 @@ dependencies {
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
 
+// Docker 유무에 따라 MySQL 마이그레이션 테스트가 실행되거나 건너뛰어지므로 캐시 키에 넣는다.
+def dockerAvailable = providers.provider {
+    try {
+        def process = new ProcessBuilder('docker', 'info')
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+        if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            return false
+        }
+        return process.exitValue() == 0
+    } catch (IOException ignored) {
+        return false
+    }
+}
+
 tasks.named('test', Test) {
-    exclude '**/BibbidiEvaluationIntegrationTest.class'
+    exclude '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    inputs.property('dockerAvailable', dockerAvailable)
+    testLogging {
+        events 'skipped', 'failed'
+    }
 }
 
 tasks.register('aiEvaluationTest', Test) {
@@ -74,8 +95,11 @@ tasks.register('aiEvaluationTest', Test) {
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    include '**/BibbidiEvaluationIntegrationTest.class'
+    include '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
     useJUnitPlatform()
+    // 평가 테스트는 같은 DB를 쓰므로 병렬로 실행하지 않는다.
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
+    outputs.doNotCacheIf('외부 AI 호출 결과는 Gradle이 추적하는 입력에 없어 재사용하면 안 된다') { true }
 }
 
 tasks.named('bootJar') {

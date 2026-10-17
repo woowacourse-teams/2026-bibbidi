@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": true,
@@ -8,5 +9,6 @@
     "target": "ES2023",
     "types": ["node"]
   },
-  "include": ["*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
 }

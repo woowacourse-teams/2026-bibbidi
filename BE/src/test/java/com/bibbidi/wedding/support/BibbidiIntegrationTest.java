@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.restdocs.RestDocumentationContextProvider;
@@ -19,6 +20,7 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Transactional
 @ExtendWith(RestDocumentationExtension.class)
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 public abstract class BibbidiIntegrationTest {
 
     @Autowired
