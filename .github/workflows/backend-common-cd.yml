@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build-and-push:
@@ -43,18 +44,42 @@ jobs:
         with:
           ref: ${{ inputs.image-tag }}
 
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: 같은 소스로 PR CI가 만든 JAR 찾기
+        id: ci-artifact
+        working-directory: .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types .github/be-cd-jobs/ci-artifact-cli.ts find
+
+      - name: PR CI가 테스트를 통과시킨 JAR 내려받기
+        if: steps.ci-artifact.outputs.artifact-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.ci-artifact.outputs.artifact-id }}
+          github-token: ${{ github.token }}
+          path: BE/build/libs
+          merge-multiple: true
+
       - name: Corretto JDK 버전 25 설정
+        if: steps.ci-artifact.outputs.artifact-id == ''
         uses: actions/setup-java@v6
         with:
           distribution: corretto
           java-version: "25"
 
       - name: Gradle 실행 환경과 빌드 결과 캐시 설정
+        if: steps.ci-artifact.outputs.artifact-id == ''
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: false
 
-      - name: Gradle clean build로 테스트와 빌드 실행
+      - name: 재사용할 JAR가 없으면 Gradle clean build로 테스트와 빌드 실행
+        if: steps.ci-artifact.outputs.artifact-id == ''
         run: ./gradlew clean build
 
       - name: Docker Hub 로그인
