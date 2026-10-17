@@ -203,13 +203,10 @@ jobs:
         if: steps.tls_issue.outcome == 'failure'
         env:
           DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
-        run: |
-          echo "::warning::TLS issue/renew failed for ${{ inputs.deployment-name }}"
-          if [ -n "${DISCORD_WEBHOOK_BE:-}" ]; then
-            curl -fsS -H 'Content-Type: application/json' \
-              -d '{"content":"Bibbidi ${{ inputs.deployment-name }}: TLS certificate issue/renew FAILED. Check the deploy workflow logs."}' \
-              "$DISCORD_WEBHOOK_BE" >/dev/null || true
-          fi
+          DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/tls-failure-cli.ts"
 
       - name: certbot 갱신 타이머 설치(1일 2회)
         run: |

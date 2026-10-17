@@ -46,6 +46,12 @@ AI 리뷰를 하지 못했습니다. 코드 변경과는 관계없는 리뷰 봇
 새 커밋을 올리거나 워크플로를 다시 실행하면 리뷰를 다시 시도합니다.`);
   }
 
+  /** 해결되지 않은 실패 안내가 이미 있는지. 같은 실패를 push마다 반복해서 알리지 않기 위해 쓴다. */
+  hasOpenFailure() {
+    const failure = this.find(FAILURE_MARKER);
+    return Boolean(failure) && failure?.body !== RESOLVED_FAILURE_BODY;
+  }
+
   /** 이후 실행이 성공하면 남아 있는 실패 안내를 해결됨으로 바꾼다. */
   async settleFailure() {
     const failure = this.find(FAILURE_MARKER);

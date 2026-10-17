@@ -1,5 +1,5 @@
 import { loadMembers, type Member } from "./member-configuration-parser.ts";
-import { sendDirectMessageOnce, sendWebhook } from "./discord-client.ts";
+import { sendDirectMessageOnce, sendWebhook } from "../discord/discord-client.ts";
 
 const WEBHOOK_CHANNELS: Record<string, string> = {
   "dev-be": "BE",

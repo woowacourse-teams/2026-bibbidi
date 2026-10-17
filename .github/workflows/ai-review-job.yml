@@ -92,4 +92,7 @@ jobs:
           REVIEW_PULL_NUMBER: ${{ steps.target.outputs.number }}
           REVIEW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          DISCORD_WEBHOOK_FE: ${{ secrets.DISCORD_WEBHOOK_FE }}
+          DISCORD_WEBHOOK_APP: ${{ secrets.DISCORD_WEBHOOK_APP }}
         run: node --experimental-strip-types .github/ai-review/job/cli.ts

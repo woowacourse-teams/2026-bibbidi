@@ -1,5 +1,5 @@
 import { loadMembers, type Member } from "./member-configuration-parser.ts";
-import { sendDirectMessageOnce, sendWebhook, type DiscordEmbed } from "./discord-client.ts";
+import { sendDirectMessageOnce, sendWebhook, type DiscordEmbed } from "../discord/discord-client.ts";
 
 type GitHubUser = { login: string };
 type PullRequest = {
