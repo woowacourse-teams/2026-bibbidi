@@ -1,7 +1,11 @@
 import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { decideImage } from "./image-decision.ts";
-import { fetchPullRequestsOfCommit, isCommitOnBranch } from "./release-source-client.ts";
+import {
+  fetchPullRequestsOfCommit,
+  hasSuccessfulDevelopmentDeployment,
+  isCommitOnBranch,
+} from "./release-source-client.ts";
 
 const requiredEnvironment = ["GITHUB_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_OUTPUT"] as const;
 
@@ -26,6 +30,12 @@ export async function main(environment: NodeJS.ProcessEnv = process.env) {
         token: values.GITHUB_TOKEN,
       }),
       isDevelopmentCommit: (sha) => isCommitOnBranch(sha, "dev-be"),
+      hasDevelopmentImage: (sha) =>
+        hasSuccessfulDevelopmentDeployment({
+          repository: values.GITHUB_REPOSITORY,
+          sha,
+          token: values.GITHUB_TOKEN,
+        }),
     });
 
     await appendFile(

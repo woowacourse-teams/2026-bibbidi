@@ -62,6 +62,11 @@ export type WorkflowJob = {
   steps?: Array<{ name: string; conclusion: string | null }>;
 };
 
+export type WorkflowRun = {
+  id: number;
+  conclusion: string | null;
+};
+
 export type WorkflowArtifact = {
   id: number;
   name: string;
