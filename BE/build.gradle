@@ -65,6 +65,10 @@ dependencies {
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
 
+tasks.withType(Test).configureEach {
+    outputs.doNotCacheIf('테스트 결과 재사용 정책은 별도 이슈(#483)에서 정한다') { true }
+}
+
 tasks.named('test', Test) {
     exclude '**/BibbidiEvaluationIntegrationTest.class'
 }
