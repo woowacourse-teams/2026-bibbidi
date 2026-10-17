@@ -15,9 +15,11 @@ import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -26,6 +28,7 @@ import org.springframework.test.context.ActiveProfiles;
 @DataJpaTest
 @ActiveProfiles("test")
 @Import({CatalogRepository.class, CatalogMapper.class})
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class CatalogRepositoryTest {
 
     @Autowired

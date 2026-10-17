@@ -11,10 +11,12 @@ import com.bibbidi.wedding.auth.domain.SocialProvider;
 import com.bibbidi.wedding.auth.repository.HandoffCodeRepository;
 import com.bibbidi.wedding.auth.repository.OidcAuthRequestRepository;
 import com.bibbidi.wedding.auth.repository.RefreshSessionRepository;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class ExpiredAuthRecordCleanupServiceIntegrationTest {
 
     private static final Long USER_ID = 1L;
