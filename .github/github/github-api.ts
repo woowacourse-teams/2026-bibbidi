@@ -41,6 +41,45 @@ export class GitHubApi {
     return this.getPages<PullRequest>("/pulls?state=open&sort=created&direction=desc", 10);
   }
 
+  async listClosedPullRequests() {
+    return this.getPages<PullRequest>("/pulls?state=closed&sort=updated&direction=desc", 20);
+  }
+
+  async getClosingIssueNumbers(number: number) {
+    const [owner, name] = this.repository.split("/");
+    const response = await this.http.send("https://api.github.com/graphql", {
+      method: "POST",
+      headers: { ...this.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              closingIssuesReferences(first: 100) {
+                nodes { number repository { nameWithOwner } }
+                pageInfo { hasNextPage }
+              }
+            }
+          }
+        }`,
+        variables: { owner, name, number },
+      }),
+    }, "GitHub closing issue references");
+    const result = await response.json() as {
+      errors?: Array<{ message: string }>;
+      data?: { repository?: { pullRequest?: { closingIssuesReferences?: {
+        nodes?: Array<{ number: number; repository: { nameWithOwner: string } }>;
+        pageInfo?: { hasNextPage: boolean };
+      } } } };
+    };
+    if (result.errors?.length) throw new Error(`GitHub GraphQL 오류: ${result.errors[0].message}`);
+    const references = result.data?.repository?.pullRequest?.closingIssuesReferences;
+    if (!references) throw new Error(`PR #${number}의 Issue 연결 정보를 읽지 못했습니다.`);
+    if (references.pageInfo?.hasNextPage) throw new Error(`PR #${number}의 Issue 연결이 100개를 초과합니다.`);
+    return (references.nodes ?? [])
+      .filter((issue) => issue.repository.nameWithOwner.toLowerCase() === this.repository.toLowerCase())
+      .map((issue) => issue.number);
+  }
+
   async getPullRequestReviews(number: number) {
     return this.getPages<PullRequestReview>(`/pulls/${number}/reviews`, 10);
   }
@@ -58,6 +97,31 @@ export class GitHubApi {
       return (await this.getJson(`/issues/${number}`)) as Issue;
     } catch (error) {
       if (error instanceof HttpError && error.status === 404) return undefined;
+      throw error;
+    }
+  }
+
+  async closeIssue(number: number) {
+    await this.write(`/issues/${number}`, "PATCH", { state: "closed" }, "GitHub issue close");
+  }
+
+  async getBranchRef(name: string) {
+    try {
+      return await this.getJson(`/git/ref/heads/${this.encodePath(name)}`) as {
+        ref: string;
+        object: { sha: string };
+      };
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) return undefined;
+      throw error;
+    }
+  }
+
+  async deleteBranch(name: string) {
+    try {
+      await this.write(`/git/refs/heads/${this.encodePath(name)}`, "DELETE", undefined, "GitHub branch delete");
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) return;
       throw error;
     }
   }
