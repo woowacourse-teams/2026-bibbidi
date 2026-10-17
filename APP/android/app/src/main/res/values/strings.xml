@@ -1,5 +1,0 @@
-<resources>
-  <string name="app_name">비비디</string>
-  <string name="expo_system_ui_user_interface_style" translatable="false">light</string>
-  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
-</resources>
