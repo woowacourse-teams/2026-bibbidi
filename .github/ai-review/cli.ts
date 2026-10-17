@@ -1,71 +1,71 @@
 import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { createGitHubClient, createOpenAIClient, loadReviewPrompts } from "./ai-review-client.ts";
-import { runReview } from "./ai-review-service.ts";
+import { BotComments } from "./comment/bot-comments.ts";
+import { GitHubApi } from "./github/github-api.ts";
+import { RetryingHttp } from "./github/retrying-http.ts";
+import { OpenAiApi } from "./model/openai-api.ts";
+import { PromptFile } from "./model/prompt-file.ts";
+import { PullRequestReview } from "./review/pull-request-review.ts";
+import { ReviewEnvironment } from "./review/review-environment.ts";
+import { StaleHeadError } from "./review/stale-head-error.ts";
 
-const requiredEnvironment = [
-  "GITHUB_TOKEN",
-  "OPENAI_API_KEY",
-  "REVIEW_REPOSITORY",
-  "REVIEW_PULL_NUMBER",
-  "REVIEW_HEAD_SHA",
-] as const;
+class ReviewCommand {
+  private readonly environment: NodeJS.ProcessEnv;
 
-type ReviewEnvironment = Record<(typeof requiredEnvironment)[number], string> & {
-  GITHUB_STEP_SUMMARY?: string;
-};
-
-export function validateEnvironment(environment: NodeJS.ProcessEnv): ReviewEnvironment {
-  const missing = requiredEnvironment.filter((name) => !environment[name]?.trim());
-  if (missing.length > 0) throw new Error(`필수 환경변수가 없습니다: ${missing.join(", ")}`);
-
-  const pullNumber = Number(environment.REVIEW_PULL_NUMBER);
-  if (!Number.isSafeInteger(pullNumber) || pullNumber < 1) {
-    throw new Error("REVIEW_PULL_NUMBER는 1 이상의 정수여야 합니다.");
+  constructor(environment: NodeJS.ProcessEnv) {
+    this.environment = environment;
   }
 
-  return environment as ReviewEnvironment;
-}
+  async run() {
+    const values = new ReviewEnvironment(this.environment).validate();
+    const pullNumber = Number(values.REVIEW_PULL_NUMBER);
+    const http = new RetryingHttp();
+    const github = new GitHubApi(http, values.GITHUB_TOKEN, values.REVIEW_REPOSITORY);
+    // 모델 제공자를 바꿀 때 이 줄과 model/ 안의 구현 클래스만 바꾼다.
+    const model = new OpenAiApi(http, values.OPENAI_API_KEY);
+    const prompts = await new PromptFile(new URL("./ai-review-prompt.yml", import.meta.url)).read();
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
-}
-
-async function appendFailureSummary(path: string | undefined, message: string) {
-  if (!path) return;
-  await appendFile(path, `## AI 코드 리뷰 실패\n\n${message}\n`, "utf8");
-}
-
-export async function main(environment: NodeJS.ProcessEnv = process.env) {
-  const values = validateEnvironment(environment);
-  const pullNumber = Number(values.REVIEW_PULL_NUMBER);
-  const github = createGitHubClient({
-    token: values.GITHUB_TOKEN,
-    repository: values.REVIEW_REPOSITORY,
-  });
-  const openai = createOpenAIClient({ apiKey: values.OPENAI_API_KEY });
-  const prompts = await loadReviewPrompts(new URL("./ai-review-prompt.yml", import.meta.url));
-
-  try {
-    const result = await runReview({
-      github,
-      openai,
-      pullNumber,
-      expectedHeadSha: values.REVIEW_HEAD_SHA,
-      prompts,
-    });
-    if (result.skipped) {
-      console.log(`AI review already exists for PR #${pullNumber} at ${values.REVIEW_HEAD_SHA}`);
-      return;
+    try {
+      const result = await new PullRequestReview({
+        github,
+        model,
+        pullNumber,
+        expectedHeadSha: values.REVIEW_HEAD_SHA,
+        prompts,
+      }).run();
+      if (result.skipped) {
+        console.log(`AI review already completed for PR #${pullNumber}; the model runs once per pull request`);
+        return;
+      }
+      console.log(`AI review submitted for PR #${pullNumber}`);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      await this.appendFailureSummary(values.GITHUB_STEP_SUMMARY, message);
+      // 새 커밋이 올라온 경우는 다음 실행이 이어받으므로 알리지 않는다.
+      if (error instanceof StaleHeadError) {
+        console.log(`::notice title=AI code review skipped::${message}`);
+        return;
+      }
+      // 리뷰 봇 실패가 머지를 막지 않도록 워크플로는 성공으로 두고 PR에 안내만 남긴다.
+      console.warn(`::warning title=AI code review failed::${message}`);
+      try {
+        const comments = await github.getIssueComments(pullNumber);
+        await new BotComments(github, pullNumber, comments).reportFailure(message);
+      } catch (reportError) {
+        console.warn(`::warning title=AI code review failure notice failed::${this.errorMessage(reportError)}`);
+      }
     }
-    console.log(`AI review submitted for PR #${pullNumber}`);
-  } catch (error) {
-    const message = errorMessage(error);
-    await appendFailureSummary(values.GITHUB_STEP_SUMMARY, message);
-    console.error(`::error title=AI code review failed::${message}`);
-    process.exitCode = 1;
+  }
+
+  private errorMessage(error: unknown) {
+    return error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+  }
+
+  private async appendFailureSummary(path: string | undefined, message: string) {
+    if (!path) return;
+    await appendFile(path, `## AI 코드 리뷰 실패\n\n${message}\n`, "utf8");
   }
 }
 
 const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
-if (entrypoint === import.meta.url) await main();
+if (entrypoint === import.meta.url) await new ReviewCommand(process.env).run();
