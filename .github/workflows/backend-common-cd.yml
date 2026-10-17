@@ -202,7 +202,7 @@ jobs:
       - name: TLS 인증서 발급 실패를 Discord로 알림
         if: steps.tls_issue.outcome == 'failure'
         env:
-          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
+          DISCORD_WEBHOOK_GITHUB_ACTION: ${{ secrets.DISCORD_WEBHOOK_GITHUB_ACTION }}
           DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

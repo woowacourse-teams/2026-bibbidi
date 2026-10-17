@@ -1,9 +1,9 @@
-import { sendWebhook } from "../discord/discord-client.ts";
+import { sendWebhookWithRetry } from "../discord/discord-client.ts";
 
 const FAILURE_COLOR = 0xed4245;
 
 /**
- * Let's Encrypt 인증서 발급·갱신이 실패했을 때 BE Discord 채널에 알린다.
+ * Let's Encrypt 인증서 발급·갱신이 실패했을 때 GitHub Actions 실패 전용 Discord 채널에 알린다.
  * 웹훅이 없거나 전송에 실패해도 배포 결과는 바꾸지 않는다.
  */
 export class TlsFailureAlert {
@@ -17,14 +17,14 @@ export class TlsFailureAlert {
     const deploymentName = this.environment.DEPLOYMENT_NAME || "알 수 없음";
     console.warn(`::warning::TLS issue/renew failed for ${deploymentName}`);
 
-    const webhook = this.environment.DISCORD_WEBHOOK_BE;
+    const webhook = this.environment.DISCORD_WEBHOOK_GITHUB_ACTION;
     if (!webhook) {
-      console.warn("::warning::DISCORD_WEBHOOK_BE가 설정되지 않아 TLS 실패 알림을 보내지 않았습니다.");
+      console.warn("::warning::DISCORD_WEBHOOK_GITHUB_ACTION이 설정되지 않아 TLS 실패 알림을 보내지 않았습니다.");
       return "no-webhook" as const;
     }
 
     try {
-      await sendWebhook(webhook, this.payload(deploymentName));
+      await sendWebhookWithRetry(webhook, this.payload(deploymentName));
       return "sent" as const;
     } catch (error) {
       const reason = error instanceof Error ? error.message : "알 수 없는 오류";

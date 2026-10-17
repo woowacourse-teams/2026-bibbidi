@@ -1,4 +1,4 @@
-import { channelForBaseBranch, sendPayload } from "../../../pr-notification/discord-pr-notification.ts";
+import { sendWebhookWithRetry } from "../../../discord/discord-client.ts";
 
 const MAX_TITLE_CHARACTERS = 100;
 const MAX_REASON_CHARACTERS = 300;
@@ -14,11 +14,11 @@ export type FailureAlertInput = {
   reason: string;
 };
 
-export type AlertResult = "sent" | "no-channel" | "no-webhook" | "failed";
+export type AlertResult = "sent" | "no-webhook" | "failed";
 
 /**
- * AI 리뷰 봇이 실패했을 때 PR 알림과 같은 분야별 Discord 채널에 알린다.
- * 전송 함수와 채널 선택은 PR 알림 코드를 재사용하고, 알림이 실패해도 리뷰 결과에는 영향을 주지 않는다.
+ * AI 리뷰 봇이 실패했을 때 GitHub Actions 실패 전용 Discord 채널에 알린다.
+ * 알림이 실패해도 리뷰 결과에는 영향을 주지 않는다.
  */
 export class ReviewFailureAlert {
   private readonly environment: NodeJS.ProcessEnv;
@@ -28,17 +28,14 @@ export class ReviewFailureAlert {
   }
 
   async send(input: FailureAlertInput): Promise<AlertResult> {
-    const channel = channelForBaseBranch(input.baseBranch);
-    if (!channel) return "no-channel";
-
-    const webhook = this.environment[`DISCORD_WEBHOOK_${channel}`];
+    const webhook = this.environment.DISCORD_WEBHOOK_GITHUB_ACTION;
     if (!webhook) {
-      console.warn(`::warning title=AI review alert skipped::${channel} 채널의 Discord 웹훅 시크릿이 설정되지 않았습니다.`);
+      console.warn("::warning title=AI review alert skipped::DISCORD_WEBHOOK_GITHUB_ACTION 시크릿이 설정되지 않았습니다.");
       return "no-webhook";
     }
 
     try {
-      await sendPayload(webhook, this.payload(input));
+      await sendWebhookWithRetry(webhook, this.payload(input));
       return "sent";
     } catch (error) {
       const reason = error instanceof Error ? error.message : "알 수 없는 오류";
