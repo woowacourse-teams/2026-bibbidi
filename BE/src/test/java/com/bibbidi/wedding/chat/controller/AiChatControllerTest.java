@@ -43,6 +43,7 @@ import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.SecurityTestConfig;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
@@ -58,6 +59,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -86,10 +88,6 @@ import reactor.test.publisher.TestPublisher;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * 컨트롤러부터 서비스, 어댑터, 대화 메모리까지 실제 객체로 연결한다. 외부 경계인 Bedrock 모델 호출({@link FakeChatModel})과
- * DB 조회(카탈로그·체크리스트 포트)만 대역으로 바꾼다.
- */
 @WebMvcTest(AiChatController.class)
 @Import({
         SecurityTestConfig.class, SseStreamManager.class, SseConfig.class,
@@ -97,6 +95,7 @@ import tools.jackson.databind.node.ObjectNode;
         AiChatControllerTest.ChatInfrastructure.class
 })
 @ExtendWith(RestDocumentationExtension.class)
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class AiChatControllerTest {
 
     private static final String ID = "7bf4d204-8331-439b-bd8f-271abc0eea99";
@@ -171,7 +170,7 @@ class AiChatControllerTest {
             await().untilAsserted(() -> modelOutput.assertSubscribers(1));
             modelOutput.next(chunk("{\"answer\":\"웨딩홀 "));
 
-            // then: 모델 응답이 끝나기 전에 앞부분이 먼저 전달된다
+            // then
             assertThat(initial.getRequest().isAsyncStarted()).isTrue();
             await().untilAsserted(() -> assertThat(body(initial))
                     .containsSubsequence("event:conversation", "\"conversationId\":\"" + ID + "\"",
@@ -305,7 +304,7 @@ class AiChatControllerTest {
         assertThat(completed.getRequest().getSession(false)).isNull();
         verify(bibbidiTokenParser).parseAccessToken(token);
 
-        // when, then: 이전 요청의 인증은 다음 요청으로 넘어가지 않는다
+        // when, then
         mockMvc.perform(post("/api/ai/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(null, "다음 질문"))))

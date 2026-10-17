@@ -10,12 +10,14 @@ import com.bibbidi.wedding.auth.service.dto.IssuedSession;
 import com.bibbidi.wedding.auth.service.dto.UserAuthInfo;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.user.service.UserResult;
 import com.bibbidi.wedding.user.service.UserService;
 import com.bibbidi.wedding.user.service.dto.PasswordLoginInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @Transactional
 @Sql("/fixtures/legacy-account-fixture.sql")
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class LegacyAccountTransferServiceIntegrationTest {
 
     private static final String LEGACY_NICKNAME = "기존회원";

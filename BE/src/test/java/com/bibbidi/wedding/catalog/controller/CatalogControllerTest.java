@@ -10,9 +10,11 @@ import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.service.CatalogService;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.util.List;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @Import(SecurityTestConfig.class)
 @WebMvcTest(CatalogController.class)
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class CatalogControllerTest {
 
     @Autowired
