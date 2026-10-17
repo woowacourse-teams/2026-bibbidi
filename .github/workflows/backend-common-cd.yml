@@ -49,8 +49,10 @@ jobs:
           distribution: corretto
           java-version: "25"
 
-      - name: Gradle 실행 환경과 의존성 캐시 설정
+      - name: Gradle 실행 환경과 빌드 결과 캐시 설정
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
 
       - name: Gradle clean build로 테스트와 빌드 실행
         run: ./gradlew clean build

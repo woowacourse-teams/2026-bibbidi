@@ -35,12 +35,6 @@ jobs:
             - name: Gradle 실행 환경과 의존성 캐시 설정
               uses: gradle/actions/setup-gradle@v6
 
-            - name: 소스 해시 기준으로 Gradle 빌드 결과 캐시
-              uses: actions/cache@v4
-              with:
-                  path: BE/build
-                  key: ${{ runner.os }}-java25-gradle-build-${{ hashFiles('BE/build.gradle', 'BE/gradle/**', 'BE/gradlew', 'BE/gradlew.bat', 'BE/src/main/**', 'BE/src/test/**', 'BE/database/**') }}
-
             - name: Gradle test로 테스트와 JaCoCo 검사 실행
               run: ./gradlew test
 
