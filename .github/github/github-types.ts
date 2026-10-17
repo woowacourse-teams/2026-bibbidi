@@ -58,3 +58,10 @@ export type WorkflowJob = {
   html_url: string;
   steps?: Array<{ name: string; conclusion: string | null }>;
 };
+
+export type WorkflowArtifact = {
+  id: number;
+  name: string;
+  expired: boolean;
+  workflow_run?: { id: number; head_repository_id?: number };
+};

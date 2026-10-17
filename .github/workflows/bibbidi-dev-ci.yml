@@ -3,9 +3,6 @@ name: 비비디 백엔드 CI
 on:
     pull_request:
         branches: ["dev-be", "release-be"]
-        paths:
-            - "BE/**"
-            - ".github/workflows/bibbidi-dev-ci.yml"
     workflow_dispatch:
 
 permissions:
@@ -17,6 +14,7 @@ concurrency:
 
 jobs:
     build:
+        name: 백엔드 CI 검증
         runs-on: ubuntu-24.04-arm
         defaults:
             run:
@@ -35,8 +33,29 @@ jobs:
             - name: Gradle 실행 환경과 의존성 캐시 설정
               uses: gradle/actions/setup-gradle@v6
 
-            - name: Gradle test로 테스트와 JaCoCo 검사 실행
-              run: ./gradlew test
+            - name: Gradle check로 테스트와 JaCoCo 커버리지 검증 실행, JAR 빌드
+              run: ./gradlew check bootJar
+
+            - name: Node.js 버전을 24.19.0으로 설정
+              if: github.event_name == 'pull_request'
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24.19.0
+
+            - name: 병합 뒤 CD가 같은 소스인지 확인할 JAR 이름 계산
+              if: github.event_name == 'pull_request'
+              id: fingerprint
+              working-directory: .
+              run: node --experimental-strip-types .github/be-cd-jobs/ci-artifact-cli.ts fingerprint
+
+            - name: 테스트를 통과한 JAR 기록
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v7
+              with:
+                  name: ${{ steps.fingerprint.outputs.name }}
+                  path: BE/build/libs/app.jar
+                  retention-days: 14
+                  if-no-files-found: error
 
             - name: 테스트 실패 시 테스트와 JaCoCo 보고서 기록
               if: failure()

@@ -85,6 +85,9 @@ def dockerAvailable = providers.provider {
 tasks.named('test', Test) {
     exclude '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
     inputs.property('dockerAvailable', dockerAvailable)
+    testLogging {
+        events 'skipped', 'failed'
+    }
 }
 
 tasks.register('aiEvaluationTest', Test) {

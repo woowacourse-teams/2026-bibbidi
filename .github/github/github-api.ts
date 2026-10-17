@@ -7,6 +7,7 @@ import type {
   PullRequestFile,
   PullRequestReview,
   RepositoryTreeItem,
+  WorkflowArtifact,
   WorkflowJob,
 } from "./github-types.ts";
 import { HttpError } from "./http-error.ts";
@@ -104,6 +105,18 @@ export class GitHubApi {
   async getWorkflowRunJobs(runId: number) {
     const payload = await this.getJson(`/actions/runs/${runId}/jobs?per_page=${PAGE_SIZE}`) as { jobs?: WorkflowJob[] };
     return payload.jobs ?? [];
+  }
+
+  async getRepositoryId() {
+    const payload = await this.getJson("") as { id: number };
+    return payload.id;
+  }
+
+  async listArtifactsByName(name: string) {
+    const payload = await this.getJson(`/actions/artifacts?name=${encodeURIComponent(name)}&per_page=${PAGE_SIZE}`) as {
+      artifacts?: WorkflowArtifact[];
+    };
+    return payload.artifacts ?? [];
   }
 
   async createReview(number: number, review: object) {
