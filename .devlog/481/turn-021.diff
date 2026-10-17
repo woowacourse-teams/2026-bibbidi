@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/backend-dev-cd.yml b/.github/workflows/backend-dev-cd.yml
+index 48b251e4f94ca55b3075061e03053f7455a72232..de51858391ddab7698887125448caa54f752411f 100644
+--- a/.github/workflows/backend-dev-cd.yml
++++ b/.github/workflows/backend-dev-cd.yml
+@@ -9,12 +9,6 @@ on:
+       - "Infra/nginx/**"
+       - "Infra/scripts/**"
+       - ".github/workflows/backend-*-cd.yml"
+-  workflow_dispatch:
+-    inputs:
+-      image_tag:
+-        description: "Build and deploy the selected commit SHA (defaults to this branch's SHA)"
+-        required: false
+-        type: string
+ 
+ permissions:
+   contents: read
+@@ -30,7 +24,7 @@ jobs:
+     with:
+       deployment-environment: backend-dev
+       runner-labels: '["self-hosted", "linux", "ARM64", "dev"]'
+-      image-tag: ${{ inputs.image_tag || github.sha }}
++      image-tag: ${{ github.sha }}
+       build-image: true
+       spring-profile: dev
+       deployment-name: development
