@@ -17,6 +17,7 @@ export type PullRequest = {
   base: { ref: string; sha: string };
   head: { ref: string; sha: string; repo?: { full_name: string } | null };
   requested_reviewers: GitHubUser[];
+  merged_at?: string | null;
 };
 
 export type PullRequestFile = {
@@ -35,6 +36,8 @@ export type Issue = {
   title: string;
   body?: string | null;
   labels?: Array<{ name: string }>;
+  state?: "open" | "closed";
+  pull_request?: object;
 };
 
 export type IssueComment = {
