@@ -3,10 +3,6 @@ name: 비비디 백엔드 CI
 on:
     pull_request:
         branches: ["dev-be", "release-be"]
-        paths:
-            - "BE/**"
-            - ".github/be-cd-jobs/**"
-            - ".github/workflows/bibbidi-dev-ci.yml"
     workflow_dispatch:
 
 permissions:
