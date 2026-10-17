@@ -27,6 +27,19 @@ export async function fetchPullRequestsOfCommit({
   }));
 }
 
+export async function hasSuccessfulDevelopmentDeployment({
+  repository,
+  sha,
+  token,
+}: PullRequestSourceRequest): Promise<boolean> {
+  const runs = await new GitHubApi(new RetryingHttp(), token, repository).listSuccessfulWorkflowRuns(
+    "backend-dev-cd.yml",
+    "dev-be",
+    sha,
+  );
+  return runs.length > 0;
+}
+
 export async function isCommitOnBranch(sha: string, branch: string): Promise<boolean> {
   await execFileAsync("git", ["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`]);
 

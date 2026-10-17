@@ -9,6 +9,7 @@ import type {
   RepositoryTreeItem,
   WorkflowArtifact,
   WorkflowJob,
+  WorkflowRun,
 } from "./github-types.ts";
 import { HttpError } from "./http-error.ts";
 import type { RetryingHttp } from "./retrying-http.ts";
@@ -169,6 +170,14 @@ export class GitHubApi {
   async getWorkflowRunJobs(runId: number) {
     const payload = await this.getJson(`/actions/runs/${runId}/jobs?per_page=${PAGE_SIZE}`) as { jobs?: WorkflowJob[] };
     return payload.jobs ?? [];
+  }
+
+  async listSuccessfulWorkflowRuns(workflowFile: string, branch: string, headSha: string) {
+    const query = `branch=${encodeURIComponent(branch)}&head_sha=${encodeURIComponent(headSha)}&status=success`;
+    const payload = await this.getJson(
+      `/actions/workflows/${encodeURIComponent(workflowFile)}/runs?${query}&per_page=${PAGE_SIZE}`,
+    ) as { workflow_runs?: WorkflowRun[] };
+    return payload.workflow_runs ?? [];
   }
 
   async getRepositoryId() {

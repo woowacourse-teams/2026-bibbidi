@@ -16,6 +16,7 @@ type ImageDecisionInput = {
   repository: string;
   pullRequests: MergedPullRequest[];
   isDevelopmentCommit: (sha: string) => Promise<boolean>;
+  hasDevelopmentImage: (sha: string) => Promise<boolean>;
 };
 
 const RELEASE_BRANCH = "release-be";
@@ -28,6 +29,7 @@ export async function decideImage({
   repository,
   pullRequests,
   isDevelopmentCommit,
+  hasDevelopmentImage,
 }: ImageDecisionInput): Promise<ImageDecision> {
   const releasePullRequests = pullRequests.filter((pullRequest) => pullRequest.baseBranch === RELEASE_BRANCH);
 
@@ -38,7 +40,8 @@ export async function decideImage({
     if (!(await isDevelopmentCommit(promotion.headSha))) {
       throw new Error("승격 PR의 마지막 커밋이 dev-be에 없습니다. 운영 배포를 거부합니다.");
     }
-    return { buildImage: false, imageTag: promotion.headSha };
+    if (await hasDevelopmentImage(promotion.headSha)) return { buildImage: false, imageTag: promotion.headSha };
+    return { buildImage: true, imageTag: releaseSha };
   }
 
   const hotfix = releasePullRequests.find(
