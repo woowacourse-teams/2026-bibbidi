@@ -61,6 +61,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ steps.ci-artifact.outputs.artifact-id }}
+          run-id: ${{ steps.ci-artifact.outputs.run-id }}
           github-token: ${{ github.token }}
           path: BE/build/libs
           merge-multiple: true

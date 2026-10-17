@@ -31,11 +31,14 @@ export async function main(command: string | undefined, environment: NodeJS.Proc
 
     const values = validateEnvironment(environment);
     const api = new GitHubApi(new RetryingHttp(), values.GITHUB_TOKEN, values.GITHUB_REPOSITORY);
-    const artifactId = await new CiArtifactFinder(api).findArtifactId(fingerprint);
-    await writeOutput(values.GITHUB_OUTPUT, { "artifact-id": artifactId ? String(artifactId) : "" });
+    const artifact = await new CiArtifactFinder(api).findArtifact(fingerprint);
+    await writeOutput(values.GITHUB_OUTPUT, {
+      "artifact-id": artifact ? String(artifact.id) : "",
+      "run-id": artifact ? String(artifact.runId) : "",
+    });
     console.log(
-      artifactId
-        ? `PR CI의 JAR를 재사용합니다. 소스 해시 ${fingerprint}, 아티팩트 ${artifactId}`
+      artifact
+        ? `PR CI의 JAR를 재사용합니다. 소스 해시 ${fingerprint}, 아티팩트 ${artifact.id}, 실행 ${artifact.runId}`
         : `재사용할 PR CI JAR가 없어 직접 빌드합니다. 소스 해시 ${fingerprint}`,
     );
   } catch (error) {
