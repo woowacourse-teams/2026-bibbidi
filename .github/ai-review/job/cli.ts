@@ -1,8 +1,8 @@
 import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { BotComments } from "../common/comment/bot-comments.ts";
-import { GitHubApi } from "../common/github/github-api.ts";
-import { RetryingHttp } from "../common/github/retrying-http.ts";
+import { GitHubApi } from "../../github/github-api.ts";
+import { RetryingHttp } from "../../github/retrying-http.ts";
 import { ReviewEnvironment, type ReviewEnvironmentValues } from "../common/review-environment.ts";
 import { ReviewStageError } from "../common/review-stage-error.ts";
 import { StaleHeadError } from "../common/stale-head-error.ts";

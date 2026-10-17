@@ -3,8 +3,8 @@ import { pathToFileURL } from "node:url";
 import { BotComments } from "../common/comment/bot-comments.ts";
 import { NoticeComment } from "../common/comment/notice-comment.ts";
 import { ReviewPrecheck } from "../common/gate/review-precheck.ts";
-import { GitHubApi } from "../common/github/github-api.ts";
-import { RetryingHttp } from "../common/github/retrying-http.ts";
+import { GitHubApi } from "../../github/github-api.ts";
+import { RetryingHttp } from "../../github/retrying-http.ts";
 import { ReviewEnvironment } from "../common/review-environment.ts";
 import { StaleHeadError } from "../common/stale-head-error.ts";
 

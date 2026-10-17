@@ -1,3 +1,5 @@
+import { GitHubApi } from "../github/github-api.ts";
+import { RetryingHttp } from "../github/retrying-http.ts";
 import { GitHubTagRepository } from "./github-tag-repository.ts";
 import { TagCleaner } from "./tag-cleaner.ts";
 
@@ -8,7 +10,8 @@ async function main() {
     const missing = requiredEnvironment.filter((name) => !process.env[name]?.trim());
     if (missing.length > 0) throw new Error(`필수 환경변수가 없습니다: ${missing.join(", ")}`);
 
-    const repository = new GitHubTagRepository(process.env.GITHUB_REPOSITORY!, process.env.GITHUB_TOKEN!);
+    const github = new GitHubApi(new RetryingHttp(), process.env.GITHUB_TOKEN!, process.env.GITHUB_REPOSITORY!);
+    const repository = new GitHubTagRepository(github);
     const result = await new TagCleaner(repository).clean({ dryRun: process.env.DRY_RUN === "true" });
 
     console.log(`k6 태그 ${result.dryRun ? "삭제 대상" : "삭제"} ${result.deleted.length}건`);

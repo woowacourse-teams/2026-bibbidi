@@ -1,14 +1,16 @@
 import { loadMembers, type Member } from "./member-configuration-parser.ts";
 import { sendDirectMessageOnce, sendWebhook, type DiscordEmbed } from "../discord/discord-client.ts";
+import { GitHubApi } from "../github/github-api.ts";
+import type { IssueEvent, PullRequest as GitHubPullRequest, PullRequestReview as Review } from "../github/github-types.ts";
+import { RetryingHttp } from "../github/retrying-http.ts";
 
-type GitHubUser = { login: string };
-type PullRequest = {
-  number: number; title: string; html_url: string; url: string; created_at: string; draft: boolean;
-  user: GitHubUser; base: { ref: string }; head: { ref: string }; requested_reviewers: GitHubUser[];
-};
-type Review = { user: GitHubUser; state: string };
-type IssueEvent = { event: string; created_at: string; requested_reviewer?: GitHubUser };
 export type ReminderStage = "4h" | "12h";
+
+/** 리마인더가 쓰는 필드만 요구한다. */
+type PullRequest = Pick<
+  GitHubPullRequest,
+  "number" | "title" | "html_url" | "url" | "created_at" | "draft" | "user" | "requested_reviewers"
+> & { base: { ref: string }; head: { ref: string } };
 
 const KST = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul", weekday: "short", hour: "2-digit", hour12: false,
@@ -17,15 +19,6 @@ const CHANNELS: Record<string, string> = {
   "dev-be": "BE", "dev-fe": "FE", "dev-app": "APP",
   "release-be": "BE", "release-fe": "FE", "release-app": "APP",
 };
-
-async function githubJson<T>(url: string, token: string): Promise<T> {
-  const response = await fetch(url, { headers: {
-    Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
-    "X-GitHub-Api-Version": "2022-11-28",
-  } });
-  if (!response.ok) throw new Error(`GitHub API 요청에 실패했습니다. (상태 코드: ${response.status})`);
-  return await response.json() as T;
-}
 
 async function isHoliday(date: Date): Promise<boolean> {
   const today = date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
@@ -106,13 +99,14 @@ export async function main(environment = process.env, now = new Date()): Promise
     return;
   }
 
-  const pulls = await githubJson<PullRequest[]>(`https://api.github.com/repos/${repository}/pulls?state=open&sort=created&direction=desc&per_page=100`, githubToken);
+  const github = new GitHubApi(new RetryingHttp(), githubToken, repository);
+  const pulls = await github.listOpenPullRequests();
   const failures: string[] = [];
   for (const pr of pulls) {
     if (pr.draft || !CHANNELS[pr.base.ref]) continue;
     const [reviews, events] = await Promise.all([
-      githubJson<Review[]>(`${pr.url}/reviews?per_page=100`, githubToken),
-      githubJson<IssueEvent[]>(`https://api.github.com/repos/${repository}/issues/${pr.number}/events?per_page=100`, githubToken),
+      github.getPullRequestReviews(pr.number),
+      github.getIssueEvents(pr.number),
     ]);
     for (const login of reminderTargets(pr, reviews)) {
       const stage = dueReminderStage(assignmentTime(login, events, pr.created_at), now);

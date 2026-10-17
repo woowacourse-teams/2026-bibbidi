@@ -4,7 +4,7 @@ import { HeadMarker } from "../../common/comment/head-marker.ts";
 import { NoticeComment } from "../../common/comment/notice-comment.ts";
 import { ReviewPrecheck } from "../../common/gate/review-precheck.ts";
 import { SecretScan } from "../../common/gate/secret-scan.ts";
-import type { GitHubApi } from "../../common/github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 import { ReviewStageError } from "../../common/review-stage-error.ts";
 import { StaleHeadError } from "../../common/stale-head-error.ts";
 import { InlineComment } from "../comment/inline-comment.ts";

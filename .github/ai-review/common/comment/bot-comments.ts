@@ -1,7 +1,7 @@
 import type { IssueComment } from "../ai-review-types.ts";
 import { BotAuthor } from "./bot-author.ts";
 import { FAILURE_MARKER, REVIEW_MARKER_PREFIX, SUMMARY_MARKER } from "./comment-markers.ts";
-import type { GitHubApi } from "../github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 
 const MAX_FAILURE_MESSAGE_CHARACTERS = 300;
 const RESOLVED_FAILURE_BODY = `${FAILURE_MARKER}\n이전 실행의 AI 리뷰 실패는 이후 실행에서 해결되었습니다.`;

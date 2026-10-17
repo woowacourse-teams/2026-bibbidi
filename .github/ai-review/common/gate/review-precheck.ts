@@ -1,5 +1,5 @@
 import type { IssueComment, PullRequest, PullRequestFile, ScanHit } from "../ai-review-types.ts";
-import type { GitHubApi } from "../github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 import { StaleHeadError } from "../stale-head-error.ts";
 import { ExcludedPaths } from "./excluded-paths.ts";
 import { InjectionScan } from "./injection-scan.ts";

@@ -1,5 +1,5 @@
 import type { CommitStatusState, Finding } from "../../common/ai-review-types.ts";
-import type { GitHubApi } from "../../common/github/github-api.ts";
+import type { GitHubApi } from "../../../github/github-api.ts";
 
 const STATUS_CONTEXT = "AI 리뷰";
 
