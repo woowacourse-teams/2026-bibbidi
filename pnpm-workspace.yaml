@@ -3,7 +3,6 @@ packages:
   - FE
   - .github/ai-review
   - Infra/k6
-  - packages/*
 
 nodeLinker: hoisted
 

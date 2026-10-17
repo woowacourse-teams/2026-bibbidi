@@ -28,8 +28,3 @@
 - [REQUIRED]
 - [CAUTION]
 - [ADVICE]
-
-## Development Log
-
-- `.devlog/{issue}/events.jsonl`
-- `.devlog/{issue}/turn-*.diff`

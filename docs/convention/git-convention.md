@@ -63,11 +63,7 @@ dev-app ──→ release-app ──┘
   - `hotfix` Branch → `type: hotfix`
   - `chore` Branch → `type: chore`
   - `docs` Branch → `type: docs`
-- Coding Agent가 Issue를 생성할 때 Type Label이 없거나 둘 이상이면 생성을 차단한다.
-- Coding Agent가 PR을 생성할 때 Head Branch Prefix와 Issue의 Type Label이 다르면 생성을 차단한다.
-- Coding Agent가 만드는 PR에는 Head Branch Prefix에 해당하는 Type Label을 자동으로 추가한다.
-- GitHub UI에서 사람이 Issue나 PR을 만들 때는 Template 안내에 따라 Type Label을 직접 선택한다.
-- Label 강제 Gate는 Coding Agent에만 적용하며 사람의 GitHub UI 작업을 GitHub Action으로 차단하지 않는다.
+- Issue와 PR의 Type Label은 작성자가 직접 지정한다.
 
 ## 작은 Issue와 짧은 브랜치
 
