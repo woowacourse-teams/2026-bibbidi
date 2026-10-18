@@ -102,7 +102,7 @@ class AiChatLifecycleTest {
     @DisplayName("답변 조각이 도착해도 제한 시간을 연장하지 않는다")
     void chunksDoNotResetTheTotalTimer() {
         // given
-        TestPublisher<ChatResponse> publisher = TestPublisher.create();
+        TestPublisher<ChatResponse> publisher = TestPublisher.createCold();
         startStreamingChat(publisher);
 
         // when

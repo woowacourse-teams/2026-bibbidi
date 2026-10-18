@@ -1,5 +1,8 @@
 spring:
   ai:
+    tools:
+      observations:
+        include-content: true
     chat:
       observations:
         log-prompt: false
@@ -36,7 +39,9 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+        gen_ai.chat.client.operation: true
         gen_ai.client.operation: true
+        spring.ai.tool: true
         ai.chat.ttft: true
   tracing:
     sampling:

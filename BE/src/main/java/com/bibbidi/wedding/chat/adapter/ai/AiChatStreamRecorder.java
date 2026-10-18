@@ -2,29 +2,23 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.metadata.Usage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 @Component
+@Slf4j(topic = "ai.chat.content")
 public class AiChatStreamRecorder {
-
-    private static final Logger CONTENT_LOG = LoggerFactory.getLogger("ai.chat.content");
 
     private final String model;
     private final Counter turns;
+    private final Counter completedTurns;
+    private final Counter cancelledTurns;
     private final Counter failures;
-    private final Counter inputTokenCount;
-    private final Counter outputTokenCount;
-    private final Timer timeToFirstToken;
 
     public AiChatStreamRecorder(
             MeterRegistry registry,
@@ -32,12 +26,9 @@ public class AiChatStreamRecorder {
     ) {
         this.model = model;
         this.turns = Counter.builder("ai.chat.turns").register(registry);
+        this.completedTurns = Counter.builder("ai.chat.completed").register(registry);
+        this.cancelledTurns = Counter.builder("ai.chat.cancelled").register(registry);
         this.failures = Counter.builder("ai.chat.failures").register(registry);
-        this.inputTokenCount = Counter.builder("ai.tokens").tag("model", model).tag("type", "input")
-                .register(registry);
-        this.outputTokenCount = Counter.builder("ai.tokens").tag("model", model).tag("type", "output")
-                .register(registry);
-        this.timeToFirstToken = Timer.builder("ai.chat.ttft").register(registry);
     }
 
     public Flux<ChatResponse> record(String userPrompt, Flux<ChatResponse> responses) {
@@ -68,9 +59,6 @@ public class AiChatStreamRecorder {
         private final String userPrompt;
         private final long startedAtNanos;
         private final StringBuffer completion = new StringBuffer();
-        private final AtomicLong firstTokenNanos = new AtomicLong(-1);
-        private final AtomicLong inputTokens = new AtomicLong();
-        private final AtomicLong outputTokens = new AtomicLong();
         private final AtomicBoolean finished = new AtomicBoolean();
 
         private Turn(String userPrompt, long startedAtNanos) {
@@ -81,24 +69,7 @@ public class AiChatStreamRecorder {
         private void onResponse(ChatResponse response) {
             String text = textOf(response);
             if (!text.isEmpty()) {
-                if (firstTokenNanos.compareAndSet(-1, System.nanoTime() - startedAtNanos)) {
-                    timeToFirstToken.record(Duration.ofNanos(firstTokenNanos.get()));
-                }
                 completion.append(text);
-            }
-            rememberUsage(response);
-        }
-
-        private void rememberUsage(ChatResponse response) {
-            Usage usage = response.getMetadata().getUsage();
-            if (usage == null) {
-                return;
-            }
-            long input = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
-            long output = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
-            if (input + output > 0) {
-                inputTokens.set(input);
-                outputTokens.set(output);
             }
         }
 
@@ -107,15 +78,18 @@ public class AiChatStreamRecorder {
                 return;
             }
             turns.increment();
-            inputTokenCount.increment(inputTokens.get());
-            outputTokenCount.increment(outputTokens.get());
-            long durationMillis = Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis();
-            long ttftNanos = firstTokenNanos.get();
-            CONTENT_LOG.info(
-                    "ai_chat_turn outcome={} model={} inputTokens={} outputTokens={} ttftMs={} durationMs={}"
-                            + " prompt={} completion={}",
-                    outcome, model, inputTokens.get(), outputTokens.get(),
-                    ttftNanos < 0 ? -1 : Duration.ofNanos(ttftNanos).toMillis(), durationMillis,
+            switch (outcome) {
+                case "completed" -> completedTurns.increment();
+                case "cancelled" -> cancelledTurns.increment();
+                default -> {
+                    // 실패는 별도 카운터에서 기록한다.
+                }
+            }
+            long durationMillis = TimeUnit.NANOSECONDS.toMillis(
+                    System.nanoTime() - startedAtNanos);
+            log.info(
+                    "ai_chat_turn outcome={} model={} durationMs={} prompt={} completion={}",
+                    outcome, model, durationMillis,
                     userPrompt, completion);
         }
     }
