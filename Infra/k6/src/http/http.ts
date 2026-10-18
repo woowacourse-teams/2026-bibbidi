@@ -10,6 +10,7 @@ export interface RequestSpec {
   path: string;
   body?: unknown;
   expected: readonly number[];
+  tags?: Record<string, string>;
 }
 
 export interface ExpectationPolicy {
@@ -55,7 +56,7 @@ export class HttpClient {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        tags: { ...this.extraTags(), name: spec.name },
+        tags: { ...this.extraTags(), ...spec.tags, name: spec.name },
         responseCallback: http.expectedStatuses(...acceptable),
       },
     );
