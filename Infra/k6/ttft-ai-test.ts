@@ -28,8 +28,8 @@ const sessions = numberFromEnv('SESSIONS', 20);
 const vus = numberFromEnv('VUS', 1);
 const thinkSeconds = numberFromEnv('THINK_SECONDS', 1);
 
-if (!Number.isInteger(sessions) || sessions < 20 || sessions > 50_000 || sessions % 20 !== 0) {
-  throw new Error('SESSIONS는 20 이상 50,000 이하의 20의 배수여야 합니다.');
+if (sessions !== 20) {
+  throw new Error('SESSIONS는 20이어야 합니다.');
 }
 if (!Number.isFinite(thinkSeconds) || thinkSeconds < 0) {
   throw new Error('THINK_SECONDS는 0 이상의 숫자여야 합니다.');
@@ -153,7 +153,7 @@ export function handleSummary(data: SummaryData): Record<string, string> {
     '',
     `테스트 ID: ${textFromEnv('TEST_ID', '-')}`,
     '요청을 보낸 시점부터 첫 delta 이벤트가 k6에 도착할 때까지를 측정합니다. 단위는 초입니다.',
-    '20세션마다 신규 14명, 체크리스트 3개 사용자 3명, 15개 사용자 3명을 사용합니다. 각 세션은 1·2·3·4·5-b턴을 실행합니다.',
+    '20세션에서 신규 14명, 체크리스트 3개 사용자 3명, 15개 사용자 3명을 사용합니다. 각 세션은 1·2·3·4·5-b턴을 실행합니다.',
     `완료한 세션: ${data.metrics?.scenario_ai_ttft_completed_sessions?.values?.count ?? 0}/${sessions}`,
     '',
     '| 구분 | p95 | p99 | 평균 |',
