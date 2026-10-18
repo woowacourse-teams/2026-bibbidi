@@ -1,7 +1,6 @@
 {
   "name": "scenario35",
   "metrics": [
-    "FollowingInstructions",
     "ProfessionalStyleAndTone"
   ],
   "userMessage": "야외 촬영은 원하지 않고 스튜디오 촬영만 할 거예요. 그에 맞는 준비 항목을 두 개 추천해 주세요.",

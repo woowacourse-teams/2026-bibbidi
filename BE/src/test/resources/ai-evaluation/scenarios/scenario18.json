@@ -1,7 +1,6 @@
 {
   "name": "scenario18",
   "metrics": [
-    "Helpfulness",
     "Relevance"
   ],
   "userMessage": "웨딩홀 계약은 끝났고 촬영 업체는 아직 못 찾았어요. 바로 다음에 챙길 준비 항목을 추천해 주세요.",

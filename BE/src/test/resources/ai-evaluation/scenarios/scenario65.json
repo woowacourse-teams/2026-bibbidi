@@ -1,0 +1,20 @@
+{
+  "name": "scenario65",
+  "metrics": [
+    "Groundedness",
+    "Relevance"
+  ],
+  "userMessage": "이걸 왜 지금 해야 하나요?",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "웨딩홀을 아직 못 정했어요. 지금 할 준비 두 개만 추천해 주세요."
+    },
+    {
+      "role": "assistant",
+      "content": "웨딩홀 투어와 웨딩홀 계약을 먼저 살펴보시면 좋아요."
+    }
+  ],
+  "referenceAnswer": "사용자가 웨딩홀을 아직 정하지 못했다는 말을 근거로, 웨딩홀을 정하는 것이 이후 준비의 기준이 된다는 취지로 설명한다. 지어낸 마감일이나 예약 가능 여부는 말하지 않는다.",
+  "expectedRefusal": "none"
+}

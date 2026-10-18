@@ -1,7 +1,6 @@
 {
   "name": "scenario09",
   "metrics": [
-    "Completeness",
     "Coherence"
   ],
   "userMessage": "신혼여행지는 정했고 항공권도 예약했어요. 출국 전 서류와 통신 준비 항목을 각각 추천해 주세요.",

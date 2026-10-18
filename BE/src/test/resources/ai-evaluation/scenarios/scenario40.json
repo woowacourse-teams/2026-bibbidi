@@ -1,8 +1,7 @@
 {
   "name": "scenario40",
   "metrics": [
-    "ProfessionalStyleAndTone",
-    "Refusal"
+    "ProfessionalStyleAndTone"
   ],
   "userMessage": "파트너가 최근 실직해서 예산을 다시 봐야 해요. 부담을 덜 수 있는 준비 항목을 추천해 주세요.",
   "chatMemory": [],

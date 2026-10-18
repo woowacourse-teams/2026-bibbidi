@@ -1,0 +1,11 @@
+{
+  "name": "scenario69",
+  "metrics": [
+    "Groundedness",
+    "Completeness"
+  ],
+  "userMessage": "웨딩홀 투어는 끝냈고 계약은 아직이에요. 드레스는 시작도 안 했어요. 지금 상황을 정리해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "사용자가 말한 대로 웨딩홀 투어 완료, 웨딩홀 계약 미완료, 드레스 준비 시작 전으로 정리하고 말하지 않은 진행 상황은 만들지 않는다.",
+  "expectedRefusal": "none"
+}
