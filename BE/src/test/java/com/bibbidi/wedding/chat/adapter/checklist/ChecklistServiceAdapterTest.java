@@ -14,8 +14,6 @@ import com.bibbidi.wedding.checklist.service.ChecklistAppointmentService;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.checklist.util.Shuffler;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +49,7 @@ class ChecklistServiceAdapterTest {
     @DisplayName("사용자의 체크리스트가 있으면 조회해서 돌려준다")
     void findsTheUsersChecklist() {
         // given
-        when(checklistRepository.getByOwnerId(USER_ID)).thenReturn(new Checklist(10L, USER_ID, List.of()));
+        when(checklistRepository.findByOwnerId(USER_ID)).thenReturn(Optional.of(new Checklist(10L, USER_ID, List.of())));
 
         // when
         Optional<ChecklistWithAppointmentsResult> checklist = adapter.findMyChecklistIfPresent(USER_ID);
@@ -64,8 +62,7 @@ class ChecklistServiceAdapterTest {
     @DisplayName("사용자의 체크리스트가 없으면 빈 값을 돌려준다")
     void returnsEmptyWhenTheUserHasNoChecklist() {
         // given
-        when(checklistRepository.getByOwnerId(USER_ID))
-                .thenThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "체크리스트가 없습니다."));
+        when(checklistRepository.findByOwnerId(USER_ID)).thenReturn(Optional.empty());
 
         // when
         Optional<ChecklistWithAppointmentsResult> checklist = adapter.findMyChecklistIfPresent(USER_ID);
