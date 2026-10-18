@@ -27,13 +27,13 @@ jobs:
       - name: 태그에서 실행 대상 읽기
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|smoke-ai-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([A-Za-z0-9._-]+)$ ]]; then
+          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|smoke-ai-test|ttft-ai-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([A-Za-z0-9._-]+)$ ]]; then
             echo "::error::태그 형식이 k6/dev/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
           needs_sse=false
           case "${BASH_REMATCH[2]}" in
-            smoke-ai-test|breakpoint-ai-*) needs_sse=true ;;
+            smoke-ai-test|ttft-ai-test|breakpoint-ai-*) needs_sse=true ;;
           esac
           {
             echo "TARGET_LABEL=${BASH_REMATCH[1]}-test"
@@ -96,7 +96,7 @@ jobs:
           K6_SYSTEM_TAGS: proto,status,method,name,group,check,error,error_code,tls_version,scenario,expected_response
           K6_PROMETHEUS_RW_SERVER_URL: https://monitoring.bibbidi.kr/prometheus/api/v1/write
           K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
-          K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }}
+          K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }},testid=${{ env.TEST_ID }}
           K6_PROMETHEUS_RW_STALE_MARKERS: "true"
           K6_PROMETHEUS_RW_PUSH_INTERVAL: 1s
           K6_WEB_DASHBOARD: "true"
