@@ -4,7 +4,12 @@ import { AiChatApi } from './ai-chat-api.ts';
 import type { AiChatClient } from './ai-chat-client.ts';
 
 interface CatalogResponse {
-  categories: { steps: { items: { id: number }[] }[] }[];
+  categories: { steps: { items: CatalogItem[] }[] }[];
+}
+
+export interface CatalogItem {
+  id: number;
+  title: string;
 }
 
 export interface Checklist {
@@ -27,6 +32,10 @@ export class BibbidiApi {
   ) {}
 
   catalogItemIds(): number[] {
+    return this.catalogItems().map((item) => item.id);
+  }
+
+  catalogItems(): CatalogItem[] {
     const response = this.client.send(this.token, {
       name: 'GET /api/catalog',
       method: 'GET',
@@ -34,7 +43,7 @@ export class BibbidiApi {
       expected: [200],
     });
     return (response.json() as unknown as CatalogResponse).categories.flatMap((category) =>
-      category.steps.flatMap((step) => step.items.map((item) => item.id)),
+      category.steps.flatMap((step) => step.items),
     );
   }
 
