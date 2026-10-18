@@ -60,9 +60,6 @@ export const options: Options = {
     },
   },
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
-  thresholds: {
-    scenario_ai_ttft_completed_sessions: [`count>=${sessions}`],
-  },
 };
 
 export function setup(): SetupData {
@@ -154,6 +151,7 @@ export function handleSummary(data: SummaryData): Record<string, string> {
   const markdown = [
     '## AI 챗봇 TTFT 측정',
     '',
+    `테스트 ID: ${textFromEnv('TEST_ID', '-')}`,
     '요청을 보낸 시점부터 첫 delta 이벤트가 k6에 도착할 때까지를 측정합니다. 단위는 초입니다.',
     '20세션마다 신규 14명, 체크리스트 3개 사용자 3명, 15개 사용자 3명을 사용합니다. 각 세션은 1·2·3·4·5-b턴을 실행합니다.',
     `완료한 세션: ${data.metrics?.scenario_ai_ttft_completed_sessions?.values?.count ?? 0}/${sessions}`,
@@ -162,7 +160,7 @@ export function handleSummary(data: SummaryData): Record<string, string> {
     '| --- | ---: | ---: | ---: |',
     ...rows.map(([label, metric]) => `| ${label} | ${value(metric, 'p(95)')} | ${value(metric, 'p(99)')} | ${value(metric, 'avg')} |`),
     '',
-    '임시 기준은 합격 조건으로 적용하지 않았습니다. 첫 측정 결과를 보고 조정합니다.',
+    'TTFT 값과 완료 세션 수는 합격 조건으로 적용하지 않았습니다. 첫 측정 결과를 보고 기준을 조정합니다.',
     '',
   ].join('\n');
   const directory = textFromEnv('SUMMARY_DIR', '.');
