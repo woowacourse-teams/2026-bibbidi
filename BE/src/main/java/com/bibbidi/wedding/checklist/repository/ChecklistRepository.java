@@ -2,6 +2,7 @@ package com.bibbidi.wedding.checklist.repository;
 
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.domain.ChecklistItem;
+import com.bibbidi.wedding.checklist.persistence.ChecklistWithItem;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
@@ -10,6 +11,7 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -63,8 +65,15 @@ public class ChecklistRepository {
     }
 
     public Optional<Checklist> findByOwnerId(Long ownerId) {
-        return jpaChecklistRepository.findByOwnerId(ownerId)
-                .map(this::toDomain);
+        List<ChecklistWithItem> rows = jpaChecklistRepository.findAllWithItemsByOwnerId(ownerId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        List<JpaChecklistItemEntity> items = rows.stream()
+                .map(ChecklistWithItem::item)
+                .filter(Objects::nonNull)
+                .toList();
+        return Optional.of(checklistMapper.toDomain(rows.getFirst().checklist(), items));
     }
 
     public Checklist getByChecklistItemId(Long checklistItemId) {

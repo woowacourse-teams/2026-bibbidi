@@ -31,7 +31,6 @@ import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -81,10 +80,13 @@ class BibbidiCustomChatPromptContextTransactionTest {
     @DisplayName("체크리스트 존재 여부와 관계없이 읽기 전용 조회를 완료하고 트랜잭션 밖에서 모델을 호출한다")
     void loadsInAReadOnlyTransactionAndCallsTheModelAfterItEnds(boolean exists) {
         // given
-        when(repository.findByOwnerId(7L)).thenAnswer(invocation -> {
+        when(repository.getByOwnerId(7L)).thenAnswer(invocation -> {
             assertThat(isActualTransactionActive()).isTrue();
             assertThat(isCurrentTransactionReadOnly()).isTrue();
-            return exists ? Optional.of(new Checklist(10L, 7L, List.of())) : Optional.empty();
+            if (!exists) {
+                throw new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "체크리스트가 없습니다.");
+            }
+            return new Checklist(10L, 7L, List.of());
         });
         model.respondWith(prompt -> {
             assertThat(isActualTransactionActive()).isFalse();
@@ -110,7 +112,7 @@ class BibbidiCustomChatPromptContextTransactionTest {
             assertThat(prompt.getInstructions()).extracting(message -> message.getText())
                     .anySatisfy(text -> assertThat(text).contains("\"exists\":" + exists));
             assertThat(context.getBean(ChatMemoryRepository.class).findByConversationId("user-info:7")).isEmpty();
-            verify(repository, times(1)).findByOwnerId(7L);
+            verify(repository, times(1)).getByOwnerId(7L);
             assertThat(lastEvent).isInstanceOf(ChatEvent.Done.class);
         });
     }
@@ -120,7 +122,7 @@ class BibbidiCustomChatPromptContextTransactionTest {
     void lookupFailureDoesNotBecomeAnEmptyChecklistOrReachTheModel() {
         // given
         BusinessException failure = new BusinessException(ClientError.INTERNAL_ERROR, "조회 장애");
-        when(repository.findByOwnerId(7L)).thenThrow(failure);
+        when(repository.getByOwnerId(7L)).thenThrow(failure);
         runner.run(context -> {
             ChatMemoryRepository memoryRepository = context.getBean(ChatMemoryRepository.class);
             BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
