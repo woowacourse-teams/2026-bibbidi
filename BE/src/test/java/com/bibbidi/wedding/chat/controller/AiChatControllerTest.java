@@ -45,6 +45,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
 import java.nio.charset.StandardCharsets;
@@ -107,6 +108,8 @@ class AiChatControllerTest {
     private ObjectMapper objectMapper;
     @Autowired
     private FakeChatModel model;
+    @Autowired
+    private SimpleMeterRegistry registry;
     @MockitoBean
     private BibbidiTokenParser bibbidiTokenParser;
     @MockitoBean
@@ -136,6 +139,11 @@ class AiChatControllerTest {
         @Bean
         AiChatStreamRecorder aiChatStreamRecorder() {
             return AiChatStreamRecorderFixture.create();
+        }
+
+        @Bean
+        SimpleMeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
         }
     }
 
@@ -191,6 +199,48 @@ class AiChatControllerTest {
             initial.getAsyncResult(5000);
             mockMvc.perform(asyncDispatch(initial));
         }
+    }
+
+    @Test
+    @DisplayName("첫 delta 전송 시 요청당 TTFT를 한 번 기록한다")
+    void recordsTtftOnceAfterTheFirstDeltaIsSent() throws Exception {
+        // given
+        long previousCount = registry.get("ai.chat.ttft").timer().count();
+        model.respondWith(Flux.just(
+                chunk("{\"answer\":\"웨딩홀 "),
+                chunk("계약\",\"recommendedItemIds\":[]}")));
+
+        // when
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
+                .andReturn();
+        initial.getAsyncResult(5000);
+        mockMvc.perform(asyncDispatch(initial));
+
+        // then
+        assertThat(body(initial)).contains("event:delta");
+        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(previousCount + 1);
+    }
+
+    @Test
+    @DisplayName("delta 없이 종료된 요청은 TTFT를 기록하지 않는다")
+    void doesNotRecordTtftWithoutDelta() throws Exception {
+        // given
+        long previousCount = registry.get("ai.chat.ttft").timer().count();
+        model.respondWith(Flux.empty());
+
+        // when
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "질문"))))
+                .andReturn();
+        initial.getAsyncResult(5000);
+        mockMvc.perform(asyncDispatch(initial));
+
+        // then
+        assertThat(body(initial)).doesNotContain("event:delta");
+        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(previousCount);
     }
 
     @Test

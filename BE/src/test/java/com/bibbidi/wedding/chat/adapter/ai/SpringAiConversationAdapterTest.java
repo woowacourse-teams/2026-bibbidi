@@ -108,8 +108,8 @@ class SpringAiConversationAdapterTest {
     }
 
     @Test
-    @DisplayName("답변을 마치면 대화 수, 첫 토큰 지연, 입력·출력 토큰 수를 기록한다")
-    void recordsTurnTtftAndTokensWhenTheAnswerCompletes() {
+    @DisplayName("답변을 마치면 완료한 대화 수를 기록한다")
+    void recordsCompletedTurnWhenTheAnswerCompletes() {
         // given
         model.respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
 
@@ -118,9 +118,8 @@ class SpringAiConversationAdapterTest {
 
         // then
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(1);
-        assertThat(registry.get("ai.tokens").tag("type", "input").counter().count()).isEqualTo(1_000_000);
-        assertThat(registry.get("ai.tokens").tag("type", "output").counter().count()).isEqualTo(500_000);
+        assertThat(registry.get("ai.chat.completed").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
         assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
     }
 
@@ -136,6 +135,24 @@ class SpringAiConversationAdapterTest {
         // then
         assertThat(registry.get("ai.chat.failures").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
+        assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
+    }
+
+    @Test
+    @DisplayName("답변 스트림이 취소되면 취소 횟수를 기록한다")
+    void recordsCancellationWhenTheAnswerStreamIsCancelled() {
+        // given
+        model.respondWith(Flux.concat(Flux.just(chunk("답변")), Flux.never()));
+
+        // when
+        adapter.stream(CONVERSATION, "질문", context()).content().take(1).blockLast();
+
+        // then
+        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
+        assertThat(registry.get("ai.chat.cancelled").counter().count()).isEqualTo(1);
+        assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
     }
 
     @Test
