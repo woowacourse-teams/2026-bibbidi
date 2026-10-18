@@ -95,7 +95,7 @@ jobs:
           K6_NO_USAGE_REPORT: "true"
           K6_SYSTEM_TAGS: proto,status,method,name,group,check,error,error_code,tls_version,scenario,expected_response
           K6_PROMETHEUS_RW_SERVER_URL: https://monitoring.bibbidi.kr/prometheus/api/v1/write
-          K6_PROMETHEUS_RW_TREND_STATS: p(90),p(95),p(99),avg,max
+          K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
           K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }}
           K6_PROMETHEUS_RW_STALE_MARKERS: "true"
           K6_PROMETHEUS_RW_PUSH_INTERVAL: 1s
