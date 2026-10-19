@@ -39,7 +39,7 @@ systemd 설정은 저장소에 두지 않고 모니터링 서버에서만 관리
 부하 테스트 워크플로(`.github/workflows/load-test.yml`)가 k6 지표를 앱 지표와 같은 수집 경로(`/prometheus/api/v1/write`)로 보낸다. 별도 서버 설정은 필요 없다.
 
 - 인증은 Alloy와 같은 `MONITORING_INGEST_TOKEN`을 공유한다. 워크플로가 `BIBBIDI_ALLOY_ENV`에서 꺼내 쓰므로, 토큰을 교체하면 앱 수집과 부하 테스트가 함께 바뀐다.
-- 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`dev-test`, `prod-test`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
+- 지표 이름은 `k6_` 접두사다. 모든 시리즈에 `target`(`loadtest`)과 `testid`(`<스크립트>-<UTC 일시>`) 라벨이 붙는다. 앱 지표의 `deployment_environment_name` 라벨이 없어서 운영 알림 규칙의 대상이 되지 않는다.
 - 요청별 `url` 태그는 보내지 않고 `name` 태그로만 집계한다. 응답 시간은 네이티브 히스토그램이 아니라 `p(95)`, `p(99)`, `avg`, `max` 시리즈로 들어간다.
 - Breakpoint는 요청 지표에 윈도우 번호를 붙이지 않고, 윈도우별 보조 지표(`window_latency`, `window_server_error`, `window_requests`)에만 `window` 라벨(1~20)을 붙인다. 회차당 시리즈는 이 지표 3종 × 윈도우 수만큼 늘어난다.
 - AI 채팅 테스트는 SSE를 받으려고 k6 커뮤니티 확장 `xk6-sse`(`k6/x/sse`)를 쓴다. 레지스트리에 k6 v2용 빌드가 없어 자동 제공을 쓰지 못하고, AI 스크립트를 실행할 때 워크플로가 `xk6`로 k6 `2.2.0`과 `xk6-sse v0.2.0`을 직접 빌드한다.
