@@ -74,6 +74,11 @@ Parameters:
     Type: String
     Default: ""
     Description: 'e.g. "limit_conn per_ip_conn 40;". Empty means no limit'
+  AutoStopHours:
+    Type: Number
+    Default: 8
+    MinValue: 1
+    Description: Hours after boot when each instance powers off. A safety net for forgotten stacks; delete the stack when the round ends
 
 Resources:
   Vpc:
@@ -219,6 +224,7 @@ Resources:
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource DbInstance --region ${AWS::Region}' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y docker.io
           systemctl enable --now docker
           docker run -d --name mysql --restart unless-stopped -p 3306:3306 \
@@ -261,6 +267,7 @@ Resources:
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource AppInstance --region ${AWS::Region}' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y docker.io docker-compose-v2
           systemctl enable --now docker
           install -d -m 0700 /opt/bibbidi/loadtest
@@ -322,6 +329,7 @@ Resources:
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource LoadGeneratorInstance --region ${AWS::Region}' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y git tar gzip curl
           # 워크플로가 SSM 터널로 접속할 키. 22번 포트는 보안 그룹에서 열지 않는다.
           install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh

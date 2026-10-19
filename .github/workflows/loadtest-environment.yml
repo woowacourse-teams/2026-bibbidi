@@ -23,6 +23,11 @@ on:
         type: string
         default: dev-be
         required: false
+      auto-stop-hours:
+        description: "create 전용: 인스턴스가 켜진 뒤 이 시간이 지나면 스스로 중지합니다(지우는 것을 잊었을 때의 안전장치)"
+        type: string
+        default: "8"
+        required: false
 
 permissions:
   contents: read
@@ -54,6 +59,7 @@ jobs:
         env:
           IMAGE_TAG: ${{ inputs.image-tag }}
           CONFIG_REF: ${{ inputs.config-ref }}
+          AUTO_STOP_HOURS: ${{ inputs.auto-stop-hours }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
@@ -82,7 +88,7 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \
               "RoundId=$ROUND_ID" \
-              "ImageTag=$IMAGE_TAG" "ConfigRef=$CONFIG_REF" \
+              "ImageTag=$IMAGE_TAG" "ConfigRef=$CONFIG_REF" "AutoStopHours=$AUTO_STOP_HOURS" \
               "DockerHubUsername=$DOCKERHUB_USERNAME" "DockerHubToken=$DOCKERHUB_TOKEN" \
               "AuthJwtSecret=$AUTH_JWT_SECRET" "MonitoringIngestToken=$MONITORING_INGEST_TOKEN" \
               "DbPassword=$DB_PASSWORD" "SshPublicKey=$(cat "$RUNNER_TEMP/loadtest_key.pub")"

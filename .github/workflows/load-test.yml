@@ -15,6 +15,7 @@ concurrency:
 jobs:
   # 전용 부하 테스트 환경: GitHub 호스팅 러너가 SSM 터널 SSH로 부하 발생기 EC2에 접속해 k6를 돌린다.
   k6-loadtest:
+    if: ${{ !startsWith(github.ref_name, 'k6/loadtest/cleanup/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: loadtest
@@ -129,6 +130,10 @@ jobs:
           mkdir -p "$REPORT_DIR"
           scp -r loadtest:'~/k6-run/k6-report/.' "$REPORT_DIR/" || echo "가져올 보고서가 없습니다."
 
+      - name: 부하 발생기의 비밀값 파일 지우기
+        if: always()
+        run: ssh loadtest 'rm -f ~/k6-run/.env' || echo "지울 파일이 없거나 접속하지 못했습니다."
+
       - name: 잡 요약에 판정표 남기기
         if: always()
         run: |
@@ -144,3 +149,38 @@ jobs:
           path: ${{ env.REPORT_DIR }}
           retention-days: 90
           if-no-files-found: warn
+
+  # 회차가 끝나면 `k6/loadtest/cleanup/<회차>` 태그로 전용 환경을 지운다.
+  cleanup:
+    if: startsWith(github.ref_name, 'k6/loadtest/cleanup/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: loadtest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REF_NAME: ${{ github.ref_name }}
+    steps:
+      - name: 태그에서 회차 읽기
+        run: |
+          set -euo pipefail
+          if [[ ! "$REF_NAME" =~ ^k6/loadtest/cleanup/([a-z0-9-]{1,24})$ ]]; then
+            echo "::error::태그 형식이 k6/loadtest/cleanup/<회차>와 맞지 않습니다: $REF_NAME"
+            exit 1
+          fi
+          echo "ROUND_ID=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: 전용 환경 지우기
+        run: |
+          set -euo pipefail
+          stack="bibbidi-loadtest-$ROUND_ID"
+          aws cloudformation delete-stack --stack-name "$stack"
+          aws cloudformation wait stack-delete-complete --stack-name "$stack"
+          aws ssm delete-parameters --names "/bibbidi/loadtest/$ROUND_ID/jwt-secret" "/bibbidi/loadtest/$ROUND_ID/ssh-key" >/dev/null
+          echo "### 부하 테스트 환경을 지웠습니다: \`$stack\`" >> "$GITHUB_STEP_SUMMARY"
