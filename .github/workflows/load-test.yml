@@ -1,7 +1,7 @@
 name: 비비디 부하 테스트
 
 # `k6/loadtest/<스크립트>/<회차>` 태그를 푸시하면 태그가 가리키는 커밋으로
-# 전용 환경을 새로 만들고(create), k6를 실행하고(k6-loadtest), 결과와 상관없이 환경을 지운다(cleanup).
+# 백엔드 이미지를 새로 빌드하고(build), 전용 환경을 새로 만들고(create), k6를 실행하고(k6-loadtest), 환경을 지운다(cleanup).
 on:
   push:
     tags:
@@ -39,8 +39,49 @@ jobs:
             echo "test_id=${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
           } >> "$GITHUB_OUTPUT"
 
-  create:
+  # 태그가 가리키는 커밋의 BE/로 백엔드 이미지를 새로 만든다. CD 이미지와 겹치지 않도록 태그에 loadtest- 를 붙인다.
+  build:
     needs: plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: BE
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+
+      - name: JAR 만들기(테스트는 PR CI가 이미 돌렸으므로 건너뛴다)
+        run: ./gradlew bootJar -x test -x jacocoTestReport -x jacocoTestCoverageVerification
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: ARM64 이미지 빌드와 푸시
+        uses: docker/build-push-action@v7
+        with:
+          context: ./BE
+          file: ./BE/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:loadtest-${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-loadtest
+          cache-to: type=inline
+
+  create:
+    needs: [plan, build]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: loadtest
@@ -53,7 +94,7 @@ jobs:
       ROUND_ID: ${{ needs.plan.outputs.round_id }}
       STACK_NAME: bibbidi-loadtest-${{ needs.plan.outputs.round_id }}
       PARAM_PREFIX: /bibbidi/loadtest/${{ needs.plan.outputs.round_id }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: loadtest-${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
 
@@ -75,7 +116,7 @@ jobs:
           set -euo pipefail
           # 이미지가 없으면 앱이 뜨지 못해 스택이 20분 뒤에야 실패하므로 먼저 막는다.
           docker manifest inspect "$DOCKERHUB_USERNAME/bibbidi-backend:$IMAGE_TAG" >/dev/null \
-            || { echo "::error::이 커밋($IMAGE_TAG)의 백엔드 이미지가 없습니다. CD가 이 커밋을 빌드한 뒤에 태그를 푸시하세요."; exit 1; }
+            || { echo "::error::백엔드 이미지($IMAGE_TAG)가 Docker Hub에 없습니다. build 잡의 결과를 확인하세요."; exit 1; }
           if aws cloudformation describe-stacks --stack-name "$STACK_NAME" >/dev/null 2>&1; then
             echo "::error::스택 $STACK_NAME 이 이미 있습니다. 매번 새 환경에서 실행하므로 다른 회차 이름을 쓰세요."
             exit 1
@@ -121,14 +162,14 @@ jobs:
               echo "파라미터 적용: $line"
             done < "$params_file"
           fi
-          # 이미지와 compose·nginx 파일은 모두 태그가 가리키는 커밋 기준이다.
+          # 템플릿과 compose·nginx 파일은 태그가 가리키는 커밋, 백엔드 이미지는 build 잡이 그 커밋으로 만든 것이다.
           aws cloudformation deploy \
             --stack-name "$STACK_NAME" \
             --template-file Infra/loadtest/loadtest-environment.yaml \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \
               "RoundId=$ROUND_ID" \
-              "ImageTag=$IMAGE_TAG" "ConfigRef=$IMAGE_TAG" \
+              "ImageTag=$IMAGE_TAG" "ConfigRef=$GITHUB_SHA" \
               "DockerHubUsername=$DOCKERHUB_USERNAME" "DockerHubToken=$DOCKERHUB_TOKEN" \
               "AuthJwtSecret=$AUTH_JWT_SECRET" "MonitoringIngestToken=$MONITORING_INGEST_TOKEN" \
               "DbPassword=$DB_PASSWORD" "SshPublicKey=$(cat "$RUNNER_TEMP/loadtest_key.pub")" \
@@ -136,7 +177,8 @@ jobs:
           {
             echo "### 부하 테스트 환경을 만들었습니다"
             echo "- 스택: \`$STACK_NAME\`"
-            echo "- 커밋(이미지 태그, 설정 ref): \`$IMAGE_TAG\`"
+            echo "- 커밋(템플릿·설정 ref): \`$GITHUB_SHA\`"
+            echo "- 백엔드 이미지: \`$IMAGE_TAG\`"
             echo "- 적용한 파라미터: ${overrides[*]:-없음(기본값)}"
           } >> "$GITHUB_STEP_SUMMARY"
 

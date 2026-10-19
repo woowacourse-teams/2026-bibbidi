@@ -8,7 +8,7 @@
 | `compose.app.yml` | 앱 서버 compose. 운영 compose에서 TLS·certbot을 뺐다 |
 | `nginx.default.conf.template` | HTTP 전용 nginx 설정. 제한값은 파라미터로 바꾼다 |
 | `params/<회차>.params` | (선택) 그 회차에서 바꿀 템플릿 파라미터 |
-| `.github/workflows/load-test.yml` | 태그 하나로 `plan` → `create` → `k6-loadtest` → `cleanup`을 실행 |
+| `.github/workflows/load-test.yml` | 태그 하나로 `plan` → `build` → `create` → `k6-loadtest` → `cleanup`을 실행 |
 
 ## 실행
 
@@ -19,11 +19,11 @@ git push origin k6/loadtest/<스크립트>/<회차>
 
 - `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `breakpoint-general-test`, `breakpoint-ai-arrival-test`, `breakpoint-ai-concurrency-test` 중 하나. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
 - `<회차>`: 소문자·숫자·하이픈 24자 이내. 회차마다 새 스택을 만들므로 같은 이름의 스택이 있으면 `create`가 실패한다.
-- 태그가 가리키는 커밋이 테스트 대상이다. 백엔드 이미지 태그와 compose·nginx 파일 ref가 모두 그 커밋의 SHA다. CD가 그 커밋의 이미지를 빌드한 뒤에 태그를 푸시해야 하며, 이미지가 없으면 `create`가 20분을 기다리지 않고 바로 실패한다.
+- 태그가 가리키는 커밋이 테스트 대상이다. `build` 잡이 그 커밋의 `BE/`로 arm64 이미지를 새로 만들어 `loadtest-<커밋 SHA>` 태그로 Docker Hub에 올리고(CD의 이미지와 겹치지 않는다), 템플릿과 compose·nginx 파일도 같은 커밋 기준이다. 병합이나 CD를 기다릴 필요가 없다. 이미지는 쌓이므로 필요하면 Docker Hub에서 `loadtest-*` 태그를 정리한다.
 
 ```mermaid
 flowchart LR
-    Plan["plan<br/>태그 검사"] --> Create["create<br/>환경 생성"]
+    Plan["plan<br/>태그 검사"] --> Build["build<br/>이미지 빌드"] --> Create["create<br/>환경 생성"]
     Create --> K6["k6-loadtest<br/>SSM 터널 SSH로 k6 실행"]
     K6 --> Cleanup["cleanup<br/>환경 삭제"]
     Create -.->|실패해도| Cleanup
@@ -88,7 +88,7 @@ JWT 비밀값, DB 비밀번호, SSH 키는 `create`가 실행마다 만든다. J
 
 회차마다 아래를 테스트 Issue에 남긴다. 운영과 다른 값은 그대로 적는다. 잡 요약에 커밋 SHA와 적용한 파라미터가 남는다.
 
-- 백엔드 이미지 태그(= 커밋 SHA), 인스턴스 타입 3종
+- 백엔드 이미지 태그(= `loadtest-<커밋 SHA>`), 인스턴스 타입 3종
 - `MysqlImage`, `MysqlMaxConnections`, `MysqlBufferPoolSize`, `DbPoolSize`와 운영 값
 - `NginxApiRateLimit`, `NginxApiConnLimit`와 운영 값(`burst=60`, `limit_conn 40`)
 - 모의 모델 설정 값(`LoadTest*`)
