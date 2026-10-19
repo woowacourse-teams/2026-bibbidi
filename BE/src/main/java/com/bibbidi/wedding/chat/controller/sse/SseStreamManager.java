@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.chat.controller.sse;
 
-import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
@@ -27,10 +26,10 @@ public class SseStreamManager {
         this.timeoutExecutor = timeoutExecutor;
     }
 
-    public SseEmitter stream(Duration timeout, SseEvent failure, Consumer<SseConnection> work) {
+    public SseEmitter stream(Duration timeout, Consumer<SseConnection> work) {
         SseEmitter emitter = new SseEmitter(DISABLED_SERVLET_TIMEOUT);
         long deadline = System.nanoTime() + timeout.toNanos();
-        SseConnection connection = new SseConnection(emitter, failure, deadline);
+        SseConnection connection = new SseConnection(emitter, deadline);
         emitter.onCompletion(connection::disconnect);
         emitter.onError(ignored -> connection.disconnect());
         emitter.onTimeout(connection::disconnect);

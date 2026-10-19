@@ -1,17 +1,13 @@
 package com.bibbidi.wedding.chat.controller;
 
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
-import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
-import com.bibbidi.wedding.chat.controller.sse.ChatEventType;
 import com.bibbidi.wedding.chat.controller.sse.SseConnection;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseProperties;
-import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
-import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.validation.Valid;
@@ -57,7 +53,6 @@ public class AiChatController {
         ChatCommand chatCommand = new ChatCommand(userId, request.conversationId(), request.message());
         return sseStreamManager.stream(
                 timeout,
-                failureEvent(),
                 chatResponseConsumer(chatCommand, ttftSample)
         );
     }
@@ -75,12 +70,5 @@ public class AiChatController {
                     })
                     .blockLast();
         };
-    }
-
-    private SseEvent failureEvent() {
-        return new SseEvent(
-                ChatEventType.FAILURE,
-                new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message())
-        );
     }
 }
