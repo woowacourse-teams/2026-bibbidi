@@ -20,6 +20,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -34,6 +35,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.header.HeaderWriterFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -89,6 +91,7 @@ public class SecurityConfig {
         final String termsAgreementPath = "/api/users/me/terms-agreement";
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.addObjectPostProcessor(eagerHeaderWriter()))
                 .cors(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -106,6 +109,16 @@ public class SecurityConfig {
                 .addFilterBefore(bibbidiTokenAuthenticationFilter(), AuthorizationFilter.class)
                 .exceptionHandling(this::configureExceptionHandling)
                 .build();
+    }
+
+    private ObjectPostProcessor<HeaderWriterFilter> eagerHeaderWriter() {
+        return new ObjectPostProcessor<>() {
+            @Override
+            public <O extends HeaderWriterFilter> O postProcess(O filter) {
+                filter.setShouldWriteHeadersEagerly(true);
+                return filter;
+            }
+        };
     }
 
     private void configureExceptionHandling(ExceptionHandlingConfigurer<HttpSecurity> handling) {
