@@ -12,6 +12,7 @@ import com.bibbidi.wedding.chat.support.FakeChatModel;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import reactor.core.publisher.Flux;
+import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import tools.jackson.databind.json.JsonMapper;
 
 class SpringAiConversationAdapterTest {
@@ -120,7 +122,7 @@ class SpringAiConversationAdapterTest {
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.completed").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
-        assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
+        assertThat(failureCount("throttled") + failureCount("timeout") + failureCount("error")).isZero();
     }
 
     @Test
@@ -133,10 +135,42 @@ class SpringAiConversationAdapterTest {
         adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
 
         // then
-        assertThat(registry.get("ai.chat.failures").counter().count()).isEqualTo(1);
+        assertThat(failureCount("error")).isEqualTo(1);
+        assertThat(failureCount("throttled")).isZero();
+        assertThat(failureCount("timeout")).isZero();
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
         assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
+    }
+
+    @Test
+    @DisplayName("모델이 한도 초과로 실패하면 throttled 사유로 기록한다")
+    void recordsThrottledFailureWhenTheModelIsThrottled() {
+        // given
+        model.respondWith(Flux.error(ThrottlingException.builder().message("Too many tokens").build()));
+
+        // when
+        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+
+        // then
+        assertThat(failureCount("throttled")).isEqualTo(1);
+        assertThat(failureCount("timeout")).isZero();
+        assertThat(failureCount("error")).isZero();
+    }
+
+    @Test
+    @DisplayName("모델 응답이 시간 초과로 실패하면 timeout 사유로 기록한다")
+    void recordsTimeoutFailureWhenTheModelTimesOut() {
+        // given
+        model.respondWith(Flux.error(new TimeoutException("응답 시간 초과")));
+
+        // when
+        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+
+        // then
+        assertThat(failureCount("timeout")).isEqualTo(1);
+        assertThat(failureCount("throttled")).isZero();
+        assertThat(failureCount("error")).isZero();
     }
 
     @Test
@@ -152,7 +186,7 @@ class SpringAiConversationAdapterTest {
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
         assertThat(registry.get("ai.chat.cancelled").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.failures").counter().count()).isZero();
+        assertThat(failureCount("throttled") + failureCount("timeout") + failureCount("error")).isZero();
     }
 
     @Test
@@ -185,5 +219,9 @@ class SpringAiConversationAdapterTest {
 
     private static ChatResponse chunk(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+    }
+
+    private double failureCount(String reason) {
+        return registry.get("ai.chat.failures").tag("reason", reason).counter().count();
     }
 }

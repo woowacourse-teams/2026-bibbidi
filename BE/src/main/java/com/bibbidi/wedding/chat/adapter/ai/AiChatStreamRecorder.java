@@ -2,23 +2,30 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 @Component
 @Slf4j(topic = "ai.chat.content")
 public class AiChatStreamRecorder {
 
+    private static final String THROTTLED = "throttled";
+    private static final String TIMEOUT = "timeout";
+    private static final String ERROR = "error";
+
     private final String model;
     private final Counter turns;
     private final Counter completedTurns;
     private final Counter cancelledTurns;
-    private final Counter failures;
+    private final Map<String, Counter> failures;
 
     public AiChatStreamRecorder(
             MeterRegistry registry,
@@ -28,7 +35,11 @@ public class AiChatStreamRecorder {
         this.turns = Counter.builder("ai.chat.turns").register(registry);
         this.completedTurns = Counter.builder("ai.chat.completed").register(registry);
         this.cancelledTurns = Counter.builder("ai.chat.cancelled").register(registry);
-        this.failures = Counter.builder("ai.chat.failures").register(registry);
+        this.failures = Map.of(
+                THROTTLED, failureCounter(registry, THROTTLED),
+                TIMEOUT, failureCounter(registry, TIMEOUT),
+                ERROR, failureCounter(registry, ERROR)
+        );
     }
 
     public Flux<ChatResponse> record(String userPrompt, Flux<ChatResponse> responses) {
@@ -38,11 +49,27 @@ public class AiChatStreamRecorder {
                     .doOnNext(turn::onResponse)
                     .doOnComplete(() -> turn.finish("completed"))
                     .doOnError(exception -> {
-                        failures.increment();
+                        failures.get(failureReasonOf(exception)).increment();
                         turn.finish("failed");
                     })
                     .doOnCancel(() -> turn.finish("cancelled"));
         });
+    }
+
+    private static Counter failureCounter(MeterRegistry registry, String reason) {
+        return Counter.builder("ai.chat.failures").tag("reason", reason).register(registry);
+    }
+
+    private static String failureReasonOf(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ThrottlingException) {
+                return THROTTLED;
+            }
+            if (cause instanceof TimeoutException) {
+                return TIMEOUT;
+            }
+        }
+        return ERROR;
     }
 
     static String textOf(ChatResponse response) {
