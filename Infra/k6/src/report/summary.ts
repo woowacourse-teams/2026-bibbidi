@@ -54,15 +54,20 @@ export class SummaryReport {
       ['처리한 시나리오 수', this.format(this.value('iterations', 'count'), 0)],
       ['응답 검사 통과율', this.format(this.value('checks', 'rate'), 4)],
       ['서버 오류(5xx) 건수', this.format(this.value('server_errors', 'count') ?? 0, 0)],
-      ['응답 시간 평균(ms)', this.format(this.value('http_req_duration', 'avg'))],
-      ['응답 시간 p95(ms, 느린 5% 경계)', this.format(this.value('http_req_duration', 'p(95)'))],
-      ['응답 시간 p99(ms, 느린 1% 경계)', this.format(this.value('http_req_duration', 'p(99)'))],
-      ['응답 시간 최대(ms)', this.format(this.value('http_req_duration', 'max'))],
+      ['응답 시간 평균(ms)', this.format(this.value(this.durationMetric(), 'avg'))],
+      ['응답 시간 p95(ms, 느린 5% 경계)', this.format(this.value(this.durationMetric(), 'p(95)'))],
+      ['응답 시간 p99(ms, 느린 1% 경계)', this.format(this.value(this.durationMetric(), 'p(99)'))],
+      ['응답 시간 최대(ms)', this.format(this.value(this.durationMetric(), 'max'))],
       ['건너뛴 시나리오 수(dropped_iterations)', this.format(this.value('dropped_iterations', 'count') ?? 0, 0)],
       ...this.extraRows(),
     ];
 
     return ['| 항목 | 값 |', '| --- | --- |', ...rows.map(([name, cell]) => `| ${name} | ${cell} |`)];
+  }
+
+  // 요약표가 읽는 응답 시간 지표. SSE처럼 오래 열리는 요청이 섞이면 하위 지표로 바꿔 쓴다.
+  protected durationMetric(): string {
+    return 'http_req_duration';
   }
 
   protected extraRows(): [string, string][] {

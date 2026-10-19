@@ -17,7 +17,7 @@ git tag k6/loadtest/<스크립트>/<회차> <커밋>
 git push origin k6/loadtest/<스크립트>/<회차>
 ```
 
-- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `breakpoint-general-test`, `breakpoint-ai-arrival-test`, `breakpoint-ai-concurrency-test` 중 하나. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
+- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `surge-test`(Q1 홍보일 급증), `saturation-test`(Q2 먼저 포화되는 자원), `ai-isolation-test`(Q3 AI 격리), `ai-throttle-test`(Q4 한도 초과) 중 하나. 각 스크립트의 목적, 흐름, 판정 기준은 [`Infra/k6/README.md`](../k6/README.md)에 있다. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
 - `<회차>`: 소문자·숫자·하이픈 24자 이내. 회차마다 새 스택을 만들므로 같은 이름의 스택이 있으면 `create`가 실패한다.
 - 템플릿과 compose·nginx 파일, 시드는 태그가 가리키는 커밋 기준이다. 백엔드 이미지는 그 커밋까지 `BE/`를 마지막으로 바꾼 커밋의 CD 이미지다. CD는 `BE/**` 등이 바뀐 커밋에서만 이미지를 만들기 때문에 `Infra/`만 바꾼 커밋에도 태그를 달 수 있다. 그 이미지가 없으면(CD가 아직 안 끝났거나 취소됨) `create`가 20분을 기다리지 않고 바로 실패한다.
 
@@ -43,6 +43,16 @@ DbPoolSize=5
 ```
 
 한 줄에 `파라미터=값` 하나이고, 허용 목록의 이름만 받는다: `AppInstanceType`, `DbInstanceType`, `LoadGeneratorInstanceType`, `MysqlImage`, `MysqlMaxConnections`, `MysqlBufferPoolSize`, `DbPoolSize`, `NginxApiRateLimit`, `NginxApiConnLimit`, `LoadTestTtftMs`, `LoadTestChunkIntervalMs`, `LoadTestChunks`, `LoadTestThrottleRatio`, `AutoStopHours`. 비밀값과 이미지는 바꿀 수 없다. 허용하지 않는 줄이 있으면 `create`가 실패한다.
+
+### 테스트별 회차 조건 예시
+
+| 테스트 | `params/<회차>.params` |
+| --- | --- |
+| Q4 한도 초과(전부 실패) | `LoadTestThrottleRatio=1.0` |
+| Q4 한도 초과(30% 실패) | `LoadTestThrottleRatio=0.3` |
+| Q2 풀 크기 비교 | `DbPoolSize=2`, `DbPoolSize=5`, `DbPoolSize=10`을 회차마다 하나씩 |
+
+시드가 만든 리프레시 토큰은 환경마다 한 번씩만 쓸 수 있다. 같은 환경에서 `token_refresh` 흐름이 있는 스크립트를 두 번 돌리면 두 번째는 재사용으로 401을 받는다. 태그마다 환경과 시드가 새로 만들어지므로 이 도구로 돌릴 때는 문제가 없다.
 
 ## 구성
 

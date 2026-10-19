@@ -17,6 +17,14 @@ export class UserIds {
   }
 }
 
+// AI 대화 사용자는 신규 사용자와 ID가 겹치지 않게 반복 번호에 이 값을 더한다. 신규 사용자는 이 값 미만의 반복 번호만 쓴다.
+export const AI_USER_ITERATION_OFFSET = 50_000;
+
+// 시드(generate-seed.py)가 만든 리프레시 세션의 토큰. 번호마다 하나이고 한 번만 쓸 수 있다.
+export function refreshTokenFor(index: number): string {
+  return `loadtest-refresh-${index}`;
+}
+
 export interface PooledUser {
   userId: number;
   appointmentId: number;

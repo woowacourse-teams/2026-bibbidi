@@ -1,26 +1,34 @@
 import type { Options } from 'k6/options';
-import { ApiFactory } from './src/api/api.ts';
 import { Environment, numberFromEnv, textFromEnv } from './src/common/environment.ts';
-import { HttpClient } from './src/http/http.ts';
-import { LoadTest } from './src/scenario/load-test.ts';
-import { NewUserSession, ReturningUserSession, SessionSequence, type SetupData } from './src/session/session.ts';
+import { GeneralLoad } from './src/scenario/promotion.ts';
 import { SummaryReport, type SummaryData } from './src/report/summary.ts';
-import { AccessTokenIssuer } from './src/common/token.ts';
+import {
+  CatalogBrowseSession,
+  NewUserSession,
+  ReturningUserSession,
+  SessionSequence,
+  TokenRefreshSession,
+  type SetupData,
+} from './src/session/session.ts';
 
 const environment = Environment.fromEnv();
 
-const sessions = new SessionSequence([new NewUserSession(), new ReturningUserSession()]);
-
-const apis = new ApiFactory(new HttpClient(environment.baseUrl), new AccessTokenIssuer(environment));
-const test = new LoadTest(apis, sessions, numberFromEnv('POOL_SIZE', 1));
+// 일반 API 흐름 4종을 한 번씩 돌려 본다. 신규, 재방문, 카탈로그, 토큰 갱신 순서다.
+const sessions = new SessionSequence([
+  new NewUserSession(),
+  new ReturningUserSession(),
+  new CatalogBrowseSession(),
+  new TokenRefreshSession(),
+]);
+const load = new GeneralLoad(environment, () => ({}));
 
 export const options: Options = {
   scenarios: {
     smoke: {
       executor: 'shared-iterations',
       vus: 1,
-      iterations: numberFromEnv('ITERATIONS', 2),
-      maxDuration: textFromEnv('MAX_DURATION', '30s'),
+      iterations: numberFromEnv('ITERATIONS', 4),
+      maxDuration: textFromEnv('MAX_DURATION', '2m'),
     },
   },
   thresholds: {
@@ -31,11 +39,11 @@ export const options: Options = {
 };
 
 export function setup(): SetupData {
-  return test.setup();
+  return load.setup();
 }
 
 export default function (data: SetupData): void {
-  test.run(data);
+  load.runner().runSelected(sessions, data);
 }
 
 export function handleSummary(data: SummaryData): Record<string, string> {

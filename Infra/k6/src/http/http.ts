@@ -1,6 +1,7 @@
 import { check } from 'k6';
 import http, { type RefinedResponse } from 'k6/http';
 import { Counter } from 'k6/metrics';
+import type { TagProvider } from '../config/shape.ts';
 
 export const serverErrors = new Counter('server_errors');
 
@@ -10,67 +11,61 @@ export interface RequestSpec {
   path: string;
   body?: unknown;
   expected: readonly number[];
+  // 기본은 general. 일부러 4xx를 받는 요청은 따로 태그해 일반 API 판정에서 뺀다.
+  kind?: string;
 }
 
-export interface ExpectationPolicy {
-  acceptable(spec: RequestSpec): number[];
-}
-
-export class StrictExpectation implements ExpectationPolicy {
-  acceptable(spec: RequestSpec): number[] {
-    return [...spec.expected];
-  }
-}
-
-export class ExpectationWithExtras implements ExpectationPolicy {
-  constructor(private readonly extraStatuses: readonly number[]) {}
-
-  acceptable(spec: RequestSpec): number[] {
-    return [...spec.expected, ...this.extraStatuses];
-  }
-}
-
-export type TagProvider = () => Record<string, string>;
-
-export interface ResponseObserver {
-  observe(spec: RequestSpec, response: RefinedResponse<'text'>): void;
-}
-
+// 일반 API 요청에는 kind=general 태그를 붙여, SSE로 오래 열리는 AI 요청과 응답 시간을 따로 판정한다.
+// 주의: http.batch는 요청별 responseCallback을 적용하지 않아, 배치 안의 기대한 4xx도 http_req_failed로 센다.
 export class HttpClient {
   constructor(
     private readonly baseUrl: string,
-    private readonly expectation: ExpectationPolicy = new StrictExpectation(),
     private readonly extraTags: TagProvider = () => ({}),
-    private readonly observers: readonly ResponseObserver[] = [],
   ) {}
 
-  send(token: string, spec: RequestSpec): RefinedResponse<'text'> {
-    const acceptable = this.expectation.acceptable(spec);
+  send(token: string | null, spec: RequestSpec): RefinedResponse<'text'> {
     const response = http.request(
       spec.method,
       `${this.baseUrl}${spec.path}`,
       spec.body === undefined ? null : JSON.stringify(spec.body),
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        tags: { ...this.extraTags(), name: spec.name },
-        responseCallback: http.expectedStatuses(...acceptable),
-      },
+      this.params(token, spec),
     );
+    this.verify(spec, response);
+    return response;
+  }
 
+  // 홈처럼 한 화면이 API 여러 개를 동시에 부를 때 쓴다.
+  sendBatch(token: string | null, specs: readonly RequestSpec[]): RefinedResponse<'text'>[] {
+    const responses = http.batch(
+      specs.map((spec) => ({
+        method: spec.method,
+        url: `${this.baseUrl}${spec.path}`,
+        body: spec.body === undefined ? null : JSON.stringify(spec.body),
+        params: this.params(token, spec),
+      })),
+    ) as RefinedResponse<'text'>[];
+    responses.forEach((response, index) => this.verify(specs[index], response));
+    return responses;
+  }
+
+  private params(token: string | null, spec: RequestSpec) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== null) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return {
+      headers,
+      tags: { kind: spec.kind ?? 'general', ...this.extraTags(), name: spec.name },
+      responseCallback: http.expectedStatuses(...spec.expected),
+    };
+  }
+
+  private verify(spec: RequestSpec, response: RefinedResponse<'text'>): void {
     if (response.status >= 500) {
       serverErrors.add(1);
     }
     check(response, {
-      [`${spec.name} -> ${acceptable.join('|')}`]: (r) => acceptable.includes(r.status),
+      [`${spec.name} -> ${spec.expected.join('|')}`]: (r) => spec.expected.includes(r.status),
     });
-
-    for (const observer of this.observers) {
-      observer.observe(spec, response);
-    }
-
-    return response;
   }
 }
