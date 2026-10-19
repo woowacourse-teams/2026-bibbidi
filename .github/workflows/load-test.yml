@@ -352,6 +352,18 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
+      # k6 임계값으로는 구간끼리의 비율을 판정할 수 없어서, ai-isolation-test가 내보낸 판정 파일로 잡의 성패를 정한다.
+      # 파일이 없거나 비율을 구하지 못했으면(구간에 요청이 없음) 실패로 본다.
+      - name: AI 격리 비율 판정
+        if: ${{ always() && env.SCRIPT == 'ai-isolation-test' }}
+        run: |
+          set -euo pipefail
+          verdict="$REPORT_DIR/verdict.json"
+          test -f "$verdict" || { echo "::error::verdict.json이 없어 AI 격리 비율을 판정하지 못했습니다."; exit 1; }
+          jq -r '"AI 격리 비율(투입 중 ÷ 투입 전 p95): \(.ratio // "측정 불가") (기준 \(.limit)배 이하)"' "$verdict"
+          jq -e '.passed == true' "$verdict" >/dev/null \
+            || { echo "::error::AI 부하가 일반 API를 기준 이상으로 늦췄거나 비율을 측정하지 못했습니다."; exit 1; }
+
   # 만들기나 테스트가 실패해도 환경은 지운다. 비밀값 파일(.env)도 환경과 함께 사라진다.
   cleanup:
     needs: [plan, create, seed, k6-loadtest]

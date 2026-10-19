@@ -1,4 +1,4 @@
-import { BURST_DURATION, BURST_REQUESTS, GENERAL_DURATION, generalMetric } from '../config/thresholds.ts';
+import { BURST_DURATION, BURST_REQUESTS, GENERAL_DURATION, REFRESH_VIOLATIONS, generalMetric } from '../config/thresholds.ts';
 import { SLO } from '../config/targets.ts';
 import { SummaryReport, type SummaryData } from './summary.ts';
 
@@ -128,7 +128,9 @@ export class GeneralSloReport extends SummaryReport {
   private burstLine(): string {
     const p95 = this.value(BURST_DURATION, 'p(95)');
     const count = this.value(BURST_REQUESTS, 'count');
-    return `여러 탭 동시 갱신(판정 제외): 요청 ${count === undefined ? '-' : count.toFixed(0)}건, p95 ${this.format(p95, 0)}ms`;
+    const violations = this.value(REFRESH_VIOLATIONS, 'count') ?? 0;
+    const rotation = violations === 0 ? '✅ 200 하나 + 401 하나' : `❌ 200/401 조합이 어긋난 쌍 ${violations}건`;
+    return `여러 탭 동시 갱신(응답 시간은 판정 제외): 요청 ${count === undefined ? '-' : count.toFixed(0)}건, p95 ${this.format(p95, 0)}ms, 토큰 회전 ${rotation}`;
   }
 
   private thresholdLines(): string[] {

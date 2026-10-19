@@ -1,3 +1,4 @@
+import { Counter } from 'k6/metrics';
 import type { HttpClient, RequestSpec } from '../http/http.ts';
 import type { AccessTokenIssuer } from '../common/token.ts';
 import { AiChatApi } from './ai-chat-api.ts';
@@ -29,6 +30,10 @@ export interface IssuedTokens {
   accessToken: string;
   refreshToken: string;
 }
+
+// 같은 리프레시 토큰을 동시에 두 번 보냈을 때 정확히 하나만 200이고 하나는 재사용 401이어야 한다.
+// 둘 다 성공하면 토큰 회전·행 잠금이 깨진 것이고, 둘 다 실패하면 갱신 자체가 깨진 것이다.
+export const refreshRotationViolations = new Counter('refresh_rotation_violations');
 
 const HOME_READS: readonly RequestSpec[] = [
   { name: 'GET /api/checklists/me/progress', method: 'GET', path: '/api/checklists/me/progress', expected: [200] },
@@ -155,6 +160,10 @@ export class AuthApi {
       { ...this.refreshSpec(refreshToken, [200, 401]), kind: 'refresh_burst' },
     ];
     const responses = this.client.sendBatch(null, specs);
+    const statuses = responses.map((response) => response.status).sort();
+    if (statuses.length !== 2 || statuses[0] !== 200 || statuses[1] !== 401) {
+      refreshRotationViolations.add(1);
+    }
     const winner = responses.find((response) => response.status === 200);
     return winner === undefined ? null : (winner.json() as unknown as IssuedTokens);
   }

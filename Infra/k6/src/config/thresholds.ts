@@ -46,6 +46,8 @@ export function generalThresholds(groups: readonly GatedGroup[]): Thresholds {
   // 여러 탭 동시 갱신의 응답 시간은 일반 API 판정과 따로 기록한다.
   thresholds[BURST_DURATION] = ['max>=0'];
   thresholds[BURST_REQUESTS] = ['count>=0'];
+  // 동시 갱신에서 200 하나와 401 하나가 아닌 조합이 한 번이라도 나오면 실패한다. 동시 갱신이 없었으면 표본이 없어 통과한다.
+  thresholds[REFRESH_VIOLATIONS] = ['count==0'];
 
   return thresholds;
 }
@@ -54,6 +56,7 @@ export function generalThresholds(groups: readonly GatedGroup[]): Thresholds {
 export const GENERAL_DURATION = 'http_req_duration{kind:general}';
 export const BURST_DURATION = 'http_req_duration{kind:refresh_burst}';
 export const BURST_REQUESTS = 'http_reqs{kind:refresh_burst}';
+export const REFRESH_VIOLATIONS = 'refresh_rotation_violations';
 
 export const AI_OUTCOMES = ['completed', 'failure_event', 'rejected', 'disconnected', 'http_error'] as const;
 

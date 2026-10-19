@@ -34,6 +34,7 @@ export const options: Options = {
   thresholds: {
     checks: ['rate==1'],
     server_errors: ['count==0'],
+    refresh_rotation_violations: ['count==0'],
   },
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
 };
