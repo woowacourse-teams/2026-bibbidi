@@ -41,8 +41,22 @@ public class LoadTestChatModel implements ChatModel {
                             Duration.ofMillis(properties.chunkIntervalMs()))
                     .take(properties.chunks())
                     .map(index -> new ChatResponse(
-                            List.of(new Generation(new AssistantMessage("토큰" + index + " ")))));
+                            List.of(new Generation(new AssistantMessage(chunkText(index))))));
         });
+    }
+
+    // 서비스는 모델 출력을 {"answer":"...","recommendedItemIds":[...]} JSON으로 읽는다.
+    // 첫 조각에 여는 부분을, 마지막 조각에 닫는 부분을 붙여 첫 토큰 지연이 답변 첫 글자 시점이 되게 한다.
+    private String chunkText(long index) {
+        StringBuilder text = new StringBuilder();
+        if (index == 0) {
+            text.append("{\"answer\":\"");
+        }
+        text.append("토큰").append(index).append(' ');
+        if (index == properties.chunks() - 1) {
+            text.append("\",\"recommendedItemIds\":[]}");
+        }
+        return text.toString();
     }
 
     @Override

@@ -2,13 +2,16 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bibbidi.wedding.chat.service.parser.ChatAnswerStream;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.boot.context.annotation.UserConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.json.JsonMapper;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 class LoadTestChatModelTest {
@@ -24,6 +27,21 @@ class LoadTestChatModelTest {
                 .expectNextCount(3)
                 .expectComplete()
                 .verify(Duration.ofSeconds(2));
+    }
+
+    @Test
+    void 서비스가_읽는_구조화된_응답으로_흘린다() {
+        LoadTestChatModel model = new LoadTestChatModel(
+                new LoadTestChatModelProperties(1, 1, 3, 0), () -> 0.5);
+        List<String> chunks = model.stream(PROMPT)
+                .map(response -> response.getResult().getOutput().getText())
+                .collectList()
+                .block(Duration.ofSeconds(2));
+
+        var answer = new ChatAnswerStream(JsonMapper.builder().build()).read(chunks.stream(), delta -> { });
+
+        assertThat(answer.answer()).isEqualTo("토큰0 토큰1 토큰2 ");
+        assertThat(answer.recommendedItemIds()).isEmpty();
     }
 
     @Test
