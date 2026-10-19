@@ -1,7 +1,9 @@
 import { numberFromEnv } from '../common/environment.ts';
 
-// 부하 목표와 합격 기준(SLO)을 이 파일 한 곳에 모은다. 값은 #456의 잠정값이고 환경 변수로 덮어쓸 수 있다.
-// "잠정" 표시가 있는 값은 팀 결정이나 홍보일 실측이 끝나면 여기서만 고친다.
+// 부하 목표와 합격 기준(SLO)을 이 파일 한 곳에 모은다. 값은 환경 변수로 덮어쓸 수 있다.
+// SLO와 단계 구성(Q2 ×1·2·5·10, Q3 4분·6분·2분)은 #456~#538에 적힌 값이다.
+// 피크 크기·모양·흐름 비율은 이슈에 숫자가 없어서 아래 근거로 정한 값이고, "잠정" 표시가 있는 값은
+// 팀 결정이나 홍보일 실측이 끝나면 여기서만 고친다.
 
 export const SLO = {
   // 일반 API: 응답 시간과 실패율. k6 측정값으로 판정한다.
@@ -17,27 +19,36 @@ export const SLO = {
   isolationRatio: numberFromEnv('SLO_ISOLATION_RATIO', 1.2),
 };
 
-// 잠정: 홍보일 실측 피크는 아직 없어서 작은 값으로 시작한다. 단위는 초당 시작하는 사용 흐름(세션) 수다.
+// 급증 한 번에 신규 사용자 100명이 들어오는 것을 기준으로 잡았다.
+//   - 지금 총 사용자는 17명이고 8주 안의 설계 상한이 1,000명이다(#456).
+//   - 홍보일 실측: 오픈채팅에서 초반에 50명이 들어왔다(전체 사용자 약 213명). 목표 배수 ×2면 100명이다.
+//   - Q2는 이 급증을 ×1·2·5·10으로 키워 한 번에 몰리는 신규가 100 → 200 → 500 → 1,000명이 되게 한다.
+// 단위는 초당 시작하는 사용 흐름(세션) 수다. 신규 사용자 수 = 세션 × 신규 몫(MIX.newUser).
+// 0.85 × 0.8 = 초당 신규 0.68명이고, 기본 Q1 모양에서 시험 전체의 신규가 약 100명, Q2 ×1 단계(2.5분)가 약 100명이다.
+// 오픈채팅 50명이 도착한 시간 폭은 모르는 상태라 위 모양(급증 30초 + 피크 60초)은 가정이다.
 // 목표 부하 배수(1배 또는 2배)는 팀 결정 대기라 PEAK_MULTIPLIER로 바꾼다.
 export const PEAK = {
-  sessionsPerSecond: numberFromEnv('PEAK_SESSIONS_PER_SECOND', 5),
+  sessionsPerSecond: numberFromEnv('PEAK_SESSIONS_PER_SECOND', 0.85),
   multiplier: numberFromEnv('PEAK_MULTIPLIER', 1),
   get effectiveSessionsPerSecond(): number {
     return this.sessionsPerSecond * this.multiplier;
   },
 };
 
-// 잠정: 홍보일 실측 전에는 일반적인 SNS 패턴(상승 1~2분, 피크 유지 10~15분, 반감)으로 시작한다.
+// 잠정: 오픈채팅처럼 한 번 몰렸다 끝나는 모양으로 잡았다(총 4.5분). 실제 도착 시간 폭은 모른다.
+// #456은 일반적인 SNS 패턴(상승 1~2분, 피크 유지 10~15분, 반감 1시간)을 출발점으로 적었지만,
+// 실측 유입(오픈채팅 50명, 총 약 213명)에는 10분 피크가 맞지 않아 짧게 줄였다.
 export const SHAPE = {
   baselineSeconds: numberFromEnv('SHAPE_BASELINE_SECONDS', 60),
-  surgeSeconds: numberFromEnv('SHAPE_SURGE_SECONDS', 120),
-  peakSeconds: numberFromEnv('SHAPE_PEAK_SECONDS', 600),
-  decaySeconds: numberFromEnv('SHAPE_DECAY_SECONDS', 300),
+  surgeSeconds: numberFromEnv('SHAPE_SURGE_SECONDS', 30),
+  peakSeconds: numberFromEnv('SHAPE_PEAK_SECONDS', 60),
+  decaySeconds: numberFromEnv('SHAPE_DECAY_SECONDS', 120),
   // 평소 부하는 피크의 몇 배인지.
   baselineRatio: numberFromEnv('SHAPE_BASELINE_RATIO', 0.1),
 };
 
 // 잠정: 신규와 재방문 비율은 홍보일 실측으로 정한다. 근거 없는 60%는 폐기했다.
+// 홍보일 사용자 약 213명 중 신규가 약 199명(약 93%)으로 보이지만 열의 뜻을 추정한 것이라 80%로 두었다.
 // 재방문 부하는 활성 비율이 낮아(DAU ÷ 30일 활성 약 5%) 신규 피크보다 작다고 가정한다.
 export const MIX = {
   newUser: numberFromEnv('MIX_NEW_USER', 0.8),
