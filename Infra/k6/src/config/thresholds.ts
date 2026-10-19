@@ -41,6 +41,7 @@ export function generalThresholds(groups: readonly GatedGroup[]): Thresholds {
       group.failure ? gate(`rate<${SLO.generalFailureRate}`, group.abortAfterSeconds) : 'rate>=0',
     ];
     thresholds[generalMetric('http_reqs', group.tags)] = ['count>=0'];
+    thresholds[`new_users{${group.tags}}`] = ['count>=0'];
   }
 
   // 여러 탭 동시 갱신의 응답 시간은 일반 API 판정과 따로 기록한다.
