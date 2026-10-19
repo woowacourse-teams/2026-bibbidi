@@ -242,7 +242,8 @@ Resources:
           apt-get update -y
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource DbInstance --region ${AWS::Region}' EXIT
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource DbInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
           shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y docker.io
           systemctl enable --now docker
@@ -285,7 +286,8 @@ Resources:
           apt-get update -y
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource AppInstance --region ${AWS::Region}' EXIT
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource AppInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
           shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y docker.io docker-compose-v2
           systemctl enable --now docker
@@ -320,7 +322,8 @@ Resources:
           docker compose up -d
           until curl -fs http://127.0.0.1:8081/actuator/health/readiness >/dev/null; do sleep 5; done
           curl -fs http://127.0.0.1/healthz >/dev/null
-          docker logs bibbidi-backend 2>&1 | grep -q 'profiles are active.*loadtest'
+          docker logs bibbidi-backend > /tmp/backend.log 2>&1
+          grep -q 'profiles are active.*loadtest' /tmp/backend.log
 
   LoadGeneratorInstance:
     Type: AWS::EC2::Instance
@@ -351,7 +354,8 @@ Resources:
           apt-get update -y
           apt-get install -y python3-pip
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          trap 'cfn-signal -e $? --stack ${AWS::StackName} --resource LoadGeneratorInstance --region ${AWS::Region}' EXIT
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource LoadGeneratorInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
           shutdown -h "+$(( ${AutoStopHours} * 60 ))"
           apt-get install -y git tar gzip curl
           # 워크플로가 SSM 터널로 접속할 키. 22번 포트는 보안 그룹에서 열지 않는다.

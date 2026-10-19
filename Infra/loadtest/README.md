@@ -69,7 +69,7 @@ GitHub `loadtest` 환경에 아래 값을 둔다. 이미 있는 저장소 시크
 | --- | --- | --- |
 | 변수 | `LOADTEST_AWS_ROLE_ARN` | OIDC로 가정하는 AWS 역할 |
 
-AWS 역할은 신뢰 정책의 `sub`를 `repo:woowacourse-teams/2026-bibbidi:environment:loadtest`로 제한한다. 필요한 권한: CloudFormation 스택 `bibbidi-loadtest-*` 생성·삭제, VPC·EC2·보안 그룹 생성·삭제, `bibbidi-loadtest-*` 인스턴스 역할 생성과 `iam:PassRole`, `/bibbidi/loadtest/*` 경로의 SSM Parameter 쓰기·읽기·삭제, 부하 발생기 인스턴스로의 `ssm:StartSession`(`AWS-StartSSHSession` 문서).
+AWS 역할은 신뢰 정책의 `sub`를 `loadtest` 환경으로 제한한다. 이 저장소는 OIDC 토큰의 `sub`가 불변 형식이라 값이 `<sub_claim_prefix>:environment:loadtest`다. 접두사는 `gh api repos/woowacourse-teams/2026-bibbidi/actions/oidc/customization/sub`로 확인하고 (`repo:woowacourse-teams@66992148/2026-bibbidi@1321029096`), 이름 기반 값(`repo:woowacourse-teams/2026-bibbidi:...`)을 쓰면 `Not authorized to perform sts:AssumeRoleWithWebIdentity`로 거부된다. 필요한 권한: CloudFormation 스택 `bibbidi-loadtest-*` 생성·삭제, VPC·EC2·보안 그룹 생성·삭제, `bibbidi-loadtest-*` 인스턴스 역할 생성과 `iam:PassRole`, `/bibbidi/loadtest/*` 경로의 SSM Parameter 쓰기·읽기·삭제, 부하 발생기 인스턴스로의 `ssm:StartSession`(`AWS-StartSSHSession` 문서).
 
 JWT 비밀값, DB 비밀번호, SSH 키는 `create`가 실행마다 만든다. JWT 값과 개인키는 `/bibbidi/loadtest/<회차>/` 아래 SSM SecureString으로 저장되어 `k6-loadtest` 잡이 읽고, `cleanup`이 지운다. DB 비밀번호는 스택 파라미터로만 넘긴다.
 
