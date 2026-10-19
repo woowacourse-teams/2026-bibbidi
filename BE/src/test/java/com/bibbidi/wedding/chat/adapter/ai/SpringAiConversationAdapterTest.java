@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
@@ -9,6 +10,8 @@ import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Set;
@@ -141,6 +144,32 @@ class SpringAiConversationAdapterTest {
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
         assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
         assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
+    }
+
+    @Test
+    @DisplayName("모델 호출 한도를 넘으면 한도 초과 예외로 바꾼다")
+    void convertsThrottlingToCapacityExceeded() {
+        // given
+        ThrottlingException throttling = ThrottlingException.builder().message("Too many requests").build();
+        model.respondWith(Flux.error(throttling));
+
+        // when, then
+        assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.clientError()).isEqualTo(ClientError.AI_CAPACITY_EXCEEDED))
+                .hasCause(throttling);
+    }
+
+    @Test
+    @DisplayName("한도 초과가 아닌 모델 실패는 그대로 전달한다")
+    void keepsOtherModelFailures() {
+        // given
+        IllegalStateException failure = new IllegalStateException("모델 오류");
+        model.respondWith(Flux.error(failure));
+
+        // when, then
+        assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
+                .isSameAs(failure);
     }
 
     @Test

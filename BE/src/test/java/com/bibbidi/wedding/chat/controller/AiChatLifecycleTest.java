@@ -15,10 +15,8 @@ import com.bibbidi.wedding.chat.service.ConversationKey;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
-import com.bibbidi.wedding.chat.controller.sse.ChatEventType;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
-import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
@@ -151,7 +149,7 @@ class AiChatLifecycleTest {
             return Flux.just(response("늦은 답변"));
         });
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
-        sse.stream(RESPONSE_TIMEOUT, new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
+        sse.stream(RESPONSE_TIMEOUT, connection -> {
             try {
                 sendEvents(connection, chat.chat(new ChatCommand(7L, ID, "질문")));
             } finally {
@@ -181,7 +179,7 @@ class AiChatLifecycleTest {
                 .doOnSubscribe(ignored -> subscribed.countDown()));
 
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
-        sse.stream(RESPONSE_TIMEOUT, new SseEvent(ChatEventType.FAILURE, "실패 안내"), connection -> {
+        sse.stream(RESPONSE_TIMEOUT, connection -> {
             ChatSseHandler reply = new ChatSseHandler(connection);
             try {
                 chat.chat(new ChatCommand(7L, ID, "질문")).doOnNext(event -> {

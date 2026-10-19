@@ -302,11 +302,13 @@ class AiChatControllerTest {
         // then
         MvcResult completed = mockMvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
                 .andDo(document("ai-chat-failure", resource(ResourceSnippetParameters.builder().tag("AI Chat")
-                        .summary("AI 대화 생성 실패").description("SSE 시작 이후의 공개 실패 이벤트. 이후 done을 보내지 않습니다.")
+                        .summary("AI 대화 생성 실패")
+                        .description("SSE 시작 이후의 공개 실패 이벤트. errorCode와 message를 담고, 이후 done을 보내지 않습니다.")
                         .responseSchema(schema("ChatEventStream"))
                         .build()))).andReturn();
         assertThat(body(completed))
-                .contains("event:delta", "일부 답변", "event:failure", ClientError.INTERNAL_ERROR.message())
+                .contains("event:delta", "일부 답변", "event:failure",
+                        "\"errorCode\":" + ClientError.INTERNAL_ERROR.errorCode(), ClientError.INTERNAL_ERROR.message())
                 .doesNotContain("비밀", "event:done");
     }
 

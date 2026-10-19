@@ -3,7 +3,6 @@ package com.bibbidi.wedding.chat.controller.sse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
-import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
 import com.bibbidi.wedding.chat.support.RecordingSseEmitter;
 import java.time.Duration;
@@ -20,8 +19,7 @@ class ChatSseHandlerTest {
     @BeforeEach
     void setUp() {
         emitter = new RecordingSseEmitter();
-        SseConnection connection = new SseConnection(emitter, new SseEvent(ChatEventType.FAILURE, "실패 안내"),
-                System.nanoTime() + Duration.ofSeconds(30).toNanos());
+        SseConnection connection = new SseConnection(emitter, System.nanoTime() + Duration.ofSeconds(30).toNanos());
         handler = new ChatSseHandler(connection);
     }
 
