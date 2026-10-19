@@ -58,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -165,7 +165,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -247,7 +247,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -365,7 +365,7 @@ jobs:
     env:
       ROUND_ID: ${{ needs.plan.outputs.round_id }}
     steps:
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
