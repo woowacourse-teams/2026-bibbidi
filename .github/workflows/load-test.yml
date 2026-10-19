@@ -76,7 +76,9 @@ jobs:
           file: ./BE/Dockerfile
           push: true
           platforms: linux/arm64
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:loadtest-${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:loadtest-${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-loadtest
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-loadtest
           cache-to: type=inline
 
