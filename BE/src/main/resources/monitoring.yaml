@@ -43,6 +43,8 @@ management:
         gen_ai.client.operation: true
         spring.ai.tool: true
         ai.chat.ttft: true
+        hikaricp.connections.usage: true
+        hikaricp.connections.acquire: true
   tracing:
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
