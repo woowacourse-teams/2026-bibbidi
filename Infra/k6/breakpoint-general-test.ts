@@ -26,7 +26,7 @@ const mix = new SessionMix([
 
 const client = new HttpClient(environment.baseUrl, new StrictExpectation(), () => ({}), [new WindowMetrics(plan)]);
 const apis = new ApiFactory(client, new AccessTokenIssuer(environment));
-const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 50));
+const test = new LoadTest(apis, mix, numberFromEnv('POOL_SIZE', 100));
 
 const preAllocatedVUs = numberFromEnv('PRE_ALLOCATED_VUS', plan.endRate(plan.windows) * 3);
 

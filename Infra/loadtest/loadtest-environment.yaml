@@ -245,10 +245,14 @@ Resources:
           signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource DbInstance --region ${AWS::Region}; }
           trap 'signal $?' EXIT
           shutdown -h "+$(( ${AutoStopHours} * 60 ))"
+          install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+          echo '${SshPublicKey}' > /home/ubuntu/.ssh/authorized_keys
+          chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
+          chmod 0600 /home/ubuntu/.ssh/authorized_keys
           apt-get install -y docker.io
           systemctl enable --now docker
           docker run -d --name mysql --restart unless-stopped -p 3306:3306 \
-            -e MYSQL_ROOT_PASSWORD='${DbPassword}' -e MYSQL_DATABASE=bibbidi \
+            -e MYSQL_ROOT_PASSWORD='${DbPassword}' -e MYSQL_DATABASE=bibbidi_loadtest \
             -v /var/lib/bibbidi-mysql:/var/lib/mysql \
             ${MysqlImage} \
             --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci \
@@ -307,7 +311,7 @@ Resources:
           ENV
           cat > .env.spring <<'ENV'
           DB_HOST=${DbInstance.PrivateIp}
-          DB_NAME=bibbidi
+          DB_NAME=bibbidi_loadtest
           DB_USER=root
           DB_PASSWORD=${DbPassword}
           DB_POOL_SIZE=${DbPoolSize}
