@@ -4,7 +4,6 @@ import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
-import com.bibbidi.wedding.catalog.persistence.CatalogRow;
 import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
@@ -16,26 +15,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CatalogMapper {
-
-    public Catalog toDomain(List<CatalogRow> rows) {
-        Map<Long, JpaCategoryEntity> categories = new LinkedHashMap<>();
-        Map<Long, JpaStepEntity> steps = new LinkedHashMap<>();
-        Map<Long, JpaCatalogItemEntity> items = new LinkedHashMap<>();
-        for (CatalogRow row : rows) {
-            categories.putIfAbsent(row.category().id(), row.category());
-            if (row.step() != null) {
-                steps.putIfAbsent(row.step().id(), row.step());
-            }
-            if (row.item() != null) {
-                items.putIfAbsent(row.item().id(), row.item());
-            }
-        }
-        return toDomain(
-                new ArrayList<>(categories.values()),
-                new ArrayList<>(steps.values()),
-                new ArrayList<>(items.values())
-        );
-    }
 
     public Catalog toDomain(
             List<JpaCategoryEntity> categoryEntities,
