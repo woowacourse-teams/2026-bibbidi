@@ -1,7 +1,12 @@
 import { sleep } from 'k6';
+import { Counter } from 'k6/metrics';
 import type { ApiFactory } from '../api/api.ts';
+import type { TagProvider } from '../config/shape.ts';
 import { REFRESH_BURST_RATIO, THINK } from '../config/targets.ts';
 import { pickRandom, refreshTokenFor, UserIds, type PooledUser } from './users.ts';
+
+// 시험 중에 새로 만든 사용자 수. 구간(phase)이나 단계(stage)로 나눠 보고서에 싣는다.
+export const newUsers = new Counter('new_users');
 
 export interface SetupData {
   runId: number;
@@ -31,12 +36,17 @@ export function think(): void {
 
 // 신규: 준비 목록 둘러보기 → 체크리스트 만들고 담기 → 일정 잡기 → 홈
 export class NewUserSession implements Session {
+  constructor(private readonly tags: TagProvider = () => ({})) {}
+
   run({ data, iteration, apis }: SessionContext): void {
     const api = apis.forUser(UserIds.fresh(data.runId, iteration));
 
     api.catalogItemIds();
     think();
     api.createChecklist();
+    if (__VU !== 0) {
+      newUsers.add(1, this.tags());
+    }
     const [firstItemId] = api.addCatalogItems(pickRandom(data.catalogItemIds, 3));
     think();
     api.createAppointment(firstItemId, 1 + (iteration % 28));
