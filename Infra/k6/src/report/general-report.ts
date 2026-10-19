@@ -13,6 +13,7 @@ export interface ReportGroup {
 export interface GroupResult {
   group: ReportGroup;
   requests: number;
+  newUsers: number;
   p95: number | undefined;
   p99: number | undefined;
   failureRate: number | undefined;
@@ -89,6 +90,7 @@ export class GeneralSloReport extends SummaryReport {
     return {
       group,
       requests: this.value(generalMetric('http_reqs', group.tags), 'count') ?? 0,
+      newUsers: this.value(`new_users{${group.tags}}`, 'count') ?? 0,
       p95,
       p99,
       failureRate,
@@ -97,9 +99,10 @@ export class GeneralSloReport extends SummaryReport {
   }
 
   private table(results: readonly GroupResult[]): string[] {
-    const header = ['구간', '요청 수', 'p95(ms)', 'p99(ms)', '실패율(%)', '판정'];
+    const header = ['구간', '신규 사용자', '요청 수', 'p95(ms)', 'p99(ms)', '실패율(%)', '판정'];
     const rows = results.map((result) => [
       result.group.label,
+      this.format(result.newUsers, 0),
       this.format(result.requests, 0),
       this.format(result.p95, 0),
       this.format(result.p99, 0),
