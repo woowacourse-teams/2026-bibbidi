@@ -74,6 +74,25 @@ Parameters:
     Type: String
     Default: ""
     Description: 'e.g. "limit_conn per_ip_conn 40;". Empty means no limit'
+  LoadTestTtftMs:
+    Type: Number
+    Default: 3000
+    Description: Mock model delay before the first token (bibbidi.ai.loadtest.ttft-ms)
+  LoadTestChunkIntervalMs:
+    Type: Number
+    Default: 50
+    MinValue: 1
+    Description: Mock model interval between tokens (bibbidi.ai.loadtest.chunk-interval-ms)
+  LoadTestChunks:
+    Type: Number
+    Default: 40
+    MinValue: 1
+    Description: Mock model token count per answer (bibbidi.ai.loadtest.chunks)
+  LoadTestThrottleRatio:
+    Type: String
+    Default: "0"
+    AllowedPattern: "(0|1|0\\.[0-9]+|1\\.0+)"
+    Description: Share of requests the mock model fails with a throttling error, 0 to 1 (bibbidi.ai.loadtest.throttle-ratio)
   AutoStopHours:
     Type: Number
     Default: 8
@@ -290,6 +309,10 @@ Resources:
           DB_USER=root
           DB_PASSWORD=${DbPassword}
           DB_POOL_SIZE=${DbPoolSize}
+          BIBBIDI_AI_LOADTEST_TTFT_MS=${LoadTestTtftMs}
+          BIBBIDI_AI_LOADTEST_CHUNK_INTERVAL_MS=${LoadTestChunkIntervalMs}
+          BIBBIDI_AI_LOADTEST_CHUNKS=${LoadTestChunks}
+          BIBBIDI_AI_LOADTEST_THROTTLE_RATIO=${LoadTestThrottleRatio}
           AUTH_JWT_SECRET=${AuthJwtSecret}
           ENV
           echo '${DockerHubToken}' | docker login -u '${DockerHubUsername}' --password-stdin

@@ -1,5 +1,7 @@
 name: 비비디 부하 테스트
 
+# `k6/loadtest/<스크립트>/<회차>` 태그를 푸시하면 태그가 가리키는 커밋으로
+# 전용 환경을 새로 만들고(create), k6를 실행하고(k6-loadtest), 결과와 상관없이 환경을 지운다(cleanup).
 on:
   push:
     tags:
@@ -13,22 +15,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # 전용 부하 테스트 환경: GitHub 호스팅 러너가 SSM 터널 SSH로 부하 발생기 EC2에 접속해 k6를 돌린다.
-  k6-loadtest:
-    if: ${{ !startsWith(github.ref_name, 'k6/loadtest/cleanup/') }}
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    environment: loadtest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      REF_NAME: ${{ github.ref_name }}
-      REPORT_DIR: ${{ github.workspace }}/k6-report
+    timeout-minutes: 5
+    outputs:
+      script: ${{ steps.read.outputs.script }}
+      round_id: ${{ steps.read.outputs.round_id }}
+      test_id: ${{ steps.read.outputs.test_id }}
     steps:
-      - uses: actions/checkout@v7
-
       - name: 태그에서 실행 대상 읽기
+        id: read
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([a-z0-9-]{1,24})$ ]]; then
@@ -36,10 +34,128 @@ jobs:
             exit 1
           fi
           {
-            echo "SCRIPT=${BASH_REMATCH[1]}"
-            echo "ROUND_ID=${BASH_REMATCH[2]}"
-            echo "TEST_ID=${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
-          } >> "$GITHUB_ENV"
+            echo "script=${BASH_REMATCH[1]}"
+            echo "round_id=${BASH_REMATCH[2]}"
+            echo "test_id=${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+          } >> "$GITHUB_OUTPUT"
+
+  create:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: loadtest
+    outputs:
+      owns_stack: ${{ steps.guard.outputs.owns_stack }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ROUND_ID: ${{ needs.plan.outputs.round_id }}
+      STACK_NAME: bibbidi-loadtest-${{ needs.plan.outputs.round_id }}
+      PARAM_PREFIX: /bibbidi/loadtest/${{ needs.plan.outputs.round_id }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 태그가 가리키는 커밋의 이미지와 기존 스택 확인
+        id: guard
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          # 이미지가 없으면 앱이 뜨지 못해 스택이 20분 뒤에야 실패하므로 먼저 막는다.
+          docker manifest inspect "$DOCKERHUB_USERNAME/bibbidi-backend:$IMAGE_TAG" >/dev/null \
+            || { echo "::error::이 커밋($IMAGE_TAG)의 백엔드 이미지가 없습니다. CD가 이 커밋을 빌드한 뒤에 태그를 푸시하세요."; exit 1; }
+          if aws cloudformation describe-stacks --stack-name "$STACK_NAME" >/dev/null 2>&1; then
+            echo "::error::스택 $STACK_NAME 이 이미 있습니다. 매번 새 환경에서 실행하므로 다른 회차 이름을 쓰세요."
+            exit 1
+          fi
+          # 여기를 통과한 실행만 이 스택의 주인이다. cleanup은 주인일 때만 지운다.
+          echo "owns_stack=true" >> "$GITHUB_OUTPUT"
+
+      - name: 전용 환경 만들기
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+        run: |
+          set -euo pipefail
+          # JWT 비밀값과 DB 비밀번호, SSH 키는 회차마다 새로 만든다.
+          # k6 잡이 JWT 값과 개인키를 다시 읽을 수 있도록 SSM Parameter Store에 둔다.
+          AUTH_JWT_SECRET="$(openssl rand -hex 32)"
+          DB_PASSWORD="$(openssl rand -hex 16)"
+          MONITORING_INGEST_TOKEN="$(printf '%s\n' "$ALLOY_ENV_CONTENT" \
+            | tr -d '\r' \
+            | sed -n -E 's/^(export )?MONITORING_INGEST_TOKEN=//p' \
+            | head -n 1 \
+            | sed -E "s/^(\"|')//; s/(\"|')$//")"
+          test -n "$MONITORING_INGEST_TOKEN" || { echo "::error::BIBBIDI_ALLOY_ENV에서 MONITORING_INGEST_TOKEN을 찾지 못했습니다."; exit 1; }
+          for secret in "$DOCKERHUB_TOKEN" "$AUTH_JWT_SECRET" "$MONITORING_INGEST_TOKEN" "$DB_PASSWORD"; do
+            echo "::add-mask::$secret"
+          done
+          ssh-keygen -q -t ed25519 -N '' -C "loadtest-$ROUND_ID" -f "$RUNNER_TEMP/loadtest_key"
+          aws ssm put-parameter --name "$PARAM_PREFIX/jwt-secret" --type SecureString --overwrite --value "$AUTH_JWT_SECRET" >/dev/null
+          aws ssm put-parameter --name "$PARAM_PREFIX/ssh-key" --type SecureString --overwrite --value "file://$RUNNER_TEMP/loadtest_key" >/dev/null
+          # 회차 조건은 태그가 가리키는 커밋의 Infra/loadtest/params/<회차>.params 에 둔다(없으면 기본값).
+          # 한 줄에 `파라미터=값` 하나이고 허용 목록에 있는 이름만 받는다. 비밀값과 이미지는 바꿀 수 없다.
+          allowed=" AppInstanceType DbInstanceType LoadGeneratorInstanceType MysqlImage MysqlMaxConnections MysqlBufferPoolSize DbPoolSize NginxApiRateLimit NginxApiConnLimit LoadTestTtftMs LoadTestChunkIntervalMs LoadTestChunks LoadTestThrottleRatio AutoStopHours "
+          overrides=()
+          params_file="Infra/loadtest/params/$ROUND_ID.params"
+          if [ -f "$params_file" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              line="${line%$'\r'}"
+              case "$line" in ''|'#'*) continue ;; esac
+              key="${line%%=*}"
+              [[ "$line" == *=* && "$allowed" == *" $key "* ]] || { echo "::error::$params_file 에서 허용하지 않는 줄입니다: $line"; exit 1; }
+              overrides+=("$line")
+              echo "파라미터 적용: $line"
+            done < "$params_file"
+          fi
+          # 이미지와 compose·nginx 파일은 모두 태그가 가리키는 커밋 기준이다.
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --template-file Infra/loadtest/loadtest-environment.yaml \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              "RoundId=$ROUND_ID" \
+              "ImageTag=$IMAGE_TAG" "ConfigRef=$IMAGE_TAG" \
+              "DockerHubUsername=$DOCKERHUB_USERNAME" "DockerHubToken=$DOCKERHUB_TOKEN" \
+              "AuthJwtSecret=$AUTH_JWT_SECRET" "MonitoringIngestToken=$MONITORING_INGEST_TOKEN" \
+              "DbPassword=$DB_PASSWORD" "SshPublicKey=$(cat "$RUNNER_TEMP/loadtest_key.pub")" \
+              "${overrides[@]}"
+          {
+            echo "### 부하 테스트 환경을 만들었습니다"
+            echo "- 스택: \`$STACK_NAME\`"
+            echo "- 커밋(이미지 태그, 설정 ref): \`$IMAGE_TAG\`"
+            echo "- 적용한 파라미터: ${overrides[*]:-없음(기본값)}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # GitHub 호스팅 러너가 SSM 터널 SSH로 부하 발생기 EC2에 접속해 k6를 돌린다.
+  k6-loadtest:
+    needs: [plan, create]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: loadtest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SCRIPT: ${{ needs.plan.outputs.script }}
+      ROUND_ID: ${{ needs.plan.outputs.round_id }}
+      TEST_ID: ${{ needs.plan.outputs.test_id }}
+      REPORT_DIR: ${{ github.workspace }}/k6-report
+    steps:
+      - uses: actions/checkout@v7
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -130,10 +246,6 @@ jobs:
           mkdir -p "$REPORT_DIR"
           scp -r loadtest:'~/k6-run/k6-report/.' "$REPORT_DIR/" || echo "가져올 보고서가 없습니다."
 
-      - name: 부하 발생기의 비밀값 파일 지우기
-        if: always()
-        run: ssh loadtest 'rm -f ~/k6-run/.env' || echo "지울 파일이 없거나 접속하지 못했습니다."
-
       - name: 잡 요약에 판정표 남기기
         if: always()
         run: |
@@ -150,9 +262,10 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
-  # 회차가 끝나면 `k6/loadtest/cleanup/<회차>` 태그로 전용 환경을 지운다.
+  # 만들기나 테스트가 실패해도 환경은 지운다. 비밀값 파일(.env)도 환경과 함께 사라진다.
   cleanup:
-    if: startsWith(github.ref_name, 'k6/loadtest/cleanup/')
+    needs: [plan, create, k6-loadtest]
+    if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: loadtest
@@ -160,23 +273,15 @@ jobs:
       contents: read
       id-token: write
     env:
-      REF_NAME: ${{ github.ref_name }}
+      ROUND_ID: ${{ needs.plan.outputs.round_id }}
     steps:
-      - name: 태그에서 회차 읽기
-        run: |
-          set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/loadtest/cleanup/([a-z0-9-]{1,24})$ ]]; then
-            echo "::error::태그 형식이 k6/loadtest/cleanup/<회차>와 맞지 않습니다: $REF_NAME"
-            exit 1
-          fi
-          echo "ROUND_ID=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
-
       - uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
 
       - name: 전용 환경 지우기
+        if: ${{ needs.create.outputs.owns_stack == 'true' }}
         run: |
           set -euo pipefail
           stack="bibbidi-loadtest-$ROUND_ID"
