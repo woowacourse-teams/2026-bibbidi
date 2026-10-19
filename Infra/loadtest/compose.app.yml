@@ -1,0 +1,98 @@
+# 부하 테스트 전용 앱 서버. 운영 compose(BE/compose.prod.yml)에서 TLS·certbot을 뺀 구성이다.
+services:
+  backend:
+    image: "${DOCKERHUB_USERNAME:?}/bibbidi-backend:${IMAGE_TAG:?}"
+    container_name: bibbidi-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.spring
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,loadtest
+      OTEL_SERVICE_NAME: bibbidi-backend
+      OTEL_SERVICE_INSTANCE_ID: bibbidi-backend-loadtest
+      DEPLOYMENT_ENVIRONMENT_NAME: loadtest
+      OTEL_RESOURCE_ATTRIBUTES: service.name=bibbidi-backend,service.instance.id=bibbidi-backend-loadtest,deployment.environment.name=loadtest
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+    ports:
+      - "127.0.0.1:8081:8081"
+    stop_grace_period: 40s
+    mem_limit: 1200m
+    networks:
+      - loadtest
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  nginx:
+    image: nginx:1.31.0-alpine
+    container_name: nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NGINX_API_RATE_LIMIT: ${NGINX_API_RATE_LIMIT:-}
+      NGINX_API_CONN_LIMIT: ${NGINX_API_CONN_LIMIT:-}
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - loadtest
+    mem_limit: 128m
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  alloy:
+    image: grafana/alloy:v1.11.0
+    container_name: alloy
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental
+    environment:
+      DOCKER_HOST_URL: tcp://dockerproxy:2375
+      DEPLOYMENT_ENVIRONMENT_NAME: loadtest
+      MONITORING_INGEST_TOKEN: ${MONITORING_INGEST_TOKEN:?}
+      SERVICE_INSTANCE_ID: bibbidi-backend-loadtest
+    depends_on:
+      - dockerproxy
+    volumes:
+      - ./alloy.config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    networks:
+      - loadtest
+    mem_limit: 256m
+    cpus: 0.50
+
+  dockerproxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: dockerproxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      EVENTS: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - loadtest
+    mem_limit: 64m
+    cpus: 0.25
+
+networks:
+  loadtest:
+
+volumes:
+  alloy_data:
