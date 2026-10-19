@@ -29,7 +29,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([a-z0-9-]{1,24})$ ]]; then
+          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test)/([a-z0-9-]{1,24})$ ]]; then
             echo "::error::태그 형식이 k6/loadtest/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
@@ -58,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -165,7 +165,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -247,7 +247,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
@@ -324,8 +324,8 @@ jobs:
           ssh loadtest "cd ~/k6-run && . ./.env && k6 run -o experimental-prometheus-rw --tag testid=$TEST_ID Infra/k6/$SCRIPT.ts"
           status=$?
           set -e
-          if [ "$status" -eq 99 ] && [[ "$SCRIPT" == breakpoint-* ]]; then
-            echo "임계값 중단은 Breakpoint의 정상 결과입니다."
+          if [ "$status" -eq 99 ] && [ "$SCRIPT" = saturation-test ]; then
+            echo "임계값 중단은 포화 시험(saturation-test)의 정상 결과입니다. 중단된 단계가 포화점입니다."
             exit 0
           fi
           exit "$status"
@@ -352,6 +352,18 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
+      # k6 임계값으로는 구간끼리의 비율을 판정할 수 없어서, ai-isolation-test가 내보낸 판정 파일로 잡의 성패를 정한다.
+      # 파일이 없거나 비율을 구하지 못했으면(구간에 요청이 없음) 실패로 본다.
+      - name: AI 격리 비율 판정
+        if: ${{ always() && env.SCRIPT == 'ai-isolation-test' }}
+        run: |
+          set -euo pipefail
+          verdict="$REPORT_DIR/verdict.json"
+          test -f "$verdict" || { echo "::error::verdict.json이 없어 AI 격리 비율을 판정하지 못했습니다."; exit 1; }
+          jq -r '"AI 격리 비율(투입 중 ÷ 투입 전 p95): \(.ratio // "측정 불가") (기준 \(.limit)배 이하)"' "$verdict"
+          jq -e '.passed == true' "$verdict" >/dev/null \
+            || { echo "::error::AI 부하가 일반 API를 기준 이상으로 늦췄거나 비율을 측정하지 못했습니다."; exit 1; }
+
   # 만들기나 테스트가 실패해도 환경은 지운다. 비밀값 파일(.env)도 환경과 함께 사라진다.
   cleanup:
     needs: [plan, create, seed, k6-loadtest]
@@ -365,7 +377,7 @@ jobs:
     env:
       ROUND_ID: ${{ needs.plan.outputs.round_id }}
     steps:
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.LOADTEST_AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
