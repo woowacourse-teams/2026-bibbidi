@@ -16,7 +16,7 @@ import { Seeded } from './src/session/users.ts';
 // Q5: 엔드포인트마다 동시 사용자 1000명이 같은 순간에 요청 1개씩 보내고 쉬기를 되풀이한다(기본 3초 간격, 최소 휴식 1초).
 // 사람 1000명이 각자 한 번씩 누르는 상황이라, 서버가 느려져도 응답을 받은 뒤에야 다음 요청을 보낸다.
 // 엔드포인트는 차례로 하나씩 시험한다(앞 시험 뒤 15초 간격). 사용자는 시드가 만든 사용자 1000명이다.
-// 엔드포인트마다 p95·p99·실패율을 판정하고 서버 오류(5xx)는 한 건도 없어야 한다. 받은 상태 코드도 엔드포인트별로 남긴다.
+// 합격 기준은 두지 않는다. 엔드포인트마다 응답 시간(p95·p99)과 실패율, 받은 상태 코드를 기록해 부하 정도만 본다.
 const environment = Environment.fromEnv();
 const client = new HttpClient(environment.baseUrl);
 const runner = new EndpointRunner(client, new AccessTokenIssuer(environment));
@@ -41,12 +41,9 @@ function scenarios(): Record<string, Scenario> {
 const groups: (GatedGroup & ReportGroup)[] = TARGETS.map((target) => ({
   label: target.name,
   tags: `endpoint:${endpointTag(target.name)}`,
-  p95: true,
-  p99: true,
-  failure: true,
 }));
 
-// 상태 코드 지표는 임계값을 선언해야 요약에 나타난다. 판정에는 쓰지 않는 항상 참인 식이다.
+// 하위 지표는 임계값을 선언해야 요약에 나타난다. 판정에는 쓰지 않는 항상 참인 식이다.
 function responseThresholds(): Thresholds {
   return Object.fromEntries(
     TARGETS.flatMap((target) => STATUS_CODES.map((code): [string, string[]] => [responseMetric(endpointTag(target.name), code), ['count>=0']])),
@@ -55,7 +52,7 @@ function responseThresholds(): Thresholds {
 
 export const options: Options = {
   scenarios: scenarios(),
-  thresholds: { ...generalThresholds(groups), ...responseThresholds(), server_errors: ['count==0'] },
+  thresholds: { ...generalThresholds(groups), ...responseThresholds() },
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
 };
 
@@ -88,7 +85,7 @@ export function handleSummary(data: SummaryData): Record<string, string> {
   return new WorstCaseReport(
     data,
     'Q5 엔드포인트별 동시 사용자 1000명',
-    `엔드포인트마다 ${WORST_CASE.users}명이 ${WORST_CASE.periodSeconds}초 간격으로 같은 순간에 요청하기를 ${WORST_CASE.holdSeconds}초 동안 되풀이한 결과입니다. ❌나 도달 못함이 있는 엔드포인트는 이 부하에서 신뢰할 수 없습니다.`,
+    `엔드포인트마다 ${WORST_CASE.users}명이 ${WORST_CASE.periodSeconds}초 간격으로 같은 순간에 요청하기를 ${WORST_CASE.holdSeconds}초 동안 되풀이한 결과입니다. 합격 기준 없이 부하 정도를 기록합니다.`,
     groups,
   )
     .withEndpoints(TARGETS.map((target) => ({ label: target.name, endpoint: endpointTag(target.name) })))

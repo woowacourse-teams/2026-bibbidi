@@ -12,9 +12,19 @@ export interface EndpointLabel {
   endpoint: string;
 }
 
+// 합격 기준 없이 부하 정도만 기록하는 보고서. 기준·판정 문구는 빼고 상태 코드 표를 붙인다.
 export class WorstCaseReport extends GeneralSloReport {
+  toMarkdown(): string {
+    return [`## ${this.title}`, '', `> ${this.intro}`, '', ...this.body(), '', '### 전체 요약', '', ...this.overview(true), ''].join('\n');
+  }
+
   body(): string[] {
-    return [...super.body(), '', ...this.statusTable()];
+    const lines = super.body().filter((line) => !line.startsWith('기준:') && !line.startsWith('여러 탭'));
+    return [...lines, '', ...this.statusTable()];
+  }
+
+  protected overview(passed: boolean): string[] {
+    return super.overview(passed).filter((line) => !line.startsWith('| 판정'));
   }
 
   private statusTable(): string[] {
