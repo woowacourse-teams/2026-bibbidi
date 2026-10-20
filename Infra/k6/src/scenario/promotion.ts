@@ -22,7 +22,7 @@ export interface ScenarioShape {
 // 일반 API 부하의 흐름 4종. 시나리오마다 도착률을 나눠 신규·재방문·카탈로그·토큰 갱신 비율을 맞춘다.
 export class GeneralLoad {
   private readonly test: LoadTest;
-  private readonly newUserSession = new NewUserSession();
+  private readonly newUserSession: NewUserSession;
   private readonly returningUserSession = new ReturningUserSession();
   private readonly catalogBrowseSession = new CatalogBrowseSession();
   private readonly tokenRefreshSession = new TokenRefreshSession();
@@ -38,6 +38,7 @@ export class GeneralLoad {
       chatClient,
     );
     this.test = new LoadTest(apis);
+    this.newUserSession = new NewUserSession(requestTags);
     this.apis = apis;
   }
 
