@@ -1,4 +1,5 @@
 import {
+  CSSProperties,
   RefObject,
   useCallback,
   useEffect,
@@ -7,10 +8,7 @@ import {
   useState,
 } from "react";
 
-const POPOVER_WIDTH = 280;
-const POPOVER_MAX_HEIGHT = 272;
-const POPOVER_MARGIN = 12;
-const POPOVER_GAP = 8;
+import { getPreparationProgressPopoverStyle } from "./getPreparationProgressPopoverStyle";
 
 export function usePreparationProgressPopover(
   onClose: () => void,
@@ -18,7 +16,13 @@ export function usePreparationProgressPopover(
 ) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [position, setPosition] = useState({ left: POPOVER_MARGIN, top: 0 });
+  const listRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>(() =>
+    getPreparationProgressPopoverStyle({ right: 0, top: 0, bottom: 0 }, 0, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }),
+  );
   const closeAndRestoreFocus = useCallback(() => {
     triggerRef.current?.focus();
     onClose();
@@ -26,27 +30,45 @@ export function usePreparationProgressPopover(
 
   useLayoutEffect(() => {
     const updatePosition = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) {
+      const trigger = triggerRef.current;
+      const dialog = dialogRef.current;
+      if (!trigger || !dialog) {
         return;
       }
 
-      const left = Math.max(
-        POPOVER_MARGIN,
-        Math.min(
-          rect.right - POPOVER_WIDTH,
-          window.innerWidth - POPOVER_WIDTH - POPOVER_MARGIN,
-        ),
+      const list = listRef.current;
+      // 높이가 제한된 상태에서도 잘린 내용까지 포함해 필요한 높이를 구한다.
+      const contentHeight =
+        dialog.getBoundingClientRect().height +
+        Math.max(0, dialog.scrollHeight - dialog.clientHeight) +
+        (list ? Math.max(0, list.scrollHeight - list.clientHeight) : 0);
+      const nextStyle = getPreparationProgressPopoverStyle(
+        trigger.getBoundingClientRect(),
+        contentHeight,
+        { width: window.innerWidth, height: window.innerHeight },
       );
-      const top = rect.bottom + POPOVER_GAP;
-      setPosition((current) =>
-        current.left === left && current.top === top ? current : { left, top },
+      setStyle((current) =>
+        current.left === nextStyle.left &&
+        current.top === nextStyle.top &&
+        current.bottom === nextStyle.bottom &&
+        current.width === nextStyle.width &&
+        current.maxHeight === nextStyle.maxHeight
+          ? current
+          : nextStyle,
       );
     };
     updatePosition();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(updatePosition);
+    if (dialogRef.current) observer?.observe(dialogRef.current);
+    if (listRef.current?.firstElementChild)
+      observer?.observe(listRef.current.firstElementChild);
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
@@ -83,10 +105,7 @@ export function usePreparationProgressPopover(
     closeAndRestoreFocus,
     closeRef,
     dialogRef,
-    style: {
-      ...position,
-      width: POPOVER_WIDTH,
-      maxHeight: `min(${POPOVER_MAX_HEIGHT}px, calc(100dvh - ${position.top + POPOVER_MARGIN}px))`,
-    },
+    listRef,
+    style,
   };
 }

@@ -17,7 +17,7 @@ export function PreparationProgressPopover({
   progress,
   triggerRef,
 }: PreparationProgressPopoverProps) {
-  const { closeAndRestoreFocus, closeRef, dialogRef, style } =
+  const { closeAndRestoreFocus, closeRef, dialogRef, listRef, style } =
     usePreparationProgressPopover(onClose, triggerRef);
 
   return (
@@ -44,6 +44,7 @@ export function PreparationProgressPopover({
       <div
         aria-label="카테고리별 준비 현황"
         className="preparation-progress-popover__list"
+        ref={listRef}
         role="region"
         // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 긴 카테고리 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
         tabIndex={0}
