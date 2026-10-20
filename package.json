@@ -8,10 +8,6 @@
     "pnpm": ">=11 <12"
   },
   "scripts": {
-    "app": "pnpm --filter @bibbidi/app start",
-    "app:android": "pnpm --filter @bibbidi/app android",
-    "app:web": "pnpm --filter @bibbidi/app web",
-    "app:typecheck": "pnpm --filter @bibbidi/app typecheck",
     "web": "pnpm --filter bibbidi-fe dev",
     "web:build": "pnpm --filter bibbidi-fe build"
   }

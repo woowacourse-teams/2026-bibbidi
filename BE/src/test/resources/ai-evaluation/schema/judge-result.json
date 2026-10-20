@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "scenarioName": { "type": "string" },
+    "metricType": { "type": "string" },
+    "status": { "type": "string", "enum": ["scored", "unscorable"] },
+    "score": { "type": ["integer", "null"] },
+    "reason": { "type": "string" }
+  },
+  "required": ["scenarioName", "metricType", "status", "score", "reason"],
+  "additionalProperties": false
+}

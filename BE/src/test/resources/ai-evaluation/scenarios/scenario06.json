@@ -1,0 +1,11 @@
+{
+  "name": "scenario06",
+  "metrics": [
+    "Completeness",
+    "Coherence"
+  ],
+  "userMessage": "예식은 소규모로 하고 싶고 예산도 빠듯하며 아직 지역을 못 정했어요. 우선 준비할 항목 세 개를 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "소규모 예식의 '예식 형태 결정', 예산의 '총예산 수립', 지역의 '예식 지역 결정'을 모두 다룬다.",
+  "expectedRefusal": "none"
+}

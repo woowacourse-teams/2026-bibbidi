@@ -1,62 +1,34 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# local AI tools
-.claude/
-AGENTS.md
-CLAUDE.md
-
-# local editor settings
-.vscode/
-
-# Native
+# Gradle / local SDK settings
+.gradle/
 .kotlin/
-*.orig.*
+**/build/
+local.properties
+
+# Xcode local state and build output
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Signing material (managed through GitHub Secrets)
 *.jks
 *.keystore
 *.p8
 *.p12
 *.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
 *.pem
-credentials.json
-/credentials/
+*.mobileprovision
 keystore.properties
+credentials.json
 
-# local env files
+# Local tooling and environment
+.claude/
+.vscode/
 .env*
 !.env.example
+.DS_Store
 
-# typescript
-*.tsbuildinfo
-
-# test output
-coverage/
-
-# Android release artifacts copied outside build directories
+# Release artifacts
 *.apk
 *.aab
 mapping.txt
 native-debug-symbols.zip
-
-# iOS is generated. Android is versioned so the team shares the same Gradle setup.
-/ios

@@ -1,0 +1,61 @@
+name: 비비디 워크플로 실패 알리미
+
+on:
+  workflow_run:
+    workflows:
+      - 비비디 AI 리뷰 실행
+      - Android Release AAB
+      - 비비디 백엔드 개발 CD
+      - 비비디 백엔드 운영 CD
+      - 비비디 백엔드 CI
+      - Frontend CI
+      - 비비디 k6 태그 정리
+      - 비비디 부하 테스트
+      - PR 알리미
+      - PR 코드리뷰 리마인더
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: workflow-failure-alert-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: 실패한 워크플로를 Discord에 알림
+    if: contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 기본 브랜치의 알림 코드 체크아웃
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: 실패한 워크플로를 Discord로 알림
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_GITHUB_ACTION: ${{ secrets.DISCORD_WEBHOOK_GITHUB_ACTION }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          PULL_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: node --experimental-strip-types .github/workflow-alert/cli.ts

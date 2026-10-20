@@ -3,11 +3,11 @@ package com.bibbidi.wedding.checklist.controller;
 import com.bibbidi.wedding.checklist.controller.dto.resp.ChecklistItemResponse;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
-import com.bibbidi.wedding.common.auth.Auth;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +28,7 @@ public class ChecklistItemController {
 
     @GetMapping("/api/checklist-items/{itemId}/remaining-appointments")
     public boolean hasRemainingAppointments(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long itemId
     ) {
         return checklistService.hasRemainingAppointments(userId, itemId);
@@ -36,7 +36,7 @@ public class ChecklistItemController {
 
     @PutMapping("/api/checklist-items/{itemId}/category")
     public ChecklistItemResponse changeCategory(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long itemId,
             @Valid @RequestBody @NotNull(message = "카테고리를 선택해야 합니다.") Long categoryId
     ) {
@@ -47,7 +47,7 @@ public class ChecklistItemController {
 
     @PutMapping("/api/checklist-items/{itemId}/title")
     public ChecklistItemResponse changeTitle(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long itemId,
             @Valid
             @RequestBody
@@ -67,7 +67,7 @@ public class ChecklistItemController {
 
     @PutMapping("/api/checklist-items/{itemId}/status")
     public ChecklistItemResponse changeStatus(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long itemId,
             @Valid @RequestBody @NotNull(message = "할 일 상태를 선택해야 합니다.") String status
     ) {
@@ -79,7 +79,7 @@ public class ChecklistItemController {
     @DeleteMapping("/api/checklist-items/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
-            @Auth Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @PathVariable Long itemId
     ) {
         checklistService.deleteItem(userId, itemId);
