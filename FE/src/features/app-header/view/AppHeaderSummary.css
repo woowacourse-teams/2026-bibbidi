@@ -102,7 +102,33 @@
 }
 
 .app-header-summary__progress-ring .app-header-summary__progress-range {
-  stroke: var(--color-bg-brand-solid);
+  stroke: var(--color-palette-coral-muted);
+}
+
+.app-header-summary__progress {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-header-summary__progress-chevron {
+  width: 16px;
+  height: 16px;
+  margin-left: 12px;
+  fill: none;
+  stroke: var(--color-fg-neutral-muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-header-summary__progress[aria-expanded="true"]
+  .app-header-summary__progress-chevron {
+  transform: rotate(180deg);
 }
 
 @media (max-width: 760px) {
@@ -125,6 +151,15 @@
   .app-header-summary__d-day,
   .app-header-summary__progress {
     gap: 4px;
+  }
+
+  .app-header-summary__progress {
+    min-height: 36px;
+    padding: 6px;
+  }
+
+  .app-header-summary__progress-chevron {
+    display: none;
   }
 
   .app-header-summary__progress-ring {

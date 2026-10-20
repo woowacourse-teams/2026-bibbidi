@@ -1,5 +1,11 @@
 import { StrictMode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repositoryMocks = vi.hoisted(() => ({
@@ -35,7 +41,14 @@ import {
 } from "./repository/weddingDateRepository";
 import { AppHeaderSummaryFeature } from "./AppHeaderSummaryFeature";
 
-const summary = { completedTaskCount: 2, totalTaskCount: 3 };
+const summary = {
+  categories: [
+    { id: "1", title: "웨딩홀", completedTaskCount: 2, totalTaskCount: 3 },
+    { id: "2", title: "스드메", completedTaskCount: 0, totalTaskCount: 0 },
+  ],
+  completedTaskCount: 2,
+  totalTaskCount: 3,
+};
 
 beforeEach(() => {
   repositoryMocks.checklistRevision = 0;
@@ -45,6 +58,154 @@ beforeEach(() => {
 });
 
 describe("AppHeaderSummaryFeature", () => {
+  it("완료율을 열면 실제 순서와 빈 카테고리를 표시하고 재클릭으로 닫는다", async () => {
+    render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
+    const trigger = await screen.findByRole("button", {
+      name: /카테고리별 완료율 보기/,
+    });
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "카테고리별 완료율" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(within(dialog).getByText("전체 2/3개 완료 · 67%")).toBeTruthy();
+    expect(
+      within(dialog)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["웨딩홀67%2/3", "스드메0%0/0"]);
+    expect(
+      within(dialog)
+        .getByRole("progressbar", { name: "웨딩홀 완료율" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("67");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it.each(["Escape", "닫기", "바깥 영역"])(
+    "%s로 완료율 팝오버를 닫는다",
+    async (method) => {
+      render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
+      const trigger = await screen.findByRole("button", {
+        name: /카테고리별 완료율 보기/,
+      });
+      fireEvent.click(trigger);
+      const close = screen.getByRole("button", { name: "완료율 팝오버 닫기" });
+      expect(document.activeElement).toBe(close);
+      if (method === "Escape") {
+        trigger.focus();
+        fireEvent.keyDown(trigger, { key: "Escape" });
+      } else if (method === "닫기") {
+        fireEvent.click(close);
+      } else {
+        fireEvent.pointerDown(document.body);
+      }
+      expect(screen.queryByRole("dialog")).toBeNull();
+      if (method !== "바깥 영역") {
+        expect(document.activeElement).toBe(trigger);
+      }
+    },
+  );
+
+  it("체크리스트 변경 시 열린 팝오버와 전체 완료율을 함께 갱신한다", async () => {
+    const onAuthenticationRequired = vi.fn();
+    const { rerender } = render(
+      <AppHeaderSummaryFeature
+        onAuthenticationRequired={onAuthenticationRequired}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
+    );
+    repositoryMocks.getSummary.mockResolvedValue({
+      ...summary,
+      completedTaskCount: 3,
+      categories: [
+        { ...summary.categories[0], completedTaskCount: 3 },
+        summary.categories[1],
+      ],
+    });
+    repositoryMocks.checklistRevision = 1;
+    rerender(
+      <AppHeaderSummaryFeature
+        onAuthenticationRequired={onAuthenticationRequired}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "카테고리별 완료율" });
+    expect(
+      await within(dialog).findByText("전체 3/3개 완료 · 100%"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /전체 완료율 100%/ }),
+    ).toBeTruthy();
+  });
+
+  it("완료율 재조회 실패 후 복구돼도 팝오버를 자동으로 다시 열지 않는다", async () => {
+    const onAuthenticationRequired = vi.fn();
+    const { rerender } = render(
+      <AppHeaderSummaryFeature
+        onAuthenticationRequired={onAuthenticationRequired}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
+    );
+    repositoryMocks.getSummary.mockRejectedValueOnce(
+      new AppHeaderSummaryLoadError(),
+    );
+    repositoryMocks.checklistRevision = 1;
+    rerender(
+      <AppHeaderSummaryFeature
+        onAuthenticationRequired={onAuthenticationRequired}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /카테고리별 완료율 보기/ }),
+      ).toBeNull(),
+    );
+
+    repositoryMocks.checklistRevision = 2;
+    rerender(
+      <AppHeaderSummaryFeature
+        onAuthenticationRequired={onAuthenticationRequired}
+      />,
+    );
+    const trigger = await screen.findByRole("button", {
+      name: /카테고리별 완료율 보기/,
+    });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
+    ).toBeNull();
+  });
+
+  it("날짜 팝오버와 완료율 팝오버를 한 번에 하나만 연다", async () => {
+    render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
+    const progress = await screen.findByRole("button", {
+      name: /카테고리별 완료율 보기/,
+    });
+    const weddingDate = await screen.findByRole("button", {
+      name: /결혼 예정일 설정/,
+    });
+    fireEvent.click(progress);
+    fireEvent.click(weddingDate);
+    expect(
+      screen.getByRole("dialog", { name: "결혼 예정일 설정" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
+    ).toBeNull();
+    fireEvent.click(progress);
+    expect(
+      screen.getByRole("dialog", { name: "카테고리별 완료율" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("dialog", { name: "결혼 예정일 설정" }),
+    ).toBeNull();
+  });
+
   it("결혼 일자 미설정 안내를 브랜드 색상 상태로 표시한다", async () => {
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
 

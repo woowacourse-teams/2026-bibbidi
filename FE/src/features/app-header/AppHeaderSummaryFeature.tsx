@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   useAppHeaderChecklistRevision,
@@ -25,6 +25,11 @@ export function AppHeaderSummaryFeature({
   const weddingDateRepository = useWeddingDateRepository();
   const checklistRevision = useAppHeaderChecklistRevision();
   const [summary, setSummary] = useState<AppHeaderSummaryModel | null>(null);
+  const [isProgressPopoverOpen, setIsProgressPopoverOpen] = useState(false);
+  const closeProgressPopover = useCallback(
+    () => setIsProgressPopoverOpen(false),
+    [],
+  );
   const weddingDate = useWeddingDate({
     onAuthenticationRequired,
     repository: weddingDateRepository,
@@ -47,6 +52,7 @@ export function AppHeaderSummaryFeature({
         }
 
         setSummary(null);
+        setIsProgressPopoverOpen(false);
         if (error instanceof AppHeaderAuthenticationRequiredError) {
           onAuthenticationRequired();
         }
@@ -66,11 +72,20 @@ export function AppHeaderSummaryFeature({
   return (
     <AppHeaderSummary
       isPopoverOpen={weddingDate.isPopoverOpen}
+      isProgressPopoverOpen={isProgressPopoverOpen}
       isSaving={weddingDate.isSaving}
       onClosePopover={weddingDate.closePopover}
-      onOpenPopover={weddingDate.openPopover}
+      onCloseProgressPopover={closeProgressPopover}
+      onOpenPopover={() => {
+        closeProgressPopover();
+        weddingDate.openPopover();
+      }}
       onRetryWeddingDate={weddingDate.retryLoad}
       onSaveWeddingDate={weddingDate.save}
+      onToggleProgressPopover={() => {
+        weddingDate.closePopover();
+        setIsProgressPopoverOpen((open) => !open);
+      }}
       saveError={weddingDate.saveError}
       viewModel={viewModel}
       weddingDate={weddingDate.currentDate}

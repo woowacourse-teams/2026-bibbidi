@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createAppHeaderSummaryViewModel } from "./createAppHeaderSummaryViewModel";
 
-const progress = { completedTaskCount: 2, totalTaskCount: 4 };
+const progress = { categories: [], completedTaskCount: 2, totalTaskCount: 4 };
 const today = new Date(2027, 4, 15, 23, 59);
 
 describe("createAppHeaderSummaryViewModel", () => {

@@ -1,7 +1,7 @@
 import {
-  MyChecklistAuthenticationRequiredError,
-  MyChecklistQueryRepository,
-  MyChecklistRequestAbortedError,
+  ChecklistQueryAuthenticationRequiredError,
+  ChecklistQueryRepository,
+  ChecklistQueryRequestAbortedError,
 } from "../../checklist";
 import {
   AppHeaderSummaryModel,
@@ -34,20 +34,23 @@ export class AppHeaderSummaryRequestAbortedError extends Error {
 }
 
 export function createAppHeaderSummaryRepository(
-  checklistRepository: MyChecklistQueryRepository,
+  checklistRepository: ChecklistQueryRepository,
 ): AppHeaderSummaryRepository {
   return {
     async getSummary(signal) {
       try {
-        const checklist = await checklistRepository.getChecklist(signal);
+        const checklist = await checklistRepository.getChecklist(
+          "authenticated",
+          signal,
+        );
 
-        return createAppHeaderSummaryModel(checklist.items);
+        return createAppHeaderSummaryModel(checklist);
       } catch (error) {
-        if (error instanceof MyChecklistAuthenticationRequiredError) {
+        if (error instanceof ChecklistQueryAuthenticationRequiredError) {
           throw new AppHeaderAuthenticationRequiredError({ cause: error });
         }
 
-        if (error instanceof MyChecklistRequestAbortedError) {
+        if (error instanceof ChecklistQueryRequestAbortedError) {
           throw new AppHeaderSummaryRequestAbortedError({ cause: error });
         }
 

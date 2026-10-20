@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 
 import {
-  useMyChecklistQueryRepository,
+  useChecklistQueryRepository,
   useMyChecklistRevision,
 } from "../checklist";
 import { createAppHeaderSummaryRepository } from "./repository/appHeaderSummaryRepository";
 import { createWeddingDateRepository } from "./repository/weddingDateRepository";
 
 export function useAppHeaderSummaryRepository() {
-  const checklistRepository = useMyChecklistQueryRepository();
+  const checklistRepository = useChecklistQueryRepository();
 
   return useMemo(
     () => createAppHeaderSummaryRepository(checklistRepository),

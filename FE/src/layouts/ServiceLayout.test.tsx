@@ -119,6 +119,14 @@ describe("ServiceLayout", () => {
         );
       }
 
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
       if (url === "/api/users/me/wedding-date") {
         return Promise.resolve(
           new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
@@ -385,6 +393,14 @@ describe("ServiceLayout", () => {
         );
       }
 
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
+            status: 200,
+          }),
+        );
+      }
+
       if (url === "/api/users/me/wedding-date") {
         return Promise.resolve(
           new Response(JSON.stringify({ weddingDate: null }), { status: 200 }),
@@ -416,6 +432,18 @@ describe("ServiceLayout", () => {
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(await screen.findByText("67%")).toBeTruthy();
     expect(screen.getByText("2/3")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: /카테고리별 완료율 보기/ }),
+    );
+    const progressDialog = screen.getByRole("dialog", {
+      name: "카테고리별 완료율",
+    });
+    expect(
+      within(progressDialog)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["첫 번째 카테고리67%2/3", "두 번째 카테고리0%0/0"]);
+
     expect(screen.queryByRole("link", { name: "로그인" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/checklists/me",
