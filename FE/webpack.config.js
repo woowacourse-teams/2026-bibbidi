@@ -95,7 +95,7 @@ module.exports = (_environment, arguments_) => {
           ],
         },
         {
-          test: /\.(png|jpe?g|gif|svg)$/i,
+          test: /\.(png|jpe?g|gif|svg|webp|woff2)$/i,
           type: "asset/resource",
           generator: {
             filename: "assets/[name].[contenthash:8][ext][query]",
@@ -106,7 +106,7 @@ module.exports = (_environment, arguments_) => {
 
     plugins: [
       new HtmlWebpackPlugin({
-        favicon: "./src/assets/bibbidi-favicon.png",
+        favicon: "./src/assets/bibbidi-favicon-48.png",
         siteOrigin: getSiteOrigin(),
         template: "./public/index.html",
         minify: isProduction,

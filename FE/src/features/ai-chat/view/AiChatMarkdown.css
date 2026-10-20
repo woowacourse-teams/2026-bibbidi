@@ -1,0 +1,97 @@
+.ai-chat__markdown :is(p, ul, ol, blockquote, pre) {
+  margin: 12px 0;
+}
+
+.ai-chat__markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.ai-chat__markdown h1 {
+  font-size: 20px;
+}
+
+.ai-chat__markdown h2 {
+  font-size: 18px;
+}
+
+.ai-chat__markdown :is(ul, ol) {
+  padding-left: 24px;
+}
+
+.ai-chat__markdown li > :is(p, ul, ol) {
+  margin: 4px 0;
+}
+
+.ai-chat__markdown .task-list-item {
+  list-style: none;
+}
+
+.ai-chat__markdown input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--color-fg-brand);
+}
+
+.ai-chat__markdown a {
+  color: var(--color-fg-brand);
+  text-underline-offset: 3px;
+}
+
+.ai-chat__markdown blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--color-stroke-neutral-weak);
+  color: var(--color-fg-neutral-muted);
+}
+
+.ai-chat__markdown code {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: var(--color-bg-layer-basement);
+  font-size: 0.9em;
+}
+
+.ai-chat__markdown pre {
+  max-width: 100%;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--color-bg-layer-basement);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.ai-chat__markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.ai-chat__table-scroll {
+  max-width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.ai-chat__markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.ai-chat__markdown :is(th, td) {
+  padding: 8px 12px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.ai-chat__markdown th {
+  background: var(--color-bg-layer-basement);
+}
+
+.ai-chat__markdown > :first-child {
+  margin-top: 0;
+}
+
+.ai-chat__markdown > :last-child {
+  margin-bottom: 0;
+}

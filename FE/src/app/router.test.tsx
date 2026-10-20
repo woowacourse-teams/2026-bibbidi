@@ -102,6 +102,37 @@ afterEach(() => {
 });
 
 describe("appRoutes", () => {
+  it.each([401, 200])(
+    "인증 응답 %s에서도 랜딩을 독립 화면으로 표시하고 시작 버튼을 준비 목록으로 연결한다",
+    async (status) => {
+      installFetch(
+        new Response(
+          JSON.stringify(
+            status === 200
+              ? { id: 1, nickname: "bibbidi" }
+              : { errorCode: 201, message: "로그인이 필요합니다." },
+          ),
+          { status },
+        ),
+      );
+      const router = renderRouter(["/landing"]);
+      expect(
+        await screen.findByRole("main", { name: "비비디 서비스 소개" }),
+      ).toBeTruthy();
+      expect(router.state.location.pathname).toBe("/landing");
+      expect(
+        screen.queryByRole("navigation", { name: "주요 메뉴" }),
+      ).toBeNull();
+      fireEvent.click(
+        screen.getAllByRole("link", { name: /준비 시작하기/ })[0],
+      );
+      expect(
+        await screen.findByRole("main", { name: "준비 목록" }),
+      ).toBeTruthy();
+      expect(router.state.location.pathname).toBe("/preparation");
+    },
+  );
+
   it("회원가입 주소는 로그인 화면으로 이동한다", async () => {
     installFetch(
       new Response(
@@ -311,7 +342,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -362,7 +393,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -379,7 +410,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -395,7 +426,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
@@ -458,7 +489,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 · 전체 단계",
       }),
     ).toBeTruthy();
     expect(screen.getByRole("main", { name: "준비 목록" })).toBeTruthy();
@@ -509,7 +540,7 @@ describe("appRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "로드맵에서 필요한 일만, 내 체크리스트에",
+        name: "첫 번째 카테고리 · 전체 단계",
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/preparation");
@@ -534,7 +565,7 @@ describe("appRoutes", () => {
 
       expect(
         await screen.findByRole("heading", {
-          name: "로드맵에서 필요한 일만, 내 체크리스트에",
+          name: "첫 번째 카테고리 · 전체 단계",
         }),
       ).toBeTruthy();
       expect(router.state.location.pathname).toBe("/");

@@ -1,7 +1,10 @@
 import { ReactNode, useEffect, useId, useRef } from "react";
 
 import "./ChecklistModalDialog.css";
-import { containTabFocus, focusFirstElement } from "./containTabFocus";
+import {
+  containTabFocus,
+  focusFirstElement,
+} from "../../../shared/focus/containTabFocus";
 
 interface ChecklistModalDialogProps {
   actions: ReactNode;

@@ -8,9 +8,9 @@ import { preparationCatalogFixture } from "../preparation/test/fixtures/preparat
 import { GuestRecommendedTasksFeature } from "./GuestRecommendedTasksFeature";
 
 vi.mock("../catalog", () => ({ catalogRepository: { getCatalog: vi.fn() } }));
-vi.mock("../preparation", () => ({
+vi.mock("../preparation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../preparation")>()),
   usePreparationChecklistRepository: vi.fn(),
-  PreparationAuthenticationRequiredError: class extends Error {},
 }));
 vi.mock("../../infrastructure/analytics", () => ({
   analytics: { track: vi.fn() },

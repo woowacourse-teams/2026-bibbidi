@@ -2,7 +2,10 @@ import { useCallback } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
-import { usePreparationChecklistRepository } from "../preparation";
+import {
+  usePreparationChecklistRepository,
+  useCatalogTaskAddition,
+} from "../preparation";
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import { recommendedCatalogItemsRepository } from "./homeDependencies";
 import type { RecommendedCatalogItemsRepository } from "./repository/recommendedCatalogItemsRepository";
@@ -10,7 +13,6 @@ import {
   createCalendarPlanningModel,
   getLocalDate,
 } from "./model/calendarPlanning";
-import { useRecommendedTaskAddition } from "./useRecommendedTaskAddition";
 import { useCalendarPlanningData } from "./useCalendarPlanningData";
 import { useCalendarDateAssignment } from "./useCalendarDateAssignment";
 import { createRecommendedScheduleViewModel } from "./view-model/createRecommendedScheduleViewModel";
@@ -106,7 +108,7 @@ function CalendarPlanningFeature({
     },
     [recommended, refreshChecklist, refreshRecommended],
   );
-  const addition = useRecommendedTaskAddition({
+  const addition = useCatalogTaskAddition({
     authScope: audience ?? authState.status,
     isAuthenticated: audience === "authenticated",
     onAuthenticationRequired: refreshAuth,

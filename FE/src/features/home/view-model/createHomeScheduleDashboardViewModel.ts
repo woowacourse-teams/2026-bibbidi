@@ -3,7 +3,7 @@ import type {
   HomeScheduleDashboardRecommendedModel,
   HomeScheduleDashboardUnscheduledModel,
 } from "../model/homeScheduleDashboard";
-import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
+import type { CatalogTaskAdditionState } from "../../preparation/model/catalogTaskAddition";
 import {
   createRecommendedScheduleViewModel,
   RecommendedScheduleViewModel,
@@ -126,7 +126,7 @@ function createUnscheduledViewModel(
 
 function createRecommendedViewModel(
   model: HomeScheduleDashboardRecommendedModel,
-  addition: RecommendedTaskAdditionState,
+  addition: CatalogTaskAdditionState,
 ): HomeScheduleDashboardRecommendedViewModel {
   switch (model.status) {
     case "loading":
@@ -176,7 +176,7 @@ function assertNever(value: never): never {
 export function createHomeScheduleDashboardViewModel(
   model: HomeScheduleDashboardModel,
   options: {
-    recommendedTaskAddition?: RecommendedTaskAdditionState;
+    recommendedTaskAddition?: CatalogTaskAdditionState;
   } = {},
 ): HomeScheduleDashboardViewModel {
   const recommendedTaskAddition = options.recommendedTaskAddition ?? {

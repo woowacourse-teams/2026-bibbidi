@@ -7,7 +7,7 @@ import {
 } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistModalDialog } from "./ChecklistModalDialog";
-import { containTabFocus } from "./containTabFocus";
+import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import "./ChecklistTaskCreation.css";
 
 interface ChecklistTaskCreationProps {

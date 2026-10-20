@@ -24,3 +24,11 @@
   line-height: 1;
   letter-spacing: -0.045em;
 }
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("../../assets/fonts/nunito-brand-900.woff2") format("woff2");
+  unicode-range: U+62, U+64, U+69;
+}
