@@ -1,0 +1,6 @@
+-- 개발 서버의 인메모리 H2가 시작될 때마다 테스트 사용자 네 명을 만든다.
+INSERT INTO users (nickname, status, role, created_at, updated_at) VALUES
+('보예', 'PENDING', 'NORMAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('티뉴', 'PENDING', 'NORMAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('바드', 'PENDING', 'NORMAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('라티', 'PENDING', 'NORMAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

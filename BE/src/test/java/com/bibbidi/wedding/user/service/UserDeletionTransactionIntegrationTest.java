@@ -6,19 +6,21 @@ import static org.mockito.BDDMockito.willThrow;
 
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaAppointmentRepository;
-import com.bibbidi.wedding.auth.password.PasswordHasher;
-import com.bibbidi.wedding.auth.service.AuthService;
+import com.bibbidi.wedding.common.domain.UserRole;
+import com.bibbidi.wedding.common.domain.UserStatus;
 import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.bibbidi.wedding.user.persistence.JpaUserEntity;
 import com.bibbidi.wedding.user.persistence.JpaUserRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
@@ -27,15 +29,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class UserDeletionTransactionIntegrationTest {
 
-    private static final String PASSWORD = "wish";
-
     @Autowired
-    private AuthService authService;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
+    private UserService userService;
 
     @Autowired
     private JpaUserRepository jpaUserRepository;
@@ -61,7 +59,7 @@ class UserDeletionTransactionIntegrationTest {
     @DisplayName("체크리스트 삭제 중 실패하면 먼저 삭제한 일정과 할 일도 모두 롤백한다")
     void shouldRollbackAllDeletedDataWhenDeletionFails() {
         JpaUserEntity user = jpaUserRepository.saveAndFlush(
-                new JpaUserEntity(null, "bibbidi", passwordHasher.hash(PASSWORD), null)
+                new JpaUserEntity(null, "bibbidi", UserStatus.ACTIVE, UserRole.NORMAL, null, null)
         );
         JpaChecklistEntity checklist = jpaChecklistRepository.saveAndFlush(
                 new JpaChecklistEntity(null, user.id())
@@ -94,7 +92,7 @@ class UserDeletionTransactionIntegrationTest {
                 .given(jpaChecklistRepository)
                 .deleteByChecklistId(checklist.id());
 
-        assertThatThrownBy(() -> authService.deleteUser(user.id(), PASSWORD))
+        assertThatThrownBy(() -> userService.delete(user.id()))
                 .isInstanceOf(DataAccessException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("checklist deletion failed");

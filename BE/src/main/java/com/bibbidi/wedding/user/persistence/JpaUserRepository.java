@@ -14,6 +14,12 @@ public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
 
     Optional<JpaUserEntity> findByNicknameIgnoreCase(String nickname);
 
+    Optional<JpaUserEntity> findByNicknameIgnoreCaseAndPasswordHashIsNotNull(String nickname);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE JpaUserEntity user SET user.passwordHash = NULL WHERE user.id = :userId")
+    int removePasswordHashByUserId(@Param("userId") Long userId);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM JpaUserEntity user WHERE user.id = :userId")
     int deleteByUserId(@Param("userId") Long userId);

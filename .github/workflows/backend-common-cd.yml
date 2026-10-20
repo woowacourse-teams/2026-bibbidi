@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build-and-push:
@@ -40,17 +41,46 @@ jobs:
     steps:
       - name: 배포 백엔드 소스 코드 체크아웃
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.image-tag }}
+
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: 같은 소스로 PR CI가 만든 JAR 찾기
+        id: ci-artifact
+        working-directory: .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types .github/be-cd-jobs/ci-artifact-cli.ts find
+
+      - name: PR CI가 테스트를 통과시킨 JAR 내려받기
+        if: steps.ci-artifact.outputs.artifact-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.ci-artifact.outputs.artifact-id }}
+          run-id: ${{ steps.ci-artifact.outputs.run-id }}
+          github-token: ${{ github.token }}
+          path: BE/build/libs
+          merge-multiple: true
 
       - name: Corretto JDK 버전 25 설정
+        if: steps.ci-artifact.outputs.artifact-id == ''
         uses: actions/setup-java@v6
         with:
           distribution: corretto
           java-version: "25"
 
-      - name: Gradle 실행 환경과 의존성 캐시 설정
+      - name: Gradle 실행 환경과 빌드 결과 캐시 설정
+        if: steps.ci-artifact.outputs.artifact-id == ''
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
 
-      - name: Gradle clean build로 테스트와 빌드 실행
+      - name: 재사용할 JAR가 없으면 Gradle clean build로 테스트와 빌드 실행
+        if: steps.ci-artifact.outputs.artifact-id == ''
         run: ./gradlew clean build
 
       - name: Docker Hub 로그인
@@ -69,7 +99,11 @@ jobs:
           file: ./BE/Dockerfile
           push: true
           platforms: linux/arm64
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-${{ inputs.deployment-name }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:buildcache-${{ inputs.deployment-name }}
+          cache-to: type=inline
 
   deploy:
     needs: build-and-push
@@ -103,6 +137,17 @@ jobs:
       - name: 커밋 SHA 태그의 배포 이미지 존재 확인
         run: docker manifest inspect "${{ secrets.DOCKERHUB_USERNAME }}/bibbidi-backend:${{ inputs.image-tag }}" >/dev/null
 
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: Alloy 설정 문법과 참조 검증
+        run: >
+          docker run --rm
+          -v "$PWD/Infra/monitoring/grafana/alloy/config.alloy:/etc/alloy/config.alloy:ro"
+          grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
+
       - name: Compose와 nginx·Alloy·환경 파일 설치
         env:
           SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
@@ -117,7 +162,7 @@ jobs:
           install -d -m 0755 /opt/bibbidi/app/infra/nginx
           install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
           install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
-          install -m 0644 Infra/monitoring/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
+          install -m 0644 Infra/monitoring/grafana/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
           umask 077
           printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
@@ -133,11 +178,19 @@ jobs:
           set -a
           . /opt/bibbidi/app/.env.nginx
           set +a
-          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT}' \
+          test -n "$ONLY_DEVELOPER_ALLOWED_IP"
+          if [ '${{ inputs.deployment-name }}' = production ]; then
+            export NGINX_API_RATE_LIMIT='limit_req zone=per_ip_api burst=60 nodelay;'
+            export NGINX_API_CONN_LIMIT='limit_conn per_ip_conn 40;'
+          else
+            export NGINX_API_RATE_LIMIT=''
+            export NGINX_API_CONN_LIMIT=''
+          fi
+          envsubst '${SERVER_NAME} ${CERT_DOMAIN} ${NGINX_ALLOWED_ORIGIN} ${NGINX_ALLOWED_ORIGIN_ALT} ${ONLY_DEVELOPER_ALLOWED_IP} ${NGINX_API_RATE_LIMIT} ${NGINX_API_CONN_LIMIT}' \
             < /opt/bibbidi/app/infra/nginx/nginx.conf.template \
             > /opt/bibbidi/app/infra/nginx/nginx.conf
           test -s /opt/bibbidi/app/infra/nginx/nginx.conf
-          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT)\}' \
+          ! grep -Eq '\$\{(SERVER_NAME|CERT_DOMAIN|NGINX_ALLOWED_ORIGIN|NGINX_ALLOWED_ORIGIN_ALT|ONLY_DEVELOPER_ALLOWED_IP)\}' \
             /opt/bibbidi/app/infra/nginx/nginx.conf
 
       - name: nginx 기동을 위한 TLS 인증서 초기화
@@ -153,17 +206,13 @@ jobs:
         run: |
           set -euo pipefail
           cd /opt/bibbidi/app
+          export ALLOY_CONFIG_SHA=$(sha256sum "$ALLOY_CONFIG_PATH" | cut -c1-16)
+          set -a
+          . "$ALLOY_ENV_FILE"
+          set +a
 
           PREVIOUS_IMAGE=$(docker inspect -f '{{.Config.Image}}' bibbidi-backend 2>/dev/null || true)
-
-          rollback() {
-            if [ -z "$PREVIOUS_IMAGE" ]; then
-              echo "::error::deploy failed and no previous image is available to roll back to"
-              return
-            fi
-            echo "::error::deploy failed - rolling back backend to $PREVIOUS_IMAGE"
-            IMAGE_TAG="${PREVIOUS_IMAGE##*:}" docker compose up -d --force-recreate backend || true
-          }
+          export PREVIOUS_IMAGE
 
           docker compose config >/dev/null
           docker compose pull backend nginx alloy dockerproxy
@@ -171,26 +220,7 @@ jobs:
           docker exec nginx nginx -t
           docker exec nginx nginx -s reload
 
-          if ! curl \
-            --fail \
-            --silent \
-            --show-error \
-            --retry 60 \
-            --retry-delay 2 \
-            --retry-connrefused \
-            --retry-all-errors \
-            http://127.0.0.1:8080/actuator/health \
-            | grep --quiet '"status":"UP"'; then
-            docker compose logs --tail=200 backend nginx alloy
-            rollback
-            exit 1
-          fi
-
-          if ! curl --fail --silent http://127.0.0.1/healthz >/dev/null; then
-            docker compose logs --tail=200 nginx alloy
-            rollback
-            exit 1
-          fi
+          node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/deploy-health.ts"
 
       - name: Let's Encrypt TLS 인증서 발급 또는 갱신
         id: tls_issue
@@ -200,14 +230,11 @@ jobs:
       - name: TLS 인증서 발급 실패를 Discord로 알림
         if: steps.tls_issue.outcome == 'failure'
         env:
-          DISCORD_WEBHOOK_BE: ${{ secrets.DISCORD_WEBHOOK_BE }}
-        run: |
-          echo "::warning::TLS issue/renew failed for ${{ inputs.deployment-name }}"
-          if [ -n "${DISCORD_WEBHOOK_BE:-}" ]; then
-            curl -fsS -H 'Content-Type: application/json' \
-              -d '{"content":"Bibbidi ${{ inputs.deployment-name }}: TLS certificate issue/renew FAILED. Check the deploy workflow logs."}' \
-              "$DISCORD_WEBHOOK_BE" >/dev/null || true
-          fi
+          DISCORD_WEBHOOK_GITHUB_ACTION: ${{ secrets.DISCORD_WEBHOOK_GITHUB_ACTION }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/tls-failure-cli.ts"
 
       - name: certbot 갱신 타이머 설치(1일 2회)
         run: |
