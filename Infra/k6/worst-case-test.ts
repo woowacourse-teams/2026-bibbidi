@@ -1,6 +1,8 @@
 import exec from 'k6/execution';
 import type { Options, Scenario } from 'k6/options';
 import { Environment, textFromEnv } from './src/common/environment.ts';
+// refresh_rotation_violations 지표를 등록한다. 임계값 선언(generalThresholds)이 이 이름을 항상 참조한다.
+import './src/api/api.ts';
 import { AccessTokenIssuer } from './src/common/token.ts';
 import { WORST_CASE } from './src/config/targets.ts';
 import { generalThresholds, type GatedGroup } from './src/config/thresholds.ts';
