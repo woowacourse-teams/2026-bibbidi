@@ -24,9 +24,9 @@ export interface GroupResult {
 export class GeneralSloReport extends SummaryReport {
   constructor(
     data: SummaryData,
-    private readonly title: string,
-    private readonly intro: string,
-    private readonly groups: readonly ReportGroup[],
+    protected readonly title: string,
+    protected readonly intro: string,
+    protected readonly groups: readonly ReportGroup[],
   ) {
     super(data);
   }

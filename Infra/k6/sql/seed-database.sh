@@ -10,7 +10,7 @@ sudo docker exec -i mysql sh -c 'test "$MYSQL_DATABASE" = bibbidi_loadtest && MY
 COMMAND
 )
 dump_command=$(cat <<'COMMAND'
-sudo docker exec mysql sh -c 'test "$MYSQL_DATABASE" = bibbidi_loadtest || exit 1; export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysqldump -uroot --single-transaction --no-create-info --skip-add-drop-table --skip-comments --set-gtid-purged=OFF bibbidi_loadtest categories steps catalog_items precedences && mysqldump -uroot --single-transaction --no-create-info --skip-add-drop-table --skip-comments --set-gtid-purged=OFF --where="id >= 900000000" bibbidi_loadtest users checklists checklist_items appointments refresh_sessions'
+sudo docker exec mysql sh -c 'test "$MYSQL_DATABASE" = bibbidi_loadtest || exit 1; export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysqldump -uroot --single-transaction --no-create-info --skip-add-drop-table --skip-comments --set-gtid-purged=OFF bibbidi_loadtest categories steps catalog_items precedences terms && mysqldump -uroot --single-transaction --no-create-info --skip-add-drop-table --skip-comments --set-gtid-purged=OFF --where="id >= 900000000" bibbidi_loadtest users checklists checklist_items appointments refresh_sessions'
 COMMAND
 )
 

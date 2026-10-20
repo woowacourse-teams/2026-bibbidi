@@ -17,7 +17,7 @@ git tag k6/loadtest/<스크립트>/<회차> <커밋>
 git push origin k6/loadtest/<스크립트>/<회차>
 ```
 
-- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `surge-test`(Q1 홍보일 급증), `saturation-test`(Q2 먼저 포화되는 자원), `ai-isolation-test`(Q3 AI 격리), `ai-throttle-test`(Q4 한도 초과) 중 하나. 각 스크립트의 목적, 흐름, 판정 기준은 [`Infra/k6/README.md`](../k6/README.md)에 있다. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
+- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `surge-test`(Q1 홍보일 급증), `saturation-test`(Q2 먼저 포화되는 자원), `ai-isolation-test`(Q3 AI 격리), `ai-throttle-test`(Q4 한도 초과), `worst-case-test`(Q5 모든 엔드포인트 동시 사용 최악 시험) 중 하나. 각 스크립트의 목적, 흐름, 판정 기준은 [`Infra/k6/README.md`](../k6/README.md)에 있다. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
 - `<회차>`: 소문자·숫자·하이픈 24자 이내. 회차마다 새 스택을 만들므로 같은 이름의 스택이 있으면 `create`가 실패한다.
 - 템플릿과 compose·nginx 파일, 시드는 태그가 가리키는 커밋 기준이다. 백엔드 이미지는 그 커밋까지 `BE/`를 마지막으로 바꾼 커밋의 CD 이미지다. CD는 `BE/**` 등이 바뀐 커밋에서만 이미지를 만들기 때문에 `Infra/`만 바꾼 커밋에도 태그를 달 수 있다. 그 이미지가 없으면(CD가 아직 안 끝났거나 취소됨) `create`가 20분을 기다리지 않고 바로 실패한다.
 
