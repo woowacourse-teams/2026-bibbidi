@@ -94,7 +94,6 @@ function setAuth(status: "guest" | "authenticated" | "synchronizing", id = 1) {
     completeAuthentication: vi.fn(),
     endAuthentication: vi.fn(),
     failAuthentication: vi.fn(),
-    requireAccountSetup: vi.fn(),
   });
 }
 function mount(entry = "/calendar") {

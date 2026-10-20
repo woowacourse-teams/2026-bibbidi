@@ -172,7 +172,7 @@ describe("PostHog 사용자 여정", () => {
     expect(sdk.startSessionRecording).not.toHaveBeenCalled();
   });
 
-  it("약관과 임시 계정의 여정을 익명으로 유지하고 최종 회원에 한 번만 연결한다", () => {
+  it("약관과 인증 동기화 중에는 익명을 유지하고 최종 회원에 한 번만 연결한다", () => {
     const { sdk, client } = setup();
     client.setContext({
       authState: "onboardingRequired",
@@ -181,15 +181,9 @@ describe("PostHog 사용자 여정", () => {
     client.track(page);
     client.setContext({
       authState: "synchronizing",
-      pathname: "/onboarding/account",
+      pathname: "/onboarding",
       userId: 999,
     });
-    client.setContext({
-      authState: "accountSetupRequired",
-      pathname: "/onboarding/account",
-      userId: 999,
-    });
-    client.track({ name: "legacy_transfer_complete", parameters: {} });
     expect(sdk.identify).not.toHaveBeenCalled();
     expect(sdk.reset).not.toHaveBeenCalled();
     client.setContext({
@@ -204,10 +198,6 @@ describe("PostHog 사용자 여정", () => {
     });
     expect(sdk.identify).toHaveBeenCalledExactlyOnceWith("bibbidi:user:42");
     expect(sdk.reset).not.toHaveBeenCalled();
-    expect(sdk.capture).toHaveBeenCalledWith(
-      "legacy_transfer_complete",
-      expect.objectContaining({ auth_state: "accountSetupRequired" }),
-    );
   });
 
   it("인증 확인 실패로 회원 ID를 지우거나 수집을 계속하지 않는다", () => {

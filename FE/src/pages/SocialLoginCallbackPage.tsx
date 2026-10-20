@@ -1,10 +1,6 @@
 import { useCallback } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
-import {
-  beginAccountSetupProgress,
-  clearAccountSetupProgress,
-} from "../features/account-setup";
 import { acceptWebAccessToken, useAuth } from "../features/auth";
 import {
   SocialLoginCallback,
@@ -21,13 +17,11 @@ export function SocialLoginCallbackPage() {
       acceptWebAccessToken(session.accessToken);
 
       if (session.termsAgreementRequired) {
-        beginAccountSetupProgress();
         beginOnboarding();
         navigate("/onboarding", { replace: true });
         return;
       }
 
-      clearAccountSetupProgress();
       refreshAuth();
     },
     [beginOnboarding, navigate, refreshAuth],

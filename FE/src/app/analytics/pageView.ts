@@ -26,10 +26,6 @@ const PAGE_DEFINITIONS = {
     screenName: "login",
   },
   "/onboarding": { pageTitle: "약관 동의", screenName: "onboarding_terms" },
-  "/onboarding/account": {
-    pageTitle: "계정 선택",
-    screenName: "onboarding_account",
-  },
 } as const;
 
 export type PagePath = keyof typeof PAGE_DEFINITIONS;

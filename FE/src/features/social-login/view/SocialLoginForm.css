@@ -124,59 +124,6 @@
   }
 }
 
-.social-login-form__account-guide {
-  display: grid;
-  width: 100%;
-  flex: none;
-  align-self: center;
-  align-items: center;
-  grid-template-columns: 36px 1fr;
-  gap: 12px;
-  margin-top: 12px;
-  background: var(--color-bg-layer-basement);
-  color: var(--color-fg-neutral-muted);
-  font-size: 14px;
-  line-height: 1.55;
-  padding: 0 2px;
-}
-
-.social-login-form__guide-icon {
-  display: inline-flex;
-  width: 36px;
-  height: 36px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--color-bg-brand-weak);
-  color: var(--color-fg-brand);
-}
-
-.social-login-form__guide-icon svg {
-  width: 20px;
-  height: 20px;
-  stroke: currentcolor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.social-login-form__guide-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.social-login-form__guide-copy strong {
-  color: var(--color-fg-brand);
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.social-login-form__guide-description {
-  white-space: nowrap;
-}
-
 .social-login-form__notice {
   margin: 12px 0 0;
   color: var(--color-fg-neutral-muted);
@@ -265,19 +212,5 @@
 @media (max-width: 520px) {
   .social-login-form__headline {
     font-size: clamp(23px, 7.2vw, 28px);
-  }
-
-  .social-login-form__account-guide {
-    grid-template-columns: 32px 1fr;
-    gap: 8px;
-  }
-
-  .social-login-form__guide-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .social-login-form__guide-description {
-    font-size: 12px;
   }
 }
