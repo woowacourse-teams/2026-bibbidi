@@ -29,7 +29,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test)/([a-z0-9-]{1,24})$ ]]; then
+          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test|worst-case-test)/([a-z0-9-]{1,24})$ ]]; then
             echo "::error::태그 형식이 k6/loadtest/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi

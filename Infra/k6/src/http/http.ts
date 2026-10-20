@@ -5,6 +5,11 @@ import type { TagProvider } from '../config/shape.ts';
 
 export const serverErrors = new Counter('server_errors');
 
+// name 태그에는 공백과 중괄호가 들어 있어 임계값 식의 태그 값으로 쓸 수 없다. 엔드포인트별 판정은 이 태그로 나눈다.
+export function endpointTag(name: string): string {
+  return name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
 export interface RequestSpec {
   name: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -55,7 +60,7 @@ export class HttpClient {
     }
     return {
       headers,
-      tags: { kind: spec.kind ?? 'general', ...this.extraTags(), name: spec.name },
+      tags: { kind: spec.kind ?? 'general', ...this.extraTags(), name: spec.name, endpoint: endpointTag(spec.name) },
       responseCallback: http.expectedStatuses(...spec.expected),
     };
   }

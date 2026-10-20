@@ -67,3 +67,11 @@ export const VUS = {
   preAllocated: numberFromEnv('PRE_ALLOCATED_VUS', 50),
   max: numberFromEnv('MAX_VUS', 300),
 };
+
+// Q5: 엔드포인트마다 동시 사용자 1000명을 1분간 유지한다. 엔드포인트는 차례로 하나씩 시험한다.
+export const WORST_CASE = {
+  users: numberFromEnv('WORST_CASE_USERS', 1000),
+  holdSeconds: numberFromEnv('WORST_CASE_HOLD_SECONDS', 60),
+  // 앞 엔드포인트의 느린 응답이 다음 구간에 섞이지 않게 두는 간격(초).
+  gapSeconds: numberFromEnv('WORST_CASE_GAP_SECONDS', 15),
+};
