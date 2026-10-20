@@ -1,7 +1,7 @@
 # PostHog 사용자 여정 계측 설계와 운영 절차
 
-Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 2026-09-29 수정.
-FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
+Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 가입 흐름은 [#573](https://github.com/woowacourse-teams/2026-bibbidi/issues/573)에 따라 2026-10-20 수정.
+초기 설계 FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 
 ## 목적과 범위
 
@@ -11,20 +11,12 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 
 ## 회원 식별과 페이지
 
-```text
-/login → 제공자 → /auth/:provider → /onboarding → /onboarding/account
-   익명           녹화 제외          익명              익명
-                                            new 또는 legacy 처리
-                                                ↓
-                            /me 조회 + 체크리스트 조정 완료(authenticated)
-                                                ↓
-                               identify(bibbidi:user:{최종 id})
-```
+신규 가입자는 소셜 로그인 후 `/onboarding`에서 약관에 동의하고, 홈으로 이동해 체크리스트 자동 준비와 비로그인 준비 항목 이전을 마친다. `authenticated` 상태에서 `bibbidi:user:{id}`로 identify한다.
 
 - `loading`, `synchronizing`, `error`: 일반 이벤트와 녹화를 보류한다. 네트워크 오류만으로 reset하지 않는다.
-- `guest`, `onboardingRequired`, `accountSetupRequired`: 익명으로 수집한다. `/onboarding`, `/onboarding/account`를 페이지 정의에 추가한다.
+- `guest`, `onboardingRequired`: 익명으로 수집한다. 약관 동의 화면 `/onboarding`은 페이지뷰를 수집한다. 이전 `/onboarding/account` 주소는 리다이렉트만 하며 페이지뷰를 수집하지 않는다.
 - `authenticated`에서만 `/me.id`로 identify한다. 닉네임·이메일·JWT sub를 식별이나 Person 속성으로 보내지 않는다.
-- 기존 회원 이전은 임시 회원을 삭제하고 소셜 식별자를 기존 회원으로 이동한다. 따라서 임시 ID는 identify하지 않으며, 약관 동의와 이전 처리 사이의 로딩으로 익명 ID를 reset하지 않는다.
+- 약관 동의 후 체크리스트 준비 중에는 회원 ID를 identify하지 않으며, 인증 동기화로 익명 ID를 reset하지 않는다.
 - 로그아웃 성공 이벤트를 기존 ID에 보낸 뒤 reset한다. 명시적 계정 전환·탈퇴 완료도 reset한다. 401/회원 없음으로 세션 무효가 확정되면 기존 회원 식별을 해제한다.
 - 익명 상태의 reset은 SDK ID를 바꾸지 않는다. 녹화와 일반 이벤트 수집은 중지하되 가입 중 세션 만료 전후의 익명 여정을 연결한다.
 - 1차 목표는 홍보로 들어온 비로그인 방문자를 한 명씩 추적하는 것이다. 그래서 SDK 식별 저장소는 `localStorage`로 두어 같은 브라우저의 재방문과 새 탭을 같은 익명 방문자로 잇고, `person_profiles: "always"`로 익명 방문자도 People에 한 명씩 남긴다. 로그인하면 그동안의 익명 기록이 최종 회원에 합쳐진다. 다른 기기나 브라우저는 로그인 전까지 다른 방문자로 잡힌다.
@@ -44,14 +36,11 @@ FE 기준 `dev-fe@4b118bb8`, BE 계약 확인 `dev-be@6250f75c`.
 | social_login_callback_failed | callback 오류, provider=kakao/google/unknown, failure_kind=cancelled/invalid_callback/state_invalid_or_expired/network/timeout/api/unknown |
 | social_login_callback_complete | 콜백 API 성공, provider, terms_required. 로그인 완료와 구분 |
 | onboarding_terms_complete | 약관 동의 성공 또는 응답 유실 후 성공 확인 |
-| account_setup_choice | 사용자가 new/legacy를 선택한 시점, choice |
-| legacy_transfer_submit | 검증 통과 후 이전 요청 직전 |
-| legacy_transfer_failed | validation/authentication/terms_required/network/timeout/api/unknown. 네트워크 응답 유실 후 성공 여부가 불명확하면 outcome=unknown |
-| legacy_transfer_complete | 이전 성공 또는 응답 유실 후 성공 확인. 아직 익명 |
-| account_setup_complete | 새 계정 생성/기존 회원 이전 완료, choice |
 | appointment_form_view | 일정 폼 닫힘→열림, source=checklist/calendar |
 | appointment_submit | 검증 통과 후 실제 저장 시도, source. 목록 재조회만 하는 재시도는 제외 |
 | appointment_create_failed | 입력 검증/저장 실패. 저장 후 목록 재조회 실패는 제외 |
+
+계정 선택·기존 계정 이전 화면을 제거하면서 `account_setup_choice`, `legacy_transfer_submit`, `legacy_transfer_failed`, `legacy_transfer_complete`, `account_setup_complete` 수집을 중단했다. 약관 동의 완료는 `onboarding_terms_complete`로 확인하고, 체크리스트 준비 후에는 `authenticated` 상태의 페이지뷰와 회원 식별을 확인한다.
 
 서버의 208은 state 불일치, 만료, 쿠키 바인딩 실패를 함께 나타낸다. FE에서 구분할 수 없으므로 `state_invalid_or_expired`로 묶는다. 취소는 제공자가 `error=access_denied`로 돌려준 경우다. 제공자 화면에서 돌아오지 않은 사용자는 실패 이벤트가 없고 시작 후 다음 단계가 관측되지 않은 방문으로만 해석한다.
 
@@ -126,11 +115,11 @@ S3에 없는 경로(`/calendar` 등)는 CloudFront 오류 페이지로 `index.ht
 
 ## 대시보드와 QA
 
-- People에서 `bibbidi:user:{id}` 검색 → 세션별 Events → Recordings. 세션 기준으로 소셜 시작/약관/계정 선택/완료, 일정 폼/제출/성공을 각각 분석한다.
+- People에서 `bibbidi:user:{id}` 검색 → 세션별 Events → Recordings. 세션 기준으로 소셜 시작/약관 동의/인증 완료, 일정 폼/제출/성공을 각각 분석한다.
 - 세션의 마지막 화면·행동과 실패 사유를 확인한다. 최소 30분 비활성 방문만 이탈 후보로 보고 종료 시각·떠난 이유를 단정하지 않는다. 긴 OAuth 왕복은 세션이 나뉠 수 있으므로 회원 전환 퍼널과 방문 퍼널을 구분한다.
-- 자동 검증: 비활성 초기화, SDK 오류 격리, 온보딩 페이지뷰, 임시 회원 미식별, 계정 변경/reset, URL/속성 마스킹, 콜백 실패 분류, 명시적 실패 이벤트.
+- 자동 검증: 비활성 초기화, SDK 오류 격리, 약관 동의 페이지뷰, 인증 동기화 중 회원 미식별, 계정 변경/reset, URL/속성 마스킹, 콜백 실패 분류, 명시적 실패 이벤트.
 - 실제 개발 프로젝트에서 **Discard client IP data** 설정이 켜져 있고 수신 데이터에 IP가 저장되지 않는지 확인한다.
-- 실제 개발 프로젝트 QA: 같은 탭 게스트→약관→new/legacy→최종 Person 병합, 새로고침/다른 탭/탈퇴, Safari/모바일, 차단기, StrictMode 중복, 일정 저장 후 목록 조회 실패.
+- 실제 개발 프로젝트 QA: 같은 탭 게스트→약관→체크리스트 자동 준비·비로그인 항목 이전→최종 Person 병합, 새로고침/다른 탭/탈퇴, Safari/모바일, 차단기, StrictMode 중복, 일정 저장 후 목록 조회 실패.
 - 비밀 테스트 문자열을 입력·저장하고 Network payload와 실제 녹화에서 제목/메모/닉네임/비밀번호/code/state/referrer/DOM 속성에 남지 않는지 확인한다. 자동 테스트만으로 실제 수신·리플레이를 검증했다고 판단하지 않는다.
 
 ## 구현 책임과 변경 범위
