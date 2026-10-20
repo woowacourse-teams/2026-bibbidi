@@ -59,10 +59,7 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "/onboarding/account",
-        lazy: async () => ({
-          Component: (await import("../pages/AccountSetupPage"))
-            .AccountSetupPage,
-        }),
+        element: <Navigate replace to="/" />,
       },
       {
         // 소셜 제공자가 로그인 뒤 돌려보내는 주소다. 제공자 콘솔의 리다이렉트 URI와 같아야 한다.

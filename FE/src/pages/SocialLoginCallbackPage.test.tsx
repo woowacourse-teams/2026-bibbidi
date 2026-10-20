@@ -2,12 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  beginAccountSetupProgress,
-  clearAccountSetupProgress,
-  hasAccountSetupProgress,
-} from "../features/account-setup";
-
 const authMocks = vi.hoisted(() => ({
   acceptWebAccessToken: vi.fn(),
   beginOnboarding: vi.fn(),
@@ -41,13 +35,12 @@ afterEach(() => {
   authMocks.acceptWebAccessToken.mockReset();
   authMocks.beginOnboarding.mockReset();
   authMocks.refreshAuth.mockReset();
-  clearAccountSetupProgress();
   vi.unstubAllGlobals();
 });
 
 describe("SocialLoginCallbackPage", () => {
   it.each(["kakao", "google"])(
-    "%s 신규 가입 콜백이면 진행 표시를 만들고 온보딩으로 replace 이동한다",
+    "%s 신규 가입 콜백이면 온보딩으로 replace 이동한다",
     async (provider) => {
       vi.stubGlobal(
         "fetch",
@@ -86,7 +79,6 @@ describe("SocialLoginCallbackPage", () => {
       );
       expect(authMocks.beginOnboarding).toHaveBeenCalledOnce();
       expect(authMocks.refreshAuth).not.toHaveBeenCalled();
-      expect(hasAccountSetupProgress()).toBe(true);
 
       fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
       expect(
@@ -95,8 +87,7 @@ describe("SocialLoginCallbackPage", () => {
     },
   );
 
-  it("가입 완료 소셜 로그인은 남아 있는 계정 설정 표시를 지운다", async () => {
-    beginAccountSetupProgress();
+  it("가입 완료 소셜 로그인은 인증 상태를 새로 확인한다", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -119,7 +110,6 @@ describe("SocialLoginCallbackPage", () => {
     );
 
     expect(await screen.findByText("로그인했어요.")).toBeTruthy();
-    expect(hasAccountSetupProgress()).toBe(false);
     expect(authMocks.refreshAuth).toHaveBeenCalledOnce();
   });
 });

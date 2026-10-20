@@ -93,10 +93,6 @@ function renderServiceLayout(
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
             <Route element={<ServiceLayout />}>{routes}</Route>
-            <Route
-              path="/onboarding/account"
-              element={<div>계정 선택 화면</div>}
-            />
           </Routes>
         </MemoryRouter>
       </ChecklistMigrationProvider>
@@ -1150,45 +1146,72 @@ describe("ServiceLayout", () => {
     ).toBeNull();
   });
 
-  it("체크리스트가 없으면 계정 선택 화면으로 이동한다", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockImplementation((url: string, init?: RequestInit) => {
-        if (url === "/api/users/me") {
-          return Promise.resolve(
-            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
-              status: 200,
-            }),
-          );
-        }
-
-        if (url === "/api/checklists/me" && init?.method === "GET") {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                errorCode: 303,
-                message: "체크리스트를 찾을 수 없습니다.",
-              }),
-              { status: 404 },
-            ),
-          );
-        }
-
-        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
-      });
+  it("체크리스트가 없으면 자동 생성하고 현재 서비스 화면을 유지한다", async () => {
+    let hasChecklist = false;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" })),
+        );
+      }
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture)),
+        );
+      }
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null })),
+        );
+      }
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          hasChecklist
+            ? new Response(JSON.stringify({ id: 1, items: [] }))
+            : new Response(
+                JSON.stringify({
+                  errorCode: 303,
+                  message: "체크리스트를 찾을 수 없습니다.",
+                }),
+                { status: 404 },
+              ),
+        );
+      }
+      if (url === "/api/checklists") {
+        hasChecklist = true;
+        return Promise.resolve(new Response("1", { status: 201 }));
+      }
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
     installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
-      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      <Route
+        path="/preparation"
+        element={
+          <>
+            <PreparationRoadmapFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
       ["/preparation"],
     );
 
-    expect(await screen.findByText("계정 선택 화면")).toBeTruthy();
-    const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
-    expect(requestedUrls).not.toContain("/api/checklists");
-    expect(requestedUrls).not.toContain("/api/checklists/me/catalog-items");
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(
-      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+      await screen.findByRole("heading", { name: "첫 번째 카테고리 로드맵" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/preparation",
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists"),
     ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/checklists/me/catalog-items",
+      ),
+    ).toHaveLength(0);
   });
 });

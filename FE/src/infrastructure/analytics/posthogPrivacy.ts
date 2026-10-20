@@ -9,7 +9,6 @@ const PUBLIC_PATHS = new Set([
   "/calendar",
   "/checklist",
   "/onboarding",
-  "/onboarding/account",
 ]);
 
 export function analyticsPagePath(pathname: string): string | null {

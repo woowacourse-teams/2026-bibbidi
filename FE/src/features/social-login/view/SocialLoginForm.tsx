@@ -141,25 +141,6 @@ export function SocialLoginForm() {
           ))}
         </div>
 
-        <aside
-          aria-labelledby="legacy-account-guide-title"
-          className="social-login-form__account-guide"
-        >
-          <span aria-hidden="true" className="social-login-form__guide-icon">
-            <svg fill="none" viewBox="0 0 24 24">
-              <path d="M9.5 14.5 14.5 9.5M7.25 16.75l-1 1a3.54 3.54 0 0 1-5-5l3.5-3.5a3.54 3.54 0 0 1 5 0M16.75 7.25l1-1a3.54 3.54 0 0 1 5 5l-3.5 3.5a3.54 3.54 0 0 1-5 0" />
-            </svg>
-          </span>
-          <span className="social-login-form__guide-copy">
-            <strong id="legacy-account-guide-title">
-              기존 계정이 있으신가요?
-            </strong>
-            <span className="social-login-form__guide-description">
-              소셜 로그인 후 기존 계정과 연동할 수 있어요.
-            </span>
-          </span>
-        </aside>
-
         {socialLoginNotice && (
           <p className="social-login-form__notice" role="status">
             {socialLoginNotice}

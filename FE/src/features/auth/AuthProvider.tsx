@@ -31,7 +31,6 @@ interface AuthContextValue {
   completeAuthentication: (user: CurrentUser) => void;
   endAuthentication: () => void;
   failAuthentication: (user: CurrentUser) => void;
-  requireAccountSetup: (user: CurrentUser) => void;
   refreshAuth: () => void;
 }
 
@@ -175,19 +174,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, []);
 
-  const requireAccountSetup = useCallback((user: CurrentUser) => {
-    setAuthState((currentState) => {
-      if (
-        currentState.status !== "synchronizing" ||
-        currentState.user.id !== user.id
-      ) {
-        return currentState;
-      }
-
-      return { status: "accountSetupRequired", user };
-    });
-  }, []);
-
   const failAuthentication = useCallback((user: CurrentUser) => {
     setAuthState((currentState) => {
       if (
@@ -223,7 +209,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       completeAuthentication,
       endAuthentication,
       failAuthentication,
-      requireAccountSetup,
       refreshAuth,
     }),
     [
@@ -233,7 +218,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       completeAuthentication,
       endAuthentication,
       failAuthentication,
-      requireAccountSetup,
       refreshAuth,
     ],
   );

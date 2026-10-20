@@ -43,8 +43,7 @@ export function AppPageViewTracker({
   const isAppRouteSettled =
     authState.status === "authenticated" ||
     authState.status === "guest" ||
-    authState.status === "onboardingRequired" ||
-    authState.status === "accountSetupRequired";
+    authState.status === "onboardingRequired";
 
   const trackHomeEntryPageView = useCallback(() => {
     if (router.state.location.pathname !== "/" || !isAppRouteSettled) return;

@@ -19,13 +19,6 @@ export function AuthLayout() {
     return <Navigate replace to="/onboarding" />;
   }
 
-  if (
-    authState.status === "accountSetupRequired" &&
-    pathname !== "/onboarding/account"
-  ) {
-    return <Navigate replace to="/onboarding/account" />;
-  }
-
   if (authState.status === "guest" && isOnboardingPath) {
     return <Navigate replace to="/login" />;
   }

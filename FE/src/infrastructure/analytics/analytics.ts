@@ -17,7 +17,6 @@ export interface AnalyticsContext {
     | "loading"
     | "guest"
     | "onboardingRequired"
-    | "accountSetupRequired"
     | "synchronizing"
     | "authenticated"
     | "error";

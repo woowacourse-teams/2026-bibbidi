@@ -67,10 +67,8 @@ describe("PostHog 개인정보 정제", () => {
   });
   it("일반 화면의 쿼리와 해시도 제거한다", () => {
     expect(
-      sanitizeAnalyticsUrl(
-        "https://example.com/onboarding/account?code=secret#secret",
-      ),
-    ).toBe("https://example.com/onboarding/account");
+      sanitizeAnalyticsUrl("https://example.com/onboarding?code=secret#secret"),
+    ).toBe("https://example.com/onboarding");
   });
   it("자동 초기 유입, referrer, Person 속성과 임의의 원문 속성을 제거한다", () => {
     const result = sanitizePostHogEvent({

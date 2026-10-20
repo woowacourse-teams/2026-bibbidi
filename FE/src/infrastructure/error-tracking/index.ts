@@ -8,7 +8,6 @@ type AuthState =
   | "loading"
   | "guest"
   | "onboardingRequired"
-  | "accountSetupRequired"
   | "synchronizing"
   | "authenticated"
   | "error";
