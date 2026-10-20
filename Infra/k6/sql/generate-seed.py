@@ -15,6 +15,7 @@ REFRESH_EXPIRES_AT = "2036-01-01 00:00:00"
 REFRESH_FAMILY_NAMESPACE = uuid.UUID("6f1c5a52-6a3b-4d9a-9a2e-0d7d1c4a5b10")
 ROOT = Path(__file__).resolve().parents[3]
 CATALOG_SQL = ROOT / "BE/database/mysql/load_catalog.sql"
+TERMS_SQL = ROOT / "BE/database/mysql/load_terms.sql"
 
 
 def insert_rows(output, table, columns, rows):
@@ -45,6 +46,9 @@ def generate(output, users, refresh_sessions):
     output.write("USE `bibbidi_loadtest`;\nSET NAMES utf8mb4;\n")
     output.write("SET time_zone = '+00:00';\nSTART TRANSACTION;\n")
     output.write(CATALOG_SQL.read_text(encoding="utf-8").replace("CURRENT_TIMESTAMP", f"'{FIXED_TIME}'"))
+    output.write("\n")
+    # 약관이 비어 있으면 약관 동의 API가 항상 400이다. 필수 약관 버전을 시드로 넣는다.
+    output.write(TERMS_SQL.read_text(encoding="utf-8").replace("CURRENT_TIMESTAMP", f"'{FIXED_TIME}'"))
     output.write("\n")
 
     insert_rows(

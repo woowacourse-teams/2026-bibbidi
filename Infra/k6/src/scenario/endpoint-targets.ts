@@ -187,7 +187,10 @@ export const TARGETS: readonly Target[] = [
     request: ({ user, state }) =>
       spec('POST /api/auth/native/sessions/refresh', '/api/auth/native/sessions/refresh', [200], { refreshToken: state.refreshToken ?? refreshTokenFor(user) }),
     onResponse: ({ state }, response) => {
-      state.refreshToken = response.status === 200 ? (response.json() as unknown as { refreshToken: string }).refreshToken : undefined;
+      // 연결이 끊긴 요청은 서버가 토큰을 돌렸는지 알 수 없다. 이전 토큰을 그대로 두고 다음 라운드에 다시 보낸다.
+      if (response.status === 200) {
+        state.refreshToken = (response.json() as unknown as { refreshToken: string }).refreshToken;
+      }
     },
   },
   {
