@@ -68,10 +68,15 @@ export const VUS = {
   max: numberFromEnv('MAX_VUS', 300),
 };
 
-// Q5: 엔드포인트마다 동시 사용자 1000명을 1분간 유지한다. 엔드포인트는 차례로 하나씩 시험한다.
+// Q5: 엔드포인트마다 동시 사용자 1000명이 한꺼번에 요청 1개씩 보내고 쉬기를 되풀이한다. 엔드포인트는 차례로 하나씩 시험한다.
+// 사람 1000명이 각자 한 번씩 누르는 상황이다. 서버가 느려져도 응답을 받은 뒤에야 다음 요청을 보낸다(쉬지 않고 쏘는 부하가 아니다).
 export const WORST_CASE = {
   users: numberFromEnv('WORST_CASE_USERS', 1000),
   holdSeconds: numberFromEnv('WORST_CASE_HOLD_SECONDS', 60),
+  // 한 라운드(요청 + 휴식)의 길이. 라운드는 이 간격의 배수 시각에 맞춰 시작해 모든 사용자가 같은 순간에 요청한다.
+  periodSeconds: numberFromEnv('WORST_CASE_PERIOD_SECONDS', 3),
+  // 응답을 받은 뒤 다음 요청까지 최소로 쉬는 시간. 응답이 늦어도 이만큼은 쉰다.
+  minRestSeconds: numberFromEnv('WORST_CASE_MIN_REST_SECONDS', 1),
   // 앞 엔드포인트의 느린 응답이 다음 구간에 섞이지 않게 두는 간격(초).
   gapSeconds: numberFromEnv('WORST_CASE_GAP_SECONDS', 15),
 };

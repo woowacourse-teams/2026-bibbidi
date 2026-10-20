@@ -5,16 +5,18 @@ import { Environment, textFromEnv } from './src/common/environment.ts';
 import './src/api/api.ts';
 import { AccessTokenIssuer } from './src/common/token.ts';
 import { WORST_CASE } from './src/config/targets.ts';
-import { generalThresholds, type GatedGroup } from './src/config/thresholds.ts';
+import { generalThresholds, type GatedGroup, type Thresholds } from './src/config/thresholds.ts';
 import { HttpClient, endpointTag } from './src/http/http.ts';
-import { GeneralSloReport, type ReportGroup } from './src/report/general-report.ts';
+import type { ReportGroup } from './src/report/general-report.ts';
+import { responseMetric, STATUS_CODES, WorstCaseReport } from './src/report/worst-case-report.ts';
 import type { SummaryData } from './src/report/summary.ts';
 import { EndpointRunner, scenarioNameOf, TARGETS, type EndpointData } from './src/scenario/endpoint-targets.ts';
-import { UserIds } from './src/session/users.ts';
+import { Seeded } from './src/session/users.ts';
 
-// Q5: 엔드포인트마다 동시 사용자 1000명이 1분간 그 엔드포인트만 쉬지 않고 부른다.
-// 엔드포인트는 차례로 하나씩 시험하고(앞 시험 뒤 15초 간격), 사용자 수는 처음부터 1000명이다.
-// 엔드포인트마다 p95·p99·실패율을 판정하고 서버 오류(5xx)는 한 건도 없어야 한다.
+// Q5: 엔드포인트마다 동시 사용자 1000명이 같은 순간에 요청 1개씩 보내고 쉬기를 되풀이한다(기본 3초 간격, 최소 휴식 1초).
+// 사람 1000명이 각자 한 번씩 누르는 상황이라, 서버가 느려져도 응답을 받은 뒤에야 다음 요청을 보낸다.
+// 엔드포인트는 차례로 하나씩 시험한다(앞 시험 뒤 15초 간격). 사용자는 시드가 만든 사용자 1000명이다.
+// 엔드포인트마다 p95·p99·실패율을 판정하고 서버 오류(5xx)는 한 건도 없어야 한다. 받은 상태 코드도 엔드포인트별로 남긴다.
 const environment = Environment.fromEnv();
 const client = new HttpClient(environment.baseUrl);
 const runner = new EndpointRunner(client, new AccessTokenIssuer(environment));
@@ -44,27 +46,35 @@ const groups: (GatedGroup & ReportGroup)[] = TARGETS.map((target) => ({
   failure: true,
 }));
 
+// 상태 코드 지표는 임계값을 선언해야 요약에 나타난다. 판정에는 쓰지 않는 항상 참인 식이다.
+function responseThresholds(): Thresholds {
+  return Object.fromEntries(
+    TARGETS.flatMap((target) => STATUS_CODES.map((code): [string, string[]] => [responseMetric(endpointTag(target.name), code), ['count>=0']])),
+  );
+}
+
 export const options: Options = {
   scenarios: scenarios(),
-  thresholds: { ...generalThresholds(groups), server_errors: ['count==0'] },
+  thresholds: { ...generalThresholds(groups), ...responseThresholds(), server_errors: ['count==0'] },
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
 };
 
 export function setup(): EndpointData {
   const tokens = new AccessTokenIssuer(environment);
-  const catalog = client.send(tokens.issue(UserIds.pooled(0)), {
-    name: 'GET /api/catalog',
-    method: 'GET',
-    path: '/api/catalog',
-    expected: [200],
-    kind: 'fixture',
-  });
+  const probe = tokens.issue(Seeded.userId(WORST_CASE.users - 1));
+  // 마지막 사용자가 없으면 시드의 사용자 수가 모자란 것이다. 사용자 행은 API로 만들 수 없어 시드(seed-users)를 늘려야 한다.
+  const lastUser = client.send(probe, { name: 'GET /api/users/me', method: 'GET', path: '/api/users/me', expected: [200], kind: 'fixture' });
+  if (lastUser.status !== 200) {
+    throw new Error(`시드 사용자가 ${WORST_CASE.users}명보다 적습니다(마지막 사용자 조회 ${lastUser.status}). Infra/loadtest/params/<회차>.seed-users 를 확인하세요.`);
+  }
+  const catalog = client.send(probe, { name: 'GET /api/catalog', method: 'GET', path: '/api/catalog', expected: [200], kind: 'fixture' });
   const categories = (catalog.json() as unknown as { categories: { id: number; steps: { items: { id: number }[] }[] }[] }).categories;
-  const terms = client.send(tokens.issue(UserIds.pooled(0)), { name: 'GET /api/terms', method: 'GET', path: '/api/terms', expected: [200], kind: 'fixture' });
+  const terms = client.send(probe, { name: 'GET /api/terms', method: 'GET', path: '/api/terms', expected: [200], kind: 'fixture' });
   return {
     runId: Math.floor(Date.now() / 1000),
+    seededUsers: WORST_CASE.users,
     categoryIds: categories.map((category) => category.id),
-    itemIds: categories.flatMap((category) => category.steps.flatMap((step) => step.items.map((item) => item.id))),
+    catalogItemIds: categories.flatMap((category) => category.steps.flatMap((step) => step.items.map((item) => item.id))).sort((a, b) => a - b),
     termsVersion: (terms.json() as unknown as { version: string }[])[0]?.version ?? '',
   };
 }
@@ -75,10 +85,12 @@ export function hit(data: EndpointData): void {
 }
 
 export function handleSummary(data: SummaryData): Record<string, string> {
-  return new GeneralSloReport(
+  return new WorstCaseReport(
     data,
     'Q5 엔드포인트별 동시 사용자 1000명',
-    `엔드포인트마다 ${WORST_CASE.users}명이 ${WORST_CASE.holdSeconds}초 동안 동시에 부른 결과입니다. ❌나 도달 못함이 있는 엔드포인트는 이 부하에서 신뢰할 수 없습니다.`,
+    `엔드포인트마다 ${WORST_CASE.users}명이 ${WORST_CASE.periodSeconds}초 간격으로 같은 순간에 요청하기를 ${WORST_CASE.holdSeconds}초 동안 되풀이한 결과입니다. ❌나 도달 못함이 있는 엔드포인트는 이 부하에서 신뢰할 수 없습니다.`,
     groups,
-  ).files(textFromEnv('SUMMARY_DIR', '.'));
+  )
+    .withEndpoints(TARGETS.map((target) => ({ label: target.name, endpoint: endpointTag(target.name) })))
+    .files(textFromEnv('SUMMARY_DIR', '.'));
 }

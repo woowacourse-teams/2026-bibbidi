@@ -1,43 +1,48 @@
 import exec from 'k6/execution';
+import { sleep } from 'k6';
 import type { RefinedResponse } from 'k6/http';
 import type { AccessTokenIssuer } from '../common/token.ts';
+import { WORST_CASE } from '../config/targets.ts';
 import type { HttpClient, RequestSpec } from '../http/http.ts';
-import { refreshTokenFor, UserIds } from '../session/users.ts';
+import { refreshTokenFor, Seeded, UserIds } from '../session/users.ts';
 
 export interface EndpointData {
   runId: number;
+  seededUsers: number;
   categoryIds: number[];
-  itemIds: number[];
+  // 준비 목록 항목 번호를 오름차순으로 둔 것. 시드의 항목 번호(1부터 연속)와 같은 순서다.
+  catalogItemIds: number[];
   termsVersion: string;
 }
 
 interface UserState {
   token: string;
-  checklistItemId: number;
-  appointmentId: number;
+  // 제목·상태·카테고리 변경 대상. 준비 목록에서 추가한 항목은 제목·카테고리를 바꿀 수 없어 직접 만든 항목을 쓴다.
+  customItemId: number;
+  // 삭제 대상. 삭제 요청이 한꺼번에 나가도록 쉬는 동안 미리 만들어 둔다.
+  pendingId: number;
   refreshToken: string | undefined;
 }
 
 interface Context {
   data: EndpointData;
+  // 시드 사용자 번호(0부터)
   user: number;
-  iteration: number;
+  round: number;
   state: UserState;
   prepare: Prepare;
 }
 
-// 시험 대상 요청 하나. 준비 요청(체크리스트·일정 만들기)은 kind=fixture로 태그해 판정에서 뺀다.
+// 시험 대상 요청 하나. 준비 요청은 kind=fixture로 태그해 판정에서 뺀다.
 interface Target {
   name: string;
-  // 체크리스트가 없어도 되는 요청
-  bare?: boolean;
+  // 라운드마다 체크리스트가 없는 새 사용자로 보낸다(체크리스트 생성은 사용자당 한 번만 성공한다).
+  freshUser?: boolean;
+  // 첫 요청 전과 요청마다 그 직후(다음 라운드 몫)에 부른다. 요청이 한꺼번에 나가도록 준비는 쉬는 동안 끝낸다.
+  prepare?(context: Context): void;
   request(context: Context): RequestSpec;
   onResponse?(context: Context, response: RefinedResponse<'text'>): void;
 }
-
-const OK = [200, 201, 204];
-// 입력에 따라 거절될 수 있는 요청은 4xx도 기대한 응답으로 본다. 서버 오류(5xx)만 실패다.
-const OK_OR_REJECTED = [200, 201, 204, 400, 409];
 
 function dateAfter(days: number): string {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -47,8 +52,8 @@ function appointmentBody(date: string) {
   return { title: '부하 테스트 일정', date, startTime: `${date}T10:00:00`, endTime: `${date}T11:00:00`, place: '부하 테스트 장소', memo: 'k6' };
 }
 
-function spec(name: string, path: string, expected: readonly number[], body?: unknown): RequestSpec {
-  return { name, method: name.slice(0, name.indexOf(' ')) as RequestSpec['method'], path, body, expected };
+function spec(name: string, path: string, expected: readonly number[], body?: unknown, rawBody = false): RequestSpec {
+  return { name, method: name.slice(0, name.indexOf(' ')) as RequestSpec['method'], path, body, expected, rawBody };
 }
 
 class Prepare {
@@ -61,59 +66,62 @@ class Prepare {
     return this.client.send(this.token, { ...request, kind: 'fixture' });
   }
 
-  checklist(itemIds: number[]): number {
-    this.send(spec('POST /api/checklists', '/api/checklists', [201, 409]));
-    const added = this.send(spec('POST /api/checklists/me/catalog-items', '/api/checklists/me/catalog-items', OK_OR_REJECTED, itemIds.slice(0, 3)));
-    return (added.json() as unknown as { items: { id: number }[] }).items?.[0]?.id ?? 0;
-  }
-
   appointment(itemId: number): number {
-    const response = this.send(spec('POST /api/checklist-items/{id}/appointments', `/api/checklist-items/${itemId}/appointments`, [201], appointmentBody(dateAfter(1))));
+    const response = this.send(
+      spec('POST /api/checklist-items/{id}/appointments', `/api/checklist-items/${itemId}/appointments`, [201], appointmentBody(dateAfter(1))),
+    );
     return (response.json() as unknown as { id: number }).id;
   }
 
   customItem(categoryId: number): number {
-    const response = this.send(spec('POST /api/checklists/me/items', '/api/checklists/me/items', [201], { title: '삭제할 할 일', categoryId }));
+    const response = this.send(spec('POST /api/checklists/me/items', '/api/checklists/me/items', [201], { title: '직접 만든 할 일', categoryId }));
     return (response.json() as unknown as { id: number }).id;
   }
 }
 
-// 시드가 만든 리프레시 세션은 한 번만 쓸 수 있어, 갱신과 로그아웃이 서로 다른 번호 대역을 쓴다.
-const LOGOUT_TOKEN_OFFSET = 1000;
+function ensureCustomItem({ data, state, prepare }: Context): void {
+  if (state.customItemId === 0) {
+    state.customItemId = prepare.customItem(data.categoryIds[0]);
+  }
+}
 
 export const TARGETS: readonly Target[] = [
-  { name: 'GET /api/terms', bare: true, request: () => spec('GET /api/terms', '/api/terms', [200]) },
+  { name: 'GET /api/terms', request: () => spec('GET /api/terms', '/api/terms', [200]) },
   {
     name: 'POST /api/users/me/terms-agreement',
-    bare: true,
-    request: ({ data }) => spec('POST /api/users/me/terms-agreement', '/api/users/me/terms-agreement', OK_OR_REJECTED, { termsVersion: data.termsVersion, agreed: true }),
+    request: ({ data }) => spec('POST /api/users/me/terms-agreement', '/api/users/me/terms-agreement', [200, 409], { termsVersion: data.termsVersion, agreed: true }),
   },
-  { name: 'GET /api/users/me', bare: true, request: () => spec('GET /api/users/me', '/api/users/me', [200, 404]) },
-  { name: 'GET /api/users/me/wedding-date', bare: true, request: () => spec('GET /api/users/me/wedding-date', '/api/users/me/wedding-date', [200, 404]) },
+  { name: 'GET /api/users/me', request: () => spec('GET /api/users/me', '/api/users/me', [200]) },
+  { name: 'GET /api/users/me/wedding-date', request: () => spec('GET /api/users/me/wedding-date', '/api/users/me/wedding-date', [200, 404]) },
   {
     name: 'PUT /api/users/me/wedding-date',
-    bare: true,
-    request: ({ iteration }) => spec('PUT /api/users/me/wedding-date', '/api/users/me/wedding-date', OK_OR_REJECTED, { weddingDate: dateAfter(90 + (iteration % 30)) }),
+    request: ({ round }) => spec('PUT /api/users/me/wedding-date', '/api/users/me/wedding-date', [200], { weddingDate: dateAfter(90 + (round % 30)) }),
   },
   {
     name: 'GET /api/users/nickname/availability',
-    bare: true,
-    request: ({ user, iteration }) => spec('GET /api/users/nickname/availability', `/api/users/nickname/availability?nickname=u${user}x${iteration % 100}`, [200, 400]),
+    request: ({ user, round }) => spec('GET /api/users/nickname/availability', `/api/users/nickname/availability?nickname=a${user}r${round}`, [200]),
   },
   {
+    // 닉네임은 10자 이하이고 중복될 수 없다. 사용자 번호와 라운드로 사용자마다 다른 값을 만든다.
     name: 'PUT /api/users/me/nickname',
-    bare: true,
-    request: ({ user, iteration }) => spec('PUT /api/users/me/nickname', '/api/users/me/nickname', OK_OR_REJECTED, { nickname: `u${user}x${iteration % 100}`.slice(0, 10) }),
+    request: ({ user, round }) => spec('PUT /api/users/me/nickname', '/api/users/me/nickname', [200], { nickname: `n${user}r${round}` }),
   },
-  { name: 'GET /api/catalog', bare: true, request: () => spec('GET /api/catalog', '/api/catalog', [200]) },
-  { name: 'POST /api/checklists', bare: true, request: () => spec('POST /api/checklists', '/api/checklists', [201, 409]) },
+  { name: 'GET /api/catalog', request: () => spec('GET /api/catalog', '/api/catalog', [200]) },
+  { name: 'POST /api/checklists', freshUser: true, request: () => spec('POST /api/checklists', '/api/checklists', [201]) },
   {
+    // 시드가 담아 둔 항목 뒤 번호부터 골라 중복(409)을 피한다.
     name: 'POST /api/checklists/me/catalog-items',
-    request: ({ data, iteration }) => spec('POST /api/checklists/me/catalog-items', '/api/checklists/me/catalog-items', OK_OR_REJECTED, [data.itemIds[iteration % data.itemIds.length]]),
+    request: ({ data, user, round }) =>
+      spec(
+        'POST /api/checklists/me/catalog-items',
+        '/api/checklists/me/catalog-items',
+        [201, 409],
+        [data.catalogItemIds[Seeded.unusedCatalogRank(user, round, data.catalogItemIds.length)]],
+      ),
   },
   {
     name: 'POST /api/checklists/me/items',
-    request: ({ data, iteration }) => spec('POST /api/checklists/me/items', '/api/checklists/me/items', [201], { title: `할 일 ${iteration}`, categoryId: data.categoryIds[0] }),
+    request: ({ data, round }) => spec('POST /api/checklists/me/items', '/api/checklists/me/items', [201], { title: `할 일 ${round}`, categoryId: data.categoryIds[0] }),
   },
   { name: 'GET /api/checklists/me', request: () => spec('GET /api/checklists/me', '/api/checklists/me', [200]) },
   { name: 'GET /api/checklists/me/progress', request: () => spec('GET /api/checklists/me/progress', '/api/checklists/me/progress', [200]) },
@@ -124,76 +132,91 @@ export const TARGETS: readonly Target[] = [
     request: () => spec('GET /api/checklists/me/recommended-catalog-items', '/api/checklists/me/recommended-catalog-items?limit=4', [200]),
   },
   {
+    // 제목은 본문 전체가 값이다(JSON 따옴표 없음).
     name: 'PUT /api/checklist-items/{id}/title',
-    request: ({ state, iteration }) => spec('PUT /api/checklist-items/{id}/title', `/api/checklist-items/${state.checklistItemId}/title`, [200], `수정한 할 일 ${iteration}`),
+    prepare: ensureCustomItem,
+    request: ({ state, round }) => spec('PUT /api/checklist-items/{id}/title', `/api/checklist-items/${state.customItemId}/title`, [200], `수정한 할 일 ${round}`, true),
   },
   {
+    // 상태는 prev·continue·done 중 하나이고 본문 전체가 값이다.
     name: 'PUT /api/checklist-items/{id}/status',
-    request: ({ state, iteration }) => spec('PUT /api/checklist-items/{id}/status', `/api/checklist-items/${state.checklistItemId}/status`, [200], iteration % 2 === 0 ? 'continue' : 'prev'),
+    prepare: ensureCustomItem,
+    request: ({ state, round }) => spec('PUT /api/checklist-items/{id}/status', `/api/checklist-items/${state.customItemId}/status`, [200], round % 2 === 0 ? 'continue' : 'prev', true),
   },
   {
+    // 카테고리는 JSON 숫자 하나다.
     name: 'PUT /api/checklist-items/{id}/category',
-    request: ({ data, state, iteration }) =>
-      spec('PUT /api/checklist-items/{id}/category', `/api/checklist-items/${state.checklistItemId}/category`, [200], data.categoryIds[iteration % data.categoryIds.length]),
+    prepare: ensureCustomItem,
+    request: ({ data, state, round }) =>
+      spec('PUT /api/checklist-items/{id}/category', `/api/checklist-items/${state.customItemId}/category`, [200], data.categoryIds[round % data.categoryIds.length]),
   },
   {
     name: 'GET /api/checklist-items/{id}/remaining-appointments',
-    request: ({ state }) => spec('GET /api/checklist-items/{id}/remaining-appointments', `/api/checklist-items/${state.checklistItemId}/remaining-appointments`, [200]),
+    request: ({ user }) => spec('GET /api/checklist-items/{id}/remaining-appointments', `/api/checklist-items/${Seeded.checklistItemId(user)}/remaining-appointments`, [200]),
   },
   {
     name: 'POST /api/checklist-items/{id}/appointments',
-    request: ({ state, iteration }) =>
-      spec('POST /api/checklist-items/{id}/appointments', `/api/checklist-items/${state.checklistItemId}/appointments`, [201], appointmentBody(dateAfter(1 + (iteration % 28)))),
+    request: ({ user, round }) =>
+      spec('POST /api/checklist-items/{id}/appointments', `/api/checklist-items/${Seeded.checklistItemId(user)}/appointments`, [201], appointmentBody(dateAfter(1 + (round % 28)))),
   },
   {
     name: 'PUT /api/appointments/{id}',
-    request: ({ state, iteration }) => spec('PUT /api/appointments/{id}', `/api/appointments/${state.appointmentId}`, [200], appointmentBody(dateAfter(1 + (iteration % 28)))),
+    request: ({ user, round }) => spec('PUT /api/appointments/{id}', `/api/appointments/${Seeded.appointmentId(user)}`, [200], appointmentBody(dateAfter(1 + (round % 28)))),
   },
   {
     name: 'PUT /api/appointments/{id}/complete',
-    request: ({ state, iteration }) => spec('PUT /api/appointments/{id}/complete', `/api/appointments/${state.appointmentId}/complete`, [200], iteration % 2 === 0),
+    request: ({ user, round }) => spec('PUT /api/appointments/{id}/complete', `/api/appointments/${Seeded.appointmentId(user)}/complete`, [200], round % 2 === 0),
   },
   {
-    // 반복마다 일정을 새로 만들어(준비 요청) 지우는 요청만 잰다.
     name: 'DELETE /api/appointments/{id}',
-    request: ({ state, prepare }) => spec('DELETE /api/appointments/{id}', `/api/appointments/${prepare.appointment(state.checklistItemId)}`, OK),
+    prepare: (context) => {
+      context.state.pendingId = context.prepare.appointment(Seeded.checklistItemId(context.user));
+    },
+    request: ({ state }) => spec('DELETE /api/appointments/{id}', `/api/appointments/${state.pendingId}`, [204]),
   },
   {
     name: 'DELETE /api/checklist-items/{id}',
-    request: ({ data, prepare }) => spec('DELETE /api/checklist-items/{id}', `/api/checklist-items/${prepare.customItem(data.categoryIds[0])}`, OK),
+    prepare: (context) => {
+      context.state.pendingId = context.prepare.customItem(context.data.categoryIds[0]);
+    },
+    request: ({ state }) => spec('DELETE /api/checklist-items/{id}', `/api/checklist-items/${state.pendingId}`, [204]),
   },
   {
-    // 리프레시 토큰은 한 번만 쓸 수 있다. 받은 토큰을 다음 반복에 이어 쓴다.
+    // 리프레시 토큰은 한 번만 쓸 수 있다. 받은 토큰을 다음 라운드에 이어 쓴다.
     name: 'POST /api/auth/native/sessions/refresh',
-    bare: true,
     request: ({ user, state }) =>
-      spec('POST /api/auth/native/sessions/refresh', '/api/auth/native/sessions/refresh', [200, 401], { refreshToken: state.refreshToken ?? refreshTokenFor(user - 1) }),
+      spec('POST /api/auth/native/sessions/refresh', '/api/auth/native/sessions/refresh', [200], { refreshToken: state.refreshToken ?? refreshTokenFor(user) }),
     onResponse: ({ state }, response) => {
       state.refreshToken = response.status === 200 ? (response.json() as unknown as { refreshToken: string }).refreshToken : undefined;
     },
   },
   {
-    // 로그아웃은 세션을 지우므로 첫 반복만 실제 세션을 지우고 이후는 이미 지워진 토큰이다. 지워진 토큰도 5xx 없이 끝나야 한다.
+    // 로그아웃은 세션을 지우므로 첫 라운드만 실제 세션을 지우고 이후는 이미 지워진 토큰이다. 지워진 토큰도 5xx 없이 끝나야 한다.
     name: 'DELETE /api/auth/native/sessions/current',
-    bare: true,
-    request: ({ user }) =>
-      spec('DELETE /api/auth/native/sessions/current', '/api/auth/native/sessions/current', [...OK, 400, 401, 404], {
-        refreshToken: refreshTokenFor(LOGOUT_TOKEN_OFFSET + user - 1),
+    request: ({ data, user }) =>
+      spec('DELETE /api/auth/native/sessions/current', '/api/auth/native/sessions/current', [204, 401], {
+        refreshToken: refreshTokenFor(data.seededUsers + user),
       }),
   },
 ];
-
-// 엔드포인트마다 사용자 대역이 달라, 앞 시험이 만든 데이터에 뒤 시험이 영향을 받지 않는다.
-const USERS_PER_TARGET = 2_000;
 
 // 시나리오 이름이자 임계값에 쓰는 scenario 태그 값.
 export function scenarioNameOf(index: number): string {
   return `t${String(index).padStart(2, '0')}`;
 }
 
+// 모든 사용자가 라운드 시작 시각(시나리오 시작 + 라운드 길이의 배수)에 맞춰 동시에 요청하도록 그때까지 쉰다.
+// 응답이 늦어도 최소 휴식은 지킨다. 그러면 다음 시작 시각으로 넘어간다.
+function restUntilNextRound(minRestSeconds: number): void {
+  const periodMs = WORST_CASE.periodSeconds * 1000;
+  const elapsedMs = Date.now() - exec.scenario.startTime;
+  const nextMs = Math.ceil((elapsedMs + minRestSeconds * 1000) / periodMs) * periodMs;
+  sleep(Math.max(0, nextMs - elapsedMs) / 1000);
+}
+
 export class EndpointRunner {
-  // k6는 VU마다 자바스크립트 런타임이 따로라 이 상태는 VU 하나의 것이다.
-  private state: UserState | undefined;
+  // k6는 VU마다 자바스크립트 런타임이 따로라 이 상태는 VU 하나의 것이다. 시나리오가 바뀌면 다시 만든다.
+  private state: { index: number; user: UserState } | undefined;
 
   constructor(
     private readonly client: HttpClient,
@@ -202,28 +225,31 @@ export class EndpointRunner {
 
   run(index: number, data: EndpointData): void {
     const target = TARGETS[index];
-    const user = exec.vu.idInInstance;
-    const state = this.stateFor(UserIds.fresh(data.runId, index * USERS_PER_TARGET + user));
-    const prepare = new Prepare(this.client, state.token);
+    const user = (exec.vu.idInInstance - 1) % data.seededUsers;
+    const round = exec.vu.iterationInScenario;
+    const state = this.stateFor(index, user);
+    const context: Context = { data, user, round, state, prepare: new Prepare(this.client, state.token) };
 
-    if (!target.bare && state.checklistItemId === 0) {
-      state.checklistItemId = prepare.checklist(data.itemIds);
-      state.appointmentId = prepare.appointment(state.checklistItemId);
+    if (round === 0 && target.prepare !== undefined) {
+      target.prepare(context);
+      restUntilNextRound(0);
     }
 
-    const context: Context = { data, user, iteration: exec.vu.iterationInScenario, state, prepare };
-    const response = this.client.send(state.token, target.request(context));
+    const token = target.freshUser ? this.tokens.issue(UserIds.fresh(data.runId, user + data.seededUsers * round)) : state.token;
+    const response = this.client.send(token, target.request(context));
     target.onResponse?.(context, response);
+
+    target.prepare?.(context);
+    restUntilNextRound(WORST_CASE.minRestSeconds);
   }
 
-  // 시나리오가 바뀌면 같은 VU가 다른 사용자로 다시 시작한다.
-  private stateFor(userId: number): UserState {
-    if (this.state === undefined || this.userId !== userId) {
-      this.userId = userId;
-      this.state = { token: this.tokens.issue(userId), checklistItemId: 0, appointmentId: 0, refreshToken: undefined };
+  private stateFor(index: number, user: number): UserState {
+    if (this.state === undefined || this.state.index !== index) {
+      this.state = {
+        index,
+        user: { token: this.tokens.issue(Seeded.userId(user)), customItemId: 0, pendingId: 0, refreshToken: undefined },
+      };
     }
-    return this.state;
+    return this.state.user;
   }
-
-  private userId = 0;
 }

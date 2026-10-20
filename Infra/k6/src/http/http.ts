@@ -4,6 +4,8 @@ import { Counter } from 'k6/metrics';
 import type { TagProvider } from '../config/shape.ts';
 
 export const serverErrors = new Counter('server_errors');
+// 엔드포인트별로 어떤 상태 코드가 몇 번 왔는지. 상태 0은 연결 실패·시간 초과다.
+export const responses = new Counter('responses');
 
 // name 태그에는 공백과 중괄호가 들어 있어 임계값 식의 태그 값으로 쓸 수 없다. 엔드포인트별 판정은 이 태그로 나눈다.
 export function endpointTag(name: string): string {
@@ -15,6 +17,8 @@ export interface RequestSpec {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   body?: unknown;
+  // 문자열 본문을 JSON 따옴표 없이 그대로 보낸다. 제목·상태 변경 API는 본문 전체가 값이다.
+  rawBody?: boolean;
   expected: readonly number[];
   // 기본은 general. 일부러 4xx를 받는 요청은 따로 태그해 일반 API 판정에서 뺀다.
   kind?: string;
@@ -32,7 +36,7 @@ export class HttpClient {
     const response = http.request(
       spec.method,
       `${this.baseUrl}${spec.path}`,
-      spec.body === undefined ? null : JSON.stringify(spec.body),
+      this.serialize(spec),
       this.params(token, spec),
     );
     this.verify(spec, response);
@@ -45,12 +49,19 @@ export class HttpClient {
       specs.map((spec) => ({
         method: spec.method,
         url: `${this.baseUrl}${spec.path}`,
-        body: spec.body === undefined ? null : JSON.stringify(spec.body),
+        body: this.serialize(spec),
         params: this.params(token, spec),
       })),
     ) as RefinedResponse<'text'>[];
     responses.forEach((response, index) => this.verify(specs[index], response));
     return responses;
+  }
+
+  private serialize(spec: RequestSpec): string | null {
+    if (spec.body === undefined) {
+      return null;
+    }
+    return spec.rawBody && typeof spec.body === 'string' ? spec.body : JSON.stringify(spec.body);
   }
 
   private params(token: string | null, spec: RequestSpec) {
@@ -68,6 +79,9 @@ export class HttpClient {
   private verify(spec: RequestSpec, response: RefinedResponse<'text'>): void {
     if (response.status >= 500) {
       serverErrors.add(1);
+    }
+    if ((spec.kind ?? 'general') === 'general') {
+      responses.add(1, { endpoint: endpointTag(spec.name), code: String(response.status) });
     }
     check(response, {
       [`${spec.name} -> ${spec.expected.join('|')}`]: (r) => spec.expected.includes(r.status),
