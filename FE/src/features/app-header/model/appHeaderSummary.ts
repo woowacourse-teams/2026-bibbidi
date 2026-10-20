@@ -1,32 +1,40 @@
-import type { ChecklistItemStatus } from "../../checklist";
+import type { ChecklistQueryModel } from "../../checklist";
 
 export interface AppHeaderSummaryModel {
+  categories: AppHeaderCategorySummaryModel[];
   completedTaskCount: number;
   totalTaskCount: number;
 }
 
-export interface AppHeaderChecklistItem {
-  status: ChecklistItemStatus;
+export interface AppHeaderCategorySummaryModel {
+  id: string;
+  title: string;
+  completedTaskCount: number;
+  totalTaskCount: number;
 }
 
 export function createAppHeaderSummaryModel(
-  items: readonly AppHeaderChecklistItem[],
+  checklist: ChecklistQueryModel,
 ): AppHeaderSummaryModel {
+  const categories = checklist.categories.map((category) => {
+    const items = category.items;
+    return {
+      id: category.id,
+      title: category.title,
+      completedTaskCount: items.filter((item) => item.status === "done").length,
+      totalTaskCount: items.length,
+    };
+  });
+
   return {
-    completedTaskCount: items.filter((item) => item.status === "done").length,
-    totalTaskCount: items.length,
+    categories,
+    completedTaskCount: categories.reduce(
+      (total, category) => total + category.completedTaskCount,
+      0,
+    ),
+    totalTaskCount: categories.reduce(
+      (total, category) => total + category.totalTaskCount,
+      0,
+    ),
   };
-}
-
-export function calculatePreparationProgress(
-  completedTaskCount: number,
-  totalTaskCount: number,
-) {
-  if (totalTaskCount <= 0) {
-    return 0;
-  }
-
-  const progress = Math.round((completedTaskCount / totalTaskCount) * 100);
-
-  return Math.min(100, Math.max(0, progress));
 }

@@ -1,0 +1,111 @@
+.preparation-progress-popover {
+  position: fixed;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--color-bg-neutral-weak);
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 2px 0 rgb(54 56 61 / 10%);
+  color: var(--color-fg-neutral);
+  white-space: normal;
+}
+
+.preparation-progress-popover__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preparation-progress-popover h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.preparation-progress-popover__heading button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.preparation-progress-popover__heading button:hover {
+  background: var(--color-bg-neutral-weak);
+}
+
+.preparation-progress-popover > p {
+  margin: 2px 0 10px;
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.preparation-progress-popover__list {
+  min-height: 0;
+  margin: 0;
+  padding: 4px 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--color-bg-neutral-weak);
+}
+
+.preparation-progress-popover ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preparation-progress-popover li {
+  display: grid;
+  min-height: 32px;
+  grid-template-columns: minmax(0, 56px) minmax(0, 1fr) 36px 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.preparation-progress-popover__category {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preparation-progress-popover li strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preparation-progress-popover__track,
+.preparation-progress-popover__track > span {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-bg-neutral-weak);
+}
+
+.preparation-progress-popover__track > span {
+  background: var(--color-palette-coral-muted);
+}
+
+.preparation-progress-popover__count {
+  color: var(--color-fg-neutral-muted);
+  text-align: right;
+}
+
+.preparation-progress-popover button:focus-visible,
+.preparation-progress-popover__list:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}

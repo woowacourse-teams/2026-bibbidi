@@ -1,16 +1,20 @@
-import { useRef } from "react";
+import { useId, useRef } from "react";
 
 import { AppHeaderSummaryViewModel } from "../view-model/createAppHeaderSummaryViewModel";
 import { WeddingDatePopover } from "./WeddingDatePopover";
+import { PreparationProgressPopover } from "./PreparationProgressPopover";
 import "./AppHeaderSummary.css";
 
 interface AppHeaderSummaryProps {
   isPopoverOpen: boolean;
+  isProgressPopoverOpen: boolean;
   isSaving: boolean;
   onClosePopover: () => void;
+  onCloseProgressPopover: () => void;
   onOpenPopover: () => void;
   onRetryWeddingDate: () => void;
   onSaveWeddingDate: (date: string) => void;
+  onToggleProgressPopover: () => void;
   saveError: string | null;
   viewModel: AppHeaderSummaryViewModel;
   weddingDate: string | null;
@@ -18,16 +22,21 @@ interface AppHeaderSummaryProps {
 
 export function AppHeaderSummary({
   isPopoverOpen,
+  isProgressPopoverOpen,
   isSaving,
   onClosePopover,
+  onCloseProgressPopover,
   onOpenPopover,
   onRetryWeddingDate,
   onSaveWeddingDate,
+  onToggleProgressPopover,
   saveError,
   viewModel,
   weddingDate,
 }: AppHeaderSummaryProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const progressTriggerRef = useRef<HTMLButtonElement>(null);
+  const progressPopoverId = useId();
   const isWeddingDateUnset =
     viewModel.weddingDateStatus === "loaded" && weddingDate === null;
   const dateDisplay = (
@@ -95,24 +104,53 @@ export function AppHeaderSummary({
       {viewModel.progress ? (
         <>
           <span aria-hidden="true" className="app-header-summary__separator" />
-          <div className="app-header-summary__progress">
-            <svg
-              aria-hidden="true"
-              className="app-header-summary__progress-ring"
-              viewBox="0 0 24 24"
+          <div>
+            <button
+              aria-controls={
+                isProgressPopoverOpen ? progressPopoverId : undefined
+              }
+              aria-expanded={isProgressPopoverOpen}
+              aria-haspopup="dialog"
+              aria-label={`전체 완료율 ${viewModel.progress.label}, ${viewModel.progress.taskCountLabel}개 완료. 카테고리별 완료율 보기`}
+              className="app-header-summary__progress"
+              disabled={isSaving}
+              onClick={onToggleProgressPopover}
+              ref={progressTriggerRef}
+              type="button"
             >
-              <circle cx="12" cy="12" pathLength="100" r="9" />
-              <circle
-                className="app-header-summary__progress-range"
-                cx="12"
-                cy="12"
-                pathLength="100"
-                r="9"
-                strokeDasharray={`${viewModel.progress.percentage} ${100 - viewModel.progress.percentage}`}
+              <svg
+                aria-hidden="true"
+                className="app-header-summary__progress-ring"
+                viewBox="0 0 24 24"
+              >
+                <circle cx="12" cy="12" pathLength="100" r="9" />
+                <circle
+                  className="app-header-summary__progress-range"
+                  cx="12"
+                  cy="12"
+                  pathLength="100"
+                  r="9"
+                  strokeDasharray={`${viewModel.progress.percentage} ${100 - viewModel.progress.percentage}`}
+                />
+              </svg>
+              <strong>{viewModel.progress.label}</strong>
+              <span>{viewModel.progress.taskCountLabel}</span>
+              <svg
+                aria-hidden="true"
+                className="app-header-summary__progress-chevron"
+                viewBox="0 0 16 16"
+              >
+                <path d="m5 6 3 3 3-3" />
+              </svg>
+            </button>
+            {isProgressPopoverOpen ? (
+              <PreparationProgressPopover
+                id={progressPopoverId}
+                onClose={onCloseProgressPopover}
+                progress={viewModel.progress}
+                triggerRef={progressTriggerRef}
               />
-            </svg>
-            <strong>{viewModel.progress.label}</strong>
-            <span>{viewModel.progress.taskCountLabel}</span>
+            ) : null}
           </div>
         </>
       ) : null}

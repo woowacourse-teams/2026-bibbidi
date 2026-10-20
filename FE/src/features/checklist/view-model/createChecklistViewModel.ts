@@ -202,7 +202,7 @@ function createGroup(
   const completedCount = tasks.filter(
     (task) => task.status === "complete",
   ).length;
-  const progress = calculateChecklistProgress(tasks);
+  const progress = calculateChecklistProgress(completedCount, tasks.length);
 
   return {
     completedCount,
@@ -271,7 +271,7 @@ export function createChecklistViewModel(
     const completedCount = tasks.filter(
       (task) => task.status === "complete",
     ).length;
-    const progress = calculateChecklistProgress(tasks);
+    const progress = calculateChecklistProgress(completedCount, tasks.length);
 
     return {
       completedCount,

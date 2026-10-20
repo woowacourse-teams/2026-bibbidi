@@ -1,4 +1,5 @@
 export { ChecklistFeature } from "./ChecklistFeature";
+export { calculateChecklistProgress } from "./model/checklist";
 export {
   MyChecklistProvider,
   useMyChecklistCommandRepository,
