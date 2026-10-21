@@ -1,6 +1,6 @@
-package com.bibbidi.wedding.chat.config;
+package com.bibbidi.wedding.chat.adapter.ai.config;
 
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import org.springframework.context.annotation.Bean;

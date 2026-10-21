@@ -27,9 +27,10 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
-import com.bibbidi.wedding.chat.adapter.ai.AiChatStreamRecorder;
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
@@ -92,7 +93,8 @@ import tools.jackson.databind.node.ObjectNode;
 @WebMvcTest(AiChatController.class)
 @Import({
         SecurityTestConfig.class, SseStreamManager.class, SseConfig.class,
-        AiChatService.class, SpringAiConversationAdapter.class, JacksonChatAnswerParser.class,
+        AiChatService.class, SpringAiConversationAdapter.class, SpringAiChatClient.class,
+        JacksonChatAnswerParser.class,
         AiChatControllerTest.ChatInfrastructure.class
 })
 @ExtendWith(RestDocumentationExtension.class)

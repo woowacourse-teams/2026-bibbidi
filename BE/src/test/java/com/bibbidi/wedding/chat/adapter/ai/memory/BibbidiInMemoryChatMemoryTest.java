@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.memory;
 
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import java.time.Clock;

@@ -12,13 +12,17 @@ import static org.springframework.transaction.support.TransactionSynchronization
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
-import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.catalog.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.checklist.ChecklistServiceAdapter;
-import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
-import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.service.AiChatService;
+import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
+import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
@@ -27,9 +31,6 @@ import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.util.Shuffler;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
-import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,7 +96,7 @@ class BibbidiCustomChatPromptContextTransactionTest {
             BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
             ObjectMapper mapper = context.getBean(ObjectMapper.class);
             ChecklistService checklist = context.getBean(ChecklistService.class);
-            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory, mapper,
                     AiChatStreamRecorderFixture.create()),
                     new CatalogServiceAdapter(context.getBean(CatalogService.class)),
                     new ChecklistServiceAdapter(checklist),
@@ -126,7 +127,7 @@ class BibbidiCustomChatPromptContextTransactionTest {
             BibbidiInMemoryChatMemory memory = context.getBean(BibbidiInMemoryChatMemory.class);
             ObjectMapper mapper = context.getBean(ObjectMapper.class);
             ChecklistService checklist = context.getBean(ChecklistService.class);
-            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+            AiChatService chat = new AiChatService(new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory, mapper,
                     AiChatStreamRecorderFixture.create()),
                     new CatalogServiceAdapter(context.getBean(CatalogService.class)),
                     new ChecklistServiceAdapter(checklist),

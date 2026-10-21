@@ -2,7 +2,7 @@ package com.bibbidi.wedding.chat.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.service.AiChatService;

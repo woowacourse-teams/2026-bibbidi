@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistItemSnapshot;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
@@ -46,7 +48,7 @@ class SpringAiConversationAdapterTest {
         registry = new SimpleMeterRegistry();
         model = new FakeChatModel();
         memory = new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
-        adapter = new SpringAiConversationAdapter(ChatClient.create(model), memory,
+        adapter = new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory,
                 JsonMapper.builder().findAndAddModules().build(), AiChatStreamRecorderFixture.create(registry));
     }
 

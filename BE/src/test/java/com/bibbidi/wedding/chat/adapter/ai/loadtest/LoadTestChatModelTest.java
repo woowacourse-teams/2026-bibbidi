@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.loadtest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,8 +11,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.boot.context.annotation.UserConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import reactor.test.StepVerifier;
-import tools.jackson.databind.json.JsonMapper;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
+import tools.jackson.databind.json.JsonMapper;
 
 class LoadTestChatModelTest {
 

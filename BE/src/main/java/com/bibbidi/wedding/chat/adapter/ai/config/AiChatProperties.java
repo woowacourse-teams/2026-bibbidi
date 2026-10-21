@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.config;
+package com.bibbidi.wedding.chat.adapter.ai.config;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

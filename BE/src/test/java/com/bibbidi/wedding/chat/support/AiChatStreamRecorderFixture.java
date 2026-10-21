@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.support;
 
-import com.bibbidi.wedding.chat.adapter.ai.AiChatStreamRecorder;
+import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 

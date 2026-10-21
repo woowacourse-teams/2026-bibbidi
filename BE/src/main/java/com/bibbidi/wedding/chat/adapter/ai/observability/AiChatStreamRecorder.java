@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.observability;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -72,7 +72,7 @@ public class AiChatStreamRecorder {
         return ERROR;
     }
 
-    static String textOf(ChatResponse response) {
+    public static String textOf(ChatResponse response) {
         if (response.getResult() == null
                 || response.getResult().getOutput() == null
                 || response.getResult().getOutput().getText() == null) {
