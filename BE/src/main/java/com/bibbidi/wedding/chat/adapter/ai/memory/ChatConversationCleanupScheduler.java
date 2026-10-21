@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.memory;
 
 import com.bibbidi.wedding.chat.adapter.ai.config.AiChatProperties;
 import lombok.extern.slf4j.Slf4j;

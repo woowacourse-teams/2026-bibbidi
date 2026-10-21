@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.loadtest;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;

@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.ai;
+package com.bibbidi.wedding.chat.adapter.ai.loadtest;
 
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

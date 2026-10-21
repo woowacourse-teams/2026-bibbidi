@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
+import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;

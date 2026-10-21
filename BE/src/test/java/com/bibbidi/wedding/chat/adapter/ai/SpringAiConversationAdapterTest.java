@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistItemSnapshot;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
