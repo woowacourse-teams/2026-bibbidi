@@ -3,8 +3,8 @@ import { isValidChatMessage } from "../model/aiChat";
 import { readSseEvents, SseEvent } from "./readSseEvents";
 
 const CHAT_ENDPOINT = `${__BIBBIDI_API_BASE_URL__.replace(/\/+$/, "")}/api/ai/chat`;
-// 서버의 30초 제한 뒤에도 완료/실패 이벤트가 도착하지 않으면 수신을 종료한다.
-const CHAT_TIMEOUT_MS = 45_000;
+// 서버의 기본 60초 제한 뒤 15초의 수신 여유를 두고 완료/실패 이벤트를 기다린다.
+const CHAT_TIMEOUT_MS = 75_000;
 const UUID_PATTERN = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
 
 export class AiChatApiError extends Error {

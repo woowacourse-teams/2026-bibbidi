@@ -383,7 +383,53 @@ describe("AI 채팅 SSE 통신", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("전체 제한 시간이 지나면 수신을 끝내고 재요청하지 않는다", async () => {
+  it.each(["done", "failure"])(
+    "60초 시점에 도착한 %s 이벤트를 처리하고 타이머를 정리한다",
+    async (terminalEvent) => {
+      vi.useFakeTimers();
+      let source!: ReadableStreamDefaultController<Uint8Array>;
+      const cancel = vi.fn();
+      fetchMock.mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              source = controller;
+              controller.enqueue(encoder.encode(conversation));
+            },
+            cancel,
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      );
+      const { receiver, promise } = receive();
+      const settled = vi.fn();
+      const completion = promise.then(
+        () => settled("done"),
+        () => settled("failure"),
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(settled).not.toHaveBeenCalled();
+      expect(cancel).not.toHaveBeenCalled();
+      source.enqueue(
+        encoder.encode(
+          delta("늦게 도착한 답변") +
+            (terminalEvent === "done"
+              ? done
+              : 'event: failure\ndata: {"errorCode":901,"message":"공개 실패 안내"}\n\n'),
+        ),
+      );
+      await completion;
+      expect(settled).toHaveBeenCalledExactlyOnceWith(terminalEvent);
+      expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith(
+        "늦게 도착한 답변",
+      );
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("75초까지 완료·실패 이벤트가 없으면 수신을 끝내고 재요청하지 않는다", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
     fetchMock.mockResolvedValue(
@@ -393,7 +439,9 @@ describe("AI 채팅 SSE 통신", () => {
     );
     const { promise } = receive();
     const rejection = expect(promise).rejects.toBeInstanceOf(AiChatApiError);
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(74_999);
+    expect(cancel).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     await rejection;
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledOnce();
