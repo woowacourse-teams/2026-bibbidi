@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.config.AiChatConfig;
 import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
@@ -62,7 +63,8 @@ class EvaluationChatRunnerTest {
 
     private final FakeChatModel fakeModel = new FakeChatModel(BedrockChatOptions.builder().build());
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(AiChatConfig.class, SpringAiConversationAdapter.class, AiChatService.class,
+            .withUserConfiguration(AiChatConfig.class, SpringAiChatClient.class,
+                    SpringAiConversationAdapter.class, AiChatService.class,
                     JacksonChatAnswerParser.class, PipelineConfiguration.class,
                     BibbidiEvaluationIntegrationTest.ModelRecordingConfiguration.class)
             .withBean(ChatModel.class, () -> fakeModel)
