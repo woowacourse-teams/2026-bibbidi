@@ -1,19 +1,25 @@
 package com.bibbidi.wedding.chat.adapter.ai.config;
 
+import com.bibbidi.wedding.chat.adapter.ai.memory.ExpiringChatMemoryRepository;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
+import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
 import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import java.util.Map;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(AiChatProperties.class)
 public class AiChatConfig {
 
     @Bean
@@ -21,11 +27,24 @@ public class AiChatConfig {
             ChatClient.Builder chatClientBuilder,
             ChatMemory chatMemory,
             ChatOptions.Builder<?> structuredAnswerOptions,
-            SystemPrompt systemPrompt
+            SystemPrompt systemPrompt,
+            CatalogServiceAdapter catalogTools,
+            ChecklistServiceAdapter checklistTools
     ) {
         return chatClientBuilder.defaultOptions(structuredAnswerOptions)
                 .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+
+    @Bean
+    ChatMemory chatMemory(AiChatProperties properties) {
+        return MessageWindowChatMemory.builder()
+                .chatMemoryRepository(
+                        new ExpiringChatMemoryRepository(properties.conversationIdleTimeout())
+                )
+                .maxMessages(properties.memoryMaxMessages())
                 .build();
     }
 
