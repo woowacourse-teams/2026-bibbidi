@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
@@ -9,7 +10,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Map;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -21,13 +21,13 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class SpringAiConversationAdapter implements AiConversationPort {
 
-    private final ChatClient chatClient;
+    private final SpringAiChatClient chatClient;
     private final BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory;
     private final ObjectMapper mapper;
     private final AiChatStreamRecorder recorder;
 
     public SpringAiConversationAdapter(
-            ChatClient chatClient,
+            SpringAiChatClient chatClient,
             BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory,
             ObjectMapper mapper,
             AiChatStreamRecorder recorder
@@ -63,12 +63,7 @@ public class SpringAiConversationAdapter implements AiConversationPort {
 
         Flux<String> answerFlux = recorder.record(
                         userPrompt,
-                        chatClient.prompt()
-                                .messages(memories)
-                                .messages(checklist, catalog)
-                                .messages(userMessage)
-                                .stream()
-                                .chatResponse()
+                        chatClient.stream(memories, checklist, catalog, userMessage)
                 )
                 .onErrorMap(SpringAiConversationAdapter::isThrottled, exception -> new BusinessException(
                         ClientError.AI_CAPACITY_EXCEEDED, "Bedrock 호출 한도 초과", exception))

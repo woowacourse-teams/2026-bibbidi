@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
@@ -73,7 +74,7 @@ class AiChatLifecycleTest {
         ChecklistLookupPort checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
-        chat = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+        chat = new AiChatService(new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory, mapper,
                 AiChatStreamRecorderFixture.create()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));

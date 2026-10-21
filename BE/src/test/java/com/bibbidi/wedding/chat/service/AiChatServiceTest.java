@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
@@ -79,7 +80,7 @@ class AiChatServiceTest {
         catalogService = mock(CatalogLookupPort.class);
         checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        service = new AiChatService(new SpringAiConversationAdapter(ChatClient.create(model), memory, mapper,
+        service = new AiChatService(new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory, mapper,
                 AiChatStreamRecorderFixture.create()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
