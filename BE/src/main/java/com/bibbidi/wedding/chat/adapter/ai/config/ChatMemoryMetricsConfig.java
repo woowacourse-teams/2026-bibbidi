@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.config;
+package com.bibbidi.wedding.chat.adapter.ai.config;
 
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import io.micrometer.core.instrument.Gauge;

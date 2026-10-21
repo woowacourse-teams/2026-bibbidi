@@ -11,7 +11,7 @@ import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
-import com.bibbidi.wedding.chat.config.AiChatConfig;
+import com.bibbidi.wedding.chat.adapter.ai.config.AiChatConfig;
 import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
 import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
