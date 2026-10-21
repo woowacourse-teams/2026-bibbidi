@@ -266,6 +266,57 @@ describe("실제 AI 채팅", () => {
     });
   });
 
+  it.each([false, true])(
+    "모바일 여부 %s에서 한도 초과는 별도로 안내하고 미완료 답변을 수동 재시도한다",
+    async (isMobile) => {
+      const reply = pendingReply();
+      if (isMobile) mockMobileDialog();
+      render(chat());
+      if (isMobile)
+        fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+      await send("질문");
+      reply.delta("중간 답변");
+      await reply.fail(new AiChatApiError(undefined, 902));
+      expect(screen.getByRole("alert").textContent).toContain(
+        "요청이 많아 AI가 답변하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+      expect(screen.getByText("중간 답변")).toBeTruthy();
+      expect(screen.getByText("미완료 답변")).toBeTruthy();
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(authRequired).not.toHaveBeenCalled();
+      expect(mocks.stream).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+      await screen.findByText("실제 AI 답변이에요.");
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText("중간 답변")).toBeNull();
+      expect(screen.queryByText("미완료 답변")).toBeNull();
+      expect(within(screen.getByRole("log")).getAllByText("질문")).toHaveLength(
+        1,
+      );
+      expect(mocks.stream).toHaveBeenCalledTimes(2);
+      expect(mocks.stream.mock.calls[1][0]).toEqual({
+        message: "질문",
+        conversationId: id,
+      });
+    },
+  );
+
+  it.each([901, 999, undefined])(
+    "오류 코드 %s는 기존 공통 실패 안내를 표시한다",
+    async (errorCode) => {
+      mocks.stream.mockRejectedValueOnce(
+        new AiChatApiError(undefined, errorCode),
+      );
+      render(chat());
+      await send("질문");
+      expect((await screen.findByRole("alert")).textContent).toContain(
+        "답변을 끝까지 받지 못했어요. 다시 시도해 주세요.",
+      );
+      expect(authRequired).not.toHaveBeenCalled();
+    },
+  );
+
   it("인증 만료는 안전하게 안내하고 기존 인증 상태를 다시 확인한다", async () => {
     mocks.stream.mockRejectedValueOnce(new AiChatApiError(401));
     render(chat());

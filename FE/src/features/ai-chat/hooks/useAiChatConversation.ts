@@ -81,7 +81,9 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
       setErrorMessage(
         authenticationRequired
           ? "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
-          : "답변을 끝까지 받지 못했어요. 다시 시도해 주세요.",
+          : error instanceof AiChatApiError && error.capacityExceeded
+            ? "요청이 많아 AI가 답변하지 못했습니다. 잠시 후 다시 시도해 주세요."
+            : "답변을 끝까지 받지 못했어요. 다시 시도해 주세요.",
       );
       if (authenticationRequired) onAuthenticationRequired();
     } finally {

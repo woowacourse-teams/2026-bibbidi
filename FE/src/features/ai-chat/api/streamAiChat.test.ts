@@ -263,7 +263,67 @@ describe("AI 채팅 SSE 통신", () => {
     expect(receiver.onDelta).not.toHaveBeenCalled();
   });
 
-  it.each([400, 401, 403, 500])(
+  it.each([901, 902, 999, 401])(
+    "failure의 오류 코드 %s를 HTTP 상태와 분리해 전달한다",
+    async (errorCode) => {
+      fetchMock.mockResolvedValue(
+        response([
+          encoder.encode(
+            conversation +
+              delta("중간 답변") +
+              `event: failure\ndata: ${JSON.stringify({ errorCode, message: "secret upstream error" })}\n\n` +
+              done,
+          ),
+        ]),
+      );
+      const { receiver, promise } = receive();
+      await expect(promise).rejects.toMatchObject({
+        errorCode,
+        status: undefined,
+        authenticationRequired: false,
+        capacityExceeded: errorCode === 902,
+        message: "AI 답변을 끝까지 받지 못했습니다.",
+      });
+      expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith("중간 답변");
+      expect(fetchMock).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("대화 시작 전에 도착한 한도 초과도 구분한다", async () => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          'event: failure\ndata: {"errorCode":902,"message":"secret upstream error"}\n\n',
+        ),
+      ]),
+    );
+    await expect(receive().promise).rejects.toMatchObject({
+      errorCode: 902,
+      capacityExceeded: true,
+    });
+  });
+
+  it.each([
+    '{"message":"secret upstream error"}',
+    '{"errorCode":"902","message":"secret upstream error"}',
+    '{"errorCode":902.5,"message":"secret upstream error"}',
+    '{"errorCode":902}',
+    '{"errorCode":902,"message":null}',
+    "null",
+    "[]",
+    "invalid-json",
+  ])("구형·잘못된 failure 데이터 %s는 공통 오류로 처리한다", async (data) => {
+    fetchMock.mockResolvedValue(
+      response([encoder.encode(`event: failure\ndata: ${data}\n\n`)]),
+    );
+    await expect(receive().promise).rejects.toMatchObject({
+      errorCode: undefined,
+      capacityExceeded: false,
+      message: "AI 답변을 끝까지 받지 못했습니다.",
+    });
+  });
+
+  it.each([400, 401, 403, 500, 503])(
     "HTTP %s를 안전한 오류로 전달한다",
     async (status) => {
       fetchMock.mockResolvedValue(new Response("secret response", { status }));

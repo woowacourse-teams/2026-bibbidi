@@ -8,13 +8,20 @@ const CHAT_TIMEOUT_MS = 45_000;
 const UUID_PATTERN = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
 
 export class AiChatApiError extends Error {
-  constructor(readonly status?: number) {
+  constructor(
+    readonly status?: number,
+    readonly errorCode?: number,
+  ) {
     super("AI 답변을 끝까지 받지 못했습니다.");
     this.name = "AiChatApiError";
   }
 
   get authenticationRequired(): boolean {
     return this.status === 401;
+  }
+
+  get capacityExceeded(): boolean {
+    return this.errorCode === 902;
   }
 }
 
@@ -41,9 +48,21 @@ function createChatEventHandler(request: ChatRequest, receiver: ChatReceiver) {
       )
     )
       return false;
-    if (event.type === "failure") throw new AiChatApiError();
     const value: unknown = JSON.parse(event.data);
     if (typeof value !== "object" || value === null) throw new AiChatApiError();
+    if (event.type === "failure") {
+      if (
+        !("errorCode" in value) ||
+        typeof value.errorCode !== "number" ||
+        !Number.isSafeInteger(value.errorCode) ||
+        value.errorCode < 100 ||
+        value.errorCode > 999 ||
+        !("message" in value) ||
+        typeof value.message !== "string"
+      )
+        throw new AiChatApiError();
+      throw new AiChatApiError(undefined, value.errorCode);
+    }
     if (event.type === "component") {
       if (
         !conversationId ||
