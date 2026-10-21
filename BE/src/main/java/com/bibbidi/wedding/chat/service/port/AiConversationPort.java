@@ -7,5 +7,4 @@ public interface AiConversationPort {
 
     AiResponseStream stream(String conversationKey, String userPrompt, BibbidiCustomChatPromptContext context);
 
-    void remember(String conversationKey, String userPrompt, String answer);
 }

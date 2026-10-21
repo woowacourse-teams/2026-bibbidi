@@ -18,15 +18,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
 @Service
-@Slf4j
 public class AiChatService {
 
     private final AiConversationPort conversationPort;
@@ -87,7 +84,7 @@ public class AiChatService {
                         }
                 );
 
-        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, message,
+        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id,
                 response.recommendableItemIds(), answer));
         return Flux.concat(answerEvents, completion);
     }
@@ -112,7 +109,7 @@ public class AiChatService {
         return new BibbidiCustomChatPromptContext(checklist, catalog, recommendableIds);
     }
 
-    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
+    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id,
                                            Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
         ChatAnswer answer = stream.finish();
         List<Long> suggestedIds = answer.recommendedItemIds().stream()
@@ -128,17 +125,7 @@ public class AiChatService {
         }
         return Flux.concat(
                 Flux.fromIterable(events),
-                Flux.just(new ChatEvent.Done(id.toString())),
-                Mono.fromRunnable(() -> rememberTurn(key, message, answer.answer()))
-                        .then(Mono.empty())
+                Flux.just(new ChatEvent.Done(id.toString()))
         );
-    }
-
-    private void rememberTurn(ConversationKey key, String message, String answer) {
-        try {
-            conversationPort.remember(key.toMemoryKey(), message, answer);
-        } catch (RuntimeException exception) {
-            log.error("AI 대화 저장 실패", exception);
-        }
     }
 }
