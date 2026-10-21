@@ -29,7 +29,6 @@ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
@@ -54,8 +53,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,10 +67,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -109,8 +113,6 @@ class AiChatControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
-    private FakeChatModel model;
-    @Autowired
     private SimpleMeterRegistry registry;
     @MockitoBean
     private BibbidiTokenParser bibbidiTokenParser;
@@ -119,13 +121,18 @@ class AiChatControllerTest {
     @MockitoBean
     private ChecklistLookupPort checklistLookup;
     private MockMvc mockMvc;
+    private static final List<Prompt> RECEIVED_PROMPTS = new CopyOnWriteArrayList<>();
+    private static volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
 
     @TestConfiguration
     static class ChatInfrastructure {
 
         @Bean
         FakeChatModel fakeChatModel() {
-            return new FakeChatModel();
+            return new FakeChatModel(prompt -> {
+                RECEIVED_PROMPTS.add(prompt);
+                return responder.apply(prompt);
+            });
         }
 
         @Bean
@@ -134,8 +141,8 @@ class AiChatControllerTest {
         }
 
         @Bean
-        BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory() {
-            return new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
+        ChatMemory bibbidiInMemoryChatMemory() {
+            return MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).maxMessages(18).build();
         }
 
         @Bean
@@ -151,7 +158,8 @@ class AiChatControllerTest {
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
-        model.reset();
+        RECEIVED_PROMPTS.clear();
+        responder = prompt -> Flux.empty();
         when(catalogLookup.findAllItemDetails()).thenReturn(List.of(
                 new CatalogItemDetailSnapshot(1L, "웨딩홀 후보 정하기", "웨딩홀", 1, "후보"),
                 new CatalogItemDetailSnapshot(2L, "스튜디오 후보 정하기", "촬영", 1, "후보"),
@@ -167,7 +175,7 @@ class AiChatControllerTest {
     void streamsConversationAnswerChunksAndComponentsBeforeCompletion() throws Exception {
         // given
         TestPublisher<ChatResponse> modelOutput = TestPublisher.create();
-        model.respondWith(modelOutput.flux());
+        respondWith(modelOutput.flux());
 
         // when
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
@@ -208,7 +216,7 @@ class AiChatControllerTest {
     void recordsTtftOnceAfterTheFirstDeltaIsSent() throws Exception {
         // given
         long previousCount = registry.get("ai.chat.ttft").timer().count();
-        model.respondWith(Flux.just(
+        respondWith(Flux.just(
                 chunk("{\"answer\":\"웨딩홀 "),
                 chunk("계약\",\"recommendedItemIds\":[]}")));
 
@@ -230,7 +238,7 @@ class AiChatControllerTest {
     void doesNotRecordTtftWithoutDelta() throws Exception {
         // given
         long previousCount = registry.get("ai.chat.ttft").timer().count();
-        model.respondWith(Flux.empty());
+        respondWith(Flux.empty());
 
         // when
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
@@ -249,7 +257,7 @@ class AiChatControllerTest {
     @DisplayName("정상 완료 시 SSE 응답 계약을 만족한다")
     void documentsTheCompletedSseResponseContract() throws Exception {
         // given
-        model.respondWith(Flux.just(
+        respondWith(Flux.just(
                 chunk("{\"answer\":\"웨딩홀 "),
                 chunk("계약을 확인하세요.\",\"recommendedItemIds\":[1,2,3]}")));
 
@@ -290,7 +298,7 @@ class AiChatControllerTest {
     @DisplayName("답변 생성이 실패하면 고정된 공개 오류 메시지를 전송하고 완료 이벤트를 보내지 않는다")
     void streamErrorsSendOnlyTheFixedPublicMessageAndNeverDone() throws Exception {
         // given
-        model.respondWith(Flux.concat(
+        respondWith(Flux.concat(
                 Flux.just(chunk("{\"answer\":\"일부 답변")),
                 Flux.error(new IllegalStateException("외부 API 비밀 원문"))));
 
@@ -323,7 +331,7 @@ class AiChatControllerTest {
         when(bibbidiTokenParser.parseAccessToken(token)).thenReturn(
                 new BibbidiTokenClaims(USER_ID, UserStatus.ACTIVE, UserRole.NORMAL, "테스트회원", null));
         CountDownLatch answerAllowed = new CountDownLatch(1);
-        model.respondWith(Flux.defer(() -> {
+        respondWith(Flux.defer(() -> {
             awaitLatch(answerAllowed);
             return fails
                     ? Flux.concat(Flux.just(chunk("{\"answer\":\"답변")),
@@ -373,7 +381,7 @@ class AiChatControllerTest {
         // given
         CountDownLatch modelSubscribed = new CountDownLatch(1);
         AtomicBoolean modelCancelled = new AtomicBoolean();
-        model.respondWith(Flux.<ChatResponse>never()
+        respondWith(Flux.<ChatResponse>never()
                 .doOnSubscribe(subscription -> modelSubscribed.countDown())
                 .doOnCancel(() -> modelCancelled.set(true)));
         MvcResult result = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
@@ -398,7 +406,7 @@ class AiChatControllerTest {
         // given
         CountDownLatch modelSubscribed = new CountDownLatch(1);
         AtomicBoolean modelCancelled = new AtomicBoolean();
-        model.respondWith(Flux.<ChatResponse>never()
+        respondWith(Flux.<ChatResponse>never()
                 .doOnSubscribe(subscription -> modelSubscribed.countDown())
                 .doOnCancel(() -> modelCancelled.set(true)));
         MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
@@ -452,7 +460,7 @@ class AiChatControllerTest {
     @DisplayName("대화 ID 문자열을 UUID로 변환하여 같은 대화로 처리한다")
     void convertsTheConversationIdToUuidBeforeProcessingTheChat() throws Exception {
         // given
-        model.respondWith(Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}")));
+        respondWith(Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}")));
         ObjectNode request = (ObjectNode) objectMapper.valueToTree(new ChatRequest(UUID.fromString(ID), "질문"));
         request.put("conversationId", ID.toUpperCase(Locale.ROOT));
 
@@ -468,7 +476,7 @@ class AiChatControllerTest {
         assertThat(body(completed))
                 .contains("\"conversationId\":\"" + ID + "\"", "event:done")
                 .doesNotContain("event:failure");
-        assertThat(model.lastPrompt().getInstructions().getLast().getText()).isEqualTo("질문");
+        assertThat(RECEIVED_PROMPTS.getLast().getInstructions().getLast().getText()).isEqualTo("질문");
     }
 
     @ParameterizedTest
@@ -511,7 +519,7 @@ class AiChatControllerTest {
 
     private void assertNothingWasProcessed() {
         verifyNoInteractions(catalogLookup, checklistLookup);
-        assertThat(model.prompts()).isEmpty();
+        assertThat(RECEIVED_PROMPTS).isEmpty();
     }
 
     private static String body(MvcResult result) throws Exception {
@@ -529,5 +537,9 @@ class AiChatControllerTest {
             Thread.currentThread().interrupt();
             throw new CancellationException("응답 중단");
         }
+    }
+
+    private static void respondWith(Flux<ChatResponse> response) {
+        responder = prompt -> response;
     }
 }

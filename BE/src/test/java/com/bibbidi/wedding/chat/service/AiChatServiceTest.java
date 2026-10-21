@@ -9,8 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
-import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
@@ -19,6 +17,7 @@ import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
+import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -33,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,9 +42,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -63,8 +64,9 @@ class AiChatServiceTest {
     private static final UUID CONVERSATION_ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99");
     private static final UUID ANOTHER_CONVERSATION_ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea98");
 
-    private FakeChatModel model;
-    private BibbidiInMemoryChatMemory memory;
+    private final List<Prompt> receivedPrompts = new CopyOnWriteArrayList<>();
+    private volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
+    private ChatMemory memory;
     private AiChatService service;
     private List<ChatEvent> received;
     private CatalogLookupPort catalogService;
@@ -74,13 +76,16 @@ class AiChatServiceTest {
 
     @BeforeEach
     void setUp() {
-        model = new FakeChatModel();
+        FakeChatModel model = new FakeChatModel(prompt -> {
+            receivedPrompts.add(prompt);
+            return responder.apply(prompt);
+        });
         ChatMemoryRepository repository = new InMemoryChatMemoryRepository();
-        memory = new BibbidiInMemoryChatMemory(repository, 18);
+        memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
         catalogService = mock(CatalogLookupPort.class);
         checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
-        service = new AiChatService(new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory, mapper,
+        service = new AiChatService(new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
                 AiChatStreamRecorderFixture.create()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
@@ -96,7 +101,7 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("답변을 조각별로 전달하고 완료된 대화만 저장한다")
+    @DisplayName("답변을 조각별로 전달하며 Advisor가 질문을 먼저, 모델 답변을 완료 후 저장한다")
     void streamsChunksAndRecordsOnlyTheCompletedTurn() throws Exception {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
@@ -105,7 +110,7 @@ class AiChatServiceTest {
         // when, then: 답변 조각을 받는 동안에는 대화를 저장하지 않는다
         publisher.next(chunk("{\"answer\":\"웨딩홀 "));
         await().until(() -> received.contains(new ChatEvent.Delta("웨딩홀 ")));
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
         publisher.next(chunk("계약을 확인하세요.\",\"recommendedItemIds\":[]}"));
         await().until(() -> received.contains(new ChatEvent.Delta("계약을 확인하세요.")));
 
@@ -116,14 +121,14 @@ class AiChatServiceTest {
         // then
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("질문", "웨딩홀 계약을 확인하세요.");
+                .containsExactly("질문", "{\"answer\":\"웨딩홀 계약을 확인하세요.\",\"recommendedItemIds\":[]}");
     }
 
     @Test
     @DisplayName("대화 ID가 없으면 새 UUID를 생성해 전달한다")
     void generatesAnIdForANewConversation() {
         // given
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(USER_ID, null, "질문");
@@ -138,7 +143,7 @@ class AiChatServiceTest {
     @DisplayName("인증된 사용자로 최신 정보를 준비하고 모델에는 도구를 전달하지 않는다")
     void loadsTheAuthenticatedUsersContextWithoutTools() {
         // given
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "질문");
@@ -158,21 +163,19 @@ class AiChatServiceTest {
         when(checklistService.findMyChecklistIfPresent(USER_ID))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(new ChecklistWithAppointmentsResult(10L, List.of())));
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "첫 질문");
         runChat(USER_ID, CONVERSATION_ID, "둘째 질문");
 
         // then
-        List<Prompt> prompts = model.prompts();
+        List<Prompt> prompts = receivedPrompts;
         assertThat(prompts).hasSize(2);
-        assertThat(prompts.get(0).getInstructions())
-                .extracting(message -> message.getText())
-                .anySatisfy(text -> assertThat(text).contains("\"exists\":false"));
-        assertThat(prompts.get(1).getInstructions())
-                .extracting(message -> message.getText())
-                .anySatisfy(text -> assertThat(text).contains("\"exists\":true"));
+        assertThat(prompts.get(0).getInstructions()).extracting(message -> message.getText())
+                .containsExactly("첫 질문");
+        assertThat(prompts.get(1).getInstructions()).extracting(message -> message.getText())
+                .containsExactly("첫 질문", jsonAnswer("답변"), "둘째 질문");
         verify(catalogService, times(2)).findAllItemDetails();
         verify(checklistService, times(2)).findMyChecklistIfPresent(USER_ID);
     }
@@ -182,7 +185,7 @@ class AiChatServiceTest {
     void callsTheModelWithoutAnActiveTransaction() throws Exception {
         // given
         AtomicBoolean transactionActive = new AtomicBoolean(true);
-        model.respondWith(prompt -> {
+        respondWith(prompt -> {
             transactionActive.set(TransactionSynchronizationManager.isActualTransactionActive());
             return Flux.just(response("답변"));
         });
@@ -200,7 +203,7 @@ class AiChatServiceTest {
     void reusesHistoryForTheSameUserAndConversation() {
         // given
         givenConversationHistory();
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "추천해줘");
@@ -209,7 +212,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .hasSize(5).startsWith("예산은 1000", "알겠습니다.").endsWith("추천해줘");
+                .containsExactly("예산은 1000", "알겠습니다.", "추천해줘");
     }
 
     @Test
@@ -217,7 +220,7 @@ class AiChatServiceTest {
     void doesNotReuseAnotherUsersHistory() {
         // given
         givenConversationHistory();
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(ANOTHER_USER_ID, CONVERSATION_ID, "추천해줘");
@@ -226,7 +229,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .hasSize(3).endsWith("추천해줘").doesNotContain("예산은 1000", "알겠습니다.");
+                .containsExactly("추천해줘");
     }
 
     @Test
@@ -234,7 +237,7 @@ class AiChatServiceTest {
     void doesNotReuseAnotherConversationsHistory() {
         // given
         givenConversationHistory();
-        model.respondWith(Flux.just(response("답변")));
+        respondWith(Flux.just(response("답변")));
 
         // when
         runChat(USER_ID, ANOTHER_CONVERSATION_ID, "추천해줘");
@@ -243,7 +246,7 @@ class AiChatServiceTest {
         Prompt prompt = captureModelPrompt();
         assertThat(prompt.getInstructions())
                 .extracting(message -> message.getText())
-                .hasSize(3).endsWith("추천해줘").doesNotContain("예산은 1000", "알겠습니다.");
+                .containsExactly("추천해줘");
     }
 
     @Test
@@ -251,7 +254,7 @@ class AiChatServiceTest {
     void userTextWithBracesIsPassedAsLiteralContent() {
         // given
         String question = "예산 {예산}과 조건 {\"촬영\":false}를 참고해줘";
-        model.respondWith(Flux.just(response("확인했어요.")));
+        respondWith(Flux.just(response("확인했어요.")));
 
         // when
         runChat(USER_ID, null, question);
@@ -277,10 +280,10 @@ class AiChatServiceTest {
         // then
         assertThatThrownBy(() -> responseTask.get(5, TimeUnit.SECONDS))
                 .hasCauseInstanceOf(IllegalStateException.class);
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
 
         // given
-        model.respondWith(Flux.just(response("새 답변")));
+        respondWith(Flux.just(response("새 답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "다시 질문");
@@ -288,21 +291,21 @@ class AiChatServiceTest {
         // then
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("다시 질문", "새 답변");
+                .containsExactly("질문", "다시 질문", jsonAnswer("새 답변"));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("emptyAnswers")
-    @DisplayName("답변이 비어 있거나 공백뿐이면 예외를 던지고 대화를 저장하지 않는다")
+    @DisplayName("답변이 비어 있거나 공백뿐이면 예외를 던진다")
     void emptyOrBlankAnswersDoNotRecordATurn(Flux<ChatResponse> answer) {
         // given
-        model.respondWith(answer);
+        respondWith(answer);
 
         // when, then
         assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "질문"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isNotEmpty();
     }
 
     static Stream<Arguments> emptyAnswers() {
@@ -313,10 +316,10 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("답변 뒤의 추천 데이터가 잘못되면 카드를 보내거나 대화를 저장하지 않는다")
+    @DisplayName("추천 데이터가 잘못되면 카드를 보내지 않는다")
     void invalidRecommendationOutputDoesNotCompleteOrRecordTheTurn() {
         // given
-        model.respondWith(Flux.just(
+        respondWith(Flux.just(
                 chunk("{\"answer\":\"부분 답변\",\"recommendedItemIds\":[\"1\"]}")));
 
         // when, then
@@ -324,7 +327,7 @@ class AiChatServiceTest {
                 .isInstanceOf(BusinessException.class);
         assertThat(received).contains(new ChatEvent.Delta("부분 답변"));
         assertThat(received).noneMatch(event -> event instanceof ChatEvent.Component || event instanceof ChatEvent.Done);
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).hasSize(2);
     }
 
     @Test
@@ -332,7 +335,7 @@ class AiChatServiceTest {
     void cancelledSubscriptionDoesNotRecordTheAnswer() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
-        model.respondWith(publisher.flux());
+        respondWith(publisher.flux());
 
         // when
         service.chat(new ChatCommand(USER_ID, CONVERSATION_ID, "질문"))
@@ -345,10 +348,10 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("완료 이벤트를 전달하지 못하면 완성된 답변도 저장하지 않는다")
+    @DisplayName("완료 이벤트 전달이 실패해도 Advisor에는 모델 답변이 저장된다")
     void failedDoneDeliveryDoesNotRecordTheAnswer() {
         // given
-        model.respondWith(Flux.just(response("완성된 답변")));
+        respondWith(Flux.just(response("완성된 답변")));
 
         // when, then
         assertThatThrownBy(() -> service.chat(new ChatCommand(USER_ID, CONVERSATION_ID, "질문"))
@@ -357,15 +360,15 @@ class AiChatServiceTest {
                         throw new CancellationException("연결 종료");
                     }
                 }).blockLast()).isInstanceOf(CancellationException.class);
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).hasSize(2);
     }
 
     @Test
-    @DisplayName("답변 조각 소비가 실패하면 모델 구독을 취소하고 대화를 저장하지 않는다")
+    @DisplayName("답변 조각 소비가 실패하면 모델 구독을 취소하고 질문만 남긴다")
     void consumingAChunkFailureCancelsTheModelAndDiscardsTheTurn() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
-        model.respondWith(publisher.flux());
+        respondWith(publisher.flux());
         Future<?> responseTask = executor.submit(() -> service.chat(new ChatCommand(USER_ID, CONVERSATION_ID, "질문"))
                 .doOnNext(event -> {
                     if (event instanceof ChatEvent.Delta) {
@@ -382,11 +385,11 @@ class AiChatServiceTest {
         assertThatThrownBy(() -> responseTask.get(5, TimeUnit.SECONDS))
                 .hasCauseInstanceOf(CancellationException.class);
         publisher.assertCancelled();
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
     }
 
     @Test
-    @DisplayName("응답 작업이 중단되면 모델 구독을 취소하고 늦게 도착한 답변을 저장하지 않는다")
+    @DisplayName("응답 작업 중단 후 늦게 도착한 답변은 저장하지 않는다")
     void interruptCancelsTheModelAndDiscardsLateResults() {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.createNoncompliant(
@@ -404,10 +407,10 @@ class AiChatServiceTest {
 
         // when, then: 중단 이후에 도착한 답변은 저장하지 않는다
         publisher.next(response("늦은 답변")).complete();
-        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).isEmpty();
+        assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
 
         // given
-        model.respondWith(Flux.just(response("재시도")));
+        respondWith(Flux.just(response("재시도")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "재요청");
@@ -415,7 +418,7 @@ class AiChatServiceTest {
         // then
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("재요청", "재시도");
+                .containsExactly("질문", "재요청", jsonAnswer("재시도"));
     }
 
     @Test
@@ -424,7 +427,7 @@ class AiChatServiceTest {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         Future<?> firstResponse = startStreamingChat(publisher);
-        model.respondWith(Flux.just(response("새 답변")));
+        respondWith(Flux.just(response("새 답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "새 질문");
@@ -436,14 +439,14 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("중단된 이전 응답은 부분 답변을 전달했더라도 대화 기록에 저장하지 않는다")
+    @DisplayName("중단된 이전 응답의 질문만 기억에 남는다")
     void supersededTurnIsNotRecordedEvenWithAPartialAnswer() throws Exception {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         Future<?> firstResponse = startStreamingChat(publisher);
         publisher.next(chunk("{\"answer\":\"웨딩홀은 "));
         await().until(() -> received.contains(new ChatEvent.Delta("웨딩홀은 ")));
-        model.respondWith(Flux.just(response("새 답변")));
+        respondWith(Flux.just(response("새 답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "새 질문");
@@ -452,21 +455,21 @@ class AiChatServiceTest {
         firstResponse.get(5, TimeUnit.SECONDS);
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("새 질문", "새 답변");
-        List<Prompt> prompts = model.prompts();
+                .containsExactly("질문", "새 질문", jsonAnswer("새 답변"));
+        List<Prompt> prompts = receivedPrompts;
         assertThat(prompts).hasSize(2);
         assertThat(prompts.getLast().getInstructions())
                 .extracting(message -> message.getText())
-                .doesNotContain("질문", "웨딩홀은 ");
+                .doesNotContain("웨딩홀은 ");
     }
 
     @Test
-    @DisplayName("답변 조각을 받기 전에 중단된 요청은 대화 기록에 저장하지 않는다")
+    @DisplayName("답변 조각 전 중단된 요청의 질문은 기억에 남는다")
     void supersededTurnWithoutAnswerChunksIsNotRecorded() throws Exception {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         Future<?> firstResponse = startStreamingChat(publisher);
-        model.respondWith(Flux.just(response("새 답변")));
+        respondWith(Flux.just(response("새 답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "새 질문");
@@ -475,7 +478,7 @@ class AiChatServiceTest {
         firstResponse.get(5, TimeUnit.SECONDS);
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("새 질문", "새 답변");
+                .containsExactly("질문", "새 질문", jsonAnswer("새 답변"));
     }
 
     @Test
@@ -486,11 +489,11 @@ class AiChatServiceTest {
         startStreamingChat(firstPublisher);
         TestPublisher<ChatResponse> secondPublisher = TestPublisher.create();
         CountDownLatch secondSubscribed = new CountDownLatch(1);
-        model.respondWith(secondPublisher.flux()
+        respondWith(secondPublisher.flux()
                 .doOnSubscribe(ignored -> secondSubscribed.countDown()));
         Future<?> secondResponse = executor.submit(() -> runChat(USER_ID, CONVERSATION_ID, "둘째 질문"));
         await().until(() -> secondSubscribed.getCount() == 0);
-        model.respondWith(Flux.just(response("셋째 답변")));
+        respondWith(Flux.just(response("셋째 답변")));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "셋째 질문");
@@ -500,7 +503,7 @@ class AiChatServiceTest {
         secondPublisher.assertCancelled();
         assertThat(memory.get(new ConversationKey(USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("셋째 질문", "셋째 답변");
+                .containsExactly("질문", "둘째 질문", "셋째 질문", jsonAnswer("셋째 답변"));
     }
 
     @Test
@@ -509,7 +512,7 @@ class AiChatServiceTest {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         startStreamingChat(publisher);
-        model.respondWith(Flux.just(response("다른 사용자")));
+        respondWith(Flux.just(response("다른 사용자")));
 
         // when
         runChat(ANOTHER_USER_ID, CONVERSATION_ID, "질문");
@@ -517,7 +520,7 @@ class AiChatServiceTest {
         // then
         assertThat(memory.get(new ConversationKey(ANOTHER_USER_ID, CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("질문", "다른 사용자");
+                .containsExactly("질문", jsonAnswer("다른 사용자"));
     }
 
     @Test
@@ -526,7 +529,7 @@ class AiChatServiceTest {
         // given
         TestPublisher<ChatResponse> publisher = TestPublisher.create();
         startStreamingChat(publisher);
-        model.respondWith(Flux.just(response("다른 대화 답변")));
+        respondWith(Flux.just(response("다른 대화 답변")));
 
         // when
         runChat(USER_ID, ANOTHER_CONVERSATION_ID, "질문");
@@ -534,12 +537,12 @@ class AiChatServiceTest {
         // then
         assertThat(memory.get(new ConversationKey(USER_ID, ANOTHER_CONVERSATION_ID).toMemoryKey()))
                 .extracting(message -> message.getText())
-                .containsExactly("질문", "다른 대화 답변");
+                .containsExactly("질문", jsonAnswer("다른 대화 답변"));
     }
 
     private Future<?> startStreamingChat(TestPublisher<ChatResponse> publisher) {
         CountDownLatch subscribed = new CountDownLatch(1);
-        model.respondWith(publisher.flux()
+        respondWith(publisher.flux()
                 .doOnSubscribe(ignored -> subscribed.countDown()));
         Future<?> responseTask = executor.submit(() -> {
             try {
@@ -562,15 +565,27 @@ class AiChatServiceTest {
     }
 
     private Prompt captureModelPrompt() {
-        assertThat(model.prompts()).hasSize(1);
-        return model.lastPrompt();
+        assertThat(receivedPrompts).hasSize(1);
+        return receivedPrompts.getLast();
     }
 
     private static ChatResponse response(String text) {
-        return chunk(JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of())));
+        return chunk(jsonAnswer(text));
+    }
+
+    private static String jsonAnswer(String text) {
+        return JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of()));
     }
 
     private static ChatResponse chunk(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+    }
+
+    private void respondWith(Flux<ChatResponse> response) {
+        responder = prompt -> response;
+    }
+
+    private void respondWith(Function<Prompt, Flux<ChatResponse>> responder) {
+        this.responder = responder;
     }
 }

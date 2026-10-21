@@ -4,25 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
-import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.adapter.ai.memory.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistItemSnapshot;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
+import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -30,52 +32,52 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
-import tools.jackson.databind.json.JsonMapper;
 
 class SpringAiConversationAdapterTest {
 
     private static final String CONVERSATION = "7:7bf4d204-8331-439b-bd8f-271abc0eea99";
 
-    private FakeChatModel model;
-    private BibbidiInMemoryChatMemory memory;
+    private final List<Prompt> receivedPrompts = new CopyOnWriteArrayList<>();
+    private volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
+    private ChatMemory memory;
     private SpringAiConversationAdapter adapter;
     private SimpleMeterRegistry registry;
 
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        model = new FakeChatModel();
-        memory = new BibbidiInMemoryChatMemory(new InMemoryChatMemoryRepository(), 18);
-        adapter = new SpringAiConversationAdapter(new SpringAiChatClient(ChatClient.create(model)), memory,
-                JsonMapper.builder().findAndAddModules().build(), AiChatStreamRecorderFixture.create(registry));
+        FakeChatModel model = new FakeChatModel(prompt -> {
+            receivedPrompts.add(prompt);
+            return responder.apply(prompt);
+        });
+        memory = MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).maxMessages(18).build();
+        adapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
+                AiChatStreamRecorderFixture.create(registry));
     }
 
     @Test
-    @DisplayName("이전 대화, 준비 정보, 카탈로그, 사용자 질문 순서로 모델에 전달한다")
+    @DisplayName("이전 대화와 사용자 질문을 모델에 전달한다")
     void sendsHistoryContextAndQuestionToTheModelInOrder() {
         // given
         memory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
-        model.respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk("답변")));
 
         // when
         adapter.stream(CONVERSATION, "추천해줘", context()).content().blockLast();
 
         // then
-        List<Message> instructions = model.lastPrompt().getInstructions();
-        assertThat(instructions).extracting(Message::getText).hasSize(5)
-                .startsWith("예산은 1000", "알겠습니다.")
-                .endsWith("추천해줘");
-        assertThat(instructions.get(2).getText()).contains("\"checklist\"", "웨딩홀 예약", "\"recommendableItemIds\"");
-        assertThat(instructions.get(3).getText()).contains("\"catalog\"", "웨딩홀 후보 정하기");
+        List<Message> instructions = receivedPrompts.getLast().getInstructions();
+        assertThat(instructions).extracting(Message::getText).containsExactly("예산은 1000", "알겠습니다.", "추천해줘");
     }
 
     @Test
     @DisplayName("모델이 보낸 답변 조각과 추천 가능한 항목 ID를 그대로 돌려준다")
     void returnsTheModelContentAndRecommendableItemIds() {
         // given
-        model.respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약")));
+        respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약")));
 
         // when
         AiResponseStream response = adapter.stream(CONVERSATION, "질문", context());
@@ -86,27 +88,28 @@ class SpringAiConversationAdapterTest {
     }
 
     @Test
-    @DisplayName("호출할 때마다 대화에 연결한 준비 정보를 최신 값으로 바꾼다")
+    @DisplayName("다음 호출에서 Advisor가 앞선 대화 기록을 전달한다")
     void replacesThePromptContextOnEveryStream() {
         // given
         BibbidiCustomChatPromptContext latest = new BibbidiCustomChatPromptContext(
                 ChecklistSnapshot.notFound(), List.of(), Set.of());
-        model.respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk("답변")));
         adapter.stream(CONVERSATION, "첫 질문", context()).content().blockLast();
 
         // when
         adapter.stream(CONVERSATION, "둘째 질문", latest).content().blockLast();
 
         // then
-        assertThat(memory.bibbidiCustomContext(CONVERSATION)).isEqualTo(latest);
-        assertThat(model.lastPrompt().getInstructions().get(0).getText()).contains("\"exists\":false");
+        assertThat(receivedPrompts.getLast().getInstructions()).extracting(Message::getText)
+                .containsExactly("첫 질문", "답변", "둘째 질문");
     }
 
     @Test
     @DisplayName("질문과 답변을 한 쌍으로 대화 기록에 저장한다")
     void remembersTheQuestionAndAnswerAsAPair() {
         // when
-        adapter.remember(CONVERSATION, "질문", "답변");
+        respondWith(Flux.just(chunk("답변")));
+        adapter.stream(CONVERSATION, "질문", context()).content().blockLast();
 
         // then
         assertThat(memory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
@@ -118,7 +121,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("답변을 마치면 완료한 대화 수를 기록한다")
     void recordsCompletedTurnWhenTheAnswerCompletes() {
         // given
-        model.respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
+        respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
 
         // when
         adapter.stream(CONVERSATION, "질문", context()).content().blockLast();
@@ -134,7 +137,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("답변 도중 모델이 실패하면 실패 횟수를 기록한다")
     void recordsFailureWhenTheModelFails() {
         // given
-        model.respondWith(Flux.concat(Flux.just(chunk("웨딩홀 ")), Flux.error(new IllegalStateException("모델 오류"))));
+        respondWith(Flux.concat(Flux.just(chunk("웨딩홀 ")), Flux.error(new IllegalStateException("모델 오류"))));
 
         // when
         adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
@@ -153,7 +156,7 @@ class SpringAiConversationAdapterTest {
     void convertsThrottlingToCapacityExceeded() {
         // given
         ThrottlingException throttling = ThrottlingException.builder().message("Too many requests").build();
-        model.respondWith(Flux.error(throttling));
+        respondWith(Flux.error(throttling));
 
         // when, then
         assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
@@ -167,7 +170,7 @@ class SpringAiConversationAdapterTest {
     void keepsOtherModelFailures() {
         // given
         IllegalStateException failure = new IllegalStateException("모델 오류");
-        model.respondWith(Flux.error(failure));
+        respondWith(Flux.error(failure));
 
         // when, then
         assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
@@ -178,7 +181,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("모델이 한도 초과로 실패하면 throttled 사유로 기록한다")
     void recordsThrottledFailureWhenTheModelIsThrottled() {
         // given
-        model.respondWith(Flux.error(ThrottlingException.builder().message("Too many tokens").build()));
+        respondWith(Flux.error(ThrottlingException.builder().message("Too many tokens").build()));
 
         // when
         adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
@@ -193,7 +196,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("모델 응답이 시간 초과로 실패하면 timeout 사유로 기록한다")
     void recordsTimeoutFailureWhenTheModelTimesOut() {
         // given
-        model.respondWith(Flux.error(new TimeoutException("응답 시간 초과")));
+        respondWith(Flux.error(new TimeoutException("응답 시간 초과")));
 
         // when
         adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
@@ -208,7 +211,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("답변 스트림이 취소되면 취소 횟수를 기록한다")
     void recordsCancellationWhenTheAnswerStreamIsCancelled() {
         // given
-        model.respondWith(Flux.concat(Flux.just(chunk("답변")), Flux.never()));
+        respondWith(Flux.concat(Flux.just(chunk("답변")), Flux.never()));
 
         // when
         adapter.stream(CONVERSATION, "질문", context()).content().take(1).blockLast();
@@ -224,7 +227,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("토큰 사용량만 담긴 조각은 답변 조각으로 전달하지 않는다")
     void doesNotForwardChunksWithoutText() {
         // given
-        model.respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
+        respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
 
         // when
         List<String> content = adapter.stream(CONVERSATION, "질문", context()).content().collectList().block();
@@ -254,5 +257,13 @@ class SpringAiConversationAdapterTest {
 
     private double failureCount(String reason) {
         return registry.get("ai.chat.failures").tag("reason", reason).counter().count();
+    }
+
+    private void respondWith(Flux<ChatResponse> response) {
+        responder = prompt -> response;
+    }
+
+    private void respondWith(Function<Prompt, Flux<ChatResponse>> responder) {
+        this.responder = responder;
     }
 }
