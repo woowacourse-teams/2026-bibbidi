@@ -2,9 +2,7 @@ package com.bibbidi.wedding.chat.service;
 
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
@@ -12,7 +10,6 @@ import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,12 +63,11 @@ public class AiChatService {
     }
 
     private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
-        BibbidiCustomChatPromptContext context = loadPromptContext(key.userId());
-        AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
+        Flux<String> response = conversationPort.stream(key.userId(), key.toMemoryKey(), message);
         List<String> deltas = new ArrayList<>();
         ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
 
-        Flux<ChatEvent> answerEvents = response.content()
+        Flux<ChatEvent> answerEvents = response
                 .publishOn(Schedulers.boundedElastic())
                 .concatMap(chunk -> {
                             deltas.clear();
@@ -84,43 +80,30 @@ public class AiChatService {
                         }
                 );
 
-        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id,
-                response.recommendableItemIds(), answer));
+        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, answer));
         return Flux.concat(answerEvents, completion);
     }
 
-    private BibbidiCustomChatPromptContext loadPromptContext(Long userId) {
+    private Set<Long> loadRecommendableItemIds(Long userId) {
         List<CatalogItemDetailSnapshot> catalog = catalogLookup.findAllItemDetails();
-        ChecklistSnapshot checklist = checklistLookup.findMyChecklistIfPresent(userId)
-                .map(ChecklistSnapshot::from)
-                .orElseGet(ChecklistSnapshot::notFound);
-
-        Set<Long> addedIds = new HashSet<>();
-        checklist.items().forEach(item -> addedIds.add(item.catalogItemId()));
-
-        Set<Long> recommendableIds = new HashSet<>();
-        catalog.forEach(item -> {
-                    if (!addedIds.contains(item.id())) {
-                        recommendableIds.add(item.id());
-                    }
-                }
-        );
-
-        return new BibbidiCustomChatPromptContext(checklist, catalog, recommendableIds);
+        ChecklistSnapshot checklist = ChecklistSnapshot.of(checklistLookup.findMyChecklistIfPresent(userId));
+        return Set.copyOf(checklist.recommendableItemIds(catalog));
     }
 
-    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id,
-                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
+    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, ChatAnswerParser.Session stream) {
         ChatAnswer answer = stream.finish();
-        List<Long> suggestedIds = answer.recommendedItemIds().stream()
-                .filter(recommendableIds::contains)
-                .distinct()
-                .toList();
         List<ChatEvent> events = new ArrayList<>();
-        if (!suggestedIds.isEmpty()) {
-            List<Long> ids = checklistLookup.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
-            if (!ids.isEmpty()) {
-                events.add(new ChatEvent.Component(ids));
+        if (!answer.recommendedItemIds().isEmpty()) {
+            Set<Long> recommendableIds = loadRecommendableItemIds(key.userId());
+            List<Long> suggestedIds = answer.recommendedItemIds().stream()
+                    .filter(recommendableIds::contains)
+                    .distinct()
+                    .toList();
+            if (!suggestedIds.isEmpty()) {
+                List<Long> ids = checklistLookup.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
+                if (!ids.isEmpty()) {
+                    events.add(new ChatEvent.Component(ids));
+                }
             }
         }
         return Flux.concat(

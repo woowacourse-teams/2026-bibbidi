@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 
@@ -60,7 +61,15 @@ public class EvaluationChatRunner {
     }
 
     public List<Document> providedContext() {
-        return List.of();
+        return model.calls().stream()
+                .flatMap(call -> call.prompt().getInstructions().stream())
+                .filter(ToolResponseMessage.class::isInstance)
+                .map(ToolResponseMessage.class::cast)
+                .flatMap(message -> message.getResponses().stream())
+                .map(ToolResponseMessage.ToolResponse::responseData)
+                .distinct()
+                .map(Document::new)
+                .toList();
     }
 
     private void accept(ChatEvent event) {

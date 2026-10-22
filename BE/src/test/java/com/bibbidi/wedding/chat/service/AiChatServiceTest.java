@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
@@ -140,8 +141,8 @@ class AiChatServiceTest {
     }
 
     @Test
-    @DisplayName("인증된 사용자로 최신 정보를 준비하고 모델에는 도구를 전달하지 않는다")
-    void loadsTheAuthenticatedUsersContextWithoutTools() {
+    @DisplayName("모델을 호출하기 전에는 체크리스트와 카탈로그를 조회하지 않고 인증된 사용자의 ID를 도구 컨텍스트에 전달한다")
+    void passesTheUserIdToToolsWithoutLoadingContextBeforeTheModel() {
         // given
         respondWith(Flux.just(response("답변")));
 
@@ -151,18 +152,14 @@ class AiChatServiceTest {
         // then
         Prompt prompt = captureModelPrompt();
         ToolCallingChatOptions options = (ToolCallingChatOptions) prompt.getOptions();
-        verify(checklistService).findMyChecklistIfPresent(USER_ID);
-        assertThat(options.getToolCallbacks()).isNullOrEmpty();
-        assertThat(options.getToolContext()).isNullOrEmpty();
+        verifyNoInteractions(catalogService, checklistService);
+        assertThat(options.getToolContext()).containsEntry("userId", USER_ID);
     }
 
     @Test
-    @DisplayName("대화할 때마다 최신 체크리스트 정보를 다시 조회한다")
-    void refreshesPromptContextForEachRequest() {
+    @DisplayName("추천이 없는 답변은 체크리스트와 카탈로그를 조회하지 않고, 같은 대화의 다음 요청에는 앞선 대화를 전달한다")
+    void reusesEarlierTurnsWithoutLoadingContextWhenNothingIsRecommended() {
         // given
-        when(checklistService.findMyChecklistIfPresent(USER_ID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(new ChecklistWithAppointmentsResult(10L, List.of())));
         respondWith(Flux.just(response("답변")));
 
         // when
@@ -176,8 +173,7 @@ class AiChatServiceTest {
                 .containsExactly("첫 질문");
         assertThat(prompts.get(1).getInstructions()).extracting(message -> message.getText())
                 .containsExactly("첫 질문", jsonAnswer("답변"), "둘째 질문");
-        verify(catalogService, times(2)).findAllItemDetails();
-        verify(checklistService, times(2)).findMyChecklistIfPresent(USER_ID);
+        verifyNoInteractions(catalogService, checklistService);
     }
 
     @Test
