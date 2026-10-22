@@ -71,8 +71,10 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
         Path inputFile = Files.createTempFile("bibbidi-claude-judge-input-", ".txt");
         try {
             Files.writeString(inputFile, prompt.getContents(), StandardCharsets.UTF_8);
-            String schemaArgument = System.getProperty("os.name").startsWith("Windows")
-                    ? schema.replace("\"", "\\\"") : schema;
+            // Windows 기본 모드는 직접 이스케이프하고, 엄격 모드(false)는 JDK의 처리를 따른다.
+            boolean legacyWindowsArguments = System.getProperty("os.name").startsWith("Windows")
+                    && !"false".equalsIgnoreCase(System.getProperty("jdk.lang.Process.allowAmbiguousCommands", "true"));
+            String schemaArgument = legacyWindowsArguments ? schema.replace("\"", "\\\"") : schema;
             Process process = new ProcessBuilder(
                     executable, "-p", "--safe-mode", "--no-session-persistence",
                     "--tools", "", "--disallowedTools", "mcp__*",

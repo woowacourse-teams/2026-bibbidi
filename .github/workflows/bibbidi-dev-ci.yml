@@ -13,6 +13,37 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
+    windows-cli-schema:
+        name: Windows CLI 스키마 인자 검증
+        runs-on: windows-latest
+        defaults:
+            run:
+                working-directory: BE
+
+        steps:
+            - name: 테스트 소스 코드 체크아웃
+              uses: actions/checkout@v7
+
+            - name: Corretto JDK 버전 25 설정
+              uses: actions/setup-java@v6
+              with:
+                  java-version: "25"
+                  distribution: "corretto"
+
+            - name: Gradle 실행 환경과 의존성 캐시 설정
+              uses: gradle/actions/setup-gradle@v6
+
+            - name: 실제 모델 없이 Windows CLI의 JSON 스키마 인자 검증
+              run: .\gradlew.bat test --tests '*ClaudeCliWindowsTest' --console=plain
+
+            - name: 테스트 실패 시 보고서 기록
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: windows-cli-test-reports
+                  path: BE/build/reports/tests/test
+                  retention-days: 7
+
     build:
         name: 백엔드 CI 검증
         runs-on: ubuntu-24.04-arm
