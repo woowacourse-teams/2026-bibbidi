@@ -9,8 +9,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties("bibbidi.ai.chatbot")
 public record AiChatProperties(
-        @Min(4) int memoryMaxMessages,
-        @NotNull Duration conversationIdleTimeout,
-        @NotNull Duration conversationCleanupInterval
+        @Min(10) int memoryMaxMessages,
+        @NotNull Duration conversationIdleTimeout
 ) {
 }
