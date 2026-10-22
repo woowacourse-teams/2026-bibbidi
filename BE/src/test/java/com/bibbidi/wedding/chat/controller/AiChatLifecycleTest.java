@@ -84,7 +84,7 @@ class AiChatLifecycleTest {
         CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
         chat = new AiChatService(
                 new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory), "test-model"),
-                new ChatTurnRecorder(new SimpleMeterRegistry()),
+                List.of(new ChatTurnRecorder(new SimpleMeterRegistry())),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
         answerStarted = false;

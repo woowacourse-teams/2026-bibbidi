@@ -14,10 +14,11 @@ import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
+import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
+import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
@@ -54,6 +55,7 @@ class AiChatServiceTest {
 
     private final List<ModelCall> modelCalls = new CopyOnWriteArrayList<>();
     private final List<List<TurnSignal>> recordedTurns = new CopyOnWriteArrayList<>();
+    private final List<TurnContext> recordedContexts = new CopyOnWriteArrayList<>();
     private final AtomicBoolean transactionActiveAtModelCall = new AtomicBoolean(true);
     private volatile Supplier<Flux<String>> responder = Flux::empty;
     private AiChatService service;
@@ -81,14 +83,12 @@ class AiChatServiceTest {
                         return responder.get();
                     }
                 },
-                new ChatTurnRecorder(new SimpleMeterRegistry()) {
-                    @Override
-                    public void record(String userPrompt, Flux<TurnSignal> signals) {
-                        List<TurnSignal> turn = new CopyOnWriteArrayList<>();
-                        recordedTurns.add(turn);
-                        signals.subscribe(turn::add);
-                    }
-                },
+                List.of((TurnConsumer) (context, signals) -> {
+                    List<TurnSignal> turn = new CopyOnWriteArrayList<>();
+                    recordedTurns.add(turn);
+                    recordedContexts.add(context);
+                    signals.subscribe(turn::add);
+                }),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(MAPPER));
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -491,6 +491,24 @@ class AiChatServiceTest {
         // then
         assertThat(modelCalls).hasSize(1);
         assertThat(recordedTurns).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("턴 소비자에게 사용자, 대화, 질문, 시작 시각을 전달한다")
+    void passesTheTurnContextToConsumers() {
+        // given
+        respondWith(Flux.just(answerJson("답변")));
+
+        // when
+        runChat(USER_ID, CONVERSATION_ID, "질문");
+
+        // then
+        assertThat(recordedContexts).hasSize(1);
+        TurnContext context = recordedContexts.getFirst();
+        assertThat(context.userId()).isEqualTo(USER_ID);
+        assertThat(context.conversationId()).isEqualTo(CONVERSATION_ID);
+        assertThat(context.userPrompt()).isEqualTo("질문");
+        assertThat(context.startedAt()).isNotNull();
     }
 
     private void assertCancelReason(CancelReason reason) {

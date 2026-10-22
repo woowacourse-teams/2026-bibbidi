@@ -1,64 +1,56 @@
 package com.bibbidi.wedding.chat.service;
 
+import com.bibbidi.wedding.chat.service.turn.FailureReason;
+import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
+import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
-import com.bibbidi.wedding.common.exception.BusinessException;
-import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
+import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 @Component
 @Slf4j(topic = "ai.chat.content")
-public class ChatTurnRecorder {
+public class ChatTurnRecorder implements TurnConsumer {
 
-    private static final String THROTTLED = "throttled";
-    private static final String TIMEOUT = "timeout";
-    private static final String ERROR = "error";
-
+    private final Scheduler scheduler;
     private final Counter turns;
     private final Counter completedTurns;
     private final Counter cancelledTurns;
-    private final Map<String, Counter> failures;
+    private final Map<FailureReason, Counter> failures = new EnumMap<>(FailureReason.class);
 
+    @Autowired
     public ChatTurnRecorder(MeterRegistry registry) {
+        this(registry, Schedulers.boundedElastic());
+    }
+
+    public ChatTurnRecorder(MeterRegistry registry, Scheduler scheduler) {
+        this.scheduler = scheduler;
         this.turns = Counter.builder("ai.chat.turns").register(registry);
         this.completedTurns = Counter.builder("ai.chat.completed").register(registry);
         this.cancelledTurns = Counter.builder("ai.chat.cancelled").register(registry);
-        this.failures = Map.of(
-                THROTTLED, failureCounter(registry, THROTTLED),
-                TIMEOUT, failureCounter(registry, TIMEOUT),
-                ERROR, failureCounter(registry, ERROR)
-        );
+        for (FailureReason reason : FailureReason.values()) {
+            failures.put(reason, Counter.builder("ai.chat.failures")
+                    .tag("reason", reason.name().toLowerCase(Locale.ROOT))
+                    .register(registry));
+        }
     }
 
-    public void record(String userPrompt, Flux<TurnSignal> signals) {
-        Turn turn = new Turn(userPrompt);
-        signals.subscribe(
+    @Override
+    public void consume(TurnContext context, Flux<TurnSignal> signals) {
+        Turn turn = new Turn(context.userPrompt());
+        signals.publishOn(scheduler).subscribe(
                 turn::onSignal,
                 exception -> log.error("ai_chat_turn 기록 실패. type={}", exception.getClass().getSimpleName())
         );
-    }
-
-    private static Counter failureCounter(MeterRegistry registry, String reason) {
-        return Counter.builder("ai.chat.failures").tag("reason", reason).register(registry);
-    }
-
-    private static String failureReasonOf(Throwable exception) {
-        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            if (cause instanceof BusinessException business
-                    && business.clientError() == ClientError.AI_CAPACITY_EXCEEDED) {
-                return THROTTLED;
-            }
-            if (cause instanceof TimeoutException) {
-                return TIMEOUT;
-            }
-        }
-        return ERROR;
     }
 
     private final class Turn {
@@ -84,7 +76,7 @@ public class ChatTurnRecorder {
                     finish("completed", completed, "-");
                 }
                 case TurnSignal.Failed failed -> {
-                    failures.get(failureReasonOf(failed.cause())).increment();
+                    failures.get(FailureReason.of(failed.cause())).increment();
                     finish("failed", failed, "-");
                 }
                 case TurnSignal.Cancelled cancelled -> {
