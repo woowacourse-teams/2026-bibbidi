@@ -1,4 +1,3 @@
-import { generalMetric } from '../config/thresholds.ts';
 import { GeneralSloReport } from './general-report.ts';
 
 // 엔드포인트별로 받은 상태 코드. 임계값에 선언한 코드만 요약에 나타나므로 STATUS_CODES와 같은 목록을 쓴다.
@@ -30,30 +29,18 @@ export class WorstCaseReport extends GeneralSloReport {
 
   private statusTable(): string[] {
     const rows = this.endpoints.map(({ label, endpoint }) => {
-      const total = this.value(generalMetric('http_reqs', `endpoint:${endpoint}`), 'count') ?? 0;
       const counts = STATUS_CODES.map((code) => [code, this.value(responseMetric(endpoint, code), 'count') ?? 0] as const)
         .filter(([, count]) => count > 0)
-        .map(([code, count]) => {
-          const percentage = total > 0 ? `${(count / total * 100).toFixed(3)}%` : '비율 산출 불가';
-          const rate = this.includeStatusRates ? ` (${percentage})` : '';
-          return `${code === 0 ? '연결 실패' : code}×${count}${rate}`;
-        });
+        .map(([code, count]) => `${code === 0 ? '연결 실패' : code}×${count}`);
       return `| ${label} | ${counts.length === 0 ? '-' : counts.join(', ')} |`;
     });
-    const column = this.includeStatusRates ? '상태 코드 ×횟수 (전체 요청 대비 비율)' : '상태 코드 ×횟수';
-    return ['### 엔드포인트별 상태 코드', '', `| 엔드포인트 | ${column} |`, '| --- | --- |', ...rows];
+    return ['### 엔드포인트별 상태 코드', '', '| 엔드포인트 | 상태 코드 ×횟수 |', '| --- | --- |', ...rows];
   }
 
   private endpoints: readonly EndpointLabel[] = [];
-  private includeStatusRates = false;
 
   withEndpoints(endpoints: readonly EndpointLabel[]): this {
     this.endpoints = endpoints;
-    return this;
-  }
-
-  withStatusRates(): this {
-    this.includeStatusRates = true;
     return this;
   }
 }

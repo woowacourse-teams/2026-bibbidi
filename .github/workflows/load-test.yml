@@ -29,7 +29,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test|worst-case-test|catalog-items-test)/([a-z0-9-]{1,24})$ ]]; then
+          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test|worst-case-test)/([a-z0-9-]{1,24})$ ]]; then
             echo "::error::태그 형식이 k6/loadtest/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
@@ -294,19 +294,6 @@ jobs:
             ServerAliveInterval 30
             ProxyCommand aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p
           CONFIG
-          if [ "$SCRIPT" = catalog-items-test ]; then
-            db_id="$(output DbInstanceId)"
-            cat >> ~/.ssh/config <<CONFIG
-          Host loadtest-db
-            HostName $db_id
-            User ubuntu
-            IdentityFile ~/.ssh/loadtest_key
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
-            ServerAliveInterval 30
-            ProxyCommand aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p
-          CONFIG
-          fi
           # 비밀값은 인자가 아니라 원격의 600 파일로 전달한다.
           {
             printf 'export BASE_URL=%q\n' "$base_url"
@@ -333,27 +320,10 @@ jobs:
 
       - name: k6 실행
         run: |
-          set -euo pipefail
-          mysql_command=$(cat <<'COMMAND'
-          sudo docker exec -i mysql sh -c 'test "$MYSQL_DATABASE" = bibbidi_loadtest && MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --batch --skip-column-names -uroot bibbidi_loadtest'
-          COMMAND
-          )
-          snapshot_sql() {
-            mkdir -p "$REPORT_DIR"
-            ssh loadtest-db "$mysql_command" < Infra/k6/sql/catalog-items-metrics.sql > "$REPORT_DIR/sql-$1.tsv"
-            # 수집이 꺼져 있거나 digest가 유실되면 측정 성공으로 취급하지 않는다. 설정은 바꾸지 않는다.
-            test "$(awk '$1 == "performance_schema" { print $2 }' "$REPORT_DIR/sql-$1.tsv")" = 1
-            test "$(awk '$1 == "statements_digest" { print $2 }' "$REPORT_DIR/sql-$1.tsv")" = YES
-            test "$(awk '$1 == "Performance_schema_digest_lost" { print $2 }' "$REPORT_DIR/sql-$1.tsv")" = 0
-            test "$(awk '$1 == "unattributed_digest" { print $2 }' "$REPORT_DIR/sql-$1.tsv")" = 0
-            test "$(awk '$1 == "catalog_seed_valid" { print $2 }' "$REPORT_DIR/sql-$1.tsv")" = 1
-          }
-          if [ "$SCRIPT" = catalog-items-test ]; then snapshot_sql before; fi
           set +e
           ssh loadtest "cd ~/k6-run && . ./.env && k6 run -o experimental-prometheus-rw --tag testid=$TEST_ID Infra/k6/$SCRIPT.ts"
           status=$?
           set -e
-          if [ "$SCRIPT" = catalog-items-test ]; then snapshot_sql after; fi
           if [ "$status" -eq 99 ] && [ "$SCRIPT" = saturation-test ]; then
             echo "임계값 중단은 포화 시험(saturation-test)의 정상 결과입니다. 중단된 단계가 포화점입니다."
             exit 0
