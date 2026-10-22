@@ -4,7 +4,7 @@ import com.bibbidi.wedding.chat.adapter.ai.memory.ExpiringChatMemoryRepository;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
-import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import java.util.Map;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;

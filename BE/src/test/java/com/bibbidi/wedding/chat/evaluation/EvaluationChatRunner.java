@@ -4,8 +4,9 @@ import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ConversationKey;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +42,8 @@ public class EvaluationChatRunner {
         completed = false;
         try {
             memory.add(memoryKey, scenario.chatMemory().stream().map(this::message).toList());
-            service.chat(new ChatCommand(userId, conversationId, scenario.userMessage()))
+            service.chat(new ChatCommand(userId, conversationId, scenario.userMessage()),
+                            () -> CancelReason.CLIENT_DISCONNECTED)
                     .doOnNext(this::accept)
                     .blockLast(timeout);
             if (!completed || answer.isEmpty()) {
@@ -77,7 +79,8 @@ public class EvaluationChatRunner {
             case ChatEvent.Delta delta -> answer.append(delta.text());
             case ChatEvent.Component component -> recommendedItemIds.addAll(component.catalogItemIds());
             case ChatEvent.Done ignored -> completed = true;
-            default -> { }
+            default -> {
+            }
         }
     }
 

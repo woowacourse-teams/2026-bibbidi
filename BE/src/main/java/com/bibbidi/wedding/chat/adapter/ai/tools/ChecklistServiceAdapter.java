@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.adapter.ai.tools;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
+import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;

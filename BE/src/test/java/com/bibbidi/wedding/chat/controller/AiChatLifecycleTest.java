@@ -14,16 +14,18 @@ import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.service.AiChatService;
+import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
 import com.bibbidi.wedding.chat.service.ConversationKey;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
-import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -80,8 +82,9 @@ class AiChatLifecycleTest {
         ChecklistLookupPort checklistService = mock(ChecklistLookupPort.class);
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
-        chat = new AiChatService(new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
-                AiChatStreamRecorderFixture.create()),
+        chat = new AiChatService(
+                new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory), "test-model"),
+                new ChatTurnRecorder(new SimpleMeterRegistry()),
                 catalogService, checklistService,
                 new JacksonChatAnswerParser(mapper));
         answerStarted = false;
@@ -134,7 +137,8 @@ class AiChatLifecycleTest {
         // then
         await().untilAsserted(publisher::assertCancelled);
         await().untilTrue(responseFinished);
-        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
+        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).extracting(message -> message.getText())
+                .containsExactly("질문");
     }
 
     @Test
@@ -158,7 +162,8 @@ class AiChatLifecycleTest {
         SseStreamManager sse = new SseStreamManager(executor, scheduler);
         sse.stream(RESPONSE_TIMEOUT, connection -> {
             try {
-                sendEvents(connection, chat.chat(new ChatCommand(7L, ID, "질문")));
+                sendEvents(connection,
+                        chat.chat(new ChatCommand(7L, ID, "질문"), () -> CancelReason.CLIENT_DISCONNECTED));
             } finally {
                 responseFinished.set(true);
             }
@@ -177,7 +182,8 @@ class AiChatLifecycleTest {
 
         // then
         await().untilTrue(responseFinished);
-        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).extracting(message -> message.getText()).containsExactly("질문");
+        assertThat(memory.get(new ConversationKey(7L, ID).toMemoryKey())).extracting(message -> message.getText())
+                .containsExactly("질문");
     }
 
     private void startStreamingChat(TestPublisher<ChatResponse> publisher) {
@@ -189,7 +195,7 @@ class AiChatLifecycleTest {
         sse.stream(RESPONSE_TIMEOUT, connection -> {
             ChatSseHandler reply = new ChatSseHandler(connection);
             try {
-                chat.chat(new ChatCommand(7L, ID, "질문")).doOnNext(event -> {
+                chat.chat(new ChatCommand(7L, ID, "질문"), () -> CancelReason.CLIENT_DISCONNECTED).doOnNext(event -> {
                     reply.send(event);
                     deliveredEvents.add(event);
                 }).blockLast();

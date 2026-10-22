@@ -1,14 +1,13 @@
 package com.bibbidi.wedding.chat.service.parser;
 
-import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
-import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import tools.jackson.databind.ObjectMapper;
 
-public final class ReactiveChatAnswerStream implements ChatAnswerParser.Session {
+public final class ReactiveChatAnswerStream {
 
     private static final Pattern ANSWER_FIELD = Pattern.compile("\"answer\"\\s*:\\s*\"");
 
@@ -27,7 +26,6 @@ public final class ReactiveChatAnswerStream implements ChatAnswerParser.Session 
         this.answerWriter = new AnswerDeltaWriter(sendAnswerChunk);
     }
 
-    @Override
     public void accept(String chunk) {
         json.append(chunk);
         if (!answerStarted) {
@@ -88,9 +86,9 @@ public final class ReactiveChatAnswerStream implements ChatAnswerParser.Session 
         }
     }
 
-    @Override
     public ChatAnswer finish() {
-        ChatAnswer answer = new ChatAnswerStream(mapper).read(Stream.of(json.toString()), ignored -> {});
+        ChatAnswer answer = new ChatAnswerStream(mapper).read(Stream.of(json.toString()), ignored -> {
+        });
         if (!answer.answer().equals(answerWriter.text()) || answerWriter.hasPendingText()) {
             throw new IllegalStateException("스트리밍 답변과 검증된 응답이 일치하지 않습니다.");
         }

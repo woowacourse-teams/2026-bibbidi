@@ -6,8 +6,9 @@ import com.bibbidi.wedding.chat.controller.sse.SseConnection;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseProperties;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.validation.Valid;
@@ -57,11 +58,15 @@ public class AiChatController {
         );
     }
 
+    private static CancelReason cancelReasonOf(SseConnection connection) {
+        return connection.timedOut() ? CancelReason.RESPONSE_TIMEOUT : CancelReason.CLIENT_DISCONNECTED;
+    }
+
     private Consumer<SseConnection> chatResponseConsumer(ChatCommand chatCommand, Timer.Sample ttftSample) {
         return connection -> {
             ChatSseHandler handler = new ChatSseHandler(connection);
             AtomicBoolean firstDeltaSent = new AtomicBoolean();
-            aiChatService.chat(chatCommand)
+            aiChatService.chat(chatCommand, () -> cancelReasonOf(connection))
                     .doOnNext(event -> {
                         handler.send(event);
                         if (event instanceof ChatEvent.Delta && firstDeltaSent.compareAndSet(false, true)) {

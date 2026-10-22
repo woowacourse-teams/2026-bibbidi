@@ -29,15 +29,14 @@ import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
+import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
 import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
-import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
@@ -142,12 +141,13 @@ class AiChatControllerTest {
 
         @Bean
         ChatMemory bibbidiInMemoryChatMemory() {
-            return MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).maxMessages(18).build();
+            return MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository())
+                    .maxMessages(18).build();
         }
 
         @Bean
-        AiChatStreamRecorder aiChatStreamRecorder() {
-            return AiChatStreamRecorderFixture.create();
+        ChatTurnRecorder chatTurnRecorder(SimpleMeterRegistry registry) {
+            return new ChatTurnRecorder(registry);
         }
 
         @Bean
@@ -283,7 +283,8 @@ class AiChatControllerTest {
                                         + "정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
                                 .requestSchema(schema("ChatRequest"))
                                 .responseSchema(schema("ChatEventStream"))
-                                .requestHeaders(headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("로그인 access token. Bearer 인증"))
                                 .requestFields(fieldWithPath("conversationId").type(JsonFieldType.STRING).optional()
                                                 .description("이전 대화 UUID 문자열. 생략 또는 null이면 서버에서 생성"),
                                         fieldWithPath("message").description("사용자 메시지. 공백 제외 필수, 최대 4000자"))
@@ -335,7 +336,7 @@ class AiChatControllerTest {
             awaitLatch(answerAllowed);
             return fails
                     ? Flux.concat(Flux.just(chunk("{\"answer\":\"답변")),
-                            Flux.error(new IllegalStateException("테스트 답변 생성 실패")))
+                    Flux.error(new IllegalStateException("테스트 답변 생성 실패")))
                     : Flux.just(chunk("{\"answer\":\"답변\",\"recommendedItemIds\":[]}"));
         }));
 
