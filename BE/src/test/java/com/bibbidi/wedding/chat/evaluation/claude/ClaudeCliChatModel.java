@@ -1,14 +1,11 @@
 package com.bibbidi.wedding.chat.evaluation.claude;
 
+import com.bibbidi.wedding.chat.evaluation.cli.CliJsonSchema;
+import com.bibbidi.wedding.chat.evaluation.cli.CliProcess;
+import com.bibbidi.wedding.chat.evaluation.cli.CliWorkspace;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -19,7 +16,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.core.io.ClassPathResource;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,7 +27,7 @@ public class ClaudeCliChatModel implements ChatModel {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String executable;
     private final String model;
-    private final Duration timeout;
+    private final CliProcess process;
 
     public ClaudeCliChatModel(String model, Duration timeout) {
         this(System.getProperty("os.name").startsWith("Windows") ? "claude.exe" : "claude", model, timeout);
@@ -40,7 +36,7 @@ public class ClaudeCliChatModel implements ChatModel {
     public ClaudeCliChatModel(String executable, String model, Duration timeout) {
         this.executable = executable;
         this.model = model;
-        this.timeout = timeout;
+        this.process = new CliProcess(timeout, "Claude generation");
     }
 
     @Override
@@ -61,65 +57,51 @@ public class ClaudeCliChatModel implements ChatModel {
     }
 
     private ChatResponse runClaude(Prompt prompt) throws IOException, InterruptedException {
-        String schema;
-        try (InputStream input = new ClassPathResource(ANSWER_SCHEMA).getInputStream()) {
-            schema = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        try (CliWorkspace files = new CliWorkspace("bibbidi-claude-generation-")) {
+            prepareInput(prompt, files);
+            int exitCode = process.execute(prepareProcess(files));
+            return readResponse(files, exitCode);
         }
-        Path directory = Files.createTempDirectory("bibbidi-claude-generation-");
-        Path instructions = directory.resolve("instructions.md");
-        Path input = directory.resolve("input.txt");
-        Path output = directory.resolve("output.json");
-        try {
-            Files.writeString(instructions, systemText(prompt), StandardCharsets.UTF_8);
-            Files.writeString(input, transcript(prompt), StandardCharsets.UTF_8);
-            // Windows 기본 모드는 직접 이스케이프하고, 엄격 모드(false)는 JDK의 처리를 따른다.
-            boolean legacyWindowsArguments = System.getProperty("os.name").startsWith("Windows")
-                    && !"false".equalsIgnoreCase(System.getProperty("jdk.lang.Process.allowAmbiguousCommands", "true"));
-            String schemaArgument = legacyWindowsArguments ? schema.replace("\"", "\\\"") : schema;
-            Process process = new ProcessBuilder(
-                    executable, "-p", "--safe-mode", "--no-session-persistence",
-                    "--tools", "", "--disallowedTools", "mcp__*",
-                    "--model", model, "--system-prompt-file", instructions.toString(),
-                    "--output-format", "json", "--json-schema", schemaArgument)
-                    .directory(directory.toFile())
-                    .redirectInput(input.toFile())
-                    .redirectOutput(output.toFile())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            try {
-                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Claude generation timed out", new TimeoutException());
-                }
-            } catch (InterruptedException exception) {
-                process.destroyForcibly().onExit().join();
-                throw exception;
-            }
-            String result = Files.readString(output, StandardCharsets.UTF_8);
-            if (result.isBlank()) {
-                throw new IllegalStateException("Claude generation exited with code " + process.exitValue());
-            }
-            JsonNode envelope = objectMapper.readTree(result);
-            if (process.exitValue() != 0 || envelope.path("is_error").asBoolean()) {
-                throw new IllegalStateException("Claude generation failed: "
-                        + envelope.path("result").asString("exit code " + process.exitValue()));
-            }
-            JsonNode structuredOutput = envelope.get("structured_output");
-            if (structuredOutput == null || !structuredOutput.isObject()) {
-                throw new IllegalStateException("Claude generation returned no structured output");
-            }
-            return new ChatResponse(
-                    List.of(new Generation(new AssistantMessage(structuredOutput.toString()))),
-                    ChatResponseMetadata.builder()
-                            .model(model)
-                            .usage(usage(envelope.get("usage")))
-                            .build());
-        } finally {
-            Files.deleteIfExists(input);
-            Files.deleteIfExists(instructions);
-            Files.deleteIfExists(output);
-            Files.deleteIfExists(directory);
+    }
+
+    private void prepareInput(Prompt prompt, CliWorkspace files) throws IOException {
+        files.write("instructions.md", systemText(prompt));
+        files.write("input.txt", transcript(prompt));
+    }
+
+    private ProcessBuilder prepareProcess(CliWorkspace files) throws IOException {
+        String schema = new CliJsonSchema(ANSWER_SCHEMA).asArgument();
+        return new ProcessBuilder(
+                executable, "-p", "--safe-mode", "--no-session-persistence",
+                "--tools", "", "--disallowedTools", "mcp__*",
+                "--model", model, "--system-prompt-file", files.path("instructions.md").toString(),
+                "--output-format", "json", "--json-schema", schema)
+                .directory(files.directory().toFile())
+                .redirectInput(files.path("input.txt").toFile())
+                .redirectOutput(files.path("output.json").toFile());
+    }
+
+    private ChatResponse readResponse(CliWorkspace files, int exitCode) throws IOException {
+        String result = files.read("output.json");
+        if (result.isBlank()) {
+            throw new IllegalStateException("Claude generation exited with code " + exitCode);
         }
+        JsonNode envelope = objectMapper.readTree(result);
+        if (exitCode != 0 || envelope.path("is_error").asBoolean()) {
+            throw new IllegalStateException("Claude generation failed: "
+                    + envelope.path("result").asString("exit code " + exitCode));
+        }
+        return createResponse(envelope);
+    }
+
+    private ChatResponse createResponse(JsonNode envelope) {
+        JsonNode answer = envelope.get("structured_output");
+        if (answer == null || !answer.isObject()) {
+            throw new IllegalStateException("Claude generation returned no structured output");
+        }
+        return new ChatResponse(
+                List.of(new Generation(new AssistantMessage(answer.toString()))),
+                ChatResponseMetadata.builder().model(model).usage(readUsage(envelope.get("usage"))).build());
     }
 
     private String systemText(Prompt prompt) {
@@ -135,7 +117,7 @@ public class ClaudeCliChatModel implements ChatModel {
                 .collect(Collectors.joining("\n\n"));
     }
 
-    private DefaultUsage usage(JsonNode usage) {
+    private DefaultUsage readUsage(JsonNode usage) {
         if (usage == null || usage.isNull() || !usage.has("input_tokens") || !usage.has("output_tokens")) {
             return null;
         }

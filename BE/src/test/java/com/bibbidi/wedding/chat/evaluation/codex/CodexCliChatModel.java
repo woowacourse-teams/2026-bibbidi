@@ -1,14 +1,11 @@
 package com.bibbidi.wedding.chat.evaluation.codex;
 
+import com.bibbidi.wedding.chat.evaluation.cli.CliJsonSchema;
+import com.bibbidi.wedding.chat.evaluation.cli.CliProcess;
+import com.bibbidi.wedding.chat.evaluation.cli.CliWorkspace;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -19,7 +16,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.core.io.ClassPathResource;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -32,7 +28,7 @@ public class CodexCliChatModel implements ChatModel {
     private final String executable;
     private final String model;
     private final String reasoningEffort;
-    private final Duration timeout;
+    private final CliProcess process;
 
     public CodexCliChatModel(String model, String reasoningEffort, Duration timeout) {
         this(System.getProperty("os.name").startsWith("Windows") ? "codex.cmd" : "codex",
@@ -43,7 +39,7 @@ public class CodexCliChatModel implements ChatModel {
         this.executable = executable;
         this.model = model;
         this.reasoningEffort = reasoningEffort;
-        this.timeout = timeout;
+        this.process = new CliProcess(timeout, "Codex generation");
     }
 
     @Override
@@ -64,58 +60,41 @@ public class CodexCliChatModel implements ChatModel {
     }
 
     private ChatResponse runCodex(Prompt prompt) throws IOException, InterruptedException {
-        Path directory = Files.createTempDirectory("bibbidi-codex-generation-");
-        Path instructions = directory.resolve("instructions.md");
-        Path input = directory.resolve("input.txt");
-        Path schema = directory.resolve("schema.json");
-        Path answer = directory.resolve("answer.json");
-        Path events = directory.resolve("events.jsonl");
-        try {
-            Files.writeString(instructions, systemText(prompt), StandardCharsets.UTF_8);
-            Files.writeString(input, transcript(prompt), StandardCharsets.UTF_8);
-            try (InputStream schemaInput = new ClassPathResource(ANSWER_SCHEMA).getInputStream()) {
-                Files.copy(schemaInput, schema);
-            }
-            Process process = new ProcessBuilder(
-                    executable, "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-                    "--skip-git-repo-check", "--sandbox", "read-only", "--model", model,
-                    "--config", "model_reasoning_effort=" + reasoningEffort,
-                    "--config", "model_instructions_file='" + instructions + "'",
-                    "--output-schema", schema.toString(),
-                    "--output-last-message", answer.toString(), "-")
-                    .directory(directory.toFile())
-                    .redirectInput(input.toFile())
-                    .redirectOutput(events.toFile())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            try {
-                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Codex generation timed out", new TimeoutException());
-                }
-            } catch (InterruptedException exception) {
-                process.destroyForcibly().onExit().join();
-                throw exception;
-            }
-            String eventLog = Files.readString(events, StandardCharsets.UTF_8);
-            if (process.exitValue() != 0) {
-                throw new IllegalStateException("Codex generation failed: " + failureMessage(eventLog));
-            }
-            String text = Files.readString(answer, StandardCharsets.UTF_8);
-            return new ChatResponse(
-                    List.of(new Generation(new AssistantMessage(text))),
-                    ChatResponseMetadata.builder()
-                            .model(model)
-                            .usage(usage(eventLog))
-                            .build());
-        } finally {
-            Files.deleteIfExists(input);
-            Files.deleteIfExists(instructions);
-            Files.deleteIfExists(schema);
-            Files.deleteIfExists(answer);
-            Files.deleteIfExists(events);
-            Files.deleteIfExists(directory);
+        try (CliWorkspace files = new CliWorkspace("bibbidi-codex-generation-")) {
+            prepareInput(prompt, files);
+            int exitCode = process.execute(prepareProcess(files));
+            return readResponse(files, exitCode);
         }
+    }
+
+    private void prepareInput(Prompt prompt, CliWorkspace files) throws IOException {
+        files.write("instructions.md", systemText(prompt));
+        files.write("input.txt", transcript(prompt));
+        new CliJsonSchema(ANSWER_SCHEMA).writeTo(files.path("schema.json"));
+    }
+
+    private ProcessBuilder prepareProcess(CliWorkspace files) {
+        return new ProcessBuilder(
+                executable, "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
+                "--skip-git-repo-check", "--sandbox", "read-only", "--model", model,
+                "--config", "model_reasoning_effort=" + reasoningEffort,
+                "--config", "model_instructions_file='" + files.path("instructions.md") + "'",
+                "--output-schema", files.path("schema.json").toString(),
+                "--output-last-message", files.path("answer.json").toString(), "-")
+                .directory(files.directory().toFile())
+                .redirectInput(files.path("input.txt").toFile())
+                .redirectOutput(files.path("events.jsonl").toFile());
+    }
+
+    private ChatResponse readResponse(CliWorkspace files, int exitCode) throws IOException {
+        String eventLog = files.read("events.jsonl");
+        if (exitCode != 0) {
+            throw new IllegalStateException("Codex generation failed: " + readFailureMessage(eventLog));
+        }
+        String answer = files.read("answer.json");
+        return new ChatResponse(
+                List.of(new Generation(new AssistantMessage(answer))),
+                ChatResponseMetadata.builder().model(model).usage(readUsage(eventLog)).build());
     }
 
     private String systemText(Prompt prompt) {
@@ -131,7 +110,7 @@ public class CodexCliChatModel implements ChatModel {
                 .collect(Collectors.joining("\n\n"));
     }
 
-    private DefaultUsage usage(String eventLog) {
+    private DefaultUsage readUsage(String eventLog) {
         JsonNode usage = null;
         for (String line : eventLog.lines().toList()) {
             if (line.isBlank()) {
@@ -150,7 +129,7 @@ public class CodexCliChatModel implements ChatModel {
                 null);
     }
 
-    private String failureMessage(String eventLog) {
+    private String readFailureMessage(String eventLog) {
         String message = "exit without message";
         for (String line : eventLog.lines().toList()) {
             if (line.isBlank()) {
