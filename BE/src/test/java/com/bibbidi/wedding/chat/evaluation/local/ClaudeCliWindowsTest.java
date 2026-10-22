@@ -39,44 +39,10 @@ class ClaudeCliWindowsTest {
 
     @BeforeAll
     void compileCliStub() throws IOException, InterruptedException {
-        Path source = directory.resolve("FakeCli.cs");
         executable = directory.resolve("fake-cli.exe");
-        Files.writeString(source, """
-                using System;
-                using System.IO;
-                using System.Text;
-
-                public class FakeCli {
-                    public static void Main(string[] args) {
-                        Console.In.ReadToEnd();
-                        int schemaIndex = Array.IndexOf(args, "--json-schema");
-                        File.WriteAllText(
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "schema.json"),
-                            args[schemaIndex + 1], new UTF8Encoding(false));
-                        Console.WriteLine(@"{""structured_output"":{""answer"":""answer"",""recommendedItemIds"":[],""scenarioName"":""example"",""metricType"":""Completeness"",""status"":""scored"",""score"":4,""reason"":""reason""}}");
-                    }
-                }
-                """);
-        Path compiler = directory.resolve("compile.ps1");
-        Files.writeString(compiler, """
-                param([string]$SourceFile, [string]$OutputFile)
-                $ErrorActionPreference = 'Stop'
-                Write-Output 'Compiling CLI stub'
-                Add-Type -Path $SourceFile -OutputAssembly $OutputFile -OutputType ConsoleApplication
-                Write-Output 'CLI stub ready'
-                """);
-        Path compilerLog = directory.resolve("compiler.log");
-        Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
-                "-ExecutionPolicy", "Bypass", "-File", compiler.toString(), source.toString(), executable.toString())
-                .redirectErrorStream(true)
-                .redirectOutput(compilerLog.toFile())
-                .start();
-        process.getOutputStream().close();
-        if (!process.waitFor(120, TimeUnit.SECONDS)) {
-            process.destroyForcibly().onExit().join();
-            throw new IllegalStateException("CLI stub compilation timed out: " + Files.readString(compilerLog));
-        }
-        assertThat(process.exitValue()).withFailMessage(Files.readString(compilerLog)).isZero();
+        Path source = copyFixture("claude-windows.cs", "FakeCli.cs");
+        Path compiler = copyFixture("compile-windows-cli.ps1", "compile.ps1");
+        compileExecutable(source, compiler);
     }
 
     @BeforeEach
@@ -110,15 +76,42 @@ class ClaudeCliWindowsTest {
     @DisplayName("Windows의 기본 모드와 엄격 모드에서 채점 CLI가 원본 JSON 스키마를 받는다")
     void passesJudgeSchemaWithoutCorruption(String allowAmbiguousCommands) throws IOException {
         System.setProperty("jdk.lang.Process.allowAmbiguousCommands", allowAmbiguousCommands);
-        MetricInformation metric = new EvaluationDataLoader().loadMetrics().stream()
-                .filter(information -> information.metricType().equals("Completeness"))
-                .findFirst().orElseThrow();
+        MetricInformation metric = completenessMetric();
         ClaudeCliBibbidiJudge judge = new ClaudeCliBibbidiJudge(
                 executable.toString(), "test", Duration.ofSeconds(10));
 
         judge.evaluate(new Prompt("question"), metric, "example");
 
         assertOriginalSchema("ai-evaluation/schema/judge-result.json");
+    }
+
+    private void compileExecutable(Path source, Path compiler) throws IOException, InterruptedException {
+        Path compilerLog = directory.resolve("compiler.log");
+        Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
+                "-ExecutionPolicy", "Bypass", "-File", compiler.toString(), source.toString(), executable.toString())
+                .redirectErrorStream(true)
+                .redirectOutput(compilerLog.toFile())
+                .start();
+        process.getOutputStream().close();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly().onExit().join();
+            throw new IllegalStateException("CLI stub compilation timed out: " + Files.readString(compilerLog));
+        }
+        assertThat(process.exitValue()).withFailMessage(Files.readString(compilerLog)).isZero();
+    }
+
+    private Path copyFixture(String resource, String name) throws IOException {
+        Path target = directory.resolve(name);
+        try (var input = new ClassPathResource("ai-evaluation/cli-stubs/" + resource).getInputStream()) {
+            Files.copy(input, target);
+        }
+        return target;
+    }
+
+    private MetricInformation completenessMetric() throws IOException {
+        return new EvaluationDataLoader().loadMetrics().stream()
+                .filter(metric -> metric.metricType().equals("Completeness"))
+                .findFirst().orElseThrow();
     }
 
     private void assertOriginalSchema(String resource) throws IOException {

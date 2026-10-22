@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.chat.evaluation.local;
 
 import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
+import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiJudge;
 import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
@@ -45,8 +46,7 @@ class BibbidiLocalEvaluationTest {
 
     @TestFactory
     Stream<DynamicTest> evaluatesPreparedScenarios() {
-        return input.scenarios().stream().map(scenario -> DynamicTest.dynamicTest(
-                scenario.name(), () -> runner.evaluate(input, scenario, metrics)));
+        return input.scenarios().stream().map(this::createScenarioTest);
     }
 
     @AfterAll
@@ -54,6 +54,10 @@ class BibbidiLocalEvaluationTest {
         if (report != null) {
             report.write();
         }
+    }
+
+    private DynamicTest createScenarioTest(EvaluationScenario scenario) {
+        return DynamicTest.dynamicTest(scenario.name(), () -> runner.evaluate(input, scenario, metrics));
     }
 
     private LocalEvaluationInput readInput(Path path) throws IOException {
