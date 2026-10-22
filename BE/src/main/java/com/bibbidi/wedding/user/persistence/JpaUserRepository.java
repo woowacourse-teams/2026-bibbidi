@@ -11,8 +11,7 @@ import org.springframework.data.repository.query.Param;
 public interface JpaUserRepository extends JpaRepository<JpaUserEntity, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT user FROM JpaUserEntity user WHERE user.id = :userId")
-    Optional<JpaUserEntity> findByIdForUpdate(@Param("userId") Long userId);
+    Optional<JpaUserEntity> findForUpdateById(Long userId);
 
     boolean existsByNicknameIgnoreCase(String nickname);
 

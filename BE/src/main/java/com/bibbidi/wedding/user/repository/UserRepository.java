@@ -52,7 +52,7 @@ public class UserRepository {
     }
 
     public User findByIdForUpdate(Long userId) {
-        return userMapper.toDomain(jpaUserRepository.findByIdForUpdate(userId)
+        return userMapper.toDomain(jpaUserRepository.findForUpdateById(userId)
                 .orElseThrow(() -> new BusinessException(USER_NOT_FOUND, USER_NOT_FOUND_MESSAGE + userId)));
     }
 
