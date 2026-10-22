@@ -61,7 +61,9 @@ class ClaudeCliWindowsTest {
         Files.writeString(compiler, """
                 param([string]$SourceFile, [string]$OutputFile)
                 $ErrorActionPreference = 'Stop'
+                Write-Output 'Compiling CLI stub'
                 Add-Type -Path $SourceFile -OutputAssembly $OutputFile -OutputType ConsoleApplication
+                Write-Output 'CLI stub ready'
                 """);
         Path compilerLog = directory.resolve("compiler.log");
         Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
@@ -69,9 +71,10 @@ class ClaudeCliWindowsTest {
                 .redirectErrorStream(true)
                 .redirectOutput(compilerLog.toFile())
                 .start();
-        if (!process.waitFor(30, TimeUnit.SECONDS)) {
+        process.getOutputStream().close();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
             process.destroyForcibly().onExit().join();
-            throw new IllegalStateException("CLI stub compilation timed out");
+            throw new IllegalStateException("CLI stub compilation timed out: " + Files.readString(compilerLog));
         }
         assertThat(process.exitValue()).withFailMessage(Files.readString(compilerLog)).isZero();
     }
