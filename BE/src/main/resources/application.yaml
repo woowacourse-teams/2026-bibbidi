@@ -35,6 +35,10 @@ spring:
 bibbidi:
   sse:
     response-timeout-seconds: 60
+  ai:
+    chatbot:
+      memory-max-messages: 20
+      conversation-idle-timeout: 1h
 server:
   shutdown: graceful
 

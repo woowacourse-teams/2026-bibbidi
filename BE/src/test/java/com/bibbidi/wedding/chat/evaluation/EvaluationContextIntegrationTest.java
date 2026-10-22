@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -57,7 +58,8 @@ class EvaluationContextIntegrationTest {
         runner.run(new EvaluationDataLoader().loadScenarios().getFirst(), 900001L, Duration.ofSeconds(10));
         assertThat(runner.answer()).isEqualTo("예식 지역을 정하고 웨딩홀 투어를 준비하세요.");
         assertThat(runner.recommendedItemIds()).containsExactly(1L);
-        assertThat(runner.providedContext()).isEmpty();
+        assertThat(runner.providedContext()).hasSize(2);
+        assertThat(runner.providedContext().getFirst().getText()).contains("\"exists\"");
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -66,9 +68,20 @@ class EvaluationContextIntegrationTest {
         @Bean
         @Primary
         ChatModel chatModel() {
-            return new FakeChatModel(BedrockChatOptions.builder().build(), Flux.just(
-                    new ChatResponse(List.of(new Generation(new AssistantMessage(
-                            "{\"answer\":\"예식 지역을 정하고 웨딩홀 투어를 준비하세요.\",\"recommendedItemIds\":[1]}"))))));
+            return new FakeChatModel(BedrockChatOptions.builder().build(), prompt -> {
+                boolean toolsAnswered = prompt.getInstructions().stream().anyMatch(ToolResponseMessage.class::isInstance);
+                if (toolsAnswered) {
+                    return Flux.just(new ChatResponse(List.of(new Generation(new AssistantMessage(
+                            "{\"answer\":\"예식 지역을 정하고 웨딩홀 투어를 준비하세요.\",\"recommendedItemIds\":[1]}")))));
+                }
+                AssistantMessage toolCalls = AssistantMessage.builder()
+                        .content("")
+                        .toolCalls(List.of(
+                                new AssistantMessage.ToolCall("call-1", "function", "getMyChecklist", "{}"),
+                                new AssistantMessage.ToolCall("call-2", "function", "getRecommendableItemIds", "{}")))
+                        .build();
+                return Flux.just(new ChatResponse(List.of(new Generation(toolCalls))));
+            });
         }
     }
 }

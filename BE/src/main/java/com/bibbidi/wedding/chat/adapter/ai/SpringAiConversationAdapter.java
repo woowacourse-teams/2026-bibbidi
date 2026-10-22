@@ -2,8 +2,6 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.observability.AiChatStreamRecorder;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -27,12 +25,12 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     }
 
     @Override
-    public AiResponseStream stream(String conversationKey, String userPrompt, BibbidiCustomChatPromptContext context) {
+    public Flux<String> stream(Long userId, String conversationKey, String userPrompt) {
         UserMessage userMessage = new UserMessage(userPrompt);
 
-        Flux<String> answerFlux = recorder.record(
+        return recorder.record(
                         userPrompt,
-                        chatClient.streamReply(conversationKey, userMessage)
+                        chatClient.streamReply(userId, conversationKey, userMessage)
                 )
                 .onErrorMap(SpringAiConversationAdapter::isThrottled, exception -> new BusinessException(
                         ClientError.AI_CAPACITY_EXCEEDED, "Bedrock 호출 한도 초과", exception))
@@ -40,11 +38,6 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                         ClientError.INTERNAL_ERROR, "AI 응답 없음", exception))
                 .map(AiChatStreamRecorder::textOf)
                 .filter(text -> !text.isEmpty());
-
-        return new AiResponseStream(
-                answerFlux,
-                context.recommendableItemIds()
-        );
     }
 
     private static boolean isThrottled(Throwable exception) {

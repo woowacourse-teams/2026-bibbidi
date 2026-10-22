@@ -3,11 +3,6 @@ package com.bibbidi.wedding.chat.adapter.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
-import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistItemSnapshot;
-import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
@@ -15,7 +10,6 @@ import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -33,11 +27,13 @@ import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import reactor.core.publisher.Flux;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 class SpringAiConversationAdapterTest {
 
+    private static final Long USER_ID = 7L;
     private static final String CONVERSATION = "7:7bf4d204-8331-439b-bd8f-271abc0eea99";
 
     private final List<Prompt> receivedPrompts = new CopyOnWriteArrayList<>();
@@ -66,7 +62,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("답변")));
 
         // when
-        adapter.stream(CONVERSATION, "추천해줘", context()).content().blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "추천해줘").blockLast();
 
         // then
         List<Message> instructions = receivedPrompts.getLast().getInstructions();
@@ -74,30 +70,41 @@ class SpringAiConversationAdapterTest {
     }
 
     @Test
-    @DisplayName("모델이 보낸 답변 조각과 추천 가능한 항목 ID를 그대로 돌려준다")
-    void returnsTheModelContentAndRecommendableItemIds() {
+    @DisplayName("모델이 보낸 답변 조각을 그대로 돌려준다")
+    void returnsTheModelContent() {
         // given
         respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약")));
 
         // when
-        AiResponseStream response = adapter.stream(CONVERSATION, "질문", context());
+        List<String> content = adapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
 
         // then
-        assertThat(response.content().collectList().block()).containsExactly("웨딩홀 ", "계약");
-        assertThat(response.recommendableItemIds()).containsExactlyInAnyOrder(2L, 3L);
+        assertThat(content).containsExactly("웨딩홀 ", "계약");
+    }
+
+    @Test
+    @DisplayName("도구 호출에 요청한 사용자의 ID를 전달한다")
+    void passesTheRequestingUserIdToTheToolContext() {
+        // given
+        respondWith(Flux.just(chunk("답변")));
+
+        // when
+        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
+
+        // then
+        ToolCallingChatOptions options = (ToolCallingChatOptions) receivedPrompts.getLast().getOptions();
+        assertThat(options.getToolContext()).containsEntry("userId", USER_ID);
     }
 
     @Test
     @DisplayName("다음 호출에서 Advisor가 앞선 대화 기록을 전달한다")
-    void replacesThePromptContextOnEveryStream() {
+    void passesEarlierTurnsOfTheSameConversation() {
         // given
-        BibbidiCustomChatPromptContext latest = new BibbidiCustomChatPromptContext(
-                ChecklistSnapshot.notFound(), List.of(), Set.of());
         respondWith(Flux.just(chunk("답변")));
-        adapter.stream(CONVERSATION, "첫 질문", context()).content().blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "첫 질문").blockLast();
 
         // when
-        adapter.stream(CONVERSATION, "둘째 질문", latest).content().blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "둘째 질문").blockLast();
 
         // then
         assertThat(receivedPrompts.getLast().getInstructions()).extracting(Message::getText)
@@ -109,7 +116,7 @@ class SpringAiConversationAdapterTest {
     void remembersTheQuestionAndAnswerAsAPair() {
         // when
         respondWith(Flux.just(chunk("답변")));
-        adapter.stream(CONVERSATION, "질문", context()).content().blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
 
         // then
         assertThat(memory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
@@ -124,7 +131,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
 
         // when
-        adapter.stream(CONVERSATION, "질문", context()).content().blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
 
         // then
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
@@ -140,7 +147,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.concat(Flux.just(chunk("웨딩홀 ")), Flux.error(new IllegalStateException("모델 오류"))));
 
         // when
-        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
 
         // then
         assertThat(failureCount("error")).isEqualTo(1);
@@ -159,7 +166,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(throttling));
 
         // when, then
-        assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
+        assertThatThrownBy(() -> adapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.clientError()).isEqualTo(ClientError.AI_CAPACITY_EXCEEDED))
                 .hasCause(throttling);
@@ -173,7 +180,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(failure));
 
         // when, then
-        assertThatThrownBy(() -> adapter.stream(CONVERSATION, "질문", context()).content().blockLast())
+        assertThatThrownBy(() -> adapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
                 .isSameAs(failure);
     }
 
@@ -184,7 +191,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(ThrottlingException.builder().message("Too many tokens").build()));
 
         // when
-        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
 
         // then
         assertThat(failureCount("throttled")).isEqualTo(1);
@@ -199,7 +206,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(new TimeoutException("응답 시간 초과")));
 
         // when
-        adapter.stream(CONVERSATION, "질문", context()).content().collectList().onErrorReturn(List.of()).block();
+        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
 
         // then
         assertThat(failureCount("timeout")).isEqualTo(1);
@@ -214,7 +221,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.concat(Flux.just(chunk("답변")), Flux.never()));
 
         // when
-        adapter.stream(CONVERSATION, "질문", context()).content().take(1).blockLast();
+        adapter.stream(USER_ID, CONVERSATION, "질문").take(1).blockLast();
 
         // then
         assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
@@ -230,7 +237,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
 
         // when
-        List<String> content = adapter.stream(CONVERSATION, "질문", context()).content().collectList().block();
+        List<String> content = adapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
 
         // then
         assertThat(content).containsExactly("답변");
@@ -240,15 +247,6 @@ class SpringAiConversationAdapterTest {
         return new ChatResponse(
                 List.of(new Generation(new AssistantMessage(""))),
                 ChatResponseMetadata.builder().usage(new DefaultUsage(inputTokens, outputTokens)).build());
-    }
-
-    private static BibbidiCustomChatPromptContext context() {
-        ChecklistSnapshot checklist = new ChecklistSnapshot(true, List.of(
-                new ChecklistItemSnapshot(1L, 1L, "웨딩홀 예약", "TODO", List.of())));
-        List<CatalogItemDetailSnapshot> catalog = List.of(
-                new CatalogItemDetailSnapshot(1L, "웨딩홀 후보 정하기", "웨딩홀", 1, "후보"),
-                new CatalogItemDetailSnapshot(2L, "스튜디오 후보 정하기", "촬영", 1, "후보"));
-        return new BibbidiCustomChatPromptContext(checklist, catalog, Set.of(2L, 3L));
     }
 
     private static ChatResponse chunk(String text) {

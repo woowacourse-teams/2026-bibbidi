@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.adapter.catalog;
+package com.bibbidi.wedding.chat.adapter.ai.tools;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
