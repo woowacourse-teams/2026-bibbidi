@@ -5,13 +5,13 @@ import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
 import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.evaluation.EvaluationResponse;
 import org.springframework.core.io.ClassPathResource;
@@ -59,9 +59,11 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
     private CodexOutput runCodex(Prompt prompt) throws IOException, InterruptedException {
         Path directory = Files.createTempDirectory("bibbidi-judge-");
         Path schema = directory.resolve("schema.json");
+        Path inputFile = directory.resolve("input.txt");
         Path answer = directory.resolve("answer.json");
         Path events = directory.resolve("events.jsonl");
         try {
+            Files.writeString(inputFile, prompt.getContents(), StandardCharsets.UTF_8);
             try (InputStream input = new ClassPathResource(RESULT_SCHEMA).getInputStream()) {
                 Files.copy(input, schema);
             }
@@ -71,16 +73,14 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
                     "--config", "model_reasoning_effort=" + reasoningEffort,
                     "--output-schema", schema.toString(),
                     "--output-last-message", answer.toString(), "-")
+                    .redirectInput(inputFile.toFile())
                     .redirectOutput(events.toFile())
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            try (OutputStream input = process.getOutputStream()) {
-                input.write(prompt.getContents().getBytes(StandardCharsets.UTF_8));
-            }
             try {
                 if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                     process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Codex judge timed out");
+                    throw new IllegalStateException("Codex judge timed out", new TimeoutException());
                 }
             } catch (InterruptedException exception) {
                 process.destroyForcibly().onExit().join();
@@ -92,6 +92,7 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
             String answerText = Files.readString(answer, StandardCharsets.UTF_8);
             return new CodexOutput(answerText, tokenUsage(Files.readString(events, StandardCharsets.UTF_8)));
         } finally {
+            Files.deleteIfExists(inputFile);
             Files.deleteIfExists(answer);
             Files.deleteIfExists(events);
             Files.deleteIfExists(schema);

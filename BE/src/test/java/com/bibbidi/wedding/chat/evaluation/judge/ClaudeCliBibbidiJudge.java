@@ -5,13 +5,13 @@ import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
 import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.evaluation.EvaluationResponse;
 import org.springframework.core.io.ClassPathResource;
@@ -68,23 +68,23 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
             schema = new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
         Path output = Files.createTempFile("bibbidi-claude-judge-", ".json");
+        Path inputFile = Files.createTempFile("bibbidi-claude-judge-input-", ".txt");
         try {
+            Files.writeString(inputFile, prompt.getContents(), StandardCharsets.UTF_8);
             String schemaArgument = System.getProperty("os.name").startsWith("Windows")
                     ? schema.replace("\"", "\\\"") : schema;
             Process process = new ProcessBuilder(
                     executable, "-p", "--safe-mode", "--no-session-persistence",
                     "--tools", "", "--disallowedTools", "mcp__*",
                     "--model", model, "--output-format", "json", "--json-schema", schemaArgument)
+                    .redirectInput(inputFile.toFile())
                     .redirectOutput(output.toFile())
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            try (OutputStream input = process.getOutputStream()) {
-                input.write(prompt.getContents().getBytes(StandardCharsets.UTF_8));
-            }
             try {
                 if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                     process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Claude judge timed out");
+                    throw new IllegalStateException("Claude judge timed out", new TimeoutException());
                 }
             } catch (InterruptedException exception) {
                 process.destroyForcibly().onExit().join();
@@ -95,6 +95,7 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
             }
             return Files.readString(output, StandardCharsets.UTF_8);
         } finally {
+            Files.deleteIfExists(inputFile);
             Files.deleteIfExists(output);
         }
     }
