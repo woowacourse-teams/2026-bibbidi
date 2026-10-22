@@ -141,6 +141,77 @@ class LocalEvaluationRunnerTest {
         assertThat(result().path("scenarios").get(1).path("generation").path("calls").size()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("추천 번호를 읽다가 실패해도 이미 읽은 답변과 번호를 보존한다")
+    void preservesPartialAnswerWhenReadingRecommendedIdsFails() throws IOException {
+        BibbidiEvaluationReportWriter report = report();
+        LocalEvaluationRunner runner = new LocalEvaluationRunner(
+                prompt -> response("{\"answer\":\"받은 답변\",\"recommendedItemIds\":[12,1.5]}"),
+                (prompt, information, name) -> { throw new AssertionError("Must not judge malformed responses"); }, report);
+
+        assertThatThrownBy(() -> runner.evaluate(input, scenario, Map.of(metric.metricType(), metric)))
+                .isInstanceOf(IllegalStateException.class);
+        report.write();
+
+        JsonNode recorded = result().path("scenarios").get(0);
+        assertThat(recorded.path("generation").path("answer").asText()).isEqualTo("받은 답변");
+        assertThat(recorded.path("generation").path("recommendedItemIds").size()).isEqualTo(1);
+        assertThat(recorded.path("generation").path("recommendedItemIds").get(0).asLong()).isEqualTo(12);
+        assertThat(recorded.path("failure").path("phase").asText()).isEqualTo("generation");
+        assertThat(recorded.path("metrics").isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("뒤 지표의 채점이 실패해도 앞 지표의 점수와 실패한 지표를 보존한다")
+    void preservesCompletedScoresWhenALaterMetricFails() throws IOException {
+        MetricInformation nextMetric = new MetricInformation("Relevance", metric.role(), metric.task(), metric.rubric(),
+                metric.scale(), metric.direction(), metric.requiredInputs());
+        EvaluationScenario twoMetrics = new EvaluationScenario(scenario.name(), List.of("Completeness", "Relevance"),
+                scenario.userMessage(), scenario.chatMemory(), scenario.referenceAnswer(), scenario.expectedRefusal());
+        IllegalStateException failure = new IllegalStateException("second metric failed");
+        BibbidiEvaluationReportWriter report = report();
+        LocalEvaluationRunner runner = new LocalEvaluationRunner(
+                prompt -> response("{\"answer\":\"받은 답변\",\"recommendedItemIds\":[12]}"),
+                (prompt, information, name) -> {
+                    if (information.metricType().equals(nextMetric.metricType())) {
+                        throw failure;
+                    }
+                    return score(prompt);
+                }, report);
+
+        assertThatThrownBy(() -> runner.evaluate(input, twoMetrics,
+                Map.of(metric.metricType(), metric, nextMetric.metricType(), nextMetric))).isSameAs(failure);
+        report.write();
+
+        JsonNode recorded = result().path("scenarios").get(0);
+        assertThat(recorded.path("generation").path("answer").asText()).isEqualTo("받은 답변");
+        assertThat(recorded.path("failure").path("phase").asText()).isEqualTo("metricEvaluation");
+        assertThat(recorded.path("failure").path("metricType").asText()).isEqualTo("Relevance");
+        assertThat(recorded.path("metrics").size()).isEqualTo(2);
+        assertThat(recorded.path("metrics").get(0).path("score").asInt()).isEqualTo(4);
+        assertThat(recorded.path("metrics").get(1).path("status").asText()).isEqualTo("error");
+        assertThat(result().path("summary").path("completedScenarios").asInt()).isZero();
+    }
+
+    @Test
+    @DisplayName("프롬프트 구성이 실패해도 모델을 호출하지 않고 생성 실패로 기록한다")
+    void recordsPromptFailuresBeforeCallingTheModel() throws IOException {
+        EvaluationScenario invalid = new EvaluationScenario(scenario.name(), scenario.metrics(), scenario.userMessage(),
+                List.of(new EvaluationScenario.ChatMessage("unknown", "잘못된 역할")), "", "");
+        BibbidiEvaluationReportWriter report = report();
+        LocalEvaluationRunner runner = new LocalEvaluationRunner(
+                prompt -> { throw new AssertionError("Must not call the model for invalid prompts"); },
+                (prompt, information, name) -> { throw new AssertionError("Must not judge invalid prompts"); }, report);
+
+        assertThatThrownBy(() -> runner.evaluate(input, invalid, Map.of(metric.metricType(), metric)))
+                .isInstanceOf(IllegalArgumentException.class);
+        report.write();
+
+        JsonNode recorded = result().path("scenarios").get(0);
+        assertThat(recorded.path("failure").path("phase").asText()).isEqualTo("generation");
+        assertThat(recorded.path("generation").path("calls").isEmpty()).isTrue();
+    }
+
     private EvaluationResponse score(Prompt prompt) {
         return new EvaluationResponse(false, 4, "채점 이유", Map.of(
                 "metricType", metric.metricType(), "rawScore", 4, "qualityPassDetermined", false,
