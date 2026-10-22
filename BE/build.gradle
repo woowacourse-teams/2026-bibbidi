@@ -112,7 +112,6 @@ tasks.named('processResources') {
     from('database/mysql/load_terms.sql')
 }
 
-// 서비스·DB 없이 준비한 자료로 실행하는 수동 모델 평가다.
 tasks.register('aiLocalEvaluationTest', Test) {
     description = 'Evaluates models locally using prepared input, without Spring or Bedrock.'
     group = 'verification'
