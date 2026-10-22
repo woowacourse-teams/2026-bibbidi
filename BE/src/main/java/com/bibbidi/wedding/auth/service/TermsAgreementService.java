@@ -34,8 +34,8 @@ public class TermsAgreementService {
                     ClientError.INVALID_REQUEST,
                     "약관에 동의해야 가입을 완료할 수 있습니다.");
         }
-        termsService.agree(currentUserId, termsVersion);
         UserResult user = userService.agreeToTerms(currentUserId, termsVersion);
+        termsService.agree(currentUserId, termsVersion);
         return bibbidiTokenIssuer.issueAccessToken(
                 new BibbidiTokenClaims(
                         user.id(),

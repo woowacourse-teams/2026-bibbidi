@@ -89,7 +89,7 @@ export const TARGETS: readonly Target[] = [
   { name: 'GET /api/terms', request: () => spec('GET /api/terms', '/api/terms', [200]) },
   {
     name: 'POST /api/users/me/terms-agreement',
-    request: ({ data }) => spec('POST /api/users/me/terms-agreement', '/api/users/me/terms-agreement', [200, 409], { termsVersion: data.termsVersion, agreed: true }),
+    request: ({ data }) => spec('POST /api/users/me/terms-agreement', '/api/users/me/terms-agreement', [200], { termsVersion: data.termsVersion, agreed: true }),
   },
   { name: 'GET /api/users/me', request: () => spec('GET /api/users/me', '/api/users/me', [200]) },
   { name: 'GET /api/users/me/wedding-date', request: () => spec('GET /api/users/me/wedding-date', '/api/users/me/wedding-date', [200, 404]) },

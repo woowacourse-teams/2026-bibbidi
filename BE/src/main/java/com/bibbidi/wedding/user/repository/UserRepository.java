@@ -51,6 +51,11 @@ public class UserRepository {
         );
     }
 
+    public User findByIdForUpdate(Long userId) {
+        return userMapper.toDomain(jpaUserRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new BusinessException(USER_NOT_FOUND, USER_NOT_FOUND_MESSAGE + userId)));
+    }
+
     public WeddingDate findWeddingDateByUserId(Long userId) {
         JpaUserEntity entity = getJpaUserEntity(userId);
         return new WeddingDate(entity.id(), entity.weddingDate());
