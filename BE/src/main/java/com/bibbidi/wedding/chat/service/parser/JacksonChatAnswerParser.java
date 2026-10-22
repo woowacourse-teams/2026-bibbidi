@@ -1,12 +1,11 @@
 package com.bibbidi.wedding.chat.service.parser;
 
-import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-public class JacksonChatAnswerParser implements ChatAnswerParser {
+public class JacksonChatAnswerParser {
 
     private final ObjectMapper mapper;
 
@@ -14,8 +13,7 @@ public class JacksonChatAnswerParser implements ChatAnswerParser {
         this.mapper = mapper;
     }
 
-    @Override
-    public Session newSession(Consumer<String> answerChunk) {
+    public ReactiveChatAnswerStream newSession(Consumer<String> answerChunk) {
         return new ReactiveChatAnswerStream(mapper, answerChunk);
     }
 }

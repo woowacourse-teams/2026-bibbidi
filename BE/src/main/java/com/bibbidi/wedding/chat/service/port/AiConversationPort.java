@@ -4,6 +4,8 @@ import reactor.core.publisher.Flux;
 
 public interface AiConversationPort {
 
+    String modelName();
+
     Flux<String> stream(Long userId, String conversationKey, String userPrompt);
 
 }

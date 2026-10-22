@@ -3,10 +3,12 @@ package com.bibbidi.wedding.chat.service.parser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.common.exception.BusinessException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -19,7 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ChatAnswerStreamTest {
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     @Test
     @DisplayName("JSON 필드와 이스케이프가 조각 경계에서 나뉘어도 답변만 즉시 전달한다")
@@ -29,11 +31,12 @@ class ChatAnswerStreamTest {
         String expected = "준비 \"목록\"\n경로 \\ / 😀";
 
         for (int boundary = 0; boundary <= json.length(); boundary++) {
-            ChatAnswerStream stream = new ChatAnswerStream(mapper);
+            ChatAnswerStream stream = new ChatAnswerStream(MAPPER);
             List<String> deltas = new ArrayList<>();
 
             // when
-            ChatAnswer answer = stream.read(Stream.of(json.substring(0, boundary), json.substring(boundary)), deltas::add);
+            ChatAnswer answer = stream.read(Stream.of(json.substring(0, boundary), json.substring(boundary)),
+                    deltas::add);
 
             // then
             assertThat(String.join("", deltas)).isEqualTo(expected);
@@ -47,7 +50,7 @@ class ChatAnswerStreamTest {
     @DisplayName("답변 필드가 끝나기 전에도 텍스트를 전달하고 추천 ID는 노출하지 않는다")
     void streamsBeforeTheAnswerStringIsCompleteAndAcceptsEitherFieldOrder() {
         // given
-        ChatAnswerStream stream = new ChatAnswerStream(mapper);
+        ChatAnswerStream stream = new ChatAnswerStream(MAPPER);
         List<String> deltas = new ArrayList<>();
         String remaining = "답변\"}";
         Stream<String> chunks = Stream.of("", "{\"recommendedItemIds\":[2],\"answer\":\"일부 ", "", remaining, "")
@@ -67,7 +70,7 @@ class ChatAnswerStreamTest {
     @DisplayName("한 글자씩 수신해도 JSON처럼 보이는 답변과 이모지를 원문대로 전달한다")
     void streamsSingleCharacterChunksWithoutSplittingEmoji(String json, String expected) {
         // given
-        ChatAnswerStream stream = new ChatAnswerStream(mapper);
+        ChatAnswerStream stream = new ChatAnswerStream(MAPPER);
         List<String> deltas = new ArrayList<>();
         Stream<String> chunks = json.chars().mapToObj(character -> String.valueOf((char) character));
 
@@ -87,12 +90,12 @@ class ChatAnswerStreamTest {
     void streamsAnswersLargerThanTheParserBuffers() {
         // given
         String expected = "준비 \\\"목록\\\"\n😀 ".repeat(3000);
-        String json = mapper.writeValueAsString(new ChatAnswer(expected, List.of(2L)));
+        String json = MAPPER.writeValueAsString(new ChatAnswer(expected, List.of(2L)));
         List<String> deltas = new ArrayList<>();
         AtomicBoolean closed = new AtomicBoolean();
 
         // when
-        ChatAnswer answer = new ChatAnswerStream(mapper).read(
+        ChatAnswer answer = new ChatAnswerStream(MAPPER).read(
                 Stream.of(json).onClose(() -> closed.set(true)), deltas::add);
 
         // then
@@ -114,7 +117,7 @@ class ChatAnswerStreamTest {
                 .onClose(() -> closed.set(true));
 
         // when, then
-        assertThatThrownBy(() -> new ChatAnswerStream(mapper).read(chunks, delta -> {
+        assertThatThrownBy(() -> new ChatAnswerStream(MAPPER).read(chunks, delta -> {
             throw cancelled;
         })).isSameAs(cancelled);
         assertThat(closed).isTrue();
@@ -123,7 +126,8 @@ class ChatAnswerStreamTest {
     static Stream<Arguments> singleCharacterOutputs() {
         String literalAnswer = "제목 {\"answer\":\"가짜\"}를 확인 😀";
         return Stream.of(
-                Arguments.of(JsonMapper.builder().build().writeValueAsString(new ChatAnswer(literalAnswer, List.of(2L))),
+                Arguments.of(
+                        MAPPER.writeValueAsString(new ChatAnswer(literalAnswer, List.of(2L))),
                         literalAnswer),
                 Arguments.of("{\"recommendedItemIds\":[2],\"ans\\u0077er\":\"준비\\n\\uD83D\\uDE00\"}", "준비\n😀")
         );
@@ -134,11 +138,12 @@ class ChatAnswerStreamTest {
     @DisplayName("불완전하거나 계약에 맞지 않는 출력은 완료 결과로 인정하지 않는다")
     void rejectsMalformedOrInvalidOutputs(String json) {
         // given
-        ChatAnswerStream stream = new ChatAnswerStream(mapper);
+        ChatAnswerStream stream = new ChatAnswerStream(MAPPER);
         AtomicBoolean closed = new AtomicBoolean();
 
         // when, then
-        assertThatThrownBy(() -> stream.read(Stream.of(json).onClose(() -> closed.set(true)), delta -> { }))
+        assertThatThrownBy(() -> stream.read(Stream.of(json).onClose(() -> closed.set(true)), delta -> {
+        }))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("챗봇의 구조화된 응답이 올바르지 않습니다.");
         assertThat(closed).isTrue();
@@ -147,27 +152,31 @@ class ChatAnswerStreamTest {
     static Stream<String> invalidOutputs() {
         return Stream.of(
                 "",
-                "[]",
-                "null",
+                json(List.of()),
+                json(null),
                 "{\"answer\":\"일부",
-                "{\"answer\":42,\"recommendedItemIds\":[]}",
-                "{\"answer\":\" \",\"recommendedItemIds\":[]}",
-                "{\"answer\":\"답변\"}",
-                "{\"recommendedItemIds\":[]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":null}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":{}}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[\"1\"]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[1.5]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[0]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[9223372036854775808]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[],\"extra\":true}",
+                json(Map.of("answer", 42, "recommendedItemIds", List.of())),
+                json(new ChatAnswer(" ", List.of())),
+                json(Map.of("answer", "답변")),
+                json(Map.of("recommendedItemIds", List.of())),
+                json(new ChatAnswer("답변", null)),
+                json(Map.of("answer", "답변", "recommendedItemIds", Map.of())),
+                json(Map.of("answer", "답변", "recommendedItemIds", List.of("1"))),
+                json(Map.of("answer", "답변", "recommendedItemIds", List.of(1.5))),
+                json(new ChatAnswer("답변", List.of(0L))),
+                json(Map.of("answer", "답변", "recommendedItemIds", List.of(new BigInteger("9223372036854775808")))),
+                json(Map.of("answer", "답변", "recommendedItemIds", List.of(), "extra", true)),
                 "{\"answer\":\"답변\",\"answer\":\"다른 답변\",\"recommendedItemIds\":[]}",
                 "{\"answer\":\"답변\",\"recommendedItemIds\":[],\"recommendedItemIds\":[]}",
                 "{\"answer\":\"답변\",\"recommendedItemIds\":[],\"recommendedItem\\u0049ds\":[]}",
                 "{\"answer\":\"\\q\",\"recommendedItemIds\":[]}",
                 "{\"answer\":\"\\uZZZZ\",\"recommendedItemIds\":[]}",
                 "{\"answer\":\"\\uD83D\",\"recommendedItemIds\":[]}",
-                "{\"answer\":\"답변\",\"recommendedItemIds\":[]}{}"
+                json(new ChatAnswer("답변", List.of())) + "{}"
         );
+    }
+
+    private static String json(Object value) {
+        return MAPPER.writeValueAsString(value);
     }
 }

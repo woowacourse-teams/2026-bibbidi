@@ -2,16 +2,14 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
-import com.bibbidi.wedding.chat.support.AiChatStreamRecorderFixture;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,41 +26,45 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.test.publisher.TestPublisher;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 class SpringAiConversationAdapterTest {
 
     private static final Long USER_ID = 7L;
     private static final String CONVERSATION = "7:7bf4d204-8331-439b-bd8f-271abc0eea99";
+    private static final String ANOTHER_CONVERSATION = "8:7bf4d204-8331-439b-bd8f-271abc0eea99";
 
     private final List<Prompt> receivedPrompts = new CopyOnWriteArrayList<>();
-    private volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
-    private ChatMemory memory;
-    private SpringAiConversationAdapter adapter;
-    private SimpleMeterRegistry registry;
+    private volatile Function<Prompt, Flux<ChatResponse>> responder = _ -> Flux.empty();
+    private ChatMemory chatMemory;
+    private SpringAiConversationAdapter springAiConversationAdapter;
 
     @BeforeEach
     void setUp() {
-        registry = new SimpleMeterRegistry();
         FakeChatModel model = new FakeChatModel(prompt -> {
             receivedPrompts.add(prompt);
             return responder.apply(prompt);
         });
-        memory = MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).maxMessages(18).build();
-        adapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
-                AiChatStreamRecorderFixture.create(registry));
+        chatMemory = MessageWindowChatMemory.builder()
+                .chatMemoryRepository(new InMemoryChatMemoryRepository())
+                .maxMessages(18)
+                .build();
+        springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
+                chatMemory), "test-model");
     }
 
     @Test
     @DisplayName("이전 대화와 사용자 질문을 모델에 전달한다")
     void sendsHistoryContextAndQuestionToTheModelInOrder() {
         // given
-        memory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
+        chatMemory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
         respondWith(Flux.just(chunk("답변")));
 
         // when
-        adapter.stream(USER_ID, CONVERSATION, "추천해줘").blockLast();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "추천해줘").blockLast();
 
         // then
         List<Message> instructions = receivedPrompts.getLast().getInstructions();
@@ -76,7 +78,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약")));
 
         // when
-        List<String> content = adapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
+        List<String> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
 
         // then
         assertThat(content).containsExactly("웨딩홀 ", "계약");
@@ -89,7 +91,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("답변")));
 
         // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
 
         // then
         ToolCallingChatOptions options = (ToolCallingChatOptions) receivedPrompts.getLast().getOptions();
@@ -101,10 +103,10 @@ class SpringAiConversationAdapterTest {
     void passesEarlierTurnsOfTheSameConversation() {
         // given
         respondWith(Flux.just(chunk("답변")));
-        adapter.stream(USER_ID, CONVERSATION, "첫 질문").blockLast();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "첫 질문").blockLast();
 
         // when
-        adapter.stream(USER_ID, CONVERSATION, "둘째 질문").blockLast();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "둘째 질문").blockLast();
 
         // then
         assertThat(receivedPrompts.getLast().getInstructions()).extracting(Message::getText)
@@ -116,46 +118,12 @@ class SpringAiConversationAdapterTest {
     void remembersTheQuestionAndAnswerAsAPair() {
         // when
         respondWith(Flux.just(chunk("답변")));
-        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
 
         // then
-        assertThat(memory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
-        assertThat(memory.get(CONVERSATION)).extracting(Message::getMessageType)
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getMessageType)
                 .extracting(Enum::name).containsExactly("USER", "ASSISTANT");
-    }
-
-    @Test
-    @DisplayName("답변을 마치면 완료한 대화 수를 기록한다")
-    void recordsCompletedTurnWhenTheAnswerCompletes() {
-        // given
-        respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약"), usageOnly(1_000_000, 500_000)));
-
-        // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
-
-        // then
-        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.completed").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
-        assertThat(failureCount("throttled") + failureCount("timeout") + failureCount("error")).isZero();
-    }
-
-    @Test
-    @DisplayName("답변 도중 모델이 실패하면 실패 횟수를 기록한다")
-    void recordsFailureWhenTheModelFails() {
-        // given
-        respondWith(Flux.concat(Flux.just(chunk("웨딩홀 ")), Flux.error(new IllegalStateException("모델 오류"))));
-
-        // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
-
-        // then
-        assertThat(failureCount("error")).isEqualTo(1);
-        assertThat(failureCount("throttled")).isZero();
-        assertThat(failureCount("timeout")).isZero();
-        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
-        assertThat(registry.get("ai.chat.cancelled").counter().count()).isZero();
     }
 
     @Test
@@ -166,7 +134,7 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(throttling));
 
         // when, then
-        assertThatThrownBy(() -> adapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.clientError()).isEqualTo(ClientError.AI_CAPACITY_EXCEEDED))
                 .hasCause(throttling);
@@ -180,54 +148,8 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.error(failure));
 
         // when, then
-        assertThatThrownBy(() -> adapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
                 .isSameAs(failure);
-    }
-
-    @Test
-    @DisplayName("모델이 한도 초과로 실패하면 throttled 사유로 기록한다")
-    void recordsThrottledFailureWhenTheModelIsThrottled() {
-        // given
-        respondWith(Flux.error(ThrottlingException.builder().message("Too many tokens").build()));
-
-        // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
-
-        // then
-        assertThat(failureCount("throttled")).isEqualTo(1);
-        assertThat(failureCount("timeout")).isZero();
-        assertThat(failureCount("error")).isZero();
-    }
-
-    @Test
-    @DisplayName("모델 응답이 시간 초과로 실패하면 timeout 사유로 기록한다")
-    void recordsTimeoutFailureWhenTheModelTimesOut() {
-        // given
-        respondWith(Flux.error(new TimeoutException("응답 시간 초과")));
-
-        // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").collectList().onErrorReturn(List.of()).block();
-
-        // then
-        assertThat(failureCount("timeout")).isEqualTo(1);
-        assertThat(failureCount("throttled")).isZero();
-        assertThat(failureCount("error")).isZero();
-    }
-
-    @Test
-    @DisplayName("답변 스트림이 취소되면 취소 횟수를 기록한다")
-    void recordsCancellationWhenTheAnswerStreamIsCancelled() {
-        // given
-        respondWith(Flux.concat(Flux.just(chunk("답변")), Flux.never()));
-
-        // when
-        adapter.stream(USER_ID, CONVERSATION, "질문").take(1).blockLast();
-
-        // then
-        assertThat(registry.get("ai.chat.turns").counter().count()).isEqualTo(1);
-        assertThat(registry.get("ai.chat.completed").counter().count()).isZero();
-        assertThat(registry.get("ai.chat.cancelled").counter().count()).isEqualTo(1);
-        assertThat(failureCount("throttled") + failureCount("timeout") + failureCount("error")).isZero();
     }
 
     @Test
@@ -237,10 +159,101 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
 
         // when
-        List<String> content = adapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
+        List<String> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
 
         // then
         assertThat(content).containsExactly("답변");
+    }
+
+    @Test
+    @DisplayName("다른 대화 키의 기록은 모델에 전달하지 않는다")
+    void doesNotSendHistoryOfAnotherConversationKey() {
+        // given
+        chatMemory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
+        respondWith(Flux.just(chunk("답변")));
+
+        // when
+        springAiConversationAdapter.stream(USER_ID, ANOTHER_CONVERSATION, "추천해줘").blockLast();
+
+        // then
+        assertThat(receivedPrompts.getLast().getInstructions()).extracting(Message::getText)
+                .containsExactly("추천해줘");
+    }
+
+    @Test
+    @DisplayName("중괄호가 포함된 사용자 메시지를 원문 그대로 전달한다")
+    void userTextWithBracesIsPassedAsLiteralContent() {
+        // given
+        String question = "예산 {예산}과 조건 {\"촬영\":false}를 참고해줘";
+        respondWith(Flux.just(chunk("확인했어요.")));
+
+        // when
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, question).blockLast();
+
+        // then
+        assertThat(receivedPrompts.getLast().getInstructions().getLast().getText()).isEqualTo(question);
+    }
+
+    @Test
+    @DisplayName("질문은 먼저 저장하고 모델 답변은 완료한 뒤에 저장한다")
+    void remembersTheQuestionFirstAndTheAnswerOnlyOnCompletion() {
+        // given
+        TestPublisher<ChatResponse> publisher = TestPublisher.create();
+        respondWith(publisher.flux());
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").subscribe();
+        await().untilAsserted(() -> publisher.assertSubscribers(1));
+
+        // when
+        publisher.next(chunk("웨딩홀 "));
+
+        // then
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문");
+
+        // when
+        publisher.next(chunk("계약")).complete();
+
+        // then
+        await().untilAsserted(() -> assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText)
+                .containsExactly("질문", "웨딩홀 계약"));
+    }
+
+    @Test
+    @DisplayName("답변 도중 모델이 실패하면 부분 답변을 저장하지 않는다")
+    void doesNotRememberAPartialAnswerWhenTheModelFails() {
+        // given
+        TestPublisher<ChatResponse> publisher = TestPublisher.create();
+        respondWith(publisher.flux());
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").subscribe(ignored -> {
+        }, ignored -> {
+        });
+        await().untilAsserted(() -> publisher.assertSubscribers(1));
+
+        // when
+        publisher.next(chunk("일부 답변"));
+        publisher.error(new IllegalStateException("모델 오류"));
+
+        // then
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문");
+    }
+
+    @Test
+    @DisplayName("구독을 취소하면 늦게 도착한 답변도 저장하지 않는다")
+    void doesNotRememberAnswersAfterCancellation() {
+        // given
+        TestPublisher<ChatResponse> publisher = TestPublisher.createNoncompliant(
+                TestPublisher.Violation.DEFER_CANCELLATION);
+        respondWith(publisher.flux());
+        Disposable subscription = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").subscribe();
+        await().untilAsserted(() -> publisher.assertSubscribers(1));
+        publisher.next(chunk("일부 답변"));
+
+        // when
+        subscription.dispose();
+        publisher.next(chunk("늦은 답변")).complete();
+
+        // then
+        publisher.assertCancelled();
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문");
     }
 
     private static ChatResponse usageOnly(int inputTokens, int outputTokens) {
@@ -253,15 +266,7 @@ class SpringAiConversationAdapterTest {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
     }
 
-    private double failureCount(String reason) {
-        return registry.get("ai.chat.failures").tag("reason", reason).counter().count();
-    }
-
     private void respondWith(Flux<ChatResponse> response) {
         responder = prompt -> response;
-    }
-
-    private void respondWith(Function<Prompt, Flux<ChatResponse>> responder) {
-        this.responder = responder;
     }
 }
