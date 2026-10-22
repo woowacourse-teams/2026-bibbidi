@@ -7,11 +7,14 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
+import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,10 +22,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 class ChatTurnRecorderTest {
 
     private static final String MODEL = "test-model";
+    private static final TurnContext CONTEXT = new TurnContext(
+            7L, UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99"), "질문", LocalDateTime.of(2026, 10, 22, 9, 0));
 
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
     private final Logger logger = (Logger) LoggerFactory.getLogger("ai.chat.content");
@@ -32,7 +38,7 @@ class ChatTurnRecorderTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        recorder = new ChatTurnRecorder(registry);
+        recorder = new ChatTurnRecorder(registry, Schedulers.immediate());
         logger.setLevel(Level.INFO);
         logs.start();
         logger.addAppender(logs);
@@ -47,7 +53,7 @@ class ChatTurnRecorderTest {
     @DisplayName("답변을 마치면 완료한 대화 수와 첫 청크까지 시간, 총 소요 시간을 기록한다")
     void recordsCompletedTurnWithTimings() {
         // when
-        recorder.record("질문", Flux.just(
+        recorder.consume(CONTEXT, Flux.just(
                 new TurnSignal.Chunk(MODEL, "웨딩홀 ", Duration.ofMillis(120)),
                 new TurnSignal.Chunk(MODEL, "계약", Duration.ofMillis(300)),
                 new TurnSignal.Completed(MODEL, Duration.ofMillis(900))));
@@ -65,7 +71,7 @@ class ChatTurnRecorderTest {
     @DisplayName("답변 조각 없이 끝나면 첫 청크 시간을 남기지 않는다")
     void doesNotRecordFirstChunkTimeWithoutChunks() {
         // when
-        recorder.record("질문", Flux.just(new TurnSignal.Completed(MODEL, Duration.ofMillis(50))));
+        recorder.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL, Duration.ofMillis(50))));
 
         // then
         assertThat(lastLog()).contains("firstChunkMs=-");
@@ -75,7 +81,7 @@ class ChatTurnRecorderTest {
     @DisplayName("모델이 실패하면 error 사유의 실패 횟수를 기록한다")
     void recordsFailure() {
         // when
-        recorder.record("질문", Flux.just(
+        recorder.consume(CONTEXT, Flux.just(
                 new TurnSignal.Chunk(MODEL, "웨딩홀 ", Duration.ofMillis(10)),
                 new TurnSignal.Failed(MODEL, new IllegalStateException("모델 오류"), Duration.ofMillis(20))));
 
@@ -96,7 +102,7 @@ class ChatTurnRecorderTest {
         BusinessException throttling = new BusinessException(ClientError.AI_CAPACITY_EXCEEDED, "호출 한도 초과");
 
         // when
-        recorder.record("질문", Flux.just(
+        recorder.consume(CONTEXT, Flux.just(
                 new TurnSignal.Failed(MODEL, new IllegalStateException("감쌈", throttling), Duration.ofMillis(20))));
 
         // then
@@ -109,7 +115,7 @@ class ChatTurnRecorderTest {
     @DisplayName("모델 응답이 시간 초과로 실패하면 timeout 사유로 기록한다")
     void recordsTimeoutFailure() {
         // when
-        recorder.record("질문", Flux.just(
+        recorder.consume(CONTEXT, Flux.just(
                 new TurnSignal.Failed(MODEL, new TimeoutException("응답 시간 초과"), Duration.ofMillis(20))));
 
         // then
@@ -122,7 +128,7 @@ class ChatTurnRecorderTest {
     @DisplayName("취소되면 취소 횟수와 사유를 기록한다")
     void recordsCancellationWithReason() {
         // when
-        recorder.record("질문", Flux.just(
+        recorder.consume(CONTEXT, Flux.just(
                 new TurnSignal.Chunk(MODEL, "답변", Duration.ofMillis(10)),
                 new TurnSignal.Cancelled(MODEL, CancelReason.RESPONSE_TIMEOUT, Duration.ofMillis(30))));
 

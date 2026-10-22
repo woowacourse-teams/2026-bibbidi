@@ -12,7 +12,10 @@ import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.ChatTurn;
+import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
+import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +34,7 @@ import reactor.core.scheduler.Schedulers;
 public class AiChatService {
 
     private final AiConversationPort conversationPort;
-    private final ChatTurnRecorder turnRecorder;
+    private final List<TurnConsumer> turnConsumers;
     private final CatalogLookupPort catalogLookup;
     private final ChecklistLookupPort checklistLookup;
     private final JacksonChatAnswerParser answerParser;
@@ -39,13 +42,13 @@ public class AiChatService {
 
     public AiChatService(
             AiConversationPort conversationPort,
-            ChatTurnRecorder turnRecorder,
+            List<TurnConsumer> turnConsumers,
             CatalogLookupPort catalogLookup,
             ChecklistLookupPort checklistLookup,
             JacksonChatAnswerParser answerParser
     ) {
         this.conversationPort = conversationPort;
-        this.turnRecorder = turnRecorder;
+        this.turnConsumers = turnConsumers;
         this.catalogLookup = catalogLookup;
         this.checklistLookup = checklistLookup;
         this.answerParser = answerParser;
@@ -82,10 +85,8 @@ public class AiChatService {
             ConversationKey key, String message, Supplier<CancelReason> cancelReason
     ) {
         ChatTurn turn = new ChatTurn(conversationPort.modelName());
-        turnRecorder.record(
-                message,
-                turn.signals().publishOn(Schedulers.boundedElastic())
-        );
+        TurnContext context = new TurnContext(key.userId(), key.conversationId(), message, LocalDateTime.now());
+        turnConsumers.forEach(consumer -> consumer.consume(context, turn.signals()));
 
         return eventsFrom(turn, key)
                 .doOnSubscribe(ignored -> turn.start(
