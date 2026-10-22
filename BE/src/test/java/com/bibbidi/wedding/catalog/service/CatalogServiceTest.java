@@ -52,11 +52,12 @@ class CatalogServiceTest {
     @DisplayName("준비 목록에서 선택한 항목을 조회한다")
     void shouldFindItems() {
         // given
-        Catalog catalog = constructTestCatalog();
-        when(catalogRepository.findCatalog()).thenReturn(catalog);
+        List<Long> itemIds = List.of(FIRST_ITEM_ID);
+        when(catalogRepository.findItems(itemIds))
+                .thenReturn(List.of(new CatalogItemSnapshot(FIRST_ITEM_ID, 1L, "첫 번째 할 일")));
 
         // when
-        List<CatalogItemSnapshot> snapshots = catalogService.findItems(List.of(FIRST_ITEM_ID));
+        List<CatalogItemSnapshot> snapshots = catalogService.findItems(itemIds);
 
         // then
         assertThat(snapshots)

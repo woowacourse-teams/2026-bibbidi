@@ -13,6 +13,7 @@ import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
@@ -104,6 +105,48 @@ class CatalogRepositoryTest {
                 new CatalogItemDetailSnapshot(ceremonyType.id(), "예식 형태 결정", "웨딩홀", 2, "예식 진행 방식 결정"),
                 new CatalogItemDetailSnapshot(stylingConsulting.id(), "스드메 상담", "스드메", 1, "스드메 패키지 계약")
         );
+    }
+
+    @Test
+    @DisplayName("요청한 항목만 중복 없이 카테고리와 단계와 항목의 표시 순서로 조회한다")
+    void shouldFindOnlyRequestedItemsInCatalogOrder() {
+        // ID 순서와 표시 순서를 다르게 구성한다.
+        JpaCategoryEntity laterCategory = jpaCategoryRepository.save(new JpaCategoryEntity(null, "나중 영역", 2));
+        JpaCategoryEntity firstCategory = jpaCategoryRepository.save(new JpaCategoryEntity(null, "먼저 영역", 1));
+        JpaStepEntity laterStep = jpaStepRepository.save(new JpaStepEntity(
+                null, firstCategory.id(), "나중 단계", null, null, 2));
+        JpaStepEntity firstStep = jpaStepRepository.save(new JpaStepEntity(
+                null, firstCategory.id(), "먼저 단계", null, null, 1));
+        JpaStepEntity otherStep = jpaStepRepository.save(new JpaStepEntity(
+                null, laterCategory.id(), "다른 영역 단계", null, null, 1));
+        JpaCatalogItemEntity other = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, otherStep.id(), "다른 영역 항목", 1, true));
+        JpaCatalogItemEntity later = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, laterStep.id(), "나중 단계 항목", 1, true));
+        JpaCatalogItemEntity second = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, firstStep.id(), "두 번째 항목", 2, false));
+        JpaCatalogItemEntity first = jpaCatalogItemRepository.save(new JpaCatalogItemEntity(
+                null, firstStep.id(), "첫 번째 항목", 1, true));
+        jpaCatalogItemRepository.save(new JpaCatalogItemEntity(null, firstStep.id(), "요청하지 않은 항목", 3, true));
+
+        List<CatalogItemSnapshot> items = catalogRepository.findItems(
+                List.of(other.id(), later.id(), second.id(), first.id(), first.id(), Long.MAX_VALUE));
+
+        assertThat(items).containsExactly(
+                new CatalogItemSnapshot(first.id(), firstCategory.id(), "첫 번째 항목"),
+                new CatalogItemSnapshot(second.id(), firstCategory.id(), "두 번째 항목"),
+                new CatalogItemSnapshot(later.id(), firstCategory.id(), "나중 단계 항목"),
+                new CatalogItemSnapshot(other.id(), laterCategory.id(), "다른 영역 항목")
+        );
+        assertThat(catalogRepository.findItems(List.of(second.id())))
+                .containsExactly(new CatalogItemSnapshot(second.id(), firstCategory.id(), "두 번째 항목"));
+    }
+
+    @Test
+    @DisplayName("빈 ID 모음과 존재하지 않는 ID는 빈 결과를 반환한다")
+    void shouldReturnEmptyForEmptyOrMissingIds() {
+        assertThat(catalogRepository.findItems(List.of())).isEmpty();
+        assertThat(catalogRepository.findItems(List.of(Long.MAX_VALUE))).isEmpty();
     }
 
     @Test
