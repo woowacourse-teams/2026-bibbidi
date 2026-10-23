@@ -2,7 +2,7 @@ package com.bibbidi.wedding.chat.adapter.ai.loadtest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.chat.service.parser.ChatAnswerStream;
+import com.bibbidi.wedding.chat.adapter.ai.parser.ChatAnswerStream;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

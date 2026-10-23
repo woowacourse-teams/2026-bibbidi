@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import com.bibbidi.wedding.chat.domain.ChatTurnOutcome;
 import com.bibbidi.wedding.chat.domain.ChatTurnRecord;
 import com.bibbidi.wedding.chat.repository.ChatTurnRepository;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
@@ -18,6 +19,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,9 +54,9 @@ class ChatTurnArchiveTest {
     void archivesACompletedTurn() {
         // when
         archive.consume(CONTEXT, Flux.just(
-                new TurnSignal.Chunk(MODEL, "{\"answer\":\"웨딩홀 ", Duration.ofMillis(100)),
-                new TurnSignal.Chunk(MODEL, "계약\"}", Duration.ofMillis(200)),
-                new TurnSignal.Completed(MODEL, Duration.ofMillis(300))));
+                new TurnSignal.Chunk(MODEL, "{\"answer\":\"웨딩홀 ", List.of(), Duration.ofMillis(100)),
+                new TurnSignal.Chunk(MODEL, "계약\"}", List.of(), Duration.ofMillis(200)),
+                new TurnSignal.Completed(MODEL, new ChatAnswer("웨딩홀 계약", List.of()), Duration.ofMillis(300))));
 
         // then
         ChatTurnRecord record = savedRecord();
@@ -73,7 +75,7 @@ class ChatTurnArchiveTest {
     void archivesACancelledTurnWithItsReason(CancelReason reason) {
         // when
         archive.consume(CONTEXT, Flux.just(
-                new TurnSignal.Chunk(MODEL, "{\"answer\":\"일부", Duration.ofMillis(100)),
+                new TurnSignal.Chunk(MODEL, "{\"answer\":\"일부", List.of(), Duration.ofMillis(100)),
                 new TurnSignal.Cancelled(MODEL, reason, Duration.ofMillis(150))));
 
         // then
@@ -133,7 +135,7 @@ class ChatTurnArchiveTest {
     @DisplayName("종료 신호가 오기 전에는 저장하지 않는다")
     void doesNotArchiveBeforeTheTerminalSignal() {
         // when
-        archive.consume(CONTEXT, Flux.just(new TurnSignal.Chunk(MODEL, "일부", Duration.ofMillis(10))));
+        archive.consume(CONTEXT, Flux.just(new TurnSignal.Chunk(MODEL, "일부", List.of(), Duration.ofMillis(10))));
 
         // then
         verify(repository, never()).save(any());
@@ -146,7 +148,8 @@ class ChatTurnArchiveTest {
         doThrow(new IllegalStateException("DB 오류")).when(repository).save(any());
 
         // when
-        archive.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL, Duration.ofMillis(10))));
+        archive.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL,
+                new ChatAnswer("답변", List.of()), Duration.ofMillis(10))));
 
         // then
         assertThat(registry.get("ai.chat.archive.failures").counter().count()).isEqualTo(1);
@@ -161,7 +164,8 @@ class ChatTurnArchiveTest {
         ChatTurnArchive rejected = new ChatTurnArchive(repository, registry, disposed);
 
         // when
-        rejected.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL, Duration.ofMillis(10))));
+        rejected.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL,
+                new ChatAnswer("답변", List.of()), Duration.ofMillis(10))));
 
         // then
         verify(repository, never()).save(any());

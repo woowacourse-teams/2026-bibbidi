@@ -19,7 +19,7 @@ import com.bibbidi.wedding.chat.service.ConversationKey;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.ChatEvent;
-import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
@@ -83,10 +83,10 @@ class AiChatLifecycleTest {
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         CatalogLookupPort catalogService = mock(CatalogLookupPort.class);
         chat = new AiChatService(
-                new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory), "test-model"),
+                new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
+                        new JacksonChatAnswerParser(mapper), "test-model"),
                 List.of(new ChatTurnRecorder(new SimpleMeterRegistry())),
-                catalogService, checklistService,
-                new JacksonChatAnswerParser(mapper));
+                catalogService, checklistService);
         answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
         timeout = new AtomicReference<>();

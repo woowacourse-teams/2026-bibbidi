@@ -34,7 +34,7 @@ import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
-import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.support.FakeChatModel;

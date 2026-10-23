@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.port.AiResponse;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -30,12 +33,14 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.test.publisher.TestPublisher;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
+import tools.jackson.databind.json.JsonMapper;
 
 class SpringAiConversationAdapterTest {
 
     private static final Long USER_ID = 7L;
     private static final String CONVERSATION = "7:7bf4d204-8331-439b-bd8f-271abc0eea99";
     private static final String ANOTHER_CONVERSATION = "8:7bf4d204-8331-439b-bd8f-271abc0eea99";
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private final List<Prompt> receivedPrompts = new CopyOnWriteArrayList<>();
     private volatile Function<Prompt, Flux<ChatResponse>> responder = _ -> Flux.empty();
@@ -53,7 +58,7 @@ class SpringAiConversationAdapterTest {
                 .maxMessages(18)
                 .build();
         springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
-                chatMemory), "test-model");
+                chatMemory), new JacksonChatAnswerParser(MAPPER), "test-model");
     }
 
     @Test
@@ -61,7 +66,7 @@ class SpringAiConversationAdapterTest {
     void sendsHistoryContextAndQuestionToTheModelInOrder() {
         // given
         chatMemory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
-        respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk(answerJson("답변"))));
 
         // when
         springAiConversationAdapter.stream(USER_ID, CONVERSATION, "추천해줘").blockLast();
@@ -75,20 +80,24 @@ class SpringAiConversationAdapterTest {
     @DisplayName("모델이 보낸 답변 조각을 그대로 돌려준다")
     void returnsTheModelContent() {
         // given
-        respondWith(Flux.just(chunk("웨딩홀 "), chunk("계약")));
+        respondWith(Flux.just(chunk("{\"answer\":\"웨딩홀 "), chunk("계약\",\"recommendedItemIds\":[]}")));
 
         // when
-        List<String> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
+        List<AiResponse> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
+                .collectList().block();
 
         // then
-        assertThat(content).containsExactly("웨딩홀 ", "계약");
+        assertThat(content).containsExactly(
+                new AiResponse.Chunk("{\"answer\":\"웨딩홀 ", List.of("웨딩홀 ")),
+                new AiResponse.Chunk("계약\",\"recommendedItemIds\":[]}", List.of("계약")),
+                new AiResponse.Answer(new ChatAnswer("웨딩홀 계약", List.of())));
     }
 
     @Test
     @DisplayName("도구 호출에 요청한 사용자의 ID를 전달한다")
     void passesTheRequestingUserIdToTheToolContext() {
         // given
-        respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk(answerJson("답변"))));
 
         // when
         springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
@@ -102,7 +111,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("다음 호출에서 Advisor가 앞선 대화 기록을 전달한다")
     void passesEarlierTurnsOfTheSameConversation() {
         // given
-        respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk(answerJson("답변"))));
         springAiConversationAdapter.stream(USER_ID, CONVERSATION, "첫 질문").blockLast();
 
         // when
@@ -110,18 +119,19 @@ class SpringAiConversationAdapterTest {
 
         // then
         assertThat(receivedPrompts.getLast().getInstructions()).extracting(Message::getText)
-                .containsExactly("첫 질문", "답변", "둘째 질문");
+                .containsExactly("첫 질문", answerJson("답변"), "둘째 질문");
     }
 
     @Test
     @DisplayName("질문과 답변을 한 쌍으로 대화 기록에 저장한다")
     void remembersTheQuestionAndAnswerAsAPair() {
         // when
-        respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk(answerJson("답변"))));
         springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast();
 
         // then
-        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문", "답변");
+        assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText)
+                .containsExactly("질문", answerJson("답변"));
         assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getMessageType)
                 .extracting(Enum::name).containsExactly("USER", "ASSISTANT");
     }
@@ -156,13 +166,16 @@ class SpringAiConversationAdapterTest {
     @DisplayName("토큰 사용량만 담긴 조각은 답변 조각으로 전달하지 않는다")
     void doesNotForwardChunksWithoutText() {
         // given
-        respondWith(Flux.just(chunk("답변"), usageOnly(10, 5)));
+        respondWith(Flux.just(chunk(answerJson("답변")), usageOnly(10, 5)));
 
         // when
-        List<String> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").collectList().block();
+        List<AiResponse> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
+                .collectList().block();
 
         // then
-        assertThat(content).containsExactly("답변");
+        assertThat(content).containsExactly(
+                new AiResponse.Chunk(answerJson("답변"), List.of("답변")),
+                new AiResponse.Answer(new ChatAnswer("답변", List.of())));
     }
 
     @Test
@@ -170,7 +183,7 @@ class SpringAiConversationAdapterTest {
     void doesNotSendHistoryOfAnotherConversationKey() {
         // given
         chatMemory.add(CONVERSATION, List.of(new UserMessage("예산은 1000"), new AssistantMessage("알겠습니다.")));
-        respondWith(Flux.just(chunk("답변")));
+        respondWith(Flux.just(chunk(answerJson("답변"))));
 
         // when
         springAiConversationAdapter.stream(USER_ID, ANOTHER_CONVERSATION, "추천해줘").blockLast();
@@ -185,7 +198,7 @@ class SpringAiConversationAdapterTest {
     void userTextWithBracesIsPassedAsLiteralContent() {
         // given
         String question = "예산 {예산}과 조건 {\"촬영\":false}를 참고해줘";
-        respondWith(Flux.just(chunk("확인했어요.")));
+        respondWith(Flux.just(chunk(answerJson("확인했어요."))));
 
         // when
         springAiConversationAdapter.stream(USER_ID, CONVERSATION, question).blockLast();
@@ -204,17 +217,17 @@ class SpringAiConversationAdapterTest {
         await().untilAsserted(() -> publisher.assertSubscribers(1));
 
         // when
-        publisher.next(chunk("웨딩홀 "));
+        publisher.next(chunk("{\"answer\":\"웨딩홀 "));
 
         // then
         assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText).containsExactly("질문");
 
         // when
-        publisher.next(chunk("계약")).complete();
+        publisher.next(chunk("계약\",\"recommendedItemIds\":[]}")).complete();
 
         // then
         await().untilAsserted(() -> assertThat(chatMemory.get(CONVERSATION)).extracting(Message::getText)
-                .containsExactly("질문", "웨딩홀 계약"));
+                .containsExactly("질문", answerJson("웨딩홀 계약")));
     }
 
     @Test
@@ -264,6 +277,10 @@ class SpringAiConversationAdapterTest {
 
     private static ChatResponse chunk(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+    }
+
+    private static String answerJson(String text) {
+        return MAPPER.writeValueAsString(new ChatAnswer(text, List.of()));
     }
 
     private void respondWith(Flux<ChatResponse> response) {

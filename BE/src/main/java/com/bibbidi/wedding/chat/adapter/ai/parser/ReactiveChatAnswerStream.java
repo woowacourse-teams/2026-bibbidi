@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.parser;
+package com.bibbidi.wedding.chat.adapter.ai.parser;
 
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import java.util.function.Consumer;

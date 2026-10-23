@@ -6,6 +6,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
@@ -14,6 +15,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
@@ -54,9 +56,9 @@ class ChatTurnRecorderTest {
     void recordsCompletedTurnWithTimings() {
         // when
         recorder.consume(CONTEXT, Flux.just(
-                new TurnSignal.Chunk(MODEL, "웨딩홀 ", Duration.ofMillis(120)),
-                new TurnSignal.Chunk(MODEL, "계약", Duration.ofMillis(300)),
-                new TurnSignal.Completed(MODEL, Duration.ofMillis(900))));
+                new TurnSignal.Chunk(MODEL, "웨딩홀 ", List.of(), Duration.ofMillis(120)),
+                new TurnSignal.Chunk(MODEL, "계약", List.of(), Duration.ofMillis(300)),
+                new TurnSignal.Completed(MODEL, new ChatAnswer("웨딩홀 계약", List.of()), Duration.ofMillis(900))));
 
         // then
         assertThat(count("ai.chat.turns")).isEqualTo(1);
@@ -71,7 +73,8 @@ class ChatTurnRecorderTest {
     @DisplayName("답변 조각 없이 끝나면 첫 청크 시간을 남기지 않는다")
     void doesNotRecordFirstChunkTimeWithoutChunks() {
         // when
-        recorder.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL, Duration.ofMillis(50))));
+        recorder.consume(CONTEXT, Flux.just(new TurnSignal.Completed(MODEL,
+                new ChatAnswer("답변", List.of()), Duration.ofMillis(50))));
 
         // then
         assertThat(lastLog()).contains("firstChunkMs=-");
@@ -82,7 +85,7 @@ class ChatTurnRecorderTest {
     void recordsFailure() {
         // when
         recorder.consume(CONTEXT, Flux.just(
-                new TurnSignal.Chunk(MODEL, "웨딩홀 ", Duration.ofMillis(10)),
+                new TurnSignal.Chunk(MODEL, "웨딩홀 ", List.of(), Duration.ofMillis(10)),
                 new TurnSignal.Failed(MODEL, new IllegalStateException("모델 오류"), Duration.ofMillis(20))));
 
         // then
@@ -129,7 +132,7 @@ class ChatTurnRecorderTest {
     void recordsCancellationWithReason() {
         // when
         recorder.consume(CONTEXT, Flux.just(
-                new TurnSignal.Chunk(MODEL, "답변", Duration.ofMillis(10)),
+                new TurnSignal.Chunk(MODEL, "답변", List.of(), Duration.ofMillis(10)),
                 new TurnSignal.Cancelled(MODEL, CancelReason.RESPONSE_TIMEOUT, Duration.ofMillis(30))));
 
         // then
