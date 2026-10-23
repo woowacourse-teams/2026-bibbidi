@@ -8,7 +8,6 @@ import static com.epages.restdocs.apispec.Schema.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders;
@@ -26,7 +25,6 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
@@ -35,8 +33,6 @@ import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
-import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
-import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.common.domain.UserRole;
 import com.bibbidi.wedding.common.domain.UserStatus;
@@ -96,7 +92,8 @@ import tools.jackson.databind.node.ObjectNode;
 @WebMvcTest(AiChatController.class)
 @Import({
         SecurityTestConfig.class, SseStreamManager.class, SseConfig.class,
-        AiChatService.class, SpringAiConversationAdapter.class, SpringAiChatClient.class,
+        AiChatService.class,
+        SpringAiConversationAdapter.class, SpringAiChatClient.class,
         JacksonChatAnswerParser.class,
         AiChatControllerTest.ChatInfrastructure.class
 })
@@ -115,10 +112,6 @@ class AiChatControllerTest {
     private SimpleMeterRegistry registry;
     @MockitoBean
     private BibbidiTokenParser bibbidiTokenParser;
-    @MockitoBean
-    private CatalogLookupPort catalogLookup;
-    @MockitoBean
-    private ChecklistLookupPort checklistLookup;
     private MockMvc mockMvc;
     private static final List<Prompt> RECEIVED_PROMPTS = new CopyOnWriteArrayList<>();
     private static volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
@@ -160,12 +153,6 @@ class AiChatControllerTest {
     void setUp(RestDocumentationContextProvider restDocumentation) {
         RECEIVED_PROMPTS.clear();
         responder = prompt -> Flux.empty();
-        when(catalogLookup.findAllItemDetails()).thenReturn(List.of(
-                new CatalogItemDetailSnapshot(1L, "웨딩홀 후보 정하기", "웨딩홀", 1, "후보"),
-                new CatalogItemDetailSnapshot(2L, "스튜디오 후보 정하기", "촬영", 1, "후보"),
-                new CatalogItemDetailSnapshot(3L, "드레스 후보 정하기", "드레스", 1, "후보")));
-        when(checklistLookup.filterRecommendableCatalogItemIds(USER_ID, List.of(1L, 2L, 3L)))
-                .thenReturn(List.of(1L, 2L, 3L));
         mockMvc = webAppContextSetup(context).apply(springSecurity())
                 .apply(documentationConfiguration(restDocumentation)).build();
     }
@@ -519,7 +506,6 @@ class AiChatControllerTest {
     }
 
     private void assertNothingWasProcessed() {
-        verifyNoInteractions(catalogLookup, checklistLookup);
         assertThat(RECEIVED_PROMPTS).isEmpty();
     }
 
