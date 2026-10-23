@@ -43,6 +43,10 @@ services:
       - loadtest
     mem_limit: 128m
     cpus: 0.25
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
     logging:
       driver: json-file
       options:
