@@ -206,18 +206,23 @@ describe("AppHeaderSummaryFeature", () => {
     ).toBeNull();
   });
 
-  it("결혼 일자 미설정 안내를 브랜드 색상 상태로 표시한다", async () => {
+  it("결혼 일자 미설정 안내를 예정일 행에 표시한다", async () => {
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
 
     const trigger = await screen.findByRole("button", {
-      name: /D-Day, 결혼 일자 미설정\. 결혼 예정일 설정/,
+      name: /결혼 예정일 설정하기/,
     });
 
-    expect(trigger.getAttribute("data-color")).toBe("primary");
-    expect(trigger.getAttribute("data-variant")).toBe("weak");
+    expect(trigger.textContent).toContain("결혼 예정일");
     expect(
       screen.getByRole("button", { name: /결혼 예정일 설정/ }).textContent,
-    ).toContain("결혼 일자 미설정");
+    ).toContain("날짜를 설정하면 D-day를 확인할 수 있어요.");
+    expect(trigger.textContent).toContain("설정하기");
+    expect(trigger.textContent).not.toContain("결혼 일자 미설정");
+    fireEvent.click(trigger);
+    expect(
+      screen.getByRole("dialog", { name: "결혼 예정일 설정" }),
+    ).toBeTruthy();
   });
 
   it("두 조회가 진행 중일 때 결혼 예정일 로딩을 표시하고 완료율을 숨긴다", () => {

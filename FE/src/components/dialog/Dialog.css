@@ -1,0 +1,128 @@
+body:has(.bibbidi-dialog[open]) {
+  overflow: hidden;
+}
+.bibbidi-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.bibbidi-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bibbidi-dialog::backdrop {
+  background: color-mix(in srgb, var(--color-palette-ink) 48%, transparent);
+}
+.bibbidi-dialog-surface {
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
+}
+.bibbidi-dialog-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100dvh - 48px);
+  min-width: 0;
+  border-radius: 24px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 16px 64px
+    color-mix(in srgb, var(--color-palette-ink) 16%, transparent);
+  overflow: hidden;
+}
+.bibbidi-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 28px 24px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+.bibbidi-dialog-title {
+  margin: 0;
+  font: var(--typography-t4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bibbidi-dialog-description-slot {
+  margin-top: 12px;
+}
+.bibbidi-dialog-description {
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t6);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bibbidi-dialog-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+.bibbidi-dialog-actions > div {
+  flex: 1 1 max-content;
+  min-width: calc(50% - 4px);
+  max-width: 100%;
+}
+.bibbidi-dialog-actions .bibbidi-button-label {
+  white-space: normal;
+}
+@keyframes bibbidi-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bibbidi-dialog-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+.bibbidi-dialog[data-state="open"] .bibbidi-dialog-surface {
+  animation: bibbidi-dialog-enter 180ms ease-out both;
+}
+.bibbidi-dialog[data-state="closing"] .bibbidi-dialog-surface {
+  animation: bibbidi-dialog-exit 120ms ease-in both;
+}
+@media (max-width: 380px) {
+  .bibbidi-dialog {
+    padding: 16px;
+  }
+  .bibbidi-dialog-panel {
+    max-height: calc(100dvh - 32px);
+  }
+  .bibbidi-dialog-body {
+    padding-inline: 20px;
+  }
+  .bibbidi-dialog-actions {
+    padding-inline: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bibbidi-dialog[data-state] .bibbidi-dialog-surface {
+    animation: none;
+  }
+}

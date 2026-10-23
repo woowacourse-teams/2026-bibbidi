@@ -234,7 +234,7 @@ describe("ServiceLayout", () => {
     );
     expect(screen.queryByText("서버 내부 정보")).toBeNull();
     expect(analyticsMocks.track).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃 다시 시도" }));
     expect(
       fetchMock.mock.calls.filter(
         ([url]) => url === "/api/auth/web/sessions/current",
