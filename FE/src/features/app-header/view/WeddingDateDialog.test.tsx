@@ -42,9 +42,7 @@ describe("WeddingDateDialog", () => {
   it("월과 연도를 이동하고 과거 날짜도 선택한다", () => {
     const { props } = renderDialog();
     fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
-    fireEvent.change(screen.getByRole("listbox", { name: "연도" }), {
-      target: { value: "2026" },
-    });
+    fireEvent.click(screen.getByRole("option", { name: "2026년" }));
     fireEvent.click(
       screen.getByRole("button", { name: "날짜 선택으로 돌아가기" }),
     );
@@ -156,7 +154,9 @@ describe("WeddingDateDialog", () => {
     const { props } = renderDialog();
     fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
     const year = screen.getByRole("listbox", { name: "연도" });
-    expect(document.activeElement).toBe(year);
+    expect(document.activeElement).toBe(
+      screen.getByRole("option", { name: "2027년" }),
+    );
     fireEvent.keyDown(year, { key: "Escape" });
     expect(screen.getByRole("grid", { name: "2027년 5월" })).toBeTruthy();
     expect(document.activeElement).toBe(
