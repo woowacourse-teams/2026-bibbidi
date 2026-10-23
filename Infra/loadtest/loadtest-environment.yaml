@@ -299,6 +299,7 @@ Resources:
           cd /opt/bibbidi/loadtest
           base='${ConfigBaseUrl}/${ConfigRef}/Infra'
           curl -fsSL "$base/loadtest/compose.app.yml" -o compose.yaml
+          curl -fsSL "$base/loadtest/nginx.conf" -o nginx.conf
           curl -fsSL "$base/loadtest/nginx.default.conf.template" -o nginx.default.conf.template
           curl -fsSL "$base/monitoring/grafana/alloy/config.alloy" -o alloy.config.alloy
           umask 077
@@ -326,6 +327,32 @@ Resources:
           docker compose up -d
           until curl -fs http://127.0.0.1:8081/actuator/health/readiness >/dev/null; do sleep 5; done
           curl -fs http://127.0.0.1/healthz >/dev/null
+          # 준비 신호를 보내기 전에 설정과 실제 워커의 파일 한도를 확인한다.
+          docker compose exec -T nginx sh -eu <<'NGINX_CHECK'
+          nginx -t
+          config="$(nginx -T)"
+          connections="$(printf '%s\n' "$config" | awk '$1 == "worker_connections" { gsub(";", "", $2); print $2 }')"
+          echo "nginx worker_connections=$connections"
+          [ "$connections" = 4096 ] || { echo 'worker_connections must be 4096' >&2; exit 1; }
+          workers=0
+          for process in /proc/[0-9]*; do
+            command="$(tr '\000' ' ' 2>/dev/null < "$process/cmdline")" || continue
+            case "$command" in
+              'nginx: worker process'*)
+                limits="$(awk '$1 == "Max" && $2 == "open" && $3 == "files" { print $4, $5 }' "$process/limits")"
+                set -- $limits
+                [ "$#" -eq 2 ] || { echo "Cannot read open-file limits: $process" >&2; exit 1; }
+                echo "nginx worker pid=$(basename "$process") open_files soft=$1 hard=$2"
+                for limit in "$@"; do
+                  [ "$limit" = unlimited ] && continue
+                  [ "$limit" -ge "$connections" ] || { echo 'Worker open-file limit is below worker_connections' >&2; exit 1; }
+                done
+                workers=$((workers + 1))
+                ;;
+            esac
+          done
+          [ "$workers" -gt 0 ] || { echo 'No nginx worker found' >&2; exit 1; }
+          NGINX_CHECK
           docker logs bibbidi-backend > /tmp/backend.log 2>&1
           grep -q 'profiles are active.*loadtest' /tmp/backend.log
 
