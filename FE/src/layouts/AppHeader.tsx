@@ -30,7 +30,7 @@ export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   return (
     <header className="app-header">
-      <div className="app-header__inner">
+      <div className="service-page-container app-header__inner">
         <div className="app-header__left">
           <HeaderBrandLink to="/" />
 

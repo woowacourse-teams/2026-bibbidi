@@ -8,15 +8,10 @@
 
 .app-header__inner {
   display: flex;
-  width: min(
-    calc(100% - var(--service-page-margin) * 2),
-    var(--layout-width-wide)
-  );
   height: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 32px;
-  margin: 0 auto;
 }
 
 .app-header__left,

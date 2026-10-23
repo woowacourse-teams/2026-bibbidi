@@ -31,9 +31,3 @@
     padding-top: clamp(32px, 6dvh, 48px);
   }
 }
-
-@media (min-width: 768px) {
-  .auth-page--login {
-    padding-top: 128px;
-  }
-}

@@ -1,6 +1,6 @@
 # Service fonts
 
-Font faces are declared in `src/styles/tokens.css` and bundled by Webpack from
+Font faces are declared in `src/styles/fonts.css` and bundled by Webpack from
 relative URLs. The service owns these assets; it does not depend on a design
 system package or server.
 
@@ -22,4 +22,4 @@ only `b`, `d`, and `i` (U+0062, U+0064, U+0069).
 - Downloaded: 2026-10-15. Google Fonts version: v32.
 
 If the brand text or its weight changes, regenerate the subset and update the
-`unicode-range` in `src/styles/tokens.css` together.
+`unicode-range` in `src/styles/fonts.css` together.

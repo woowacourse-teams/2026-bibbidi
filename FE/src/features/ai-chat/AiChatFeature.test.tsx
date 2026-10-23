@@ -1,3 +1,4 @@
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import {
   act,
   cleanup,
@@ -102,7 +103,7 @@ afterEach(() => {
 describe("실제 AI 채팅", () => {
   it("모바일은 처음 열 때 채팅을 표시하고 데스크톱으로 전환해도 대화와 입력을 유지한다", async () => {
     mockMobileDialog();
-    const media = installMatchMedia("(width < 768px)", true);
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(chat());
     expect(screen.queryByText("어떤 준비를 도와드릴까요?")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));

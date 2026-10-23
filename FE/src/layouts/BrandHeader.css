@@ -11,13 +11,8 @@
 
 .brand-header__inner {
   display: flex;
-  width: min(
-    calc(100% - var(--service-page-margin) * 2),
-    var(--layout-width-wide)
-  );
   height: 100%;
   align-items: center;
-  margin: 0 auto;
 }
 
 @media (width < 768px) {

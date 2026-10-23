@@ -29,6 +29,43 @@ afterEach(() => {
 });
 
 describe("LandingFeature", () => {
+  it("실제 헤더 높이가 바뀌면 기능 소개 이동 위치도 함께 조정한다", () => {
+    renderLanding();
+    const header = screen.getByRole("navigation", { name: "랜딩 메뉴" });
+    const feature = screen.getByRole("region", { name: "비비디 기능 소개" });
+    const headerRect = vi.spyOn(header, "getBoundingClientRect");
+    headerRect.mockReturnValue({
+      ...header.getBoundingClientRect(),
+      height: 100,
+    });
+    vi.spyOn(feature, "getBoundingClientRect").mockReturnValue({
+      ...feature.getBoundingClientRect(),
+      top: 1000,
+    });
+    Object.defineProperty(feature, "offsetHeight", { value: 1800 });
+    vi.stubGlobal("innerHeight", 900);
+    vi.stubGlobal("scrollY", 200);
+
+    const firstStep = featureIntro().getByRole("button", {
+      name: /AI에게 질문/,
+    });
+    fireEvent.click(firstStep);
+    expect(window.scrollTo).toHaveBeenLastCalledWith({
+      top: 1140,
+      behavior: "smooth",
+    });
+
+    headerRect.mockReturnValue({
+      ...header.getBoundingClientRect(),
+      height: 150,
+    });
+    fireEvent.click(firstStep);
+    expect(window.scrollTo).toHaveBeenLastCalledWith({
+      top: 1092,
+      behavior: "smooth",
+    });
+  });
+
   it("실제 화면 캡처를 소개하고 시작 버튼을 준비 목록으로 연결한다", () => {
     renderLanding();
     expect(

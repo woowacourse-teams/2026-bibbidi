@@ -4,7 +4,7 @@ import { HeaderBrandLink } from "./HeaderBrandLink";
 export function BrandHeader() {
   return (
     <header className="brand-header">
-      <div className="brand-header__inner">
+      <div className="service-page-container brand-header__inner">
         <HeaderBrandLink to="/" />
       </div>
     </header>
