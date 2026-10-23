@@ -40,7 +40,7 @@ public class UserService {
 
     @Transactional
     public UserResult agreeToTerms(Long currentUserId, String termsVersion) {
-        User user = userRepository.findByIdForUpdate(currentUserId);
+        User user = userRepository.findById(currentUserId);
         if (user.isActive() && termsVersion.equals(user.termsVersion()) && user.termsAgreedAt() != null) {
             return UserResult.from(user);
         }
