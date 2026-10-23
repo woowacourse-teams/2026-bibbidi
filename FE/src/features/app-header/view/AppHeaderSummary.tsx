@@ -1,10 +1,13 @@
 import { useRef } from "react";
 
 import { AppHeaderSummaryViewModel } from "../view-model/createAppHeaderSummaryViewModel";
-import { WeddingDatePopover } from "./WeddingDatePopover";
+import { WeddingDateDialog } from "./WeddingDateDialog";
 import { PreparationProgress } from "./PreparationProgress";
-import { Button } from "../../../components/button";
 import { Accordion } from "../../../components/accordion";
+import { IconButton } from "../../../components/icon-button";
+import { RetryIcon } from "../../../components/icons/ActionIcons";
+import { ProgressRing } from "../../../components/progress-ring";
+import { ListRow } from "../../../components/list-row";
 import "./AppHeaderSummary.css";
 
 interface AppHeaderSummaryProps {
@@ -35,57 +38,72 @@ export function AppHeaderSummary({
   weddingDate,
 }: AppHeaderSummaryProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const isWeddingDateUnset =
-    viewModel.weddingDateStatus === "loaded" && weddingDate === null;
+  const { isWeddingDateUnset } = viewModel;
   const dateDisplay = (
-    <span aria-hidden="true" className="app-header-summary__date-value">
-      <strong>{viewModel.dDayLabel}</strong>
-      <span>· {viewModel.weddingDateLabel}</span>
-    </span>
+    <ListRow.Texts
+      top="결혼 예정일"
+      bottom={
+        viewModel.weddingDateStatus === "error" ? (
+          <span className="app-header-summary__date-error-message">
+            {viewModel.weddingDateDescription}
+          </span>
+        ) : (
+          viewModel.weddingDateDescription
+        )
+      }
+    />
   );
 
   return (
     <section aria-label="결혼 준비 현황" className="app-header-summary">
       <div className="app-header-summary__wedding-date">
-        <span className="app-header-summary__label">결혼 예정일</span>
         {viewModel.weddingDateStatus === "loaded" ? (
-          <Button
+          <ListRow
             aria-expanded={isPopoverOpen}
             aria-haspopup="dialog"
-            aria-label={`${viewModel.dDayLabel}, ${viewModel.weddingDateLabel}. 결혼 예정일 설정`}
+            aria-label={viewModel.weddingDateAccessibleLabel}
+            className={
+              isWeddingDateUnset ? "app-header-summary__date--unset" : undefined
+            }
+            border="none"
+            horizontalPadding="small"
+            withArrow
+            contents={dateDisplay}
+            right={
+              isWeddingDateUnset ? (
+                <span
+                  className="app-header-summary__date-action"
+                  aria-hidden="true"
+                >
+                  {viewModel.weddingDateActionLabel}
+                </span>
+              ) : undefined
+            }
             onClick={onOpenPopover}
             ref={triggerRef}
-            type="button"
-            color={isWeddingDateUnset ? "primary" : "dark"}
-            variant="weak"
-            size="medium"
-            display="block"
-          >
-            {dateDisplay}
-          </Button>
+          />
         ) : (
-          <div
+          <ListRow
             aria-label={viewModel.weddingDateLabel}
-            className="app-header-summary__d-day"
             role="status"
-          >
-            {dateDisplay}
-          </div>
+            border="none"
+            horizontalPadding="small"
+            contents={dateDisplay}
+            right={
+              viewModel.weddingDateStatus === "error" ? (
+                <IconButton
+                  icon={<RetryIcon />}
+                  iconSize={20}
+                  aria-label="결혼 예정일 조회 다시 시도"
+                  title="결혼 예정일 조회 다시 시도"
+                  onClick={onRetryWeddingDate}
+                />
+              ) : undefined
+            }
+          />
         )}
-        {viewModel.weddingDateStatus === "error" ? (
-          <Button
-            aria-label="결혼 예정일 조회 다시 시도"
-            onClick={onRetryWeddingDate}
-            type="button"
-            color="dark"
-            variant="weak"
-            size="medium"
-          >
-            다시 시도
-          </Button>
-        ) : null}
         {isPopoverOpen && viewModel.weddingDateStatus === "loaded" ? (
-          <WeddingDatePopover
+          <WeddingDateDialog
             initialDate={weddingDate}
             isSaving={isSaving}
             onClose={onClosePopover}
@@ -110,23 +128,7 @@ export function AppHeaderSummary({
         >
           <Accordion.Item
             description={viewModel.progress.taskCountLabel}
-            prefix={
-              <svg
-                aria-hidden="true"
-                className="app-header-summary__progress-ring"
-                viewBox="0 0 24 24"
-              >
-                <circle cx="12" cy="12" pathLength="100" r="9" />
-                <circle
-                  className="app-header-summary__progress-range"
-                  cx="12"
-                  cy="12"
-                  pathLength="100"
-                  r="9"
-                  strokeDasharray={`${viewModel.progress.percentage} ${100 - viewModel.progress.percentage}`}
-                />
-              </svg>
-            }
+            prefix={<ProgressRing value={viewModel.progress.percentage} />}
             title={`준비 완료율 · ${viewModel.progress.label}`}
             value="progress"
           >

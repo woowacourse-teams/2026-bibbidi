@@ -20,7 +20,10 @@ export interface AppHeaderCategoryProgressViewModel {
 }
 
 export interface AppHeaderSummaryViewModel {
-  dDayLabel: string;
+  isWeddingDateUnset: boolean;
+  weddingDateDescription: string;
+  weddingDateActionLabel: string | null;
+  weddingDateAccessibleLabel: string;
   progress: AppHeaderProgressViewModel | null;
   weddingDateLabel: string;
   weddingDateStatus: WeddingDateLoadState["status"];
@@ -78,7 +81,20 @@ export function createAppHeaderSummaryViewModel(
     ? calculateChecklistProgress(model.completedTaskCount, model.totalTaskCount)
     : null;
 
+  const isWeddingDateUnset =
+    weddingDate.status === "loaded" && weddingDate.date === null;
+  const weddingDateDescription = isWeddingDateUnset
+    ? "날짜를 설정하면 D-day를 확인할 수 있어요."
+    : `${weddingDateViewModel.dDayLabel} · ${weddingDateViewModel.weddingDateLabel}`;
+  const weddingDateActionLabel = isWeddingDateUnset ? "설정하기" : null;
+
   return {
+    isWeddingDateUnset,
+    weddingDateDescription,
+    weddingDateActionLabel,
+    weddingDateAccessibleLabel: isWeddingDateUnset
+      ? `결혼 예정일 ${weddingDateActionLabel}. ${weddingDateDescription}`
+      : `${weddingDateViewModel.dDayLabel}, ${weddingDateViewModel.weddingDateLabel}. 결혼 예정일 설정`,
     progress:
       model && progressPercentage !== null
         ? {
@@ -104,6 +120,6 @@ export function createAppHeaderSummaryViewModel(
           }
         : null,
     weddingDateStatus: weddingDate.status,
-    ...weddingDateViewModel,
+    weddingDateLabel: weddingDateViewModel.weddingDateLabel,
   };
 }
