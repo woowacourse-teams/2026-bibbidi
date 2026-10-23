@@ -27,18 +27,18 @@ describe("createAppHeaderSummaryViewModel", () => {
         progress,
         { status: "loaded", date: null },
         today,
-      ).mobileDDayLabel,
-    ).toBe("D-Day 미설정");
+      ).weddingDateLabel,
+    ).toBe("결혼 일자 미설정");
     expect(
       createAppHeaderSummaryViewModel(progress, { status: "loading" }, today)
-        .mobileDDayLabel,
+        .weddingDateLabel,
     ).toBe("결혼 예정일 조회 중");
     const failed = createAppHeaderSummaryViewModel(
       progress,
       { status: "error" },
       today,
     );
-    expect(failed.mobileDDayLabel).toBe("결혼 예정일 조회 실패");
+    expect(failed.weddingDateLabel).toBe("결혼 예정일 조회 실패");
     expect(failed.progress?.label).toBe("50%");
     expect(
       createAppHeaderSummaryViewModel(

@@ -195,10 +195,14 @@ describe("ServiceLayout", () => {
     );
 
     expect(await screen.findByText("1/1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const logoutButton = screen.getByRole("button", { name: "로그아웃" });
-    expect(screen.getByLabelText("현재 사용자 비").nextElementSibling).toBe(
-      logoutButton,
-    );
+    expect(
+      within(screen.getByRole("dialog", { name: "계정 메뉴" })).getByRole(
+        "button",
+        { name: "로그아웃" },
+      ),
+    ).toBe(logoutButton);
     fireEvent.click(logoutButton);
     fireEvent.click(logoutButton);
 
@@ -428,6 +432,7 @@ describe("ServiceLayout", () => {
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(await screen.findByText("67%")).toBeTruthy();
     expect(screen.getByText("2/3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     fireEvent.click(
       screen.getByRole("button", { name: /카테고리별 완료율 보기/ }),
     );
@@ -896,6 +901,7 @@ describe("ServiceLayout", () => {
       ["/preparation"],
     );
 
+    fireEvent.click(await screen.findByRole("button", { name: "계정 메뉴" }));
     const headerSummary = await screen.findByRole("region", {
       name: "결혼 준비 현황",
     });

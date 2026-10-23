@@ -1,90 +1,86 @@
-.app-header-summary,
-.app-header-summary__d-day,
-.app-header-summary__d-day-desktop,
-.app-header-summary__progress {
-  display: flex;
-  align-items: center;
-}
-
 .app-header-summary {
-  width: 360px;
-  max-width: 100%;
-  height: 48px;
-  gap: 16px;
-  white-space: nowrap;
-}
-
-.app-header-summary__d-day,
-.app-header-summary__d-day-desktop,
-.app-header-summary__progress {
+  display: grid;
   gap: 8px;
+  padding: 8px 4px;
+  white-space: normal;
 }
 
 .app-header-summary__wedding-date {
-  position: relative;
   display: flex;
-  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
 }
 
-.app-header-summary__d-day-button,
-.app-header-summary__retry {
+.app-header-summary__label {
+  display: block;
+  width: 100%;
+  padding: 0 8px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+
+.app-header-summary__d-day,
+.app-header-summary__progress {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
-  cursor: pointer;
-}
-
-.app-header-summary__d-day-button {
-  padding: 6px 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6);
   text-align: left;
 }
 
-.app-header-summary__d-day-button:hover strong,
-.app-header-summary__retry:hover {
-  color: var(--color-fg-brand);
+.app-header-summary__d-day-button,
+.app-header-summary__progress {
+  width: 100%;
+  cursor: pointer;
 }
 
-.app-header-summary__retry {
-  flex: none;
-  padding: 4px;
+.app-header-summary__date-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header-summary__date-value > span,
+.app-header-summary__progress > span {
   color: var(--color-fg-neutral-muted);
-  font-size: 12px;
-}
-
-.app-header-summary__d-day-button:focus-visible,
-.app-header-summary__retry:focus-visible {
-  outline: 3px solid var(--color-stroke-focus-ring);
-  outline-offset: 2px;
-}
-
-.app-header-summary__d-day-mobile {
-  display: none;
+  font: var(--typography-t7);
 }
 
 .app-header-summary strong {
-  color: var(--color-fg-neutral);
-  font-size: 14px;
-  font-weight: 700;
+  font: var(--typography-t6-medium);
 }
 
-.app-header-summary__d-day-desktop > span,
-.app-header-summary__progress > span {
+.app-header-summary__d-day-button:hover,
+.app-header-summary__progress:hover:not(:disabled),
+.app-header-summary__retry:hover {
+  background: var(--color-bg-neutral-weak);
+}
+
+.app-header-summary__d-day-button--unset {
+  background: var(--color-bg-brand-weak);
+}
+
+.app-header-summary__retry {
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--color-fg-neutral-muted);
-  font-size: 14px;
-  font-weight: 400;
+  font: var(--typography-t7);
+  cursor: pointer;
 }
 
-.app-header-summary__d-day-button--unset strong,
-.app-header-summary__d-day-button--unset span {
-  color: var(--color-fg-brand);
-}
-
-.app-header-summary__separator {
-  width: 1px;
-  height: 24px;
-  flex: none;
-  background: var(--color-stroke-neutral-weak);
+.app-header-summary__progress:disabled {
+  opacity: 0.4;
+  cursor: progress;
 }
 
 .app-header-summary__progress-ring {
@@ -105,21 +101,10 @@
   stroke: var(--color-stroke-brand-solid);
 }
 
-.app-header-summary__progress {
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  -webkit-tap-highlight-color: transparent;
-}
-
 .app-header-summary__progress-chevron {
   width: 16px;
   height: 16px;
-  margin-left: 12px;
+  margin-left: auto;
   fill: none;
   stroke: var(--color-fg-neutral-muted);
   stroke-linecap: round;
@@ -131,41 +116,9 @@
   transform: rotate(180deg);
 }
 
-/* Keep the summary compact through tablet widths so navigation stays usable.
-   The full summary returns at --layout-breakpoint-lg. */
-@media (width < 1280px) {
-  .app-header-summary {
-    width: auto;
-    height: 36px;
-    gap: 8px;
-  }
-
-  .app-header-summary__d-day-desktop,
-  .app-header-summary__progress > span,
-  .app-header-summary__separator {
-    display: none;
-  }
-
-  .app-header-summary__d-day-mobile {
-    display: inline;
-  }
-
-  .app-header-summary__d-day,
-  .app-header-summary__progress {
-    gap: 4px;
-  }
-
-  .app-header-summary__progress {
-    min-height: 36px;
-    padding: 6px;
-  }
-
-  .app-header-summary__progress-chevron {
-    display: none;
-  }
-
-  .app-header-summary__progress-ring {
-    width: 20px;
-    height: 20px;
-  }
+.app-header-summary__d-day-button:focus-visible,
+.app-header-summary__progress:focus-visible,
+.app-header-summary__retry:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
 }

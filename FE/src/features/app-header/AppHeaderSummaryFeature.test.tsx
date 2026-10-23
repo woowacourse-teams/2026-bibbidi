@@ -1,4 +1,6 @@
 import { StrictMode } from "react";
+import { MemoryRouter } from "react-router";
+import { AppHeader } from "../../layouts/AppHeader";
 import {
   fireEvent,
   render,
@@ -216,7 +218,9 @@ describe("AppHeaderSummaryFeature", () => {
     expect(trigger.classList).toContain(
       "app-header-summary__d-day-button--unset",
     );
-    expect(screen.getByText("D-Day 미설정")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /결혼 예정일 설정/ }).textContent,
+    ).toContain("결혼 일자 미설정");
   });
 
   it("두 조회가 진행 중일 때 결혼 예정일 로딩을 표시하고 완료율을 숨긴다", () => {
@@ -440,4 +444,139 @@ describe("AppHeaderSummaryFeature", () => {
     );
     expect(screen.queryByText("결혼 예정일 조회 실패")).toBeNull();
   });
+});
+
+function renderAccountSummary() {
+  return render(
+    <MemoryRouter>
+      <AppHeader
+        user={{
+          kind: "authenticated",
+          isLoggingOut: false,
+          logoutErrorMessage: null,
+          onLogout: vi.fn(),
+          summary: (
+            <AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />
+          ),
+          userInitial: "비",
+        }}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("계정 패널 안의 준비 현황", () => {
+  it("예정일 팝업에서 Escape를 누르면 팝업만 닫고 계정 패널을 유지한다", async () => {
+    repositoryMocks.getWeddingDate.mockResolvedValue("2027-05-15");
+    renderAccountSummary();
+    const accountTrigger = screen.getByRole("button", { name: "계정 메뉴" });
+    fireEvent.click(accountTrigger);
+    const dateTrigger = await screen.findByRole("button", {
+      name: /결혼 예정일 설정/,
+    });
+    fireEvent.click(dateTrigger);
+    const day = screen.getByRole("button", { name: "2027년 5월 15일" });
+    fireEvent.keyDown(day, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "결혼 예정일 설정" }),
+    ).toBeNull();
+    expect(screen.getByRole("dialog", { name: "계정 메뉴" })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(dateTrigger));
+    fireEvent.keyDown(dateTrigger, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "계정 메뉴" })).toBeNull();
+    expect(document.activeElement).toBe(accountTrigger);
+  });
+
+  it("완료율 팝업 바깥을 누르면 팝업부터 닫고 패널을 유지한다", async () => {
+    renderAccountSummary();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
+    );
+    fireEvent.pointerDown(document.body);
+    expect(
+      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
+    ).toBeNull();
+    expect(screen.getByRole("dialog", { name: "계정 메뉴" })).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("dialog", { name: "계정 메뉴" })).toBeNull();
+  });
+
+  it("날짜 저장 중 바깥 클릭으로 닫지 않고 실패 후 입력을 유지해 재시도한다", async () => {
+    repositoryMocks.getWeddingDate.mockResolvedValue("2027-05-15");
+    let rejectSave!: (reason: unknown) => void;
+    repositoryMocks.saveWeddingDate.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    renderAccountSummary();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월 20일" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.pointerDown(document.body);
+    expect(
+      screen.getByRole("dialog", { name: "결혼 예정일 설정" }),
+    ).toBeTruthy();
+    rejectSave(new WeddingDateSaveError());
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "2027년 5월 20일" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    repositoryMocks.saveWeddingDate.mockResolvedValueOnce("2027-05-20");
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "결혼 예정일 설정" }),
+      ).toBeNull(),
+    );
+    expect(screen.getByRole("dialog", { name: "계정 메뉴" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /2027년 5월 20일. 결혼 예정일 설정/ }),
+    ).toBeTruthy();
+  });
+});
+
+describe("화면 이동 시 준비 현황 유지", () => {
+  it.each(["예정일", "완료율"])(
+    "%s 팝업만 닫고 데이터를 재조회하지 않는다",
+    async (popup) => {
+      repositoryMocks.getWeddingDate.mockResolvedValue("2027-05-15");
+      const onAuthenticationRequired = vi.fn();
+      const { rerender } = render(
+        <AppHeaderSummaryFeature
+          navigationKey="/checklist"
+          onAuthenticationRequired={onAuthenticationRequired}
+        />,
+      );
+      const dateTrigger = await screen.findByRole("button", {
+        name: /결혼 예정일 설정/,
+      });
+      const progressTrigger = await screen.findByRole("button", {
+        name: /카테고리별 완료율 보기/,
+      });
+      fireEvent.click(popup === "예정일" ? dateTrigger : progressTrigger);
+      expect(screen.getByRole("dialog")).toBeTruthy();
+      rerender(
+        <AppHeaderSummaryFeature
+          navigationKey="/calendar"
+          onAuthenticationRequired={onAuthenticationRequired}
+        />,
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(
+        screen.getByRole("button", {
+          name: /2027년 5월 15일. 결혼 예정일 설정/,
+        }),
+      ).toBeTruthy();
+      expect(repositoryMocks.getWeddingDate).toHaveBeenCalledOnce();
+      expect(repositoryMocks.getSummary).toHaveBeenCalledOnce();
+    },
+  );
 });

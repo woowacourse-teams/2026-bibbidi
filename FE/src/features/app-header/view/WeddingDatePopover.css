@@ -6,11 +6,16 @@
 }
 
 .app-header-summary__popover {
-  position: absolute;
+  position: fixed;
   z-index: 31;
-  top: calc(100% + 10px);
-  right: 0;
+  top: 88px;
+  right: max(
+    var(--service-page-margin),
+    calc((100vw - var(--layout-width-wide)) / 2)
+  );
+  box-sizing: border-box;
   width: 320px;
+  max-width: calc(100vw - var(--service-page-margin) * 2);
   max-height: calc(100dvh - 116px);
   padding: 20px;
   overflow-y: auto;
@@ -129,7 +134,6 @@
 
 @media (width < 768px) {
   .app-header-summary__popover {
-    position: fixed;
     top: 72px;
     right: 12px;
     left: 12px;

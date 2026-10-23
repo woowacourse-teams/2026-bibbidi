@@ -16,10 +16,12 @@ import { AppHeaderSummary } from "./view/AppHeaderSummary";
 
 interface AppHeaderSummaryFeatureProps {
   onAuthenticationRequired: () => void;
+  navigationKey?: string;
 }
 
 export function AppHeaderSummaryFeature({
   onAuthenticationRequired,
+  navigationKey,
 }: AppHeaderSummaryFeatureProps) {
   const summaryRepository = useAppHeaderSummaryRepository();
   const weddingDateRepository = useWeddingDateRepository();
@@ -34,6 +36,14 @@ export function AppHeaderSummaryFeature({
     onAuthenticationRequired,
     repository: weddingDateRepository,
   });
+
+  const [previousNavigationKey, setPreviousNavigationKey] =
+    useState(navigationKey);
+  if (previousNavigationKey !== navigationKey) {
+    setPreviousNavigationKey(navigationKey);
+    closeProgressPopover();
+    weddingDate.closePopover();
+  }
 
   useEffect(() => {
     const controller = new AbortController();
