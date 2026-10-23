@@ -6,8 +6,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.support.ToolCallingFixture;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
@@ -23,21 +21,19 @@ class ChecklistServiceAdapterToolCallingTest {
     private static final Long OTHER_USER_ID = 8L;
 
     private ChecklistService checklistService;
-    private CatalogService catalogService;
     private ToolCallingFixture toolCalling;
 
     @BeforeEach
     void setUp() {
         checklistService = mock(ChecklistService.class);
-        catalogService = mock(CatalogService.class);
-        toolCalling = new ToolCallingFixture(new ChecklistServiceAdapter(checklistService, catalogService));
+        toolCalling = new ToolCallingFixture(new ChecklistServiceAdapter(checklistService));
     }
 
     @Test
-    @DisplayName("체크리스트 조회 도구와 추천 후보 조회 도구를 모델 요청에 등록한다")
+    @DisplayName("체크리스트 조회 도구를 모델 요청에 등록한다")
     void registersTheChecklistToolsOnTheModelRequest() {
         assertThat(toolCalling.registeredToolNames(USER_ID))
-                .containsExactlyInAnyOrder("getMyChecklist", "getRecommendableItemIds");
+                .containsExactly("getMyChecklist");
     }
 
     @Test
@@ -66,26 +62,6 @@ class ChecklistServiceAdapterToolCallingTest {
 
         // then
         assertThat(response).contains("\"exists\":false");
-    }
-
-    @Test
-    @DisplayName("모델이 getRecommendableItemIds를 호출하면 카탈로그 전체를 조회해 추천 가능한 항목만 거른다")
-    void filtersTheWholeCatalogWhenTheModelCallsGetRecommendableItemIds() {
-        // given
-        when(catalogService.findAllItemDetails()).thenReturn(List.of(
-                new CatalogItemDetailSnapshot(1L, "웨딩홀 후보 정하기", "웨딩홀", 1, "후보"),
-                new CatalogItemDetailSnapshot(2L, "스튜디오 후보 정하기", "촬영", 1, "후보"),
-                new CatalogItemDetailSnapshot(3L, "드레스 후보 정하기", "드레스", 1, "후보")));
-        when(checklistService.filterRecommendableCatalogItemIds(USER_ID, List.of(1L, 2L, 3L)))
-                .thenReturn(List.of(1L, 3L));
-
-        // when
-        String response = toolCalling.callTool(USER_ID, "getRecommendableItemIds", "{}");
-
-        // then
-        verify(catalogService).findAllItemDetails();
-        verify(checklistService).filterRecommendableCatalogItemIds(USER_ID, List.of(1L, 2L, 3L));
-        assertThat(response).isEqualTo("[1,3]");
     }
 
     @Test

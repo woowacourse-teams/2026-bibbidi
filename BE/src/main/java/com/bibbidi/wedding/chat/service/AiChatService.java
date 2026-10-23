@@ -1,23 +1,17 @@
 package com.bibbidi.wedding.chat.service;
 
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.ChatEvent;
-import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
-import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
-import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.ChatTurn;
 import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
 import com.bibbidi.wedding.chat.service.turn.TurnSignal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,20 +27,14 @@ public class AiChatService {
 
     private final AiConversationPort conversationPort;
     private final List<TurnConsumer> turnConsumers;
-    private final CatalogLookupPort catalogLookup;
-    private final ChecklistLookupPort checklistLookup;
     private final Map<ConversationKey, ActiveRequest> activeConversations = new ConcurrentHashMap<>();
 
     public AiChatService(
             AiConversationPort conversationPort,
-            List<TurnConsumer> turnConsumers,
-            CatalogLookupPort catalogLookup,
-            ChecklistLookupPort checklistLookup
+            List<TurnConsumer> turnConsumers
     ) {
         this.conversationPort = conversationPort;
         this.turnConsumers = turnConsumers;
-        this.catalogLookup = catalogLookup;
-        this.checklistLookup = checklistLookup;
     }
 
     public Flux<ChatEvent> chat(ChatCommand chatCommand, Supplier<CancelReason> outputCancelReason) {
@@ -83,21 +71,17 @@ public class AiChatService {
         TurnContext context = new TurnContext(key.userId(), key.conversationId(), message, LocalDateTime.now());
         turnConsumers.forEach(consumer -> consumer.consume(context, turn.signals()));
 
-        return eventsFrom(turn, key)
+        return turn.signals()
+                .publishOn(Schedulers.boundedElastic())
+                .concatMap(signal -> eventsOf(signal, key))
                 .doOnSubscribe(ignored -> turn.start(
                         conversationPort.stream(key.userId(), key.toMemoryKey(), message))
                 )
-                .doFinally(signalType -> cancelUnfinishedTurn(turn, signalType, cancelReason));
-    }
-
-    private Flux<ChatEvent> eventsFrom(ChatTurn turn, ConversationKey key) {
-        return turn.signals()
-                .publishOn(Schedulers.boundedElastic())
-                .concatMap(signal -> eventsOf(signal, key));
-    }
-
-    private void cancelUnfinishedTurn(ChatTurn turn, SignalType signalType, Supplier<CancelReason> cancelReason) {
-        turn.cancel(signalType == SignalType.CANCEL ? cancelReason.get() : CancelReason.CONSUMER_FAILED);
+                .doFinally(
+                        signalType -> turn.cancel(
+                                signalType == SignalType.CANCEL ? cancelReason.get() : CancelReason.CONSUMER_FAILED
+                        )
+                );
     }
 
     private Flux<ChatEvent> eventsOf(TurnSignal signal, ConversationKey key) {
@@ -109,29 +93,12 @@ public class AiChatService {
         };
     }
 
-    private Set<Long> loadRecommendableItemIds(Long userId) {
-        List<CatalogItemDetailSnapshot> catalog = catalogLookup.findAllItemDetails();
-        ChecklistSnapshot checklist = ChecklistSnapshot.of(checklistLookup.findMyChecklistIfPresent(userId));
-        return Set.copyOf(checklist.recommendableItemIds(catalog));
-    }
-
     private Flux<ChatEvent> completeAnswer(ConversationKey key, ChatAnswer answer) {
-        List<ChatEvent> events = new ArrayList<>();
-        if (!answer.recommendedItemIds().isEmpty()) {
-            Set<Long> recommendableIds = loadRecommendableItemIds(key.userId());
-            List<Long> suggestedIds = answer.recommendedItemIds().stream()
-                    .filter(recommendableIds::contains)
-                    .distinct()
-                    .toList();
-            if (!suggestedIds.isEmpty()) {
-                List<Long> ids = checklistLookup.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
-                if (!ids.isEmpty()) {
-                    events.add(new ChatEvent.Component(ids));
-                }
-            }
-        }
+        Flux<ChatEvent> card = answer.recommendedItemIds().isEmpty()
+                ? Flux.empty()
+                : Flux.just(new ChatEvent.Component(answer.recommendedItemIds()));
         return Flux.concat(
-                Flux.fromIterable(events),
+                card,
                 Flux.just(new ChatEvent.Done(key.conversationId().toString()))
         );
     }

@@ -78,7 +78,7 @@ class EvaluationContextIntegrationTest {
                         .content("")
                         .toolCalls(List.of(
                                 new AssistantMessage.ToolCall("call-1", "function", "getMyChecklist", "{}"),
-                                new AssistantMessage.ToolCall("call-2", "function", "getRecommendableItemIds", "{}")))
+                                new AssistantMessage.ToolCall("call-2", "function", "getCatalog", "{}")))
                         .build();
                 return Flux.just(new ChatResponse(List.of(new Generation(toolCalls))));
             });

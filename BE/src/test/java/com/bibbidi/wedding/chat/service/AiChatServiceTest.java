@@ -3,8 +3,6 @@ package com.bibbidi.wedding.chat.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatCommand;
@@ -13,8 +11,6 @@ import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.port.AiResponse;
-import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
-import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
@@ -63,15 +59,11 @@ class AiChatServiceTest {
     private volatile Supplier<Flux<String>> responder = Flux::empty;
     private AiChatService service;
     private List<ChatEvent> received;
-    private CatalogLookupPort catalogService;
-    private ChecklistLookupPort checklistService;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
 
     @BeforeEach
     void setUp() {
-        catalogService = mock(CatalogLookupPort.class);
-        checklistService = mock(ChecklistLookupPort.class);
         service = new AiChatService(
                 new AiConversationPort() {
                     @Override
@@ -91,8 +83,7 @@ class AiChatServiceTest {
                     recordedTurns.add(turn);
                     recordedContexts.add(context);
                     signals.subscribe(turn::add);
-                }),
-                catalogService, checklistService);
+                }));
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
         received = new CopyOnWriteArrayList<>();
@@ -159,6 +150,21 @@ class AiChatServiceTest {
     }
 
     @Test
+    @DisplayName("모델이 낸 추천 ID를 추가 조회 없이 카드로 전달한 뒤 Done을 보낸다")
+    void forwardsRecommendedItemIds() {
+        // given
+        respondWith(Flux.just(MAPPER.writeValueAsString(new ChatAnswer("답변", List.of(99L, 1L)))));
+
+        // when
+        runChat(USER_ID, CONVERSATION_ID, "추천해줘");
+
+        // then
+        assertThat(received).containsSubsequence(
+                new ChatEvent.Component(List.of(99L, 1L)),
+                new ChatEvent.Done(CONVERSATION_ID.toString()));
+    }
+
+    @Test
     @DisplayName("대화 기록 키는 사용자와 대화 ID로 구분한다")
     void separatesConversationKeysByUserAndConversation() {
         // given
@@ -171,19 +177,6 @@ class AiChatServiceTest {
 
         // then
         assertThat(modelCalls).extracting(ModelCall::conversationKey).doesNotHaveDuplicates();
-    }
-
-    @Test
-    @DisplayName("추천이 없는 답변은 체크리스트와 카탈로그를 조회하지 않는다")
-    void doesNotLoadContextWhenNothingIsRecommended() {
-        // given
-        respondWith(Flux.just(answerJson("답변")));
-
-        // when
-        runChat(USER_ID, CONVERSATION_ID, "질문");
-
-        // then
-        verifyNoInteractions(catalogService, checklistService);
     }
 
     @Test
