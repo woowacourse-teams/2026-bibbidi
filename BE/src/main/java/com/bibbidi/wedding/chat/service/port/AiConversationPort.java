@@ -6,6 +6,6 @@ public interface AiConversationPort {
 
     String modelName();
 
-    Flux<String> stream(Long userId, String conversationKey, String userPrompt);
+    Flux<AiResponse> stream(Long userId, String conversationKey, String userPrompt);
 
 }

@@ -2,6 +2,8 @@ package com.bibbidi.wedding.chat.service.turn;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.port.AiResponse;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,7 +19,7 @@ class ChatTurnTest {
     void lateSubscriberReceivesEverySignal() {
         // given
         ChatTurn turn = new ChatTurn("test-model");
-        turn.start(Flux.just("가", "나"));
+        turn.start(Flux.just(chunk("가"), chunk("나"), answer("가나")));
 
         // when
         List<TurnSignal> signals = turn.signals().collectList().block();
@@ -25,17 +27,21 @@ class ChatTurnTest {
         // then
         assertThat(signals).hasSize(3);
         assertThat(signals.get(0)).isInstanceOfSatisfying(TurnSignal.Chunk.class,
-                chunk -> assertThat(chunk.text()).isEqualTo("가"));
+                chunk -> {
+                    assertThat(chunk.text()).isEqualTo("가");
+                    assertThat(chunk.answerDeltas()).containsExactly("가");
+                });
         assertThat(signals.get(1)).isInstanceOfSatisfying(TurnSignal.Chunk.class,
                 chunk -> assertThat(chunk.text()).isEqualTo("나"));
-        assertThat(signals.get(2)).isInstanceOf(TurnSignal.Completed.class);
+        assertThat(signals.get(2)).isInstanceOfSatisfying(TurnSignal.Completed.class,
+                completed -> assertThat(completed.answer().answer()).isEqualTo("가나"));
     }
 
     @Test
     @DisplayName("소비자마다 같은 신호와 같은 경과 시간을 받고 모델은 한 번만 구독한다")
     void consumersShareOneModelCall() {
         // given
-        TestPublisher<String> model = TestPublisher.create();
+        TestPublisher<AiResponse> model = TestPublisher.create();
         AtomicInteger subscriptions = new AtomicInteger();
         ChatTurn turn = new ChatTurn("test-model");
         turn.start(model.flux().doOnSubscribe(ignored -> subscriptions.incrementAndGet()));
@@ -43,10 +49,10 @@ class ChatTurnTest {
         turn.signals().subscribe(first::add);
 
         // when
-        model.next("가");
+        model.next(chunk("가"));
         List<TurnSignal> second = new CopyOnWriteArrayList<>();
         turn.signals().subscribe(second::add);
-        model.complete();
+        model.next(answer("가")).complete();
 
         // then
         assertThat(subscriptions).hasValue(1);
@@ -60,7 +66,7 @@ class ChatTurnTest {
         // given
         IllegalStateException failure = new IllegalStateException("모델 오류");
         ChatTurn turn = new ChatTurn("test-model");
-        turn.start(Flux.concat(Flux.just("가"), Flux.error(failure)));
+        turn.start(Flux.concat(Flux.just(chunk("가")), Flux.error(failure)));
 
         // when
         List<TurnSignal> signals = turn.signals().collectList().block();
@@ -75,7 +81,7 @@ class ChatTurnTest {
     @DisplayName("취소하면 모델 호출을 취소하고 사유가 담긴 취소 신호 하나로 끝난다")
     void cancelCancelsTheModelAndEmitsReason() {
         // given
-        TestPublisher<String> model = TestPublisher.create();
+        TestPublisher<AiResponse> model = TestPublisher.create();
         ChatTurn turn = new ChatTurn("test-model");
         turn.start(model.flux());
 
@@ -95,13 +101,13 @@ class ChatTurnTest {
     @DisplayName("종료한 뒤 도착한 청크와 취소는 무시한다")
     void ignoresSignalsAfterTermination() {
         // given
-        TestPublisher<String> model = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION);
+        TestPublisher<AiResponse> model = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION);
         ChatTurn turn = new ChatTurn("test-model");
         turn.start(model.flux());
-        model.next("가").complete();
+        model.next(chunk("가"), answer("가")).complete();
 
         // when
-        model.next("늦은 청크");
+        model.next(chunk("늦은 청크"));
         turn.cancel(CancelReason.SUPERSEDED);
 
         // then
@@ -114,7 +120,7 @@ class ChatTurnTest {
     @DisplayName("시작하기 전에 취소하면 모델을 구독하지 않는다")
     void cancelBeforeStartSkipsTheModelCall() {
         // given
-        TestPublisher<String> model = TestPublisher.create();
+        TestPublisher<AiResponse> model = TestPublisher.create();
         ChatTurn turn = new ChatTurn("test-model");
 
         // when
@@ -123,5 +129,13 @@ class ChatTurnTest {
 
         // then
         model.assertCancelled();
+    }
+
+    private static AiResponse.Chunk chunk(String text) {
+        return new AiResponse.Chunk(text, List.of(text));
+    }
+
+    private static AiResponse.Answer answer(String text) {
+        return new AiResponse.Answer(new ChatAnswer(text, List.of()));
     }
 }

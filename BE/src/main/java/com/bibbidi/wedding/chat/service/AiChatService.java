@@ -5,8 +5,6 @@ import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
-import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
-import com.bibbidi.wedding.chat.service.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
@@ -37,21 +35,18 @@ public class AiChatService {
     private final List<TurnConsumer> turnConsumers;
     private final CatalogLookupPort catalogLookup;
     private final ChecklistLookupPort checklistLookup;
-    private final JacksonChatAnswerParser answerParser;
     private final Map<ConversationKey, ActiveRequest> activeConversations = new ConcurrentHashMap<>();
 
     public AiChatService(
             AiConversationPort conversationPort,
             List<TurnConsumer> turnConsumers,
             CatalogLookupPort catalogLookup,
-            ChecklistLookupPort checklistLookup,
-            JacksonChatAnswerParser answerParser
+            ChecklistLookupPort checklistLookup
     ) {
         this.conversationPort = conversationPort;
         this.turnConsumers = turnConsumers;
         this.catalogLookup = catalogLookup;
         this.checklistLookup = checklistLookup;
-        this.answerParser = answerParser;
     }
 
     public Flux<ChatEvent> chat(ChatCommand chatCommand, Supplier<CancelReason> outputCancelReason) {
@@ -96,32 +91,19 @@ public class AiChatService {
     }
 
     private Flux<ChatEvent> eventsFrom(ChatTurn turn, ConversationKey key) {
-        List<String> deltas = new ArrayList<>();
-        ReactiveChatAnswerStream answer = answerParser.newSession(deltas::add);
-
         return turn.signals()
                 .publishOn(Schedulers.boundedElastic())
-                .concatMap(signal -> eventsOf(signal, key, answer, deltas));
+                .concatMap(signal -> eventsOf(signal, key));
     }
 
     private void cancelUnfinishedTurn(ChatTurn turn, SignalType signalType, Supplier<CancelReason> cancelReason) {
         turn.cancel(signalType == SignalType.CANCEL ? cancelReason.get() : CancelReason.CONSUMER_FAILED);
     }
 
-    private Flux<ChatEvent> eventsOf(
-            TurnSignal signal, ConversationKey key, ReactiveChatAnswerStream answer, List<String> deltas
-    ) {
+    private Flux<ChatEvent> eventsOf(TurnSignal signal, ConversationKey key) {
         return switch (signal) {
-            case TurnSignal.Chunk chunk -> {
-                deltas.clear();
-                answer.accept(chunk.text());
-                List<ChatEvent> events = new ArrayList<>();
-                for (String delta : deltas) {
-                    events.add(new ChatEvent.Delta(delta));
-                }
-                yield Flux.fromIterable(events);
-            }
-            case TurnSignal.Completed ignored -> completeAnswer(key, answer);
+            case TurnSignal.Chunk chunk -> Flux.fromIterable(chunk.answerDeltas()).map(ChatEvent.Delta::new);
+            case TurnSignal.Completed completed -> completeAnswer(key, completed.answer());
             case TurnSignal.Failed failed -> Flux.error(failed.cause());
             case TurnSignal.Cancelled ignored -> Flux.empty();
         };
@@ -133,8 +115,7 @@ public class AiChatService {
         return Set.copyOf(checklist.recommendableItemIds(catalog));
     }
 
-    private Flux<ChatEvent> completeAnswer(ConversationKey key, ReactiveChatAnswerStream stream) {
-        ChatAnswer answer = stream.finish();
+    private Flux<ChatEvent> completeAnswer(ConversationKey key, ChatAnswer answer) {
         List<ChatEvent> events = new ArrayList<>();
         if (!answer.recommendedItemIds().isEmpty()) {
             Set<Long> recommendableIds = loadRecommendableItemIds(key.userId());

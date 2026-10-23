@@ -1,5 +1,7 @@
 package com.bibbidi.wedding.chat.service.turn;
 
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.port.AiResponse;
 import java.time.Duration;
 import org.jspecify.annotations.Nullable;
 import reactor.core.Disposable;
@@ -17,6 +19,7 @@ public final class ChatTurn {
     private final long startedAtNanos = System.nanoTime();
     private final Object lock = new Object();
     private boolean terminated;
+    private @Nullable ChatAnswer answer;
     private @Nullable Disposable modelCall;
 
     public ChatTurn(String model) {
@@ -27,8 +30,8 @@ public final class ChatTurn {
         return sink.asFlux();
     }
 
-    public void start(Flux<String> response) {
-        Disposable call = response.subscribe(this::emitChunk, this::fail, this::complete);
+    public void start(Flux<AiResponse> response) {
+        Disposable call = response.subscribe(this::emitResponse, this::fail, this::complete);
         synchronized (lock) {
             if (!terminated) {
                 modelCall = call;
@@ -42,10 +45,14 @@ public final class ChatTurn {
         terminate(new TurnSignal.Cancelled(model, reason, elapsed()));
     }
 
-    private void emitChunk(String text) {
+    private void emitResponse(AiResponse response) {
         synchronized (lock) {
             if (!terminated) {
-                sink.tryEmitNext(new TurnSignal.Chunk(model, text, elapsed()));
+                if (response instanceof AiResponse.Chunk chunk) {
+                    sink.tryEmitNext(new TurnSignal.Chunk(model, chunk.raw(), chunk.answerDeltas(), elapsed()));
+                } else if (response instanceof AiResponse.Answer completed) {
+                    answer = completed.value();
+                }
             }
         }
     }
@@ -55,7 +62,15 @@ public final class ChatTurn {
     }
 
     private void complete() {
-        terminate(new TurnSignal.Completed(model, elapsed()));
+        ChatAnswer completedAnswer;
+        synchronized (lock) {
+            completedAnswer = answer;
+        }
+        if (completedAnswer == null) {
+            fail(new IllegalStateException("완료된 AI 응답이 없습니다."));
+            return;
+        }
+        terminate(new TurnSignal.Completed(model, completedAnswer, elapsed()));
     }
 
     private void terminate(TurnSignal signal) {

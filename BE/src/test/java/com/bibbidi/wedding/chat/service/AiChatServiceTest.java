@@ -9,8 +9,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
 import com.bibbidi.wedding.chat.service.dto.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.ChatEvent;
-import com.bibbidi.wedding.chat.service.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
+import com.bibbidi.wedding.chat.service.port.AiResponse;
 import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
 import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
@@ -20,6 +22,7 @@ import com.bibbidi.wedding.chat.service.turn.TurnSignal;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -77,10 +80,10 @@ class AiChatServiceTest {
                     }
 
                     @Override
-                    public Flux<String> stream(Long userId, String conversationKey, String userPrompt) {
+                    public Flux<AiResponse> stream(Long userId, String conversationKey, String userPrompt) {
                         transactionActiveAtModelCall.set(TransactionSynchronizationManager.isActualTransactionActive());
                         modelCalls.add(new ModelCall(userId, conversationKey, userPrompt));
-                        return responder.get();
+                        return parsedResponse(responder.get());
                     }
                 },
                 List.of((TurnConsumer) (context, signals) -> {
@@ -89,8 +92,7 @@ class AiChatServiceTest {
                     recordedContexts.add(context);
                     signals.subscribe(turn::add);
                 }),
-                catalogService, checklistService,
-                new JacksonChatAnswerParser(MAPPER));
+                catalogService, checklistService);
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
         received = new CopyOnWriteArrayList<>();
@@ -123,6 +125,9 @@ class AiChatServiceTest {
                 new ChatEvent.Delta("웨딩홀 "),
                 new ChatEvent.Delta("계약을 확인하세요."),
                 new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(recordedTurns.getFirst()).filteredOn(TurnSignal.Chunk.class::isInstance)
+                .extracting(signal -> ((TurnSignal.Chunk) signal).text())
+                .containsExactly("{\"answer\":\"웨딩홀 ", "계약을 확인하세요.\",\"recommendedItemIds\":[]}");
     }
 
     @Test
@@ -543,6 +548,19 @@ class AiChatServiceTest {
 
     private void respondWith(Flux<String> response) {
         responder = () -> response;
+    }
+
+    private static Flux<AiResponse> parsedResponse(Flux<String> rawResponse) {
+        return Flux.defer(() -> {
+            List<String> deltas = new ArrayList<>();
+            ReactiveChatAnswerStream parser = new JacksonChatAnswerParser(MAPPER).newSession(deltas::add);
+            Flux<AiResponse> chunks = rawResponse.map(raw -> {
+                deltas.clear();
+                parser.accept(raw);
+                return new AiResponse.Chunk(raw, List.copyOf(deltas));
+            });
+            return chunks.concatWith(Flux.defer(() -> Flux.just(new AiResponse.Answer(parser.finish()))));
+        });
     }
 
     private record ModelCall(Long userId, String conversationKey, String prompt) {
