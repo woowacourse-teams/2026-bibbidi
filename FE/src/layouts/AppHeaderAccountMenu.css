@@ -1,84 +1,16 @@
-.app-header-account {
-  position: relative;
-  flex: none;
-}
-
-/* Menu surface; the mixed content uses a nonmodal dialog instead of menu roles. */
-.app-header-account__panel {
-  position: absolute;
-  z-index: 25;
-  top: calc(100% + 8px);
-  right: 0;
-  box-sizing: border-box;
-  width: 320px;
-  max-width: calc(100vw - var(--service-page-margin) * 2);
-  max-height: calc(100dvh - 88px);
-  padding: 8px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--color-stroke-neutral-weak);
-  border-radius: 14px;
-  background: var(--color-bg-layer-default);
-  box-shadow: 0 8px 32px
-    color-mix(in srgb, var(--color-palette-ink) 12%, transparent);
-  color: var(--color-fg-neutral);
-  font: var(--typography-t6);
-}
-
-.app-header-account__panel[hidden] {
-  display: none;
-}
-
-.app-header-account__heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 4px 12px;
-}
-
-.app-header-account__heading strong {
-  flex: 1;
-  font: var(--typography-t5-medium);
-}
-
-.app-header-account__avatar {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-bg-neutral-weak);
-  font: var(--typography-t6-medium);
-}
-
 .app-header-account__actions {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--color-stroke-neutral-weak);
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.app-header-account__actions p,
-.app-header-account__error {
+.app-header-account__status {
   margin: 0;
-  padding: 8px 12px;
+  padding: 8px 20px;
   font: var(--typography-t7);
 }
 
 .app-header-account__error {
-  display: grid;
-  gap: 8px;
   color: var(--color-fg-critical);
-}
-
-.app-header-account__logout {
-  justify-content: flex-start;
-}
-.app-header-account__logout-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.app-header-account__logout-content svg {
-  flex: none;
+  font: var(--typography-t7);
 }

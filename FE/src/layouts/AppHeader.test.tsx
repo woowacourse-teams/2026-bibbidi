@@ -76,7 +76,7 @@ describe("AppHeader", () => {
 
   it("패널 안의 로그아웃 버튼을 키보드로 사용할 수 있다", () => {
     const onLogout = vi.fn();
-    const { container } = renderHeader({
+    renderHeader({
       kind: "authenticated",
       isLoggingOut: false,
       logoutErrorMessage: null,
@@ -87,9 +87,9 @@ describe("AppHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const button = screen.getByRole("button", { name: "로그아웃" });
 
-    expect(button.closest('[role="dialog"]')?.getAttribute("aria-label")).toBe(
-      "계정 메뉴",
-    );
+    expect(
+      screen.getByRole("dialog", { name: "계정 메뉴" }).contains(button),
+    ).toBe(true);
     expect(button.getAttribute("type")).toBe("button");
     expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
       "true",
@@ -99,7 +99,6 @@ describe("AppHeader", () => {
     fireEvent.keyDown(button, { key: "Enter" });
     fireEvent.click(button);
     expect(onLogout).toHaveBeenCalledOnce();
-    expect(container.querySelector(".app-header-account__logout")).toBe(button);
   });
 
   it("처리 중 버튼을 비활성화하고 실패 안내에서 재시도할 수 있다", () => {
@@ -136,7 +135,7 @@ describe("AppHeader", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "잠시 후 다시 시도해 주세요.",
     );
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃 다시 시도" }));
     expect(onLogout).toHaveBeenCalledOnce();
   });
 

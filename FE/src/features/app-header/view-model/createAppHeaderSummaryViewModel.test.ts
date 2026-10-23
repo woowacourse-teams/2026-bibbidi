@@ -16,7 +16,8 @@ describe("createAppHeaderSummaryViewModel", () => {
       { status: "loaded", date },
       today,
     );
-    expect(viewModel.dDayLabel).toBe(label);
+    expect(viewModel.weddingDateDescription).toContain(`${label} · `);
+    expect(viewModel.weddingDateAccessibleLabel).toContain(label);
     expect(viewModel.weddingDateLabel).toContain("2027년 5월");
     expect(viewModel.progress?.label).toBe("50%");
   });
