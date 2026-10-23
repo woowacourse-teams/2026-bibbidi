@@ -291,7 +291,7 @@
 .calendar-planning__tasks button:hover {
   background: var(--calendar-heading-background);
 }
-@media (max-width: 760px) {
+@media (width < 768px) {
   .calendar-planning {
     gap: 20px;
   }

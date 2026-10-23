@@ -19,7 +19,7 @@
   padding-top: 128px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .auth-page {
     align-items: start;
     padding: 42px 24px 48px;
@@ -32,7 +32,7 @@
   }
 }
 
-@media (min-width: 744px) {
+@media (min-width: 768px) {
   .auth-page--login {
     padding-top: 128px;
   }

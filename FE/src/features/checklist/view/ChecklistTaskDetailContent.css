@@ -332,7 +332,7 @@
   text-align: center;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-detail-content__appointment {
     padding-right: 0;
     padding-left: 0;

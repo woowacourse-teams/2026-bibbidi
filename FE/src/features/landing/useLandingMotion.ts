@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useMediaQuery } from "../../shared/responsive";
+import {
+  MOBILE_LAYOUT_MEDIA_QUERY,
+  useMediaQuery,
+} from "../../shared/responsive";
 
 export const LANDING_REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -57,7 +60,9 @@ export function useLandingMotion() {
 
     const render = () => {
       frame = 0;
-      const top = window.innerWidth <= 760 ? 64 : 76;
+      const top = window.matchMedia?.(MOBILE_LAYOUT_MEDIA_QUERY).matches
+        ? 64
+        : 76;
       const travel = feature.offsetHeight - (window.innerHeight - top);
       if (travel <= 0) return;
       const progress = clamp(
@@ -144,7 +149,9 @@ export function useLandingMotion() {
     const feature = featureRef.current;
     if (!feature || motionDisabled) return;
 
-    const top = window.innerWidth <= 760 ? 64 : 76;
+    const top = window.matchMedia?.(MOBILE_LAYOUT_MEDIA_QUERY).matches
+      ? 64
+      : 76;
     const travel = feature.offsetHeight - (window.innerHeight - top);
     const target =
       feature.getBoundingClientRect().top +

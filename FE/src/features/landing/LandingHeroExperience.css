@@ -363,7 +363,7 @@
     scale: 1;
   }
 }
-@media (max-width: 760px) {
+@media (width < 768px) {
   .landing-hero-experience .landing-hero-art {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

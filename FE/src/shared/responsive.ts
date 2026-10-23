@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-export const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 760px)";
+// Keep this condition aligned with --layout-breakpoint-md in ../styles/tokens.css.
+export const MOBILE_LAYOUT_MEDIA_QUERY = "(width < 768px)";
 
 function getMediaQueryMatch(query: string, fallback: boolean) {
   if (

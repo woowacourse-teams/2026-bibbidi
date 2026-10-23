@@ -262,7 +262,7 @@
   border: 0;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .feedback-feature {
     position: static;
     display: block;

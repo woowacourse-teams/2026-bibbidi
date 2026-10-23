@@ -99,7 +99,7 @@ function mockChatScrollHeight() {
 }
 
 function mockMobileDialog() {
-  const media = installMatchMedia("(max-width: 760px)", true);
+  const media = installMatchMedia("(width < 768px)", true);
   restoreDialog = installDialogMock();
   return media;
 }
@@ -117,7 +117,7 @@ function pendingCatalog() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  installMatchMedia("(max-width: 760px)", false);
+  installMatchMedia("(width < 768px)", false);
   mocks.catalog.mockResolvedValue(preparationCatalogFixture);
   mocks.stream.mockImplementation(
     async (_request, receiver: Parameters<typeof streamAiChat>[1]) => {

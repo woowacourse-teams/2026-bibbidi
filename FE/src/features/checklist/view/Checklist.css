@@ -266,7 +266,7 @@
   justify-content: center;
   padding: 0 8px;
   border-radius: 8px;
-  color: var(--color-palette-coral-muted);
+  color: var(--color-fg-neutral);
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -560,7 +560,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-workspace,
   .checklist-workspace--detail-open,
   .checklist-workspace--add-open {

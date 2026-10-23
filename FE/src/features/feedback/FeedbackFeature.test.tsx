@@ -34,7 +34,7 @@ function setMobileViewport(matches: boolean) {
     configurable: true,
     value: (query: string) => ({
       addEventListener: () => undefined,
-      matches: query === "(max-width: 760px)" ? matches : false,
+      matches: query === "(width < 768px)" ? matches : false,
       removeEventListener: () => undefined,
     }),
   });

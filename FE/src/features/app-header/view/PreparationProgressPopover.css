@@ -97,7 +97,7 @@
 }
 
 .preparation-progress-popover__track > span {
-  background: var(--color-palette-coral-muted);
+  background: var(--color-bg-brand-solid);
 }
 
 .preparation-progress-popover__count {

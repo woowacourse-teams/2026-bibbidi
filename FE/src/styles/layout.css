@@ -1,0 +1,17 @@
+/* Viewport margins shared by the service and authentication headers.
+   Keep media conditions in sync with --layout-breakpoint-md/lg and responsive.ts. */
+:root {
+  --service-page-margin: var(--layout-margin-mobile);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --service-page-margin: var(--layout-margin-tablet);
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --service-page-margin: var(--layout-margin-desktop);
+  }
+}

@@ -8,7 +8,10 @@
 
 .app-header__inner {
   display: flex;
-  width: min(calc(100% - 48px), 1440px);
+  width: min(
+    calc(100% - var(--service-page-margin) * 2),
+    var(--layout-width-wide)
+  );
   height: 100%;
   align-items: center;
   justify-content: space-between;
@@ -193,13 +196,12 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .app-header {
     height: 64px;
   }
 
   .app-header__inner {
-    width: min(calc(100% - 32px), 1440px);
     gap: 12px;
   }
 
@@ -237,7 +239,6 @@
 
 @media (max-width: 390px) {
   .app-header__inner {
-    width: calc(100% - 24px);
     gap: 8px;
   }
 

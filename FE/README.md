@@ -38,6 +38,11 @@ pnpm dev
 
 기본 주소는 `http://localhost:3000`입니다.
 
+## 디자인 기준 적용
+
+디자인 시스템의 기준을 참고하되 토큰·폰트·스타일은 FE에서 직접 관리합니다.
+현재 C1 적용 범위와 전환 대응표는 [공통 기반 적용 기록](docs/design-foundations-migration.md)을 참고하세요.
+
 ## API 연결
 
 로컬 API 주소는 `FE/.env`에서 관리합니다. `.env`는 Git에 포함하지 않습니다.

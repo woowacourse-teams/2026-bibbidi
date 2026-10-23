@@ -172,7 +172,7 @@ function mockMobile() {
   vi.stubGlobal(
     "matchMedia",
     vi.fn((query: string) => ({
-      matches: query === "(max-width: 760px)",
+      matches: query === "(width < 768px)",
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     })),
@@ -296,7 +296,7 @@ describe("준비 로드맵 보기 전환", () => {
   );
 
   it("PC로 전환하면 열린 선택 시트를 닫고 모바일로 돌아와도 다시 열지 않는다", async () => {
-    const media = installMatchMedia("(max-width: 760px)", true);
+    const media = installMatchMedia("(width < 768px)", true);
     render(<PreparationRoadmapFeature />);
     await screen.findByText("내 웨딩홀 투어");
     fireEvent.click(screen.getByRole("button", { name: "내 로드맵" }));
@@ -841,7 +841,7 @@ describe("내 로드맵 할 일 동작", () => {
   it.each([false, true])(
     "모바일=%s에서 상세를 열고 닫으면 보던 로드맵 카테고리로 돌아온다",
     async (mobile) => {
-      installMatchMedia("(max-width: 760px)", mobile);
+      installMatchMedia("(width < 768px)", mobile);
       const current = structuredClone(checklist);
       current.categories[1].customItems = [
         { ...item(3, "스드메 상담", true), categoryId: "studio-dress-makeup" },

@@ -56,7 +56,7 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-detail-panel {
     display: none;
   }

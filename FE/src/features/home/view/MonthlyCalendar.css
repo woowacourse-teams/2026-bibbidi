@@ -264,7 +264,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .monthly-calendar__controls .monthly-calendar__today-button {
     flex: none;
     white-space: nowrap;

@@ -3,7 +3,7 @@
   --bottom-sheet-scrim-opacity: 1;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .bottom-sheet-dismiss__scrim {
     opacity: var(--bottom-sheet-scrim-opacity);
     transition: opacity 220ms ease-out;
@@ -69,7 +69,7 @@
   }
 }
 
-@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+@media (width < 768px) and (prefers-reduced-motion: reduce) {
   .bottom-sheet-dismiss__dialog,
   .bottom-sheet-dismiss__scrim {
     transition-duration: 0.01ms;
