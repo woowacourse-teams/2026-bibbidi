@@ -1,7 +1,6 @@
 {
   "name": "scenario10",
   "metrics": [
-    "Completeness",
     "Coherence"
   ],
   "userMessage": "웨딩홀 계약을 마쳤고 하객 수는 아직 몰라요. 다음 단계로 촬영과 하객 준비를 하나씩 추천해 주세요.",

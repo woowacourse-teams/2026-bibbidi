@@ -1,7 +1,6 @@
 {
   "name": "scenario16",
   "metrics": [
-    "Helpfulness",
     "Relevance"
   ],
   "userMessage": "결혼 준비를 막 시작해서 무엇부터 해야 할지 모르겠어요. 우선순위가 높은 항목 세 개를 이유와 함께 추천해 주세요.",

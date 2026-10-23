@@ -1,8 +1,7 @@
 {
   "name": "scenario26",
   "metrics": [
-    "Relevance",
-    "Helpfulness"
+    "Relevance"
   ],
   "userMessage": "본식 드레스 준비에 필요한 항목만 추천해 주세요. 다른 주제는 제외해 주세요.",
   "chatMemory": [],

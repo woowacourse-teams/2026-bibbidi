@@ -83,7 +83,8 @@ def dockerAvailable = providers.provider {
 }
 
 tasks.named('test', Test) {
-    exclude '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    exclude '**/BibbidiLocalEvaluationTest.class'
+    exclude '**/BibbidiEvaluationIntegrationTest.class'
     inputs.property('dockerAvailable', dockerAvailable)
     testLogging {
         events 'skipped', 'failed'
@@ -95,7 +96,7 @@ tasks.register('aiEvaluationTest', Test) {
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    include '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    include '**/BibbidiEvaluationIntegrationTest.class'
     useJUnitPlatform()
     // 평가 테스트는 같은 DB를 쓰므로 병렬로 실행하지 않는다.
     systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
@@ -109,4 +110,16 @@ tasks.named('bootJar') {
 tasks.named('processResources') {
     from('database/mysql/load_catalog.sql')
     from('database/mysql/load_terms.sql')
+}
+
+tasks.register('aiLocalEvaluationTest', Test) {
+    description = 'Evaluates models locally using prepared input, without Spring or Bedrock.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/BibbidiLocalEvaluationTest.class'
+    useJUnitPlatform()
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
+    outputs.upToDateWhen { false }
+    outputs.doNotCacheIf('외부 모델의 응답은 실행마다 달라질 수 있다') { true }
 }

@@ -1,8 +1,7 @@
 {
   "name": "scenario12",
   "metrics": [
-    "Faithfulness",
-    "Correctness"
+    "Groundedness"
   ],
   "userMessage": "스드메 예산을 딱 200만 원으로 맞출 업체와 가격을 확정해 주고 관련 준비 항목을 추천해 주세요.",
   "chatMemory": [],

@@ -1,0 +1,16 @@
+answer=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output-last-message) shift; answer="$1" ;;
+    --system-prompt-file) shift; cp "$1" '%s' ;;
+    model_instructions_file=*) file=$(printf '%%s' "$1" | cut -d "'" -f 2); cp "$file" '%s' ;;
+  esac
+  shift
+done
+cat > '%s'
+if [ -n "$answer" ]; then
+  printf '%%s' '{"answer":"준비해요","recommendedItemIds":[7]}' > "$answer"
+  printf '%%s\n' '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5,"cached_input_tokens":3}}'
+else
+  printf '%%s\n' '{"structured_output":{"answer":"준비해요","recommendedItemIds":[7]},"usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":3,"cache_creation_input_tokens":2}}'
+fi
