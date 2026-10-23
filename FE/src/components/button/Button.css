@@ -1,0 +1,186 @@
+.bibbidi-button {
+  --button-background: var(--color-bg-brand-solid);
+  --button-foreground: var(--color-fg-on-brand);
+  --button-overlay: var(--color-palette-ink);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 56px;
+  padding: 14px 24px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  font: var(--typography-t5-medium);
+  letter-spacing: var(--letter-spacing-ui);
+  text-align: center;
+  vertical-align: middle;
+  text-decoration: none;
+  cursor: pointer;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.bibbidi-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--button-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.bibbidi-button[data-size="small"] {
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font: var(--typography-t6-medium);
+}
+.bibbidi-button[data-size="medium"] {
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font: var(--typography-t6-medium);
+}
+.bibbidi-button[data-size="large"] {
+  min-height: 48px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+}
+
+.bibbidi-button[data-color="dark"] {
+  --button-background: var(--color-palette-ink);
+  --button-foreground: var(--color-palette-white);
+  --button-overlay: var(--color-palette-white);
+}
+.bibbidi-button[data-color="danger"] {
+  --button-background: var(--color-fg-critical);
+  --button-foreground: var(--color-palette-white);
+}
+.bibbidi-button[data-color="light"] {
+  --button-background: var(--color-palette-white);
+  --button-foreground: var(--color-fg-neutral);
+}
+.bibbidi-button[data-variant="weak"][data-color="primary"] {
+  --button-background: var(--color-bg-brand-weak);
+}
+.bibbidi-button[data-variant="weak"][data-color="dark"] {
+  --button-background: var(--color-bg-neutral-weak);
+  --button-foreground: var(--color-fg-neutral);
+  --button-overlay: var(--color-palette-ink);
+}
+.bibbidi-button[data-variant="weak"][data-color="danger"] {
+  --button-background: var(--color-bg-critical-weak);
+  --button-foreground: var(--color-fg-critical);
+}
+.bibbidi-button[data-variant="weak"][data-color="light"] {
+  --button-background: color-mix(
+    in srgb,
+    var(--color-palette-white) 18%,
+    transparent
+  );
+  --button-foreground: var(--color-palette-white);
+  --button-overlay: var(--color-palette-white);
+}
+
+.bibbidi-button[data-display="block"],
+.bibbidi-button[data-display="full"] {
+  display: flex;
+  width: 100%;
+}
+.bibbidi-button[data-display="full"] {
+  border-radius: 0;
+}
+
+.bibbidi-button-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bibbidi-button[data-loading] .bibbidi-button-label {
+  opacity: 0;
+}
+.bibbidi-button[data-loading] {
+  cursor: progress;
+}
+.bibbidi-button:disabled,
+.bibbidi-button[aria-disabled="true"]:not([data-loading]) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bibbidi-button:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 4px;
+}
+@media (hover: hover) {
+  .bibbidi-button:not([aria-disabled="true"]):hover::before {
+    opacity: 0.06;
+  }
+}
+.bibbidi-button:not([aria-disabled="true"]):active::before {
+  opacity: 0.12;
+}
+.bibbidi-button[data-color="primary"][data-variant="fill"]:not(
+    [aria-disabled="true"]
+  ):active {
+  background: var(--color-bg-brand-solid-pressed);
+}
+.bibbidi-button[data-color="primary"][data-variant="fill"]:not(
+    [aria-disabled="true"]
+  ):active::before {
+  opacity: 0;
+}
+
+.bibbidi-button-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.bibbidi-button-loader > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: bibbidi-button-pulse 900ms ease-in-out infinite;
+}
+.bibbidi-button-loader > span:nth-child(2) {
+  animation-delay: 150ms;
+}
+.bibbidi-button-loader > span:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes bibbidi-button-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bibbidi-button::before {
+    transition: none;
+  }
+  .bibbidi-button-loader > span {
+    animation: none;
+  }
+}

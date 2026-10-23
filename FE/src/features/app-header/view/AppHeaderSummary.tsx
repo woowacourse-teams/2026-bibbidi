@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { AppHeaderSummaryViewModel } from "../view-model/createAppHeaderSummaryViewModel";
 import { WeddingDatePopover } from "./WeddingDatePopover";
 import { PreparationProgress } from "./PreparationProgress";
+import { Button } from "../../../components/button";
 import { Accordion } from "../../../components/accordion";
 import "./AppHeaderSummary.css";
 
@@ -48,21 +49,20 @@ export function AppHeaderSummary({
       <div className="app-header-summary__wedding-date">
         <span className="app-header-summary__label">결혼 예정일</span>
         {viewModel.weddingDateStatus === "loaded" ? (
-          <button
+          <Button
             aria-expanded={isPopoverOpen}
             aria-haspopup="dialog"
             aria-label={`${viewModel.dDayLabel}, ${viewModel.weddingDateLabel}. 결혼 예정일 설정`}
-            className={`app-header-summary__d-day app-header-summary__d-day-button${
-              isWeddingDateUnset
-                ? " app-header-summary__d-day-button--unset"
-                : ""
-            }`}
             onClick={onOpenPopover}
             ref={triggerRef}
             type="button"
+            color={isWeddingDateUnset ? "primary" : "dark"}
+            variant="weak"
+            size="medium"
+            display="block"
           >
             {dateDisplay}
-          </button>
+          </Button>
         ) : (
           <div
             aria-label={viewModel.weddingDateLabel}
@@ -73,14 +73,16 @@ export function AppHeaderSummary({
           </div>
         )}
         {viewModel.weddingDateStatus === "error" ? (
-          <button
+          <Button
             aria-label="결혼 예정일 조회 다시 시도"
-            className="app-header-summary__retry"
             onClick={onRetryWeddingDate}
             type="button"
+            color="dark"
+            variant="weak"
+            size="medium"
           >
             다시 시도
-          </button>
+          </Button>
         ) : null}
         {isPopoverOpen && viewModel.weddingDateStatus === "loaded" ? (
           <WeddingDatePopover

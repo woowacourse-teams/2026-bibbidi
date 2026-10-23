@@ -33,11 +33,6 @@
   text-align: left;
 }
 
-.app-header-summary__d-day-button {
-  width: 100%;
-  cursor: pointer;
-}
-
 .app-header-summary__date-value {
   display: flex;
   flex-wrap: wrap;
@@ -52,26 +47,6 @@
 
 .app-header-summary__date-value strong {
   font: var(--typography-t6-medium);
-}
-
-.app-header-summary__d-day-button:hover,
-.app-header-summary__retry:hover {
-  background: var(--color-bg-neutral-weak);
-}
-
-.app-header-summary__d-day-button--unset {
-  background: var(--color-bg-brand-weak);
-}
-
-.app-header-summary__retry {
-  min-height: 44px;
-  padding: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
-  cursor: pointer;
 }
 
 .app-header-summary__progress {
@@ -100,10 +75,4 @@
 
 .app-header-summary__progress-ring .app-header-summary__progress-range {
   stroke: var(--color-stroke-brand-solid);
-}
-
-.app-header-summary__d-day-button:focus-visible,
-.app-header-summary__retry:focus-visible {
-  outline: 2px solid var(--color-stroke-focus-ring);
-  outline-offset: 2px;
 }

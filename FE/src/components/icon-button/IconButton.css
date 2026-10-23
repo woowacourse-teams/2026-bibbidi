@@ -1,0 +1,107 @@
+.bibbidi-icon-button {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: max(44px, calc(var(--icon-button-icon-size) + 20px));
+  height: max(44px, calc(var(--icon-button-icon-size) + 20px));
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icon-button-color);
+  vertical-align: middle;
+  cursor: pointer;
+  isolation: isolate;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.bibbidi-icon-button::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--icon-button-background);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.bibbidi-icon-button[data-variant="fill"]::before {
+  opacity: 1;
+}
+.bibbidi-icon-button[data-variant="border"] {
+  border-color: var(--color-stroke-neutral);
+}
+.bibbidi-icon-button-icon {
+  display: grid;
+  place-items: center;
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
+  pointer-events: none;
+}
+.bibbidi-icon-button-icon > svg,
+.bibbidi-icon-button-icon > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.bibbidi-icon-button:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .bibbidi-icon-button:not([aria-disabled="true"]):hover::before {
+    opacity: 0.6;
+  }
+  .bibbidi-icon-button[data-variant="fill"]:not(
+      [aria-disabled="true"]
+    ):hover::before {
+    opacity: 0.8;
+  }
+}
+.bibbidi-icon-button:not([aria-disabled="true"]):active::before {
+  opacity: 1;
+}
+.bibbidi-icon-button[data-variant="fill"]:not(
+    [aria-disabled="true"]
+  ):active::before {
+  opacity: 0;
+}
+.bibbidi-icon-button:disabled,
+.bibbidi-icon-button[aria-disabled="true"]:not([data-loading]) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bibbidi-icon-button[data-loading] {
+  cursor: progress;
+}
+.bibbidi-icon-button[data-loading] .bibbidi-icon-button-icon {
+  visibility: hidden;
+}
+.bibbidi-icon-button-loader {
+  position: absolute;
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: bibbidi-icon-button-spin 800ms linear infinite;
+}
+@keyframes bibbidi-icon-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bibbidi-icon-button::before {
+    transition: none;
+  }
+  .bibbidi-icon-button-loader {
+    animation: none;
+  }
+}

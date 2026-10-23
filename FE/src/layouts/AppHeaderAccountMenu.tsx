@@ -1,5 +1,12 @@
 import { ReactNode, useId } from "react";
 
+import { Button } from "../components/button";
+import { IconButton } from "../components/icon-button";
+import {
+  HamburgerIcon,
+  CloseIcon,
+  LogoutIcon,
+} from "../components/icons/ActionIcons";
 import { useAppHeaderAccountMenu } from "./useAppHeaderAccountMenu";
 
 import "./AppHeaderAccountMenu.css";
@@ -33,21 +40,18 @@ export function AppHeaderAccountMenu({
 
   return (
     <div className="app-header-account">
-      <button
+      <IconButton
         aria-controls={panelId}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label="계정 메뉴"
-        className="app-header-account__trigger"
         onClick={togglePanel}
         onKeyDown={handleTriggerKeyDown}
         ref={triggerRef}
         type="button"
-      >
-        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-          <path d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+        icon={<HamburgerIcon />}
+        variant={isOpen ? "fill" : "clear"}
+      />
       <div
         aria-label="계정 메뉴"
         className="app-header-account__panel"
@@ -64,44 +68,48 @@ export function AppHeaderAccountMenu({
             {user.userInitial}
           </span>
           <strong>내 계정</strong>
-          <button
+          <IconButton
             aria-label="계정 메뉴 닫기"
-            className="app-header-account__close"
             onClick={closeAndRestoreFocus}
             ref={closeRef}
             type="button"
-          >
-            <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-              <path d="m6 6 12 12M6 18 18 6" />
-            </svg>
-          </button>
+            icon={<CloseIcon />}
+          />
         </div>
         {user.summary}
         <div className="app-header-account__actions">
-          <button
+          <Button
             aria-busy={user.isLoggingOut}
+            loading={user.isLoggingOut}
             aria-describedby={user.logoutErrorMessage ? errorId : undefined}
             className="app-header-account__logout"
             disabled={user.isLoggingOut}
             onClick={user.onLogout}
             type="button"
+            color="dark"
+            variant="weak"
+            size="medium"
+            display="block"
           >
-            <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-              <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M8 12h10" />
-            </svg>
-            로그아웃
-          </button>
+            <span className="app-header-account__logout-content">
+              <LogoutIcon size={18} />
+              로그아웃
+            </span>
+          </Button>
           {user.isLoggingOut ? <p role="status">로그아웃 처리 중</p> : null}
           {user.logoutErrorMessage ? (
             <div className="app-header-account__error" role="alert">
               <span id={errorId}>{user.logoutErrorMessage}</span>
-              <button
+              <Button
                 disabled={user.isLoggingOut}
                 onClick={user.onLogout}
                 type="button"
+                color="dark"
+                variant="weak"
+                size="medium"
               >
                 다시 시도
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>

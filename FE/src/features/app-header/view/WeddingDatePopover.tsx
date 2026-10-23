@@ -1,5 +1,6 @@
 import { RefObject, useEffect, useId, useRef, useState } from "react";
 
+import { Button } from "../../../components/button";
 import { DatePicker } from "../../../components/date-picker";
 import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import { formatLocalDate } from "../model/weddingDate";
@@ -107,10 +108,19 @@ export function WeddingDatePopover({
           </p>
         ) : null}
         <div className="app-header-summary__popover-actions">
-          <button disabled={isSaving} onClick={onClose} type="button">
+          <Button
+            color="dark"
+            variant="weak"
+            size="medium"
+            disabled={isSaving}
+            onClick={onClose}
+            type="button"
+          >
             취소
-          </button>
-          <button
+          </Button>
+          <Button
+            size="medium"
+            loading={isSaving}
             disabled={!selectedDate || isSaving}
             onClick={() => {
               if (selectedDate) onSave(selectedDate);
@@ -118,7 +128,7 @@ export function WeddingDatePopover({
             type="button"
           >
             {isSaving ? "저장 중..." : "저장"}
-          </button>
+          </Button>
         </div>
       </div>
     </>
