@@ -1,0 +1,29 @@
+.bibbidi-page-container {
+  --page-container-margin: var(--layout-margin-mobile);
+  box-sizing: border-box;
+  width: max(0px, calc(100% - var(--page-container-margin) * 2));
+  max-width: var(--layout-width-content);
+  min-width: 0;
+  margin-inline: auto;
+}
+.bibbidi-page-container[data-width="wide"] {
+  max-width: var(--layout-width-wide);
+}
+.bibbidi-page-container[data-width="focus"] {
+  max-width: var(--layout-width-focus);
+}
+.bibbidi-page-container[data-width="auth"] {
+  max-width: var(--layout-width-auth);
+}
+/* CSS media conditions cannot reference custom properties. Keep these in sync
+   with --layout-breakpoint-md/lg in tokens.css. */
+@media (min-width: 768px) {
+  .bibbidi-page-container {
+    --page-container-margin: var(--layout-margin-tablet);
+  }
+}
+@media (min-width: 1280px) {
+  .bibbidi-page-container {
+    --page-container-margin: var(--layout-margin-desktop);
+  }
+}
