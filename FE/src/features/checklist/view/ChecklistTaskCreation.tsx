@@ -50,10 +50,11 @@ export function ChecklistTaskCreation({
     }
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (isMobileLayout || modal) {
+      if (isMobileLayout && !modal) {
         containTabFocus(event, form);
       }
 
+      if (event.key === "Escape") event.stopPropagation();
       if (
         event.key === "Escape" &&
         !(event.target instanceof HTMLSelectElement) &&

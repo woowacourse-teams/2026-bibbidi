@@ -5,12 +5,12 @@ import {
   TransitionEvent as ReactTransitionEvent,
   useCallback,
   useEffect,
-  useEffectEvent,
   useRef,
   useState,
 } from "react";
 
 import "./BottomSheetDismiss.css";
+import { useModalEnvironment } from "../modal/useModalEnvironment";
 
 interface UseBottomSheetDismissOptions {
   canDismiss?: boolean;
@@ -26,39 +26,11 @@ interface DragState {
 
 const CLOSE_ANIMATION_FALLBACK_MS = 280;
 const MAX_DRAG_DISMISS_DISTANCE = 96;
-const FOCUSABLE_ELEMENT_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 function prefersReducedMotion() {
   try {
     return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   } catch {
     return false;
-  }
-}
-
-function containTabFocus(event: KeyboardEvent, container: HTMLElement) {
-  if (event.key !== "Tab") {
-    return;
-  }
-
-  const focusableElements = Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_ELEMENT_SELECTOR),
-  );
-  const firstElement = focusableElements[0];
-  const lastElement = focusableElements.at(-1);
-
-  if (!firstElement || !lastElement) {
-    event.preventDefault();
-    return;
-  }
-
-  if (event.shiftKey && document.activeElement === firstElement) {
-    event.preventDefault();
-    lastElement.focus();
-  } else if (!event.shiftKey && document.activeElement === lastElement) {
-    event.preventDefault();
-    firstElement.focus();
   }
 }
 
@@ -104,47 +76,12 @@ export function useBottomSheetDismiss({
 
     setIsClosing(true);
   }, [canDismiss, completeDismiss, isClosing]);
-  const requestDismissFromEffect = useEffectEvent(requestDismiss);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const returnFocusElement = returnFocusRef.current;
-    const scrollContainer = document.querySelector<HTMLElement>(
-      "[data-page-scroll-container]",
-    );
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousContainerOverflow = scrollContainer?.style.overflow;
-
-    document.body.style.overflow = "hidden";
-    if (scrollContainer) {
-      scrollContainer.style.overflow = "hidden";
-    }
-    handleRef.current?.focus({ preventScroll: true });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        requestDismissFromEffect();
-        return;
-      }
-
-      if (dialog?.contains(event.target as Node)) {
-        containTabFocus(event, dialog);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousBodyOverflow;
-      if (scrollContainer) {
-        scrollContainer.style.overflow = previousContainerOverflow ?? "";
-      }
-      returnFocusElement?.focus({ preventScroll: true });
-    };
-  }, []);
+  useModalEnvironment({
+    rootRef: dialogRef,
+    initialFocusRef: handleRef,
+    returnFocusRef,
+    onEscape: requestDismiss,
+  });
 
   useEffect(() => {
     if (!isClosing) {

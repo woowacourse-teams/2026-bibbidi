@@ -11,10 +11,6 @@
   background: var(--color-bg-layer-basement);
 }
 
-.service-layout:has(.bibbidi-workspace-layout[data-aside="docked"]) {
-  --service-side-panel-width: var(--layout-width-detail);
-}
-
 .service-layout__content {
   min-height: 0;
   flex: 1;

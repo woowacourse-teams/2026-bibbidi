@@ -1,8 +1,5 @@
 .checklist-detail-panel {
-  position: sticky;
-  top: 0;
   display: flex;
-  height: calc(100dvh - 96px);
   overflow: hidden;
   flex-direction: column;
   border-left: 1px solid var(--color-stroke-neutral-weak);

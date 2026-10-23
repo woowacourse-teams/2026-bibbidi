@@ -458,6 +458,13 @@ export function Checklist({
         overlay={isOverlay}
         blocked={isForegroundBlocked}
         onClose={closeForeground}
+        onEscape={
+          !isTaskCreationOpen &&
+          !isAppointmentCreationOpen &&
+          !isAppointmentEditingOpen
+            ? closeForeground
+            : undefined
+        }
       >
         {selectedTaskContext &&
         !isMobileLayout &&
@@ -494,7 +501,7 @@ export function Checklist({
 
         {taskCreation && isTaskCreationOpen ? (
           <ChecklistTaskCreation
-            modal={isOverlay}
+            modal={isMobileLayout || isOverlay}
             categories={categories}
             controller={taskCreation}
           />
@@ -504,7 +511,7 @@ export function Checklist({
         appointmentCreation &&
         isAppointmentCreationOpen ? (
           <ChecklistAppointmentCreation
-            modal={isOverlay}
+            modal={isMobileLayout || isOverlay}
             controller={appointmentCreation}
             taskTitle={selectedTaskContext.task.title}
           />
@@ -514,7 +521,7 @@ export function Checklist({
         appointmentManagement &&
         isAppointmentEditingOpen ? (
           <ChecklistAppointmentCreation
-            modal={isOverlay}
+            modal={isMobileLayout || isOverlay}
             controller={appointmentManagement.editing}
             heading="일정 수정"
             taskTitle={selectedTaskContext.task.title}

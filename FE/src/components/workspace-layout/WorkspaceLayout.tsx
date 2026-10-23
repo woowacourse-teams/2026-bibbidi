@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import { useDockedAsideHeight } from "./useDockedAsideHeight";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import type { WorkspaceLayoutState } from "./layout";
 import "./WorkspaceLayout.css";
@@ -16,6 +18,9 @@ export function WorkspaceLayout({
   className,
   ...props
 }: WorkspaceLayoutProps) {
+  const asideRef = useRef<HTMLDivElement>(null);
+  const docked = !!aside && layout.asidePlacement === "docked";
+  useDockedAsideHeight(asideRef, docked);
   return (
     <div
       {...props}
@@ -29,7 +34,15 @@ export function WorkspaceLayout({
         <div className="bibbidi-workspace-navigation">{navigation}</div>
       )}
       <div className="bibbidi-workspace-main">{children}</div>
-      {aside && <div className="bibbidi-workspace-aside">{aside}</div>}
+      {aside && (
+        <div
+          className="bibbidi-workspace-aside"
+          ref={asideRef}
+          data-docked-panel={docked || undefined}
+        >
+          {aside}
+        </div>
+      )}
     </div>
   );
 }

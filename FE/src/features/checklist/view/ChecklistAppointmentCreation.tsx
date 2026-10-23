@@ -63,7 +63,7 @@ export function ChecklistAppointmentCreation({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isMobileLayout || modal) {
+      if (isMobileLayout && !modal) {
         containTabFocus(event, form);
       }
 

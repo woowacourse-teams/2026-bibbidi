@@ -1,5 +1,4 @@
 .checklist-workspace {
-  --checklist-panel-height: calc(100dvh - 120px);
   min-height: 100%;
 }
 .checklist-workspace__main {
@@ -12,7 +11,7 @@
 }
 .bibbidi-workspace-layout[data-aside="docked"] .checklist-workspace__panel {
   position: sticky;
-  top: 24px;
+  top: var(--layout-gutter-desktop);
   display: block;
   min-width: 0;
 }
@@ -21,7 +20,7 @@
 .checklist-workspace__panel > .checklist-appointment-creation--desktop {
   position: static;
   width: 100%;
-  height: var(--checklist-panel-height);
+  height: var(--workspace-aside-height);
 }
 .checklist-workspace__foreground-layer[data-overlay="true"] {
   position: fixed;
@@ -568,12 +567,6 @@
 }
 
 @media (width < 768px) {
-  .checklist-workspace[data-navigation="top"] .checklist-categories {
-    padding: 0;
-  }
-  .checklist {
-    padding: 0;
-  }
   .checklist__toolbar {
     min-height: 0;
     padding: 0 0 20px;

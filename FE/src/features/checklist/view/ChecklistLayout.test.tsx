@@ -43,8 +43,8 @@ function Harness() {
   const [selected, setSelected] = useState<string | null>(null);
   const creation = useChecklistTaskCreation({});
   return (
-    <div className="service-layout">
-      <header className="service-layout__header">
+    <div className="service-layout" data-modal-scope>
+      <header className="service-layout__header" data-modal-background>
         <button type="button">계정 메뉴</button>
       </header>
       <div data-page-scroll-container>
@@ -175,3 +175,23 @@ it("작성값을 크기 전환에서 유지하고 오버레이 위의 버리기 
   );
   expect(screen.getByRole("dialog", { name: "할 일 추가" })).toBeTruthy();
 });
+
+it.each([false, true])(
+  "카테고리 select의 Escape는 작성창을 닫지 않는다 (입력=%s)",
+  (dirty) => {
+    render(<Harness />);
+    resize(1024);
+    fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+    if (dirty)
+      fireEvent.change(screen.getByLabelText(/할 일 제목/), {
+        target: { value: "입력 유지" },
+      });
+    const select = screen.getByRole("combobox");
+    select.focus();
+    fireEvent.keyDown(select, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "할 일 추가" })).toBeTruthy();
+    expect(
+      screen.queryByRole("dialog", { name: "작성 중인 내용을 닫을까요?" }),
+    ).toBeNull();
+  },
+);
