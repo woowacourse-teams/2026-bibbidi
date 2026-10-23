@@ -109,3 +109,57 @@ describe("DatePicker의 외부 선택값 동기화", () => {
     );
   });
 });
+
+describe("DatePicker 연월 목록 탐색", () => {
+  it("연도를 키보드로 바꿔도 날짜를 확정하지 않고 Escape로 달력에 돌아온다", () => {
+    const onChange = vi.fn();
+    render(
+      <DatePicker
+        today={today}
+        value={today}
+        yearRange={{ start: 2026, end: 2028 }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
+    const selectedYear = screen.getByRole("option", { name: "2027년" });
+    expect(document.activeElement).toBe(selectedYear);
+    fireEvent.keyDown(selectedYear, { key: "End" });
+    const lastYear = screen.getByRole("option", { name: "2028년" });
+    expect(lastYear.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(lastYear);
+    fireEvent.keyDown(lastYear, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(lastYear);
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(lastYear, { key: "Escape" });
+    expect(screen.getByRole("grid", { name: "2028년 5월" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "2028년 5월" }),
+    );
+  });
+
+  it("선택 가능한 월 경계에서 키보드 이동을 제한하고 비활성 월 클릭은 무시한다", () => {
+    render(
+      <DatePicker
+        today={today}
+        value={today}
+        minDate="2027-03-10"
+        maxDate="2027-06-20"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
+    fireEvent.keyDown(screen.getByRole("option", { name: "5월" }), {
+      key: "Home",
+    });
+    const firstMonth = screen.getByRole("option", { name: "3월" });
+    expect(document.activeElement).toBe(firstMonth);
+    fireEvent.keyDown(firstMonth, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(firstMonth);
+    fireEvent.click(screen.getByRole("option", { name: "1월" }));
+    expect(firstMonth.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(firstMonth, { key: "End" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("option", { name: "6월" }),
+    );
+  });
+});

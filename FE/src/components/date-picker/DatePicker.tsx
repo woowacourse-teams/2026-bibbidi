@@ -13,6 +13,7 @@ import {
   monthWeeks,
   startOfMonth,
 } from "./date-utils";
+import { DatePickerMonthList } from "./DatePickerMonthList";
 import "./DatePicker.css";
 
 export type DatePickerRange = { start: string; end?: string };
@@ -177,7 +178,12 @@ export function DatePicker(props: DatePickerProps) {
     }
   });
   useLayoutEffect(() => {
-    if (pickingMonth) monthPanelRef.current?.querySelector("select")?.focus();
+    if (pickingMonth)
+      monthPanelRef.current
+        ?.querySelector<HTMLButtonElement>(
+          '[role="option"][aria-selected="true"]',
+        )
+        ?.focus({ preventScroll: true });
   }, [pickingMonth]);
 
   function commit(next: Value) {
@@ -298,7 +304,7 @@ export function DatePicker(props: DatePickerProps) {
       </div>
       <div id={panelId}>
         {pickingMonth ? (
-          // Escape is delegated from the native selects and return button.
+          // Escape is delegated from the year/month options and return button.
           // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions
           <div
             className="bibbidi-date-picker-month-panel"
@@ -311,67 +317,51 @@ export function DatePicker(props: DatePickerProps) {
             }}
           >
             <div className="bibbidi-date-picker-month-fields">
-              <label>
-                연도
-                <select
-                  disabled={unavailable}
-                  size={5}
-                  aria-label="연도"
-                  value={Number(view.slice(0, 4))}
-                  onChange={(event) => {
-                    const next = clamp(
-                      `${event.target.value.padStart(4, "0")}-${view.slice(5)}`,
-                    );
-                    setView(startOfMonth(next));
-                    setFocused(next);
-                  }}
-                >
-                  {Array.from(
-                    {
-                      length:
-                        Number(upper.slice(0, 4)) -
-                        Number(lower.slice(0, 4)) +
-                        1,
-                    },
-                    (_, i) => Number(lower.slice(0, 4)) + i,
-                  ).map((year) => (
-                    <option key={year} value={year}>
-                      {year}년
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                월
-                <select
-                  disabled={unavailable}
-                  size={5}
-                  aria-label="월"
-                  value={Number(view.slice(5, 7))}
-                  onChange={(event) => {
-                    const next = clamp(
-                      `${view.slice(0, 4)}-${event.target.value.padStart(2, "0")}-01`,
-                    );
-                    setView(startOfMonth(next));
-                    setFocused(next);
-                  }}
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                    <option
-                      key={month}
-                      value={month}
-                      disabled={
-                        `${view.slice(0, 4)}-${String(month).padStart(2, "0")}` <
-                          lower.slice(0, 7) ||
-                        `${view.slice(0, 4)}-${String(month).padStart(2, "0")}` >
-                          upper.slice(0, 7)
-                      }
-                    >
-                      {month}월
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <DatePickerMonthList
+                label="연도"
+                disabled={unavailable}
+                value={Number(view.slice(0, 4))}
+                options={Array.from(
+                  {
+                    length:
+                      Number(upper.slice(0, 4)) - Number(lower.slice(0, 4)) + 1,
+                  },
+                  (_, i) => {
+                    const year = Number(lower.slice(0, 4)) + i;
+                    return { value: year, label: `${year}년` };
+                  },
+                )}
+                onChange={(year) => {
+                  const next = clamp(
+                    `${String(year).padStart(4, "0")}-${view.slice(5)}`,
+                  );
+                  setView(startOfMonth(next));
+                  setFocused(next);
+                }}
+              />
+              <DatePickerMonthList
+                label="월"
+                disabled={unavailable}
+                value={Number(view.slice(5, 7))}
+                options={Array.from({ length: 12 }, (_, i) => {
+                  const month = i + 1;
+                  const monthDate = `${view.slice(0, 4)}-${String(month).padStart(2, "0")}`;
+                  return {
+                    value: month,
+                    label: `${month}월`,
+                    disabled:
+                      monthDate < lower.slice(0, 7) ||
+                      monthDate > upper.slice(0, 7),
+                  };
+                })}
+                onChange={(month) => {
+                  const next = clamp(
+                    `${view.slice(0, 4)}-${String(month).padStart(2, "0")}-01`,
+                  );
+                  setView(startOfMonth(next));
+                  setFocused(next);
+                }}
+              />
             </div>
             <button
               type="button"

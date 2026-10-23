@@ -146,8 +146,7 @@
 .bibbidi-date-picker-navigation button:disabled {
   opacity: 0.3;
 }
-.bibbidi-date-picker button:focus-visible,
-.bibbidi-date-picker select:focus-visible {
+.bibbidi-date-picker button:focus-visible {
   outline: 2px solid var(--color-stroke-focus-ring);
   outline-offset: -2px;
 }
@@ -161,27 +160,43 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
-.bibbidi-date-picker-month-fields label {
+.bibbidi-date-picker-month-field {
   display: grid;
   gap: 10px;
   text-align: center;
   font: var(--typography-t7);
   color: var(--color-fg-neutral-muted);
 }
-.bibbidi-date-picker-month-fields select {
-  width: 100%;
-  height: 196px;
-  padding: 8px;
+.bibbidi-date-picker-month-list {
+  height: 220px;
+  min-width: 0;
   border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: 12px;
   background: var(--color-bg-layer-default);
+}
+.bibbidi-date-picker-month-list > .bibbidi-scroll-fog-viewport {
+  position: relative;
+  scroll-padding-block: 20px;
+}
+.bibbidi-date-picker-month-options {
+  display: grid;
+  gap: 4px;
+  padding: 20px 8px;
+}
+.bibbidi-date-picker-month-options [role="option"] {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--color-fg-neutral);
   font: var(--typography-t6-medium);
-  text-align: center;
 }
-.bibbidi-date-picker-month-fields option {
-  padding: 8px;
-  border-radius: 6px;
+.bibbidi-date-picker-month-options [aria-selected="true"] {
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+.bibbidi-date-picker-month-options [role="option"]:disabled {
+  color: var(--color-fg-placeholder);
 }
 .bibbidi-date-picker-return {
   min-height: 44px;
