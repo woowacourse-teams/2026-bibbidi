@@ -1221,8 +1221,10 @@ describe("Checklist 할 일 편집", () => {
     });
     expect(within(dialog).getByText(/함께 완료돼요/)).toBeTruthy();
     expect(requestStatusChange).toHaveBeenCalledWith(500, "done");
-    expect(document.activeElement).toBe(
-      within(dialog).getByRole("button", { name: "취소" }),
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(dialog).getByRole("button", { name: "취소" }),
+      ),
     );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));

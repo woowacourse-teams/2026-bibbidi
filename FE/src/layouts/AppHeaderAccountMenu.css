@@ -3,47 +3,6 @@
   flex: none;
 }
 
-/* IconButton clear: 24px icon with a 44px circular target. */
-.app-header-account__trigger,
-.app-header-account__close {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-fg-neutral);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.app-header-account__trigger svg,
-.app-header-account__close svg,
-.app-header-account__logout svg {
-  width: 24px;
-  height: 24px;
-  flex: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.app-header-account__trigger:hover,
-.app-header-account__trigger[aria-expanded="true"],
-.app-header-account__close:hover,
-.app-header-account__logout:hover:not(:disabled) {
-  background: var(--color-bg-neutral-weak);
-}
-
-.app-header-account__trigger:active,
-.app-header-account__close:active,
-.app-header-account__logout:active:not(:disabled) {
-  background: var(--color-bg-brand-weak);
-}
-
 /* Menu surface; the mixed content uses a nonmodal dialog instead of menu roles. */
 .app-header-account__panel {
   position: absolute;
@@ -99,32 +58,6 @@
   border-top: 1px solid var(--color-stroke-neutral-weak);
 }
 
-.app-header-account__logout {
-  display: flex;
-  width: 100%;
-  min-height: 44px;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.app-header-account__logout svg {
-  width: 18px;
-  height: 18px;
-}
-
-.app-header-account__logout:disabled {
-  opacity: 0.4;
-  cursor: progress;
-}
-
 .app-header-account__actions p,
 .app-header-account__error {
   margin: 0;
@@ -138,20 +71,14 @@
   color: var(--color-fg-critical);
 }
 
-.app-header-account__error button {
-  min-height: 44px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--color-bg-neutral-weak);
-  color: var(--color-fg-neutral);
-  font: var(--typography-t6-medium);
-  cursor: pointer;
+.app-header-account__logout {
+  justify-content: flex-start;
 }
-
-.app-header-account__trigger:focus-visible,
-.app-header-account__close:focus-visible,
-.app-header-account__logout:focus-visible,
-.app-header-account__error button:focus-visible {
-  outline: 2px solid var(--color-stroke-focus-ring);
-  outline-offset: 2px;
+.app-header-account__logout-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-header-account__logout-content svg {
+  flex: none;
 }

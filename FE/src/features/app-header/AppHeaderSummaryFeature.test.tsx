@@ -213,9 +213,8 @@ describe("AppHeaderSummaryFeature", () => {
       name: /D-Day, 결혼 일자 미설정\. 결혼 예정일 설정/,
     });
 
-    expect(trigger.classList).toContain(
-      "app-header-summary__d-day-button--unset",
-    );
+    expect(trigger.getAttribute("data-color")).toBe("primary");
+    expect(trigger.getAttribute("data-variant")).toBe("weak");
     expect(
       screen.getByRole("button", { name: /결혼 예정일 설정/ }).textContent,
     ).toContain("결혼 일자 미설정");
