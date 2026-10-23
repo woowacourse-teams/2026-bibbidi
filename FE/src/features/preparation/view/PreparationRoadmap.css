@@ -30,7 +30,7 @@
 }
 
 .preparation-roadmap {
-  --preparation-roadmap-connector: var(--color-palette-coral-muted);
+  --preparation-roadmap-connector: var(--color-stroke-brand-solid);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -217,7 +217,7 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .preparation-roadmap {
     padding: 0 16px;
   }

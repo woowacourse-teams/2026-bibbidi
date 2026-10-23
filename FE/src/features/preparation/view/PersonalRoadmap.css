@@ -197,7 +197,7 @@
   outline-offset: -3px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .personal-roadmap {
     padding: 0 16px 16px;
   }

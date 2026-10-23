@@ -195,7 +195,7 @@
   opacity: 0.5;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-appointment-creation--mobile {
     position: fixed;
     z-index: 60;

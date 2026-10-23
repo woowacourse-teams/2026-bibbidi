@@ -596,7 +596,7 @@
   }
 }
 
-@media (min-width: 761px) {
+@media (min-width: 768px) {
   .home-dashboard-guest__top > .monthly-calendar {
     height: 100%;
   }
@@ -619,7 +619,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .home-dashboard-guest__top {
     grid-template-columns: minmax(0, 1fr);
   }

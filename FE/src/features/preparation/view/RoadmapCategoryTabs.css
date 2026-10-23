@@ -72,7 +72,7 @@
   outline-offset: -3px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .roadmap-category-tabs {
     justify-content: flex-start;
   }

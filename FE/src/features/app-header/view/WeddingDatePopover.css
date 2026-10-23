@@ -127,7 +127,7 @@
   opacity: 0.5;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .app-header-summary__popover {
     position: fixed;
     top: 72px;

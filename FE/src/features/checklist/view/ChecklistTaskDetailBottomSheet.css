@@ -2,7 +2,7 @@
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-detail-bottom-sheet {
     position: fixed;
     z-index: 30;

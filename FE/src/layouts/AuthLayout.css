@@ -19,7 +19,7 @@
   padding-top: 128px;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .auth-page {
     align-items: start;
     padding: 42px 24px 48px;
@@ -29,11 +29,5 @@
     align-items: stretch;
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
     padding-top: clamp(32px, 6dvh, 48px);
-  }
-}
-
-@media (min-width: 744px) {
-  .auth-page--login {
-    padding-top: 128px;
   }
 }

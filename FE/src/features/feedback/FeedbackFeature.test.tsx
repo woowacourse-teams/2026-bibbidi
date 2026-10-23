@@ -1,3 +1,4 @@
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import {
   act,
   fireEvent,
@@ -34,7 +35,7 @@ function setMobileViewport(matches: boolean) {
     configurable: true,
     value: (query: string) => ({
       addEventListener: () => undefined,
-      matches: query === "(max-width: 760px)" ? matches : false,
+      matches: query === MOBILE_LAYOUT_MEDIA_QUERY ? matches : false,
       removeEventListener: () => undefined,
     }),
   });

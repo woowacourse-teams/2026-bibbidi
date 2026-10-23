@@ -6,7 +6,7 @@
   padding: 16px 24px 24px 0;
 }
 
-@media (min-width: 761px) {
+@media (min-width: 768px) {
   .service-layout:has(.ai-chat-panel) {
     --service-side-panel-width: clamp(280px, 32vw, 480px);
   }
@@ -276,7 +276,7 @@
   white-space: nowrap;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .ai-chat-feature {
     display: contents;
   }

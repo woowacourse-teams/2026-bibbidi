@@ -102,7 +102,7 @@
 }
 
 .app-header-summary__progress-ring .app-header-summary__progress-range {
-  stroke: var(--color-palette-coral-muted);
+  stroke: var(--color-stroke-brand-solid);
 }
 
 .app-header-summary__progress {
@@ -131,7 +131,9 @@
   transform: rotate(180deg);
 }
 
-@media (max-width: 760px) {
+/* Keep the summary compact through tablet widths so navigation stays usable.
+   The full summary returns at --layout-breakpoint-lg. */
+@media (width < 1280px) {
   .app-header-summary {
     width: auto;
     height: 36px;

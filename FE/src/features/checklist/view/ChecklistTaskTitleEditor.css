@@ -141,7 +141,7 @@
   white-space: nowrap;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .checklist-title-editor {
     display: flex;
     min-width: 0;

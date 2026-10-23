@@ -177,7 +177,7 @@
   stroke-linejoin: round;
 }
 
-@media (max-width: 760px) {
+@media (width < 768px) {
   .roadmap-workspace {
     flex-direction: column;
   }

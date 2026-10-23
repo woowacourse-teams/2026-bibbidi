@@ -12,7 +12,10 @@ import {
   initializeErrorTracking,
   reportHandledError,
 } from "./infrastructure/error-tracking";
+import "./styles/fonts.css";
+import "./styles/tokens.css";
 import "./styles/colors.css";
+import "./styles/layout.css";
 import "./index.css";
 
 document.addEventListener("dragstart", preventLinkDrag);
