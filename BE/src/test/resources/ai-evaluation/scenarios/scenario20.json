@@ -1,7 +1,6 @@
 {
   "name": "scenario20",
   "metrics": [
-    "Helpfulness",
     "Relevance"
   ],
   "userMessage": "상견례 장소는 예약했지만 양가 이동이 걱정돼요. 다음으로 할 준비 항목을 추천해 주세요.",

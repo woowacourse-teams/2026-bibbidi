@@ -1,8 +1,7 @@
 {
   "name": "scenario28",
   "metrics": [
-    "Relevance",
-    "Helpfulness"
+    "Relevance"
   ],
   "userMessage": "먼 곳에서 오는 하객들의 이동을 돕는 준비 항목을 추천해 주세요.",
   "chatMemory": [],

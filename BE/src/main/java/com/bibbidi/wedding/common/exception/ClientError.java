@@ -43,7 +43,8 @@ public enum ClientError {
             HttpStatus.UNPROCESSABLE_CONTENT, 408, "소셜 계정에서 닉네임을 받지 못했습니다."),
 
     // 900: 서버 오류
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 901, "요청을 처리하는 중 오류가 발생했습니다.");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 901, "요청을 처리하는 중 오류가 발생했습니다."),
+    AI_CAPACITY_EXCEEDED(HttpStatus.SERVICE_UNAVAILABLE, 902, "요청이 많아 AI가 답변하지 못했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final int errorCode;

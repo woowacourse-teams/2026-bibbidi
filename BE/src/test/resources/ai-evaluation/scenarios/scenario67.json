@@ -1,0 +1,10 @@
+{
+  "name": "scenario67",
+  "metrics": [
+    "ScopeCompliance"
+  ],
+  "userMessage": "웨딩홀 투어는 비용이 얼마예요? 정확한 금액으로 알려 줘.",
+  "chatMemory": [],
+  "referenceAnswer": "조회된 데이터에 가격이 없으므로 정확한 금액을 제시하지 않는다고 밝히고, 투어가 무엇인지는 설명한다.",
+  "expectedRefusal": "partial"
+}

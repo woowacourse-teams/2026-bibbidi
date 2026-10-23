@@ -1,18 +1,19 @@
 package com.bibbidi.wedding.chat.controller;
 
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
-import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
-import com.bibbidi.wedding.chat.controller.sse.ChatEventType;
 import com.bibbidi.wedding.chat.controller.sse.SseConnection;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseProperties;
-import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.validation.Valid;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,12 +28,16 @@ public class AiChatController {
     private final AiChatService aiChatService;
     private final SseStreamManager sseStreamManager;
     private final SseProperties properties;
+    private final MeterRegistry meterRegistry;
+    private final Timer ttft;
 
     public AiChatController(AiChatService aiChatService, SseStreamManager sseStreamManager,
-                            SseProperties properties) {
+                            SseProperties properties, MeterRegistry meterRegistry) {
         this.aiChatService = aiChatService;
         this.sseStreamManager = sseStreamManager;
         this.properties = properties;
+        this.meterRegistry = meterRegistry;
+        this.ttft = Timer.builder("ai.chat.ttft").register(meterRegistry);
     }
 
     @PostMapping(
@@ -44,28 +49,31 @@ public class AiChatController {
             @AuthenticationPrincipal(expression = "userId") Long userId,
             @Valid @RequestBody ChatRequest request
     ) {
+        Timer.Sample ttftSample = Timer.start(meterRegistry);
         Duration timeout = Duration.ofSeconds(properties.responseTimeoutSeconds());
         ChatCommand chatCommand = new ChatCommand(userId, request.conversationId(), request.message());
         return sseStreamManager.stream(
                 timeout,
-                failureEvent(),
-                chatResponseConsumer(chatCommand)
+                chatResponseConsumer(chatCommand, ttftSample)
         );
     }
 
-    private Consumer<SseConnection> chatResponseConsumer(ChatCommand chatCommand) {
+    private static CancelReason cancelReasonOf(SseConnection connection) {
+        return connection.timedOut() ? CancelReason.RESPONSE_TIMEOUT : CancelReason.CLIENT_DISCONNECTED;
+    }
+
+    private Consumer<SseConnection> chatResponseConsumer(ChatCommand chatCommand, Timer.Sample ttftSample) {
         return connection -> {
             ChatSseHandler handler = new ChatSseHandler(connection);
-            aiChatService.chat(chatCommand)
-                    .doOnNext(handler::send)
+            AtomicBoolean firstDeltaSent = new AtomicBoolean();
+            aiChatService.chat(chatCommand, () -> cancelReasonOf(connection))
+                    .doOnNext(event -> {
+                        handler.send(event);
+                        if (event instanceof ChatEvent.Delta && firstDeltaSent.compareAndSet(false, true)) {
+                            ttftSample.stop(ttft);
+                        }
+                    })
                     .blockLast();
         };
-    }
-
-    private SseEvent failureEvent() {
-        return new SseEvent(
-                ChatEventType.FAILURE,
-                new ChatResponse.Failure(ClientError.INTERNAL_ERROR.message())
-        );
     }
 }

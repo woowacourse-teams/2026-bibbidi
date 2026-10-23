@@ -1,0 +1,10 @@
+{
+  "name": "scenario71",
+  "metrics": [
+    "Completeness"
+  ],
+  "userMessage": "웨딩홀 투어와 웨딩홀 계약은 이미 체크리스트에 넣었어요. 그다음으로 할 준비 두 개를 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "이미 등록했다고 말한 두 항목은 추천하지 않고 다른 실제 카탈로그 항목 두 개를 추천한다.",
+  "expectedRefusal": "none"
+}

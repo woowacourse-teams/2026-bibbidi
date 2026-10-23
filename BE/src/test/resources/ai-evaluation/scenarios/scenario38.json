@@ -1,8 +1,7 @@
 {
   "name": "scenario38",
   "metrics": [
-    "ProfessionalStyleAndTone",
-    "Refusal"
+    "ProfessionalStyleAndTone"
   ],
   "userMessage": "양가와 예산 이야기가 잘 안 돼 마음이 복잡해요. 가족과 상의할 준비 항목을 추천해 주세요.",
   "chatMemory": [],

@@ -2,15 +2,22 @@ spring:
   datasource:
     url: jdbc:h2:mem:bibbidi-evaluation;IGNORECASE=TRUE
   ai:
+    model:
+      chat: none
     bedrock:
       converse:
         chat:
-          model: ${BIBBIDI_EVALUATION_GENERATION_MODEL:qwen.qwen3-235b-a22b-2507-v1:0}
+          model: ${bibbidi.evaluation.generation.model}
 
 bibbidi:
   evaluation:
+    generation:
+      provider: ${BIBBIDI_EVALUATION_GENERATION_PROVIDER:codex}
+      model: ${BIBBIDI_EVALUATION_GENERATION_MODEL:gpt-6-sol}
+      reasoning-effort: ${BIBBIDI_EVALUATION_GENERATION_REASONING_EFFORT:low}
+      timeout: ${BIBBIDI_EVALUATION_GENERATION_TIMEOUT:PT3M}
     judge:
-      provider: ${BIBBIDI_EVALUATION_JUDGE_PROVIDER:codex}
-      model: ${BIBBIDI_EVALUATION_JUDGE_MODEL:gpt-6-sol}
+      provider: ${BIBBIDI_EVALUATION_JUDGE_PROVIDER:claude}
+      model: ${BIBBIDI_EVALUATION_JUDGE_MODEL:sonnet}
       reasoning-effort: ${BIBBIDI_EVALUATION_JUDGE_REASONING_EFFORT:low}
       timeout: ${BIBBIDI_EVALUATION_JUDGE_TIMEOUT:PT2M}

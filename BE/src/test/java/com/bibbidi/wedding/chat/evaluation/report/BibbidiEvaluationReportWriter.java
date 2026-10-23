@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.chat.evaluation.report;
 
-import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
-import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
-import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
+import com.bibbidi.wedding.chat.evaluation.input.EvaluationScenario;
+import com.bibbidi.wedding.chat.evaluation.report.JudgeInvocation;
+import com.bibbidi.wedding.chat.evaluation.report.ModelTokenUsage;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiUnscorableException;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel.ModelCall;
 import java.io.IOException;
@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
@@ -58,6 +59,15 @@ public class BibbidiEvaluationReportWriter {
                 providedContext, evaluations, status, phase, metricType, failure));
     }
 
+    private boolean timedOut(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof TimeoutException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ScenarioResult scenarioResult(EvaluationScenario scenario, List<ModelCall> modelCalls,
                                           String answer, List<Long> recommendedItemIds,
                                           List<Document> providedContext, List<EvaluationResponse> evaluations,
@@ -73,7 +83,7 @@ public class BibbidiEvaluationReportWriter {
             metricResults.add(failedMetricResult(metricType, failure));
         }
         FailureInfo failureInfo = failure == null ? null : new FailureInfo(
-                phase, metricType, failure.getClass().getSimpleName(), failure.getMessage());
+                phase, metricType, failure.getClass().getSimpleName(), failure.getMessage(), timedOut(failure));
         return new ScenarioResult(scenario.name(), status, failureInfo, generation,
                 scenario.metrics(),
                 List.copyOf(metricResults));
@@ -168,7 +178,7 @@ public class BibbidiEvaluationReportWriter {
                                   List<MetricResult> metrics) {
     }
 
-    private record FailureInfo(String phase, String metricType, String type, String message) {
+    private record FailureInfo(String phase, String metricType, String type, String message, boolean timedOut) {
     }
 
     private record GenerationInfo(String answer, List<Long> recommendedItemIds, List<String> providedContext,
