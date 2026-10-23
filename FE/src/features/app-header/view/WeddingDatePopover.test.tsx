@@ -27,11 +27,13 @@ function renderPopover(
 describe("WeddingDatePopover", () => {
   it("서버 날짜를 초기 선택으로 표시하고 선택만으로 저장하지 않는다", async () => {
     const { props } = renderPopover();
-    const initialDay = screen.getByRole("button", { name: "2027년 5월 15일" });
+    const initialDay = screen.getByRole("gridcell", {
+      name: /2027년 5월 15일/,
+    });
     await waitFor(() => expect(document.activeElement).toBe(initialDay));
-    expect(initialDay.getAttribute("aria-pressed")).toBe("true");
+    expect(initialDay.getAttribute("aria-selected")).toBe("true");
 
-    fireEvent.click(screen.getByRole("button", { name: "2027년 5월 20일" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /2027년 5월 20일/ }));
     expect(props.onSave).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(props.onSave).toHaveBeenCalledWith("2027-05-20");
@@ -39,9 +41,15 @@ describe("WeddingDatePopover", () => {
 
   it("월과 연도를 이동하고 과거 날짜도 선택한다", () => {
     const { props } = renderPopover();
-    fireEvent.click(screen.getByRole("button", { name: "이전 연도" }));
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
+    fireEvent.change(screen.getByRole("listbox", { name: "연도" }), {
+      target: { value: "2026" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "날짜 선택으로 돌아가기" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "이전 달" }));
-    fireEvent.click(screen.getByRole("button", { name: "2026년 4월 3일" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /2026년 4월 3일/ }));
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(props.onSave).toHaveBeenCalledWith("2026-04-03");
   });
@@ -51,41 +59,43 @@ describe("WeddingDatePopover", () => {
     fireEvent.click(screen.getByRole("button", { name: "다음 달" }));
 
     expect(
-      screen.getByRole("button", { name: "2027년 2월 28일" }).tabIndex,
+      screen.getByRole("gridcell", { name: /2027년 2월 1일/ }).tabIndex,
     ).toBe(0);
   });
 
   it("화살표와 Home/End 키로 날짜 초점을 이동한다", async () => {
     renderPopover();
-    const initialDay = screen.getByRole("button", { name: "2027년 5월 15일" });
+    const initialDay = screen.getByRole("gridcell", {
+      name: /2027년 5월 15일/,
+    });
     fireEvent.keyDown(initialDay, { key: "ArrowRight" });
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "2027년 5월 16일" }),
+        screen.getByRole("gridcell", { name: /2027년 5월 16일/ }),
       ),
     );
     fireEvent.keyDown(document.activeElement!, { key: "Home" });
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "2027년 5월 16일" }),
+        screen.getByRole("gridcell", { name: /2027년 5월 16일/ }),
       ),
     );
     fireEvent.keyDown(document.activeElement!, { key: "End" });
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "2027년 5월 22일" }),
+        screen.getByRole("gridcell", { name: /2027년 5월 22일/ }),
       ),
     );
     fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "2027년 5월 29일" }),
+        screen.getByRole("gridcell", { name: /2027년 5월 29일/ }),
       ),
     );
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "2027년 5월 30일" }),
+        screen.getByRole("gridcell", { name: /2027년 5월 30일/ }),
       ),
     );
   });
@@ -97,8 +107,8 @@ describe("WeddingDatePopover", () => {
     "지원 범위 경계 %s에서 %s 키 이동을 경계 날짜로 제한한다",
     async (initialDate, key, accessibleName) => {
       renderPopover({ initialDate });
-      const boundaryDay = screen.getByRole("button", {
-        name: accessibleName,
+      const boundaryDay = screen.getByRole("gridcell", {
+        name: new RegExp(accessibleName),
       });
 
       fireEvent.keyDown(boundaryDay, { key });
@@ -123,22 +133,47 @@ describe("WeddingDatePopover", () => {
     expect(second.props.onClose).toHaveBeenCalledOnce();
   });
 
-  it("Tab 초점을 팝오버 안에 가두고 저장 중에는 닫기와 중복 저장을 막는다", () => {
-    const { props } = renderPopover({ isSaving: true });
-    const buttons = Array.from(
-      screen
-        .getByRole("dialog")
-        .querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
-    ).filter((button) => button.tabIndex >= 0);
-    const first = buttons[0];
-    const last = buttons.at(-1)!;
+  it("연월 선택의 Escape는 날짜 선택으로 돌아오고 팝오버를 유지한다", () => {
+    const { props } = renderPopover();
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
+    const year = screen.getByRole("listbox", { name: "연도" });
+    expect(document.activeElement).toBe(year);
+    fireEvent.keyDown(year, { key: "Escape" });
+    expect(screen.getByRole("grid", { name: "2027년 5월" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "2027년 5월" }),
+    );
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it("Tab 초점을 팝오버 안에 가두고 연월 선택도 순환한다", () => {
+    renderPopover();
+    const first = screen.getByRole("button", { name: "2027년 5월" });
+    const last = screen.getByRole("button", { name: "저장" });
     first.focus();
     fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(last);
     fireEvent.keyDown(last, { key: "Tab" });
     expect(document.activeElement).toBe(first);
+    fireEvent.click(first);
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+  });
 
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  it("저장 중에는 날짜 변경과 닫기 및 중복 저장을 막는다", () => {
+    const { props } = renderPopover({ isSaving: true });
+    const dialog = screen.getByRole("dialog");
+    expect(document.activeElement).toBe(dialog);
+    expect(
+      screen
+        .getAllByRole("gridcell")
+        .filter((cell) => cell.tagName === "BUTTON")
+        .every((cell) => cell.hasAttribute("disabled")),
+    ).toBe(true);
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.pointerDown(
       document.querySelector(".app-header-summary__popover-backdrop")!,
     );

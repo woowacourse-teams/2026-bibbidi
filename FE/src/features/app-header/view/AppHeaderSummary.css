@@ -19,8 +19,7 @@
   font: var(--typography-t7);
 }
 
-.app-header-summary__d-day,
-.app-header-summary__progress {
+.app-header-summary__d-day {
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -34,8 +33,7 @@
   text-align: left;
 }
 
-.app-header-summary__d-day-button,
-.app-header-summary__progress {
+.app-header-summary__d-day-button {
   width: 100%;
   cursor: pointer;
 }
@@ -47,18 +45,16 @@
   gap: 8px;
 }
 
-.app-header-summary__date-value > span,
-.app-header-summary__progress > span {
+.app-header-summary__date-value > span {
   color: var(--color-fg-neutral-muted);
   font: var(--typography-t7);
 }
 
-.app-header-summary strong {
+.app-header-summary__date-value strong {
   font: var(--typography-t6-medium);
 }
 
 .app-header-summary__d-day-button:hover,
-.app-header-summary__progress:hover:not(:disabled),
 .app-header-summary__retry:hover {
   background: var(--color-bg-neutral-weak);
 }
@@ -78,14 +74,19 @@
   cursor: pointer;
 }
 
-.app-header-summary__progress:disabled {
-  opacity: 0.4;
-  cursor: progress;
+.app-header-summary__progress {
+  --accordion-padding: 12px 8px;
+}
+
+.app-header-summary__progress .bibbidi-accordion-item {
+  border: 0;
+}
+
+.app-header-summary__progress .bibbidi-accordion-trigger {
+  border-radius: 8px;
 }
 
 .app-header-summary__progress-ring {
-  width: 24px;
-  height: 24px;
   flex: none;
   overflow: visible;
   transform: rotate(-90deg);
@@ -101,23 +102,7 @@
   stroke: var(--color-stroke-brand-solid);
 }
 
-.app-header-summary__progress-chevron {
-  width: 16px;
-  height: 16px;
-  margin-left: auto;
-  fill: none;
-  stroke: var(--color-fg-neutral-muted);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.app-header-summary__progress[aria-expanded="true"]
-  .app-header-summary__progress-chevron {
-  transform: rotate(180deg);
-}
-
 .app-header-summary__d-day-button:focus-visible,
-.app-header-summary__progress:focus-visible,
 .app-header-summary__retry:focus-visible {
   outline: 2px solid var(--color-stroke-focus-ring);
   outline-offset: 2px;

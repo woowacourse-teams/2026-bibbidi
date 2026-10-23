@@ -9,14 +9,13 @@ export interface AppHeaderProgressViewModel {
   categories: AppHeaderCategoryProgressViewModel[];
   label: string;
   percentage: number;
-  summaryLabel: string;
   taskCountLabel: string;
 }
 
 export interface AppHeaderCategoryProgressViewModel {
   id: string;
   title: string;
-  percentage: number;
+  progress: number;
   taskCountLabel: string;
 }
 
@@ -25,6 +24,10 @@ export interface AppHeaderSummaryViewModel {
   progress: AppHeaderProgressViewModel | null;
   weddingDateLabel: string;
   weddingDateStatus: WeddingDateLoadState["status"];
+}
+
+function taskCountLabel(completed: number, total: number) {
+  return `${completed}/${total}개 완료`;
 }
 
 function createWeddingDateViewModel(
@@ -82,16 +85,22 @@ export function createAppHeaderSummaryViewModel(
             categories: model.categories.map((category) => ({
               id: category.id,
               title: category.title,
-              percentage: calculateChecklistProgress(
+              progress:
+                calculateChecklistProgress(
+                  category.completedTaskCount,
+                  category.totalTaskCount,
+                ) / 100,
+              taskCountLabel: taskCountLabel(
                 category.completedTaskCount,
                 category.totalTaskCount,
               ),
-              taskCountLabel: `${category.completedTaskCount}/${category.totalTaskCount}`,
             })),
             label: `${progressPercentage}%`,
             percentage: progressPercentage,
-            summaryLabel: `전체 ${model.completedTaskCount}/${model.totalTaskCount}개 완료 · ${progressPercentage}%`,
-            taskCountLabel: `${model.completedTaskCount}/${model.totalTaskCount}`,
+            taskCountLabel: taskCountLabel(
+              model.completedTaskCount,
+              model.totalTaskCount,
+            ),
           }
         : null,
     weddingDateStatus: weddingDate.status,
