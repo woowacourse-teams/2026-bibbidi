@@ -1,40 +1,36 @@
 package com.bibbidi.wedding.chat.evaluation;
 
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ConversationKey;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
-import tools.jackson.databind.ObjectMapper;
 
 public class EvaluationChatRunner {
 
     private final AiChatService service;
-    private final BibbidiInMemoryChatMemory memory;
+    private final ChatMemory memory;
     private final RecordingChatModel model;
-    private final ObjectMapper mapper;
     private final StringBuilder answer = new StringBuilder();
     private final List<Long> recommendedItemIds = new ArrayList<>();
-    private List<Document> providedContext = List.of();
     private boolean completed;
 
-    public EvaluationChatRunner(AiChatService service, BibbidiInMemoryChatMemory memory,
-                                RecordingChatModel model, ObjectMapper mapper) {
+    public EvaluationChatRunner(AiChatService service, ChatMemory memory, RecordingChatModel model) {
         this.service = service;
         this.memory = memory;
         this.model = model;
-        this.mapper = mapper;
     }
 
     public void run(EvaluationScenario scenario, Long userId, Duration timeout) {
@@ -43,25 +39,18 @@ public class EvaluationChatRunner {
         model.reset();
         answer.setLength(0);
         recommendedItemIds.clear();
-        providedContext = List.of();
         completed = false;
         try {
             memory.add(memoryKey, scenario.chatMemory().stream().map(this::message).toList());
-            service.chat(new ChatCommand(userId, conversationId, scenario.userMessage()))
+            service.chat(new ChatCommand(userId, conversationId, scenario.userMessage()),
+                            () -> CancelReason.CLIENT_DISCONNECTED)
                     .doOnNext(this::accept)
                     .blockLast(timeout);
             if (!completed || answer.isEmpty()) {
                 throw new IllegalStateException("평가 답변이 정상 완료되지 않았습니다.");
             }
         } finally {
-            try {
-                BibbidiCustomChatPromptContext context = memory.bibbidiCustomContext(memoryKey);
-                if (context != null && !model.calls().isEmpty()) {
-                    providedContext = List.of(new Document(mapper.writeValueAsString(context)));
-                }
-            } finally {
-                memory.clear(memoryKey);
-            }
+            memory.clear(memoryKey);
         }
     }
 
@@ -74,7 +63,15 @@ public class EvaluationChatRunner {
     }
 
     public List<Document> providedContext() {
-        return providedContext;
+        return model.calls().stream()
+                .flatMap(call -> call.prompt().getInstructions().stream())
+                .filter(ToolResponseMessage.class::isInstance)
+                .map(ToolResponseMessage.class::cast)
+                .flatMap(message -> message.getResponses().stream())
+                .map(ToolResponseMessage.ToolResponse::responseData)
+                .distinct()
+                .map(Document::new)
+                .toList();
     }
 
     private void accept(ChatEvent event) {
@@ -82,7 +79,8 @@ public class EvaluationChatRunner {
             case ChatEvent.Delta delta -> answer.append(delta.text());
             case ChatEvent.Component component -> recommendedItemIds.addAll(component.catalogItemIds());
             case ChatEvent.Done ignored -> completed = true;
-            default -> { }
+            default -> {
+            }
         }
     }
 

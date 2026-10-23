@@ -2,7 +2,6 @@ package com.bibbidi.wedding.chat.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.chat.adapter.ai.BibbidiInMemoryChatMemory;
 import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
 import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
 import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
@@ -25,6 +24,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.TestInstance;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.evaluation.EvaluationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +36,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import tools.jackson.databind.ObjectMapper;
 
 @Tag("ai-evaluation")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -59,10 +58,7 @@ class BibbidiEvaluationIntegrationTest {
     private AiChatService chatService;
 
     @Autowired
-    private BibbidiInMemoryChatMemory chatMemory;
-
-    @Autowired
-    private ObjectMapper mapper;
+    private ChatMemory chatMemory;
 
     @Value("${bibbidi.sse.response-timeout-seconds}")
     private long responseTimeoutSeconds;
@@ -112,7 +108,7 @@ class BibbidiEvaluationIntegrationTest {
 
     private void evaluateScenario(EvaluationScenario scenario, Map<String, MetricInformation> metrics) {
         RecordingChatModel recordingModel = (RecordingChatModel) generationModel;
-        EvaluationChatRunner runner = new EvaluationChatRunner(chatService, chatMemory, recordingModel, mapper);
+        EvaluationChatRunner runner = new EvaluationChatRunner(chatService, chatMemory, recordingModel);
         List<EvaluationResponse> evaluations = new ArrayList<>();
         String phase = "generation";
         String evaluatingMetric = null;
@@ -140,7 +136,7 @@ class BibbidiEvaluationIntegrationTest {
                 runner.providedContext(), evaluations);
     }
 
-    // 실제 ChatClient 설정을 유지하며 평가 프로필에서만 생성 모델 입출력을 기록한다.
+    // 평가에서는 모든 ChatModel을 기록용으로 감싸 aiChatClient가 기록용 모델을 사용하게 한다.
     @TestConfiguration(proxyBeanMethods = false)
     static class ModelRecordingConfiguration {
 

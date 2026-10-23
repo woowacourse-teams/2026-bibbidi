@@ -22,6 +22,7 @@ public final class SseConnection {
     private @Nullable Future<?> task;
     private @Nullable Future<?> timeout;
     private boolean closed;
+    private volatile boolean timedOut;
 
     SseConnection(SseEmitter emitter, long deadline) {
         this.emitter = emitter;
@@ -87,6 +88,9 @@ public final class SseConnection {
     }
 
     synchronized void timeout() {
+        if (!closed) {
+            timedOut = true;
+        }
         fail(new TimeoutException("SSE 전체 응답 시간 초과"), true);
     }
 
@@ -116,6 +120,10 @@ public final class SseConnection {
                 emitter.complete();
             }
         }
+    }
+
+    public boolean timedOut() {
+        return timedOut;
     }
 
     synchronized void disconnect() {

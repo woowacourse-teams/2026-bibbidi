@@ -1,144 +1,108 @@
 package com.bibbidi.wedding.chat.service;
 
-import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
-import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
-import com.bibbidi.wedding.chat.service.dto.prompt.ChecklistSnapshot;
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
-import com.bibbidi.wedding.chat.service.dto.result.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
-import com.bibbidi.wedding.chat.service.port.CatalogLookupPort;
-import com.bibbidi.wedding.chat.service.port.ChatAnswerParser;
-import com.bibbidi.wedding.chat.service.port.ChecklistLookupPort;
-import java.util.ArrayList;
-import java.util.HashSet;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
+import com.bibbidi.wedding.chat.service.turn.ChatTurn;
+import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
+import com.bibbidi.wedding.chat.service.turn.TurnContext;
+import com.bibbidi.wedding.chat.service.turn.TurnSignal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
 @Service
-@Slf4j
 public class AiChatService {
 
     private final AiConversationPort conversationPort;
-    private final CatalogLookupPort catalogLookup;
-    private final ChecklistLookupPort checklistLookup;
-    private final ChatAnswerParser answerParser;
-    private final Map<ConversationKey, Sinks.Empty<Void>> activeConversations = new ConcurrentHashMap<>();
+    private final List<TurnConsumer> turnConsumers;
+    private final Map<ConversationKey, ActiveRequest> activeConversations = new ConcurrentHashMap<>();
 
     public AiChatService(
             AiConversationPort conversationPort,
-            CatalogLookupPort catalogLookup,
-            ChecklistLookupPort checklistLookup,
-            ChatAnswerParser answerParser
+            List<TurnConsumer> turnConsumers
     ) {
         this.conversationPort = conversationPort;
-        this.catalogLookup = catalogLookup;
-        this.checklistLookup = checklistLookup;
-        this.answerParser = answerParser;
+        this.turnConsumers = turnConsumers;
     }
 
-    public Flux<ChatEvent> chat(ChatCommand chatCommand) {
-        UUID id = chatCommand.conversationId() == null ? UUID.randomUUID() : chatCommand.conversationId();
-        ConversationKey key = new ConversationKey(chatCommand.userId(), id);
-        return Flux.defer(() -> {
-                    Sinks.Empty<Void> superseded = Sinks.empty();
-                    Sinks.Empty<Void> previous = activeConversations.put(key, superseded);
+    public Flux<ChatEvent> chat(ChatCommand chatCommand, Supplier<CancelReason> outputCancelReason) {
+        UUID conversationId = chatCommand.conversationId() == null ? UUID.randomUUID() : chatCommand.conversationId();
+        ConversationKey key = new ConversationKey(chatCommand.userId(), conversationId);
+
+        return Flux.defer(
+                () -> {
+                    ActiveRequest current = new AiChatService.ActiveRequest(Sinks.empty(), new AtomicBoolean());
+                    ActiveRequest previous = activeConversations.put(key, current);
                     if (previous != null) {
-                        previous.tryEmitEmpty();
+                        previous.replaced().set(true);
+                        previous.newerRequestArrived().tryEmitEmpty();
                     }
+                    Supplier<CancelReason> cancelReason =
+                            () -> current.replaced().get() ?
+                                    CancelReason.SUPERSEDED
+                                    : outputCancelReason.get();
 
                     return Flux.concat(
-                                    Flux.just(new ChatEvent.Conversation(id.toString())),
-                                    Flux.defer(() -> streamAnswer(key, id, chatCommand.message()))
+                                    Flux.just(new ChatEvent.Conversation(conversationId.toString())),
+                                    Flux.defer(() -> streamReply(key, chatCommand.message(), cancelReason))
                             )
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .takeUntilOther(superseded.asMono())
-                            .doFinally(ignored -> activeConversations.remove(key, superseded));
+                            .takeUntilOther(current.newerRequestArrived().asMono())
+                            .doFinally(ignored -> activeConversations.remove(key, current));
                 }
         );
     }
 
-    private Flux<ChatEvent> streamAnswer(ConversationKey key, UUID id, String message) {
-        BibbidiCustomChatPromptContext context = loadPromptContext(key.userId());
-        AiResponseStream response = conversationPort.stream(key.toMemoryKey(), message, context);
-        List<String> deltas = new ArrayList<>();
-        ChatAnswerParser.Session answer = answerParser.newSession(deltas::add);
+    private Flux<ChatEvent> streamReply(
+            ConversationKey key, String message, Supplier<CancelReason> cancelReason
+    ) {
+        ChatTurn turn = new ChatTurn(conversationPort.modelName());
+        TurnContext context = new TurnContext(key.userId(), key.conversationId(), message, LocalDateTime.now());
+        turnConsumers.forEach(consumer -> consumer.consume(context, turn.signals()));
 
-        Flux<ChatEvent> answerEvents = response.content()
+        return turn.signals()
                 .publishOn(Schedulers.boundedElastic())
-                .concatMap(chunk -> {
-                            deltas.clear();
-                            answer.accept(chunk);
-                            List<ChatEvent> events = new ArrayList<>();
-                            for (String delta : deltas) {
-                                events.add(new ChatEvent.Delta(delta));
-                            }
-                            return Flux.fromIterable(events);
-                        }
+                .concatMap(signal -> eventsOf(signal, key))
+                .doOnSubscribe(ignored -> turn.start(
+                        conversationPort.stream(key.userId(), key.toMemoryKey(), message))
+                )
+                .doFinally(
+                        signalType -> turn.cancel(
+                                signalType == SignalType.CANCEL ? cancelReason.get() : CancelReason.CONSUMER_FAILED
+                        )
                 );
-
-        Flux<ChatEvent> completion = Flux.defer(() -> completeAnswer(key, id, message,
-                response.recommendableItemIds(), answer));
-        return Flux.concat(answerEvents, completion);
     }
 
-    private BibbidiCustomChatPromptContext loadPromptContext(Long userId) {
-        List<CatalogItemDetailSnapshot> catalog = catalogLookup.findAllItemDetails();
-        ChecklistSnapshot checklist = checklistLookup.findMyChecklistIfPresent(userId)
-                .map(ChecklistSnapshot::from)
-                .orElseGet(ChecklistSnapshot::notFound);
-
-        Set<Long> addedIds = new HashSet<>();
-        checklist.items().forEach(item -> addedIds.add(item.catalogItemId()));
-
-        Set<Long> recommendableIds = new HashSet<>();
-        catalog.forEach(item -> {
-                    if (!addedIds.contains(item.id())) {
-                        recommendableIds.add(item.id());
-                    }
-                }
-        );
-
-        return new BibbidiCustomChatPromptContext(checklist, catalog, recommendableIds);
+    private Flux<ChatEvent> eventsOf(TurnSignal signal, ConversationKey key) {
+        return switch (signal) {
+            case TurnSignal.Chunk chunk -> Flux.fromIterable(chunk.answerDeltas()).map(ChatEvent.Delta::new);
+            case TurnSignal.Completed completed -> completeAnswer(key, completed.answer());
+            case TurnSignal.Failed failed -> Flux.error(failed.cause());
+            case TurnSignal.Cancelled ignored -> Flux.empty();
+        };
     }
 
-    private Flux<ChatEvent> completeAnswer(ConversationKey key, UUID id, String message,
-                                           Set<Long> recommendableIds, ChatAnswerParser.Session stream) {
-        ChatAnswer answer = stream.finish();
-        List<Long> suggestedIds = answer.recommendedItemIds().stream()
-                .filter(recommendableIds::contains)
-                .distinct()
-                .toList();
-        List<ChatEvent> events = new ArrayList<>();
-        if (!suggestedIds.isEmpty()) {
-            List<Long> ids = checklistLookup.filterRecommendableCatalogItemIds(key.userId(), suggestedIds);
-            if (!ids.isEmpty()) {
-                events.add(new ChatEvent.Component(ids));
-            }
-        }
+    private Flux<ChatEvent> completeAnswer(ConversationKey key, ChatAnswer answer) {
+        Flux<ChatEvent> card = answer.recommendedItemIds().isEmpty()
+                ? Flux.empty()
+                : Flux.just(new ChatEvent.Component(answer.recommendedItemIds()));
         return Flux.concat(
-                Flux.fromIterable(events),
-                Flux.just(new ChatEvent.Done(id.toString())),
-                Mono.fromRunnable(() -> rememberTurn(key, message, answer.answer()))
-                        .then(Mono.empty())
+                card,
+                Flux.just(new ChatEvent.Done(key.conversationId().toString()))
         );
     }
 
-    private void rememberTurn(ConversationKey key, String message, String answer) {
-        try {
-            conversationPort.remember(key.toMemoryKey(), message, answer);
-        } catch (RuntimeException exception) {
-            log.error("AI 대화 저장 실패", exception);
-        }
+    private record ActiveRequest(Sinks.Empty<Void> newerRequestArrived, AtomicBoolean replaced) {
     }
 }

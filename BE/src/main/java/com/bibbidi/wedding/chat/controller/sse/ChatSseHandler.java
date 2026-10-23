@@ -2,7 +2,7 @@ package com.bibbidi.wedding.chat.controller.sse;
 
 import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 
 public final class ChatSseHandler {
 

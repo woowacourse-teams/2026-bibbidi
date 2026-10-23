@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.controller.sse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
-import com.bibbidi.wedding.chat.service.dto.result.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.chat.support.RecordingSseEmitter;
 import java.time.Duration;
 import java.util.List;

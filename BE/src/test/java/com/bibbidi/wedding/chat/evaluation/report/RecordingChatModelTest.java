@@ -21,7 +21,7 @@ class RecordingChatModelTest {
     @Test
     @DisplayName("토큰 메타데이터가 없는 마지막 조각 이후에도 누적 사용량을 한 번만 기록한다")
     void keepsTheLastReportedUsageWithoutAddingCumulativeChunks() {
-        FakeChatModel delegate = new FakeChatModel().respondWith(Flux.just(
+        FakeChatModel delegate = new FakeChatModel(Flux.just(
                 chunk("first", 10, 3), chunk("second", 10, 5),
                 new ChatResponse(List.of(new Generation(new AssistantMessage("last"))))));
         RecordingChatModel model = new RecordingChatModel(delegate);
@@ -38,7 +38,7 @@ class RecordingChatModelTest {
     @Test
     @DisplayName("스트리밍을 취소해도 수신한 답변과 사용량을 한 번 기록한다")
     void recordsReceivedContentOnceOnCancellation() {
-        FakeChatModel delegate = new FakeChatModel().respondWith(
+        FakeChatModel delegate = new FakeChatModel(
                 Flux.concat(Flux.just(chunk("partial", 10, 3)), Flux.never()));
         RecordingChatModel model = new RecordingChatModel(delegate);
         StepVerifier.create(model.stream(new Prompt("question")))
@@ -50,7 +50,7 @@ class RecordingChatModelTest {
     @Test
     @DisplayName("제공되지 않은 토큰 사용량은 0으로 바꾸지 않고 미확인 값으로 남긴다")
     void leavesUnreportedTokenUsageUnknown() {
-        FakeChatModel delegate = new FakeChatModel().respondWith(Flux.just(
+        FakeChatModel delegate = new FakeChatModel(Flux.just(
                 new ChatResponse(List.of(new Generation(new AssistantMessage("answer"))))));
         RecordingChatModel model = new RecordingChatModel(delegate);
         model.stream(new Prompt("question")).blockLast();

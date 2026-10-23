@@ -1,11 +1,11 @@
 package com.bibbidi.wedding.chat.service.port;
 
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
+import reactor.core.publisher.Flux;
 
 public interface AiConversationPort {
 
-    AiResponseStream stream(String conversationKey, String userPrompt, BibbidiCustomChatPromptContext context);
+    String modelName();
 
-    void remember(String conversationKey, String userPrompt, String answer);
+    Flux<AiResponse> stream(Long userId, String conversationKey, String userPrompt);
+
 }
