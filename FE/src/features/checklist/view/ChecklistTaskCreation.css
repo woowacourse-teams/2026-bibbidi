@@ -4,9 +4,6 @@
 }
 
 .checklist-task-creation--desktop {
-  position: sticky;
-  top: 0;
-  height: calc(100dvh - 96px);
   overflow: hidden;
   border-left: 1px solid var(--color-stroke-neutral-weak);
 }

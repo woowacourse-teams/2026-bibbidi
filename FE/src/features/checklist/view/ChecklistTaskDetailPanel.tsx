@@ -9,6 +9,7 @@ import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
 import "./ChecklistTaskDetailPanel.css";
 
 interface ChecklistTaskDetailPanelProps {
+  modal?: boolean;
   categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
   appointmentManagement?: ChecklistAppointmentManagementController;
@@ -19,6 +20,7 @@ interface ChecklistTaskDetailPanelProps {
 }
 
 export function ChecklistTaskDetailPanel({
+  modal = false,
   appointmentManagement,
   categories,
   categoryTitle,
@@ -31,6 +33,8 @@ export function ChecklistTaskDetailPanel({
 
   return (
     <aside
+      role={modal ? "dialog" : "complementary"}
+      aria-modal={modal ? true : undefined}
       aria-labelledby={titleId}
       className="checklist-detail-panel"
       id="checklist-task-detail-panel"

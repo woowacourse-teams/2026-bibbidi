@@ -1,18 +1,13 @@
 .checklist-page {
   display: flex;
-  height: 100%;
-  min-width: 320px;
+  min-height: 100%;
+  min-width: 0;
   flex-direction: column;
   background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
 }
 
 .checklist-page__content {
-  display: flex;
   width: 100%;
-  flex: 1;
-}
-
-.checklist-page__content > * {
-  flex: 1;
+  padding-block: 24px 32px;
 }

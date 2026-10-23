@@ -10,6 +10,7 @@ import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import "./ChecklistAppointmentCreation.css";
 
 interface ChecklistAppointmentCreationProps {
+  modal?: boolean;
   controller:
     | ChecklistAppointmentCreationController
     | ChecklistAppointmentEditingController;
@@ -27,6 +28,7 @@ function BackIcon() {
 }
 
 export function ChecklistAppointmentCreation({
+  modal = false,
   controller,
   heading = "일정 추가",
   taskTitle,
@@ -61,7 +63,7 @@ export function ChecklistAppointmentCreation({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isMobileLayout) {
+      if (isMobileLayout && !modal) {
         containTabFocus(event, form);
       }
 
@@ -74,7 +76,7 @@ export function ChecklistAppointmentCreation({
 
     form.addEventListener("keydown", handleKeyDown);
     return () => form.removeEventListener("keydown", handleKeyDown);
-  }, [controller, isMobileLayout, isSubmitting]);
+  }, [controller, isMobileLayout, isSubmitting, modal]);
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -109,11 +111,17 @@ export function ChecklistAppointmentCreation({
   return (
     <aside
       aria-labelledby="checklist-appointment-creation-title"
-      aria-modal={!embedded && isMobileLayout ? "true" : undefined}
+      aria-modal={!embedded && (isMobileLayout || modal) ? "true" : undefined}
       className={`checklist-appointment-creation checklist-appointment-creation--${
         isMobileLayout ? "mobile" : "desktop"
       }`}
-      role={embedded ? undefined : isMobileLayout ? "dialog" : "complementary"}
+      role={
+        embedded
+          ? undefined
+          : isMobileLayout || modal
+            ? "dialog"
+            : "complementary"
+      }
     >
       <form
         className="checklist-appointment-creation__form"

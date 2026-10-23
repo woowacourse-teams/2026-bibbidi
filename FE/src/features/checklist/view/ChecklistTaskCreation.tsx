@@ -11,6 +11,7 @@ import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import "./ChecklistTaskCreation.css";
 
 interface ChecklistTaskCreationProps {
+  modal?: boolean;
   categories: ChecklistCategoryViewModel[];
   controller: ChecklistTaskCreationController;
 }
@@ -24,6 +25,7 @@ function BackIcon() {
 }
 
 export function ChecklistTaskCreation({
+  modal = false,
   categories,
   controller,
 }: ChecklistTaskCreationProps) {
@@ -48,10 +50,11 @@ export function ChecklistTaskCreation({
     }
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (isMobileLayout) {
+      if (isMobileLayout && !modal) {
         containTabFocus(event, form);
       }
 
+      if (event.key === "Escape") event.stopPropagation();
       if (
         event.key === "Escape" &&
         !(event.target instanceof HTMLSelectElement) &&
@@ -64,7 +67,7 @@ export function ChecklistTaskCreation({
 
     form.addEventListener("keydown", handleKeyDown);
     return () => form.removeEventListener("keydown", handleKeyDown);
-  }, [controller, isMobileLayout]);
+  }, [controller, isMobileLayout, modal]);
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -97,12 +100,12 @@ export function ChecklistTaskCreation({
       <aside
         aria-hidden={controller.isDiscardDialogOpen ? true : undefined}
         aria-labelledby="checklist-task-creation-title"
-        aria-modal={isMobileLayout ? "true" : undefined}
+        aria-modal={isMobileLayout || modal ? "true" : undefined}
         className={`checklist-task-creation checklist-task-creation--${
           isMobileLayout ? "mobile" : "desktop"
         }`}
         inert={controller.isDiscardDialogOpen ? true : undefined}
-        role={isMobileLayout ? "dialog" : "complementary"}
+        role={isMobileLayout || modal ? "dialog" : "complementary"}
       >
         <form
           className="checklist-task-creation__form"

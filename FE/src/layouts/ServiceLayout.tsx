@@ -7,6 +7,7 @@ import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
+import { useReservedPanelSpace } from "./useReservedPanelSpace";
 
 export function ServiceLayout() {
   const { authState, endAuthentication, refreshAuth } = useAuth();
@@ -17,7 +18,9 @@ export function ServiceLayout() {
     navigate("/", { replace: true });
   }, [endAuthentication, navigate]);
   const logout = useLogout({ onSuccess: handleLogoutSuccess });
+  const layoutRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  useReservedPanelSpace(layoutRef, contentRef);
 
   useLayoutEffect(() => {
     if (contentRef.current) {
@@ -30,8 +33,8 @@ export function ServiceLayout() {
   }
 
   return (
-    <div className="service-layout">
-      <div className="service-layout__header">
+    <div className="service-layout" data-modal-scope ref={layoutRef}>
+      <div className="service-layout__header" data-modal-background>
         <AppHeader
           user={
             authState.status === "authenticated"
@@ -63,7 +66,7 @@ export function ServiceLayout() {
         <Outlet />
       </div>
 
-      <div className="service-layout__mobile-dock">
+      <div className="service-layout__mobile-dock" data-modal-background>
         <AppBottomNavigation />
         <FeedbackFeature />
       </div>
