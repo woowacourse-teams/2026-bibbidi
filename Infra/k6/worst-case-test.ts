@@ -52,7 +52,7 @@ function responseThresholds(): Thresholds {
 
 export const options: Options = {
   scenarios: scenarios(),
-  thresholds: { ...generalThresholds(groups), ...responseThresholds() },
+  thresholds: { ...generalThresholds(groups, false), ...responseThresholds() },
   summaryTrendStats: ['avg', 'p(95)', 'p(99)', 'max'],
 };
 
