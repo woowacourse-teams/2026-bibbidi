@@ -25,7 +25,10 @@ function gate(expression: string, abortAfterSeconds: number | undefined): Thresh
 }
 
 // 기준을 거는 항목은 SLO 값으로, 걸지 않는 항목은 요약에 나타나도록 항상 참인 식으로 둔다.
-export function generalThresholds(groups: readonly GatedGroup[]): Thresholds {
+export function generalThresholds(
+  groups: readonly GatedGroup[],
+  includeNewUsers = true,
+): Thresholds {
   const thresholds: Thresholds = { [GENERAL_DURATION]: ['max>=0'] };
 
   for (const group of groups) {
@@ -41,7 +44,9 @@ export function generalThresholds(groups: readonly GatedGroup[]): Thresholds {
       group.failure ? gate(`rate<${SLO.generalFailureRate}`, group.abortAfterSeconds) : 'rate>=0',
     ];
     thresholds[generalMetric('http_reqs', group.tags)] = ['count>=0'];
-    thresholds[`new_users{${group.tags}}`] = ['count>=0'];
+    if (includeNewUsers) {
+      thresholds[`new_users{${group.tags}}`] = ['count>=0'];
+    }
   }
 
   // 여러 탭 동시 갱신의 응답 시간은 일반 API 판정과 따로 기록한다.
