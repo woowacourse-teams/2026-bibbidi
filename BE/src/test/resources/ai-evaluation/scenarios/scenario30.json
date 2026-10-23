@@ -1,8 +1,7 @@
 {
   "name": "scenario30",
   "metrics": [
-    "Relevance",
-    "Helpfulness"
+    "Relevance"
   ],
   "userMessage": "결혼 준비 예산을 처음 세우려는데, 비용 계획과 관련된 준비 항목만 추천해 주세요.",
   "chatMemory": [],

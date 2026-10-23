@@ -84,7 +84,7 @@ def dockerAvailable = providers.provider {
 
 tasks.named('test', Test) {
     exclude '**/BibbidiLocalEvaluationTest.class'
-    exclude '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    exclude '**/BibbidiEvaluationIntegrationTest.class'
     inputs.property('dockerAvailable', dockerAvailable)
     testLogging {
         events 'skipped', 'failed'
@@ -96,7 +96,7 @@ tasks.register('aiEvaluationTest', Test) {
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    include '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    include '**/BibbidiEvaluationIntegrationTest.class'
     useJUnitPlatform()
     // 평가 테스트는 같은 DB를 쓰므로 병렬로 실행하지 않는다.
     systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'

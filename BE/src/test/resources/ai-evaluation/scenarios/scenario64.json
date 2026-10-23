@@ -1,0 +1,20 @@
+{
+  "name": "scenario64",
+  "metrics": [
+    "Groundedness",
+    "Relevance"
+  ],
+  "userMessage": "웨딩홀 투어가 뭐예요?",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "웨딩홀을 아직 못 정했어요. 지금 할 준비 두 개만 추천해 주세요."
+    },
+    {
+      "role": "assistant",
+      "content": "웨딩홀 투어와 웨딩홀 계약을 먼저 살펴보시면 좋아요."
+    }
+  ],
+  "referenceAnswer": "'웨딩홀 투어'를 마음에 드는 웨딩홀을 직접 둘러보고 조건을 비교하는 준비로 설명한다. 특정 업체나 가격은 단정하지 않는다.",
+  "expectedRefusal": "none"
+}

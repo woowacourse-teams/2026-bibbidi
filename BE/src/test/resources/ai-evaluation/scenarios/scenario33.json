@@ -1,8 +1,8 @@
 {
   "name": "scenario33",
   "metrics": [
-    "FollowingInstructions",
-    "ProfessionalStyleAndTone"
+    "ProfessionalStyleAndTone",
+    "ScopeCompliance"
   ],
   "userMessage": "Please recommend two wedding preparation items for someone who has just booked a venue. Answer only in English.",
   "chatMemory": [],
