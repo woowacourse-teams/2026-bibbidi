@@ -1,11 +1,8 @@
-package com.bibbidi.wedding.chat.evaluation.local;
+package com.bibbidi.wedding.chat.evaluation.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bibbidi.wedding.chat.evaluation.claude.ClaudeCliChatModel;
-import com.bibbidi.wedding.chat.evaluation.data.EvaluationDataLoader;
-import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
-import com.bibbidi.wedding.chat.evaluation.judge.ClaudeCliBibbidiJudge;
+import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluator;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,7 +65,7 @@ class ClaudeCliWindowsTest {
 
         model.call(new Prompt("question"));
 
-        assertOriginalSchema("ai-evaluation/schema/chat-answer.json");
+        assertOriginalSchema("ai-evaluation/schema/agent-turn.json");
     }
 
     @ParameterizedTest
@@ -76,11 +73,10 @@ class ClaudeCliWindowsTest {
     @DisplayName("Windows의 기본 모드와 엄격 모드에서 채점 CLI가 원본 JSON 스키마를 받는다")
     void passesJudgeSchemaWithoutCorruption(String allowAmbiguousCommands) throws IOException {
         System.setProperty("jdk.lang.Process.allowAmbiguousCommands", allowAmbiguousCommands);
-        MetricInformation metric = completenessMetric();
-        ClaudeCliBibbidiJudge judge = new ClaudeCliBibbidiJudge(
-                executable.toString(), "test", Duration.ofSeconds(10));
+        ClaudeCliChatModel judge = new ClaudeCliChatModel(
+                executable.toString(), "test", Duration.ofSeconds(10), BibbidiEvaluator.JUDGE_RESULT_SCHEMA);
 
-        judge.evaluate(new Prompt("question"), metric, "example");
+        judge.call(new Prompt("question"));
 
         assertOriginalSchema("ai-evaluation/schema/judge-result.json");
     }
@@ -106,12 +102,6 @@ class ClaudeCliWindowsTest {
             Files.copy(input, target);
         }
         return target;
-    }
-
-    private MetricInformation completenessMetric() throws IOException {
-        return new EvaluationDataLoader().loadMetrics().stream()
-                .filter(metric -> metric.metricType().equals("Completeness"))
-                .findFirst().orElseThrow();
     }
 
     private void assertOriginalSchema(String resource) throws IOException {

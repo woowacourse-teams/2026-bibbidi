@@ -1,13 +1,9 @@
-package com.bibbidi.wedding.chat.evaluation.local;
+package com.bibbidi.wedding.chat.evaluation.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.chat.evaluation.claude.ClaudeCliChatModel;
-import com.bibbidi.wedding.chat.evaluation.codex.CodexCliChatModel;
-import com.bibbidi.wedding.chat.evaluation.judge.BibbidiJudge;
-import com.bibbidi.wedding.chat.evaluation.judge.ClaudeCliBibbidiJudge;
-import com.bibbidi.wedding.chat.evaluation.judge.CodexCliBibbidiJudge;
+import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluator;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -107,9 +103,9 @@ class CliChatModelTest {
     @DisplayName("채점 CLI가 큰 입력을 읽지 않아도 시간 초과로 종료한다")
     void timesOutJudgesWithoutBlockingOnInput(String provider) throws IOException {
         String executable = script("exec sleep 10\n");
-        BibbidiJudge judge = judge(provider, executable, Duration.ofMillis(100));
+        ChatModel judge = judge(provider, executable, Duration.ofMillis(100));
 
-        assertThatThrownBy(() -> judge.evaluate(new Prompt("large input".repeat(100_000)), null, "timeout"))
+        assertThatThrownBy(() -> judge.call(new Prompt("large input".repeat(100_000))))
                 .hasCauseInstanceOf(TimeoutException.class);
     }
 
@@ -127,10 +123,10 @@ class CliChatModelTest {
                 .getContentAsString(StandardCharsets.UTF_8);
     }
 
-    private BibbidiJudge judge(String provider, String executable, Duration timeout) {
+    private ChatModel judge(String provider, String executable, Duration timeout) {
         return "codex".equals(provider)
-                ? new CodexCliBibbidiJudge(executable, "test", "medium", timeout)
-                : new ClaudeCliBibbidiJudge(executable, "test", timeout);
+                ? new CodexCliChatModel(executable, "test", "medium", timeout, BibbidiEvaluator.JUDGE_RESULT_SCHEMA)
+                : new ClaudeCliChatModel(executable, "test", timeout, BibbidiEvaluator.JUDGE_RESULT_SCHEMA);
     }
 
     private String script(String body) throws IOException {

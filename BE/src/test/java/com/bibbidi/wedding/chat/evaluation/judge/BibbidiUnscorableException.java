@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.evaluation.judge;
 
-import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
+import com.bibbidi.wedding.chat.evaluation.report.JudgeInvocation;
 
 public class BibbidiUnscorableException extends RuntimeException {
 

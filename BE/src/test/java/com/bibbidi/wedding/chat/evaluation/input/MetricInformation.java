@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.evaluation.data.prep;
+package com.bibbidi.wedding.chat.evaluation.input;
 
 import java.util.List;
 
