@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "answer": { "type": "string" },
+    "recommendedItemIds": { "type": "array", "items": { "type": "integer" } }
+  },
+  "required": ["answer", "recommendedItemIds"],
+  "additionalProperties": false
+}

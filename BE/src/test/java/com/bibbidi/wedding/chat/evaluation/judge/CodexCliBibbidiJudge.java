@@ -1,20 +1,16 @@
 package com.bibbidi.wedding.chat.evaluation.judge;
 
+import com.bibbidi.wedding.chat.evaluation.cli.CliJsonSchema;
+import com.bibbidi.wedding.chat.evaluation.cli.CliProcess;
+import com.bibbidi.wedding.chat.evaluation.cli.CliWorkspace;
 import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
 import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
 import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.evaluation.EvaluationResponse;
-import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,7 +22,7 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
     private final String executable;
     private final String model;
     private final String reasoningEffort;
-    private final Duration timeout;
+    private final CliProcess process;
 
     public CodexCliBibbidiJudge(String model, String reasoningEffort, Duration timeout) {
         this(System.getProperty("os.name").startsWith("Windows") ? "codex.cmd" : "codex",
@@ -37,7 +33,7 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
         this.executable = executable;
         this.model = model;
         this.reasoningEffort = reasoningEffort;
-        this.timeout = timeout;
+        this.process = new CliProcess(timeout, "Codex judge");
     }
 
     @Override
@@ -57,46 +53,36 @@ public class CodexCliBibbidiJudge implements BibbidiJudge {
     }
 
     private CodexOutput runCodex(Prompt prompt) throws IOException, InterruptedException {
-        Path directory = Files.createTempDirectory("bibbidi-judge-");
-        Path schema = directory.resolve("schema.json");
-        Path answer = directory.resolve("answer.json");
-        Path events = directory.resolve("events.jsonl");
-        try {
-            try (InputStream input = new ClassPathResource(RESULT_SCHEMA).getInputStream()) {
-                Files.copy(input, schema);
-            }
-            Process process = new ProcessBuilder(
-                    executable, "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-                    "--sandbox", "read-only", "--model", model,
-                    "--config", "model_reasoning_effort=" + reasoningEffort,
-                    "--output-schema", schema.toString(),
-                    "--output-last-message", answer.toString(), "-")
-                    .redirectOutput(events.toFile())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            try (OutputStream input = process.getOutputStream()) {
-                input.write(prompt.getContents().getBytes(StandardCharsets.UTF_8));
-            }
-            try {
-                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Codex judge timed out");
-                }
-            } catch (InterruptedException exception) {
-                process.destroyForcibly().onExit().join();
-                throw exception;
-            }
-            if (process.exitValue() != 0) {
-                throw new IllegalStateException("Codex judge exited with code " + process.exitValue());
-            }
-            String answerText = Files.readString(answer, StandardCharsets.UTF_8);
-            return new CodexOutput(answerText, tokenUsage(Files.readString(events, StandardCharsets.UTF_8)));
-        } finally {
-            Files.deleteIfExists(answer);
-            Files.deleteIfExists(events);
-            Files.deleteIfExists(schema);
-            Files.deleteIfExists(directory);
+        try (CliWorkspace files = new CliWorkspace("bibbidi-judge-")) {
+            prepareInput(prompt, files);
+            int exitCode = process.execute(prepareProcess(files));
+            return readOutput(files, exitCode);
         }
+    }
+
+    private void prepareInput(Prompt prompt, CliWorkspace files) throws IOException {
+        files.write("input.txt", prompt.getContents());
+        new CliJsonSchema(RESULT_SCHEMA).writeTo(files.path("schema.json"));
+    }
+
+    private ProcessBuilder prepareProcess(CliWorkspace files) {
+        return new ProcessBuilder(
+                executable, "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
+                "--sandbox", "read-only", "--model", model,
+                "--config", "model_reasoning_effort=" + reasoningEffort,
+                "--output-schema", files.path("schema.json").toString(),
+                "--output-last-message", files.path("answer.json").toString(), "-")
+                .redirectInput(files.path("input.txt").toFile())
+                .redirectOutput(files.path("events.jsonl").toFile());
+    }
+
+    private CodexOutput readOutput(CliWorkspace files, int exitCode) throws IOException {
+        if (exitCode != 0) {
+            throw new IllegalStateException("Codex judge exited with code " + exitCode);
+        }
+        String answer = files.read("answer.json");
+        String events = files.read("events.jsonl");
+        return new CodexOutput(answer, tokenUsage(events));
     }
 
     private ModelTokenUsage tokenUsage(String events) {

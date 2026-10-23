@@ -1,20 +1,16 @@
 package com.bibbidi.wedding.chat.evaluation.judge;
 
+import com.bibbidi.wedding.chat.evaluation.cli.CliJsonSchema;
+import com.bibbidi.wedding.chat.evaluation.cli.CliProcess;
+import com.bibbidi.wedding.chat.evaluation.cli.CliWorkspace;
 import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
 import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
 import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.evaluation.EvaluationResponse;
-import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -25,7 +21,7 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String executable;
     private final String model;
-    private final Duration timeout;
+    private final CliProcess process;
 
     public ClaudeCliBibbidiJudge(String model, Duration timeout) {
         this(System.getProperty("os.name").startsWith("Windows") ? "claude.exe" : "claude", model, timeout);
@@ -34,7 +30,7 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
     public ClaudeCliBibbidiJudge(String executable, String model, Duration timeout) {
         this.executable = executable;
         this.model = model;
-        this.timeout = timeout;
+        this.process = new CliProcess(timeout, "Claude judge");
     }
 
     @Override
@@ -63,39 +59,31 @@ public class ClaudeCliBibbidiJudge implements BibbidiJudge {
     }
 
     private String runClaude(Prompt prompt) throws IOException, InterruptedException {
-        String schema;
-        try (InputStream input = new ClassPathResource(RESULT_SCHEMA).getInputStream()) {
-            schema = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        try (CliWorkspace files = new CliWorkspace("bibbidi-claude-judge-")) {
+            prepareInput(prompt, files);
+            int exitCode = process.execute(prepareProcess(files));
+            return readOutput(files, exitCode);
         }
-        Path output = Files.createTempFile("bibbidi-claude-judge-", ".json");
-        try {
-            String schemaArgument = System.getProperty("os.name").startsWith("Windows")
-                    ? schema.replace("\"", "\\\"") : schema;
-            Process process = new ProcessBuilder(
-                    executable, "-p", "--safe-mode", "--no-session-persistence",
-                    "--tools", "", "--disallowedTools", "mcp__*",
-                    "--model", model, "--output-format", "json", "--json-schema", schemaArgument)
-                    .redirectOutput(output.toFile())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            try (OutputStream input = process.getOutputStream()) {
-                input.write(prompt.getContents().getBytes(StandardCharsets.UTF_8));
-            }
-            try {
-                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly().onExit().join();
-                    throw new IllegalStateException("Claude judge timed out");
-                }
-            } catch (InterruptedException exception) {
-                process.destroyForcibly().onExit().join();
-                throw exception;
-            }
-            if (process.exitValue() != 0) {
-                throw new IllegalStateException("Claude judge exited with code " + process.exitValue());
-            }
-            return Files.readString(output, StandardCharsets.UTF_8);
-        } finally {
-            Files.deleteIfExists(output);
+    }
+
+    private void prepareInput(Prompt prompt, CliWorkspace files) throws IOException {
+        files.write("input.txt", prompt.getContents());
+    }
+
+    private ProcessBuilder prepareProcess(CliWorkspace files) throws IOException {
+        String schema = new CliJsonSchema(RESULT_SCHEMA).asArgument();
+        return new ProcessBuilder(
+                executable, "-p", "--safe-mode", "--no-session-persistence",
+                "--tools", "", "--disallowedTools", "mcp__*",
+                "--model", model, "--output-format", "json", "--json-schema", schema)
+                .redirectInput(files.path("input.txt").toFile())
+                .redirectOutput(files.path("output.json").toFile());
+    }
+
+    private String readOutput(CliWorkspace files, int exitCode) throws IOException {
+        if (exitCode != 0) {
+            throw new IllegalStateException("Claude judge exited with code " + exitCode);
         }
+        return files.read("output.json");
     }
 }
