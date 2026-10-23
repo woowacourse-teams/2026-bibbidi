@@ -240,9 +240,18 @@ describe("AI 할 일 추가 연출", () => {
 
   it("모바일은 연출 후 채팅으로 복귀하고 대화·입력·스크롤·다음 추천을 유지한다", async () => {
     mobile = true;
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(
+      function (this: Element) {
+        return this.getAttribute("role") === "log"
+          ? 600 +
+              this.querySelectorAll('[aria-label="추천 할 일"]').length * 400
+          : 0;
+      },
+    );
     const { container } = workspace();
     const card = await recommend();
     const log = screen.getByRole("log");
+    await waitFor(() => expect(log.scrollTop).toBe(1000));
     log.scrollTop = 123;
     fireEvent.scroll(log);
     fireEvent.change(screen.getByRole("textbox"), {
@@ -252,13 +261,15 @@ describe("AI 할 일 추가 연출", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
     );
+    log.scrollTop = 0;
+    fireEvent.scroll(log);
     await waitFor(() =>
       expect(
         container.querySelector(".personal-roadmap__title-typing"),
       ).not.toBeNull(),
     );
     await screen.findByRole("dialog", { name: "AI 채팅" }, { timeout: 3000 });
-    expect(screen.getByRole("log").scrollTop).toBe(123);
+    await waitFor(() => expect(screen.getByRole("log").scrollTop).toBe(123));
     expect(screen.getByText("추천한 일을 담아보세요.")).toBeTruthy();
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       "다음에 물어볼 내용",
@@ -270,6 +281,7 @@ describe("AI 할 일 추가 연출", () => {
       expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
     );
     await screen.findByRole("dialog", { name: "AI 채팅" }, { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole("log").scrollTop).toBe(123));
     expect(
       screen.getByText("추천을 모두 확인했어요. 더 궁금한 준비가 있나요?"),
     ).toBeTruthy();
