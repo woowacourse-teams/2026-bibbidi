@@ -194,7 +194,11 @@ describe("ServiceLayout", () => {
       ["/", "/checklist"],
     );
 
-    expect(await screen.findByText("1/1")).toBeTruthy();
+    expect(
+      await screen.findByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const logoutButton = screen.getByRole("button", { name: "로그아웃" });
     expect(
@@ -247,7 +251,11 @@ describe("ServiceLayout", () => {
     expect(screen.getByTestId("service-location").textContent).toBe("/");
     expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
-    expect(screen.queryByText("1/1")).toBeNull();
+    expect(
+      screen.queryByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeNull();
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "logout",
@@ -430,20 +438,22 @@ describe("ServiceLayout", () => {
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
-    expect(await screen.findByText("67%")).toBeTruthy();
-    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 67%")).toBeTruthy();
+    expect(
+      screen.getByText("2/3개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /카테고리별 완료율 보기/ }),
-    );
-    const progressDialog = screen.getByRole("dialog", {
-      name: "카테고리별 완료율",
+    fireEvent.click(screen.getByRole("button", { name: /준비 완료율/ }));
+    const progressDialog = screen.getByRole("region", {
+      name: "카테고리별 준비 현황",
     });
     expect(
       within(progressDialog)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
-    ).toEqual(["첫 번째 카테고리67%2/3", "두 번째 카테고리0%0/0"]);
+    ).toEqual(["첫 번째 카테고리2/3개 완료", "두 번째 카테고리0/0개 완료"]);
 
     expect(screen.queryByRole("link", { name: "로그인" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -608,7 +618,7 @@ describe("ServiceLayout", () => {
         name: "첫 번째 카테고리 로드맵",
       }),
     ).toBeTruthy();
-    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -905,7 +915,11 @@ describe("ServiceLayout", () => {
     const headerSummary = await screen.findByRole("region", {
       name: "결혼 준비 현황",
     });
-    expect(await within(headerSummary).findByText("1/1")).toBeTruthy();
+    expect(
+      await within(headerSummary).findByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "전체 단계" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "01 준비 단계" }),
@@ -915,10 +929,14 @@ describe("ServiceLayout", () => {
       await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
     );
 
-    expect(await within(headerSummary).findByText("1/2")).toBeTruthy();
+    expect(
+      await within(headerSummary).findByText("1/2개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
     expect(
       within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
-        "50%",
+        "준비 완료율 · 50%",
       ),
     ).toBeTruthy();
     expect(await screen.findByText("서버가 추가한 두 번째 할 일")).toBeTruthy();
@@ -1140,7 +1158,7 @@ describe("ServiceLayout", () => {
     });
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
-    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

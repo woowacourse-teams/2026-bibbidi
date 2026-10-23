@@ -1,0 +1,33 @@
+.preparation-progress ul {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preparation-progress li {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font: var(--typography-t7);
+}
+
+.preparation-progress__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preparation-progress__category {
+  min-width: 0;
+  color: var(--color-fg-neutral);
+  overflow-wrap: anywhere;
+}
+
+.preparation-progress__count {
+  flex: none;
+  color: var(--color-fg-neutral-muted);
+  white-space: nowrap;
+}

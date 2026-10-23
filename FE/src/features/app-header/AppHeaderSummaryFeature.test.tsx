@@ -63,62 +63,66 @@ describe("AppHeaderSummaryFeature", () => {
   it("완료율을 열면 실제 순서와 빈 카테고리를 표시하고 재클릭으로 닫는다", async () => {
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
     const trigger = await screen.findByRole("button", {
-      name: /카테고리별 완료율 보기/,
+      name: /준비 완료율/,
     });
     fireEvent.click(trigger);
 
-    const dialog = screen.getByRole("dialog", { name: "카테고리별 완료율" });
+    const dialog = screen.getByRole("region", { name: "카테고리별 준비 현황" });
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(within(dialog).getByText("전체 2/3개 완료 · 67%")).toBeTruthy();
+    expect(within(dialog).queryByText(/전체|%/)).toBeNull();
     expect(
       within(dialog)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
-    ).toEqual(["웨딩홀67%2/3", "스드메0%0/0"]);
+    ).toEqual(["웨딩홀2/3개 완료", "스드메0/0개 완료"]);
     expect(
       within(dialog)
         .getByRole("progressbar", { name: "웨딩홀 완료율" })
         .getAttribute("aria-valuenow"),
     ).toBe("67");
+    expect(
+      within(dialog)
+        .getByRole("progressbar", { name: "웨딩홀 완료율" })
+        .getAttribute("aria-valuetext"),
+    ).toBe("2/3개 완료");
+    expect(
+      within(dialog)
+        .getByRole("progressbar", { name: "스드메 완료율" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("0");
     fireEvent.click(trigger);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.queryByRole("region", { name: "카테고리별 준비 현황" }),
+    ).toBeNull();
   });
 
-  it.each(["Escape", "닫기", "바깥 영역"])(
-    "%s로 완료율 팝오버를 닫는다",
-    async (method) => {
-      render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
-      const trigger = await screen.findByRole("button", {
-        name: /카테고리별 완료율 보기/,
-      });
-      fireEvent.click(trigger);
-      const close = screen.getByRole("button", { name: "완료율 팝오버 닫기" });
-      expect(document.activeElement).toBe(close);
-      if (method === "Escape") {
-        trigger.focus();
-        fireEvent.keyDown(trigger, { key: "Escape" });
-      } else if (method === "닫기") {
-        fireEvent.click(close);
-      } else {
-        fireEvent.pointerDown(document.body);
-      }
-      expect(screen.queryByRole("dialog")).toBeNull();
-      if (method !== "바깥 영역") {
-        expect(document.activeElement).toBe(trigger);
-      }
-    },
-  );
+  it("아코디언은 별도 대화상자를 열지 않고 초점을 유지하며 카테고리를 펼친다", async () => {
+    render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
+    const trigger = await screen.findByRole("button", { name: /준비 완료율/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(document.activeElement).toBe(trigger);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByRole("region", { name: "카테고리별 준비 현황" }),
+    ).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      screen.queryByRole("region", { name: "카테고리별 준비 현황" }),
+    ).toBeNull();
+  });
 
-  it("체크리스트 변경 시 열린 팝오버와 전체 완료율을 함께 갱신한다", async () => {
+  it("체크리스트 변경 시 펼친 카테고리와 전체 완료율을 함께 갱신한다", async () => {
     const onAuthenticationRequired = vi.fn();
     const { rerender } = render(
       <AppHeaderSummaryFeature
         onAuthenticationRequired={onAuthenticationRequired}
       />,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /준비 완료율/ }));
     repositoryMocks.getSummary.mockResolvedValue({
       ...summary,
       completedTaskCount: 3,
@@ -134,25 +138,21 @@ describe("AppHeaderSummaryFeature", () => {
       />,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "카테고리별 완료율" });
+    const dialog = screen.getByRole("region", { name: "카테고리별 준비 현황" });
+    expect(await within(dialog).findByText("3/3개 완료")).toBeTruthy();
     expect(
-      await within(dialog).findByText("전체 3/3개 완료 · 100%"),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /전체 완료율 100%/ }),
+      screen.getByRole("button", { name: /준비 완료율 · 100%/ }),
     ).toBeTruthy();
   });
 
-  it("완료율 재조회 실패 후 복구돼도 팝오버를 자동으로 다시 열지 않는다", async () => {
+  it("완료율 재조회 실패 후 복구돼도 아코디언을 자동으로 다시 열지 않는다", async () => {
     const onAuthenticationRequired = vi.fn();
     const { rerender } = render(
       <AppHeaderSummaryFeature
         onAuthenticationRequired={onAuthenticationRequired}
       />,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /준비 완료율/ }));
     repositoryMocks.getSummary.mockRejectedValueOnce(
       new AppHeaderSummaryLoadError(),
     );
@@ -163,9 +163,7 @@ describe("AppHeaderSummaryFeature", () => {
       />,
     );
     await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: /카테고리별 완료율 보기/ }),
-      ).toBeNull(),
+      expect(screen.queryByRole("button", { name: /준비 완료율/ })).toBeNull(),
     );
 
     repositoryMocks.checklistRevision = 2;
@@ -175,18 +173,18 @@ describe("AppHeaderSummaryFeature", () => {
       />,
     );
     const trigger = await screen.findByRole("button", {
-      name: /카테고리별 완료율 보기/,
+      name: /준비 완료율/,
     });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(
-      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
+      screen.queryByRole("region", { name: "카테고리별 준비 현황" }),
     ).toBeNull();
   });
 
-  it("날짜 팝오버와 완료율 팝오버를 한 번에 하나만 연다", async () => {
+  it("날짜 팝오버와 완료율 아코디언를 한 번에 하나만 연다", async () => {
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
     const progress = await screen.findByRole("button", {
-      name: /카테고리별 완료율 보기/,
+      name: /준비 완료율/,
     });
     const weddingDate = await screen.findByRole("button", {
       name: /결혼 예정일 설정/,
@@ -197,11 +195,11 @@ describe("AppHeaderSummaryFeature", () => {
       screen.getByRole("dialog", { name: "결혼 예정일 설정" }),
     ).toBeTruthy();
     expect(
-      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
+      screen.queryByRole("region", { name: "카테고리별 준비 현황" }),
     ).toBeNull();
     fireEvent.click(progress);
     expect(
-      screen.getByRole("dialog", { name: "카테고리별 완료율" }),
+      screen.getByRole("region", { name: "카테고리별 준비 현황" }),
     ).toBeTruthy();
     expect(
       screen.queryByRole("dialog", { name: "결혼 예정일 설정" }),
@@ -242,11 +240,15 @@ describe("AppHeaderSummaryFeature", () => {
     repositoryMocks.getWeddingDate.mockResolvedValue("2027-05-15");
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
 
-    expect(await screen.findByText("67%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 67%")).toBeTruthy();
     expect(
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     ).toBeTruthy();
-    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(
+      screen.getByText("2/3개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
   });
 
   it("결혼 예정일 조회 실패와 완료율 성공을 독립적으로 표시하고 날짜만 재시도한다", async () => {
@@ -255,7 +257,7 @@ describe("AppHeaderSummaryFeature", () => {
       .mockResolvedValueOnce("2027-05-15");
     render(<AppHeaderSummaryFeature onAuthenticationRequired={vi.fn()} />);
 
-    expect(await screen.findByText("67%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 67%")).toBeTruthy();
     expect(
       await screen.findByRole("status", { name: "결혼 예정일 조회 실패" }),
     ).toBeTruthy();
@@ -311,8 +313,14 @@ describe("AppHeaderSummaryFeature", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "다음 연도" }));
-    fireEvent.click(screen.getByRole("button", { name: "2028년 5월 16일" }));
+    fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
+    fireEvent.change(screen.getByRole("listbox", { name: "연도" }), {
+      target: { value: "2028" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "날짜 선택으로 돌아가기" }),
+    );
+    fireEvent.click(screen.getByRole("gridcell", { name: /2028년 5월 16일/ }));
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
     expect(
@@ -334,14 +342,14 @@ describe("AppHeaderSummaryFeature", () => {
       name: /결혼 예정일 설정/,
     });
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("button", { name: "2027년 5월 20일" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /2027년 5월 20일/ }));
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     fireEvent.click(trigger);
 
     expect(
       screen
-        .getByRole("button", { name: "2027년 5월 15일" })
-        .getAttribute("aria-pressed"),
+        .getByRole("gridcell", { name: /2027년 5월 15일/ })
+        .getAttribute("aria-selected"),
     ).toBe("true");
     expect(repositoryMocks.saveWeddingDate).not.toHaveBeenCalled();
   });
@@ -361,7 +369,7 @@ describe("AppHeaderSummaryFeature", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /20일/ }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /20일/ }));
     const saveButton = screen.getByRole("button", { name: "저장" });
     fireEvent.click(saveButton);
     fireEvent.click(saveButton);
@@ -372,7 +380,9 @@ describe("AppHeaderSummaryFeature", () => {
       "다시 시도",
     );
     expect(
-      screen.getByRole("button", { name: /20일/ }).getAttribute("aria-pressed"),
+      screen
+        .getByRole("gridcell", { name: /20일/ })
+        .getAttribute("aria-selected"),
     ).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() =>
@@ -400,7 +410,7 @@ describe("AppHeaderSummaryFeature", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     );
-    fireEvent.click(screen.getAllByRole("button", { name: /일/ }).at(-1)!);
+    fireEvent.click(screen.getAllByRole("gridcell", { name: /일/ }).at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
     unmount();
@@ -429,7 +439,7 @@ describe("AppHeaderSummaryFeature", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByText("67%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 67%")).toBeTruthy();
     expect(summarySignals[0].aborted).toBe(true);
     expect(dateSignals[0].aborted).toBe(true);
   });
@@ -475,7 +485,7 @@ describe("계정 패널 안의 준비 현황", () => {
       name: /결혼 예정일 설정/,
     });
     fireEvent.click(dateTrigger);
-    const day = screen.getByRole("button", { name: "2027년 5월 15일" });
+    const day = screen.getByRole("gridcell", { name: /2027년 5월 15일/ });
     fireEvent.keyDown(day, { key: "Escape" });
     expect(
       screen.queryByRole("dialog", { name: "결혼 예정일 설정" }),
@@ -487,17 +497,15 @@ describe("계정 패널 안의 준비 현황", () => {
     expect(document.activeElement).toBe(accountTrigger);
   });
 
-  it("완료율 팝업 바깥을 누르면 팝업부터 닫고 패널을 유지한다", async () => {
+  it("완료율은 계정 패널 안에서 펼쳐지고 바깥 클릭으로 계정 패널을 닫는다", async () => {
     renderAccountSummary();
     fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: /카테고리별 완료율 보기/ }),
-    );
-    fireEvent.pointerDown(document.body);
+    fireEvent.click(await screen.findByRole("button", { name: /준비 완료율/ }));
+    const account = screen.getByRole("dialog", { name: "계정 메뉴" });
     expect(
-      screen.queryByRole("dialog", { name: "카테고리별 완료율" }),
-    ).toBeNull();
-    expect(screen.getByRole("dialog", { name: "계정 메뉴" })).toBeTruthy();
+      within(account).getByRole("region", { name: "카테고리별 준비 현황" }),
+    ).toBeTruthy();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("dialog", { name: "계정 메뉴" })).toBeNull();
   });
@@ -516,7 +524,7 @@ describe("계정 패널 안의 준비 현황", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "2027년 5월 20일" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /2027년 5월 20일/ }));
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     fireEvent.pointerDown(document.body);
     expect(
@@ -526,8 +534,8 @@ describe("계정 패널 안의 준비 현황", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(
       screen
-        .getByRole("button", { name: "2027년 5월 20일" })
-        .getAttribute("aria-pressed"),
+        .getByRole("gridcell", { name: /2027년 5월 20일/ })
+        .getAttribute("aria-selected"),
     ).toBe("true");
     repositoryMocks.saveWeddingDate.mockResolvedValueOnce("2027-05-20");
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
@@ -545,7 +553,7 @@ describe("계정 패널 안의 준비 현황", () => {
 
 describe("화면 이동 시 준비 현황 유지", () => {
   it.each(["예정일", "완료율"])(
-    "%s 팝업만 닫고 데이터를 재조회하지 않는다",
+    "%s 상세를 닫고 데이터를 재조회하지 않는다",
     async (popup) => {
       repositoryMocks.getWeddingDate.mockResolvedValue("2027-05-15");
       const onAuthenticationRequired = vi.fn();
@@ -559,10 +567,14 @@ describe("화면 이동 시 준비 현황 유지", () => {
         name: /결혼 예정일 설정/,
       });
       const progressTrigger = await screen.findByRole("button", {
-        name: /카테고리별 완료율 보기/,
+        name: /준비 완료율/,
       });
       fireEvent.click(popup === "예정일" ? dateTrigger : progressTrigger);
-      expect(screen.getByRole("dialog")).toBeTruthy();
+      expect(
+        popup === "예정일"
+          ? screen.getByRole("dialog")
+          : screen.getByRole("region", { name: "카테고리별 준비 현황" }),
+      ).toBeTruthy();
       rerender(
         <AppHeaderSummaryFeature
           navigationKey="/calendar"
@@ -570,6 +582,9 @@ describe("화면 이동 시 준비 현황 유지", () => {
         />,
       );
       expect(screen.queryByRole("dialog")).toBeNull();
+      expect(
+        screen.queryByRole("region", { name: "카테고리별 준비 현황" }),
+      ).toBeNull();
       expect(
         screen.getByRole("button", {
           name: /2027년 5월 15일. 결혼 예정일 설정/,

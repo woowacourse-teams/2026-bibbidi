@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   useAppHeaderChecklistRevision,
@@ -27,11 +27,7 @@ export function AppHeaderSummaryFeature({
   const weddingDateRepository = useWeddingDateRepository();
   const checklistRevision = useAppHeaderChecklistRevision();
   const [summary, setSummary] = useState<AppHeaderSummaryModel | null>(null);
-  const [isProgressPopoverOpen, setIsProgressPopoverOpen] = useState(false);
-  const closeProgressPopover = useCallback(
-    () => setIsProgressPopoverOpen(false),
-    [],
-  );
+  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
   const weddingDate = useWeddingDate({
     onAuthenticationRequired,
     repository: weddingDateRepository,
@@ -41,7 +37,7 @@ export function AppHeaderSummaryFeature({
     useState(navigationKey);
   if (previousNavigationKey !== navigationKey) {
     setPreviousNavigationKey(navigationKey);
-    closeProgressPopover();
+    setIsProgressExpanded(false);
     weddingDate.closePopover();
   }
 
@@ -62,7 +58,7 @@ export function AppHeaderSummaryFeature({
         }
 
         setSummary(null);
-        setIsProgressPopoverOpen(false);
+        setIsProgressExpanded(false);
         if (error instanceof AppHeaderAuthenticationRequiredError) {
           onAuthenticationRequired();
         }
@@ -82,19 +78,18 @@ export function AppHeaderSummaryFeature({
   return (
     <AppHeaderSummary
       isPopoverOpen={weddingDate.isPopoverOpen}
-      isProgressPopoverOpen={isProgressPopoverOpen}
+      isProgressExpanded={isProgressExpanded}
       isSaving={weddingDate.isSaving}
       onClosePopover={weddingDate.closePopover}
-      onCloseProgressPopover={closeProgressPopover}
       onOpenPopover={() => {
-        closeProgressPopover();
+        setIsProgressExpanded(false);
         weddingDate.openPopover();
       }}
       onRetryWeddingDate={weddingDate.retryLoad}
       onSaveWeddingDate={weddingDate.save}
-      onToggleProgressPopover={() => {
+      onProgressExpandedChange={(expanded) => {
         weddingDate.closePopover();
-        setIsProgressPopoverOpen((open) => !open);
+        setIsProgressExpanded(expanded);
       }}
       saveError={weddingDate.saveError}
       viewModel={viewModel}
