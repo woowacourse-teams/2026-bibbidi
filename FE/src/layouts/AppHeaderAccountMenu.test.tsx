@@ -44,18 +44,16 @@ describe("헤더 계정 패널", () => {
     const panel = screen.getByRole("dialog", { name: "계정 메뉴" });
     expect(trigger.getAttribute("aria-controls")).toBe(panel.id);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "계정 메뉴 닫기" }),
-    );
+    expect(document.activeElement).toBe(panel);
     fireEvent.click(trigger);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("아래 방향키로 열고 Escape로 닫아 아이콘으로 돌아온다", () => {
+  it("패널을 열고 Escape로 닫아 아이콘으로 돌아온다", () => {
     renderMenu();
     const trigger = screen.getByRole("button", { name: "계정 메뉴" });
-    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.click(trigger);
     fireEvent.keyDown(screen.getByRole("button", { name: "계정 메뉴 닫기" }), {
       key: "Escape",
     });

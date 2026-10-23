@@ -1,7 +1,7 @@
 .app-header-summary {
   display: grid;
   gap: 8px;
-  padding: 8px 4px;
+  padding: 0;
   white-space: normal;
 }
 
@@ -11,46 +11,20 @@
   align-items: center;
 }
 
-.app-header-summary__label {
-  display: block;
-  width: 100%;
-  padding: 0 8px;
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
+.app-header-summary .app-header-summary__date--unset {
+  border-radius: var(--radius-md);
+  background: var(--color-bg-brand-weak);
 }
 
-.app-header-summary__d-day {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
+.app-header-summary__date-action {
   color: var(--color-fg-neutral);
-  font: var(--typography-t6);
-  text-align: left;
-}
-
-.app-header-summary__date-value {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.app-header-summary__date-value > span {
-  color: var(--color-fg-neutral-muted);
   font: var(--typography-t7);
-}
-
-.app-header-summary__date-value strong {
-  font: var(--typography-t6-medium);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .app-header-summary__progress {
-  --accordion-padding: 12px 8px;
+  --accordion-padding: 12px 20px;
 }
 
 .app-header-summary__progress .bibbidi-accordion-item {
@@ -61,18 +35,6 @@
   border-radius: 8px;
 }
 
-.app-header-summary__progress-ring {
-  flex: none;
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-
-.app-header-summary__progress-ring circle {
-  fill: none;
-  stroke: var(--color-stroke-neutral-weak);
-  stroke-width: 4;
-}
-
-.app-header-summary__progress-ring .app-header-summary__progress-range {
-  stroke: var(--color-stroke-brand-solid);
+.app-header-summary__date-error-message {
+  color: var(--color-fg-critical);
 }

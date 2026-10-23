@@ -2,10 +2,10 @@ import { createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { WeddingDatePopover } from "./WeddingDatePopover";
+import { WeddingDateDialog } from "./WeddingDateDialog";
 
-function renderPopover(
-  overrides: Partial<Parameters<typeof WeddingDatePopover>[0]> = {},
+function renderDialog(
+  overrides: Partial<Parameters<typeof WeddingDateDialog>[0]> = {},
 ) {
   const trigger = document.createElement("button");
   document.body.append(trigger);
@@ -20,13 +20,13 @@ function renderPopover(
     saveError: null,
     ...overrides,
   };
-  const result = render(<WeddingDatePopover {...props} />);
+  const result = render(<WeddingDateDialog {...props} />);
   return { ...result, props, trigger };
 }
 
-describe("WeddingDatePopover", () => {
+describe("WeddingDateDialog", () => {
   it("서버 날짜를 초기 선택으로 표시하고 선택만으로 저장하지 않는다", async () => {
-    const { props } = renderPopover();
+    const { props } = renderDialog();
     const initialDay = screen.getByRole("gridcell", {
       name: /2027년 5월 15일/,
     });
@@ -40,11 +40,9 @@ describe("WeddingDatePopover", () => {
   });
 
   it("월과 연도를 이동하고 과거 날짜도 선택한다", () => {
-    const { props } = renderPopover();
+    const { props } = renderDialog();
     fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
-    fireEvent.change(screen.getByRole("listbox", { name: "연도" }), {
-      target: { value: "2026" },
-    });
+    fireEvent.click(screen.getByRole("option", { name: "2026년" }));
     fireEvent.click(
       screen.getByRole("button", { name: "날짜 선택으로 돌아가기" }),
     );
@@ -55,7 +53,7 @@ describe("WeddingDatePopover", () => {
   });
 
   it("월 이동 후에도 달력에 키보드 진입점이 유지된다", () => {
-    renderPopover({ initialDate: "2027-01-31" });
+    renderDialog({ initialDate: "2027-01-31" });
     fireEvent.click(screen.getByRole("button", { name: "다음 달" }));
 
     expect(
@@ -64,7 +62,7 @@ describe("WeddingDatePopover", () => {
   });
 
   it("화살표와 Home/End 키로 날짜 초점을 이동한다", async () => {
-    renderPopover();
+    renderDialog();
     const initialDay = screen.getByRole("gridcell", {
       name: /2027년 5월 15일/,
     });
@@ -106,7 +104,7 @@ describe("WeddingDatePopover", () => {
   ])(
     "기본 연도 범위 밖의 저장 날짜 %s도 그대로 표시하고 저장한다",
     (initialDate, label) => {
-      const { props } = renderPopover({ initialDate });
+      const { props } = renderDialog({ initialDate });
       expect(
         screen
           .getByRole("gridcell", { name: new RegExp(label) })
@@ -123,7 +121,7 @@ describe("WeddingDatePopover", () => {
   ])(
     "지원 범위 경계 %s에서 %s 키 이동을 경계 날짜로 제한한다",
     async (initialDate, key, accessibleName) => {
-      renderPopover({ initialDate });
+      renderDialog({ initialDate });
       const boundaryDay = screen.getByRole("gridcell", {
         name: new RegExp(accessibleName),
       });
@@ -136,25 +134,29 @@ describe("WeddingDatePopover", () => {
   );
 
   it("Escape와 바깥 클릭으로 닫고 닫힌 뒤 트리거에 초점을 복원한다", async () => {
-    const first = renderPopover();
+    const first = renderDialog();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(first.props.onClose).toHaveBeenCalledOnce();
     first.unmount();
     await waitFor(() => expect(document.activeElement).toBe(first.trigger));
     first.trigger.remove();
 
-    const second = renderPopover();
-    fireEvent.pointerDown(
-      document.querySelector(".app-header-summary__popover-backdrop")!,
-    );
+    const second = renderDialog();
+    fireEvent.pointerDown(screen.getByRole("dialog"), {
+      clientX: -1,
+      clientY: -1,
+    });
+    fireEvent.pointerUp(screen.getByRole("dialog"));
     expect(second.props.onClose).toHaveBeenCalledOnce();
   });
 
   it("연월 선택의 Escape는 날짜 선택으로 돌아오고 팝오버를 유지한다", () => {
-    const { props } = renderPopover();
+    const { props } = renderDialog();
     fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
     const year = screen.getByRole("listbox", { name: "연도" });
-    expect(document.activeElement).toBe(year);
+    expect(document.activeElement).toBe(
+      screen.getByRole("option", { name: "2027년" }),
+    );
     fireEvent.keyDown(year, { key: "Escape" });
     expect(screen.getByRole("grid", { name: "2027년 5월" })).toBeTruthy();
     expect(document.activeElement).toBe(
@@ -164,7 +166,7 @@ describe("WeddingDatePopover", () => {
   });
 
   it("Tab 초점을 팝오버 안에 가두고 연월 선택도 순환한다", () => {
-    renderPopover();
+    renderDialog();
     const first = screen.getByRole("button", { name: "2027년 5월" });
     const last = screen.getByRole("button", { name: "저장" });
     first.focus();
@@ -179,7 +181,7 @@ describe("WeddingDatePopover", () => {
   });
 
   it("저장 중에는 날짜 변경과 닫기 및 중복 저장을 막는다", () => {
-    const { props } = renderPopover({ isSaving: true });
+    const { props } = renderDialog({ isSaving: true });
     const dialog = screen.getByRole("dialog");
     expect(document.activeElement).toBe(dialog);
     expect(
@@ -191,16 +193,18 @@ describe("WeddingDatePopover", () => {
     fireEvent.keyDown(dialog, { key: "Tab" });
     expect(document.activeElement).toBe(dialog);
     fireEvent.keyDown(dialog, { key: "Escape" });
-    fireEvent.pointerDown(
-      document.querySelector(".app-header-summary__popover-backdrop")!,
-    );
+    fireEvent.pointerDown(screen.getByRole("dialog"), {
+      clientX: -1,
+      clientY: -1,
+    });
+    fireEvent.pointerUp(screen.getByRole("dialog"));
     fireEvent.click(screen.getByRole("button", { name: "저장 중..." }));
     expect(props.onClose).not.toHaveBeenCalled();
     expect(props.onSave).not.toHaveBeenCalled();
   });
 
   it("날짜 미설정이면 저장을 비활성화하고 오류를 접근 가능한 상태로 표시한다", () => {
-    renderPopover({ initialDate: null, saveError: "저장하지 못했습니다." });
+    renderDialog({ initialDate: null, saveError: "저장하지 못했습니다." });
     expect(
       screen.getByRole("button", { name: "저장" }).hasAttribute("disabled"),
     ).toBe(true);
