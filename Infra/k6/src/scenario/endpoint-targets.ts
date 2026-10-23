@@ -12,7 +12,6 @@ export interface EndpointData {
   categoryIds: number[];
   // 준비 목록 항목 번호를 오름차순으로 둔 것. 시드의 항목 번호(1부터 연속)와 같은 순서다.
   catalogItemIds: number[];
-  termsVersion: string;
 }
 
 interface UserState {
@@ -87,10 +86,6 @@ function ensureCustomItem({ data, state, prepare }: Context): void {
 
 export const TARGETS: readonly Target[] = [
   { name: 'GET /api/terms', request: () => spec('GET /api/terms', '/api/terms', [200]) },
-  {
-    name: 'POST /api/users/me/terms-agreement',
-    request: ({ data }) => spec('POST /api/users/me/terms-agreement', '/api/users/me/terms-agreement', [200, 409], { termsVersion: data.termsVersion, agreed: true }),
-  },
   { name: 'GET /api/users/me', request: () => spec('GET /api/users/me', '/api/users/me', [200]) },
   { name: 'GET /api/users/me/wedding-date', request: () => spec('GET /api/users/me/wedding-date', '/api/users/me/wedding-date', [200, 404]) },
   {

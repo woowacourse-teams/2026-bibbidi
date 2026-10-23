@@ -66,13 +66,11 @@ export function setup(): EndpointData {
   }
   const catalog = client.send(probe, { name: 'GET /api/catalog', method: 'GET', path: '/api/catalog', expected: [200], kind: 'fixture' });
   const categories = (catalog.json() as unknown as { categories: { id: number; steps: { items: { id: number }[] }[] }[] }).categories;
-  const terms = client.send(probe, { name: 'GET /api/terms', method: 'GET', path: '/api/terms', expected: [200], kind: 'fixture' });
   return {
     runId: Math.floor(Date.now() / 1000),
     seededUsers: WORST_CASE.users,
     categoryIds: categories.map((category) => category.id),
     catalogItemIds: categories.flatMap((category) => category.steps.flatMap((step) => step.items.map((item) => item.id))).sort((a, b) => a - b),
-    termsVersion: (terms.json() as unknown as { version: string }[])[0]?.version ?? '',
   };
 }
 
