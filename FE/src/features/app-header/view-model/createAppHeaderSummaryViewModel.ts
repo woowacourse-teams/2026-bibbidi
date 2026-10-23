@@ -22,7 +22,6 @@ export interface AppHeaderCategoryProgressViewModel {
 
 export interface AppHeaderSummaryViewModel {
   dDayLabel: string;
-  mobileDDayLabel: string;
   progress: AppHeaderProgressViewModel | null;
   weddingDateLabel: string;
   weddingDateStatus: WeddingDateLoadState["status"];
@@ -35,21 +34,18 @@ function createWeddingDateViewModel(
   if (weddingDate.status === "loading") {
     return {
       dDayLabel: "D-Day",
-      mobileDDayLabel: "결혼 예정일 조회 중",
       weddingDateLabel: "결혼 예정일 조회 중",
     };
   }
   if (weddingDate.status === "error") {
     return {
       dDayLabel: "D-Day",
-      mobileDDayLabel: "결혼 예정일 조회 실패",
       weddingDateLabel: "결혼 예정일 조회 실패",
     };
   }
   if (weddingDate.date === null) {
     return {
       dDayLabel: "D-Day",
-      mobileDDayLabel: "D-Day 미설정",
       weddingDateLabel: "결혼 일자 미설정",
     };
   }
@@ -65,7 +61,6 @@ function createWeddingDateViewModel(
 
   return {
     dDayLabel,
-    mobileDDayLabel: dDayLabel,
     weddingDateLabel: `${year}년 ${month}월 ${day}일`,
   };
 }

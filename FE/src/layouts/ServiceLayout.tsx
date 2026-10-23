@@ -39,6 +39,7 @@ export function ServiceLayout() {
                   kind: "authenticated",
                   summary: (
                     <AppHeaderSummaryFeature
+                      navigationKey={pathname}
                       onAuthenticationRequired={refreshAuth}
                     />
                   ),

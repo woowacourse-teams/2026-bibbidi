@@ -61,6 +61,8 @@ describe("AppHeader", () => {
       "/checklist",
     );
 
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     expect(screen.getByText("결혼 준비 현황")).toBeTruthy();
     expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
     expect(screen.getByRole("button", { name: "로그아웃" })).toBeTruthy();
@@ -72,7 +74,7 @@ describe("AppHeader", () => {
     );
   });
 
-  it("로그아웃 버튼을 이니셜 오른쪽에 두고 키보드로 사용할 수 있다", () => {
+  it("패널 안의 로그아웃 버튼을 키보드로 사용할 수 있다", () => {
     const onLogout = vi.fn();
     const { container } = renderHeader({
       kind: "authenticated",
@@ -82,10 +84,12 @@ describe("AppHeader", () => {
       summary: null,
       userInitial: "비",
     });
-    const initial = screen.getByLabelText("현재 사용자 비");
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const button = screen.getByRole("button", { name: "로그아웃" });
 
-    expect(initial.nextElementSibling).toBe(button);
+    expect(button.closest('[role="dialog"]')?.getAttribute("aria-label")).toBe(
+      "계정 메뉴",
+    );
     expect(button.getAttribute("type")).toBe("button");
     expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
       "true",
@@ -95,7 +99,7 @@ describe("AppHeader", () => {
     fireEvent.keyDown(button, { key: "Enter" });
     fireEvent.click(button);
     expect(onLogout).toHaveBeenCalledOnce();
-    expect(container.querySelector(".app-header__logout")).toBe(button);
+    expect(container.querySelector(".app-header-account__logout")).toBe(button);
   });
 
   it("처리 중 버튼을 비활성화하고 실패 안내에서 재시도할 수 있다", () => {
@@ -108,6 +112,7 @@ describe("AppHeader", () => {
       summary: null,
       userInitial: "비",
     });
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const button = screen.getByRole("button", { name: "로그아웃" });
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(button.getAttribute("aria-busy")).toBe("true");
