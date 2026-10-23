@@ -318,9 +318,7 @@ describe("AppHeaderSummaryFeature", () => {
       await screen.findByRole("button", { name: /결혼 예정일 설정/ }),
     );
     fireEvent.click(screen.getByRole("button", { name: "2027년 5월" }));
-    fireEvent.change(screen.getByRole("listbox", { name: "연도" }), {
-      target: { value: "2028" },
-    });
+    fireEvent.click(screen.getByRole("option", { name: "2028년" }));
     fireEvent.click(
       screen.getByRole("button", { name: "날짜 선택으로 돌아가기" }),
     );
