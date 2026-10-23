@@ -6,11 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.core.io.ClassPathResource;
 
-public class CliJsonSchema {
+public class CliOutputSchema {
 
     private final String content;
 
-    public CliJsonSchema(String resource) throws IOException {
+    public CliOutputSchema(String resource) throws IOException {
         content = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -18,7 +18,7 @@ public class CliJsonSchema {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    public String asArgument() {
+    public String asCommandArgument() {
         if (usesLegacyWindowsArguments()) {
             return content.replace("\"", "\\\"");
         }

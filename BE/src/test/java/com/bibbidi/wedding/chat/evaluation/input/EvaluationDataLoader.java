@@ -1,7 +1,7 @@
-package com.bibbidi.wedding.chat.evaluation.data;
+package com.bibbidi.wedding.chat.evaluation.input;
 
-import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
-import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
+import com.bibbidi.wedding.chat.evaluation.input.EvaluationScenario;
+import com.bibbidi.wedding.chat.evaluation.input.MetricInformation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;

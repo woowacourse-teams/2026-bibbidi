@@ -1,6 +1,6 @@
-package com.bibbidi.wedding.chat.evaluation;
+package com.bibbidi.wedding.chat.evaluation.judge;
 
-import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
+import com.bibbidi.wedding.chat.evaluation.input.EvaluationScenario;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.ai.document.Document;

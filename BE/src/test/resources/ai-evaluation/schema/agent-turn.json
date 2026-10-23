@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "arguments": { "type": "string" }
+        },
+        "required": ["name", "arguments"],
+        "additionalProperties": false
+      }
+    },
+    "answer": { "type": "string" },
+    "recommendedItemIds": { "type": "array", "items": { "type": "integer" } }
+  },
+  "required": ["toolCalls", "answer", "recommendedItemIds"],
+  "additionalProperties": false
+}

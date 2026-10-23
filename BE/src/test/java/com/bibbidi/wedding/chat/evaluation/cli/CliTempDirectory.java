@@ -6,11 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-public class CliWorkspace implements AutoCloseable {
+public class CliTempDirectory implements AutoCloseable {
 
     private final Path directory;
 
-    public CliWorkspace(String prefix) throws IOException {
+    public CliTempDirectory(String prefix) throws IOException {
         directory = Files.createTempDirectory(prefix);
     }
 

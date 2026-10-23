@@ -1,8 +1,8 @@
 package com.bibbidi.wedding.chat.evaluation.report;
 
-import com.bibbidi.wedding.chat.evaluation.data.prep.EvaluationScenario;
-import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
-import com.bibbidi.wedding.chat.evaluation.data.result.ModelTokenUsage;
+import com.bibbidi.wedding.chat.evaluation.input.EvaluationScenario;
+import com.bibbidi.wedding.chat.evaluation.report.JudgeInvocation;
+import com.bibbidi.wedding.chat.evaluation.report.ModelTokenUsage;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiUnscorableException;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel.ModelCall;
 import java.io.IOException;

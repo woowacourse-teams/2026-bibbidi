@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.evaluation.data.result;
+package com.bibbidi.wedding.chat.evaluation.report;
 
 import java.util.List;
 import java.util.function.Function;
