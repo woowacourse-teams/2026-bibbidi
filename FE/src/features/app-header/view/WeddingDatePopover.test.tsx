@@ -101,6 +101,23 @@ describe("WeddingDatePopover", () => {
   });
 
   it.each([
+    ["1800-05-15", "1800년 5월 15일"],
+    ["2300-05-15", "2300년 5월 15일"],
+  ])(
+    "기본 연도 범위 밖의 저장 날짜 %s도 그대로 표시하고 저장한다",
+    (initialDate, label) => {
+      const { props } = renderPopover({ initialDate });
+      expect(
+        screen
+          .getByRole("gridcell", { name: new RegExp(label) })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      fireEvent.click(screen.getByRole("button", { name: "저장" }));
+      expect(props.onSave).toHaveBeenCalledWith(initialDate);
+    },
+  );
+
+  it.each([
     ["0001-01-01", "ArrowLeft", "1년 1월 1일"],
     ["9999-12-31", "ArrowRight", "9999년 12월 31일"],
   ])(

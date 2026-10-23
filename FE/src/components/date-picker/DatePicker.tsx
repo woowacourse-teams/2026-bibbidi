@@ -120,6 +120,27 @@ export function DatePicker(props: DatePickerProps) {
   const view = startOfMonth(clamp(storedView));
   const [focused, setFocused] = useState(initial);
   const [pickingMonth, setPickingMonth] = useState(false);
+  const selectionKey = dates.join(",");
+  const [previousSelection, setPreviousSelection] = useState(selectionKey);
+  const [requestedSelection, setRequestedSelection] = useState<string | null>(
+    null,
+  );
+
+  if (previousSelection !== selectionKey) {
+    setPreviousSelection(selectionKey);
+    setRequestedSelection(null);
+    // Parent updates to our own selection must preserve month/range navigation.
+    if (
+      value !== undefined &&
+      selectionKey !== requestedSelection &&
+      dates[0]
+    ) {
+      const nextDate = clamp(dates[0]);
+      setView(startOfMonth(nextDate));
+      setFocused(nextDate);
+    }
+  }
+
   const gridRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLButtonElement>(null);
   const monthPanelRef = useRef<HTMLDivElement>(null);
@@ -161,6 +182,10 @@ export function DatePicker(props: DatePickerProps) {
 
   function commit(next: Value) {
     if (value === undefined) setInternalValue(next);
+    else
+      setRequestedSelection(
+        selectedDates(next).filter(isDate).sort().join(","),
+      );
     if (props.selectionMode === "range")
       props.onChange?.(next as DatePickerRange);
     else if (props.selectionMode === "multiple")
