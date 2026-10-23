@@ -1,0 +1,387 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Bibbidi load test round - k6 load generator, app (nginx + backend), MySQL.
+  Create one stack per round and delete it afterwards.
+
+Parameters:
+  RoundId:
+    Type: String
+    AllowedPattern: "[a-z0-9-]{1,24}"
+    Description: Round name used in resource names, e.g. q1-r1
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+  LoadGeneratorInstanceType:
+    Type: String
+    Default: t4g.small
+    AllowedValues: [t4g.micro, t4g.small, t4g.medium]
+  AppInstanceType:
+    Type: String
+    Default: t4g.small
+    Description: Match the production app instance type, and record it in the round log
+  DbInstanceType:
+    Type: String
+    Default: t4g.small
+  ConfigRef:
+    Type: String
+    Default: dev-be
+    Description: Git ref that the app instance downloads compose and nginx files from
+  ConfigBaseUrl:
+    Type: String
+    Default: https://raw.githubusercontent.com/woowacourse-teams/2026-bibbidi
+  SshPublicKey:
+    Type: String
+    Description: Public key the workflow uses for SSH over SSM Session Manager
+  DockerHubUsername:
+    Type: String
+  DockerHubToken:
+    Type: String
+    NoEcho: true
+  ImageTag:
+    Type: String
+    Description: Backend image tag (commit SHA) under test
+  AuthJwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+  MonitoringIngestToken:
+    Type: String
+    NoEcho: true
+  DbPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    AllowedPattern: "[A-Za-z0-9]+"
+  DbPoolSize:
+    Type: Number
+    Default: 10
+    Description: Hikari maximum-pool-size. Production default is 10
+  MysqlImage:
+    Type: String
+    Default: mysql:8.0
+    Description: Must match the production MySQL version
+  MysqlMaxConnections:
+    Type: Number
+    Default: 151
+  MysqlBufferPoolSize:
+    Type: String
+    Default: 128M
+  NginxApiRateLimit:
+    Type: String
+    Default: ""
+    Description: 'nginx directive for /api, e.g. "limit_req zone=per_ip_api burst=60 nodelay;". Empty means no limit'
+  NginxApiConnLimit:
+    Type: String
+    Default: ""
+    Description: 'e.g. "limit_conn per_ip_conn 40;". Empty means no limit'
+  LoadTestTtftMs:
+    Type: Number
+    Default: 3000
+    Description: Mock model delay before the first token (bibbidi.ai.loadtest.ttft-ms)
+  LoadTestChunkIntervalMs:
+    Type: Number
+    Default: 50
+    MinValue: 1
+    Description: Mock model interval between tokens (bibbidi.ai.loadtest.chunk-interval-ms)
+  LoadTestChunks:
+    Type: Number
+    Default: 40
+    MinValue: 1
+    Description: Mock model token count per answer (bibbidi.ai.loadtest.chunks)
+  LoadTestThrottleRatio:
+    Type: String
+    Default: "0"
+    AllowedPattern: "(0|1|0\\.[0-9]+|1\\.0+)"
+    Description: Share of requests the mock model fails with a throttling error, 0 to 1 (bibbidi.ai.loadtest.throttle-ratio)
+  AutoStopHours:
+    Type: Number
+    Default: 8
+    MinValue: 1
+    Description: Hours after boot when each instance powers off. A safety net for forgotten stacks; delete the stack when the round ends
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.77.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}" }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}" }
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.77.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}" }
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}" }
+
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet
+      RouteTableId: !Ref RouteTable
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: signal-stack
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  LoadGeneratorSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Load test generator. No inbound traffic
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-generator" }
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Load test app. HTTP from the load generator only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref LoadGeneratorSecurityGroup
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-app" }
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Load test MySQL. From the app only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-db" }
+
+  DbInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: InternetRoute
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT20M
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref DbInstanceType
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref DbSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-db" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get install -y python3-pip
+          pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource DbInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
+          install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+          echo '${SshPublicKey}' > /home/ubuntu/.ssh/authorized_keys
+          chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
+          chmod 0600 /home/ubuntu/.ssh/authorized_keys
+          apt-get install -y docker.io
+          systemctl enable --now docker
+          docker run -d --name mysql --restart unless-stopped -p 3306:3306 \
+            -e MYSQL_ROOT_PASSWORD='${DbPassword}' -e MYSQL_DATABASE=bibbidi_loadtest \
+            -v /var/lib/bibbidi-mysql:/var/lib/mysql \
+            ${MysqlImage} \
+            --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci \
+            --max-connections=${MysqlMaxConnections} \
+            --innodb-buffer-pool-size=${MysqlBufferPoolSize}
+          # TCP ping은 이미지의 초기화용 임시 서버가 아니라 최종 서버가 뜬 뒤에만 성공한다.
+          until docker exec mysql mysqladmin ping -h 127.0.0.1 -uroot -p'${DbPassword}' --silent; do sleep 3; done
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: InternetRoute
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT20M
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref AppInstanceType
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref AppSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-app" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get install -y python3-pip
+          pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource AppInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
+          apt-get install -y docker.io docker-compose-v2
+          systemctl enable --now docker
+          install -d -m 0700 /opt/bibbidi/loadtest
+          cd /opt/bibbidi/loadtest
+          base='${ConfigBaseUrl}/${ConfigRef}/Infra'
+          curl -fsSL "$base/loadtest/compose.app.yml" -o compose.yaml
+          curl -fsSL "$base/loadtest/nginx.default.conf.template" -o nginx.default.conf.template
+          curl -fsSL "$base/monitoring/grafana/alloy/config.alloy" -o alloy.config.alloy
+          umask 077
+          cat > .env <<'ENV'
+          DOCKERHUB_USERNAME=${DockerHubUsername}
+          IMAGE_TAG=${ImageTag}
+          MONITORING_INGEST_TOKEN=${MonitoringIngestToken}
+          NGINX_API_RATE_LIMIT=${NginxApiRateLimit}
+          NGINX_API_CONN_LIMIT=${NginxApiConnLimit}
+          ENV
+          cat > .env.spring <<'ENV'
+          DB_HOST=${DbInstance.PrivateIp}
+          DB_NAME=bibbidi_loadtest
+          DB_USER=root
+          DB_PASSWORD=${DbPassword}
+          DB_POOL_SIZE=${DbPoolSize}
+          BIBBIDI_AI_LOADTEST_TTFT_MS=${LoadTestTtftMs}
+          BIBBIDI_AI_LOADTEST_CHUNK_INTERVAL_MS=${LoadTestChunkIntervalMs}
+          BIBBIDI_AI_LOADTEST_CHUNKS=${LoadTestChunks}
+          BIBBIDI_AI_LOADTEST_THROTTLE_RATIO=${LoadTestThrottleRatio}
+          AUTH_JWT_SECRET=${AuthJwtSecret}
+          ENV
+          echo '${DockerHubToken}' | docker login -u '${DockerHubUsername}' --password-stdin
+          until timeout 2 bash -c 'exec 3<>/dev/tcp/${DbInstance.PrivateIp}/3306'; do sleep 5; done
+          docker compose up -d
+          until curl -fs http://127.0.0.1:8081/actuator/health/readiness >/dev/null; do sleep 5; done
+          curl -fs http://127.0.0.1/healthz >/dev/null
+          docker logs bibbidi-backend > /tmp/backend.log 2>&1
+          grep -q 'profiles are active.*loadtest' /tmp/backend.log
+
+  LoadGeneratorInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: InternetRoute
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT20M
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref LoadGeneratorInstanceType
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref LoadGeneratorSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+      Tags:
+        - { Key: Name, Value: !Sub "bibbidi-loadtest-${RoundId}-generator" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get install -y python3-pip
+          pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          signal() { cfn-signal -e "$1" --reason "$(tail -c 900 /var/log/cloud-init-output.log | tr '\n"' '  ')" --stack ${AWS::StackName} --resource LoadGeneratorInstance --region ${AWS::Region}; }
+          trap 'signal $?' EXIT
+          shutdown -h "+$(( ${AutoStopHours} * 60 ))"
+          apt-get install -y git tar gzip curl
+          # 워크플로가 SSM 터널로 접속할 키. 22번 포트는 보안 그룹에서 열지 않는다.
+          install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+          echo '${SshPublicKey}' > /home/ubuntu/.ssh/authorized_keys
+          chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
+          chmod 0600 /home/ubuntu/.ssh/authorized_keys
+          # SSE 확장이 들어간 k6. 버전은 load-test.yml의 dev 실행과 같다.
+          curl -fsSL https://go.dev/dl/go1.26.0.linux-arm64.tar.gz | tar -C /usr/local -xz
+          export HOME=/root GOPATH=/root/go GOCACHE=/root/.cache/go-build PATH="$PATH:/usr/local/go/bin"
+          go install go.k6.io/xk6/cmd/xk6@v1.4.14
+          /root/go/bin/xk6 build v2.2.0 --with github.com/phymbert/xk6-sse@v0.2.0 --output /usr/local/bin/k6
+          k6 version
+
+Outputs:
+  BaseUrl:
+    Description: App URL reachable from the load generator
+    Value: !Sub "http://${AppInstance.PrivateIp}"
+  LoadGeneratorInstanceId:
+    Description: Target for the SSM-tunneled SSH session
+    Value: !Ref LoadGeneratorInstance
+  AppInstanceId:
+    Value: !Ref AppInstance
+  DbInstanceId:
+    Value: !Ref DbInstance

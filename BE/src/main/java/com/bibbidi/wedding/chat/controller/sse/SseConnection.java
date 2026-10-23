@@ -1,6 +1,9 @@
 package com.bibbidi.wedding.chat.controller.sse;
 
+import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.concurrent.CancellationException;
@@ -15,15 +18,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public final class SseConnection {
 
     private final SseEmitter emitter;
-    private final SseEvent failure;
     private final long deadline;
     private @Nullable Future<?> task;
     private @Nullable Future<?> timeout;
     private boolean closed;
 
-    SseConnection(SseEmitter emitter, SseEvent failure, long deadline) {
+    SseConnection(SseEmitter emitter, long deadline) {
         this.emitter = emitter;
-        this.failure = failure;
         this.deadline = deadline;
     }
 
@@ -95,12 +96,20 @@ public final class SseConnection {
 
     private void fail(Exception exception, boolean interrupt) {
         if (!closed) {
-            log.error("SSE 응답 처리 실패. type={}", exception.getClass().getSimpleName(), exception);
+            ClientError clientError = ClientError.INTERNAL_ERROR;
+            if (exception instanceof BusinessException businessException) {
+                clientError = businessException.clientError();
+                log.warn("SSE 응답 처리 실패. errorCode={} message={}",
+                        clientError.errorCode(), exception.getMessage());
+            } else {
+                log.error("SSE 응답 처리 실패. type={}", exception.getClass().getSimpleName(), exception);
+            }
             close(interrupt);
             try {
                 emitter.send(SseEmitter.event()
-                        .name(failure.type().value())
-                        .data(failure.data(), MediaType.APPLICATION_JSON));
+                        .name(ChatEventType.FAILURE.value())
+                        .data(new ChatResponse.Failure(clientError.errorCode(), clientError.message()),
+                                MediaType.APPLICATION_JSON));
             } catch (IOException | IllegalStateException ignored) {
                 // 이미 끊긴 연결에는 실패 이벤트를 다시 전송하지 않는다.
             } finally {

@@ -3,6 +3,8 @@ package com.bibbidi.wedding.chat.adapter.ai;
 import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
 import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
@@ -11,6 +13,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -65,6 +68,8 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                                 .stream()
                                 .chatResponse()
                 )
+                .onErrorMap(SpringAiConversationAdapter::isThrottled, exception -> new BusinessException(
+                        ClientError.AI_CAPACITY_EXCEEDED, "Bedrock 호출 한도 초과", exception))
                 .map(AiChatStreamRecorder::textOf)
                 .filter(text -> !text.isEmpty());
 
@@ -80,6 +85,15 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                 conversationKey,
                 List.of(new UserMessage(userPrompt), new AssistantMessage(answer))
         );
+    }
+
+    private static boolean isThrottled(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ThrottlingException) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

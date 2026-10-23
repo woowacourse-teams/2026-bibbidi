@@ -83,6 +83,7 @@ def dockerAvailable = providers.provider {
 }
 
 tasks.named('test', Test) {
+    exclude '**/BibbidiLocalEvaluationTest.class'
     exclude '**/BibbidiEvaluationIntegrationTest.class'
     inputs.property('dockerAvailable', dockerAvailable)
     testLogging {
@@ -109,4 +110,16 @@ tasks.named('bootJar') {
 tasks.named('processResources') {
     from('database/mysql/load_catalog.sql')
     from('database/mysql/load_terms.sql')
+}
+
+tasks.register('aiLocalEvaluationTest', Test) {
+    description = 'Evaluates models locally using prepared input, without Spring or Bedrock.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/BibbidiLocalEvaluationTest.class'
+    useJUnitPlatform()
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
+    outputs.upToDateWhen { false }
+    outputs.doNotCacheIf('외부 모델의 응답은 실행마다 달라질 수 있다') { true }
 }
