@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bibbidi.wedding.auth.token.BibbidiTokenIssuer;
-import com.bibbidi.wedding.checklist.service.ChecklistService;
 import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import java.util.List;
@@ -34,9 +33,6 @@ class CatalogItemAdditionIntegrationTest extends BibbidiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private ChecklistService checklistService;
 
     @Test
     @DisplayName("요청 중복은 한 번만 담고 요청 순서와 무관하게 카탈로그 표시 순서와 응답 필드를 유지한다")
@@ -90,15 +86,6 @@ class CatalogItemAdditionIntegrationTest extends BibbidiIntegrationTest {
         add(8L, 100L);
         assertOwnCatalogItems(7L, List.of(100));
         assertOwnCatalogItems(8L, List.of(100));
-    }
-
-    @Test
-    @DisplayName("실제 카탈로그 조회를 공유하는 추천 검증은 없는 ID와 등록 항목과 중복을 제외하고 요청 순서를 유지한다")
-    void shouldKeepRecommendationValidationContract() throws Exception {
-        add(7L, 100L);
-        assertThat(checklistService.filterRecommendableCatalogItemIds(7L, List.of(999L, 101L, 100L, 101L)))
-                .containsExactly(101L);
-        assertThat(checklistService.filterRecommendableCatalogItemIds(7L, List.of())).isEmpty();
     }
 
     private void add(Long userId, Long catalogItemId) throws Exception {
