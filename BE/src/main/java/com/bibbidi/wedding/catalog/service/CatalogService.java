@@ -1,10 +1,10 @@
 package com.bibbidi.wedding.catalog.service;
 
 import com.bibbidi.wedding.catalog.domain.Catalog;
-import com.bibbidi.wedding.catalog.domain.Category;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNameSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CategoryNames;
 import java.util.Collection;
 import java.util.List;
@@ -34,11 +34,8 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public CategoryNames findCategoryNames(Collection<Long> categoryIds) {
-        Catalog catalog = catalogRepository.findCatalog();
-
-        Map<Long, String> namesByCategoryId = catalog.categories().stream()
-                .filter(category -> categoryIds.contains(category.id()))
-                .collect(Collectors.toMap(Category::id, Category::name));
+        Map<Long, String> namesByCategoryId = catalogRepository.findCategoryNames(categoryIds).stream()
+                .collect(Collectors.toMap(CategoryNameSnapshot::id, CategoryNameSnapshot::name));
         return new CategoryNames(namesByCategoryId);
     }
 

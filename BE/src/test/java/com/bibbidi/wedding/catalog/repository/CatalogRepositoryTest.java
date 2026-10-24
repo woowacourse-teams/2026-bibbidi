@@ -14,6 +14,7 @@ import com.bibbidi.wedding.catalog.persistence.JpaStepEntity;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNameSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
@@ -147,6 +148,49 @@ class CatalogRepositoryTest {
     void shouldReturnEmptyForEmptyOrMissingIds() {
         assertThat(catalogRepository.findItems(List.of())).isEmpty();
         assertThat(catalogRepository.findItems(List.of(Long.MAX_VALUE))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("단계와 항목이 없는 카테고리도 요청한 ID와 이름으로 조회한다")
+    void shouldFindCategoryNameWithoutStepsOrItems() {
+        // given
+        JpaCategoryEntity category = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        jpaCategoryRepository.save(new JpaCategoryEntity(null, "요청하지 않은 영역", 2));
+
+        // when
+        List<CategoryNameSnapshot> names = catalogRepository.findCategoryNames(List.of(category.id()));
+
+        // then
+        assertThat(names).containsExactly(new CategoryNameSnapshot(category.id(), "웨딩홀"));
+    }
+
+    @Test
+    @DisplayName("요청한 여러 카테고리 이름을 중복 없이 조회하고 없는 ID는 제외한다")
+    void shouldFindOnlyRequestedCategoryNamesWithoutDuplicates() {
+        // given
+        JpaCategoryEntity weddingHall = jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+        JpaCategoryEntity styling = jpaCategoryRepository.save(new JpaCategoryEntity(null, "스드메", 2));
+        jpaCategoryRepository.save(new JpaCategoryEntity(null, "요청하지 않은 영역", 3));
+
+        // when
+        List<CategoryNameSnapshot> names = catalogRepository.findCategoryNames(
+                List.of(styling.id(), weddingHall.id(), weddingHall.id(), Long.MAX_VALUE));
+
+        // then
+        assertThat(names).containsExactlyInAnyOrder(
+                new CategoryNameSnapshot(weddingHall.id(), "웨딩홀"),
+                new CategoryNameSnapshot(styling.id(), "스드메")
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 카테고리 ID는 빈 이름 목록을 반환한다")
+    void shouldReturnEmptyCategoryNamesForMissingIds() {
+        // given
+        jpaCategoryRepository.save(new JpaCategoryEntity(null, "웨딩홀", 1));
+
+        // when, then
+        assertThat(catalogRepository.findCategoryNames(List.of(Long.MAX_VALUE))).isEmpty();
     }
 
     @Test
