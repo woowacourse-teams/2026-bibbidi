@@ -5,8 +5,10 @@ import com.bibbidi.wedding.catalog.persistence.JpaCatalogItemRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 
@@ -49,5 +51,12 @@ public class CatalogRepository {
 
     public List<CatalogItemDetailSnapshot> findAllItemDetails() {
         return jpaCatalogItemRepository.findAllDetails();
+    }
+
+    public List<CatalogItemSnapshot> findItems(Collection<Long> itemIds) {
+        if (itemIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaCatalogItemRepository.findSnapshotsByIdIn(itemIds);
     }
 }

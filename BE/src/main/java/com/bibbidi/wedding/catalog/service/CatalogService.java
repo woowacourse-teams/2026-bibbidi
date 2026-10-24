@@ -24,12 +24,7 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<CatalogItemSnapshot> findItems(Collection<Long> itemIds) {
-        Catalog catalog = catalogRepository.findCatalog();
-
-        return catalog.categories().stream()
-                .flatMap(category -> category.findItems(itemIds).stream()
-                        .map(item -> new CatalogItemSnapshot(item.id(), category.id(), item.title())))
-                .toList();
+        return catalogRepository.findItems(itemIds);
     }
 
     @Transactional(readOnly = true)
