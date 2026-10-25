@@ -5,7 +5,7 @@ export function installPopoverMock() {
   const originalMatches = prototype.matches;
   const style = document.createElement("style");
   style.textContent =
-    '[popover="auto"]:not([data-test-popover-open]), [popover="manual"]:not([data-test-popover-open]) { display: none; } [data-test-popover-open] { display: block; }';
+    '[popover="auto"]:not([data-test-popover-open]), [popover="manual"]:is([role="listbox"], [role="menu"]):not([data-test-popover-open]) { display: none; } [data-test-popover-open] { display: block; }';
   document.head.append(style);
 
   function toggle(element: HTMLElement, open: boolean) {
@@ -34,7 +34,10 @@ export function installPopoverMock() {
       get(this: HTMLElement) {
         if (
           this.getAttribute("popover") !== "auto" &&
-          this.getAttribute("popover") !== "manual"
+          !(
+            this.getAttribute("popover") === "manual" &&
+            ["listbox", "menu"].includes(this.getAttribute("role") ?? "")
+          )
         )
           return descriptors.showPopover?.value;
         return function (this: HTMLElement) {
@@ -47,7 +50,10 @@ export function installPopoverMock() {
       get(this: HTMLElement) {
         if (
           this.getAttribute("popover") !== "auto" &&
-          this.getAttribute("popover") !== "manual"
+          !(
+            this.getAttribute("popover") === "manual" &&
+            ["listbox", "menu"].includes(this.getAttribute("role") ?? "")
+          )
         )
           return descriptors.hidePopover?.value;
         return function (this: HTMLElement) {
