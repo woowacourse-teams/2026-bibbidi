@@ -33,3 +33,11 @@ export function RetryIcon(props: ActionIconProps) {
     </IconBase>
   );
 }
+
+export function CheckIcon(props: ActionIconProps) {
+  return (
+    <IconBase aria-hidden="true" focusable="false" {...props}>
+      <path d="m5 12 4 4L19 6" />
+    </IconBase>
+  );
+}

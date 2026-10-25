@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
+import { useChecklistAppointmentCreation } from "../useChecklistAppointmentCreation";
 import { useChecklistTaskCreation } from "../useChecklistTaskCreation";
 import { createChecklistViewModel } from "../view-model/createChecklistViewModel";
 import { Checklist } from "./Checklist";
@@ -42,6 +43,12 @@ let media: ReturnType<typeof installMatchMedia>;
 function Harness() {
   const [selected, setSelected] = useState<string | null>(null);
   const creation = useChecklistTaskCreation({});
+  const appointment = useChecklistAppointmentCreation({
+    checklistItemId: selected ? 500 : null,
+    isAuthenticated: true,
+    confirmDiscard: true,
+    onSubmit: () => false,
+  });
   return (
     <div className="service-layout" data-modal-scope>
       <header className="service-layout__header" data-modal-background>
@@ -56,6 +63,8 @@ function Harness() {
           onBackTaskDetail={() => setSelected(null)}
           onOpenTaskCreation={creation.open}
           taskCreation={creation}
+          appointmentCreation={appointment}
+          onRequestScheduleCreation={appointment.open}
         />
       </div>
     </div>
@@ -177,7 +186,7 @@ it("작성값을 크기 전환에서 유지하고 오버레이 위의 버리기 
 });
 
 it.each([false, true])(
-  "카테고리 select의 Escape는 작성창을 닫지 않는다 (입력=%s)",
+  "카테고리 팝업의 Escape는 작성창을 닫지 않는다 (입력=%s)",
   (dirty) => {
     render(<Harness />);
     resize(1024);
@@ -188,10 +197,53 @@ it.each([false, true])(
       });
     const select = screen.getByRole("combobox");
     select.focus();
+    fireEvent.click(select);
     fireEvent.keyDown(select, { key: "Escape" });
     expect(screen.getByRole("dialog", { name: "할 일 추가" })).toBeTruthy();
     expect(
       screen.queryByRole("dialog", { name: "작성 중인 내용을 닫을까요?" }),
     ).toBeNull();
+  },
+);
+
+it.each([390, 1024, 1440])(
+  "일정 변경 후 닫기는 확인을 거치고 계속 작성 시 입력·초점을 보존한다 (%s)",
+  async (width) => {
+    render(<Harness />);
+    resize(width);
+    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 방문/ }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "일정 추가" }));
+    const title = screen.getByRole("textbox", { name: /제목/ });
+    fireEvent.change(title, { target: { value: "보존할 상담 일정" } });
+    title.focus();
+    fireEvent.keyDown(title, { key: "Escape" });
+    let discard = screen.getByRole("dialog", {
+      name: "작성 중인 내용을 닫을까요?",
+    });
+    expect(document.activeElement?.textContent).toContain("계속 작성");
+    fireEvent.click(within(discard).getByRole("button", { name: "계속 작성" }));
+    await act(async () => {});
+    expect(
+      (screen.getByRole("textbox", { name: /제목/ }) as HTMLInputElement).value,
+    ).toBe("보존할 상담 일정");
+    expect(document.activeElement).toBe(title);
+    if (width === 1024)
+      fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+    else fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    discard = screen.getByRole("dialog", {
+      name: "작성 중인 내용을 닫을까요?",
+    });
+    fireEvent.keyDown(
+      within(discard).getByRole("button", { name: "계속 작성" }),
+      { key: "Escape" },
+    );
+    await act(async () => {});
+    expect(screen.getByRole("textbox", { name: /제목/ })).toBe(title);
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+    await act(async () => {});
+    expect(screen.queryByRole("textbox", { name: /제목/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "일정 추가" })).toBeTruthy();
   },
 );

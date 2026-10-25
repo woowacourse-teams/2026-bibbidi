@@ -12,6 +12,15 @@ import {
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 
+function chooseCategory(select: HTMLElement, value: string) {
+  fireEvent.click(select);
+  const native = select.parentElement!.querySelector("select")!;
+  const label = Array.from(native.options).find(
+    (option) => option.value === value,
+  )!.textContent!;
+  fireEvent.click(screen.getByRole("option", { name: label }));
+}
+
 const categories: ChecklistCategoryViewModel[] = [
   {
     completedCount: 0,
@@ -142,9 +151,7 @@ describe("할 일 추가 폼", () => {
       fireEvent.change(within(panel).getByRole("textbox"), {
         target: { value: "새 할 일" },
       });
-      fireEvent.change(within(panel).getByRole("combobox"), {
-        target: { value: "10" },
-      });
+      chooseCategory(within(panel).getByRole("combobox"), "10");
       fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
       await act(async () => {
@@ -158,10 +165,9 @@ describe("할 일 추가 폼", () => {
       expect(
         (within(reopenedPanel).getByRole("textbox") as HTMLInputElement).value,
       ).toBe("");
-      expect(
-        (within(reopenedPanel).getByRole("combobox") as HTMLSelectElement)
-          .value,
-      ).toBe("");
+      expect(within(reopenedPanel).getByRole("combobox").textContent).toContain(
+        "카테고리를 선택해 주세요",
+      );
     },
   );
 
@@ -171,9 +177,7 @@ describe("할 일 추가 폼", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "작성 중인 할 일" },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "20" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "20");
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
     await act(async () => {
@@ -185,9 +189,9 @@ describe("할 일 추가 폼", () => {
     expect((within(panel).getByRole("textbox") as HTMLInputElement).value).toBe(
       "작성 중인 할 일",
     );
-    expect(
-      (within(panel).getByRole("combobox") as HTMLSelectElement).value,
-    ).toBe("20");
+    expect(within(panel).getByRole("combobox").textContent).toContain(
+      "청첩장·하객",
+    );
   });
 
   it("닫힌 작성 세션은 사용자 변경 시 중복 close navigation을 만들지 않는다", async () => {
@@ -218,9 +222,7 @@ describe("할 일 추가 폼", () => {
     const panel = openForm();
     const title = within(panel).getByRole("textbox", { name: /할 일 제목/ });
 
-    expect(panel.classList.contains("checklist-task-creation--desktop")).toBe(
-      true,
-    );
+    expect(!panel.hasAttribute("data-mobile")).toBe(true);
     expect(document.activeElement).toBe(title);
     expect(within(panel).getByText("0 / 50")).toBeTruthy();
   });
@@ -231,24 +233,16 @@ describe("할 일 추가 폼", () => {
     openForm();
     const title = screen.getByRole("textbox", { name: /할 일 제목/ });
     fireEvent.change(title, { target: { value: "청첩장 문구 확인" } });
-    fireEvent.change(screen.getByRole("combobox", { name: /카테고리/ }), {
-      target: { value: "20" },
-    });
+    chooseCategory(screen.getByRole("combobox", { name: /카테고리/ }), "20");
 
     act(() => media.setMatches(true));
 
     const page = screen.getByRole("dialog", { name: "할 일 추가" });
-    expect(page.classList.contains("checklist-task-creation--mobile")).toBe(
-      true,
-    );
+    expect(page.hasAttribute("data-mobile")).toBe(true);
     expect(within(page).getByDisplayValue("청첩장 문구 확인")).toBeTruthy();
     expect(
-      (
-        within(page).getByRole("combobox", {
-          name: /카테고리/,
-        }) as HTMLSelectElement
-      ).value,
-    ).toBe("20");
+      within(page).getByRole("combobox", { name: /카테고리/ }).textContent,
+    ).toContain("청첩장·하객");
 
     const backButton = within(page).getByRole("button", {
       name: "체크리스트로 돌아가기",
@@ -283,7 +277,7 @@ describe("할 일 추가 폼", () => {
     const title = within(panel).getByRole("textbox", { name: /할 일 제목/ });
     expect(document.activeElement).toBe(title);
     expect(title.getAttribute("aria-describedby")).toContain(
-      "checklist-task-creation-title-error",
+      "checklist-task-creation-title-input-help",
     );
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -309,18 +303,20 @@ describe("할 일 추가 폼", () => {
     ).toBeNull();
   });
 
-  it("네이티브 카테고리 선택기에 ViewModel 선택지를 제공한다", () => {
+  it("공통 카테고리 선택기에 ViewModel 선택지를 제공한다", () => {
     render(<CreationHarness onSubmit={vi.fn()} />);
     const panel = openForm();
     const select = within(panel).getByRole("combobox", { name: /카테고리/ });
-
-    expect(within(select).getByRole("option", { name: "예식장" })).toBeTruthy();
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    const list = screen.getByRole("listbox");
+    expect(within(list).getByRole("option", { name: "예식장" })).toBeTruthy();
     expect(
-      within(select).getByRole("option", { name: "청첩장·하객" }),
+      within(list).getByRole("option", { name: "청첩장·하객" }),
     ).toBeTruthy();
-
-    fireEvent.change(select, { target: { value: "20" } });
-    expect((select as HTMLSelectElement).value).toBe("20");
+    fireEvent.keyDown(select, { key: "End" });
+    fireEvent.keyDown(select, { key: "Enter" });
+    expect(select.textContent).toContain("청첩장·하객");
+    expect(select.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("유효한 입력을 trim해 한 번 전달하고 IME 조합 중 Enter는 제출하지 않는다", async () => {
@@ -329,9 +325,9 @@ describe("할 일 추가 폼", () => {
     const panel = openForm();
     const title = within(panel).getByRole("textbox", { name: /할 일 제목/ });
     fireEvent.change(title, { target: { value: "  청첩장 문구 확인  " } });
-    fireEvent.change(
+    chooseCategory(
       within(panel).getByRole("combobox", { name: /카테고리/ }),
-      { target: { value: "10" } },
+      "10",
     );
 
     fireEvent.compositionStart(title);

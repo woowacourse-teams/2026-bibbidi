@@ -1,22 +1,15 @@
-import { SubmitEvent, useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useAppointmentFormView } from "../../checklist/useAppointmentFormView";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
-import {
-  CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH,
-  ChecklistAppointmentCreationController,
-} from "../useChecklistAppointmentCreation";
-import { ChecklistAppointmentEditingController } from "../useChecklistAppointmentManagement";
+import { CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH } from "../../checklist/useChecklistAppointmentCreation";
+import type { ChecklistAppointmentFormController } from "../../checklist/model/appointmentForm";
 import { containTabFocus } from "../../../shared/focus/containTabFocus";
-import "./ChecklistAppointmentCreation.css";
+import "./CalendarAppointmentForm.css";
 
-interface ChecklistAppointmentCreationProps {
-  modal?: boolean;
-  controller:
-    | ChecklistAppointmentCreationController
-    | ChecklistAppointmentEditingController;
-  heading?: "일정 수정" | "일정 추가";
+interface CalendarAppointmentFormProps {
+  controller: ChecklistAppointmentFormController;
   taskTitle: string;
-  embedded?: boolean;
 }
 
 function BackIcon() {
@@ -27,33 +20,24 @@ function BackIcon() {
   );
 }
 
-export function ChecklistAppointmentCreation({
-  modal = false,
+export function CalendarAppointmentForm({
   controller,
-  heading = "일정 추가",
   taskTitle,
-  embedded = false,
-}: ChecklistAppointmentCreationProps) {
+}: CalendarAppointmentFormProps) {
+  const heading = "일정 추가";
   const isMobileLayout = useIsMobileLayout();
-  const formRef = useRef<HTMLFormElement>(null);
-  const errorSummaryRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
-  const dateRef = useRef<HTMLInputElement>(null);
-  const startTimeRef = useRef<HTMLInputElement>(null);
-  const endTimeRef = useRef<HTMLInputElement>(null);
-  const placeRef = useRef<HTMLInputElement>(null);
-  const isComposingRef = useRef(false);
-  const isSubmitting = controller.submissionState.status === "submitting";
-
-  useEffect(() => {
-    titleRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (controller.submissionState.status === "error") {
-      errorSummaryRef.current?.focus();
-    }
-  }, [controller.submissionState.status]);
+  const {
+    formRef,
+    errorSummaryRef,
+    titleRef,
+    dateRef,
+    startTimeRef,
+    endTimeRef,
+    placeRef,
+    pending: isSubmitting,
+    submit,
+    titleComposition,
+  } = useAppointmentFormView(controller);
 
   useEffect(() => {
     const form = formRef.current;
@@ -63,7 +47,7 @@ export function ChecklistAppointmentCreation({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isMobileLayout && !modal) {
+      if (isMobileLayout) {
         containTabFocus(event, form);
       }
 
@@ -76,34 +60,7 @@ export function ChecklistAppointmentCreation({
 
     form.addEventListener("keydown", handleKeyDown);
     return () => form.removeEventListener("keydown", handleKeyDown);
-  }, [controller, isMobileLayout, isSubmitting, modal]);
-
-  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (isComposingRef.current) {
-      return;
-    }
-
-    const firstError = await controller.submit();
-    switch (firstError) {
-      case "title":
-        titleRef.current?.focus();
-        break;
-      case "date":
-        dateRef.current?.focus();
-        break;
-      case "startTime":
-        startTimeRef.current?.focus();
-        break;
-      case "endTime":
-        endTimeRef.current?.focus();
-        break;
-      case "place":
-        placeRef.current?.focus();
-        break;
-    }
-  };
+  }, [controller, formRef, isMobileLayout, isSubmitting]);
 
   const errorId = (field: string) =>
     `checklist-appointment-creation-${field}-error`;
@@ -111,17 +68,9 @@ export function ChecklistAppointmentCreation({
   return (
     <aside
       aria-labelledby="checklist-appointment-creation-title"
-      aria-modal={!embedded && (isMobileLayout || modal) ? "true" : undefined}
       className={`checklist-appointment-creation checklist-appointment-creation--${
         isMobileLayout ? "mobile" : "desktop"
       }`}
-      role={
-        embedded
-          ? undefined
-          : isMobileLayout || modal
-            ? "dialog"
-            : "complementary"
-      }
     >
       <form
         className="checklist-appointment-creation__form"
@@ -132,9 +81,7 @@ export function ChecklistAppointmentCreation({
         <header className="checklist-appointment-creation__header">
           {isMobileLayout ? (
             <button
-              aria-label={
-                embedded ? "캘린더로 돌아가기" : "할 일 상세로 돌아가기"
-              }
+              aria-label="캘린더로 돌아가기"
               disabled={isSubmitting}
               onClick={controller.cancel}
               type="button"
@@ -181,12 +128,7 @@ export function ChecklistAppointmentCreation({
               id="checklist-appointment-creation-title-input"
               onBlur={controller.touchTitle}
               onChange={(event) => controller.changeTitle(event.target.value)}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-              }}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
+              {...titleComposition}
               placeholder="일정 제목을 입력하세요"
               ref={titleRef}
               value={controller.draft.title}

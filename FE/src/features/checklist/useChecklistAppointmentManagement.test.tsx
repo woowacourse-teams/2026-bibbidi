@@ -221,3 +221,49 @@ describe("useChecklistAppointmentManagement", () => {
     expect(result.current.operationFeedback.status).toBe("idle");
   });
 });
+
+describe("체크리스트 일정 수정 버리기 확인", () => {
+  it("처음 연 값과 비교하고 되돌린 입력은 변경으로 취급하지 않는다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentManagement({
+        audience: "authenticated",
+        checklistItemId: 500,
+        commandRepository: createRepository(),
+        refreshAuth: () => {},
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isOpen).toBe(false);
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.changeMemo("변경한 메모"));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isDiscardDialogOpen).toBe(true);
+    act(() => result.current.editing.cancelDiscard());
+    expect(result.current.editing.draft.memo).toBe("변경한 메모");
+    act(() => result.current.editing.changeMemo(appointment.memo!));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isOpen).toBe(false);
+    expect(result.current.editing.isDiscardDialogOpen).toBe(false);
+  });
+  it("시간을 바꾼 뒤 버리기를 선택하면 수정 세션을 초기화한다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentManagement({
+        audience: "authenticated",
+        checklistItemId: 500,
+        commandRepository: createRepository(),
+        refreshAuth: () => {},
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.changeStartTime("12:00"));
+    act(() => result.current.editing.cancel());
+    act(() => result.current.editing.confirmDiscard());
+    expect(result.current.editing.isOpen).toBe(false);
+    expect(result.current.editing.isDiscardDialogOpen).toBe(false);
+    act(() => result.current.startEditing(appointment));
+    expect(result.current.editing.draft.startTime).toBe("10:00");
+  });
+});

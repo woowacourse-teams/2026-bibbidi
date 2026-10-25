@@ -1,3 +1,5 @@
+import { Button } from "../../../components/button";
+import { IconButton } from "../../../components/icon-button";
 import { KeyboardEvent, useEffect, useRef } from "react";
 
 import {
@@ -63,7 +65,7 @@ function ChecklistAppointment({
       if (
         event.target instanceof Node &&
         !menuRef.current?.contains(event.target) &&
-        event.target !== triggerRef.current
+        !triggerRef.current?.contains(event.target)
       ) {
         shouldRestoreFocusRef.current = true;
         managementRef.current?.closeMenu();
@@ -186,24 +188,25 @@ function ChecklistAppointment({
 
       {management ? (
         <span className="checklist-detail-content__appointment-menu-root">
-          <button
+          <IconButton
+            icon={
+              <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="12" cy="19" r="1.6" />
+              </svg>
+            }
+            iconSize={20}
             aria-controls={`${appointment.id}-appointment-menu`}
             aria-expanded={menuIsOpen}
             aria-haspopup="menu"
             aria-label={`${appointment.title} 일정 더보기`}
-            className="checklist-detail-content__appointment-more"
             disabled={isOperationPending}
             id={`${appointment.id}-appointment-menu-button`}
             onClick={() => management.toggleMenu(appointment.id)}
             ref={triggerRef}
             type="button"
-          >
-            <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="5" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="12" cy="19" r="1.6" />
-            </svg>
-          </button>
+          />
           {menuIsOpen ? (
             <div
               className="checklist-detail-content__appointment-menu"
@@ -283,8 +286,9 @@ export function ChecklistTaskDetailContent({
             일정 {task.appointments.length}개
           </h3>
           {onRequestScheduleCreation ? (
-            <button
-              className="checklist-detail-content__add-appointment"
+            <Button
+              size="small"
+              variant="weak"
               id={`${task.id}-add-appointment`}
               onClick={(event) => {
                 event.currentTarget.focus();
@@ -294,7 +298,7 @@ export function ChecklistTaskDetailContent({
             >
               <span aria-hidden="true">＋</span>
               일정 추가
-            </button>
+            </Button>
           ) : null}
         </div>
         {task.appointments.length === 0 ? (

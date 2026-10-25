@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../button";
 import type { ButtonProps } from "../button";
+import { canRestoreFocus } from "../../shared/focus/useReturnFocus";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
 import "./Dialog.css";
 
@@ -12,6 +13,9 @@ export type DialogProps = Omit<
 > & {
   open: boolean;
   onClose: () => void;
+  onEscape?: () => void;
+  onDimmerClick?: () => void;
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
@@ -36,6 +40,9 @@ export type ConfirmDialogProps = Omit<DialogProps, "actions"> & {
 function Root({
   open,
   onClose,
+  onEscape,
+  onDimmerClick,
+  fallbackFocusRef,
   title,
   description,
   children,
@@ -96,8 +103,11 @@ function Root({
         restore.current = () => {
           dialog.close();
           queueMicrotask(() => {
-            if (previous instanceof HTMLElement && previous.isConnected)
-              previous.focus({ preventScroll: true });
+            const target = canRestoreFocus(previous)
+              ? previous
+              : fallbackFocusRef?.current;
+            if (target && canRestoreFocus(target))
+              target.focus({ preventScroll: true });
           });
         };
         const initial =
@@ -121,7 +131,7 @@ function Root({
     return () => {
       cancelled = true;
     };
-  }, [open, portalContainer, returnFocusRef]);
+  }, [open, portalContainer, returnFocusRef, fallbackFocusRef]);
 
   function rejectDismiss() {
     const panel = panelRef.current;
@@ -164,14 +174,14 @@ function Root({
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          if (closeOnEscape) onClose();
+          if (closeOnEscape) (onEscape ?? onClose)();
           else rejectDismiss();
         } else containTabFocus(event, event.currentTarget);
       }}
       onCancel={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (closeOnEscape) onClose();
+        if (closeOnEscape) (onEscape ?? onClose)();
         else rejectDismiss();
       }}
       onPointerDown={(event) => {
@@ -187,7 +197,7 @@ function Root({
           event.target === event.currentTarget;
         backdropPress.current = false;
         if (outside) {
-          if (closeOnDimmerClick) onClose();
+          if (closeOnDimmerClick) (onDimmerClick ?? onClose)();
           else rejectDismiss();
         }
       }}

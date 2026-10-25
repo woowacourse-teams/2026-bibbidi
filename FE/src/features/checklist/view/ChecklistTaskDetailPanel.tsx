@@ -1,3 +1,5 @@
+import { IconButton } from "../../../components/icon-button";
+import { CloseIcon } from "../../../components/icons/ActionIcons";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
@@ -45,14 +47,11 @@ export function ChecklistTaskDetailPanel({
           task={task}
           titleId={titleId}
         />
-        <button
+        <IconButton
           aria-label="할 일 상세 닫기"
-          className="checklist-detail-panel__close"
+          icon={<CloseIcon />}
           onClick={onClose}
-          type="button"
-        >
-          <span aria-hidden="true">×</span>
-        </button>
+        />
       </header>
 
       <ChecklistTaskDetailContent

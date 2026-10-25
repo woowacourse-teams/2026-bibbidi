@@ -284,6 +284,7 @@ export function ChecklistFeature({
       ? selectedChecklistItemId
       : null;
   const appointmentCreation = useChecklistAppointmentCreation({
+    confirmDiscard: true,
     checklistItemId: appointmentCreationChecklistItemId,
     isAuthenticated: audience === "authenticated",
     onSubmit: onSubmitAppointment ?? submitAppointment,
@@ -291,6 +292,7 @@ export function ChecklistFeature({
     sessionIdentity,
   });
   const appointmentManagement = useChecklistAppointmentManagement({
+    confirmDiscard: true,
     audience,
     checklistItemId: appointmentManagementChecklistItemId,
     commandRepository: checklistCommandRepository,

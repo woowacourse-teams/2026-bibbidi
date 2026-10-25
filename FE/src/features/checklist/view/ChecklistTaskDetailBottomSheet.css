@@ -53,8 +53,7 @@
     margin: 0;
     overflow: hidden;
     color: var(--color-fg-neutral);
-    font-size: 20px;
-    line-height: 1.4;
+    font: var(--typography-t5);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

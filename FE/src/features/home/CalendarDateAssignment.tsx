@@ -11,7 +11,7 @@ import {
   ChecklistAppointmentCreationInput,
   useChecklistAppointmentCreation,
 } from "../checklist/useChecklistAppointmentCreation";
-import { ChecklistAppointmentCreation } from "../checklist/view/ChecklistAppointmentCreation";
+import { CalendarAppointmentForm } from "./view/CalendarAppointmentForm";
 
 export function CalendarDateAssignment({
   itemId,
@@ -103,11 +103,7 @@ export function CalendarDateAssignment({
       }}
       aria-label={`${title} 일정 추가`}
     >
-      <ChecklistAppointmentCreation
-        controller={controller}
-        taskTitle={title}
-        embedded
-      />
+      <CalendarAppointmentForm controller={controller} taskTitle={title} />
     </dialog>
   );
 }

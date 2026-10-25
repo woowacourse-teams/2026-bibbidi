@@ -162,3 +162,31 @@ export function toTimeInputValue(value: string | null) {
   const match = /(?:^|T)(\d{2}:\d{2})(?::\d{2})?/.exec(value);
   return match?.[1] ?? "";
 }
+
+export interface ChecklistAppointmentFormController {
+  canSubmit: boolean;
+  cancel: () => void;
+  changeDate: (date: string) => void;
+  changeEndTime: (endTime: string) => void;
+  changeMemo: (memo: string) => void;
+  changePlace: (place: string) => void;
+  changeStartTime: (startTime: string) => void;
+  changeTitle: (title: string) => void;
+  draft: ChecklistAppointmentFormDraft;
+  errors: ChecklistAppointmentFormErrors;
+  submissionState:
+    | { status: "idle" }
+    | { status: "submitting" }
+    | { message: string; retryLabel: string; status: "error" };
+  submit: () => Promise<ChecklistAppointmentFormField | null>;
+  touchDate: () => void;
+  touchEndTime: () => void;
+  touchPlace: () => void;
+  touchStartTime: () => void;
+  touchTitle: () => void;
+}
+export interface ChecklistAppointmentDiscardController {
+  isDiscardDialogOpen: boolean;
+  cancelDiscard: () => void;
+  confirmDiscard: () => void;
+}

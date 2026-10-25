@@ -12,6 +12,8 @@ import {
 import { AppointmentCreationError } from "./model/appointmentCreation";
 import {
   CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH,
+  ChecklistAppointmentFormController,
+  ChecklistAppointmentDiscardController,
   ChecklistAppointmentFormDraft,
   ChecklistAppointmentFormErrors,
   ChecklistAppointmentFormField,
@@ -37,15 +39,14 @@ export interface ChecklistAppointmentCreationInput {
 }
 
 export type ChecklistAppointmentCreationSubmissionState =
-  | { status: "idle" }
-  | { status: "submitting" }
-  | { message: string; retryLabel: string; status: "error" };
+  ChecklistAppointmentFormController["submissionState"];
 
 export type ChecklistAppointmentCreationDraft = ChecklistAppointmentFormDraft;
 export type ChecklistAppointmentCreationErrors = ChecklistAppointmentFormErrors;
 export type ChecklistAppointmentCreationField = ChecklistAppointmentFormField;
 
 interface UseChecklistAppointmentCreationOptions {
+  confirmDiscard?: boolean;
   checklistItemId: number | null;
   isAuthenticated: boolean;
   onSubmit?: (
@@ -56,27 +57,13 @@ interface UseChecklistAppointmentCreationOptions {
   sessionIdentity?: string;
 }
 
-export interface ChecklistAppointmentCreationController {
-  canOpen: boolean;
-  canSubmit: boolean;
-  cancel: () => void;
-  changeDate: (date: string) => void;
-  changeEndTime: (endTime: string) => void;
-  changeMemo: (memo: string) => void;
-  changePlace: (place: string) => void;
-  changeStartTime: (startTime: string) => void;
-  changeTitle: (title: string) => void;
-  draft: ChecklistAppointmentCreationDraft;
-  errors: ChecklistAppointmentCreationErrors;
+export interface ChecklistAppointmentCreationController
+  extends
+    ChecklistAppointmentFormController,
+    ChecklistAppointmentDiscardController {
   isOpen: boolean;
+  canOpen: boolean;
   open: (source?: AppointmentCreationSource) => void;
-  submissionState: ChecklistAppointmentCreationSubmissionState;
-  submit: () => Promise<ChecklistAppointmentCreationField | null>;
-  touchDate: () => void;
-  touchEndTime: () => void;
-  touchPlace: () => void;
-  touchStartTime: () => void;
-  touchTitle: () => void;
 }
 
 const emptyDraft = emptyAppointmentDraft;
@@ -86,6 +73,7 @@ const idleSubmissionState: ChecklistAppointmentCreationSubmissionState = {
 };
 
 export function useChecklistAppointmentCreation({
+  confirmDiscard = false,
   checklistItemId,
   isAuthenticated,
   onSubmit,
@@ -93,6 +81,7 @@ export function useChecklistAppointmentCreation({
   sessionIdentity,
 }: UseChecklistAppointmentCreationOptions): ChecklistAppointmentCreationController {
   const [draft, setDraft] = useState(emptyDraft);
+  const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [errors, setErrors] = useState<ChecklistAppointmentCreationErrors>({});
   const [isOpen, setIsOpen] = useState(false);
   const [submissionState, setSubmissionState] =
@@ -141,6 +130,7 @@ export function useChecklistAppointmentCreation({
 
       setActiveContextKey(contextKey);
       setDraft(emptyDraft);
+      setDiscardDialogOpen(false);
       setErrors({});
       setIsOpen(false);
       setSubmissionState(idleSubmissionState);
@@ -173,6 +163,7 @@ export function useChecklistAppointmentCreation({
     queueMicrotask(() => {
       if (!isActive) return;
       setDraft(emptyDraft);
+      setDiscardDialogOpen(false);
       setErrors({});
       setSubmissionState(idleSubmissionState);
       setIsOpen(false);
@@ -201,6 +192,7 @@ export function useChecklistAppointmentCreation({
   };
 
   const resetAndClose = () => {
+    setDiscardDialogOpen(false);
     requestGenerationRef.current += 1;
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
@@ -217,9 +209,23 @@ export function useChecklistAppointmentCreation({
     canSubmit:
       isAuthenticated && checklistItemId !== null && onSubmit !== undefined,
     cancel: () => {
-      if (!submissionInFlightRef.current) {
-        resetAndClose();
-      }
+      if (submissionInFlightRef.current) return;
+      if (
+        confirmDiscard &&
+        !needsRefreshRef.current &&
+        Object.keys(emptyDraft).some(
+          (key) =>
+            draft[key as keyof typeof draft] !==
+            emptyDraft[key as keyof typeof draft],
+        )
+      )
+        setDiscardDialogOpen(true);
+      else resetAndClose();
+    },
+    isDiscardDialogOpen: isCurrentContext && isOpen && isDiscardDialogOpen,
+    cancelDiscard: () => setDiscardDialogOpen(false),
+    confirmDiscard: () => {
+      if (!submissionInFlightRef.current) resetAndClose();
     },
     changeDate: (date) => {
       setDraft((current) => ({ ...current, date }));

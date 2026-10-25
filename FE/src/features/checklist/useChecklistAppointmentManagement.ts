@@ -6,6 +6,8 @@ import {
 } from "../../infrastructure/error-tracking";
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
+  ChecklistAppointmentFormController,
+  ChecklistAppointmentDiscardController,
   ChecklistAppointmentFormDraft,
   ChecklistAppointmentFormErrors,
   ChecklistAppointmentFormField,
@@ -45,28 +47,11 @@ interface AppointmentDeletionConfirmation {
   appointmentId: number;
 }
 
-export interface ChecklistAppointmentEditingController {
-  canSubmit: boolean;
-  cancel: () => void;
-  changeDate: (date: string) => void;
-  changeEndTime: (endTime: string) => void;
-  changeMemo: (memo: string) => void;
-  changePlace: (place: string) => void;
-  changeStartTime: (startTime: string) => void;
-  changeTitle: (title: string) => void;
-  draft: ChecklistAppointmentFormDraft;
-  errors: ChecklistAppointmentFormErrors;
+export interface ChecklistAppointmentEditingController
+  extends
+    ChecklistAppointmentFormController,
+    ChecklistAppointmentDiscardController {
   isOpen: boolean;
-  submissionState:
-    | { status: "idle" }
-    | { status: "submitting" }
-    | { message: string; retryLabel: string; status: "error" };
-  submit: () => Promise<ChecklistAppointmentFormField | null>;
-  touchDate: () => void;
-  touchEndTime: () => void;
-  touchPlace: () => void;
-  touchStartTime: () => void;
-  touchTitle: () => void;
 }
 
 export interface ChecklistAppointmentManagementController {
@@ -85,6 +70,7 @@ export interface ChecklistAppointmentManagementController {
 }
 
 interface UseChecklistAppointmentManagementOptions {
+  confirmDiscard?: boolean;
   audience: ChecklistAudience | undefined;
   checklistItemId: number | null;
   commandRepository: MyChecklistCommandRepository;
@@ -125,6 +111,7 @@ function operationErrorMessage(
 }
 
 export function useChecklistAppointmentManagement({
+  confirmDiscard = false,
   audience,
   checklistItemId,
   commandRepository,
@@ -138,6 +125,8 @@ export function useChecklistAppointmentManagement({
     number | null
   >(null);
   const [draft, setDraft] = useState(emptyAppointmentDraft);
+  const [initialDraft, setInitialDraft] = useState(emptyAppointmentDraft);
+  const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [errors, setErrors] = useState<ChecklistAppointmentFormErrors>({});
   const [deletionConfirmation, setDeletionConfirmation] =
     useState<AppointmentDeletionConfirmation | null>(null);
@@ -150,6 +139,7 @@ export function useChecklistAppointmentManagement({
   const isCurrentContext = contextKey === activeContextKey;
 
   const reset = () => {
+    setDiscardDialogOpen(false);
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
     inFlightRef.current = false;
@@ -278,6 +268,14 @@ export function useChecklistAppointmentManagement({
           } as const)
       : ({ status: "idle" } as const);
 
+  const closeEditing = () => {
+    setDiscardDialogOpen(false);
+    setEditingAppointmentId(null);
+    setDraft(emptyAppointmentDraft);
+    setErrors({});
+    setOperationFeedback({ status: "idle" });
+  };
+
   return {
     cancelDelete: () => {
       if (!inFlightRef.current) {
@@ -320,12 +318,25 @@ export function useChecklistAppointmentManagement({
         audience === "authenticated" &&
         checklistItemId !== null,
       cancel: () => {
-        if (!inFlightRef.current) {
-          setEditingAppointmentId(null);
-          setDraft(emptyAppointmentDraft);
-          setErrors({});
-          setOperationFeedback({ status: "idle" });
-        }
+        if (inFlightRef.current) return;
+        if (
+          confirmDiscard &&
+          Object.keys(initialDraft).some(
+            (key) =>
+              draft[key as keyof typeof draft] !==
+              initialDraft[key as keyof typeof draft],
+          )
+        )
+          setDiscardDialogOpen(true);
+        else closeEditing();
+      },
+      isDiscardDialogOpen:
+        isCurrentContext &&
+        editingAppointmentId !== null &&
+        isDiscardDialogOpen,
+      cancelDiscard: () => setDiscardDialogOpen(false),
+      confirmDiscard: () => {
+        if (!inFlightRef.current) closeEditing();
       },
       changeDate: (date) => {
         setDraft((current) => ({ ...current, date }));
@@ -454,6 +465,8 @@ export function useChecklistAppointmentManagement({
         setOpenMenuAppointmentId(null);
         setEditingAppointmentId(appointment.id);
         setDraft(createDraft(appointment));
+        setInitialDraft(createDraft(appointment));
+        setDiscardDialogOpen(false);
         setErrors({});
         setOperationFeedback({ status: "idle" });
       }

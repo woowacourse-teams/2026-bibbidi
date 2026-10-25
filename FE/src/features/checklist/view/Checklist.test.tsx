@@ -1249,21 +1249,23 @@ describe("Checklist 할 일 편집", () => {
       screen.getByRole("button", { name: "할 일 제목 수정" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
     expect(
       screen.queryByRole("button", { name: "할 일 제목 수정" }),
     ).toBeNull();
-    expect(screen.queryByRole("button", { name: /카테고리 변경/ })).toBeNull();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.queryByRole("combobox", { name: /카테고리 변경/ }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     expect(
       within(screen.getByRole("complementary")).getByText("예식 준비"),
@@ -1275,7 +1277,7 @@ describe("Checklist 할 일 편집", () => {
     render(
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
@@ -1284,16 +1286,21 @@ describe("Checklist 할 일 편집", () => {
     const inProgress = screen.getByRole("option", { name: "진행 중" });
     const complete = screen.getByRole("option", { name: "완료" });
     expect(incomplete.getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(incomplete);
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
 
-    fireEvent.keyDown(incomplete, { key: "End" });
-    expect(document.activeElement).toBe(complete);
-    fireEvent.keyDown(complete, { key: "Home" });
-    expect(document.activeElement).toBe(incomplete);
-    fireEvent.keyDown(incomplete, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(inProgress);
-    fireEvent.keyDown(inProgress, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(incomplete);
+    fireEvent.keyDown(trigger, { key: "End" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(complete.id);
+    fireEvent.keyDown(trigger, { key: "Home" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(inProgress.id);
+    fireEvent.keyDown(trigger, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
 
     fireEvent.click(incomplete);
     expect(requestStatusChange).not.toHaveBeenCalled();
@@ -1303,12 +1310,12 @@ describe("Checklist 할 일 편집", () => {
 
   it("상태 팝오버는 Escape와 바깥 클릭으로 닫고 트리거로 포커스를 복원한다", async () => {
     render(<EditableChecklistHarness />);
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
     fireEvent.click(trigger);
-    fireEvent.keyDown(screen.getByRole("option", { name: "예정" }), {
+    fireEvent.keyDown(trigger, {
       key: "Escape",
     });
     await waitFor(() => expect(document.activeElement).toBe(trigger));
@@ -1326,7 +1333,7 @@ describe("Checklist 할 일 편집", () => {
     const rectSpy = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
-        if (this.classList.contains("checklist-status-editor__trigger")) {
+        if (this.classList.contains("bibbidi-select-trigger")) {
           return DOMRect.fromRect({ height: 24, width: 64, x: 294, y: 320 });
         }
         if (this.classList.contains("bottom-sheet-dismiss__dialog")) {
@@ -1340,15 +1347,15 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
 
     const popover = document.querySelector(
-      ".checklist-status-editor__popover",
+      ".bibbidi-select-list",
     ) as HTMLDivElement;
-    expect(popover.style.left).toBe("178px");
-    expect(popover.style.maxHeight).toBe("482px");
-    expect(popover.style.top).toBe("238px");
+    expect(popover.style.left).toBe("202px");
+    expect(popover.style.maxHeight).toBe("320px");
+    expect(popover.style.top).toBe("352px");
     expect(popover.style.width).toBe("180px");
 
     rectSpy.mockRestore();
@@ -1362,7 +1369,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
 
@@ -1380,7 +1387,7 @@ describe("Checklist 할 일 편집", () => {
     render(
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
@@ -1411,7 +1418,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -1420,7 +1427,7 @@ describe("Checklist 할 일 편집", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
 
     expect(
-      await screen.findByRole("button", { name: "상태 변경, 현재 완료" }),
+      await screen.findByRole("combobox", { name: "상태 변경, 현재 완료" }),
     ).toBeTruthy();
     expect(
       screen
@@ -1446,7 +1453,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -1480,7 +1487,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
@@ -1497,14 +1504,14 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     expect(screen.getByRole("listbox", { name: "카테고리 선택" })).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     expect(screen.queryByRole("listbox", { name: "카테고리 선택" })).toBeNull();
     expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
@@ -1518,7 +1525,7 @@ describe("Checklist 할 일 편집", () => {
   it("카테고리 팝오버는 현재 값을 표시하고 키보드·바깥 클릭으로 닫은 뒤 포커스를 복원한다", async () => {
     const changeCategory = vi.fn().mockResolvedValue(true);
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "카테고리 변경, 현재 예식 준비",
     });
 
@@ -1526,15 +1533,15 @@ describe("Checklist 할 일 편집", () => {
     const currentOption = screen.getByRole("option", { name: "예식 준비" });
     const nextOption = screen.getByRole("option", { name: "예복 준비" });
     expect(currentOption.getAttribute("aria-selected")).toBe("true");
-    expect(currentOption.getAttribute("tabindex")).toBe("0");
-    expect(nextOption.getAttribute("tabindex")).toBe("-1");
-    expect(document.activeElement).toBe(currentOption);
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(
+      currentOption.id,
+    );
 
-    fireEvent.keyDown(currentOption, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(nextOption);
-    expect(currentOption.getAttribute("tabindex")).toBe("-1");
-    expect(nextOption.getAttribute("tabindex")).toBe("0");
-    fireEvent.keyDown(nextOption, { key: "Escape" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(nextOption.id);
+    fireEvent.keyDown(trigger, { key: "Escape" });
 
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.getByRole("complementary")).toBeTruthy();
@@ -1557,7 +1564,7 @@ describe("Checklist 할 일 편집", () => {
     const rectSpy = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
-        return this.classList.contains("checklist-category-editor__trigger")
+        return this.classList.contains("bibbidi-select-trigger")
           ? DOMRect.fromRect({ height: 32, width: 70, x: 280, y: 700 })
           : DOMRect.fromRect();
       });
@@ -1567,18 +1574,18 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
 
     const popover = document.querySelector(
-      ".checklist-category-editor__popover",
+      ".bibbidi-select-list",
     ) as HTMLDivElement;
-    expect(popover.style.left).toBe("110px");
-    expect(popover.style.maxHeight).toBe("682px");
-    expect(popover.style.top).toBe("454px");
-    expect(popover.style.width).toBe("240px");
+    expect(popover.style.left).toBe("187px");
+    expect(popover.style.maxHeight).toBe("320px");
+    expect(popover.style.bottom).toBe("76px");
+    expect(popover.style.width).toBe("180px");
 
     rectSpy.mockRestore();
     scrollHeightSpy.mockRestore();
@@ -1594,7 +1601,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -1616,7 +1623,7 @@ describe("Checklist 할 일 편집", () => {
       screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예복 준비",
       }),
     ).toBeTruthy();
@@ -1646,24 +1653,28 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     const currentOption = screen.getByRole("option", { name: "예식 준비" });
     const nextOption = screen.getByRole("option", { name: "예복 준비" });
 
-    act(() => nextOption.focus());
+    const categoryTrigger = screen.getByRole("combobox", {
+      name: /카테고리 변경/,
+    });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
     fireEvent.click(nextOption);
 
     expect((await screen.findByRole("alert")).textContent).toContain(
       "카테고리를 변경하지 못했습니다.",
     );
     expect(screen.getByRole("listbox")).toBeTruthy();
-    expect(document.activeElement).toBe(nextOption);
-    expect(nextOption.getAttribute("tabindex")).toBe("0");
+    expect(document.activeElement).toBe(categoryTrigger);
+    expect(categoryTrigger.getAttribute("aria-activedescendant")).toBe(
+      nextOption.id,
+    );
     expect(nextOption.getAttribute("aria-selected")).toBe("false");
-    expect(currentOption.getAttribute("tabindex")).toBe("-1");
     expect(currentOption.getAttribute("aria-selected")).toBe("true");
 
     fireEvent.click(nextOption);
@@ -1677,7 +1688,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -1820,12 +1831,12 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
 
     fireEvent.click(
-      within(detailPage).getByRole("button", {
+      within(detailPage).getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     fireEvent.keyDown(
-      within(detailPage).getByRole("option", { name: "예식 준비" }),
+      within(detailPage).getByRole("combobox", { name: /카테고리 변경/ }),
       { key: "Escape" },
     );
 
@@ -1835,12 +1846,12 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
 
     fireEvent.click(
-      within(detailPage).getByRole("button", {
+      within(detailPage).getByRole("combobox", {
         name: "상태 변경, 현재 예정",
       }),
     );
     fireEvent.keyDown(
-      within(detailPage).getByRole("option", { name: "예정" }),
+      within(detailPage).getByRole("combobox", { name: /상태 변경/ }),
       { key: "Escape" },
     );
 
@@ -1849,4 +1860,15 @@ describe("Checklist 할 일 편집", () => {
       screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
+});
+
+it("공통 아이콘 내부를 다시 누르면 할 일 메뉴를 닫는다", () => {
+  render(<EditableChecklistHarness />);
+  const trigger = screen.getByRole("button", { name: "할 일 제목 수정" });
+  fireEvent.click(trigger);
+  expect(screen.getByRole("menuitem", { name: "제목 변경" })).toBeTruthy();
+  const icon = trigger.querySelector(".bibbidi-icon-button-icon")!;
+  fireEvent.pointerDown(icon);
+  fireEvent.click(icon);
+  expect(screen.queryByRole("menuitem", { name: "제목 변경" })).toBeNull();
 });

@@ -1,0 +1,102 @@
+.checklist-form-panel {
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  border-left: 1px solid var(--color-stroke-neutral-weak);
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+}
+.checklist-form-panel > form {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+.checklist-form-panel__header {
+  display: flex;
+  min-height: 72px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+.checklist-form-panel__heading {
+  min-width: 0;
+  flex: 1;
+}
+.checklist-form-panel__heading h2 {
+  margin: 0;
+  font: var(--typography-t5);
+  overflow-wrap: anywhere;
+}
+.checklist-form-panel__heading p {
+  margin: 4px 0 0;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+}
+.checklist-form-panel__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px;
+}
+.checklist-form-panel__footer {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+}
+.checklist-form-panel__footer > button {
+  flex: 1;
+  min-width: 0;
+}
+.checklist-form-panel__feedback {
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+}
+.checklist-form-panel__feedback[data-error] {
+  color: var(--color-fg-critical);
+}
+.checklist-form-panel__feedback[data-success] {
+  color: var(--color-fg-positive);
+}
+.checklist-form-panel__feedback:focus {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+@media (width < 768px) {
+  .checklist-form-panel[data-mobile] {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    height: 100dvh;
+    border-left: 0;
+  }
+  .checklist-form-panel__header {
+    min-height: calc(56px + env(safe-area-inset-top));
+    padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
+  }
+  .checklist-form-panel__heading {
+    text-align: center;
+  }
+  .checklist-form-panel__spacer {
+    width: 44px;
+    flex: none;
+  }
+  .checklist-form-panel__body {
+    padding: 24px 16px;
+  }
+  .checklist-form-panel__footer {
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+}
