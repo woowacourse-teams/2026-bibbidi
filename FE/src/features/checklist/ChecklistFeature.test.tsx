@@ -38,6 +38,7 @@ const repositoryMocks = vi.hoisted(() => {
   const changeItemStatus = vi.fn();
   const changeItemTitle = vi.fn();
   const createCustomItem = vi.fn();
+  const deleteItem = vi.fn();
   const getChecklist = vi.fn();
   const hasRemainingAppointments = vi.fn();
   const cacheGetChecklist = vi.fn();
@@ -49,6 +50,7 @@ const repositoryMocks = vi.hoisted(() => {
     changeItemStatus,
     changeItemTitle,
     createCustomItem,
+    deleteItem,
     checklistRevision: 0,
     publishRevision() {
       this.checklistRevision += 1;
@@ -60,6 +62,7 @@ const repositoryMocks = vi.hoisted(() => {
       changeItemStatus,
       changeItemTitle,
       createCustomItem,
+      deleteItem,
       ensureChecklist: vi.fn(),
       hasRemainingAppointments,
       createAppointment: vi.fn(),
@@ -234,6 +237,8 @@ beforeEach(() => {
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.createCustomItem.mockReset();
   repositoryMocks.createCustomItem.mockResolvedValue(undefined);
+  repositoryMocks.deleteItem.mockReset();
+  repositoryMocks.deleteItem.mockResolvedValue(undefined);
   repositoryMocks.command.createAppointment.mockReset();
   repositoryMocks.command.createAppointment.mockResolvedValue(undefined);
   repositoryMocks.cacheGetChecklist.mockReset();
@@ -2325,6 +2330,149 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     );
     expect(
       screen.getByRole("complementary", { name: /제목 수정/ }),
+    ).toBeTruthy();
+  });
+});
+
+describe("ChecklistFeature 할 일 메뉴", () => {
+  beforeEach(() => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 1, nickname: "bibbidi" },
+    };
+  });
+
+  it.each([false, true])(
+    "로드맵 할 일에는 삭제만 표시하고 취소하면 더보기로 복귀한다 (모바일=%s)",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId = 101;
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+      const trigger = await screen.findByRole("button", {
+        name: "할 일 더보기",
+      });
+      fireEvent.click(trigger);
+      expect(screen.queryByRole("menuitem", { name: "제목 변경" })).toBeNull();
+      expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+      expect(
+        screen.queryByRole("combobox", { name: /카테고리 변경/ }),
+      ).toBeNull();
+      fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+      const dialog = screen.getByRole("dialog", {
+        name: "이 할 일을 삭제할까요?",
+      });
+      expect(dialog.textContent).toContain(
+        "삭제한 할 일과 연결된 일정은 다시 복구할 수 없어요.",
+      );
+      fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(repositoryMocks.deleteItem).not.toHaveBeenCalled();
+      expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([null, 101])(
+    "직접 생성과 로드맵 항목을 같은 삭제 명령으로 제거하고 목록·진행률·URL을 갱신한다 (원본=%s)",
+    async (sourceCatalogItemId) => {
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId =
+        sourceCatalogItemId;
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      repositoryMocks.deleteItem.mockImplementation(async () => {
+        repositoryMocks.getChecklist.mockResolvedValue({
+          categories: checklist.categories.map((category) => ({
+            ...category,
+            items: [],
+          })),
+        });
+        repositoryMocks.publishRevision();
+      });
+      renderChecklistFeature([
+        "/checklist?filter=remaining&taskId=checklist-item-500",
+      ]);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "할 일 더보기" }),
+      );
+      expect(
+        screen.queryByRole("menuitem", { name: "제목 변경" }) !== null,
+      ).toBe(sourceCatalogItemId === null);
+      fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+      const dialog = screen.getByRole("dialog", {
+        name: "이 할 일을 삭제할까요?",
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+      await waitFor(() =>
+        expect(repositoryMocks.deleteItem).toHaveBeenCalledWith(
+          500,
+          expect.any(AbortSignal),
+        ),
+      );
+      expect(await screen.findByText("아직 담은 할 일이 없어요")).toBeTruthy();
+      await waitFor(() =>
+        expect(getCurrentUrl()).toBe("/checklist?filter=remaining"),
+      );
+      expect(screen.getByText("전체 0개 · 완료 0개")).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("complementary")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /청첩장 문구 정하기/ }),
+      ).toBeNull();
+      expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([null, 101])(
+    "완료된 항목에는 삭제를 표시하지 않고 직접 생성 항목의 제목 변경은 유지한다 (원본=%s)",
+    async (sourceCatalogItemId) => {
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId =
+        sourceCatalogItemId;
+      checklist.categories[0].items[0].status = "done";
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+      await screen.findByRole("complementary", { name: "청첩장 문구 정하기" });
+      const trigger = screen.queryByRole("button", { name: "할 일 더보기" });
+      if (sourceCatalogItemId === null) {
+        fireEvent.click(trigger!);
+        expect(
+          screen.getByRole("menuitem", { name: "제목 변경" }),
+        ).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "삭제" })).toBeNull();
+      } else {
+        expect(trigger).toBeNull();
+      }
+      expect(repositoryMocks.deleteItem).not.toHaveBeenCalled();
+    },
+  );
+
+  it("로드맵 항목 삭제에 실패하면 확인창과 항목을 유지하고 재시도할 수 있다", async () => {
+    const checklist = createAuthenticatedChecklist();
+    checklist.categories[0].items[0].sourceCatalogItemId = 101;
+    repositoryMocks.getChecklist.mockResolvedValue(checklist);
+    repositoryMocks.deleteItem.mockRejectedValueOnce(
+      new ChecklistItemChangeError("unknown", "할 일을 삭제하지 못했습니다."),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    const trigger = await screen.findByRole("button", { name: "할 일 더보기" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "이 할 일을 삭제할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "할 일을 삭제하지 못했습니다.",
+    );
+    expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    await waitFor(() =>
+      expect(repositoryMocks.deleteItem).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
 });
