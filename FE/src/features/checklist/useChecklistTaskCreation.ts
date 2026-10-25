@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export const CHECKLIST_TASK_TITLE_MAX_LENGTH = 50;
+import { validateChecklistTaskTitle } from "./model/taskTitle";
 
 export interface ChecklistTaskCreationInput {
   categoryId: string;
@@ -26,18 +26,6 @@ const emptyDraft: ChecklistTaskCreationDraft = {
   categoryId: null,
   title: "",
 };
-
-function validateTitle(title: string) {
-  const trimmedTitle = title.trim();
-
-  if (trimmedTitle.length === 0) {
-    return "할 일 제목을 입력해 주세요.";
-  }
-
-  return trimmedTitle.length > CHECKLIST_TASK_TITLE_MAX_LENGTH
-    ? "할 일 제목은 50자 이하로 입력해 주세요."
-    : undefined;
-}
 
 function validateCategory(categoryId: string | null) {
   return categoryId === null ? "카테고리를 선택해 주세요." : undefined;
@@ -171,7 +159,7 @@ export function useChecklistTaskCreation({
       setDraft((current) => ({ ...current, title }));
 
       if (errors.title) {
-        replaceError("title", validateTitle(title));
+        replaceError("title", validateChecklistTaskTitle(title));
       }
     },
     confirmDiscard: () => {
@@ -204,7 +192,7 @@ export function useChecklistTaskCreation({
 
       const nextErrors = {
         categoryId: validateCategory(draft.categoryId),
-        title: validateTitle(draft.title),
+        title: validateChecklistTaskTitle(draft.title),
       };
       setErrors(nextErrors);
 
@@ -233,6 +221,7 @@ export function useChecklistTaskCreation({
     },
     touchCategory: () =>
       replaceError("categoryId", validateCategory(draft.categoryId)),
-    touchTitle: () => replaceError("title", validateTitle(draft.title)),
+    touchTitle: () =>
+      replaceError("title", validateChecklistTaskTitle(draft.title)),
   };
 }

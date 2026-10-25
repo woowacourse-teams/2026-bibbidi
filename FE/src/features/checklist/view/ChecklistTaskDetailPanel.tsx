@@ -7,7 +7,7 @@ import {
   ChecklistTaskViewModel,
 } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
-import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
+import { ChecklistTaskHeader } from "./ChecklistTaskHeader";
 import "./ChecklistTaskDetailPanel.css";
 
 interface ChecklistTaskDetailPanelProps {
@@ -42,11 +42,7 @@ export function ChecklistTaskDetailPanel({
       id="checklist-task-detail-panel"
     >
       <header className="checklist-detail-panel__header">
-        <ChecklistTaskTitleEditor
-          editing={editing}
-          task={task}
-          titleId={titleId}
-        />
+        <ChecklistTaskHeader editing={editing} task={task} titleId={titleId} />
         <IconButton
           aria-label="할 일 상세 닫기"
           icon={<CloseIcon />}
