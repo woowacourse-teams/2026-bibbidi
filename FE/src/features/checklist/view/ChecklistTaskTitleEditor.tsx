@@ -1,3 +1,6 @@
+import { IconButton } from "../../../components/icon-button";
+import { TextField } from "../../../components/text-field";
+import { CheckIcon, CloseIcon } from "../../../components/icons/ActionIcons";
 import {
   ChangeEvent,
   FormEvent,
@@ -80,7 +83,7 @@ export function ChecklistTaskTitleEditor({
       if (
         event.target instanceof Node &&
         !menuRef.current?.contains(event.target) &&
-        event.target !== editButtonRef.current
+        !editButtonRef.current?.contains(event.target)
       ) {
         setIsMenuOpen(false);
       }
@@ -209,7 +212,11 @@ export function ChecklistTaskTitleEditor({
           {task.title} 제목 수정
         </span>
         <form className="checklist-title-editor__form" onSubmit={handleSubmit}>
-          <input
+          <TextField
+            label="할 일 제목"
+            labelHidden
+            variant="line"
+            hasError={!!errorMessage}
             aria-describedby={errorMessage ? errorId : undefined}
             aria-invalid={errorMessage ? true : undefined}
             aria-label="할 일 제목"
@@ -220,23 +227,19 @@ export function ChecklistTaskTitleEditor({
             ref={inputRef}
             value={draft}
           />
-          <button
+          <IconButton
+            icon={<CheckIcon />}
             aria-label="할 일 제목 저장"
-            className="checklist-title-editor__action checklist-title-editor__action--save"
             disabled={isSaving}
             type="submit"
-          >
-            <span aria-hidden="true">✓</span>
-          </button>
-          <button
+          />
+          <IconButton
+            icon={<CloseIcon />}
             aria-label="할 일 제목 수정 취소"
-            className="checklist-title-editor__action"
             disabled={isSaving}
             onClick={finishEditing}
             type="button"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
+          />
         </form>
         {errorMessage ? (
           <span
@@ -253,19 +256,18 @@ export function ChecklistTaskTitleEditor({
 
   return (
     <div className="checklist-title-editor checklist-title-editor--read">
-      <button
+      <IconButton
+        icon={<MoreIcon />}
+        iconSize={20}
         aria-controls={`${task.id}-task-menu`}
         aria-expanded={isMenuOpen}
         aria-haspopup="menu"
         aria-label="할 일 제목 수정"
-        className="checklist-title-editor__edit"
         disabled={isSaving}
         onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
         ref={editButtonRef}
         type="button"
-      >
-        <MoreIcon />
-      </button>
+      />
       {isMenuOpen ? (
         <div
           className="checklist-title-editor__menu"

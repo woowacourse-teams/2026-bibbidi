@@ -10,8 +10,7 @@
   display: contents;
 }
 .checklist-workspace__panel > .checklist-detail-panel,
-.checklist-workspace__panel > .checklist-task-creation--desktop,
-.checklist-workspace__panel > .checklist-appointment-creation--desktop {
+.checklist-workspace__panel > .checklist-form-panel:not([data-mobile]) {
   position: static;
   width: 100%;
   height: 100%;

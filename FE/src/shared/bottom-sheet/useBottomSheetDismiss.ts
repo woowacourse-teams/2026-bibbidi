@@ -78,7 +78,6 @@ export function useBottomSheetDismiss({
   }, [canDismiss, completeDismiss, isClosing]);
   useModalEnvironment({
     rootRef: dialogRef,
-    initialFocusRef: handleRef,
     returnFocusRef,
     onEscape: requestDismiss,
   });

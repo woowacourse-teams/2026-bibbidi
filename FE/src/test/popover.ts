@@ -5,7 +5,7 @@ export function installPopoverMock() {
   const originalMatches = prototype.matches;
   const style = document.createElement("style");
   style.textContent =
-    '[popover="auto"]:not([data-test-popover-open]) { display: none; } [popover="auto"][data-test-popover-open] { display: block; }';
+    '[popover="auto"]:not([data-test-popover-open]), [popover="manual"][role="listbox"]:not([data-test-popover-open]) { display: none; } [data-test-popover-open] { display: block; }';
   document.head.append(style);
 
   function toggle(element: HTMLElement, open: boolean) {
@@ -32,7 +32,13 @@ export function installPopoverMock() {
     showPopover: {
       configurable: true,
       get(this: HTMLElement) {
-        if (this.getAttribute("popover") !== "auto")
+        if (
+          this.getAttribute("popover") !== "auto" &&
+          !(
+            this.getAttribute("popover") === "manual" &&
+            this.getAttribute("role") === "listbox"
+          )
+        )
           return descriptors.showPopover?.value;
         return function (this: HTMLElement) {
           toggle(this, true);
@@ -42,7 +48,13 @@ export function installPopoverMock() {
     hidePopover: {
       configurable: true,
       get(this: HTMLElement) {
-        if (this.getAttribute("popover") !== "auto")
+        if (
+          this.getAttribute("popover") !== "auto" &&
+          !(
+            this.getAttribute("popover") === "manual" &&
+            this.getAttribute("role") === "listbox"
+          )
+        )
           return descriptors.hidePopover?.value;
         return function (this: HTMLElement) {
           toggle(this, false);

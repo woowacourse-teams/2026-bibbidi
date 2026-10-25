@@ -1,4 +1,5 @@
-import { ChecklistModalDialog } from "./ChecklistModalDialog";
+import { Button } from "../../../components/button";
+import { ChecklistDialog } from "./ChecklistDialog";
 
 export function ChecklistStatusConfirmationDialog({
   isPending,
@@ -12,7 +13,7 @@ export function ChecklistStatusConfirmationDialog({
   onConfirm: () => void;
 }) {
   return (
-    <ChecklistModalDialog
+    <ChecklistDialog
       title="남은 일정도 완료할까요?"
       description={
         <>
@@ -25,12 +26,24 @@ export function ChecklistStatusConfirmationDialog({
       }}
       actions={
         <>
-          <button type="button" disabled={isPending} onClick={onCancel}>
+          <Button
+            size="large"
+            color="dark"
+            variant="weak"
+            type="button"
+            disabled={isPending}
+            onClick={onCancel}
+          >
             취소
-          </button>
-          <button type="button" disabled={isPending} onClick={onConfirm}>
+          </Button>
+          <Button
+            size="large"
+            type="button"
+            disabled={isPending}
+            onClick={onConfirm}
+          >
             {isPending ? "변경 중" : "함께 완료"}
-          </button>
+          </Button>
         </>
       }
     />

@@ -14,8 +14,8 @@ import { ChecklistAppointmentManagementController } from "../useChecklistAppoint
 import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
-import { ChecklistAppointmentCreation } from "./ChecklistAppointmentCreation";
-import { ChecklistModalDialog } from "./ChecklistModalDialog";
+import { ChecklistAppointmentForm } from "./ChecklistAppointmentForm";
+import { ChecklistDialog } from "./ChecklistDialog";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
 import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
@@ -377,7 +377,9 @@ export function Checklist({
     isStatusConfirmationOpen ||
     isAppointmentDeletionOpen ||
     isItemDeletionOpen ||
-    !!taskCreation?.isDiscardDialogOpen;
+    !!taskCreation?.isDiscardDialogOpen ||
+    !!appointmentCreation?.isDiscardDialogOpen ||
+    !!appointmentManagement?.editing.isDiscardDialogOpen;
   const isSubmitting =
     taskCreation?.submissionState.status === "submitting" ||
     appointmentCreation?.submissionState.status === "submitting" ||
@@ -491,7 +493,7 @@ export function Checklist({
         {selectedTaskContext &&
         appointmentCreation &&
         isAppointmentCreationOpen ? (
-          <ChecklistAppointmentCreation
+          <ChecklistAppointmentForm
             modal={isMobileLayout || isOverlay}
             controller={appointmentCreation}
             taskTitle={selectedTaskContext.task.title}
@@ -501,7 +503,7 @@ export function Checklist({
         {selectedTaskContext &&
         appointmentManagement &&
         isAppointmentEditingOpen ? (
-          <ChecklistAppointmentCreation
+          <ChecklistAppointmentForm
             modal={isMobileLayout || isOverlay}
             controller={appointmentManagement.editing}
             heading="일정 수정"
@@ -598,23 +600,21 @@ export function Checklist({
       </WorkspaceLayout>
 
       {isLoginRequiredOpen ? (
-        <ChecklistModalDialog
+        <ChecklistDialog
           actions={
             <>
-              <button
-                className="checklist-dialog__button checklist-dialog__button--secondary"
+              <Button
+                size="large"
+                color="dark"
+                variant="weak"
                 onClick={onCancelLoginRequired}
                 type="button"
               >
                 취소
-              </button>
-              <button
-                className="checklist-dialog__button checklist-dialog__button--primary"
-                onClick={onVisitLogin}
-                type="button"
-              >
+              </Button>
+              <Button size="large" onClick={onVisitLogin} type="button">
                 로그인
-              </button>
+              </Button>
             </>
           }
           description={
@@ -648,24 +648,29 @@ export function Checklist({
       ) : null}
 
       {deletionConfirmation && appointmentManagement ? (
-        <ChecklistModalDialog
+        <ChecklistDialog
           actions={
             <>
-              <button
+              <Button
+                size="large"
+                color="dark"
+                variant="weak"
                 disabled={isAppointmentDeletionPending}
                 onClick={appointmentManagement.cancelDelete}
                 type="button"
               >
                 취소
-              </button>
-              <button
+              </Button>
+              <Button
+                size="large"
+                color="danger"
                 aria-busy={isAppointmentDeletionPending}
                 disabled={isAppointmentDeletionPending}
                 onClick={() => void appointmentManagement.confirmDelete()}
                 type="button"
               >
                 {isAppointmentDeletionPending ? "삭제 중" : "삭제"}
-              </button>
+              </Button>
             </>
           }
           description={
@@ -687,30 +692,34 @@ export function Checklist({
               : appointmentManagement.cancelDelete
           }
           title="이 일정을 삭제할까요?"
-          variant="critical"
         />
       ) : null}
       {isItemDeletionOpen &&
       itemEditing?.cancelDelete &&
       itemEditing.confirmDelete ? (
-        <ChecklistModalDialog
+        <ChecklistDialog
           actions={
             <>
-              <button
+              <Button
+                size="large"
+                color="dark"
+                variant="weak"
                 disabled={isItemDeletionPending}
                 onClick={() => itemEditing.cancelDelete?.()}
                 type="button"
               >
                 취소
-              </button>
-              <button
+              </Button>
+              <Button
+                size="large"
+                color="danger"
                 aria-busy={isItemDeletionPending}
                 disabled={isItemDeletionPending}
                 onClick={() => void itemEditing.confirmDelete?.()}
                 type="button"
               >
                 {isItemDeletionPending ? "삭제 중" : "삭제"}
-              </button>
+              </Button>
             </>
           }
           description={
@@ -732,7 +741,6 @@ export function Checklist({
               : () => itemEditing.cancelDelete?.()
           }
           title="이 할 일을 삭제할까요?"
-          variant="critical"
         />
       ) : null}
     </>

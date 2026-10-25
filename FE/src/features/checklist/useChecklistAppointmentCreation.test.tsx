@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppointmentCreationError } from "./model/appointmentCreation";
@@ -492,4 +492,85 @@ describe("useChecklistAppointmentCreation", () => {
     expect(controller.submissionState.status).toBe("idle");
     expect(nextSubmit).not.toHaveBeenCalled();
   });
+});
+
+describe("체크리스트 일정 작성 버리기 확인", () => {
+  it("입력하지 않았거나 원래 값으로 되돌리면 확인 없이 닫는다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentCreation({
+        checklistItemId: 500,
+        isAuthenticated: true,
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.open());
+    act(() => result.current.cancel());
+    expect(result.current.isOpen).toBe(false);
+    act(() => result.current.open());
+    act(() => result.current.changeTitle("작성"));
+    act(() => result.current.changeTitle(""));
+    act(() => result.current.cancel());
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.isDiscardDialogOpen).toBe(false);
+  });
+  it("날짜만 변경해도 확인하고 계속 작성·버리기를 구분한다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentCreation({
+        checklistItemId: 500,
+        isAuthenticated: true,
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.open());
+    act(() => result.current.changeDate("2026-11-10"));
+    act(() => result.current.cancel());
+    expect(result.current.isDiscardDialogOpen).toBe(true);
+    expect(result.current.isOpen).toBe(true);
+    act(() => result.current.cancelDiscard());
+    expect(result.current.draft.date).toBe("2026-11-10");
+    act(() => result.current.cancel());
+    act(() => result.current.confirmDiscard());
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.draft.date).toBe("");
+  });
+  it("캘린더의 기본 옵션은 변경한 값이 있어도 즉시 닫는다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentCreation({
+        checklistItemId: 500,
+        isAuthenticated: true,
+      }),
+    );
+    act(() => result.current.open("calendar"));
+    act(() => result.current.changeTitle("캘린더 일정"));
+    act(() => result.current.cancel());
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.isDiscardDialogOpen).toBe(false);
+  });
+});
+
+it("생성은 성공하고 목록 재조회만 실패한 일정은 미저장 경고 없이 닫는다", async () => {
+  const onSubmit = vi
+    .fn()
+    .mockRejectedValue(new AppointmentCreationError("refresh-failed"));
+  const { result } = renderHook(() =>
+    useChecklistAppointmentCreation({
+      checklistItemId: 500,
+      isAuthenticated: true,
+      confirmDiscard: true,
+      onSubmit,
+    }),
+  );
+  act(() => result.current.open());
+  act(() => {
+    result.current.changeTitle("저장된 일정");
+    result.current.changeDate("2026-11-10");
+  });
+  await act(async () => {
+    await result.current.submit();
+  });
+  expect(result.current.submissionState.status).toBe("error");
+  act(() => result.current.cancel());
+  expect(result.current.isDiscardDialogOpen).toBe(false);
+  expect(result.current.isOpen).toBe(false);
+  expect(onSubmit).toHaveBeenCalledOnce();
 });

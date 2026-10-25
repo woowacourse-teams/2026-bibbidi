@@ -14,6 +14,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
 
+function chooseCategory(select: HTMLElement, value: string) {
+  fireEvent.click(select);
+  const native = select.parentElement!.querySelector("select")!;
+  const label = Array.from(native.options).find(
+    (option) => option.value === value,
+  )!.textContent!;
+  fireEvent.click(screen.getByRole("option", { name: label }));
+}
+
 const authMocks = vi.hoisted(() => ({
   authState: { status: "guest" } as
     | { status: "authenticated"; user: { id: number; nickname: string } }
@@ -489,11 +498,12 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     fireEvent.click(addScheduleButton);
     const backdrop = document.querySelector<HTMLElement>(
-      ".checklist-dialog__backdrop",
+      ".bibbidi-dialog[open]",
     );
     expect(backdrop).not.toBeNull();
     if (backdrop) {
-      fireEvent.mouseDown(backdrop);
+      fireEvent.pointerDown(backdrop);
+      fireEvent.pointerUp(backdrop);
     }
     expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
@@ -862,9 +872,15 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       within(creationPanel).getByText("일정 제목을 입력해 주세요.");
     const dateError = within(creationPanel).getByText("날짜를 선택해 주세요.");
     expect(titleInput.getAttribute("aria-invalid")).toBe("true");
-    expect(titleInput.getAttribute("aria-describedby")).toBe(titleError.id);
+    expect(
+      document.getElementById(titleInput.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe(titleError.textContent);
     expect(dateInput.getAttribute("aria-invalid")).toBe("true");
-    expect(dateInput.getAttribute("aria-describedby")).toBe(dateError.id);
+    expect(
+      document.getElementById(dateInput.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe(dateError.textContent);
     expect(document.activeElement).toBe(titleInput);
 
     fireEvent.change(titleInput, { target: { value: "상담" } });
@@ -881,7 +897,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const timeError = within(creationPanel).getByText(
       "종료 시간은 시작 시간보다 빠를 수 없어요.",
     );
-    expect(endTimeInput.getAttribute("aria-describedby")).toBe(timeError.id);
+    expect(
+      document.getElementById(endTimeInput.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe(timeError.textContent);
     await waitFor(() => expect(document.activeElement).toBe(endTimeInput));
   });
 
@@ -1018,6 +1037,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       target: { value: "버릴 일정" },
     });
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    const discard = screen.getByRole("dialog", {
+      name: "작성 중인 내용을 닫을까요?",
+    });
+    fireEvent.click(within(discard).getByRole("button", { name: "나가기" }));
 
     const restoredButton = screen.getByRole("button", { name: "일정 추가" });
     await waitFor(() => expect(restoredButton).toBe(document.activeElement));
@@ -1144,12 +1167,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(
       within(panel).getByRole("combobox", { name: /카테고리/ }),
     ).toBeTruthy();
-    expect(
-      within(panel).getByRole("option", { name: "예식 준비" }),
-    ).toBeTruthy();
-    expect(
-      within(panel).getByRole("option", { name: "예복 준비" }),
-    ).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("combobox", { name: /카테고리/ }));
+    expect(screen.getByRole("option", { name: "예식 준비" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "예복 준비" })).toBeTruthy();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
@@ -1177,9 +1197,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "  청첩장 문구 확정  " },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "20" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "20");
 
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
@@ -1250,9 +1268,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(
       (within(reopenedPanel).getByRole("textbox") as HTMLInputElement).value,
     ).toBe("");
-    expect(
-      (within(reopenedPanel).getByRole("combobox") as HTMLSelectElement).value,
-    ).toBe("");
+    expect(within(reopenedPanel).getByRole("combobox").textContent).toContain(
+      "카테고리를 선택해 주세요",
+    );
   });
 
   it("생성 실패 시 작성값과 패널을 유지하고 오류를 지운 뒤 재시도한다", async () => {
@@ -1276,9 +1294,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const panel = screen.getByRole("complementary", { name: "할 일 추가" });
     const title = within(panel).getByRole("textbox");
     fireEvent.change(title, { target: { value: "작성값 유지" } });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "20" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "20");
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
     expect((await within(panel).findByRole("alert")).textContent).toBe(
@@ -1314,9 +1330,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "인증 후 유지" },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "10");
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
@@ -1352,9 +1366,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "첫 사용자 작성값" },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "10");
 
     authMocks.authState = {
       status: "authenticated",
@@ -1369,7 +1381,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
     expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByRole("combobox").textContent).toContain(
+      "카테고리를 선택해 주세요",
+    );
   });
 
   it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
@@ -2161,7 +2175,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -2190,7 +2204,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -2254,7 +2268,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "상태 변경, 현재 예정",
       }),
     );
