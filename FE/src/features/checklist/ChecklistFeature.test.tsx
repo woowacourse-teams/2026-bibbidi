@@ -710,8 +710,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     });
     expect(within(updatedDetail).getByText("일정 1개")).toBeTruthy();
     expect(
-      document.querySelector(".checklist__task-schedule")?.textContent,
-    ).toBe("9월 20일");
+      within(
+        screen.getByRole("button", { name: /청첩장 문구 정하기/ }),
+      ).getByText("9월 20일"),
+    ).toBeTruthy();
     await waitFor(() =>
       expect(
         within(updatedDetail).getByRole("button", { name: "일정 추가" }),

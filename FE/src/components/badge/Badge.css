@@ -1,0 +1,78 @@
+.bibbidi-badge {
+  --badge-background: var(--color-bg-brand-solid);
+  --badge-foreground: var(--color-fg-on-brand);
+  --badge-weak-background: var(--color-bg-brand-weak);
+  --badge-weak-foreground: var(--color-fg-on-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--badge-background);
+  color: var(--badge-foreground);
+  font: var(--typography-t7);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-ui);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.bibbidi-badge[data-size="xsmall"] {
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.bibbidi-badge[data-size="medium"] {
+  padding: 4px 10px;
+  font: var(--typography-t6-medium);
+}
+.bibbidi-badge[data-size="large"] {
+  padding: 6px 12px;
+  font: var(--typography-t6-medium);
+}
+.bibbidi-badge-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bibbidi-badge[data-color="dark"] {
+  --badge-background: var(--color-palette-ink);
+  --badge-foreground: var(--color-palette-white);
+  --badge-weak-background: var(--color-bg-neutral-weak);
+  --badge-weak-foreground: var(--color-fg-neutral);
+}
+.bibbidi-badge[data-color="positive"] {
+  --badge-background: var(--color-bg-positive-weak);
+  --badge-foreground: var(--color-fg-positive);
+  --badge-weak-background: var(--color-bg-positive-badge);
+  --badge-weak-foreground: var(--color-fg-positive);
+}
+.bibbidi-badge[data-color="warning"] {
+  --badge-background: var(--color-fg-warning);
+  --badge-foreground: var(--color-palette-white);
+  --badge-weak-background: var(--color-bg-brand-weak);
+  --badge-weak-foreground: var(--color-fg-warning);
+}
+.bibbidi-badge[data-color="danger"] {
+  --badge-background: var(--color-fg-critical);
+  --badge-foreground: var(--color-palette-white);
+  --badge-weak-background: var(--color-bg-critical-weak);
+  --badge-weak-foreground: var(--color-fg-critical);
+}
+.bibbidi-badge[data-color="informative"] {
+  /* Deepen the existing blue with Ink for legible small text in both variants. */
+  --badge-background: color-mix(
+    in srgb,
+    var(--color-fg-informative) 80%,
+    var(--color-palette-ink)
+  );
+  --badge-foreground: var(--color-palette-white);
+  --badge-weak-background: var(--color-bg-informative-weak);
+  --badge-weak-foreground: var(--badge-background);
+}
+.bibbidi-badge[data-variant="weak"] {
+  background: var(--badge-weak-background);
+  color: var(--badge-weak-foreground);
+}

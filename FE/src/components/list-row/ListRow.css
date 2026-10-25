@@ -71,6 +71,10 @@ button.bibbidi-list-row:focus-visible {
   outline: 2px solid var(--color-stroke-focus-ring);
   outline-offset: -2px;
 }
+.bibbidi-list-row[data-selected="true"] {
+  background: var(--color-bg-brand-weak);
+  box-shadow: inset 3px 0 0 var(--color-stroke-brand-solid);
+}
 .bibbidi-list-row[data-disabled="true"] {
   cursor: not-allowed;
 }
@@ -83,7 +87,7 @@ button.bibbidi-list-row:focus-visible {
 @media (hover: hover) {
   button.bibbidi-list-row[data-touch-effect="true"]:not(
       [data-disabled="true"]
-    ):hover {
+    ):not([data-selected="true"]):hover {
     background: var(--color-bg-neutral-weak);
   }
 }
@@ -195,6 +199,9 @@ button.bibbidi-list-row[data-touch-effect="true"]:not(
   }
 }
 @media (forced-colors: active) {
+  .bibbidi-list-row[data-selected="true"] {
+    border-inline-start: 3px solid Highlight;
+  }
   .bibbidi-list-row[data-border="indented"]::before {
     background: CanvasText;
   }
