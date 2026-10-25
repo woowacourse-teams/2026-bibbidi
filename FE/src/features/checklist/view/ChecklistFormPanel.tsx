@@ -2,30 +2,15 @@ import { useEffect } from "react";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import { IconButton } from "../../../components/icon-button";
 import { CloseIcon } from "../../../components/icons/ActionIcons";
-import { ChevronLeft } from "../../../components/icons/Chevron";
+import { TopNavigation } from "../../../components/top-navigation";
 import { containTabFocus } from "../../../shared/focus/containTabFocus";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import "./ChecklistFormPanel.css";
 
-export function ChecklistFormPanel({
-  title,
-  titleId,
-  subtitle,
-  backLabel,
-  closeLabel,
-  modal = false,
-  blocked = false,
-  isSubmitting,
-  onClose,
-  onSubmit,
-  formRef,
-  children,
-  actions,
-}: {
+type ChecklistFormPanelProps = {
   title: string;
   titleId: string;
   subtitle?: string;
-  backLabel: string;
   closeLabel: string;
   modal?: boolean;
   blocked?: boolean;
@@ -35,7 +20,27 @@ export function ChecklistFormPanel({
   formRef: RefObject<HTMLFormElement | null>;
   children: ReactNode;
   actions: ReactNode;
-}) {
+} & (
+  | { mobileAction?: "back"; backLabel: string }
+  | { mobileAction: "close"; backLabel?: never }
+);
+
+export function ChecklistFormPanel({
+  title,
+  titleId,
+  subtitle,
+  backLabel,
+  closeLabel,
+  mobileAction,
+  modal = false,
+  blocked = false,
+  isSubmitting,
+  onClose,
+  onSubmit,
+  formRef,
+  children,
+  actions,
+}: ChecklistFormPanelProps) {
   const mobile = useIsMobileLayout();
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -69,30 +74,44 @@ export function ChecklistFormPanel({
       inert={blocked || undefined}
     >
       <form noValidate ref={formRef} onSubmit={onSubmit}>
-        <header className="checklist-form-panel__header">
-          {mobile && (
-            <IconButton
-              aria-label={backLabel}
-              icon={<ChevronLeft />}
-              disabled={isSubmitting}
-              onClick={onClose}
-            />
-          )}
-          <div className="checklist-form-panel__heading">
-            <h2 id={titleId}>{title}</h2>
-            {subtitle && <p>{subtitle}</p>}
-          </div>
-          {mobile ? (
-            <span className="checklist-form-panel__spacer" aria-hidden="true" />
-          ) : (
+        {mobile ? (
+          <TopNavigation
+            title={<span id={titleId}>{title}</span>}
+            subtitle={subtitle}
+            headingLevel={2}
+            sticky={false}
+            safeArea
+            divider
+            leading={
+              mobileAction === "close" ? (
+                <TopNavigation.CloseButton
+                  aria-label={closeLabel}
+                  disabled={isSubmitting}
+                  onClick={onClose}
+                />
+              ) : (
+                <TopNavigation.BackButton
+                  aria-label={backLabel}
+                  disabled={isSubmitting}
+                  onClick={onClose}
+                />
+              )
+            }
+          />
+        ) : (
+          <header className="checklist-form-panel__header">
+            <div className="checklist-form-panel__heading">
+              <h2 id={titleId}>{title}</h2>
+              {subtitle && <p>{subtitle}</p>}
+            </div>
             <IconButton
               aria-label={closeLabel}
               icon={<CloseIcon />}
               disabled={isSubmitting}
               onClick={onClose}
             />
-          )}
-        </header>
+          </header>
+        )}
         <div className="checklist-form-panel__body">{children}</div>
         <footer className="checklist-form-panel__footer">{actions}</footer>
       </form>

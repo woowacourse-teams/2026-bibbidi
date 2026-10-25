@@ -56,8 +56,8 @@ export function ChecklistTaskCreation({
       <ChecklistFormPanel
         title="할 일 추가"
         titleId="checklist-task-creation-title"
-        backLabel="체크리스트로 돌아가기"
         closeLabel="할 일 추가 닫기"
+        mobileAction="close"
         modal={modal}
         blocked={controller.isDiscardDialogOpen}
         isSubmitting={pending}

@@ -124,9 +124,9 @@ function SessionAwareCreationHarness({
   return null;
 }
 
-function openForm() {
+function openForm(role: "complementary" | "dialog" = "complementary") {
   fireEvent.click(screen.getByRole("button", { name: "할 일 추가 열기" }));
-  return screen.getByRole("complementary", { name: "할 일 추가" });
+  return screen.getByRole(role, { name: "할 일 추가" });
 }
 
 beforeEach(() => {
@@ -244,14 +244,14 @@ describe("할 일 추가 폼", () => {
       within(page).getByRole("combobox", { name: /카테고리/ }).textContent,
     ).toContain("청첩장·하객");
 
-    const backButton = within(page).getByRole("button", {
-      name: "체크리스트로 돌아가기",
+    const closeButton = within(page).getByRole("button", {
+      name: "할 일 추가 닫기",
     });
     const submitButton = within(page).getByRole("button", { name: "추가" });
     submitButton.focus();
     fireEvent.keyDown(submitButton, { key: "Tab" });
-    expect(document.activeElement).toBe(backButton);
-    fireEvent.keyDown(backButton, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(closeButton);
+    fireEvent.keyDown(closeButton, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(submitButton);
 
     act(() => media.setMatches(false));
@@ -346,75 +346,85 @@ describe("할 일 추가 폼", () => {
     });
   });
 
-  it("빈 폼은 바로 닫고 dirty 폼은 폐기 확인 후 유지하거나 초기화한다", () => {
-    render(<CreationHarness onSubmit={vi.fn()} />);
-    let panel = openForm();
-    fireEvent.click(within(panel).getByRole("button", { name: "취소" }));
-    expect(
-      screen.queryByRole("complementary", { name: "할 일 추가" }),
-    ).toBeNull();
+  it.each([false, true])(
+    "빈 폼은 바로 닫고 dirty 폼은 폐기 확인 후 유지하거나 초기화한다 (모바일=%s)",
+    (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      const role = mobile ? "dialog" : "complementary";
+      const closeLabel = mobile ? "할 일 추가 닫기" : "취소";
+      render(<CreationHarness onSubmit={vi.fn()} />);
+      let panel = openForm(role);
+      fireEvent.click(within(panel).getByRole("button", { name: closeLabel }));
+      expect(screen.queryByRole(role, { name: "할 일 추가" })).toBeNull();
 
-    panel = openForm();
-    fireEvent.change(
-      within(panel).getByRole("textbox", { name: /할 일 제목/ }),
-      {
-        target: { value: "작성 중 제목" },
-      },
-    );
-    fireEvent.keyDown(within(panel).getByRole("textbox"), { key: "Escape" });
-    const dialog = screen.getByRole("dialog", {
-      name: "작성 중인 내용을 닫을까요?",
-    });
-    expect(panel.hasAttribute("inert")).toBe(true);
-    expect(panel.getAttribute("aria-hidden")).toBe("true");
-    expect(within(dialog).getByRole("button", { name: "계속 작성" })).toBe(
-      document.activeElement,
-    );
-    fireEvent.click(within(dialog).getByRole("button", { name: "계속 작성" }));
-    expect(screen.getByDisplayValue("작성 중 제목")).toBeTruthy();
+      panel = openForm(role);
+      fireEvent.change(
+        within(panel).getByRole("textbox", { name: /할 일 제목/ }),
+        {
+          target: { value: "작성 중 제목" },
+        },
+      );
+      fireEvent.keyDown(within(panel).getByRole("textbox"), { key: "Escape" });
+      const dialog = screen.getByRole("dialog", {
+        name: "작성 중인 내용을 닫을까요?",
+      });
+      expect(panel.hasAttribute("inert")).toBe(true);
+      expect(panel.getAttribute("aria-hidden")).toBe("true");
+      expect(within(dialog).getByRole("button", { name: "계속 작성" })).toBe(
+        document.activeElement,
+      );
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "계속 작성" }),
+      );
+      expect(screen.getByDisplayValue("작성 중 제목")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "취소" }));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "나가기",
-      }),
-    );
-    expect(screen.queryByDisplayValue("작성 중 제목")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: closeLabel }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "나가기",
+        }),
+      );
+      expect(screen.queryByDisplayValue("작성 중 제목")).toBeNull();
 
-    panel = openForm();
-    expect(within(panel).getByRole("textbox").getAttribute("value")).toBe("");
-  });
+      panel = openForm(role);
+      expect(within(panel).getByRole("textbox").getAttribute("value")).toBe("");
+    },
+  );
 
-  it("controlled 제출 중·성공·실패 상태를 표현하고 제출 중 중복 제출과 닫기를 막는다", () => {
-    const onSubmit = vi.fn();
-    render(<StatefulCreationHarness onSubmit={onSubmit} />);
-    const panel = openForm();
+  it.each([false, true])(
+    "controlled 제출 중·성공·실패 상태를 표현하고 제출 중 중복 제출과 닫기를 막는다 (모바일=%s)",
+    (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      const onSubmit = vi.fn();
+      render(<StatefulCreationHarness onSubmit={onSubmit} />);
+      const panel = openForm(mobile ? "dialog" : "complementary");
 
-    fireEvent.click(screen.getByRole("button", { name: "제출 중 주입" }));
-    expect(within(panel).getByRole("status").textContent).toBe(
-      "할 일을 추가하고 있어요.",
-    );
-    expect(
-      within(panel)
-        .getByRole("button", { name: "추가 중" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-    expect(
-      within(panel)
-        .getByRole("button", { name: "할 일 추가 닫기" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "제출 중 주입" }));
+      expect(within(panel).getByRole("status").textContent).toBe(
+        "할 일을 추가하고 있어요.",
+      );
+      expect(
+        within(panel)
+          .getByRole("button", { name: "추가 중" })
+          .hasAttribute("disabled"),
+      ).toBe(true);
+      expect(
+        within(panel)
+          .getByRole("button", { name: "할 일 추가 닫기" })
+          .hasAttribute("disabled"),
+      ).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "실패 주입" }));
-    expect(within(panel).getByRole("alert").textContent).toBe(
-      "서버가 요청을 처리하지 못했어요.",
-    );
+      fireEvent.click(screen.getByRole("button", { name: "실패 주입" }));
+      expect(within(panel).getByRole("alert").textContent).toBe(
+        "서버가 요청을 처리하지 못했어요.",
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "성공 주입" }));
-    expect(within(panel).getByRole("status").textContent).toBe(
-      "할 일을 추가했어요.",
-    );
-  });
+      fireEvent.click(screen.getByRole("button", { name: "성공 주입" }));
+      expect(within(panel).getByRole("status").textContent).toBe(
+        "할 일을 추가했어요.",
+      );
+    },
+  );
 
   it("onSubmit 경계가 없으면 production 저장 버튼을 비활성화한다", () => {
     render(<CreationHarness />);
