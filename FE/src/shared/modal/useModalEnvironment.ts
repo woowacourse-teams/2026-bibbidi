@@ -54,6 +54,7 @@ export function useModalEnvironment({
   returnFocusRef,
   inertBackground = false,
   restoreOnlyOnUnmount = false,
+  restoreFocus = true,
 }: {
   active?: boolean;
   rootRef: RefObject<HTMLElement | null>;
@@ -63,6 +64,8 @@ export function useModalEnvironment({
   returnFocusRef?: RefObject<HTMLElement | null>;
   inertBackground?: boolean;
   restoreOnlyOnUnmount?: boolean;
+  /** Disable when a child layer owns restoration across modal/docked changes. */
+  restoreFocus?: boolean;
 }) {
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     const root = rootRef.current;
@@ -106,6 +109,7 @@ export function useModalEnvironment({
       document.removeEventListener("keydown", handleKeyDown);
       release.reverse().forEach((unlock) => unlock());
       if (
+        restoreFocus &&
         (!restoreOnlyOnUnmount || !root.isConnected) &&
         previous instanceof HTMLElement &&
         previous.isConnected
@@ -119,5 +123,6 @@ export function useModalEnvironment({
     returnFocusRef,
     inertBackground,
     restoreOnlyOnUnmount,
+    restoreFocus,
   ]);
 }

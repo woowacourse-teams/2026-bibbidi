@@ -1,9 +1,12 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
 
+import { Button } from "../../../components/button";
+import { canRestoreFocus } from "../../../shared/focus/useReturnFocus";
 import {
   WorkspaceLayout,
   useWorkspaceLayout,
 } from "../../../components/workspace-layout";
+import { ChecklistCategories } from "./ChecklistCategories";
 import { ChecklistForeground } from "./ChecklistForeground";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentCreationController } from "../useChecklistAppointmentCreation";
@@ -38,17 +41,6 @@ interface ChecklistProps {
   revealCustomCategory?: { categoryId: string; requestId: number } | null;
   selectedTaskId: string | null;
   taskCreation?: ChecklistTaskCreationController;
-}
-
-function canRestoreFocus(
-  button: HTMLButtonElement | null,
-): button is HTMLButtonElement {
-  return (
-    button !== null &&
-    button.isConnected &&
-    !button.disabled &&
-    button.closest("[hidden]") === null
-  );
 }
 
 export function Checklist({
@@ -97,7 +89,7 @@ export function Checklist({
   >(null);
   const fallbackFocusRef = useRef<HTMLButtonElement>(null);
   const addTaskButtonRef = useRef<HTMLButtonElement>(null);
-  const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
+  const taskCreationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasAppointmentCreationOpenRef = useRef(
     appointmentCreation?.isOpen ?? false,
   );
@@ -223,18 +215,6 @@ export function Checklist({
       : null;
     previousSelectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskContext, selectedTaskId]);
-
-  useEffect(() => {
-    if (
-      wasTaskCreationOpenRef.current &&
-      !isTaskCreationOpen &&
-      !selectedTaskContext
-    ) {
-      addTaskButtonRef.current?.focus({ preventScroll: true });
-    }
-
-    wasTaskCreationOpenRef.current = isTaskCreationOpen;
-  }, [isTaskCreationOpen, selectedTaskContext]);
 
   useEffect(() => {
     if (
@@ -375,6 +355,12 @@ export function Checklist({
     onSelectTask(taskId);
   };
 
+  const openTaskCreation = (event: MouseEvent<HTMLButtonElement>) => {
+    taskCreationTriggerRef.current = event.currentTarget;
+    event.currentTarget.focus({ preventScroll: true });
+    onOpenTaskCreation?.();
+  };
+
   const isForegroundBlocked =
     isLoginRequiredOpen ||
     isStatusConfirmationOpen ||
@@ -401,33 +387,13 @@ export function Checklist({
       aria-hidden={backgroundHidden || undefined}
       inert={backgroundHidden || undefined}
     >
-      <nav aria-label="체크리스트 대분류" className="checklist-categories">
-        <ul className="checklist-categories__list">
-          {categories.map((category) => {
-            const isCurrent = category.id === selectedCategory?.id;
-
-            return (
-              <li key={category.id}>
-                <button
-                  aria-controls="checklist-category-content"
-                  aria-label={`${category.title} ${category.countLabel}`}
-                  aria-pressed={isCurrent}
-                  className={`checklist-categories__button${
-                    isCurrent ? " checklist-categories__button--current" : ""
-                  }`}
-                  onClick={() => selectCategory(category.id)}
-                  type="button"
-                >
-                  <span>{category.title}</span>
-                  <span className="checklist-categories__count">
-                    {category.countLabel}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <ChecklistCategories
+        categories={categories}
+        selectedCategoryId={selectedCategory?.id}
+        controlsId="checklist-category-content"
+        placement={layout.navigationPlacement}
+        onSelect={selectCategory}
+      />
     </div>
   );
   const foreground = hasAside ? (
@@ -458,6 +424,7 @@ export function Checklist({
         }
         overlay={isOverlay}
         blocked={isForegroundBlocked}
+        restoreFocus={!isTaskCreationOpen}
         onClose={closeForeground}
         onEscape={
           !isTaskCreationOpen &&
@@ -505,6 +472,8 @@ export function Checklist({
             modal={isMobileLayout || isOverlay}
             categories={categories}
             controller={taskCreation}
+            returnFocusRef={taskCreationTriggerRef}
+            fallbackFocusRef={addTaskButtonRef}
           />
         ) : null}
 
@@ -560,17 +529,15 @@ export function Checklist({
                     : "로그인하면 체크리스트가 그대로 저장돼요."}
                 </p>
               </div>
-              <button
+              <Button
                 className="checklist__add-task"
-                onClick={() => {
-                  addTaskButtonRef.current?.focus({ preventScroll: true });
-                  onOpenTaskCreation?.();
-                }}
+                size="large"
+                onClick={openTaskCreation}
                 ref={addTaskButtonRef}
                 type="button"
               >
                 <span aria-hidden="true">＋</span>할 일 추가
-              </button>
+              </Button>
             </header>
 
             {selectedCategory && tasks.length === 0 ? (
@@ -578,20 +545,22 @@ export function Checklist({
                 <h2>아직 담은 할 일이 없어요</h2>
                 <p>로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
                 <div className="checklist__empty-actions">
-                  <button
-                    className="checklist__empty-primary"
+                  <Button
+                    size="large"
                     onClick={() => onVisitPreparation?.(selectedCategory.id)}
                     type="button"
                   >
                     로드맵에서 추가
-                  </button>
-                  <button
-                    className="checklist__empty-secondary"
-                    onClick={onOpenTaskCreation}
+                  </Button>
+                  <Button
+                    size="large"
+                    color="dark"
+                    variant="weak"
+                    onClick={openTaskCreation}
                     type="button"
                   >
                     직접 추가
-                  </button>
+                  </Button>
                 </div>
               </section>
             ) : (
@@ -740,6 +709,12 @@ export function Checklist({
           onBackdropPress={onCancelLoginRequired}
           onEscape={onCancelLoginRequired}
           title="로그인이 필요해요"
+          returnFocusRef={
+            loginRequiredReason === "task-creation"
+              ? taskCreationTriggerRef
+              : undefined
+          }
+          fallbackFocusRef={addTaskButtonRef}
         />
       ) : null}
 
