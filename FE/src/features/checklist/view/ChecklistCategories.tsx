@@ -1,3 +1,6 @@
+import { useId } from "react";
+import { Checkbox } from "../../../components/checkbox";
+import { Tab } from "../../../components/tab";
 import type { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./ChecklistCategories.css";
 
@@ -9,6 +12,10 @@ interface ChecklistCategoriesProps {
   onSelect: (categoryId: string) => void;
 }
 
+export function getChecklistCategoryTabId(categoryId: string) {
+  return `checklist-category-tab-${categoryId}`;
+}
+
 export function ChecklistCategories({
   categories,
   selectedCategoryId,
@@ -16,33 +23,48 @@ export function ChecklistCategories({
   placement,
   onSelect,
 }: ChecklistCategoriesProps) {
+  const radioName = useId();
   return (
-    <nav
-      aria-label="체크리스트 대분류"
-      className="checklist-categories"
-      data-placement={placement}
-    >
-      <ul className="checklist-categories__list">
-        {categories.map((category) => (
-          <li key={category.id}>
-            <button
+    <nav aria-label="체크리스트 대분류" className="checklist-categories">
+      {placement === "top" ? (
+        <Tab
+          ariaLabel="체크리스트 대분류"
+          size="small"
+          fluid
+          onChange={(index) => onSelect(categories[index].id)}
+        >
+          {categories.map((category) => (
+            <Tab.Item
+              key={category.id}
+              id={getChecklistCategoryTabId(category.id)}
               aria-controls={controlsId}
               aria-label={`${category.title} ${category.countLabel}`}
-              aria-pressed={category.id === selectedCategoryId}
-              className="checklist-categories__button"
-              onClick={() => onSelect(category.id)}
-              type="button"
+              selected={category.id === selectedCategoryId}
             >
-              <span className="checklist-categories__label">
-                {category.title}
-              </span>
-              <span className="checklist-categories__count">
-                {category.countLabel}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+              {category.title}
+            </Tab.Item>
+          ))}
+        </Tab>
+      ) : (
+        <fieldset className="checklist-categories__group">
+          <legend>카테고리</legend>
+          {categories.map((category) => (
+            <label className="checklist-categories__option" key={category.id}>
+              <Checkbox.Circle
+                inputType="radio"
+                size={20}
+                name={radioName}
+                value={category.id}
+                aria-controls={controlsId}
+                aria-label={`${category.title} ${category.countLabel}`}
+                checked={category.id === selectedCategoryId}
+                onChange={(event) => onSelect(event.currentTarget.value)}
+              />
+              <span>{category.title}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
     </nav>
   );
 }
