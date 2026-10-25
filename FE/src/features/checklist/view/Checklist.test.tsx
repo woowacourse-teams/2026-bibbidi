@@ -1066,10 +1066,10 @@ describe("Checklist 목록 표현", () => {
   });
 
   it("목록 왼쪽 체크 표시 없이 완료 상태를 positive 배지로 표시한다", () => {
-    const { container } = render(<ChecklistHarness />);
+    render(<ChecklistHarness />);
     const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
 
-    expect(container.querySelector(".checklist__completion-mark")).toBeNull();
+    expect(within(completedTask).queryByRole("checkbox")).toBeNull();
     expect(
       within(completedTask)
         .getByText("완료")
