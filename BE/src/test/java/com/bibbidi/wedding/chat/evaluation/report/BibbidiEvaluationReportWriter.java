@@ -1,8 +1,6 @@
 package com.bibbidi.wedding.chat.evaluation.report;
 
 import com.bibbidi.wedding.chat.evaluation.input.EvaluationScenario;
-import com.bibbidi.wedding.chat.evaluation.report.JudgeInvocation;
-import com.bibbidi.wedding.chat.evaluation.report.ModelTokenUsage;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiUnscorableException;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel.ModelCall;
 import java.io.IOException;
@@ -11,15 +9,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationResponse;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public class BibbidiEvaluationReportWriter {
 
@@ -48,7 +46,8 @@ public class BibbidiEvaluationReportWriter {
                 "codex".equals(judgeProvider) ? reasoningEffort : null);
     }
 
-    public void record(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer, List<Long> recommendedItemIds,
+    public void record(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer,
+                       List<Long> recommendedItemIds,
                        List<Document> providedContext,
                        List<EvaluationResponse> evaluations, String selectedTier, Long firstDeltaMs, Long totalMs) {
         scenarios.add(scenarioResult(scenario, modelCalls, answer, recommendedItemIds,
@@ -56,7 +55,8 @@ public class BibbidiEvaluationReportWriter {
                 selectedTier, firstDeltaMs, totalMs));
     }
 
-    public void recordFailure(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer, List<Long> recommendedItemIds,
+    public void recordFailure(EvaluationScenario scenario, List<ModelCall> modelCalls, String answer,
+                              List<Long> recommendedItemIds,
                               List<Document> providedContext,
                               List<EvaluationResponse> evaluations, String phase, String metricType,
                               Throwable failure, String selectedTier, Long firstDeltaMs, Long totalMs) {
@@ -143,7 +143,7 @@ public class BibbidiEvaluationReportWriter {
         }
         rows.sort(Comparator.comparing(ComparisonRow::scenario).thenComparing(ComparisonRow::model));
         StringBuilder table = new StringBuilder("# 모델별 시나리오 비교\n\n"
-                + "| 시나리오 | 생성 모델 | Jev 선택 | TTFT(ms) | 전체(ms) | 생성 토큰 | 품질 통과 |\n"
+                + "| 시나리오 | 생성 모델 | 선택 모델 | TTFT(ms) | 전체(ms) | 생성 토큰 | 품질 통과 |\n"
                 + "| --- | --- | --- | ---: | ---: | ---: | ---: |\n");
         for (ComparisonRow row : rows) {
             table.append("| ").append(row.scenario()).append(" | ").append(row.model()).append(" | ")

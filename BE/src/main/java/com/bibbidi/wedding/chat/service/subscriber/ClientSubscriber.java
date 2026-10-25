@@ -19,7 +19,6 @@ public final class ClientSubscriber implements TurnSubscriber {
     private Flux<ChatResult> toClient(ChatResult result) {
         return switch (result) {
             case ChatResult.Failed failed -> Flux.error(failed.cause());
-            case ChatResult.Selected ignored -> Flux.empty();
             case ChatResult.Cancelled ignored -> Flux.empty();
             default -> Flux.just(result);
         };

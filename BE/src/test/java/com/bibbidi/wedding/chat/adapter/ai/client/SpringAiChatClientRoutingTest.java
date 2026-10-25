@@ -54,4 +54,20 @@ class SpringAiChatClientRoutingTest {
         assertThat(lunaPrompts).hasSize(1);
         assertThat(client.modelName(ChatModelTier.LUNA)).isEqualTo("gpt-6-luna");
     }
+
+    @Test
+    void recordsTheBedrockSolModelForLunaWhenNoOpenAiClientExists() {
+        ChatClient bedrock = ChatClient.create(new FakeChatModel(prompt -> Flux.empty()));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ChatClient> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        ChatModelRouter router = new AiChatConfig().chatModelRouter(
+                bedrock, provider,
+                new AiChatProperties(10, Duration.ofHours(1),
+                        "qwen-id", "global.openai.gpt-6.1-sol", "gpt-6-luna"), "");
+        SpringAiChatClient client = new SpringAiChatClient(router);
+
+        assertThat(client.modelName(ChatModelTier.LUNA)).isEqualTo("global.openai.gpt-6.1-sol");
+        assertThat(client.modelName(ChatModelTier.QWEN)).isEqualTo("qwen-id");
+    }
 }

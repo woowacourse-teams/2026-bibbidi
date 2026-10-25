@@ -72,22 +72,22 @@ public class AiChatConfig {
                     ChatModelTier.SOL, route));
         }
 
-        ChatClient openAiClient = lunaClient.getIfAvailable();
-        if (openAiClient == null) {
-            return new ChatModelRouter(Map.of(
-                    ChatModelTier.QWEN, new ChatModelRoute(bedrockClient, properties.qwenModel(), null),
-                    ChatModelTier.LUNA, new ChatModelRoute(bedrockClient, properties.lunaModel(), null),
-                    ChatModelTier.SOL, new ChatModelRoute(bedrockClient, properties.solModel(), null)));
-        }
-
         String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
+        ChatModelRoute qwen = new ChatModelRoute(bedrockClient, properties.qwenModel(),
+                () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
+        ChatModelRoute sol = new ChatModelRoute(bedrockClient, properties.solModel(),
+                () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
+                        .requestParameters(strictJsonFormatParameters()));
+
+        ChatClient openAiClient = lunaClient.getIfAvailable();
+        // OpenAI 클라이언트가 없으면 Luna 요청도 Bedrock Sol 모델이 처리하므로, 기록하는 모델명도 Sol로 맞춘다.
+        ChatModelRoute luna = openAiClient == null
+                ? sol
+                : new ChatModelRoute(openAiClient, properties.lunaModel(), null);
         return new ChatModelRouter(Map.of(
-                ChatModelTier.QWEN, new ChatModelRoute(bedrockClient, properties.qwenModel(),
-                        () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema)),
-                ChatModelTier.LUNA, new ChatModelRoute(openAiClient, properties.lunaModel(), null),
-                ChatModelTier.SOL, new ChatModelRoute(bedrockClient, properties.solModel(),
-                        () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
-                                .requestParameters(strictJsonFormatParameters()))));
+                ChatModelTier.QWEN, qwen,
+                ChatModelTier.LUNA, luna,
+                ChatModelTier.SOL, sol));
     }
 
     @Bean

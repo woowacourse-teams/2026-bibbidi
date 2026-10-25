@@ -13,7 +13,6 @@ import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluationRequest;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluator;
 import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
-import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ConversationKey;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
@@ -78,12 +77,6 @@ class BibbidiEvaluationIntegrationTest {
     @Autowired
     private EvaluationProperties properties;
 
-    @Autowired
-    private ModelClassifier classifier;
-
-    @Value("${bibbidi.ai.chatbot.routing.api-key:}")
-    private String jevApiKey;
-
     @Value("${bibbidi.sse.response-timeout-seconds}")
     private long responseTimeoutSeconds;
 
@@ -137,12 +130,12 @@ class BibbidiEvaluationIntegrationTest {
             reportWriter.recordFailure(scenario, recordingModel.calls(), generated.answer(),
                     generated.recommendedItemIds(), providedContext(), evaluations,
                     phase, evaluatingMetric, failure,
-                    measurement.selectedTier, measurement.firstDeltaMs, measurement.totalMs);
+                    measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
             throw failure;
         }
         reportWriter.record(scenario, recordingModel.calls(), generated.answer(),
                 generated.recommendedItemIds(), providedContext(), evaluations,
-                measurement.selectedTier, measurement.firstDeltaMs, measurement.totalMs);
+                measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
     }
 
     private void generate(EvaluationScenario scenario, GeneratedAnswer generated, GenerationMeasurement measurement) {
@@ -152,15 +145,14 @@ class BibbidiEvaluationIntegrationTest {
         recordingModel.reset();
         try {
             chatMemory.add(memoryKey, scenario.chatMemory().stream().map(this::toMessage).toList());
-            if (!jevApiKey.isBlank()) {
-                measurement.selectedTier = classifier.classify(memoryKey, scenario.userMessage())
-                        .block(timeout).name();
-            }
             long startedAt = System.nanoTime();
             chatService.chat(
                             new ChatCommand(EVALUATION_USER_ID, conversationId, scenario.userMessage()),
                             () -> CancelReason.CLIENT_DISCONNECTED)
                     .doOnNext(event -> {
+                        if (event instanceof ChatResult.Selected selected) {
+                            measurement.selectedModel = selected.model();
+                        }
                         if (event instanceof ChatResult.Delta delta && !delta.text().isEmpty()
                                 && measurement.firstDeltaMs == null) {
                             measurement.firstDeltaMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
@@ -178,7 +170,7 @@ class BibbidiEvaluationIntegrationTest {
     }
 
     private static final class GenerationMeasurement {
-        private String selectedTier;
+        private String selectedModel;
         private Long firstDeltaMs;
         private Long totalMs;
     }
