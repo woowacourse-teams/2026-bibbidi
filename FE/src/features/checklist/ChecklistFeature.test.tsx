@@ -1957,6 +1957,19 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
     expect(screen.getByRole("heading", { name: "빈 카테고리" })).toBeTruthy();
     expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
 
+    const directAddButton = screen.getByRole("button", { name: "직접 추가" });
+    fireEvent.click(directAddButton);
+    const loginDialog = screen.getByRole("dialog", {
+      name: "로그인이 필요해요",
+    });
+    fireEvent.keyDown(
+      within(loginDialog).getByRole("button", { name: "취소" }),
+      {
+        key: "Escape",
+      },
+    );
+    await waitFor(() => expect(document.activeElement).toBe(directAddButton));
+
     fireEvent.click(screen.getByRole("button", { name: "로드맵에서 추가" }));
     expect(getCurrentUrl()).toBe("/?categoryId=10");
   });

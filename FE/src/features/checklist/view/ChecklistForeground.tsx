@@ -9,6 +9,7 @@ export function ChecklistForeground({
   blocked,
   onClose,
   onEscape,
+  restoreFocus = true,
 }: {
   children: ReactNode;
   modal: boolean;
@@ -16,6 +17,7 @@ export function ChecklistForeground({
   blocked: boolean;
   onClose: () => void;
   onEscape?: () => void;
+  restoreFocus?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useModalEnvironment({
@@ -25,6 +27,7 @@ export function ChecklistForeground({
     onEscape,
     inertBackground: true,
     restoreOnlyOnUnmount: true,
+    restoreFocus,
   });
   return (
     <div

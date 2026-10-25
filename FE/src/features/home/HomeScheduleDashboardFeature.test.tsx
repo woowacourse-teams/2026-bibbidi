@@ -791,7 +791,16 @@ describe("캘린더 추천 담기의 기존 인증·요청·성공 이벤트 계
     const recommendationCount =
       recommended.getRecommendedCatalogItems.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "내 할 일에 추가" }));
-    await waitFor(() => expect(analytics.track).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(query.getChecklist).toHaveBeenCalledTimes(queryCount + 1);
+      expect(recommended.getRecommendedCatalogItems).toHaveBeenCalledTimes(
+        recommendationCount + 1,
+      );
+      expect(
+        screen.queryByRole("button", { name: "내 할 일에 추가" }),
+      ).toBeNull();
+    });
     expect(analytics.track).toHaveBeenCalledWith({
       name: "preparation_item_add",
       parameters: {
@@ -801,18 +810,11 @@ describe("캘린더 추천 담기의 기존 인증·요청·성공 이벤트 계
         source: "calendar_recommendation",
       },
     });
-    expect(query.getChecklist).toHaveBeenCalledTimes(queryCount + 1);
-    expect(recommended.getRecommendedCatalogItems).toHaveBeenCalledTimes(
-      recommendationCount + 1,
-    );
     expect(addition.addCatalogItemIds).toHaveBeenCalledWith(
       "authenticated",
       ["101"],
       expect.any(AbortSignal),
     );
-    expect(
-      screen.queryByRole("button", { name: "내 할 일에 추가" }),
-    ).toBeNull();
   });
 
   it("이미 추가된 항목 응답이면 성공 이벤트를 중복 전송하지 않는다", async () => {

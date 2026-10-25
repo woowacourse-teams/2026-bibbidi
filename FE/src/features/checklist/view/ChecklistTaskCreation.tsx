@@ -1,4 +1,6 @@
 import { SubmitEvent, useEffect, useRef } from "react";
+import type { RefObject } from "react";
+import { useReturnFocus } from "../../../shared/focus/useReturnFocus";
 
 import { useIsMobileLayout } from "../../../shared/responsive";
 import {
@@ -14,6 +16,8 @@ interface ChecklistTaskCreationProps {
   modal?: boolean;
   categories: ChecklistCategoryViewModel[];
   controller: ChecklistTaskCreationController;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 }
 
 function BackIcon() {
@@ -28,6 +32,8 @@ export function ChecklistTaskCreation({
   modal = false,
   categories,
   controller,
+  returnFocusRef,
+  fallbackFocusRef,
 }: ChecklistTaskCreationProps) {
   const isMobileLayout = useIsMobileLayout();
   const formRef = useRef<HTMLFormElement>(null);
@@ -37,6 +43,8 @@ export function ChecklistTaskCreation({
   const isSubmitting = controller.submissionState.status === "submitting";
   const titleErrorId = "checklist-task-creation-title-error";
   const categoryErrorId = "checklist-task-creation-category-error";
+
+  useReturnFocus(formRef, returnFocusRef, fallbackFocusRef);
 
   useEffect(() => {
     titleRef.current?.focus();

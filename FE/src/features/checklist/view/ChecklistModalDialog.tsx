@@ -1,4 +1,6 @@
 import { ReactNode, useEffect, useId, useRef } from "react";
+import type { RefObject } from "react";
+import { useReturnFocus } from "../../../shared/focus/useReturnFocus";
 
 import "./ChecklistModalDialog.css";
 import {
@@ -13,6 +15,8 @@ interface ChecklistModalDialogProps {
   onEscape?: () => void;
   title: string;
   variant?: "default" | "critical";
+  returnFocusRef?: RefObject<HTMLElement | null>;
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export function ChecklistModalDialog({
@@ -22,6 +26,8 @@ export function ChecklistModalDialog({
   onEscape,
   title,
   variant = "default",
+  returnFocusRef,
+  fallbackFocusRef,
 }: ChecklistModalDialogProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -29,25 +35,13 @@ export function ChecklistModalDialog({
   const titleId = `checklist-dialog-title-${reactId}`;
   const descriptionId = `checklist-dialog-description-${reactId}`;
 
+  useReturnFocus(dialogRef, returnFocusRef, fallbackFocusRef);
+
   useEffect(() => {
     const dialog = dialogRef.current;
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
     if (dialog) {
       focusFirstElement(dialog);
     }
-
-    return () => {
-      if (previouslyFocused?.isConnected) {
-        queueMicrotask(() => {
-          if (!dialog?.isConnected && previouslyFocused.isConnected) {
-            previouslyFocused.focus();
-          }
-        });
-      }
-    };
   }, []);
 
   useEffect(() => {
