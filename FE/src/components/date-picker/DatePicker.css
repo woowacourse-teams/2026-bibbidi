@@ -184,6 +184,7 @@
   padding: 20px 8px;
 }
 .bibbidi-date-picker-month-options [role="option"] {
+  height: 40px;
   min-height: 40px;
   border: 0;
   border-radius: 6px;

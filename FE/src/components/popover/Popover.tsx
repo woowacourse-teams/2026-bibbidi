@@ -147,12 +147,12 @@ function Root({
   useEffect(() => {
     if (!isOpen) return;
     const outsideFocus = (event: FocusEvent) => {
+      const panel = panelRef.current;
+      const trigger = triggerRef.current;
+      // A replacement layer can take focus before this effect's cleanup runs.
+      if (!panel || !trigger) return;
       const target = event.target as Node;
-      if (
-        !panelRef.current?.contains(target) &&
-        !triggerRef.current?.contains(target)
-      )
-        setOpen(false);
+      if (!panel.contains(target) && !trigger.contains(target)) setOpen(false);
     };
     document.addEventListener("focusin", outsideFocus);
     return () => document.removeEventListener("focusin", outsideFocus);

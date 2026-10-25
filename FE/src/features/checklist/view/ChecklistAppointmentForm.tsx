@@ -2,6 +2,7 @@ import { useAppointmentFormView } from "../useAppointmentFormView";
 import { Button } from "../../../components/button";
 import { TextField } from "../../../components/text-field";
 import { TextArea } from "../../../components/text-area";
+import { PickerField } from "../../../components/picker-field";
 import {
   CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH,
   ChecklistAppointmentCreationController,
@@ -36,10 +37,8 @@ export function ChecklistAppointmentForm({
     pending,
     submit,
     titleComposition,
-  } = useAppointmentFormView(controller);
-  const field = (
-    key: "title" | "date" | "startTime" | "endTime" | "place",
-  ) => ({
+  } = useAppointmentFormView<HTMLButtonElement>(controller);
+  const field = (key: "title" | "place") => ({
     id: `checklist-appointment-creation-${key === "title" ? "title-input" : key}`,
     disabled: pending,
     value: controller.draft[key],
@@ -105,31 +104,43 @@ export function ChecklistAppointmentForm({
           placeholder="일정 제목을 입력하세요"
           right={counter(controller.draft.title)}
         />
-        <TextField
-          {...field("date")}
+        <PickerField
+          id="checklist-appointment-creation-date"
           label="날짜"
-          type="date"
+          kind="date"
+          yearRange={{ start: 1, end: 9999 }}
           required
+          value={controller.draft.date}
+          disabled={pending}
+          error={controller.errors.date}
           ref={dateRef}
           onBlur={controller.touchDate}
-          onChange={(event) => controller.changeDate(event.target.value)}
+          onChange={controller.changeDate}
         />
         <div className="checklist-appointment-form__times">
-          <TextField
-            {...field("startTime")}
+          <PickerField
+            id="checklist-appointment-creation-startTime"
             label="시작 시간"
-            type="time"
+            kind="time"
+            minuteStep={1}
+            value={controller.draft.startTime}
+            disabled={pending}
+            error={controller.errors.startTime}
             ref={startTimeRef}
             onBlur={controller.touchStartTime}
-            onChange={(event) => controller.changeStartTime(event.target.value)}
+            onChange={controller.changeStartTime}
           />
-          <TextField
-            {...field("endTime")}
+          <PickerField
+            id="checklist-appointment-creation-endTime"
             label="종료 시간"
-            type="time"
+            kind="time"
+            minuteStep={1}
+            value={controller.draft.endTime}
+            disabled={pending}
+            error={controller.errors.endTime}
             ref={endTimeRef}
             onBlur={controller.touchEndTime}
-            onChange={(event) => controller.changeEndTime(event.target.value)}
+            onChange={controller.changeEndTime}
           />
         </div>
         <TextField

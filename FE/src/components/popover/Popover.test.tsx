@@ -1,4 +1,4 @@
-import { createRef } from "react";
+import { createRef, useLayoutEffect, useRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,29 @@ import { Button } from "../button";
 import { ListRow } from "../list-row";
 
 describe("Popover의 입력과 초점", () => {
+  it("다른 레이어로 교체될 때 새 레이어의 초점을 바깥 클릭으로 처리하지 않는다", () => {
+    const onOpenChange = vi.fn();
+    function Replacement() {
+      const ref = useRef<HTMLButtonElement>(null);
+      useLayoutEffect(() => ref.current?.focus(), []);
+      return <button ref={ref}>새 레이어</button>;
+    }
+    const view = render(
+      <Popover
+        title="설정"
+        trigger={<Button>설정 열기</Button>}
+        open
+        onOpenChange={onOpenChange}
+      />,
+    );
+    onOpenChange.mockClear();
+    view.rerender(<Replacement />);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "새 레이어" }),
+    );
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("트리거 ref와 입력 초점을 연결하고 Tab 입력으로 패널을 닫지 않는다", () => {
     const triggerRef = createRef<HTMLButtonElement>();
     const inputRef = createRef<HTMLInputElement>();
