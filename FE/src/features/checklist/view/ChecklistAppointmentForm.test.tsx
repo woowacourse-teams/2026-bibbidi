@@ -90,6 +90,7 @@ describe.each([false, true])(
       fireEvent.click(screen.getByRole("button", { name: "저장" }));
       const dateTrigger = screen.getByRole("button", {
         name: "날짜 날짜 선택",
+        description: "필수 항목입니다. 날짜를 선택해 주세요.",
       });
       await waitFor(() => expect(document.activeElement).toBe(dateTrigger));
       expect(screen.getByRole("alert").textContent).toBe(
@@ -106,6 +107,12 @@ describe.each([false, true])(
         expect(screen.queryByRole("dialog", { name: "날짜 선택" })).toBeNull(),
       );
       expect(screen.queryByText("날짜를 선택해 주세요.")).toBeNull();
+      expect(
+        screen.getByRole("button", {
+          name: `날짜 ${today}`,
+          description: "필수 항목입니다.",
+        }),
+      ).toBeTruthy();
       await chooseTime("시작 시간", "9", "13");
       await chooseTime("종료 시간", "8", "45");
       fireEvent.click(screen.getByRole("button", { name: "저장" }));

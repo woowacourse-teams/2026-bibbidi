@@ -912,9 +912,11 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     ).toBe(titleError.textContent);
 
     expect(
-      document.getElementById(dateInput.getAttribute("aria-describedby")!)
-        ?.textContent,
-    ).toBe(dateError.textContent);
+      within(creationPanel).getByRole("button", {
+        name: /^날짜 /,
+        description: `필수 항목입니다. ${dateError.textContent}`,
+      }),
+    ).toBe(dateInput);
     expect(document.activeElement).toBe(titleInput);
 
     fireEvent.change(titleInput, { target: { value: "상담" } });

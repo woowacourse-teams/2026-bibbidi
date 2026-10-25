@@ -16,7 +16,8 @@
 .bibbidi-text-field-label > span {
   color: var(--color-fg-critical);
 }
-.bibbidi-text-field-label[data-hidden] {
+.bibbidi-text-field-label[data-hidden],
+.bibbidi-text-field-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;

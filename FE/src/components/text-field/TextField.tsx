@@ -93,6 +93,11 @@ function FieldButton({
       disabled={disabled}
       className={className}
     >
+      {required && (
+        <span id={`${id}-required`} className="bibbidi-text-field-sr-only">
+          필수 항목입니다.
+        </span>
+      )}
       <button
         {...props}
         id={id}
@@ -100,7 +105,14 @@ function FieldButton({
         disabled={disabled}
         className="bibbidi-text-field-control bibbidi-text-field-button"
         aria-labelledby={labelledBy ?? `${id}-label ${id}-value`}
-        aria-describedby={fieldDescription(id, help, describedBy)}
+        aria-describedby={
+          [
+            required ? `${id}-required` : undefined,
+            fieldDescription(id, help, describedBy),
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
       >
         <span
           id={`${id}-value`}
