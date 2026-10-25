@@ -1,10 +1,14 @@
 package com.bibbidi.wedding.chat.adapter.ai.config;
 
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.memory.ExpiringChatMemoryRepository;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelRoutingProperties;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import java.util.Map;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
@@ -13,13 +17,18 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AiChatProperties.class)
+@EnableConfigurationProperties({AiChatProperties.class, ModelRoutingProperties.class})
 public class AiChatConfig {
 
     @Bean
@@ -49,10 +58,70 @@ public class AiChatConfig {
     }
 
     @Bean
+    public ChatModelRouter chatModelRouter(
+            @Qualifier("aiChatClient") ChatClient bedrockClient,
+            @Qualifier("lunaChatClient") ObjectProvider<ChatClient> lunaClient,
+            AiChatProperties properties,
+            @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel
+    ) {
+        if (!evaluationModel.isBlank()) {
+            ChatModelRoute route = new ChatModelRoute(bedrockClient, evaluationModel, null);
+            return new ChatModelRouter(Map.of(
+                    ChatModelTier.QWEN, route,
+                    ChatModelTier.LUNA, route,
+                    ChatModelTier.SOL, route));
+        }
+
+        ChatClient openAiClient = lunaClient.getIfAvailable();
+        if (openAiClient == null) {
+            return new ChatModelRouter(Map.of(
+                    ChatModelTier.QWEN, new ChatModelRoute(bedrockClient, properties.qwenModel(), null),
+                    ChatModelTier.LUNA, new ChatModelRoute(bedrockClient, properties.lunaModel(), null),
+                    ChatModelTier.SOL, new ChatModelRoute(bedrockClient, properties.solModel(), null)));
+        }
+
+        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
+        return new ChatModelRouter(Map.of(
+                ChatModelTier.QWEN, new ChatModelRoute(bedrockClient, properties.qwenModel(),
+                        () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema)),
+                ChatModelTier.LUNA, new ChatModelRoute(openAiClient, properties.lunaModel(), null),
+                ChatModelTier.SOL, new ChatModelRoute(bedrockClient, properties.solModel(),
+                        () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
+                                .requestParameters(strictJsonFormatParameters()))));
+    }
+
+    @Bean
+    @Profile("!test & !evaluator")
+    ChatClient lunaChatClient(
+            @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
+            @Value("${bibbidi.ai.chatbot.luna-model}") String model,
+            ChatMemory chatMemory,
+            SystemPrompt systemPrompt,
+            CatalogServiceAdapter catalogTools,
+            ChecklistServiceAdapter checklistTools
+    ) {
+        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .options(OpenAiChatOptions.builder()
+                        .apiKey(apiKey)
+                        .model(model)
+                        .reasoningEffort("none")
+                        .outputSchema(schema)
+                        .strict(true)
+                        .build())
+                .build();
+        return ChatClient.builder(chatModel)
+                .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools)
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+
+    @Bean
     ChatOptions.Builder<?> structuredAnswerOptions(
             @Value("${spring.ai.bedrock.converse.chat.model}") String model
     ) {
-        BeanOutputConverter<ChatAnswer> outputConverter = new BeanOutputConverter<>(ChatAnswer.class);
+        BeanOutputConverter<ChatResult.Answer> outputConverter = new BeanOutputConverter<>(ChatResult.Answer.class);
         BedrockChatOptions.Builder options = BedrockChatOptions.builder()
                 .outputSchema(outputConverter.getJsonSchema());
 

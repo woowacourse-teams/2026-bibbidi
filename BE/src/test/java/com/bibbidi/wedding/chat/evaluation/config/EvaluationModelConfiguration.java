@@ -7,6 +7,7 @@ import com.bibbidi.wedding.chat.evaluation.model.CodexCliChatModel;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -20,6 +21,7 @@ public class EvaluationModelConfiguration {
      * 서비스의 {@code aiChatClient}가 쓰는 {@code ChatModel}이다. Bedrock 대신 이 모델을 쓴다.
      */
     @Bean
+    @ConditionalOnProperty(name = "spring.ai.model.chat", havingValue = "none")
     ChatModel generationChatModel(EvaluationProperties properties) {
         ModelProperties generation = properties.generation();
         return switch (generation.provider()) {

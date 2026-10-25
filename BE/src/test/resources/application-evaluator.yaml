@@ -3,13 +3,17 @@ spring:
     url: jdbc:h2:mem:bibbidi-evaluation;IGNORECASE=TRUE
   ai:
     model:
-      chat: none
+      chat: ${BIBBIDI_EVALUATION_CHAT_PROVIDER:none}
     bedrock:
       converse:
         chat:
           model: ${bibbidi.evaluation.generation.model}
 
 bibbidi:
+  ai:
+    chatbot:
+      routing:
+        forced-tier: ${BIBBIDI_EVALUATION_ROUTE_TIER:SOL}
   evaluation:
     generation:
       provider: ${BIBBIDI_EVALUATION_GENERATION_PROVIDER:codex}

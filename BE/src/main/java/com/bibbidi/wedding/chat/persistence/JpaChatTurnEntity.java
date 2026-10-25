@@ -34,6 +34,9 @@ public class JpaChatTurnEntity extends BaseTimeEntity {
     @Column(name = "completion", nullable = false, columnDefinition = "TEXT")
     private String completion;
 
+    @Column(name = "model", nullable = false, length = 100)
+    private String model;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "outcome", nullable = false, length = 20)
     private ChatTurnOutcome outcome;
@@ -44,6 +47,9 @@ public class JpaChatTurnEntity extends BaseTimeEntity {
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;
 
+    @Column(name = "duration_ms", nullable = false)
+    private long durationMs;
+
     protected JpaChatTurnEntity() {
     }
 
@@ -52,17 +58,21 @@ public class JpaChatTurnEntity extends BaseTimeEntity {
             String conversationId,
             String userPrompt,
             String completion,
+            String model,
             ChatTurnOutcome outcome,
             @Nullable String outcomeReason,
-            LocalDateTime startedAt
+            LocalDateTime startedAt,
+            long durationMs
     ) {
         this.userId = userId;
         this.conversationId = conversationId;
         this.userPrompt = userPrompt;
         this.completion = completion;
+        this.model = model;
         this.outcome = outcome;
         this.outcomeReason = outcomeReason;
         this.startedAt = startedAt;
+        this.durationMs = durationMs;
     }
 
     public Long userId() {
@@ -81,6 +91,10 @@ public class JpaChatTurnEntity extends BaseTimeEntity {
         return completion;
     }
 
+    public String model() {
+        return model;
+    }
+
     public ChatTurnOutcome outcome() {
         return outcome;
     }
@@ -91,5 +105,9 @@ public class JpaChatTurnEntity extends BaseTimeEntity {
 
     public LocalDateTime startedAt() {
         return startedAt;
+    }
+
+    public long durationMs() {
+        return durationMs;
     }
 }

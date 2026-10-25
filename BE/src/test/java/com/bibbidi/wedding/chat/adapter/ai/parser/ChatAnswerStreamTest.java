@@ -3,7 +3,7 @@ package com.bibbidi.wedding.chat.adapter.ai.parser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -35,12 +35,12 @@ class ChatAnswerStreamTest {
             List<String> deltas = new ArrayList<>();
 
             // when
-            ChatAnswer answer = stream.read(Stream.of(json.substring(0, boundary), json.substring(boundary)),
+            ChatResult.Answer answer = stream.read(Stream.of(json.substring(0, boundary), json.substring(boundary)),
                     deltas::add);
 
             // then
             assertThat(String.join("", deltas)).isEqualTo(expected);
-            assertThat(answer).isEqualTo(new ChatAnswer(expected, List.of(2L, 1L)));
+            assertThat(answer).isEqualTo(new ChatResult.Answer(expected, List.of(2L, 1L)));
             assertThat(deltas).allSatisfy(delta ->
                     assertThat(Character.isHighSurrogate(delta.charAt(delta.length() - 1))).isFalse());
         }
@@ -61,7 +61,7 @@ class ChatAnswerStreamTest {
                 });
 
         // when, then
-        assertThat(stream.read(chunks, deltas::add)).isEqualTo(new ChatAnswer("일부 답변", List.of(2L)));
+        assertThat(stream.read(chunks, deltas::add)).isEqualTo(new ChatResult.Answer("일부 답변", List.of(2L)));
         assertThat(deltas).containsExactly("일부 ", "답변");
     }
 
@@ -75,14 +75,14 @@ class ChatAnswerStreamTest {
         Stream<String> chunks = json.chars().mapToObj(character -> String.valueOf((char) character));
 
         // when
-        ChatAnswer answer = stream.read(chunks, delta -> {
+        ChatResult.Answer answer = stream.read(chunks, delta -> {
             assertThat(Character.isHighSurrogate(delta.charAt(delta.length() - 1))).isFalse();
             deltas.add(delta);
         });
 
         // then
         assertThat(String.join("", deltas)).isEqualTo(expected);
-        assertThat(answer).isEqualTo(new ChatAnswer(expected, List.of(2L)));
+        assertThat(answer).isEqualTo(new ChatResult.Answer(expected, List.of(2L)));
     }
 
     @Test
@@ -90,16 +90,16 @@ class ChatAnswerStreamTest {
     void streamsAnswersLargerThanTheParserBuffers() {
         // given
         String expected = "준비 \\\"목록\\\"\n😀 ".repeat(3000);
-        String json = MAPPER.writeValueAsString(new ChatAnswer(expected, List.of(2L)));
+        String json = MAPPER.writeValueAsString(new ChatResult.Answer(expected, List.of(2L)));
         List<String> deltas = new ArrayList<>();
         AtomicBoolean closed = new AtomicBoolean();
 
         // when
-        ChatAnswer answer = new ChatAnswerStream(MAPPER).read(
+        ChatResult.Answer answer = new ChatAnswerStream(MAPPER).read(
                 Stream.of(json).onClose(() -> closed.set(true)), deltas::add);
 
         // then
-        assertThat(answer).isEqualTo(new ChatAnswer(expected, List.of(2L)));
+        assertThat(answer).isEqualTo(new ChatResult.Answer(expected, List.of(2L)));
         assertThat(deltas.size()).isGreaterThan(1);
         assertThat(String.join("", deltas)).isEqualTo(expected);
         assertThat(deltas).allSatisfy(delta ->
@@ -127,7 +127,7 @@ class ChatAnswerStreamTest {
         String literalAnswer = "제목 {\"answer\":\"가짜\"}를 확인 😀";
         return Stream.of(
                 Arguments.of(
-                        MAPPER.writeValueAsString(new ChatAnswer(literalAnswer, List.of(2L))),
+                        MAPPER.writeValueAsString(new ChatResult.Answer(literalAnswer, List.of(2L))),
                         literalAnswer),
                 Arguments.of("{\"recommendedItemIds\":[2],\"ans\\u0077er\":\"준비\\n\\uD83D\\uDE00\"}", "준비\n😀")
         );
@@ -156,14 +156,14 @@ class ChatAnswerStreamTest {
                 json(null),
                 "{\"answer\":\"일부",
                 json(Map.of("answer", 42, "recommendedItemIds", List.of())),
-                json(new ChatAnswer(" ", List.of())),
+                json(new ChatResult.Answer(" ", List.of())),
                 json(Map.of("answer", "답변")),
                 json(Map.of("recommendedItemIds", List.of())),
-                json(new ChatAnswer("답변", null)),
+                json(new ChatResult.Answer("답변", null)),
                 json(Map.of("answer", "답변", "recommendedItemIds", Map.of())),
                 json(Map.of("answer", "답변", "recommendedItemIds", List.of("1"))),
                 json(Map.of("answer", "답변", "recommendedItemIds", List.of(1.5))),
-                json(new ChatAnswer("답변", List.of(0L))),
+                json(new ChatResult.Answer("답변", List.of(0L))),
                 json(Map.of("answer", "답변", "recommendedItemIds", List.of(new BigInteger("9223372036854775808")))),
                 json(Map.of("answer", "답변", "recommendedItemIds", List.of(), "extra", true)),
                 "{\"answer\":\"답변\",\"answer\":\"다른 답변\",\"recommendedItemIds\":[]}",
@@ -172,7 +172,7 @@ class ChatAnswerStreamTest {
                 "{\"answer\":\"\\q\",\"recommendedItemIds\":[]}",
                 "{\"answer\":\"\\uZZZZ\",\"recommendedItemIds\":[]}",
                 "{\"answer\":\"\\uD83D\",\"recommendedItemIds\":[]}",
-                json(new ChatAnswer("답변", List.of())) + "{}"
+                json(new ChatResult.Answer("답변", List.of())) + "{}"
         );
     }
 

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
-import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
+import com.bibbidi.wedding.chat.service.dto.checklist.ChecklistSnapshot;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;

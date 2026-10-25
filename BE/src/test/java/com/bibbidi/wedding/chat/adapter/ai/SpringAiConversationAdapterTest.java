@@ -3,10 +3,11 @@ package com.bibbidi.wedding.chat.adapter.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.mock;
 
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.port.AiResponse;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.common.exception.BusinessException;
@@ -58,7 +59,7 @@ class SpringAiConversationAdapterTest {
                 .maxMessages(18)
                 .build();
         springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
-                chatMemory), new JacksonChatAnswerParser(MAPPER), "test-model");
+                chatMemory), new JacksonChatAnswerParser(MAPPER), mock(ModelClassifier.class), "qwen");
     }
 
     @Test
@@ -83,14 +84,15 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk("{\"answer\":\"웨딩홀 "), chunk("계약\",\"recommendedItemIds\":[]}")));
 
         // when
-        List<AiResponse> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
+        List<ChatResult> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
                 .collectList().block();
 
         // then
         assertThat(content).containsExactly(
-                new AiResponse.Chunk("{\"answer\":\"웨딩홀 ", List.of("웨딩홀 ")),
-                new AiResponse.Chunk("계약\",\"recommendedItemIds\":[]}", List.of("계약")),
-                new AiResponse.Answer(new ChatAnswer("웨딩홀 계약", List.of())));
+                new ChatResult.Selected("test-model"),
+                new ChatResult.Delta("웨딩홀 "),
+                new ChatResult.Delta("계약"),
+                new ChatResult.Answer("웨딩홀 계약", List.of()));
     }
 
     @Test
@@ -169,13 +171,14 @@ class SpringAiConversationAdapterTest {
         respondWith(Flux.just(chunk(answerJson("답변")), usageOnly(10, 5)));
 
         // when
-        List<AiResponse> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
+        List<ChatResult> content = springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문")
                 .collectList().block();
 
         // then
         assertThat(content).containsExactly(
-                new AiResponse.Chunk(answerJson("답변"), List.of("답변")),
-                new AiResponse.Answer(new ChatAnswer("답변", List.of())));
+                new ChatResult.Selected("test-model"),
+                new ChatResult.Delta("답변"),
+                new ChatResult.Answer("답변", List.of()));
     }
 
     @Test
@@ -280,7 +283,7 @@ class SpringAiConversationAdapterTest {
     }
 
     private static String answerJson(String text) {
-        return MAPPER.writeValueAsString(new ChatAnswer(text, List.of()));
+        return MAPPER.writeValueAsString(new ChatResult.Answer(text, List.of()));
     }
 
     private void respondWith(Flux<ChatResponse> response) {

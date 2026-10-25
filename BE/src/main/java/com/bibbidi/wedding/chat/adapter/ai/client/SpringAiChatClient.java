@@ -1,38 +1,45 @@
 package com.bibbidi.wedding.chat.adapter.ai.client;
 
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.ToolContext;
-import java.util.Map;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 @Component
-public class SpringAiChatClient {
+public final class SpringAiChatClient {
 
     private static final String TOOL_CONTEXT_USER_ID = "userId";
 
-    private final ChatClient chatClient;
+    private final ChatModelRouter router;
 
-    @Autowired
-    public SpringAiChatClient(ChatClient chatClient) {
-        this.chatClient = chatClient;
+    public SpringAiChatClient(ChatModelRouter router) {
+        this.router = router;
     }
 
-    public Flux<ChatResponse> streamReply(Long userId, String conversationKey, UserMessage userMessage) {
-        return chatClient.prompt()
-                .messages(userMessage)
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationKey))
-                .toolContext(Map.of(TOOL_CONTEXT_USER_ID, userId))
+    public Flux<ChatResponse> streamReply(ChatModelRequest request) {
+        ChatModelRoute route = router.route(request.tier());
+        ChatClient.ChatClientRequestSpec prompt = route.client().prompt();
+        if (route.options() != null) {
+            prompt = prompt.options(route.options().get());
+        }
+        return prompt
+                .messages(request.userMessage())
+                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey()))
+                .toolContext(Map.of(TOOL_CONTEXT_USER_ID, request.userId()))
                 .stream()
                 .chatResponse();
     }
 
+    public String modelName(ChatModelTier tier) {
+        return router.route(tier).modelName();
+    }
+
     /**
-     * 도구가 조회할 사용자는 모델이 정한 인자가 아니라 요청에 담아 보낸 이 값만 따른다.
+     * 도구는 모델이 정한 인자보다 요청에 담아 보낸 사용자 ID를 따른다.
      */
     public static Long userIdOf(ToolContext toolContext) {
         if (toolContext.getContext().get(TOOL_CONTEXT_USER_ID) instanceof Long userId) {

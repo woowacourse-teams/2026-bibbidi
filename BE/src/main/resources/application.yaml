@@ -39,6 +39,17 @@ bibbidi:
     chatbot:
       memory-max-messages: 20
       conversation-idle-timeout: 1h
+      qwen-model: ${BIBBIDI_CHAT_QWEN_MODEL:qwen.qwen3-235b-a22b-2507-v1:0}
+      sol-model: ${BIBBIDI_CHAT_SOL_MODEL:global.openai.gpt-6.1-sol}
+      luna-model: ${BIBBIDI_CHAT_LUNA_MODEL:gpt-6-luna}
+      luna-api-key: ${OPENAI_API_KEY:}
+      routing:
+        api-key: ${TYPESAFE_API_KEY:}
+        endpoint: https://api.typesafe.ai/v1/systemone
+        model: jev-latest
+        timeout: 1500ms
+        min-confidence: 0.7
+        history-messages: 6
 server:
   shutdown: graceful
 

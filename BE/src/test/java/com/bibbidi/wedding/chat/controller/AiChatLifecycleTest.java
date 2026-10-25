@@ -14,16 +14,15 @@ import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
 import com.bibbidi.wedding.chat.controller.sse.ChatSseHandler;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
+import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
 import com.bibbidi.wedding.chat.service.ConversationKey;
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.ChatEvent;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -67,7 +66,7 @@ class AiChatLifecycleTest {
     private AtomicReference<Runnable> timeout;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
-    private List<ChatEvent> deliveredEvents;
+    private List<ChatResult> deliveredEvents;
 
     @BeforeEach
     void setUp() {
@@ -80,8 +79,8 @@ class AiChatLifecycleTest {
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         chat = new AiChatService(
                 new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
-                        new JacksonChatAnswerParser(mapper), "test-model"),
-                List.of(new ChatTurnRecorder(new SimpleMeterRegistry())));
+                        new JacksonChatAnswerParser(mapper), mock(ModelClassifier.class), "qwen"),
+                List.of(new ClientSubscriber()));
         answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
         timeout = new AtomicReference<>();
@@ -205,16 +204,17 @@ class AiChatLifecycleTest {
         String jsonChunk = (answerStarted ? "" : "{\"answer\":\"") + text;
         answerStarted = true;
         publisher.next(new ChatResponse(List.of(new Generation(new AssistantMessage(jsonChunk)))));
-        await().until(() -> deliveredEvents.contains(new ChatEvent.Delta(text)));
+        await().until(() -> deliveredEvents.stream()
+                .anyMatch(event -> event instanceof ChatResult.Delta delta && delta.text().equals(text)));
     }
 
     private static ChatResponse response(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(
-                JsonMapper.builder().build().writeValueAsString(new ChatAnswer(text, List.of()))))));
+                JsonMapper.builder().build().writeValueAsString(new ChatResult.Answer(text, List.of()))))));
     }
 
     private static void sendEvents(com.bibbidi.wedding.chat.controller.sse.SseConnection connection,
-                                   Flux<ChatEvent> events) {
+                                   Flux<ChatResult> events) {
         ChatSseHandler handler = new ChatSseHandler(connection);
         events.doOnNext(handler::send).blockLast();
     }

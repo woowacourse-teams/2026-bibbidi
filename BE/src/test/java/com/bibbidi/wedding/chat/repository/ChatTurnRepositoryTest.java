@@ -38,7 +38,7 @@ class ChatTurnRepositoryTest {
     void savesACancelledTurn() {
         // when
         chatTurnRepository.save(new ChatTurnRecord(
-                7L, CONVERSATION_ID, "질문", "일부 출력", ChatTurnOutcome.CANCELLED, "RESPONSE_TIMEOUT", STARTED_AT));
+                7L, CONVERSATION_ID, "질문", "일부 출력", "test-model", ChatTurnOutcome.CANCELLED, "RESPONSE_TIMEOUT", STARTED_AT, 1_500));
 
         // then
         List<JpaChatTurnEntity> saved = jpaChatTurnRepository.findAll();
@@ -48,6 +48,8 @@ class ChatTurnRepositoryTest {
         assertThat(turn.conversationId()).isEqualTo(CONVERSATION_ID.toString());
         assertThat(turn.userPrompt()).isEqualTo("질문");
         assertThat(turn.completion()).isEqualTo("일부 출력");
+        assertThat(turn.model()).isEqualTo("test-model");
+        assertThat(turn.durationMs()).isEqualTo(1_500);
         assertThat(turn.outcome()).isEqualTo(ChatTurnOutcome.CANCELLED);
         assertThat(turn.outcomeReason()).isEqualTo("RESPONSE_TIMEOUT");
         assertThat(turn.startedAt()).isEqualTo(STARTED_AT);
@@ -62,9 +64,9 @@ class ChatTurnRepositoryTest {
 
         // when
         chatTurnRepository.save(new ChatTurnRecord(
-                7L, CONVERSATION_ID, "질문", longCompletion, ChatTurnOutcome.COMPLETED, null, STARTED_AT));
+                7L, CONVERSATION_ID, "질문", longCompletion, "test-model", ChatTurnOutcome.COMPLETED, null, STARTED_AT, 2_000));
         chatTurnRepository.save(new ChatTurnRecord(
-                7L, CONVERSATION_ID, "다음 질문", "", ChatTurnOutcome.CANCELLED, "CLIENT_DISCONNECTED", STARTED_AT));
+                7L, CONVERSATION_ID, "다음 질문", "", "unselected", ChatTurnOutcome.CANCELLED, "CLIENT_DISCONNECTED", STARTED_AT, 0));
 
         // then
         List<JpaChatTurnEntity> saved = jpaChatTurnRepository.findAll();

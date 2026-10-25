@@ -26,12 +26,16 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
 import com.bibbidi.wedding.chat.controller.dto.req.ChatRequest;
 import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
-import com.bibbidi.wedding.chat.service.ChatTurnRecorder;
+import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.common.domain.UserRole;
@@ -46,6 +50,7 @@ import jakarta.servlet.AsyncListener;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -85,6 +90,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.context.WebApplicationContext;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.publisher.TestPublisher;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -92,7 +98,7 @@ import tools.jackson.databind.node.ObjectNode;
 @WebMvcTest(AiChatController.class)
 @Import({
         SecurityTestConfig.class, SseStreamManager.class, SseConfig.class,
-        AiChatService.class,
+        AiChatService.class, ClientSubscriber.class,
         SpringAiConversationAdapter.class, SpringAiChatClient.class,
         JacksonChatAnswerParser.class,
         AiChatControllerTest.ChatInfrastructure.class
@@ -112,6 +118,8 @@ class AiChatControllerTest {
     private SimpleMeterRegistry registry;
     @MockitoBean
     private BibbidiTokenParser bibbidiTokenParser;
+    @MockitoBean
+    private ModelClassifier classifier;
     private MockMvc mockMvc;
     private static final List<Prompt> RECEIVED_PROMPTS = new CopyOnWriteArrayList<>();
     private static volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
@@ -128,19 +136,20 @@ class AiChatControllerTest {
         }
 
         @Bean
-        ChatClient chatClient(FakeChatModel model) {
+        ChatClient aiChatClient(FakeChatModel model) {
             return ChatClient.create(model);
+        }
+
+        @Bean
+        ChatModelRouter chatModelRouter(ChatClient aiChatClient) {
+            return new ChatModelRouter(Map.of(ChatModelTier.QWEN,
+                    new ChatModelRoute(aiChatClient, "test-model", null)));
         }
 
         @Bean
         ChatMemory bibbidiInMemoryChatMemory() {
             return MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository())
                     .maxMessages(18).build();
-        }
-
-        @Bean
-        ChatTurnRecorder chatTurnRecorder(SimpleMeterRegistry registry) {
-            return new ChatTurnRecorder(registry);
         }
 
         @Bean
@@ -151,6 +160,8 @@ class AiChatControllerTest {
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
+        when(classifier.classify(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(Mono.just(ChatModelTier.QWEN));
         RECEIVED_PROMPTS.clear();
         responder = prompt -> Flux.empty();
         mockMvc = webAppContextSetup(context).apply(springSecurity())
