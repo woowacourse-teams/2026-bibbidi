@@ -86,9 +86,11 @@ export function useModalEnvironment({
     if (!active || !root) return;
     const previous = returnFocusRef?.current ?? document.activeElement;
     const scope = root.closest("[data-modal-scope]") ?? document;
-    const scroll = scope.querySelector<HTMLElement>(
-      "[data-page-scroll-container]",
-    );
+    const scroll =
+      scope instanceof HTMLElement &&
+      scope.matches("[data-page-scroll-container]")
+        ? scope
+        : scope.querySelector<HTMLElement>("[data-page-scroll-container]");
     const release = [lockScroll(document.body)];
     if (scroll) release.push(lockScroll(scroll));
     if (inertBackground) {

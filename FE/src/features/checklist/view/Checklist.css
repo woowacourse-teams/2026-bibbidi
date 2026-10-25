@@ -9,18 +9,12 @@
 .checklist-workspace__panel {
   display: contents;
 }
-.bibbidi-workspace-layout[data-aside="docked"] .checklist-workspace__panel {
-  position: sticky;
-  top: var(--layout-gutter-desktop);
-  display: block;
-  min-width: 0;
-}
 .checklist-workspace__panel > .checklist-detail-panel,
 .checklist-workspace__panel > .checklist-task-creation--desktop,
 .checklist-workspace__panel > .checklist-appointment-creation--desktop {
   position: static;
   width: 100%;
-  height: var(--workspace-aside-height);
+  height: 100%;
 }
 .checklist-workspace__foreground-layer[data-overlay="true"] {
   position: fixed;

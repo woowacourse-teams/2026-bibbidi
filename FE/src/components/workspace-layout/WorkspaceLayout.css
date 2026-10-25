@@ -20,7 +20,8 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.bibbidi-workspace-aside {
+.bibbidi-workspace-aside,
+.bibbidi-workspace-aside-content {
   display: contents;
 }
 .bibbidi-workspace-layout[data-aside="docked"] {
@@ -46,6 +47,17 @@
   align-self: stretch;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.bibbidi-workspace-layout[data-aside="docked"]
+  > .bibbidi-workspace-aside
+  > .bibbidi-workspace-aside-content {
+  position: sticky;
+  top: calc(
+    var(--app-layout-header-height, 0px) + var(--layout-gutter-desktop)
+  );
+  display: block;
+  min-width: 0;
+  height: var(--workspace-aside-height);
 }
 @media (min-width: 768px) {
   .bibbidi-workspace-layout {

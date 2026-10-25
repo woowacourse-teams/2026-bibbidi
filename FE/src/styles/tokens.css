@@ -72,7 +72,7 @@
   --color-palette-red: #c92a20;
   --color-palette-blue: #217cf9;
 
-  --color-bg-layer-basement: #fcfaf4;
+  --color-bg-layer-basement: #f9fafb;
   --color-bg-layer-default: var(--color-palette-white);
   --color-bg-brand-solid: var(--color-palette-gold);
   --color-bg-brand-solid-pressed: var(--color-palette-gold-pressed);
