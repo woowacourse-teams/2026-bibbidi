@@ -1077,6 +1077,112 @@ describe("Checklist 목록 표현", () => {
     ).not.toBeNull();
   });
 
+  it("접힌 그룹에서도 이름과 값이 있는 진행률을 펼침 버튼 바깥에 표시한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "계약하기" });
+    const progress = screen.getByRole("progressbar", {
+      name: "계약하기 진행률",
+    });
+    const panel = document.getElementById(
+      trigger.getAttribute("aria-controls")!,
+    );
+    expect(panel?.hidden).toBe(true);
+    expect(progress.getAttribute("aria-valuenow")).toBe("100");
+    expect(progress.getAttribute("aria-valuetext")).toBe("1/1 완료, 100%");
+    expect(trigger.contains(progress)).toBe(false);
+    expect(panel?.contains(progress)).toBe(false);
+    expect(
+      screen
+        .getByRole("progressbar", { name: "상담하기 진행률" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("0");
+
+    fireEvent.click(trigger);
+    expect(panel?.hidden).toBe(false);
+    expect(panel?.getAttribute("aria-labelledby")).toBe(trigger.id);
+  });
+
+  it("방향키와 Home·End로 그룹 제목만 이동하고 펼침 상태를 유지한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+    const first = screen.getByRole("button", { name: "계약하기" });
+    const last = screen.getByRole("button", { name: "상담하기" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "End" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Home" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(last);
+    expect(first.getAttribute("aria-expanded")).toBe("false");
+    expect(last.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("직접 추가로 열린 그룹을 접을 수 있고 다음 추가 요청에서 다시 펼친다", () => {
+    const query = createGroupedChecklistQuery();
+    query.categories[0].customItems = [
+      {
+        ...query.categories[0].items[1],
+        id: "custom-item",
+        checklistItemId: 30,
+        sourceCatalogItemId: null,
+        title: "직접 추가한 일",
+      },
+    ];
+    const categories = createChecklistViewModel(query);
+    const renderChecklist = (requestId: number) => (
+      <Checklist
+        categories={categories}
+        onBackTaskDetail={vi.fn()}
+        onCloseTaskDetail={vi.fn()}
+        onSelectTask={vi.fn()}
+        revealCustomCategory={{ categoryId: "10", requestId }}
+        selectedTaskId={null}
+      />
+    );
+    const view = render(renderChecklist(1));
+    const custom = screen.getByRole("button", { name: "내가 추가한 일" });
+    expect(custom.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(custom);
+    fireEvent.click(screen.getByRole("button", { name: "계약하기" }));
+    expect(custom.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      screen.getByRole("progressbar", { name: "내가 추가한 일 진행률" }),
+    ).toBeTruthy();
+    view.rerender(renderChecklist(2));
+    expect(custom.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: /직접 추가한 일/ })).toBeTruthy();
+  });
+
+  it("선택한 할 일의 그룹을 접고 상세를 닫으면 첫 그룹 제목으로 초점을 돌린다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /방문 상담/ }));
+    const group = screen.getByRole("button", { name: "상담하기" });
+    group.focus();
+    fireEvent.click(group);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "계약하기" }),
+    );
+  });
+
   it("첫 미완료 중분류를 열고 여러 중분류를 동시에 펼치며 대분류를 전환한다", () => {
     render(
       <ChecklistHarness
@@ -1094,19 +1200,19 @@ describe("Checklist 목록 표현", () => {
     expect(completedGroup.getAttribute("aria-expanded")).toBe("false");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
     expect(
-      completedGroup.closest(".checklist__group")?.className,
-    ).not.toContain("checklist__group--expanded");
-    expect(incompleteGroup.closest(".checklist__group")?.className).toContain(
-      "checklist__group--expanded",
-    );
+      completedGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("closed");
+    expect(
+      incompleteGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("open");
     expect(screen.queryByText("빈 단계")).toBeNull();
 
     fireEvent.click(completedGroup);
     expect(completedGroup.getAttribute("aria-expanded")).toBe("true");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
-    expect(completedGroup.closest(".checklist__group")?.className).toContain(
-      "checklist__group--expanded",
-    );
+    expect(
+      completedGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("open");
     expect(screen.getByText("계약 완료")).toBeTruthy();
     expect(screen.getByText("방문 상담")).toBeTruthy();
 
@@ -1120,6 +1226,18 @@ describe("Checklist 목록 표현", () => {
     expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
     expect(screen.getByText("드레스 투어")).toBeTruthy();
     expect(screen.queryByText("방문 상담")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "예식장 1/2" }));
+    expect(
+      screen
+        .getByRole("button", { name: "계약하기" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "상담하기" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
   });
 });
 
@@ -1507,7 +1625,10 @@ describe("Checklist 할 일 편집", () => {
         .getByRole("button", { name: "할 일 제목 수정" })
         .hasAttribute("disabled"),
     ).toBe(false);
-    const movedCategoryList = document.getElementById("20-legacy-tasks");
+    const movedGroup = screen.getByRole("button", { name: "예복 준비" });
+    const movedCategoryList = document.getElementById(
+      movedGroup.getAttribute("aria-controls")!,
+    );
     expect(movedCategoryList).toBeTruthy();
     expect(
       within(movedCategoryList as HTMLElement).getByRole("button", {
