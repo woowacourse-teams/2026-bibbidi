@@ -545,50 +545,62 @@ describe("Checklist 웹 상세 패널", () => {
     await waitFor(() => expect(document.activeElement).toBe(firstTrigger));
   });
 
-  it("수정 화면에 기존 값을 채우고 취소하면 일정 메뉴 버튼으로 초점을 복원한다", async () => {
-    render(
-      <AppointmentManagementHarness
-        repository={createAppointmentCommandRepository()}
-      />,
-    );
-    const trigger = screen.getByRole("button", {
-      name: "계약서 검토 일정 더보기",
-    });
-    fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
+  it.each([false, true])(
+    "수정 화면에 기존 값을 채우고 취소하면 일정 메뉴 버튼으로 초점을 복원한다 (모바일=%s)",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(
+        <AppointmentManagementHarness
+          repository={createAppointmentCommandRepository()}
+        />,
+      );
+      const trigger = screen.getByRole("button", {
+        name: "계약서 검토 일정 더보기",
+      });
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
 
-    const form = screen.getByRole("complementary", { name: "일정 수정" });
-    expect(
-      (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
-    ).toBe("계약서 검토");
-    expect(
-      (within(form).getByLabelText(/날짜/) as HTMLInputElement).value,
-    ).toBe("2026-09-12");
-    expect(
-      (within(form).getByLabelText("시작 시간") as HTMLInputElement).value,
-    ).toBe("19:00");
-    expect(
-      (within(form).getByLabelText("종료 시간") as HTMLInputElement).value,
-    ).toBe("20:30");
-    expect(
-      (within(form).getByLabelText("장소") as HTMLInputElement).value,
-    ).toBe("온라인");
-    expect(
-      (within(form).getByLabelText("메모") as HTMLTextAreaElement).value,
-    ).toBe("계약 조건 확인");
+      const form = screen.getByRole(mobile ? "dialog" : "complementary", {
+        name: "일정 수정",
+      });
+      expect(
+        (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
+      ).toBe("계약서 검토");
+      expect(
+        (within(form).getByLabelText(/날짜/) as HTMLInputElement).value,
+      ).toBe("2026-09-12");
+      expect(
+        (within(form).getByLabelText("시작 시간") as HTMLInputElement).value,
+      ).toBe("19:00");
+      expect(
+        (within(form).getByLabelText("종료 시간") as HTMLInputElement).value,
+      ).toBe("20:30");
+      expect(
+        (within(form).getByLabelText("장소") as HTMLInputElement).value,
+      ).toBe("온라인");
+      expect(
+        (within(form).getByLabelText("메모") as HTMLTextAreaElement).value,
+      ).toBe("계약 조건 확인");
 
-    fireEvent.click(within(form).getByRole("button", { name: "취소" }));
-    expect(
-      screen.queryByRole("complementary", { name: "일정 수정" }),
-    ).toBeNull();
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByRole("button", {
-          name: "계약서 검토 일정 더보기",
+      fireEvent.click(
+        within(form).getByRole("button", {
+          name: mobile ? "할 일 상세로 돌아가기" : "취소",
         }),
-      ),
-    );
-  });
+      );
+      expect(
+        screen.queryByRole(mobile ? "dialog" : "complementary", {
+          name: "일정 수정",
+        }),
+      ).toBeNull();
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", {
+            name: "계약서 검토 일정 더보기",
+          }),
+        ),
+      );
+    },
+  );
 
   it("삭제는 확인 버튼 뒤에만 실행하고 실패 시 다이얼로그에서 재시도한다", async () => {
     const repository = createAppointmentCommandRepository();

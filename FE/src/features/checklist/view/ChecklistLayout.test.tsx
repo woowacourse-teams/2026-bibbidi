@@ -231,6 +231,10 @@ it.each([390, 1024, 1440])(
     expect(document.activeElement).toBe(title);
     if (width === 1024)
       fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+    else if (width === 390)
+      fireEvent.click(
+        screen.getByRole("button", { name: "할 일 상세로 돌아가기" }),
+      );
     else fireEvent.click(screen.getByRole("button", { name: "취소" }));
     discard = screen.getByRole("dialog", {
       name: "작성 중인 내용을 닫을까요?",
