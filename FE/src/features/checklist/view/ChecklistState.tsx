@@ -1,3 +1,4 @@
+import { Button } from "../../../components/button";
 import "./ChecklistState.css";
 
 interface ChecklistStateProps {
@@ -31,9 +32,9 @@ export function ChecklistState({
     return (
       <div className="checklist-state" role="alert">
         <p>로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.</p>
-        <button onClick={onRetry} type="button">
+        <Button size="medium" onClick={onRetry}>
           다시 시도
-        </button>
+        </Button>
       </div>
     );
   }
@@ -41,9 +42,9 @@ export function ChecklistState({
   return (
     <div className="checklist-state" role="alert">
       <p>{errorMessage ?? "체크리스트를 불러오지 못했어요."}</p>
-      <button onClick={onRetry} type="button">
+      <Button size="medium" onClick={onRetry}>
         다시 시도
-      </button>
+      </Button>
     </div>
   );
 }
