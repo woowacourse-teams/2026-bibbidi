@@ -8,7 +8,7 @@
 - 로컬 폰트 로딩: `src/styles/fonts.css`. 토큰 값과 파일 로딩 선언을 분리한다.
 - FE 값의 원본: `src/styles/tokens.css`. 문서 사이트 전용 테마와 전역 스타일은 포함하지 않는다.
 - 기존 화면의 색상 이름 호환: `src/styles/colors.css`.
-- 공통 헤더 여백: `src/styles/layout.css`.
+- 공통 반응형 바깥 여백: `src/styles/layout.css`. 최대 너비는 `components/page-container`에서 관리한다.
 - 진입점의 적용 순서: fonts → tokens → 색상 별칭 → 공통 컨테이너·여백 → 전역 기본 스타일.
 - 다음 표의 숫자와 HEX는 **변경 전 FE 값**이다. 새 값은 FE 토큰을 기준으로 확인한다.
 
@@ -50,7 +50,7 @@ Pretendard는 UI 전체에, Nunito는 `bibbidi` 워드마크에 사용한다. Nu
 | 모바일 CSS 최대 760px, 데스크톱 최소 761px | `--layout-breakpoint-md` | CSS `(width < 768px)`와 JS `MOBILE_LAYOUT_MEDIA_QUERY`를 함께 변경 |
 | 랜딩 모션의 `innerWidth <= 760` | 실제 랜딩 헤더 높이 | CSS로 결정된 높이를 읽어 스크롤 계산에 사용 |
 | 로그인 상단 여백의 최소 744px 분기 | `--layout-breakpoint-md` | 모바일 규칙과 겹치지 않도록 정렬 |
-| 공통 헤더 최대 1440px | `--layout-width-wide` | 공통 `.service-page-container`로 서비스·인증 헤더에 적용 |
+| 공통 헤더 최대 1440px | `--layout-width-wide` | PageContainer의 wide 규격으로 서비스·인증 헤더에 적용 |
 | 헤더 좌우 16px / 24px, 작은 화면 12px 예외 | `--layout-margin-mobile/tablet/desktop` | `--service-page-margin`으로 공유. lg부터 데스크톱 여백 사용 |
 | 헤더의 준비 요약 고정 360px | `--layout-breakpoint-lg` 전까지 요약을 축약 | 태블릿에서 메뉴와 요약이 겹치지 않도록 적용 |
 | 하단 독 좌우 16px, 본문 하단 추가 여백 16px | 같은 모바일 여백 토큰 | 안전 영역 및 기존 독 높이와 함께 적용 |
@@ -86,7 +86,7 @@ CSS 미디어 조건에는 CSS 변수를 사용할 수 없어 수치를 작성�
 
 공통 `components/page-container`와 `components/workspace-layout`을 FE에서 관리하고 체크리스트에 먼저 적용했다. 디자인 시스템의 구현을 참고했으며 저장소 간 import나 패키지 의존성은 추가하지 않는다. C1에서 미뤘던 체크리스트 본문·카테고리·상세 너비를 기존 `--layout-*` 토큰에 맞췄다.
 
-- PageContainer는 최대 너비와 뷰포트별 바깥 여백을 담당한다. 기존 헤더의 `.service-page-container`는 유지한다.
+- PageContainer는 최대 너비와 뷰포트별 바깥 여백을 담당한다. 후속 #642에서 기존 헤더의 `.service-page-container`도 PageContainer로 통일했다.
 - `useWorkspaceLayout`은 뷰포트 중단점과 ResizeObserver로 확인한 실제 본문 너비를 함께 판정한다. WorkspaceLayout은 그 결과에 따라 탐색·본문·보조 슬롯을 배치한다. 레이아웃 측정과 화면의 레이어 동작을 연결할 수 있도록 FE에서는 훅을 별도로 제공한다.
 - 카테고리는 상단 가로 탐색을 기본으로 하고, xl 이상에서 카테고리와 본문 최소 너비를 확보하면 측면에 둔다. 보조 영역은 lg 이상이면서 본문 최소 너비·간격·패널 너비를 확보할 때만 병렬 배치한다.
 - 모바일 상세 바텀시트·작성 전체 화면을 유지한다. 태블릿과 너비가 부족한 데스크톱에서는 오른쪽 오버레이를 사용한다. 할 일 추가·일정 추가/수정에도 같은 전환을 적용한다.
@@ -97,3 +97,19 @@ CSS의 md·lg 조건을 바꾸면 관련 CSS와 공통 responsive.ts를 함께 �
 
 
 #635 검토 후 모달의 스크롤 잠금·배경 비활성화·초점 이동·가두기·복귀를 `shared/modal/useModalEnvironment`에 모았다. BottomSheet와 체크리스트 오버레이가 스크롤 잠금 수명을 공유하며, 서비스 레이아웃은 `data-modal-scope`·`data-modal-background`로 배경 경계를 제공한다. 폼의 Escape·취소·검증은 폼이 담당하고, 부모 레이어는 같은 Escape를 다시 처리하지 않는다. PageContainer는 기존 `--service-page-margin`을 재사용해 중단점별 여백 정의를 한곳에 유지한다. 상세·할 일 작성에서 사용하지 않는 이전 sticky·고정 높이는 제거했으며, 캘린더에서도 사용하는 일정 작성의 기본 스타일은 유지한다.
+
+## AppLayout 후속 적용 — #642
+
+`bibbidi-design`의 최초 배경 규격 `09dce5c`와 후속 헤더·스크롤 규격 `ac1714f`를 기준으로 `components/app-layout`을 FE에서 직접 관리한다. ServiceLayout과 AuthLayout의 최상위 요소에 적용하며, 전체 너비·최소 화면 높이(100vh 폴백과 100dvh)·배경·기본 글자색과 헤더 배치를 담당한다. 표준 div 속성과 ref는 실제 최상위 요소에 전달한다.
+
+앱 배경 토큰 `--color-bg-layer-basement`는 크림색에서 밝은 회색 `#F9FAFB`로 변경했다. 기본 표면 토큰 `--color-bg-layer-default`는 흰색을 유지한다. 공통 토큰을 참조하는 랜딩 일부 표면에도 새 배경색이 적용되며, 랜딩 전용 구성은 유지한다.
+
+ServiceLayout은 AppLayout의 `header` 슬롯에 기존 AppHeader를 넣고 `sticky`·`fade`·`contained`를 사용한다. 화면 높이 안에서 AppLayout 자체가 스크롤되며 본문이 헤더 뒤로 지나간다. 기존 본문 div의 별도 스크롤은 제거했다. AuthLayout은 BrandHeader를 같은 슬롯에 넣고 `sticky`·`fade`·`document`로 문서 전체 스크롤을 유지한다. 두 헤더의 배경·구분선과 BrandHeader의 별도 sticky는 제거해 표면과 배치를 AppLayout으로 모았다.
+
+실제 헤더 높이는 ResizeObserver로 측정하고, 미지원 환경에서는 창 크기 변경 시 다시 계산한다. 서비스의 경로 변경 시 초기화와 패널 예약 공간 측정은 AppLayout ref를 사용한다. 모달은 범위 요소 자체가 스크롤 영역인 경우도 찾아 잠그고, 병렬 상세 패널은 측정한 헤더 높이 아래에 고정하며 높이 변경도 반영한다. 하단 탐색의 본문 여백은 유지하고 스크롤 여백은 새 스크롤 영역에 적용했다. PageContainer는 너비·여백, WorkspaceLayout은 영역 배치를 담당하며 배경을 추가하지 않는다.
+
+서비스·인증 화면은 `hideScrollBar`를 켜서 페이지 스크롤바를 숨긴다. 휠·터치·키보드 스크롤과 앵커 이동, 모달의 스크롤 잠금은 유지한다. contained는 AppLayout 자체에, document는 해당 AppLayout이 있는 문서에만 적용되며 패널·메뉴 내부의 스크롤바는 변경하지 않는다.
+
+서비스 레이아웃은 `--service-content-height`로 헤더와 모바일 하단 독을 제외한 본문 높이를 제공한다. 내부 스크롤이 필요한 준비 로드맵은 자신의 높이에 이 값을 사용하며 상위 `.service-layout__content`를 직접 덮어쓰지 않는다. 카테고리 변경 시 목록 스크롤만 초기화하는 동작은 유지한다. 하단 독의 본문 예약 여백과 스크롤 여백은 `--service-bottom-inset`을 공유한다.
+
+병렬 패널의 sticky 위치와 측정 높이는 WorkspaceLayout의 내부 래퍼에 적용한다. 높이 훅은 래퍼의 실제 시작 위치와 CSS가 계산한 sticky top을 읽으며 헤더 높이·간격 계산식을 중복하지 않는다. 그리드 끝에서 sticky가 위로 밀릴 때도 높이가 늘어나지 않도록 top을 하한으로 사용한다. Checklist는 해당 공간 안의 내용과 오버레이·바텀시트만 구성한다. 두 헤더는 PageContainer의 wide 규격을 재사용하고 이전 컨테이너 CSS는 제거했다.

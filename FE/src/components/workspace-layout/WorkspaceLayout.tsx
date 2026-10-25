@@ -37,10 +37,11 @@ export function WorkspaceLayout({
       {aside && (
         <div
           className="bibbidi-workspace-aside"
-          ref={asideRef}
           data-docked-panel={docked || undefined}
         >
-          {aside}
+          <div className="bibbidi-workspace-aside-content" ref={asideRef}>
+            {aside}
+          </div>
         </div>
       )}
     </div>

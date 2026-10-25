@@ -1,12 +1,8 @@
 .brand-header {
-  position: sticky;
-  z-index: 10;
-  top: 0;
   min-width: 320px;
   height: 72px;
   flex: none;
-  border-bottom: 1px solid var(--color-stroke-neutral-weak);
-  background: var(--color-bg-layer-default);
+  background: transparent;
 }
 
 .brand-header__inner {

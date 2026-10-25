@@ -352,7 +352,7 @@ describe("ServiceLayout", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
+  it("서비스 경로가 변경되면 AppLayout 스크롤을 맨 위로 초기화한다", async () => {
     installLegacyWebSessionFetch(
       vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
@@ -370,13 +370,24 @@ describe("ServiceLayout", () => {
     );
     await screen.findByText("홈 화면");
     const content = container.querySelector<HTMLElement>(
-      ".service-layout__content",
+      "[data-page-scroll-container]",
     );
 
     expect(content).not.toBeNull();
     if (!content) {
       return;
     }
+
+    expect(content.classList.contains("bibbidi-app-layout")).toBe(true);
+    expect(content.getAttribute("data-scroll")).toBe("contained");
+    expect(content.hasAttribute("data-hide-scroll-bar")).toBe(true);
+    expect(content.getAttribute("data-header-position")).toBe("sticky");
+    const header = content.querySelector(".bibbidi-app-layout-header");
+    expect(header?.parentElement).toBe(content);
+    expect(header?.getAttribute("data-tone")).toBe("fade");
+    expect(
+      content.querySelector(".service-layout__content")?.parentElement,
+    ).toBe(content);
 
     content.scrollTop = 700;
 
@@ -743,7 +754,7 @@ describe("ServiceLayout", () => {
       name: /체크리스트 항목 10/,
     });
     const content = container.querySelector<HTMLElement>(
-      ".service-layout__content",
+      "[data-page-scroll-container]",
     );
     expect(content).not.toBeNull();
     if (!content) {

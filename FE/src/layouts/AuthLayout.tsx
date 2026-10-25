@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
+import { AppLayout } from "../components/app-layout";
 import { getSafeLoginReturnPath, useAuth } from "../features/auth";
 import { BrandHeader } from "./BrandHeader";
 import "./AuthLayout.css";
@@ -24,9 +25,14 @@ export function AuthLayout() {
   }
 
   return (
-    <div className="auth-layout">
-      <BrandHeader />
-
+    <AppLayout
+      className="auth-layout"
+      header={<BrandHeader />}
+      headerPosition="sticky"
+      headerTone="fade"
+      scroll="document"
+      hideScrollBar
+    >
       <main className={`auth-page${isLoginPath ? " auth-page--login" : ""}`}>
         {authState.status === "loading" ||
         authState.status === "synchronizing" ? (
@@ -35,6 +41,6 @@ export function AuthLayout() {
           <Outlet />
         )}
       </main>
-    </div>
+    </AppLayout>
   );
 }

@@ -13,31 +13,52 @@ function Modal({ name, onEscape }: { name: string; onEscape?: () => void }) {
   );
 }
 
-it("동시에 열린 모달이 모두 닫힐 때까지 스크롤과 배경 잠금을 유지한다", () => {
-  const view = (first: boolean, second: boolean) => (
-    <div data-modal-scope>
-      <header data-modal-background>
-        <button type="button">배경</button>
-      </header>
-      <div data-page-scroll-container style={{ overflow: "auto" }}>
+it.each([false, true])(
+  "스크롤 영역이 모달 범위 자체인지(%s)에 관계없이 마지막 모달까지 잠금을 유지한다",
+  (scopeIsScroll) => {
+    const modals = (first: boolean, second: boolean) => (
+      <>
         {first && <Modal name="첫째" />}
         {second && <Modal name="둘째" />}
+      </>
+    );
+    const view = (first: boolean, second: boolean) => (
+      <div
+        data-modal-scope
+        data-page-scroll-container={scopeIsScroll || undefined}
+        style={scopeIsScroll ? { overflow: "auto" } : undefined}
+      >
+        <header data-modal-background>
+          <button type="button">배경</button>
+        </header>
+        {scopeIsScroll ? (
+          modals(first, second)
+        ) : (
+          <div data-page-scroll-container style={{ overflow: "auto" }}>
+            {modals(first, second)}
+          </div>
+        )}
       </div>
-    </div>
-  );
-  const { container, rerender } = render(view(true, false));
-  const scroll = container.querySelector<HTMLElement>(
-    "[data-page-scroll-container]",
-  )!;
-  const background = container.querySelector("header")!;
-  rerender(view(true, true));
-  rerender(view(false, true));
-  expect(scroll.style.overflow).toBe("hidden");
-  expect(background.hasAttribute("inert")).toBe(true);
-  rerender(view(false, false));
-  expect(scroll.style.overflow).toBe("auto");
-  expect(background.hasAttribute("inert")).toBe(false);
-});
+    );
+    const { container, rerender } = render(view(true, false));
+    const scroll = container.querySelector<HTMLElement>(
+      "[data-page-scroll-container]",
+    )!;
+    const background = container.querySelector("header")!;
+    scroll.scrollTop = 300;
+    rerender(view(true, true));
+    rerender(view(false, true));
+    expect(scroll.style.overflow).toBe("hidden");
+    expect(background.hasAttribute("inert")).toBe(true);
+    rerender(view(false, false));
+    expect(scroll.style.overflow).toBe("auto");
+    expect(background.hasAttribute("inert")).toBe(false);
+    expect(scroll.scrollTop).toBe(300);
+    expect(scroll.closest("[data-modal-scope]")?.hasAttribute("inert")).toBe(
+      false,
+    );
+  },
+);
 
 it("하위 컨트롤이 처리한 Escape를 모달에서 다시 실행하지 않는다", () => {
   const close = vi.fn();

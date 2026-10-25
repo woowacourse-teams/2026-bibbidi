@@ -15,9 +15,12 @@ export function useDockedAsideHeight(
       const gap =
         Number.parseFloat(styles.getPropertyValue("--layout-gutter-desktop")) ||
         0;
+      // Read the resolved sticky offset from CSS instead of duplicating its formula.
+      // Near the grid's bottom, sticky can be pushed upward; keep a stable height.
+      const inset = Number.parseFloat(styles.top) || 0;
       const top = Math.max(
         aside.getBoundingClientRect().top,
-        (scroll?.getBoundingClientRect().top ?? 0) + gap,
+        (scroll?.getBoundingClientRect().top ?? 0) + inset,
       );
       aside.style.setProperty(
         "--workspace-aside-height",
@@ -29,12 +32,22 @@ export function useDockedAsideHeight(
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     observer?.observe(aside);
     if (aside.parentElement) observer?.observe(aside.parentElement);
+    // AppLayout updates the measured header height on its scroll root.
+    const headerChanges = new MutationObserver(update);
+    if (scroll)
+      headerChanges.observe(scroll, {
+        attributes: true,
+        attributeFilter: ["style"],
+      });
     window.addEventListener("resize", update);
     scroll?.addEventListener("scroll", update, { passive: true });
+    if (!scroll) window.addEventListener("scroll", update, { passive: true });
     return () => {
       observer?.disconnect();
+      headerChanges.disconnect();
       window.removeEventListener("resize", update);
       scroll?.removeEventListener("scroll", update);
+      if (!scroll) window.removeEventListener("scroll", update);
       aside.style.removeProperty("--workspace-aside-height");
     };
   }, [ref, docked]);

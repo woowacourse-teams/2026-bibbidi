@@ -1,4 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router";
+import { PageContainer } from "../components/page-container";
 
 import "./AppHeader.css";
 import { HeaderBrandLink } from "./HeaderBrandLink";
@@ -28,7 +29,7 @@ export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   return (
     <header className="app-header">
-      <div className="service-page-container app-header__inner">
+      <PageContainer width="wide" className="app-header__inner">
         <div className="app-header__left">
           <HeaderBrandLink to="/" />
 
@@ -71,7 +72,7 @@ export function AppHeader({ user }: AppHeaderProps) {
             </span>
           </div>
         )}
-      </div>
+      </PageContainer>
     </header>
   );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 
+import { AppLayout } from "../components/app-layout";
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth, useLogout } from "../features/auth";
 import { FeedbackFeature } from "../features/feedback";
@@ -19,12 +20,11 @@ export function ServiceLayout() {
   }, [endAuthentication, navigate]);
   const logout = useLogout({ onSuccess: handleLogoutSuccess });
   const layoutRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  useReservedPanelSpace(layoutRef, contentRef);
+  useReservedPanelSpace(layoutRef);
 
   useLayoutEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
+    if (layoutRef.current) {
+      layoutRef.current.scrollTop = 0;
     }
   }, [pathname]);
 
@@ -33,36 +33,45 @@ export function ServiceLayout() {
   }
 
   return (
-    <div className="service-layout" data-modal-scope ref={layoutRef}>
-      <div className="service-layout__header" data-modal-background>
-        <AppHeader
-          user={
-            authState.status === "authenticated"
-              ? {
-                  kind: "authenticated",
-                  summary: (
-                    <AppHeaderSummaryFeature
-                      navigationKey={pathname}
-                      onAuthenticationRequired={refreshAuth}
-                    />
-                  ),
-                  isLoggingOut: logout.isLoggingOut,
-                  logoutErrorMessage: logout.errorMessage,
-                  onLogout: logout.submit,
-                  userInitial: authState.user.nickname.charAt(0),
-                }
-              : authState.status === "guest"
-                ? { kind: "guest" }
-                : { kind: "pending" }
-          }
-        />
-      </div>
-
-      <div
-        className="service-layout__content"
-        data-page-scroll-container
-        ref={contentRef}
-      >
+    <AppLayout
+      className="service-layout"
+      data-modal-scope
+      data-page-scroll-container
+      ref={layoutRef}
+      role="region"
+      aria-label="서비스 화면"
+      tabIndex={0}
+      scroll="contained"
+      hideScrollBar
+      headerPosition="sticky"
+      headerTone="fade"
+      header={
+        <div className="service-layout__header" data-modal-background>
+          <AppHeader
+            user={
+              authState.status === "authenticated"
+                ? {
+                    kind: "authenticated",
+                    summary: (
+                      <AppHeaderSummaryFeature
+                        navigationKey={pathname}
+                        onAuthenticationRequired={refreshAuth}
+                      />
+                    ),
+                    isLoggingOut: logout.isLoggingOut,
+                    logoutErrorMessage: logout.errorMessage,
+                    onLogout: logout.submit,
+                    userInitial: authState.user.nickname.charAt(0),
+                  }
+                : authState.status === "guest"
+                  ? { kind: "guest" }
+                  : { kind: "pending" }
+            }
+          />
+        </div>
+      }
+    >
+      <div className="service-layout__content">
         <Outlet />
       </div>
 
@@ -70,6 +79,6 @@ export function ServiceLayout() {
         <AppBottomNavigation />
         <FeedbackFeature />
       </div>
-    </div>
+    </AppLayout>
   );
 }
