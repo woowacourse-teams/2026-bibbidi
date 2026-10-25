@@ -671,6 +671,42 @@ describe("Checklist 웹 상세 패널", () => {
     );
   });
 
+  it("할 일 행에 전체 제목과 기존 일정·상태를 표시하고 상태별로 별도 조작을 만들지 않는다", () => {
+    const query = createChecklistQuery();
+    const title =
+      "예식장 방문 전에 양가 부모님과 함께 확인할 계약 조건과 준비 사항";
+    query.categories[0].items.push({
+      ...query.categories[0].items[0],
+      appointments: [],
+      checklistItemId: 12,
+      id: "checklist-item-12",
+      status: "prev",
+      title,
+    });
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(
+      <Checklist
+        categories={createChecklistViewModel(query)}
+        onBackTaskDetail={vi.fn()}
+        onCloseTaskDetail={vi.fn()}
+        onSelectTask={vi.fn()}
+        selectedTaskId={null}
+      />,
+    );
+
+    const scheduled = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    expect(within(scheduled).getByText("9월 8일")).toBeTruthy();
+    expect(within(scheduled).getByText("진행 중")).toBeTruthy();
+    const completed = screen.getByRole("button", { name: /웨딩홀 투어/ });
+    expect(within(completed).getByText("일정 없음")).toBeTruthy();
+    expect(within(completed).getByText("완료")).toBeTruthy();
+    const pending = screen.getByRole("button", { name: new RegExp(title) });
+    expect(within(pending).getByText(title)).toBeTruthy();
+    expect(within(pending).getByText("예정")).toBeTruthy();
+    expect(within(pending).queryByRole("button")).toBeNull();
+    expect(within(pending).queryByRole("checkbox")).toBeNull();
+  });
+
   it("선택한 할 일의 API 기반 상세 정보와 전체 일정을 서버 순서로 표시한다", () => {
     render(<ChecklistHarness />);
 
@@ -701,10 +737,18 @@ describe("Checklist 웹 상세 패널", () => {
   it("다른 할 일을 선택하면 패널 내용을 교체하고 빈 일정 상태를 표시한다", () => {
     render(<ChecklistHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 투어/ }));
+    const firstTask = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
+    fireEvent.click(firstTask);
+    expect(firstTask.getAttribute("data-selected")).toBe("true");
+    fireEvent.click(completedTask);
+    expect(firstTask.hasAttribute("data-selected")).toBe(false);
+    expect(firstTask.getAttribute("aria-expanded")).toBe("false");
+    expect(completedTask.getAttribute("data-selected")).toBe("true");
+    expect(completedTask.getAttribute("aria-expanded")).toBe("true");
 
     const panel = screen.getByRole("complementary", { name: "웨딩홀 투어" });
+    expect(completedTask.getAttribute("aria-controls")).toBe(panel.id);
     expect(within(panel).getByText("완료")).toBeTruthy();
     expect(
       within(panel).getByRole("heading", { name: "일정 0개" }),
@@ -713,6 +757,12 @@ describe("Checklist 웹 상세 패널", () => {
     expect(
       screen.queryByRole("complementary", { name: "웨딩홀 계약" }),
     ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 상세 닫기" }));
+    expect(completedTask.hasAttribute("data-selected")).toBe(false);
+    expect(completedTask.hasAttribute("aria-controls")).toBe(false);
+    expect(completedTask.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(completedTask);
   });
 
   it("닫기 버튼과 Escape 키로 패널을 닫고 선택한 항목으로 포커스를 돌린다", () => {
@@ -1015,13 +1065,16 @@ describe("Checklist 목록 표현", () => {
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
   });
 
-  it("목록 왼쪽 체크 표시 없이 완료 배경과 상태 문구를 유지한다", () => {
+  it("목록 왼쪽 체크 표시 없이 완료 상태를 positive 배지로 표시한다", () => {
     const { container } = render(<ChecklistHarness />);
     const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
 
     expect(container.querySelector(".checklist__completion-mark")).toBeNull();
-    expect(completedTask.closest(".checklist__task--complete")).not.toBeNull();
-    expect(within(completedTask).getByText("완료")).toBeTruthy();
+    expect(
+      within(completedTask)
+        .getByText("완료")
+        .closest('[data-color="positive"]'),
+    ).not.toBeNull();
   });
 
   it("첫 미완료 중분류를 열고 여러 중분류를 동시에 펼치며 대분류를 전환한다", () => {

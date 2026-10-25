@@ -17,6 +17,7 @@ import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
 import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
+import { ChecklistTaskRow } from "./ChecklistTaskRow";
 
 interface ChecklistProps {
   appointmentCreation?: ChecklistAppointmentCreationController;
@@ -675,24 +676,20 @@ export function Checklist({
                         hidden={!isExpanded}
                         id={taskListId}
                       >
-                        {group.tasks.map((task) => {
+                        {group.tasks.map((task, taskIndex) => {
                           const isSelected = selectedTaskId === task.id;
 
                           return (
-                            <li
-                              className={`checklist__task checklist__task--${task.status}${
-                                isSelected ? " checklist__task--selected" : ""
-                              }`}
-                              key={task.id}
-                            >
-                              <button
-                                aria-controls={
+                            <li key={task.id}>
+                              <ChecklistTaskRow
+                                task={task}
+                                selected={isSelected}
+                                first={taskIndex === 0}
+                                detailId={
                                   isMobileLayout
                                     ? "checklist-task-detail-bottom-sheet"
                                     : "checklist-task-detail-panel"
                                 }
-                                aria-expanded={isSelected}
-                                className="checklist__task-button"
                                 onClick={(event) => selectTask(task.id, event)}
                                 ref={(button) => {
                                   if (button) {
@@ -701,22 +698,7 @@ export function Checklist({
                                     taskButtonRefs.current.delete(task.id);
                                   }
                                 }}
-                                type="button"
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className="checklist__task-marker"
-                                />
-                                <span className="checklist__task-title">
-                                  {task.title}
-                                </span>
-                                <span className="checklist__task-schedule">
-                                  {task.schedule}
-                                </span>
-                                <span className="checklist__task-status">
-                                  {task.statusLabel}
-                                </span>
-                              </button>
+                              />
                             </li>
                           );
                         })}

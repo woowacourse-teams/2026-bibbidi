@@ -15,6 +15,7 @@ type RowOptions = {
   horizontalPadding?: ListRowHorizontalPadding;
   withArrow?: boolean;
   withTouchEffect?: boolean;
+  selected?: boolean;
   disabled?: boolean;
   disabledStyle?: "type1" | "type2";
 };
@@ -41,6 +42,7 @@ function ListRowRoot({
   horizontalPadding = "medium",
   withArrow = false,
   withTouchEffect = true,
+  selected = false,
   disabled = false,
   disabledStyle = "type1",
   className,
@@ -58,6 +60,7 @@ function ListRowRoot({
     "data-disabled": unavailable || undefined,
     "data-disabled-style": disabledStyle,
     "data-touch-effect": (!!props.onClick && withTouchEffect) || undefined,
+    "data-selected": selected || undefined,
   };
   const body = (
     <>
