@@ -1,4 +1,5 @@
 import { Button } from "../../../components/button";
+import { Checkbox } from "../../../components/checkbox";
 import { IconButton } from "../../../components/icon-button";
 import { Menu } from "../../../components/menu";
 
@@ -49,39 +50,23 @@ function ChecklistAppointment({
           : ""
       }`}
     >
-      {management ? (
-        <button
-          aria-busy={isPending ? true : undefined}
-          aria-label={
-            appointment.isDone
+      <Checkbox.Circle
+        aria-busy={isPending ? true : undefined}
+        aria-label={
+          management
+            ? appointment.isDone
               ? `${appointment.title} 일정 미완료로 변경`
               : `${appointment.title} 일정 완료`
-          }
-          aria-pressed={appointment.isDone}
-          className="checklist-detail-content__appointment-check"
-          disabled={isOperationPending}
-          onClick={() =>
-            void management.changeCompletion(
-              appointment.id,
-              !appointment.isDone,
-            )
-          }
-          type="button"
-        >
-          <span aria-hidden="true">{appointment.isDone ? "✓" : ""}</span>
-        </button>
-      ) : (
-        <span
-          aria-label={appointment.isDone ? "완료된 일정" : "미완료 일정"}
-          className={`checklist-detail-content__appointment-check${
-            appointment.isDone
-              ? " checklist-detail-content__appointment-check--complete"
-              : ""
-          }`}
-        >
-          {appointment.isDone ? "✓" : ""}
-        </span>
-      )}
+            : appointment.isDone
+              ? "완료된 일정"
+              : "미완료 일정"
+        }
+        checked={appointment.isDone}
+        disabled={!management || isOperationPending}
+        onCheckedChange={(checked) =>
+          void management?.changeCompletion(appointment.id, checked)
+        }
+      />
 
       <span className="checklist-detail-content__appointment-main">
         <time

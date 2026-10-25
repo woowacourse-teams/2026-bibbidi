@@ -652,7 +652,7 @@ describe("Checklist 웹 상세 패널", () => {
     expect(screen.getByRole("dialog")).toBe(dialog);
   });
 
-  it("완료 요청 중 체크 버튼을 비활성화해 중복 변경을 막는다", async () => {
+  it("완료 요청 중 체크박스를 비활성화해 중복 변경을 막는다", async () => {
     let resolveCompletion: () => void = () => undefined;
     const repository = createAppointmentCommandRepository();
     vi.mocked(repository.changeAppointmentCompletion).mockReturnValue(
@@ -661,13 +661,21 @@ describe("Checklist 웹 상세 패널", () => {
       }),
     );
     render(<AppointmentManagementHarness repository={repository} />);
-    const completionButton = screen.getByRole("button", {
+    const completionCheckbox = screen.getByRole("checkbox", {
       name: "계약서 검토 일정 완료",
-    });
+    }) as HTMLInputElement;
 
-    fireEvent.click(completionButton);
-    fireEvent.click(completionButton);
-    expect((completionButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(completionCheckbox);
+    fireEvent.click(completionCheckbox);
+    expect(completionCheckbox.disabled).toBe(true);
+    expect(completionCheckbox.getAttribute("aria-busy")).toBe("true");
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "계약금 입금 일정 미완료로 변경",
+        }) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
     expect(
       (
         screen.getByRole("button", {
@@ -676,9 +684,14 @@ describe("Checklist 웹 상세 패널", () => {
       ).disabled,
     ).toBe(true);
     expect(repository.changeAppointmentCompletion).toHaveBeenCalledOnce();
+    expect(repository.changeAppointmentCompletion).toHaveBeenCalledWith(
+      2,
+      true,
+      expect.any(AbortSignal),
+    );
 
     await act(async () => resolveCompletion());
-    expect((completionButton as HTMLButtonElement).disabled).toBe(false);
+    expect(completionCheckbox.disabled).toBe(false);
   });
 
   it("완료된 일정은 체크 상태와 완료 스타일을 명확히 표시한다", () => {
@@ -688,14 +701,43 @@ describe("Checklist 웹 상세 패널", () => {
       />,
     );
 
-    const completionButton = screen.getByRole("button", {
+    const completionCheckbox = screen.getByRole("checkbox", {
       name: "계약금 입금 일정 미완료로 변경",
-    });
-    const appointment = completionButton.closest("li");
+    }) as HTMLInputElement;
+    const appointment = completionCheckbox.closest("li");
 
-    expect(completionButton.getAttribute("aria-pressed")).toBe("true");
+    expect(completionCheckbox.checked).toBe(true);
     expect(appointment?.classList).toContain(
       "checklist-detail-content__appointment--complete",
+    );
+  });
+
+  it("미완료로 변경하는 요청이 실패하면 체크 상태를 유지하고 다시 시도할 수 있다", async () => {
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.changeAppointmentCompletion).mockRejectedValueOnce(
+      new AppointmentManagementError("unknown"),
+    );
+    render(<AppointmentManagementHarness repository={repository} />);
+    const completionCheckbox = screen.getByRole("checkbox", {
+      name: "계약금 입금 일정 미완료로 변경",
+    }) as HTMLInputElement;
+
+    fireEvent.click(completionCheckbox);
+
+    expect(repository.changeAppointmentCompletion).toHaveBeenCalledWith(
+      1,
+      false,
+      expect.any(AbortSignal),
+    );
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "일정을 변경하지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(completionCheckbox.checked).toBe(true);
+    expect(completionCheckbox.disabled).toBe(false);
+    fireEvent.click(completionCheckbox);
+    await waitFor(() =>
+      expect(repository.changeAppointmentCompletion).toHaveBeenCalledTimes(2),
     );
   });
 
@@ -759,7 +801,20 @@ describe("Checklist 웹 상세 패널", () => {
     expect(within(panel).getByText("계약 조건 확인")).toBeTruthy();
     expect(within(panel).getByText("시간 없음 · 장소 없음")).toBeTruthy();
     expect(within(panel).getByText("메모 없음")).toBeTruthy();
-    expect(within(panel).getByLabelText("완료된 일정")).toBeTruthy();
+    const completed = within(panel).getByRole("checkbox", {
+      name: "완료된 일정",
+    }) as HTMLInputElement;
+    const incomplete = within(panel).getByRole("checkbox", {
+      name: "미완료 일정",
+    }) as HTMLInputElement;
+    expect(completed.checked).toBe(true);
+    expect(incomplete.checked).toBe(false);
+    expect(completed.disabled).toBe(true);
+    expect(incomplete.disabled).toBe(true);
+    fireEvent.click(completed);
+    fireEvent.click(incomplete);
+    expect(completed.checked).toBe(true);
+    expect(incomplete.checked).toBe(false);
   });
 
   it("다른 할 일을 선택하면 패널 내용을 교체하고 빈 일정 상태를 표시한다", () => {
