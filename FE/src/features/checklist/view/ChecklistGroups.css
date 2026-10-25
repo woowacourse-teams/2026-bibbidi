@@ -1,0 +1,45 @@
+.checklist__groups.bibbidi-accordion {
+  --accordion-min-height: 80px;
+  --accordion-open-background: var(--color-bg-layer-default);
+  --accordion-summary-width: clamp(96px, 10vw, 120px);
+  --accordion-panel-padding: 0;
+}
+
+.checklist__group {
+  overflow: hidden;
+}
+
+.checklist__group-progress {
+  display: grid;
+  gap: 6px;
+}
+
+.checklist__group-progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.checklist__group-count {
+  color: var(--color-fg-neutral);
+}
+
+.checklist__group-number {
+  min-width: 2ch;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.checklist__tasks {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+  list-style: none;
+}

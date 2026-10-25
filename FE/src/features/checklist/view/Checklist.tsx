@@ -20,7 +20,7 @@ import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
 import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
-import { ChecklistTaskRow } from "./ChecklistTaskRow";
+import { ChecklistGroups } from "./ChecklistGroups";
 
 interface ChecklistProps {
   appointmentCreation?: ChecklistAppointmentCreationController;
@@ -132,6 +132,14 @@ export function Checklist({
     .find((category) => category.id === revealCustomCategory?.categoryId)
     ?.groups.find((group) => group.isCustom)?.id;
   const tasks = selectedCategory?.tasks ?? [];
+  const expandedGroupValues = (selectedCategory?.groups ?? [])
+    .filter(
+      (group) =>
+        expandedGroupIds.has(group.id) ||
+        (group.id === revealCustomGroupId &&
+          revealCustomCategory?.requestId !== collapsedRevealRequestId),
+    )
+    .map((group) => group.id);
   const completedTaskCount = selectedCategory?.completedCount ?? 0;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
   const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
@@ -322,20 +330,23 @@ export function Checklist({
     selectedTaskContext,
   ]);
 
-  const toggleGroup = (groupId: string, isExpanded: boolean) => {
+  const changeExpandedGroups = (values: string[]) => {
     setExpandedGroupIds((currentIds) => {
       const nextIds = new Set(currentIds);
-
-      if (isExpanded) {
-        nextIds.delete(groupId);
-      } else {
-        nextIds.add(groupId);
-      }
+      selectedCategory?.groups.forEach((group) => {
+        if (values.includes(group.id)) nextIds.add(group.id);
+        else nextIds.delete(group.id);
+      });
 
       return nextIds;
     });
 
-    if (isExpanded && groupId === revealCustomGroupId && revealCustomCategory) {
+    if (
+      revealCustomGroupId &&
+      revealCustomCategory &&
+      expandedGroupValues.includes(revealCustomGroupId) &&
+      !values.includes(revealCustomGroupId)
+    ) {
       setCollapsedRevealRequestId(revealCustomCategory.requestId);
     }
   };
@@ -564,118 +575,23 @@ export function Checklist({
                 </div>
               </section>
             ) : (
-              <div className="checklist__groups">
-                {selectedCategory?.groups.map((group, groupIndex) => {
-                  const isExpanded =
-                    expandedGroupIds.has(group.id) ||
-                    (group.id === revealCustomGroupId &&
-                      revealCustomCategory?.requestId !==
-                        collapsedRevealRequestId);
-                  const taskListId = `${group.id}-tasks`;
-
-                  return (
-                    <section
-                      aria-labelledby={`${group.id}-title`}
-                      className={`checklist__group${
-                        isExpanded ? " checklist__group--expanded" : ""
-                      }`}
-                      key={group.id}
-                    >
-                      <h2 className="checklist__group-heading">
-                        <button
-                          aria-controls={taskListId}
-                          aria-expanded={isExpanded}
-                          aria-label={`${group.numberLabel} ${group.title}, ${group.countLabel}, 진행률 ${group.progressLabel}`}
-                          className="checklist__group-header"
-                          onClick={() => toggleGroup(group.id, isExpanded)}
-                          ref={groupIndex === 0 ? fallbackFocusRef : undefined}
-                          type="button"
-                        >
-                          <span className="checklist__group-copy">
-                            <span className="checklist__group-number">
-                              {group.numberLabel}
-                            </span>
-                            <span className="checklist__group-title-area">
-                              <span
-                                className="checklist__group-title"
-                                id={`${group.id}-title`}
-                              >
-                                {group.title}
-                              </span>
-                              <span className="checklist__group-count">
-                                {group.countLabel}
-                              </span>
-                            </span>
-                          </span>
-
-                          <span className="checklist__progress-area">
-                            <span
-                              aria-label={`${group.title} 진행률`}
-                              aria-valuemax={100}
-                              aria-valuemin={0}
-                              aria-valuenow={group.progress}
-                              className="checklist__progress"
-                              role="progressbar"
-                            >
-                              <span
-                                className="checklist__progress-fill"
-                                style={{ width: `${group.progress}%` }}
-                              />
-                            </span>
-                            <span className="checklist__progress-label">
-                              {group.progressLabel}
-                            </span>
-                            <span
-                              aria-hidden="true"
-                              className={`checklist__disclosure${
-                                isExpanded
-                                  ? " checklist__disclosure--expanded"
-                                  : ""
-                              }`}
-                            >
-                              ›
-                            </span>
-                          </span>
-                        </button>
-                      </h2>
-
-                      <ul
-                        aria-label={`${group.title} 할 일`}
-                        className="checklist__tasks"
-                        hidden={!isExpanded}
-                        id={taskListId}
-                      >
-                        {group.tasks.map((task, taskIndex) => {
-                          const isSelected = selectedTaskId === task.id;
-
-                          return (
-                            <li key={task.id}>
-                              <ChecklistTaskRow
-                                task={task}
-                                selected={isSelected}
-                                first={taskIndex === 0}
-                                detailId={
-                                  isMobileLayout
-                                    ? "checklist-task-detail-bottom-sheet"
-                                    : "checklist-task-detail-panel"
-                                }
-                                onClick={(event) => selectTask(task.id, event)}
-                                ref={(button) => {
-                                  if (button) {
-                                    taskButtonRefs.current.set(task.id, button);
-                                  } else {
-                                    taskButtonRefs.current.delete(task.id);
-                                  }
-                                }}
-                              />
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
+              <ChecklistGroups
+                groups={selectedCategory?.groups ?? []}
+                value={expandedGroupValues}
+                onValueChange={changeExpandedGroups}
+                selectedTaskId={selectedTaskId}
+                detailId={
+                  isMobileLayout
+                    ? "checklist-task-detail-bottom-sheet"
+                    : "checklist-task-detail-panel"
+                }
+                firstGroupTriggerRef={fallbackFocusRef}
+                onSelectTask={selectTask}
+                onTaskButtonRef={(taskId, button) => {
+                  if (button) taskButtonRefs.current.set(taskId, button);
+                  else taskButtonRefs.current.delete(taskId);
+                }}
+              />
             )}
           </section>
         </div>

@@ -4,11 +4,17 @@ import {
   useCallback,
   useContext,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import type { ComponentPropsWithRef, KeyboardEvent, ReactNode } from "react";
+import type {
+  ComponentPropsWithRef,
+  KeyboardEvent,
+  ReactNode,
+  Ref,
+} from "react";
 import { ChevronDown } from "../icons/Chevron";
 import "./Accordion.css";
 
@@ -42,6 +48,9 @@ export type AccordionItemProps = Omit<
   description?: string;
   /** Decorative content only; interactive elements belong in the panel. */
   prefix?: ReactNode;
+  /** Non-interactive summary to the right of the title, outside the trigger. */
+  summary?: ReactNode;
+  triggerRef?: Ref<HTMLButtonElement>;
   disabled?: boolean;
 };
 
@@ -155,6 +164,8 @@ function AccordionItem({
   title,
   description,
   prefix,
+  summary,
+  triggerRef: externalTriggerRef,
   disabled = false,
   children,
   className,
@@ -165,6 +176,7 @@ function AccordionItem({
   if (!group) throw new Error("Accordion.Item must be used inside Accordion.");
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  useImperativeHandle(externalTriggerRef, () => triggerRef.current!, []);
   const panelRef = useRef<HTMLDivElement>(null);
   const open = group.values.includes(value);
   const unavailable =
@@ -200,6 +212,7 @@ function AccordionItem({
         .filter(Boolean)
         .join(" ")}
       data-state={open ? "open" : "closed"}
+      data-has-summary={summary != null || undefined}
       data-disabled={unavailable || undefined}
     >
       <Heading className="bibbidi-accordion-heading">
@@ -240,6 +253,9 @@ function AccordionItem({
           />
         </button>
       </Heading>
+      {summary != null && (
+        <div className="bibbidi-accordion-summary">{summary}</div>
+      )}
       <div
         id={`${id}-panel`}
         ref={panelRef}
