@@ -469,6 +469,34 @@ afterEach(() => {
 });
 
 describe("Checklist 웹 상세 패널", () => {
+  it("모바일 일정 메뉴의 Escape는 메뉴만 닫고 삭제 취소 후 트리거로 복귀한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+    const detail = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    const trigger = within(detail).getByRole("button", {
+      name: "계약서 검토 일정 더보기",
+    });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(within(detail).getByRole("menuitem", { name: "수정" }), {
+      key: "Escape",
+    });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "웨딩홀 계약" })).toBe(detail);
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.click(trigger);
+    fireEvent.click(within(detail).getByRole("menuitem", { name: "삭제" }));
+    expect(screen.queryByRole("menu")).toBeNull();
+    const confirmation = screen.getByRole("dialog", {
+      name: "이 일정을 삭제할까요?",
+    });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
   it("일정 메뉴는 하나만 열리고 키보드·바깥 클릭·Escape와 포커스 복귀를 지원한다", async () => {
     const view = render(
       <AppointmentManagementHarness
@@ -1245,9 +1273,7 @@ describe("Checklist 할 일 편집", () => {
   it("직접 작성 항목에만 제목과 카테고리 수정 동작을 노출한다", () => {
     render(<EditableChecklistHarness />);
 
-    expect(
-      screen.getByRole("button", { name: "할 일 제목 수정" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "할 일 더보기" })).toBeTruthy();
     expect(
       screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
@@ -1258,9 +1284,7 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
-    expect(
-      screen.queryByRole("button", { name: "할 일 제목 수정" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "할 일 더보기" })).toBeNull();
     expect(
       screen.queryByRole("combobox", { name: /카테고리 변경/ }),
     ).toBeNull();
@@ -1516,7 +1540,7 @@ describe("Checklist 할 일 편집", () => {
     expect(screen.queryByRole("listbox", { name: "카테고리 선택" })).toBeNull();
     expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
     expect(screen.getByRole("textbox", { name: "할 일 제목" })).toBeTruthy();
@@ -1613,7 +1637,7 @@ describe("Checklist 할 일 편집", () => {
     expect(changeCategory).toHaveBeenCalledWith(500, "20");
     expect(
       screen
-        .getByRole("button", { name: "할 일 제목 수정" })
+        .getByRole("button", { name: "할 일 더보기" })
         .hasAttribute("disabled"),
     ).toBe(true);
 
@@ -1629,7 +1653,7 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
     expect(
       screen
-        .getByRole("button", { name: "할 일 제목 수정" })
+        .getByRole("button", { name: "할 일 더보기" })
         .hasAttribute("disabled"),
     ).toBe(false);
     const movedGroup = screen.getByRole("button", { name: "예복 준비" });
@@ -1717,7 +1741,7 @@ describe("Checklist 할 일 편집", () => {
     );
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     expect(document.activeElement).toBe(input);
@@ -1746,13 +1770,13 @@ describe("Checklist 할 일 편집", () => {
     const changeTitle = vi.fn().mockResolvedValue(true);
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
 
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
-    expect(screen.getByRole("alert").textContent).toContain("입력해주세요");
+    expect(screen.getByRole("alert").textContent).toContain("입력해 주세요");
 
     fireEvent.change(input, { target: { value: "가".repeat(51) } });
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
@@ -1763,7 +1787,7 @@ describe("Checklist 할 일 편집", () => {
 
     expect(changeTitle).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+      expect(screen.getByRole("button", { name: "할 일 더보기" })).toBe(
         document.activeElement,
       ),
     );
@@ -1778,7 +1802,7 @@ describe("Checklist 할 일 편집", () => {
     );
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "실패 후 유지할 제목" } });
@@ -1802,7 +1826,7 @@ describe("Checklist 할 일 편집", () => {
     expect(screen.getByRole("complementary")).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "할 일 제목" })).toBeNull();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+      expect(screen.getByRole("button", { name: "할 일 더보기" })).toBe(
         document.activeElement,
       ),
     );
@@ -1816,7 +1840,7 @@ describe("Checklist 할 일 편집", () => {
       name: "청첩장 문구 정하기",
     });
     fireEvent.click(
-      within(detailPage).getByRole("button", { name: "할 일 제목 수정" }),
+      within(detailPage).getByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(
       within(detailPage).getByRole("menuitem", { name: "제목 변경" }),
@@ -1864,7 +1888,7 @@ describe("Checklist 할 일 편집", () => {
 
 it("공통 아이콘 내부를 다시 누르면 할 일 메뉴를 닫는다", () => {
   render(<EditableChecklistHarness />);
-  const trigger = screen.getByRole("button", { name: "할 일 제목 수정" });
+  const trigger = screen.getByRole("button", { name: "할 일 더보기" });
   fireEvent.click(trigger);
   expect(screen.getByRole("menuitem", { name: "제목 변경" })).toBeTruthy();
   const icon = trigger.querySelector(".bibbidi-icon-button-icon")!;

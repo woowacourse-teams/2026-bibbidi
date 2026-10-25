@@ -8,7 +8,7 @@ import {
   ChecklistTaskViewModel,
 } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
-import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
+import { ChecklistTaskHeader } from "./ChecklistTaskHeader";
 import "./ChecklistTaskDetailBottomSheet.css";
 
 interface ChecklistTaskDetailBottomSheetProps {
@@ -63,11 +63,7 @@ export function ChecklistTaskDetailBottomSheet({
     <ChecklistTaskDetailBottomSheetShell
       onClose={onClose}
       title={
-        <ChecklistTaskTitleEditor
-          editing={editing}
-          task={task}
-          titleId={titleId}
-        />
+        <ChecklistTaskHeader editing={editing} task={task} titleId={titleId} />
       }
       titleId={titleId}
     >

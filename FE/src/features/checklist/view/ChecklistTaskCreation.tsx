@@ -1,3 +1,4 @@
+import { CHECKLIST_TASK_TITLE_MAX_LENGTH } from "../model/taskTitle";
 import { useEffect, useRef } from "react";
 import type { FormEvent, RefObject } from "react";
 import { Button } from "../../../components/button";
@@ -5,10 +6,7 @@ import { TextField } from "../../../components/text-field";
 import { Select, type SelectHandle } from "../../../components/select";
 import { useReturnFocus } from "../../../shared/focus/useReturnFocus";
 import { useIsMobileLayout } from "../../../shared/responsive";
-import {
-  CHECKLIST_TASK_TITLE_MAX_LENGTH,
-  ChecklistTaskCreationController,
-} from "../useChecklistTaskCreation";
+import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import { ChecklistFormPanel } from "./ChecklistFormPanel";
 import { ChecklistDiscardDialog } from "./ChecklistDiscardDialog";

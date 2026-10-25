@@ -304,9 +304,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
         name: "청첩장 문구 정하기",
       }),
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "할 일 제목 수정" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "할 일 더보기" })).toBeNull();
   });
 
   it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
@@ -2236,7 +2234,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+      await screen.findByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
@@ -2301,7 +2299,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+      await screen.findByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });

@@ -1,3 +1,4 @@
+import { validateChecklistTaskTitle } from "../model/taskTitle";
 import {
   ChecklistItemChangeResponse,
   CustomChecklistItemCreationResponse,
@@ -586,18 +587,9 @@ export function createMyChecklistCommandRepository(
     async changeItemTitle(itemId, title, signal) {
       const normalizedTitle = title.trim();
 
-      if (normalizedTitle.length === 0) {
-        throw new ChecklistItemChangeError(
-          "invalid-request",
-          "할 일 제목을 입력해주세요.",
-        );
-      }
-
-      if (normalizedTitle.length > 50) {
-        throw new ChecklistItemChangeError(
-          "invalid-request",
-          "할 일 제목은 50자 이하로 입력해주세요.",
-        );
+      const titleError = validateChecklistTaskTitle(normalizedTitle);
+      if (titleError) {
+        throw new ChecklistItemChangeError("invalid-request", titleError);
       }
 
       return changeChecklistItem(
@@ -657,17 +649,11 @@ export function createMyChecklistCommandRepository(
     async createCustomItem(title, categoryId, signal) {
       const normalizedTitle = title.trim();
 
-      if (normalizedTitle.length === 0) {
+      const titleError = validateChecklistTaskTitle(normalizedTitle);
+      if (titleError) {
         throw new CustomChecklistItemCreationError(
           "invalid-request",
-          "할 일 제목을 입력해주세요.",
-        );
-      }
-
-      if (normalizedTitle.length > 50) {
-        throw new CustomChecklistItemCreationError(
-          "invalid-request",
-          "할 일 제목은 50자 이하로 입력해주세요.",
+          titleError,
         );
       }
 
