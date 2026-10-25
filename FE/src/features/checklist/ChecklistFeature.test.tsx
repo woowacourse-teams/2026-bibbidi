@@ -1254,8 +1254,8 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
     expect(
       screen
-        .getByRole("button", { name: "예복 준비 0/1" })
-        .getAttribute("aria-pressed"),
+        .getByRole("tab", { name: "예복 준비 0/1" })
+        .getAttribute("aria-selected"),
     ).toBe("true");
     expect(
       screen
@@ -1465,9 +1465,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       },
     ]);
     await screen.findByRole("complementary", { name: "로컬 체크리스트 항목" });
-    fireEvent.click(
-      screen.getByRole("button", { name: "두 번째 카테고리 0/0" }),
-    );
+    fireEvent.click(screen.getByRole("tab", { name: "두 번째 카테고리 0/0" }));
     expect(getCurrentUrl()).toBe("/checklist");
     expect(screen.queryByRole("complementary")).toBeNull();
   });
@@ -2138,9 +2136,9 @@ describe("ChecklistFeature 대분류와 중분류 UI", () => {
     });
     expect(
       within(categoryNavigation)
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["첫 번째 카테고리0/1", "두 번째 카테고리0/0"]);
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["첫 번째 카테고리", "두 번째 카테고리"]);
     const groupButton = screen
       .getAllByRole("button", { name: /첫 번째 카테고리/ })
       .find((button) => button.hasAttribute("aria-expanded"));

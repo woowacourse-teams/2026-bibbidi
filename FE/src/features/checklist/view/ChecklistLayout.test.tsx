@@ -34,6 +34,7 @@ const categories = createChecklistViewModel({
         },
       ],
     },
+    { id: "20", title: "스드메", items: [] },
   ],
 });
 let available = 1280;
@@ -245,5 +246,71 @@ it.each([390, 1024, 1440])(
     await act(async () => {});
     expect(screen.queryByRole("textbox", { name: /제목/ })).toBeNull();
     expect(screen.getByRole("button", { name: "일정 추가" })).toBeTruthy();
+  },
+);
+
+it("실제 레이아웃 너비로 Tab과 Radio를 전환하고 현재 위치와 선택을 유지한다", () => {
+  render(<Harness />);
+  const category = screen.getByRole("radio", {
+    name: "예식장 0/1",
+  }) as HTMLInputElement;
+  fireEvent.click(category);
+  expect(category.checked).toBe(true);
+  const breadcrumb = screen.getByRole("navigation", { name: "현재 위치" });
+  expect(within(breadcrumb).getByText("체크리스트")).toBeTruthy();
+  expect(
+    within(breadcrumb).getByText("예식장").getAttribute("aria-current"),
+  ).toBe("page");
+  expect(screen.queryByRole("tablist")).toBeNull();
+  for (const width of [390, 1024]) {
+    resize(width);
+    const tab = screen.getByRole("tab", { name: "예식장 0/1" });
+    const panel = screen.getByRole("tabpanel", { name: "예식장 0/1" });
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(tab.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.getAttribute("aria-labelledby")).toBe(tab.id);
+    expect(panel.tabIndex).toBe(0);
+  }
+  resize(1440, 560);
+  expect(screen.getByRole("tablist")).toBeTruthy();
+  resize(1440, 1280);
+  expect(screen.queryByRole("tablist")).toBeNull();
+  expect(
+    (screen.getByRole("radio", { name: "예식장 0/1" }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  fireEvent.click(screen.getByRole("radio", { name: "스드메 0/0" }));
+  expect(
+    within(breadcrumb).getByText("스드메").getAttribute("aria-current"),
+  ).toBe("page");
+  expect(
+    screen.getByRole("heading", { level: 1, name: "스드메" }),
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "초기화" })).toBeNull();
+});
+
+it.each([1280, 1440])(
+  "상세를 연 뒤 카테고리를 바꿔도 선택 컨트롤의 초점을 유지한다 (%s)",
+  (width) => {
+    render(<Harness />);
+    resize(width);
+    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 방문/ }));
+    expect(
+      screen.getByRole("complementary", { name: "웨딩홀 방문" }),
+    ).toBeTruthy();
+    const role = width === 1440 ? "radio" : "tab";
+    const category = screen.getByRole(role, { name: "스드메 0/0" });
+    category.focus();
+    fireEvent.click(category);
+    expect(
+      screen.queryByRole("complementary", { name: "웨딩홀 방문" }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(category);
+    if (role === "tab") {
+      fireEvent.keyDown(category, { key: "ArrowLeft" });
+      expect(document.activeElement).toBe(
+        screen.getByRole("tab", { name: "예식장 0/1" }),
+      );
+    }
   },
 );

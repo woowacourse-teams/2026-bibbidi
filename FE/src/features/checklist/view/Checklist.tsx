@@ -6,8 +6,12 @@ import {
   WorkspaceLayout,
   useWorkspaceLayout,
 } from "../../../components/workspace-layout";
-import { ChecklistCategories } from "./ChecklistCategories";
+import {
+  ChecklistCategories,
+  getChecklistCategoryTabId,
+} from "./ChecklistCategories";
 import { ChecklistForeground } from "./ChecklistForeground";
+import { ChecklistHeader } from "./ChecklistHeader";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentCreationController } from "../useChecklistAppointmentCreation";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
@@ -105,6 +109,7 @@ export function Checklist({
   );
   const deletionAppointmentIdRef = useRef<number | null>(null);
   const previousSelectedTaskIdRef = useRef(selectedTaskId);
+  const categoryChangeClosingDetailRef = useRef(false);
   const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
   const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const selectedTaskContext = categories
@@ -209,7 +214,9 @@ export function Checklist({
         taskButtonRefs.current.get(previousSelectedTaskId) ??
         selectedTaskButtonRef.current;
 
-      if (canRestoreFocus(previousTaskButton)) {
+      if (categoryChangeClosingDetailRef.current) {
+        categoryChangeClosingDetailRef.current = false;
+      } else if (canRestoreFocus(previousTaskButton)) {
         previousTaskButton.focus({ preventScroll: true });
       } else {
         (fallbackFocusRef.current ?? addTaskButtonRef.current)?.focus({
@@ -356,12 +363,14 @@ export function Checklist({
       return;
     }
 
+    categoryChangeClosingDetailRef.current = selectedTaskId !== null;
     setSelectedCategoryId(categoryId);
     setDismissedRevealRequestId(revealCustomCategory?.requestId ?? null);
     onCloseTaskDetail();
   };
 
   const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
+    categoryChangeClosingDetailRef.current = false;
     selectedTaskButtonRef.current = event.currentTarget;
     onSelectTask(taskId);
   };
@@ -516,6 +525,15 @@ export function Checklist({
 
   return (
     <>
+      <ChecklistHeader
+        categoryTitle={selectedCategory?.title}
+        taskCount={tasks.length}
+        completedCount={completedTaskCount}
+        isAuthenticated={isAuthenticated}
+        hidden={backgroundHidden}
+        onAddTask={openTaskCreation}
+        addTaskButtonRef={addTaskButtonRef}
+      />
       <WorkspaceLayout
         ref={workspaceRef}
         layout={layout}
@@ -529,30 +547,21 @@ export function Checklist({
           inert={backgroundHidden || undefined}
         >
           <section
-            aria-label="결혼 준비 체크리스트"
+            aria-label={
+              layout.navigationPlacement === "side"
+                ? "결혼 준비 체크리스트"
+                : undefined
+            }
+            aria-labelledby={
+              layout.navigationPlacement === "top" && selectedCategory
+                ? getChecklistCategoryTabId(selectedCategory.id)
+                : undefined
+            }
+            role={layout.navigationPlacement === "top" ? "tabpanel" : undefined}
+            tabIndex={layout.navigationPlacement === "top" ? 0 : undefined}
             className="checklist"
             id="checklist-category-content"
           >
-            <header className="checklist__toolbar">
-              <div className="checklist__summary">
-                <h1>{selectedCategory?.title ?? "체크리스트"}</h1>
-                <p>
-                  {isAuthenticated
-                    ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
-                    : "로그인하면 체크리스트가 그대로 저장돼요."}
-                </p>
-              </div>
-              <Button
-                className="checklist__add-task"
-                size="large"
-                onClick={openTaskCreation}
-                ref={addTaskButtonRef}
-                type="button"
-              >
-                <span aria-hidden="true">＋</span>할 일 추가
-              </Button>
-            </header>
-
             {selectedCategory && tasks.length === 0 ? (
               <section className="checklist__empty">
                 <h2>아직 담은 할 일이 없어요</h2>

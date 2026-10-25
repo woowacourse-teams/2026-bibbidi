@@ -1304,13 +1304,13 @@ describe("Checklist 목록 표현", () => {
       screen.getByRole("complementary", { name: "방문 상담" }),
     ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "스드메 0/1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "스드메 0/1" }));
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
     expect(screen.getByText("드레스 투어")).toBeTruthy();
     expect(screen.queryByText("방문 상담")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "예식장 1/2" }));
+    fireEvent.click(screen.getByRole("tab", { name: "예식장 1/2" }));
     expect(
       screen
         .getByRole("button", { name: "계약하기" })
