@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { FormEvent, RefObject } from "react";
 import { Button } from "../../../components/button";
 import { TextField } from "../../../components/text-field";
-import { Select } from "../../../components/select";
+import { Select, type SelectHandle } from "../../../components/select";
 import { useReturnFocus } from "../../../shared/focus/useReturnFocus";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import {
@@ -30,7 +30,7 @@ export function ChecklistTaskCreation({
   const mobile = useIsMobileLayout();
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const categoryRef = useRef<HTMLButtonElement>(null);
+  const categoryRef = useRef<SelectHandle>(null);
   const composing = useRef(false);
   const pending = controller.submissionState.status === "submitting";
   useReturnFocus(formRef, returnFocusRef, fallbackFocusRef);

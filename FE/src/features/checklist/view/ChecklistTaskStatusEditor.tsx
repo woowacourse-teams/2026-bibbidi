@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Select } from "../../../components/select";
+import { Select, type SelectHandle } from "../../../components/select";
 import { Badge } from "../../../components/badge";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistItemStatus } from "../model/myChecklist";
@@ -18,7 +18,7 @@ export function ChecklistTaskStatusEditor({
   task: ChecklistTaskViewModel;
 }) {
   const submitting = useRef(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<SelectHandle>(null);
   const itemId = task.checklistItemId;
   const confirming =
     itemId !== null && editing?.statusConfirmation?.itemId === itemId;

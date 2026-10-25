@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
@@ -19,6 +20,19 @@ export type SelectOption = {
   group?: string;
   disabled?: boolean;
 };
+export type SelectHandle = { focus: (options?: FocusOptions) => void };
+
+function supportsNativePopover() {
+  if (typeof document === "undefined") return false;
+  const probe = document.createElement("div");
+  probe.setAttribute("popover", "manual");
+  probe.setAttribute("role", "listbox");
+  return (
+    typeof probe.showPopover === "function" &&
+    typeof probe.hidePopover === "function"
+  );
+}
+
 export type SelectSize = "medium" | "large";
 type BaseProps = {
   options: SelectOption[];
@@ -44,7 +58,7 @@ type BaseProps = {
   id?: string;
   className?: string;
   style?: CSSProperties;
-  ref?: Ref<HTMLButtonElement>;
+  ref?: Ref<SelectHandle>;
   onBlur?: () => void;
 };
 export type SelectProps = BaseProps &
@@ -85,6 +99,7 @@ export function Select(props: SelectProps) {
     style,
     ref,
   } = props;
+  const [supportsPopover] = useState(supportsNativePopover);
   const groups = [...new Set(inputOptions.map((option) => option.group))];
   const options = groups.flatMap((group) =>
     inputOptions.filter((option) => option.group === group),
@@ -117,7 +132,7 @@ export function Select(props: SelectProps) {
   const [validationError, setValidationError] = useState(false);
   const [position, setPosition] = useState<CSSProperties>({});
   const search = useRef({ text: "", time: 0 });
-  const isOpen = open && !disabled && !readOnly;
+  const isOpen = supportsPopover && open && !disabled && !readOnly;
   const isInvalid =
     invalid || !!error || (validationError && chosen.length === 0);
   const message =
@@ -129,6 +144,15 @@ export function Select(props: SelectProps) {
     .map((option, index) => (option.disabled ? -1 : index))
     .filter((index) => index >= 0);
   const activeIndex = enabled.includes(active) ? active : (enabled[0] ?? -1);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: (options) =>
+        (supportsPopover ? trigger.current : native.current)?.focus(options),
+    }),
+    [supportsPopover],
+  );
 
   useEffect(() => {
     const ownerForm = native.current?.form;
@@ -328,90 +352,134 @@ export function Select(props: SelectProps) {
         {label}
         {required && <span aria-hidden="true"> *</span>}
       </label>
-      <button
-        ref={(element) => {
-          trigger.current = element;
-          if (typeof ref === "function") return ref(element);
-          if (ref) ref.current = element;
-        }}
-        id={id}
-        type="button"
-        role="combobox"
-        className="bibbidi-select-trigger"
-        disabled={disabled}
-        aria-disabled={disabled || loading || undefined}
-        aria-busy={loading || undefined}
-        aria-labelledby={`${id}-label`}
-        aria-describedby={message ? `${id}-message` : undefined}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        aria-controls={isOpen ? `${id}-list` : undefined}
-        aria-activedescendant={
-          isOpen && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined
-        }
-        aria-required={required || undefined}
-        aria-invalid={isInvalid || undefined}
-        aria-readonly={readOnly || undefined}
-        data-open={isOpen || undefined}
-        data-invalid={isInvalid || undefined}
-        data-readonly={readOnly || undefined}
-        onClick={() => {
-          if (!loading) {
-            if (isOpen) setOpen(false);
-            else show();
+      {supportsPopover && (
+        <button
+          ref={trigger}
+          id={id}
+          type="button"
+          role="combobox"
+          className="bibbidi-select-trigger"
+          disabled={disabled}
+          aria-disabled={disabled || loading || undefined}
+          aria-busy={loading || undefined}
+          aria-labelledby={`${id}-label`}
+          aria-describedby={message ? `${id}-message` : undefined}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={isOpen ? `${id}-list` : undefined}
+          aria-activedescendant={
+            isOpen && activeIndex >= 0
+              ? `${id}-option-${activeIndex}`
+              : undefined
           }
-        }}
-        onKeyDown={onKeyDown}
-        onBlur={() => {
-          setOpen(false);
-          props.onBlur?.();
-        }}
-      >
-        {prefix && (
-          <span className="bibbidi-select-prefix" aria-hidden="true">
-            {prefix}
+          aria-required={required || undefined}
+          aria-invalid={isInvalid || undefined}
+          aria-readonly={readOnly || undefined}
+          data-open={isOpen || undefined}
+          data-invalid={isInvalid || undefined}
+          data-readonly={readOnly || undefined}
+          onClick={() => {
+            if (!loading) {
+              if (isOpen) setOpen(false);
+              else show();
+            }
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={() => {
+            setOpen(false);
+            props.onBlur?.();
+          }}
+        >
+          {prefix && (
+            <span className="bibbidi-select-prefix" aria-hidden="true">
+              {prefix}
+            </span>
+          )}
+          <span
+            className="bibbidi-select-value"
+            data-placeholder={!summary || undefined}
+            title={chosen.map((option) => option.label).join(", ")}
+          >
+            {summary || placeholder}
           </span>
-        )}
-        <span
-          className="bibbidi-select-value"
-          data-placeholder={!summary || undefined}
-          title={chosen.map((option) => option.label).join(", ")}
-        >
-          {summary || placeholder}
-        </span>
-        <ChevronDown
-          className="bibbidi-select-chevron"
-          width={18}
-          height={18}
-          aria-hidden="true"
-        />
-      </button>
-      {message && (
-        <p
-          className="bibbidi-select-message"
-          id={`${id}-message`}
-          data-error={isInvalid || undefined}
-          role={error ? "alert" : undefined}
-        >
-          {message}
-        </p>
+          <ChevronDown
+            className="bibbidi-select-chevron"
+            width={18}
+            height={18}
+            aria-hidden="true"
+          />
+        </button>
       )}
       <select
         ref={native}
-        className="bibbidi-select-native"
-        aria-hidden="true"
-        tabIndex={-1}
+        className={
+          supportsPopover
+            ? "bibbidi-select-native"
+            : "bibbidi-select-trigger bibbidi-select-fallback"
+        }
+        id={supportsPopover ? undefined : id}
+        aria-hidden={supportsPopover || undefined}
+        tabIndex={supportsPopover ? -1 : undefined}
+        aria-labelledby={!supportsPopover ? `${id}-label` : undefined}
+        aria-describedby={
+          !supportsPopover && message ? `${id}-message` : undefined
+        }
+        aria-invalid={(!supportsPopover && isInvalid) || undefined}
+        aria-readonly={(!supportsPopover && readOnly) || undefined}
+        aria-busy={(!supportsPopover && loading) || undefined}
+        data-readonly={readOnly || undefined}
+        data-invalid={isInvalid || undefined}
         name={name}
         form={form}
         multiple={props.multiple}
         value={props.multiple ? values : (values[0] ?? "")}
-        disabled={disabled}
+        disabled={disabled || (!supportsPopover && loading)}
         required={required && !readOnly}
-        onChange={() => {}}
+        onFocus={() => {
+          if (!supportsPopover && !readOnly && !loading) setOpen(true);
+        }}
+        onBlur={() => {
+          if (!supportsPopover) {
+            setOpen(false);
+            props.onBlur?.();
+          }
+        }}
+        onPointerDown={(event) => {
+          if (!supportsPopover && readOnly) event.preventDefault();
+        }}
+        onKeyDown={(event) => {
+          if (
+            !supportsPopover &&
+            readOnly &&
+            !["Tab", "Escape"].includes(event.key)
+          )
+            event.preventDefault();
+        }}
+        onChange={(event) => {
+          if (supportsPopover || disabled || loading || readOnly) return;
+          if (props.multiple) {
+            const next = Array.from(
+              event.currentTarget.selectedOptions,
+              (option) => option.value,
+            );
+            if (props.value === undefined) setInternal(next);
+            if (
+              next.length !== values.length ||
+              next.some((value) => !values.includes(value))
+            )
+              props.onChange?.(next);
+          } else {
+            const next = event.currentTarget.value;
+            if (props.value === undefined) setInternal(next);
+            if (!values.includes(next)) props.onChange?.(next);
+            if (values.includes(next) || props.closeOnSelect !== false)
+              setOpen(false);
+          }
+        }}
         onInvalid={(event) => {
           event.preventDefault();
           setValidationError(true);
-          trigger.current?.focus();
+          (supportsPopover ? trigger.current : native.current)?.focus();
         }}
       >
         {!props.multiple && <option value="">{placeholder}</option>}
@@ -425,6 +493,16 @@ export function Select(props: SelectProps) {
           </option>
         ))}
       </select>
+      {message && (
+        <p
+          className="bibbidi-select-message"
+          id={`${id}-message`}
+          data-error={isInvalid || undefined}
+          role={error ? "alert" : undefined}
+        >
+          {message}
+        </p>
+      )}
       {isOpen && (
         <div
           ref={panel}

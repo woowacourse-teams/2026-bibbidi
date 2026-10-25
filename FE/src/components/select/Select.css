@@ -226,3 +226,9 @@
   border-color: transparent;
   background: transparent;
 }
+
+.bibbidi-select-fallback[multiple] {
+  height: auto;
+  min-height: 52px;
+  padding-block: 8px;
+}

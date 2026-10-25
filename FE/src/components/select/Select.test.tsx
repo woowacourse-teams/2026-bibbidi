@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { createRef, useState } from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Select } from "./Select";
+import { Select, type SelectHandle } from "./Select";
 
 const options = [
   { value: "prev", label: "예정" },
@@ -93,5 +93,123 @@ describe("Select", () => {
     expect(screen.getByRole("alert").textContent).toBe("저장 실패");
     fireEvent.keyDown(trigger, { key: "Enter" });
     expect(onChange).toHaveBeenCalledTimes(2);
+  });
+});
+
+it.each(["prev", "done"])(
+  "현재 선택값 %s를 마우스·키보드로 다시 고르면 변경 없이 닫는다",
+  (value) => {
+    const onChange = vi.fn();
+    render(
+      <Select
+        label="상태"
+        options={options}
+        value={value}
+        onChange={onChange}
+        closeOnSelect={false}
+      />,
+    );
+    const trigger = screen.getByRole("combobox");
+    fireEvent.click(trigger);
+    fireEvent.click(
+      screen.getByRole("option", { name: value === "prev" ? "예정" : "완료" }),
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).toBeNull();
+  },
+);
+
+function withoutPopover(run: () => void) {
+  const prototype = HTMLElement.prototype;
+  const show = Object.getOwnPropertyDescriptor(prototype, "showPopover")!;
+  const hide = Object.getOwnPropertyDescriptor(prototype, "hidePopover")!;
+  Object.defineProperties(prototype, {
+    showPopover: { configurable: true, value: undefined },
+    hidePopover: { configurable: true, value: undefined },
+  });
+  try {
+    run();
+  } finally {
+    Object.defineProperties(prototype, {
+      showPopover: show,
+      hidePopover: hide,
+    });
+  }
+}
+
+it("Popover API가 없으면 네이티브 선택기로 변경·오류 초점을 처리한다", () => {
+  withoutPopover(() => {
+    const onChange = vi.fn();
+    const ref = createRef<SelectHandle>();
+    render(
+      <Select
+        ref={ref}
+        label="카테고리"
+        options={options}
+        defaultValue="prev"
+        onChange={onChange}
+        required
+        error="선택을 확인해 주세요."
+      />,
+    );
+    const select = screen.getByRole("combobox", { name: "카테고리" });
+    expect(select.tagName).toBe("SELECT");
+    act(() => ref.current?.focus());
+    expect(document.activeElement).toBe(select);
+    expect(select.getAttribute("aria-hidden")).toBeNull();
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      document.getElementById(select.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe("선택을 확인해 주세요.");
+    fireEvent.change(select, { target: { value: "done" } });
+    expect((select as HTMLSelectElement).value).toBe("done");
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("done");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.invalid(select);
+    expect(document.activeElement).toBe(select);
+  });
+});
+
+it("Popover 미지원 환경에서도 readonly·저장 중 변경과 동일 값 요청을 차단한다", () => {
+  withoutPopover(() => {
+    const onChange = vi.fn();
+    const view = render(
+      <Select
+        label="상태"
+        options={options}
+        value="prev"
+        onChange={onChange}
+      />,
+    );
+    const select = screen.getByRole("combobox");
+    fireEvent.change(select, { target: { value: "prev" } });
+    expect(onChange).not.toHaveBeenCalled();
+    view.rerender(
+      <Select
+        label="상태"
+        options={options}
+        value="prev"
+        onChange={onChange}
+        loading
+      />,
+    );
+    expect((select as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.change(select, { target: { value: "done" } });
+    view.rerender(
+      <Select
+        label="상태"
+        options={options}
+        value="prev"
+        onChange={onChange}
+        readOnly
+      />,
+    );
+    fireEvent.change(select, { target: { value: "done" } });
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
