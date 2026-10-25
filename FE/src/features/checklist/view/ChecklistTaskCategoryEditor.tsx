@@ -12,14 +12,26 @@ export function ChecklistTaskCategoryEditor({
   editing,
   task,
 }: {
-  categories: ChecklistCategoryViewModel[];
+  categories: Pick<ChecklistCategoryViewModel, "id" | "title">[];
   categoryTitle: string;
-  editing?: ChecklistItemEditingController;
-  task: ChecklistTaskViewModel;
+  editing?: Pick<
+    ChecklistItemEditingController,
+    | "categoryEditSession"
+    | "changeCategory"
+    | "changeFeedback"
+    | "clearError"
+    | "finishCategoryEditing"
+    | "startCategoryEditing"
+  >;
+  task: Pick<
+    ChecklistTaskViewModel,
+    "canEditCategory" | "categoryId" | "checklistItemId"
+  >;
 }) {
   const submitting = useRef(false);
   const itemId = task.checklistItemId;
-  if (!task.isEditable || itemId === null || !editing) return categoryTitle;
+  if (!task.canEditCategory || itemId === null || !editing)
+    return categoryTitle;
   const feedback = editing.changeFeedback;
   const pending = feedback.status === "pending";
   const error =

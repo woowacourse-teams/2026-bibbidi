@@ -20,7 +20,7 @@ interface ChecklistTaskHeaderProps {
   >;
   task: Pick<
     ChecklistTaskViewModel,
-    "isEditable" | "checklistItemStatus" | "checklistItemId" | "id" | "title"
+    "canEditTitle" | "canDelete" | "checklistItemId" | "id" | "title"
   >;
   titleId: string;
 }
@@ -43,11 +43,9 @@ export function ChecklistTaskHeader({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreMenuFocus = useRef(false);
   const itemId = task.checklistItemId;
-  const canEditTitle = task.isEditable && itemId !== null && !!editing;
+  const canEditTitle = task.canEditTitle && itemId !== null && !!editing;
   const canDelete =
-    canEditTitle &&
-    task.checklistItemStatus !== "done" &&
-    !!editing?.requestDelete;
+    task.canDelete && itemId !== null && !!editing?.requestDelete;
   const titleSession = editing?.titleEditSession;
   const isEditing = canEditTitle && titleSession?.itemId === itemId;
   const feedback = editing?.changeFeedback;

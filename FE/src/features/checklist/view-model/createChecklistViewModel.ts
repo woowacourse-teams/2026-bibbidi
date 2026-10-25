@@ -25,11 +25,13 @@ const taskStatusByChecklistItemStatus: Record<
 
 export interface ChecklistTaskViewModel {
   appointments: ChecklistAppointmentViewModel[];
+  canDelete: boolean;
+  canEditCategory: boolean;
+  canEditTitle: boolean;
   categoryId: string;
   checklistItemStatus: ChecklistItemStatus;
   checklistItemId: number | null;
   id: string;
-  isEditable: boolean;
   isStatusEditable: boolean;
   title: string;
   schedule: string;
@@ -174,16 +176,19 @@ function getTaskSchedule(item: ChecklistQueryItemModel): string {
 
 function createTask(item: ChecklistQueryItemModel): ChecklistTaskViewModel {
   const status = getTaskStatus(item);
+  const hasSavedItem = item.checklistItemId !== null;
+  const isCustomItem = item.sourceCatalogItemId === null;
 
   return {
     appointments: item.appointments.map(createAppointmentViewModel),
+    canDelete: hasSavedItem && item.status !== "done",
+    canEditCategory: hasSavedItem && isCustomItem,
+    canEditTitle: hasSavedItem && isCustomItem,
     categoryId: item.categoryId,
     checklistItemStatus: item.status,
     checklistItemId: item.checklistItemId,
     id: item.id,
-    isEditable:
-      item.checklistItemId !== null && item.sourceCatalogItemId === null,
-    isStatusEditable: item.checklistItemId !== null,
+    isStatusEditable: hasSavedItem,
     schedule: getTaskSchedule(item),
     status,
     statusLabel: statusLabels[status],
