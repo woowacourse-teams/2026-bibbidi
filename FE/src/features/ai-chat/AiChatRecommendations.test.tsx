@@ -113,7 +113,10 @@ function pendingCatalog() {
         finish = resolve;
       }),
   );
-  return () => act(async () => finish(preparationCatalogFixture));
+  return async () => {
+    await waitFor(() => expect(mocks.catalog).toHaveBeenCalledOnce());
+    await act(async () => finish(preparationCatalogFixture));
+  };
 }
 
 beforeEach(() => {
