@@ -125,3 +125,26 @@
   color: var(--color-fg-placeholder);
   opacity: 1;
 }
+
+.bibbidi-text-field-button {
+  text-align: left;
+  cursor: pointer;
+}
+.bibbidi-text-field-button:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 3px;
+}
+.bibbidi-text-field-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bibbidi-text-field-value[data-placeholder] {
+  color: var(--color-fg-placeholder);
+}
+.bibbidi-text-field-button .bibbidi-text-field-right svg {
+  width: 20px;
+  height: 20px;
+}

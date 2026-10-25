@@ -111,6 +111,36 @@ describe("DatePicker의 외부 선택값 동기화", () => {
 });
 
 describe("DatePicker 연월 목록 탐색", () => {
+  it("전체 연도를 지원해도 보이는 항목만 렌더링하고 끝까지 키보드로 이동한다", () => {
+    render(
+      <DatePicker
+        value="2026-10-26"
+        today="2026-10-26"
+        yearRange={{ start: 1, end: 9999 }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "2026년 10월" }));
+    const years = screen.getByRole("listbox", { name: "연도" });
+    expect(
+      years.querySelectorAll('[role="option"]').length,
+    ).toBeLessThanOrEqual(20);
+    const selected = screen.getByRole("option", { name: "2026년" });
+    fireEvent.keyDown(selected, { key: "End" });
+    const last = screen.getByRole("option", { name: "9999년" });
+    expect(document.activeElement).toBe(last);
+    expect(last.getAttribute("aria-setsize")).toBe("9999");
+    fireEvent.keyDown(last, { key: "Home" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("option", { name: "1년" }),
+    );
+    fireEvent.scroll(years, { target: { scrollTop: 4000 * 44 } });
+    expect(
+      years.querySelectorAll('[role="option"]').length,
+    ).toBeLessThanOrEqual(20);
+    expect(years.querySelectorAll('[role="option"][tabindex="0"]').length).toBe(
+      1,
+    );
+  });
   it("연도를 키보드로 바꿔도 날짜를 확정하지 않고 Escape로 달력에 돌아온다", () => {
     const onChange = vi.fn();
     render(

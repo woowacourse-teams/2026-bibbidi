@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
+import { dateLabel, localToday } from "../../components/date-picker/date-utils";
 
 function chooseCategory(select: HTMLElement, value: string) {
   fireEvent.click(select);
@@ -21,6 +22,48 @@ function chooseCategory(select: HTMLElement, value: string) {
     (option) => option.value === value,
   )!.textContent!;
   fireEvent.click(screen.getByRole("option", { name: label }));
+}
+
+function chooseAppointmentDate(form: HTMLElement, value: string) {
+  fireEvent.click(within(form).getByRole("button", { name: /^날짜 / }));
+  const panel = screen.getByRole("dialog", { name: "날짜 선택" });
+  const [year, month] = localToday().split("-").map(Number);
+  const [targetYear, targetMonth] = value.split("-").map(Number);
+  const distance = (targetYear - year) * 12 + targetMonth - month;
+  for (let step = 0; step < Math.abs(distance); step++)
+    fireEvent.click(
+      within(panel).getByRole("button", {
+        name: distance < 0 ? "이전 달" : "다음 달",
+      }),
+    );
+  fireEvent.click(
+    within(panel).getByRole("gridcell", { name: dateLabel(value) }),
+  );
+  fireEvent.click(within(panel).getByRole("button", { name: "확인" }));
+}
+
+function chooseAppointmentTime(
+  form: HTMLElement,
+  label: string,
+  value: string,
+) {
+  fireEvent.click(
+    within(form).getByRole("button", { name: new RegExp(`^${label} `) }),
+  );
+  const panel = screen.getByRole("dialog", { name: `${label} 선택` });
+  const [hour, minute] = value.split(":").map(Number);
+  for (const [column, option] of [
+    ["오전·오후", hour < 12 ? "오전" : "오후"],
+    ["시", String(hour % 12 || 12)],
+    ["분", String(minute).padStart(2, "0")],
+  ])
+    fireEvent.click(
+      within(within(panel).getByRole("listbox", { name: column })).getByRole(
+        "option",
+        { name: option },
+      ),
+    );
+  fireEvent.click(within(panel).getByRole("button", { name: "확인" }));
 }
 
 const authMocks = vi.hoisted(() => ({
@@ -627,15 +670,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(creationPanel).getByLabelText(/제목/), {
       target: { value: " 웨딩홀 상담 " },
     });
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
-    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
-      target: { value: "10:00" },
-    });
-    fireEvent.change(within(creationPanel).getByLabelText("종료 시간"), {
-      target: { value: "11:30" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
+    chooseAppointmentTime(creationPanel, "시작 시간", "10:00");
+    chooseAppointmentTime(creationPanel, "종료 시간", "11:30");
     fireEvent.change(within(creationPanel).getByLabelText(/장소/), {
       target: { value: " 웨딩홀 " },
     });
@@ -707,9 +744,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "웨딩홀 상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
@@ -766,9 +801,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
     expect(within(form).getByRole("alert").textContent).toBe(
@@ -793,9 +826,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
     expect(within(form).getByRole("alert").textContent).toBe(
@@ -823,9 +854,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const form = screen.getByRole("complementary", { name: "일정 추가" });
     const titleInput = within(form).getByLabelText(/제목/) as HTMLInputElement;
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await within(form).findByText(
       "일정은 저장됐어요. 목록을 다시 불러와 주세요.",
@@ -866,7 +895,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const titleInput = within(creationPanel).getByRole("textbox", {
       name: /제목/,
     });
-    const dateInput = within(creationPanel).getByLabelText(/날짜/);
+    const dateInput = within(creationPanel).getByRole("button", {
+      name: /^날짜 /,
+    });
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -879,7 +910,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       document.getElementById(titleInput.getAttribute("aria-describedby")!)
         ?.textContent,
     ).toBe(titleError.textContent);
-    expect(dateInput.getAttribute("aria-invalid")).toBe("true");
+
     expect(
       document.getElementById(dateInput.getAttribute("aria-describedby")!)
         ?.textContent,
@@ -887,12 +918,12 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(document.activeElement).toBe(titleInput);
 
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(dateInput, { target: { value: "2026-09-01" } });
-    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
-      target: { value: "18:00" },
+    chooseAppointmentDate(creationPanel, "2026-09-01");
+    chooseAppointmentTime(creationPanel, "시작 시간", "18:00");
+    const endTimeInput = within(creationPanel).getByRole("button", {
+      name: /^종료 시간 /,
     });
-    const endTimeInput = within(creationPanel).getByLabelText("종료 시간");
-    fireEvent.change(endTimeInput, { target: { value: "17:00" } });
+    chooseAppointmentTime(creationPanel, "종료 시간", "17:00");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -942,9 +973,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
         target: { value: "상담" },
       },
     );
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -1001,9 +1030,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       name: /제목/,
     });
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );

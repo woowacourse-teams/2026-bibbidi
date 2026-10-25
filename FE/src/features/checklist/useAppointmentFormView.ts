@@ -2,15 +2,15 @@ import { useEffect, useRef } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import type { ChecklistAppointmentFormController } from "./model/appointmentForm";
 
-export function useAppointmentFormView(
-  controller: ChecklistAppointmentFormController,
-) {
+export function useAppointmentFormView<
+  PickerElement extends HTMLElement = HTMLInputElement,
+>(controller: ChecklistAppointmentFormController) {
   const formRef = useRef<HTMLFormElement>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const dateRef = useRef<HTMLInputElement>(null);
-  const startTimeRef = useRef<HTMLInputElement>(null);
-  const endTimeRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<PickerElement>(null);
+  const startTimeRef = useRef<PickerElement>(null);
+  const endTimeRef = useRef<PickerElement>(null);
   const placeRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   useEffect(() => {

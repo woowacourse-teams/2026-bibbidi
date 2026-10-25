@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { useModalEnvironment } from "./useModalEnvironment";
+import { BottomSheet } from "../../components/bottom-sheet";
 
 function Modal({ name, onEscape }: { name: string; onEscape?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -12,6 +13,41 @@ function Modal({ name, onEscape }: { name: string; onEscape?: () => void }) {
     </div>
   );
 }
+
+it.each(["모달", "바텀시트"])(
+  "%s부터 열고 먼저 닫아도 마지막 레이어가 닫힐 때 스크롤을 복원한다",
+  async (first) => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "auto";
+    const layers = (modal: boolean, sheet: boolean) => (
+      <>
+        {modal && <Modal name="기존 모달" />}
+        <BottomSheet
+          open={sheet}
+          onClose={() => {}}
+          aria-label="신규 바텀시트"
+        />
+      </>
+    );
+    const view = render(layers(first === "모달", first === "바텀시트"));
+    try {
+      view.rerender(layers(true, true));
+      view.rerender(layers(first !== "모달", first !== "바텀시트"));
+      if (first === "바텀시트")
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("dialog", { name: "신규 바텀시트" }),
+          ).toBeNull(),
+        );
+      expect(document.body.style.overflow).toBe("hidden");
+      view.rerender(layers(false, false));
+      await waitFor(() => expect(document.body.style.overflow).toBe("auto"));
+    } finally {
+      view.unmount();
+      document.body.style.overflow = previous;
+    }
+  },
+);
 
 it.each([false, true])(
   "스크롤 영역이 모달 범위 자체인지(%s)에 관계없이 마지막 모달까지 잠금을 유지한다",

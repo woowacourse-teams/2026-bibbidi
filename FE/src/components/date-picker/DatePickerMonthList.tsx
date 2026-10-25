@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { ScrollFog } from "../scroll-fog";
 
@@ -21,15 +21,34 @@ export function DatePickerMonthList({
 }: DatePickerMonthListProps) {
   const labelId = useId();
   const viewportRef = useRef<HTMLDivElement>(null);
-  const selectedRef = useRef<HTMLButtonElement>(null);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const [anchor, setAnchor] = useState({ value, index: selectedIndex });
+  const pendingFocus = useRef(false);
+  if (anchor.value !== value) setAnchor({ value, index: selectedIndex });
+  const virtual = options.length > 80;
+  const start = virtual
+    ? Math.max(0, Math.min(anchor.index - 5, options.length - 20))
+    : 0;
+  const end = virtual ? Math.min(options.length, start + 20) : options.length;
+  const selectedVisible = selectedIndex >= start && selectedIndex < end;
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
-    const selected = selectedRef.current;
-    if (viewport && selected)
-      viewport.scrollTop =
-        selected.offsetTop -
-        (viewport.clientHeight - selected.offsetHeight) / 2;
-  }, [value]);
+    if (viewport) {
+      viewport.scrollTop = Math.max(
+        0,
+        20 + selectedIndex * 44 - (viewport.clientHeight - 40) / 2,
+      );
+      if (pendingFocus.current) {
+        viewport
+          .querySelector<HTMLButtonElement>(`[data-value="${value}"]`)
+          ?.focus({ preventScroll: true });
+        pendingFocus.current = false;
+      }
+    }
+  }, [value, selectedIndex]);
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: number) {
     const available = options.filter((option) => !option.disabled);
@@ -46,10 +65,8 @@ export function DatePickerMonthList({
     event.preventDefault();
     const next = available[destinations[event.key]];
     if (!next) return;
+    pendingFocus.current = true;
     onChange(next.value);
-    viewportRef.current
-      ?.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`)
-      ?.focus({ preventScroll: true });
   }
 
   return (
@@ -62,19 +79,42 @@ export function DatePickerMonthList({
         aria-labelledby={labelId}
         aria-disabled={disabled || undefined}
         tabIndex={-1}
+        onScroll={(event) => {
+          if (virtual)
+            setAnchor({
+              value,
+              index: Math.floor(event.currentTarget.scrollTop / 44),
+            });
+        }}
         placement={["top", "bottom"]}
         size={20}
       >
-        <div className="bibbidi-date-picker-month-options">
-          {options.map((option) => (
+        <div
+          className="bibbidi-date-picker-month-options"
+          style={
+            virtual
+              ? {
+                  paddingTop: 20 + start * 44,
+                  paddingBottom: 20 + (options.length - end) * 44,
+                }
+              : undefined
+          }
+        >
+          {options.slice(start, end).map((option, visibleIndex) => (
             <button
               key={option.value}
               type="button"
               role="option"
               aria-selected={value === option.value}
               disabled={disabled || option.disabled}
-              tabIndex={!disabled && value === option.value ? 0 : -1}
-              ref={value === option.value ? selectedRef : undefined}
+              tabIndex={
+                !disabled &&
+                (selectedVisible ? value === option.value : visibleIndex === 0)
+                  ? 0
+                  : -1
+              }
+              aria-posinset={start + visibleIndex + 1}
+              aria-setsize={options.length}
               data-value={option.value}
               onKeyDown={(event) => onKeyDown(event, option.value)}
               onClick={() => onChange(option.value)}

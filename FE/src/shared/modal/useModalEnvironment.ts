@@ -1,33 +1,14 @@
 import { useEffect, useEffectEvent } from "react";
 import type { RefObject } from "react";
 import { containTabFocus, focusFirstElement } from "../focus/containTabFocus";
+import { lockScroll } from "../scroll/lockScroll";
 
 // Locks are shared by sheets and foreground panels so overlapping lifetimes
 // cannot restore scrolling or background interaction before the last owner exits.
-const scrollLocks = new WeakMap<
-  HTMLElement,
-  { count: number; previous: string }
->();
 const inertLocks = new WeakMap<
   HTMLElement,
   { count: number; previous: boolean }
 >();
-
-function lockScroll(element: HTMLElement) {
-  const lock = scrollLocks.get(element) ?? {
-    count: 0,
-    previous: element.style.overflow,
-  };
-  scrollLocks.set(element, lock);
-  lock.count++;
-  element.style.overflow = "hidden";
-  return () => {
-    if (--lock.count === 0) {
-      element.style.overflow = lock.previous;
-      scrollLocks.delete(element);
-    }
-  };
-}
 
 function lockInert(element: HTMLElement) {
   const lock = inertLocks.get(element) ?? {

@@ -567,14 +567,14 @@ describe("Checklist 웹 상세 패널", () => {
         (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
       ).toBe("계약서 검토");
       expect(
-        (within(form).getByLabelText(/날짜/) as HTMLInputElement).value,
-      ).toBe("2026-09-12");
+        within(form).getByRole("button", { name: "날짜 2026-09-12" }),
+      ).toBeTruthy();
       expect(
-        (within(form).getByLabelText("시작 시간") as HTMLInputElement).value,
-      ).toBe("19:00");
+        within(form).getByRole("button", { name: "시작 시간 19:00" }),
+      ).toBeTruthy();
       expect(
-        (within(form).getByLabelText("종료 시간") as HTMLInputElement).value,
-      ).toBe("20:30");
+        within(form).getByRole("button", { name: "종료 시간 20:30" }),
+      ).toBeTruthy();
       expect(
         (within(form).getByLabelText("장소") as HTMLInputElement).value,
       ).toBe("온라인");
