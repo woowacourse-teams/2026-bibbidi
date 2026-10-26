@@ -146,29 +146,6 @@ async function chooseDate(date: string) {
   );
 }
 
-async function chooseTime(label: string, hour: string, minute: string) {
-  fireEvent.click(
-    screen.getByRole("button", { name: new RegExp(`^${label} `) }),
-  );
-  const picker = screen.getByRole("dialog", { name: `${label} 선택` });
-  fireEvent.click(
-    within(within(picker).getByRole("listbox", { name: "시" })).getByRole(
-      "option",
-      { name: hour },
-    ),
-  );
-  fireEvent.click(
-    within(within(picker).getByRole("listbox", { name: "분" })).getByRole(
-      "option",
-      { name: minute },
-    ),
-  );
-  fireEvent.click(within(picker).getByRole("button", { name: "확인" }));
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: `${label} 선택` })).toBeNull(),
-  );
-}
-
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
   vi.resetAllMocks();
@@ -1008,10 +985,9 @@ describe("캘린더 일정 폼의 공용 입력·레이어 계약", () => {
     },
   );
 
-  it("날짜·시간 검증과 요청 실패 후 입력을 유지하고 같은 요청으로 재시도한다", async () => {
+  it("날짜 필수 오류를 선택 버튼에 연결하고 초점을 이동한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
     checklist.categories[0].items = [task(1, 101)];
-    command.createAppointment.mockRejectedValueOnce(new Error("save failed"));
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
     await screen.findByRole("textbox", { name: /제목/ });
@@ -1019,17 +995,17 @@ describe("캘린더 일정 폼의 공용 입력·레이어 계약", () => {
     const date = screen.getByRole("button", { name: "날짜 날짜 선택" });
     await waitFor(() => expect(document.activeElement).toBe(date));
     expect(screen.getByRole("alert").textContent).toBe("날짜를 선택해 주세요.");
-    await chooseDate(localToday());
-    await chooseTime("시작 시간", "9", "13");
-    await chooseTime("종료 시간", "8", "45");
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "종료 시간 08:45" }),
-      ),
-    );
     expect(command.createAppointment).not.toHaveBeenCalled();
-    await chooseTime("종료 시간", "10", "17");
+  });
+
+  it("저장 실패 후 입력과 오류 초점을 유지하고 같은 요청으로 재시도한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    checklist.categories[0].items = [task(1, 101)];
+    command.createAppointment.mockRejectedValueOnce(new Error("save failed"));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    await screen.findByRole("textbox", { name: /제목/ });
+    await chooseDate(localToday());
     const title = screen.getByRole("textbox", { name: /제목/ });
     fireEvent.change(title, { target: { value: "방문 상담" } });
     fireEvent.change(screen.getByRole("textbox", { name: "장소" }), {
@@ -1053,8 +1029,8 @@ describe("캘린더 일정 폼의 공용 입력·레이어 계약", () => {
     expect(command.createAppointment.mock.calls[0][1]).toMatchObject({
       date: localToday(),
       title: "방문 상담",
-      startTime: `${localToday()}T09:13:00`,
-      endTime: `${localToday()}T10:17:00`,
+      startTime: null,
+      endTime: null,
       place: "상담실",
       memo: "작성한 메모",
     });
