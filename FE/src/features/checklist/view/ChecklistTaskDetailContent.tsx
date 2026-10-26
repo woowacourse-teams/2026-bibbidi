@@ -99,14 +99,16 @@ function ChecklistAppointment({
                 void management?.changeCompletion(appointment.id, checked)
               }
             />
-            <time
-              aria-label={appointment.dateLabel}
-              className="checklist-detail-content__appointment-date"
-              dateTime={appointment.date}
-            >
-              <span>{appointment.monthLabel}</span>
-              <strong>{appointment.dayLabel}</strong>
-            </time>
+            <ListRow.Asset size="medium">
+              <time
+                aria-label={appointment.dateLabel}
+                className="checklist-detail-content__appointment-date"
+                dateTime={appointment.date}
+              >
+                <span>{appointment.monthLabel}</span>
+                <strong>{appointment.dayLabel}</strong>
+              </time>
+            </ListRow.Asset>
           </span>
         }
         contents={

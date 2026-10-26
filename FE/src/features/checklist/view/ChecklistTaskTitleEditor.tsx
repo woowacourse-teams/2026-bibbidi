@@ -33,7 +33,6 @@ export function ChecklistTaskTitleEditor({
   const inputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef(false);
   const errorMessage = validationMessage ?? requestError;
-  const errorId = `${taskId}-title-error`;
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
@@ -95,12 +94,12 @@ export function ChecklistTaskTitleEditor({
       </span>
       <form className="checklist-title-editor__form" onSubmit={handleSubmit}>
         <TextField
+          id={`${taskId}-title-input`}
           label="할 일 제목"
           labelHidden
           variant="line"
           hasError={!!errorMessage}
-          aria-describedby={errorMessage ? errorId : undefined}
-          aria-invalid={errorMessage ? true : undefined}
+          help={errorMessage && <span role="alert">{errorMessage}</span>}
           aria-label="할 일 제목"
           className="checklist-title-editor__input"
           disabled={isSaving}
@@ -123,15 +122,6 @@ export function ChecklistTaskTitleEditor({
           type="button"
         />
       </form>
-      {errorMessage ? (
-        <span
-          className="checklist-title-editor__error"
-          id={errorId}
-          role="alert"
-        >
-          {errorMessage}
-        </span>
-      ) : null}
     </div>
   );
 }

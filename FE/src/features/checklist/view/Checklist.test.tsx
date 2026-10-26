@@ -1591,6 +1591,19 @@ describe("Checklist 할 일 편집", () => {
   });
 
   it("완료 변경 중 Escape는 dialog에서 소비하고 활성 요청을 유지한다", async () => {
+    const matchMedia = window.matchMedia;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) =>
+        query === "(prefers-reduced-motion: reduce)"
+          ? {
+              ...matchMedia(MOBILE_LAYOUT_MEDIA_QUERY),
+              media: query,
+              matches: false,
+            }
+          : matchMedia(query),
+      ),
+    );
     let resolveStatusChange: (value: boolean) => void = () => undefined;
     const confirmStatusChange = vi.fn(
       () =>
@@ -1906,8 +1919,18 @@ describe("Checklist 할 일 편집", () => {
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
     expect(screen.getByRole("alert").textContent).toContain("입력해 주세요");
+    expect(
+      screen.getByRole("textbox", {
+        name: "할 일 제목",
+        description: /입력해 주세요/,
+      }),
+    ).toBe(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
 
     fireEvent.change(input, { target: { value: "가".repeat(51) } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(input.hasAttribute("aria-describedby")).toBe(false);
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
     expect(screen.getByRole("alert").textContent).toContain("50자 이하");
 

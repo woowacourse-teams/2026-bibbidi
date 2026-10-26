@@ -7,22 +7,13 @@
 .checklist-title-editor__form {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
 }
 
 .checklist-title-editor__input {
   flex: 1;
   min-width: 0;
-}
-
-.checklist-title-editor__error {
-  display: block;
-  margin-top: 4px;
-  color: var(--color-fg-critical);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.35;
 }
 
 .checklist-title-editor__accessible-title {
@@ -45,16 +36,5 @@
 
   .checklist-title-editor__form {
     width: 100%;
-  }
-
-  .checklist-title-editor__error {
-    position: absolute;
-    top: calc(100% + 1px);
-    right: 8px;
-    left: 8px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: var(--color-bg-critical-weak);
-    text-align: left;
   }
 }

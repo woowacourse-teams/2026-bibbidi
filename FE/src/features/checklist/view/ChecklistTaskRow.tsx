@@ -1,14 +1,8 @@
 import type { ComponentPropsWithRef } from "react";
 
-import { Badge, type BadgeColor } from "../../../components/badge";
 import { ListRow } from "../../../components/list-row";
 import type { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
-
-const statusColors: Record<ChecklistTaskViewModel["status"], BadgeColor> = {
-  incomplete: "dark",
-  "in-progress": "primary",
-  complete: "positive",
-};
+import { ChecklistTaskStatusBadge } from "./ChecklistTaskStatusBadge";
 
 interface ChecklistTaskRowProps {
   task: Pick<
@@ -39,9 +33,10 @@ export function ChecklistTaskRow({
       border={first ? "none" : "indented"}
       contents={<ListRow.Texts top={task.title} bottom={task.schedule} />}
       right={
-        <Badge color={statusColors[task.status]} variant="weak" size="small">
-          {task.statusLabel}
-        </Badge>
+        <ChecklistTaskStatusBadge
+          status={task.status}
+          label={task.statusLabel}
+        />
       }
       withArrow
       onClick={onClick}

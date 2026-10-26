@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Select, type SelectHandle } from "../../../components/select";
-import { Badge } from "../../../components/badge";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistItemStatus } from "../model/myChecklist";
 import { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
+import { ChecklistTaskStatusBadge } from "./ChecklistTaskStatusBadge";
 
 const options = [
   { label: "예정", value: "prev" },
@@ -29,17 +29,7 @@ export function ChecklistTaskStatusEditor({
   }, [confirming]);
   if (!task.isStatusEditable || itemId === null || !editing)
     return (
-      <Badge
-        color={
-          task.status === "complete"
-            ? "positive"
-            : task.status === "in-progress"
-              ? "primary"
-              : "dark"
-        }
-      >
-        {task.statusLabel}
-      </Badge>
+      <ChecklistTaskStatusBadge status={task.status} label={task.statusLabel} />
     );
   const feedback = editing.changeFeedback;
   const pending = feedback.status === "pending";
