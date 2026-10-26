@@ -1,9 +1,8 @@
 import type { MouseEvent, Ref } from "react";
 
-import { Accordion } from "../../../components/accordion";
-import { ProgressBar } from "../../../components/progress-bar";
+import { AccordionPrimitive } from "../../../components/accordion";
 import type { ChecklistGroupViewModel } from "../view-model/createChecklistViewModel";
-import { ChecklistTaskRow } from "./ChecklistTaskRow";
+import { ChecklistGroup } from "./ChecklistGroup";
 import "./ChecklistGroups.css";
 
 interface ChecklistGroupsProps {
@@ -28,63 +27,24 @@ export function ChecklistGroups({
   onTaskButtonRef,
 }: ChecklistGroupsProps) {
   return (
-    <Accordion
+    <AccordionPrimitive.Root
       className="checklist__groups"
       headingLevel={2}
       type="multiple"
-      variant="separated"
       value={value}
       onValueChange={onValueChange}
     >
       {groups.map((group, groupIndex) => (
-        <Accordion.Item
-          className="checklist__group"
+        <ChecklistGroup
           key={group.id}
-          value={group.id}
-          title={group.title}
-          prefix={
-            <span className="checklist__group-number">{group.numberLabel}</span>
-          }
+          group={group}
           triggerRef={groupIndex === 0 ? firstGroupTriggerRef : undefined}
-          summary={
-            <div className="checklist__group-progress">
-              <div className="checklist__group-progress-label">
-                <span className="checklist__group-count">
-                  {group.countLabel} 완료
-                </span>
-                <span>{group.progressLabel}</span>
-              </div>
-              <ProgressBar
-                aria-label={`${group.title} 진행률`}
-                aria-valuetext={`${group.countLabel} 완료, ${group.progressLabel}`}
-                progress={group.progress / 100}
-                size="light"
-              />
-            </div>
-          }
-        >
-          <ul aria-label={`${group.title} 할 일`} className="checklist__tasks">
-            {group.tasks.map((task, taskIndex) => {
-              const isSelected = selectedTaskId === task.id;
-
-              return (
-                <li key={task.id}>
-                  <ChecklistTaskRow
-                    task={task}
-                    selected={isSelected}
-                    first={taskIndex === 0}
-                    detailId={detailId}
-                    onClick={(event) => onSelectTask(task.id, event)}
-                    ref={(button) => {
-                      onTaskButtonRef(task.id, button);
-                    }}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </Accordion.Item>
+          selectedTaskId={selectedTaskId}
+          detailId={detailId}
+          onSelectTask={onSelectTask}
+          onTaskButtonRef={onTaskButtonRef}
+        />
       ))}
-    </Accordion>
+    </AccordionPrimitive.Root>
   );
 }
