@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
@@ -55,6 +55,7 @@ function CalendarPlanningFeature({
   recommendedRepository: RecommendedCatalogItemsRepository;
   refreshAuth: () => void;
 }) {
+  const calendarHeadingRef = useRef<HTMLHeadingElement>(null);
   const { authState } = useAuth();
   const audience =
     authState.status === "authenticated"
@@ -155,6 +156,7 @@ function CalendarPlanningFeature({
 
   return (
     <CalendarPlanning
+      headingRef={calendarHeadingRef}
       referenceDate={getReferenceDate()}
       schedules={schedules}
       focusDate={dateAssignment.focusDate}
@@ -183,6 +185,7 @@ function CalendarPlanningFeature({
                 title={dateAssignment.selectedTask.title}
                 onClose={dateAssignment.closeDate}
                 onSaved={dateAssignment.onSaved}
+                fallbackFocusRef={calendarHeadingRef}
               />
             )}
           {dateAssignment.loginTo && (

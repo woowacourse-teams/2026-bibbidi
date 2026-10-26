@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "../auth";
 import { analytics } from "../../infrastructure/analytics";
@@ -26,6 +26,9 @@ import {
   usePreparationChecklistRepository,
 } from "../preparation";
 import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
+import { dateLabel, localToday } from "../../components/date-picker/date-utils";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
+import { installMatchMedia } from "../../test/matchMedia";
 import { HomeScheduleDashboardFeature } from "./HomeScheduleDashboardFeature";
 import {
   RecommendedCatalogItemsAuthenticationRequiredError,
@@ -100,10 +103,16 @@ function mount(entry = "/calendar") {
   const ui = (repository: RecommendedCatalogItemsRepository) => (
     <StrictMode>
       <MemoryRouter initialEntries={[entry]}>
-        <HomeScheduleDashboardFeature
-          getReferenceDate={() => "2026-10-05"}
-          recommendedRepository={repository}
-        />
+        <div
+          data-modal-scope
+          data-page-scroll-container
+          style={{ overflow: "auto" }}
+        >
+          <HomeScheduleDashboardFeature
+            getReferenceDate={() => "2026-10-05"}
+            recommendedRepository={repository}
+          />
+        </div>
       </MemoryRouter>
     </StrictMode>
   );
@@ -115,6 +124,52 @@ function mount(entry = "/calendar") {
     },
   };
 }
+async function chooseDate(date: string) {
+  const trigger = screen.getByRole("button", { name: /^날짜 / });
+  fireEvent.click(trigger);
+  const picker = screen.getByRole("dialog", { name: "날짜 선택" });
+  const [year, month] = date.split("-").map(Number);
+  const [currentYear, currentMonth] = localToday().split("-").map(Number);
+  const difference = (year - currentYear) * 12 + month - currentMonth;
+  for (let index = 0; index < Math.abs(difference); index++)
+    fireEvent.click(
+      within(picker).getByRole("button", {
+        name: difference > 0 ? "다음 달" : "이전 달",
+      }),
+    );
+  fireEvent.click(
+    within(picker).getByRole("gridcell", { name: dateLabel(date) }),
+  );
+  fireEvent.click(within(picker).getByRole("button", { name: "확인" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "날짜 선택" })).toBeNull(),
+  );
+}
+
+async function chooseTime(label: string, hour: string, minute: string) {
+  fireEvent.click(
+    screen.getByRole("button", { name: new RegExp(`^${label} `) }),
+  );
+  const picker = screen.getByRole("dialog", { name: `${label} 선택` });
+  fireEvent.click(
+    within(within(picker).getByRole("listbox", { name: "시" })).getByRole(
+      "option",
+      { name: hour },
+    ),
+  );
+  fireEvent.click(
+    within(within(picker).getByRole("listbox", { name: "분" })).getByRole(
+      "option",
+      { name: minute },
+    ),
+  );
+  fireEvent.click(within(picker).getByRole("button", { name: "확인" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: `${label} 선택` })).toBeNull(),
+  );
+}
+
+afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
   vi.resetAllMocks();
   setAuth("authenticated");
@@ -311,18 +366,17 @@ describe("calendar planning", () => {
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
     await screen.findByRole("textbox", { name: /제목/ });
-    fireEvent.change(
-      screen.getByLabelText("날짜", { exact: false, selector: "input" }),
-      {
-        target: { value: "2026-11-12" },
-      },
-    );
+    await chooseDate("2026-11-12");
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() =>
       expect(command.createAppointment).toHaveBeenCalledTimes(1),
     );
     await screen.findByRole("region", { name: "날짜를 정할 일 0개" });
     await screen.findByRole("table", { name: "2026년 11월 달력" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "내 준비 일정", level: 1 }),
+    );
     const day = screen.getByRole("region", { name: "11월 12일 일정" });
     fireEvent.click(within(day).getByRole("button"));
     expect(
@@ -335,12 +389,7 @@ describe("calendar planning", () => {
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
     await screen.findByRole("textbox", { name: /제목/ });
-    fireEvent.change(
-      screen.getByLabelText("날짜", { exact: false, selector: "input" }),
-      {
-        target: { value: "2026-10-07" },
-      },
-    );
+    await chooseDate("2026-10-07");
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "목록 다시 불러오기" }),
@@ -905,5 +954,228 @@ describe("캘린더 추천 담기의 기존 인증·요청·성공 이벤트 계
     await waitFor(() => expect(analytics.track).toHaveBeenCalledTimes(1));
     expect(addition.addCatalogItemIds).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("캘린더 일정 폼의 공용 입력·레이어 계약", () => {
+  it.each([false, true])(
+    "모바일=%s에서 취소 후 진입 버튼과 스크롤을 복원한다",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      checklist.categories[0].items = [task(1, 101)];
+      mount();
+      const trigger = await screen.findByRole("button", { name: "일정 추가" });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const layer = await screen.findByRole("dialog", {
+        name: "내 할 일 1 일정 추가",
+      });
+      expect(layer.getAttribute("data-placement")).toBe(
+        mobile ? "fullscreen" : "side",
+      );
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole("textbox", { name: /제목/ }),
+        ),
+      );
+      const scroll = document.querySelector<HTMLElement>(
+        "[data-page-scroll-container]",
+      )!;
+      expect(document.body.style.overflow).toBe("hidden");
+      expect(scroll.style.overflow).toBe("hidden");
+      for (const type of ["pointerdown", "pointerup"])
+        fireEvent(layer, new MouseEvent(type, { bubbles: true, button: 0 }));
+      expect(screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" })).toBe(
+        layer,
+      );
+      fireEvent.change(screen.getByRole("textbox", { name: /제목/ }), {
+        target: { value: "작성 중" },
+      });
+      const last = within(layer).getByRole("button", { name: "저장" });
+      last.focus();
+      fireEvent.keyDown(last, { key: "Tab" });
+      expect(layer.contains(document.activeElement)).toBe(true);
+      fireEvent.click(
+        within(layer).getByRole("button", {
+          name: mobile ? "캘린더로 돌아가기" : "일정 추가 닫기",
+        }),
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(scroll.style.overflow).toBe("auto");
+      expect(document.body.style.overflow).not.toBe("hidden");
+      expect(command.createAppointment).not.toHaveBeenCalled();
+    },
+  );
+
+  it("날짜·시간 검증과 요청 실패 후 입력을 유지하고 같은 요청으로 재시도한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    checklist.categories[0].items = [task(1, 101)];
+    command.createAppointment.mockRejectedValueOnce(new Error("save failed"));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    await screen.findByRole("textbox", { name: /제목/ });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    const date = screen.getByRole("button", { name: "날짜 날짜 선택" });
+    await waitFor(() => expect(document.activeElement).toBe(date));
+    expect(screen.getByRole("alert").textContent).toBe("날짜를 선택해 주세요.");
+    await chooseDate(localToday());
+    await chooseTime("시작 시간", "9", "13");
+    await chooseTime("종료 시간", "8", "45");
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "종료 시간 08:45" }),
+      ),
+    );
+    expect(command.createAppointment).not.toHaveBeenCalled();
+    await chooseTime("종료 시간", "10", "17");
+    const title = screen.getByRole("textbox", { name: /제목/ });
+    fireEvent.change(title, { target: { value: "방문 상담" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "장소" }), {
+      target: { value: "상담실" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "메모" }), {
+      target: { value: "작성한 메모" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await screen.findByRole("button", { name: "다시 시도" });
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe(
+        "일정을 저장하지 못했어요. 다시 시도해 주세요.",
+      ),
+    );
+    expect((title as HTMLInputElement).value).toBe("방문 상담");
+    expect(
+      (screen.getByRole("textbox", { name: "메모" }) as HTMLTextAreaElement)
+        .value,
+    ).toBe("작성한 메모");
+    expect(command.createAppointment.mock.calls[0][1]).toMatchObject({
+      date: localToday(),
+      title: "방문 상담",
+      startTime: `${localToday()}T09:13:00`,
+      endTime: `${localToday()}T10:17:00`,
+      place: "상담실",
+      memo: "작성한 메모",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(command.createAppointment).toHaveBeenCalledTimes(2);
+    expect(command.createAppointment.mock.calls[1][1]).toEqual(
+      command.createAppointment.mock.calls[0][1],
+    );
+  });
+
+  it("저장 중에는 중복 실행과 Escape·취소·닫기를 막는다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    checklist.categories[0].items = [task(1, 101)];
+    const pending = deferred<void>();
+    command.createAppointment.mockReturnValue(pending.promise);
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    await screen.findByRole("textbox", { name: /제목/ });
+    await chooseDate(localToday());
+    const save = screen.getByRole("button", { name: "저장" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    const layer = screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" });
+    expect(
+      (screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "취소" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "일정 추가 닫기" }));
+    fireEvent.keyDown(layer, { key: "Escape" });
+    fireEvent(layer, new Event("cancel", { bubbles: true, cancelable: true }));
+    expect((layer as HTMLDialogElement).open).toBe(true);
+    expect(command.createAppointment).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("선택기의 Escape와 화면 크기 전환이 작성 중인 폼을 닫거나 초기화하지 않는다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    checklist.categories[0].items = [task(1, 101)];
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "일정 추가" }));
+    const title = await screen.findByRole("textbox", { name: /제목/ });
+    fireEvent.change(title, { target: { value: "작성 중인 제목" } });
+    await chooseDate(localToday());
+    const trigger = screen.getByRole("button", { name: "시작 시간 시간 선택" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    let picker = screen.getByRole("dialog", { name: "시작 시간 선택" });
+    fireEvent.keyDown(within(picker).getByRole("listbox", { name: "시" }), {
+      key: "Escape",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "시작 시간 선택" }),
+      ).toBeNull(),
+    );
+    expect(document.activeElement).toBe(trigger);
+    const layer = screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" });
+    act(() => media.setMatches(true));
+    expect(layer.getAttribute("data-placement")).toBe("fullscreen");
+    expect(screen.getByRole("textbox", { name: /제목/ })).toBe(title);
+    expect((title as HTMLInputElement).value).toBe("작성 중인 제목");
+    expect(
+      screen.getByRole("button", { name: `날짜 ${localToday()}` }),
+    ).toBeTruthy();
+    const mobileTrigger = screen.getByRole("button", {
+      name: "시작 시간 시간 선택",
+    });
+    mobileTrigger.focus();
+    fireEvent.click(mobileTrigger);
+    picker = screen.getByRole("dialog", { name: "시작 시간 선택" });
+    const confirm = within(picker).getByRole("button", { name: "확인" });
+    confirm.focus();
+    fireEvent.keyDown(confirm, { key: "Tab" });
+    expect(picker.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(within(picker).getByRole("listbox", { name: "시" }), {
+      key: "Escape",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "시작 시간 선택" }),
+      ).toBeNull(),
+    );
+    expect(screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" })).toBe(
+      layer,
+    );
+    expect(document.activeElement).toBe(mobileTrigger);
+    fireEvent.keyDown(title, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("퇴장이 끝날 때까지 입력 화면과 스크롤 잠금을 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    checklist.categories[0].items = [task(1, 101)];
+    mount();
+    const entry = await screen.findByRole("button", { name: "일정 추가" });
+    entry.focus();
+    fireEvent.click(entry);
+    const title = await screen.findByRole("textbox", { name: /제목/ });
+    fireEvent.change(title, { target: { value: "퇴장 중에도 보존" } });
+    const layer = screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" });
+    const surface = layer.querySelector<HTMLElement>(
+      ".bibbidi-panel-overlay-surface",
+    )!;
+    const exit = deferred<void>();
+    surface.getAnimations = () => [
+      { finished: exit.promise } as unknown as Animation,
+    ];
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(layer.getAttribute("data-state")).toBe("closing");
+    expect((title as HTMLInputElement).value).toBe("퇴장 중에도 보존");
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(surface.hasAttribute("inert")).toBe(true);
+    await act(async () => exit.resolve());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(entry));
+    expect(document.body.style.overflow).not.toBe("hidden");
   });
 });

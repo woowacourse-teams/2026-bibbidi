@@ -346,19 +346,3 @@
     height: 32px;
   }
 }
-.calendar-planning__date-dialog {
-  padding: 0;
-  width: min(480px, calc(100vw - 32px));
-  max-height: 90dvh;
-  border: 1px solid var(--color-stroke-neutral);
-  border-radius: 16px;
-  background: var(--color-bg-layer-default);
-}
-.calendar-planning__date-dialog::backdrop {
-  background: rgb(0 0 0 / 30%);
-}
-.calendar-planning__date-dialog .checklist-appointment-creation {
-  position: static;
-  height: min(720px, 85dvh);
-  border: 0;
-}

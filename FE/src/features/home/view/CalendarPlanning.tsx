@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 
 import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
@@ -7,6 +7,7 @@ import { CalendarPlusIcon } from "./UnscheduledTask";
 import "./CalendarPlanning.css";
 
 interface CalendarPlanningProps {
+  headingRef?: Ref<HTMLHeadingElement>;
   referenceDate: string;
   schedules: CalendarScheduleModel[];
   focusDate?: string;
@@ -22,6 +23,7 @@ interface CalendarPlanningProps {
 }
 
 export function CalendarPlanning({
+  headingRef,
   referenceDate,
   schedules,
   focusDate,
@@ -38,7 +40,9 @@ export function CalendarPlanning({
   return (
     <section className="calendar-planning" aria-label="내 준비 일정 대시보드">
       <header className="calendar-planning__heading">
-        <h1>내 준비 일정</h1>
+        <h1 ref={headingRef} tabIndex={-1}>
+          내 준비 일정
+        </h1>
         <p>필요한 할 일을 담고, 날짜를 정해 준비 일정을 관리해요.</p>
       </header>
       <div className="calendar-planning__layout">

@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import type { RefObject } from "react";
+import { PanelOverlay } from "../../components/panel-overlay";
+import { useIsMobileLayout } from "../../shared/responsive";
+import { usePageScrollContainer } from "../../shared/scroll/usePageScrollContainer";
 
 import { useAuth } from "../auth";
 import {
@@ -18,17 +22,27 @@ export function CalendarDateAssignment({
   title,
   onClose,
   onSaved,
+  fallbackFocusRef,
 }: {
   itemId: number;
   title: string;
   onClose: () => void;
   onSaved: (date: string) => void;
+  fallbackFocusRef: RefObject<HTMLElement | null>;
 }) {
   const { authState, refreshAuth } = useAuth();
   const command = useMyChecklistCommandRepository();
   const query = useMyChecklistQueryRepository();
   const savedDate = useRef<string>("");
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  }, []);
+  const mobile = useIsMobileLayout();
+  const { ref, environment } = usePageScrollContainer();
   const completeRefresh = useCallback(
     async (signal: AbortSignal) => {
       try {
@@ -79,31 +93,36 @@ export function CalendarDateAssignment({
     onRetryRefresh: completeRefresh,
   });
   const started = useRef(false);
-  const wasOpen = useRef(false);
   useEffect(() => {
     if (!started.current && controller.canOpen) {
       started.current = true;
       controller.open("calendar");
       controller.changeTitle(title);
-      dialogRef.current?.showModal();
     }
-    if (controller.isOpen) wasOpen.current = true;
-    else if (wasOpen.current) {
-      dialogRef.current?.close();
-      onClose();
-    }
-  }, [controller, title, onClose]);
+  }, [controller, title]);
+  const pending = controller.submissionState.status === "submitting";
   return (
-    <dialog
-      className="calendar-planning__date-dialog"
-      ref={dialogRef}
-      onCancel={(event) => {
-        event.preventDefault();
-        controller.cancel();
-      }}
-      aria-label={`${title} 일정 추가`}
-    >
-      <CalendarAppointmentForm controller={controller} taskTitle={title} />
-    </dialog>
+    <div ref={ref}>
+      {environment && (
+        <PanelOverlay
+          open={controller.isOpen}
+          onClose={controller.cancel}
+          onExited={onClose}
+          placement={mobile ? "fullscreen" : "side"}
+          aria-label={`${title} 일정 추가`}
+          scrollContainer={environment.scrollContainer}
+          returnFocusRef={returnFocusRef}
+          fallbackFocusRef={fallbackFocusRef}
+          closeOnEscape={!pending}
+          closeOnDimmerClick={false}
+        >
+          <CalendarAppointmentForm
+            open={controller.isOpen}
+            controller={controller}
+            taskTitle={title}
+          />
+        </PanelOverlay>
+      )}
+    </div>
   );
 }
