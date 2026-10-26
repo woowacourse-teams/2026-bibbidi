@@ -3,7 +3,6 @@ package com.bibbidi.wedding.checklist.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -196,48 +195,49 @@ class AppointmentServiceTest {
     }
 
     @Test
-    @DisplayName("가까운 일정을 저장소에서 조회해 결과로 변환한다")
+    @DisplayName("사용자, 요청 시각, 개수 제한을 저장소에 전달하고 가까운 일정을 결과로 변환한다")
     void shouldFindNearbyAppointmentsAsResults() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 9, 0);
         Appointment appointment = createAppointment();
-        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
+        given(appointmentRepository.findNearby(USER_ID, now, 6))
                 .willReturn(List.of(appointment));
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6, LocalDateTime.now());
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 6, now);
 
-        assertThat(results).containsExactly(AppointmentResult.fromDomain(appointment));
+        then(appointmentRepository).should().findNearby(USER_ID, now, 6);
+        assertThat(results).containsExactly(new AppointmentResult(
+                APPOINTMENT_ID, CHECKLIST_ITEM_ID, "title", LocalDate.of(2026, 9, 1),
+                LocalDateTime.of(2026, 9, 1, 10, 0), LocalDateTime.of(2026, 9, 1, 11, 0),
+                "place", "memo", false
+        ));
     }
 
     @Test
-    @DisplayName("가까운 일정은 날짜, 시각(시각 있는 일정 우선) 순으로 정렬한다")
-    void shouldOrderNearbyAppointmentsByDateThenTimedFirst() {
-        Appointment timelessTomorrow = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
-        Appointment timedTomorrow = appointmentOnDate(
-                2L, LocalDate.of(2026, 9, 2), LocalDateTime.of(2026, 9, 2, 9, 0));
-        Appointment dayAfterTomorrow = appointmentOnDate(3L, LocalDate.of(2026, 9, 3), null);
-        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
-                .willReturn(List.of(timelessTomorrow, dayAfterTomorrow, timedTomorrow));
+    @DisplayName("가까운 일정 조회는 저장소가 반환한 순서를 보존한다")
+    void shouldPreserveNearbyAppointmentOrderFromRepository() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 9, 0);
+        Appointment first = appointmentOnDate(2L, LocalDate.of(2026, 9, 3), null);
+        Appointment second = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
+        given(appointmentRepository.findNearby(USER_ID, now, 2))
+                .willReturn(List.of(first, second));
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 10, LocalDateTime.now());
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2, now);
 
-        assertThat(results)
-                .extracting(AppointmentResult::id)
-                .containsExactly(timedTomorrow.id(), timelessTomorrow.id(), dayAfterTomorrow.id());
+        assertThat(results).containsExactly(
+                AppointmentResult.fromDomain(first),
+                AppointmentResult.fromDomain(second)
+        );
     }
 
     @Test
-    @DisplayName("가까운 일정 조회는 요청한 개수만큼만 반환한다")
-    void shouldLimitNearbyAppointmentsToRequestedCount() {
-        Appointment first = appointmentOnDate(1L, LocalDate.of(2026, 9, 2), null);
-        Appointment second = appointmentOnDate(2L, LocalDate.of(2026, 9, 3), null);
-        Appointment third = appointmentOnDate(3L, LocalDate.of(2026, 9, 4), null);
-        given(appointmentRepository.findNearby(eq(USER_ID), any(LocalDateTime.class)))
-                .willReturn(List.of(first, second, third));
+    @DisplayName("저장소에 가까운 일정이 없으면 빈 결과를 반환한다")
+    void shouldReturnEmptyResultsWhenNoNearbyAppointmentsExist() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 9, 0);
+        given(appointmentRepository.findNearby(USER_ID, now, 20)).willReturn(List.of());
 
-        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 2, LocalDateTime.now());
+        List<AppointmentResult> results = appointmentService.findNearby(USER_ID, 20, now);
 
-        assertThat(results)
-                .extracting(AppointmentResult::id)
-                .containsExactly(first.id(), second.id());
+        assertThat(results).isEmpty();
     }
 
     private static Appointment appointmentOnDate(Long id, LocalDate date, LocalDateTime startTime) {

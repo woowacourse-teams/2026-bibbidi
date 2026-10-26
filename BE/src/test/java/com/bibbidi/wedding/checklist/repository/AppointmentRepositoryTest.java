@@ -329,7 +329,7 @@ class AppointmentRepositoryTest {
         saveAppointmentOnDate(itemId, LocalDate.now().minusDays(1), null, "지난 일정");
         saveDoneAppointmentOnDate(itemId, LocalDate.now().plusDays(1), "완료된 미래 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
+        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
 
         assertThat(found)
                 .extracting(Appointment::id)
@@ -344,7 +344,7 @@ class AppointmentRepositoryTest {
         Appointment timelessToday = saveAppointmentOnDate(itemId, LocalDate.now(), null, "시각 없는 오늘 일정");
         saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().minusHours(1), "지난 오늘 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
+        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
 
         assertThat(found)
                 .extracting(Appointment::id)
@@ -358,7 +358,7 @@ class AppointmentRepositoryTest {
         Long otherUsersItemId = saveChecklistItem(otherUsersChecklist);
         saveAppointmentOnDate(otherUsersItemId, LocalDate.now().plusDays(1), null, "다른 사용자 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now());
+        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
 
         assertThat(found).isEmpty();
     }
