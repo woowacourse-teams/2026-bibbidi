@@ -144,9 +144,10 @@
 .bibbidi-bottom-sheet-option[data-disabled] > span:first-child {
   opacity: 0.4;
 }
+
 @keyframes bibbidi-bottom-sheet-enter {
   from {
-    transform: translateY(100%);
+    transform: var(--bottom-sheet-enter-transform, translateY(100%));
   }
   to {
     transform: translateY(0);
@@ -154,10 +155,10 @@
 }
 @keyframes bibbidi-bottom-sheet-exit {
   from {
-    transform: translateY(0);
+    transform: var(--bottom-sheet-exit-transform, translateY(0));
   }
   to {
-    transform: translateY(100%);
+    transform: translateY(calc(100% - var(--bottom-sheet-drag-offset, 0px)));
   }
 }
 @keyframes bibbidi-bottom-sheet-dim-in {
@@ -192,12 +193,15 @@
   animation: bibbidi-bottom-sheet-dim-out 240ms ease-in both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bibbidi-bottom-sheet[open][data-animation][data-state]
-    .bibbidi-bottom-sheet-panel,
   .bibbidi-bottom-sheet[open][data-state] .bibbidi-bottom-sheet-panel,
-  .bibbidi-bottom-sheet[open][data-animation][data-state]::backdrop,
   .bibbidi-bottom-sheet[open][data-state]::backdrop {
     animation: none;
     transition: none;
   }
+}
+
+.bibbidi-bottom-sheet-header-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
 }

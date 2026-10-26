@@ -284,3 +284,68 @@ describe("디자인 시스템 BottomSheet", () => {
     );
   });
 });
+
+it("드래그 닫기는 끌어 내린 위치에서 퇴장하고 다시 열 때만 위치를 초기화한다", async () => {
+  render(<Harness />);
+  const trigger = screen.getByRole("button", { name: "날짜 선택 열기" });
+  trigger.focus();
+  fireEvent.click(trigger);
+  const layer = screen.getByRole("dialog", { name: "날짜 선택" });
+  const handle = screen.getByRole("button", { name: "아래로 밀어 닫기" });
+  let finish!: () => void;
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  Object.defineProperty(layer.firstElementChild, "getAnimations", {
+    configurable: true,
+    value: () => [{ finished }],
+  });
+  const touch = (clientY: number) => ({ identifier: 1, clientX: 100, clientY });
+  const panel = layer.firstElementChild as HTMLElement;
+  panel.style.transform = "matrix(1, 0, 0, 1, 0, 20)";
+  fireEvent.touchStart(handle, { touches: [touch(100)] });
+  fireEvent.touchMove(handle, { touches: [touch(240)] });
+  fireEvent.touchEnd(handle, { touches: [], changedTouches: [touch(240)] });
+  expect(layer.dataset.state).toBe("closing");
+  expect(panel.style.getPropertyValue("--bottom-sheet-exit-transform")).toBe(
+    "matrix(1, 0, 0, 1, 0, 20)",
+  );
+  expect(layer.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
+    "140px",
+  );
+  expect(document.body.style.overflow).toBe("hidden");
+  await act(async () => finish());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  fireEvent.click(trigger);
+  expect(
+    screen
+      .getByRole("dialog", { name: "날짜 선택" })
+      .style.getPropertyValue("--bottom-sheet-drag-offset"),
+  ).toBe("0px");
+});
+
+it("제어하는 화면이 드래그 닫기를 거절하면 원래 위치로 복귀한다", async () => {
+  const onClose = vi.fn();
+  render(
+    <BottomSheet
+      open
+      onClose={onClose}
+      header={<BottomSheet.Header>상세</BottomSheet.Header>}
+    >
+      내용
+    </BottomSheet>,
+  );
+  const handle = screen.getByRole("button", { name: "아래로 밀어 닫기" });
+  const touch = (clientY: number) => ({ identifier: 1, clientX: 100, clientY });
+  fireEvent.touchStart(handle, { touches: [touch(100)] });
+  fireEvent.touchMove(handle, { touches: [touch(240)] });
+  fireEvent.touchEnd(handle, { touches: [], changedTouches: [touch(240)] });
+  await act(async () => {});
+  expect(onClose).toHaveBeenCalledOnce();
+  const layer = screen.getByRole("dialog", { name: "상세" });
+  expect(layer.dataset.state).toBe("open");
+  expect(layer.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
+    "0px",
+  );
+});

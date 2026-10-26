@@ -41,7 +41,9 @@ let available = 1280;
 let notify: () => void;
 let media: ReturnType<typeof installMatchMedia>;
 
-function Harness() {
+function Harness({
+  loginRequiredReason = null,
+}: { loginRequiredReason?: "schedule-creation" | null } = {}) {
   const [selected, setSelected] = useState<string | null>(null);
   const creation = useChecklistTaskCreation({});
   const appointment = useChecklistAppointmentCreation({
@@ -52,12 +54,13 @@ function Harness() {
   });
   return (
     <div className="service-layout" data-modal-scope>
-      <header className="service-layout__header" data-modal-background>
+      <header className="service-layout__header">
         <button type="button">계정 메뉴</button>
       </header>
       <div data-page-scroll-container>
         <Checklist
           categories={categories}
+          loginRequiredReason={loginRequiredReason}
           selectedTaskId={selected}
           onSelectTask={setSelected}
           onCloseTaskDetail={() => setSelected(null)}
@@ -70,6 +73,12 @@ function Harness() {
       </div>
     </div>
   );
+}
+
+function clickDimmer() {
+  const layer = document.querySelector(".bibbidi-panel-overlay[open]")!;
+  for (const type of ["pointerdown", "pointerup"])
+    fireEvent(layer, new MouseEvent(type, { bubbles: true, button: 0 }));
 }
 
 function resize(width: number, parentWidth = width - 64) {
@@ -124,7 +133,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("상세를 병렬 패널·오버레이·바텀시트로 바꾸고 닫으면 목록 초점과 스크롤을 복원한다", () => {
+it("상세를 병렬 패널·오버레이·바텀시트로 바꾸고 닫으면 목록 초점과 스크롤을 복원한다", async () => {
   const { container } = render(<Harness />);
   const trigger = screen.getByRole("button", { name: /웨딩홀 방문/ });
   const scroll = container.querySelector<HTMLElement>(
@@ -137,9 +146,9 @@ it("상세를 병렬 패널·오버레이·바텀시트로 바꾸고 닫으면 �
   ).toBeTruthy();
   resize(1024);
   const dialog = screen.getByRole("dialog", { name: "웨딩홀 방문" });
-  expect(
-    container.querySelector(".service-layout__header")?.hasAttribute("inert"),
-  ).toBe(true);
+  expect(dialog.tagName).toBe("DIALOG");
+  expect((dialog as HTMLDialogElement).open).toBe(true);
+  expect(dialog.getAttribute("aria-modal")).toBe("true");
   expect(scroll.style.overflow).toBe("hidden");
   const close = within(dialog).getByRole("button", { name: "할 일 상세 닫기" });
   close.focus();
@@ -154,6 +163,7 @@ it("상세를 병렬 패널·오버레이·바텀시트로 바꾸고 닫으면 �
   fireEvent.keyDown(screen.getByRole("button", { name: "할 일 상세 닫기" }), {
     key: "Escape",
   });
+  await act(async () => {});
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(trigger);
   expect(scroll.scrollTop).toBe(250);
@@ -172,7 +182,7 @@ it("작성값을 크기 전환에서 유지하고 오버레이 위의 버리기 
     ).toBe("입력 유지");
   }
   resize(1024);
-  fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+  clickDimmer();
   const discard = screen.getByRole("dialog", {
     name: "작성 중인 내용을 닫을까요?",
   });
@@ -229,8 +239,7 @@ it.each([390, 1024, 1440])(
       (screen.getByRole("textbox", { name: /제목/ }) as HTMLInputElement).value,
     ).toBe("보존할 상담 일정");
     expect(document.activeElement).toBe(title);
-    if (width === 1024)
-      fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+    if (width === 1024) clickDimmer();
     else if (width === 390)
       fireEvent.click(
         screen.getByRole("button", { name: "할 일 상세로 돌아가기" }),
@@ -318,3 +327,160 @@ it.each([1280, 1440])(
     }
   },
 );
+
+it("취소 확인창을 연 채 배치를 바꿔도 확인창이 마지막에 열리고 작성값을 보존한다", async () => {
+  const showModal = vi.spyOn(HTMLDialogElement.prototype, "showModal");
+  render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
+  fireEvent.change(screen.getByLabelText(/할 일 제목/), {
+    target: { value: "확인 중인 할 일" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "취소" }));
+  for (const width of [1024, 390, 1440]) {
+    resize(width);
+    const confirmation = screen.getByRole("dialog", {
+      name: "작성 중인 내용을 닫을까요?",
+    });
+    expect(showModal.mock.contexts.at(-1)).toBe(confirmation);
+    expect(document.activeElement?.textContent).toContain("계속 작성");
+  }
+  fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+  await act(async () => {});
+  expect((screen.getByLabelText(/할 일 제목/) as HTMLInputElement).value).toBe(
+    "확인 중인 할 일",
+  );
+});
+
+it.each([390, 1024])(
+  "일정 선택기를 닫아도 작성 오버레이와 배경 스크롤 잠금을 유지한다 (%s)",
+  async (width) => {
+    const { container } = render(<Harness />);
+    resize(width);
+    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 방문/ }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "일정 추가" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /제목/ }), {
+      target: { value: "작성 중인 일정" },
+    });
+    const dateTrigger = screen.getByRole("button", { name: /^날짜 / });
+    dateTrigger.focus();
+    fireEvent.click(dateTrigger);
+    const picker = screen.getByRole("dialog", { name: "날짜 선택" });
+    fireEvent.keyDown(within(picker).getByRole("button", { name: "확인" }), {
+      key: "Escape",
+    });
+    await act(async () => {});
+    expect(screen.queryByRole("dialog", { name: "날짜 선택" })).toBeNull();
+    expect(
+      screen
+        .getByRole("dialog", { name: "일정 추가" })
+        .classList.contains("bibbidi-panel-overlay"),
+    ).toBe(true);
+    expect(
+      (screen.getByRole("textbox", { name: /제목/ }) as HTMLInputElement).value,
+    ).toBe("작성 중인 일정");
+    expect(document.activeElement).toBe(dateTrigger);
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(
+      container.querySelector<HTMLElement>("[data-page-scroll-container]")!
+        .style.overflow,
+    ).toBe("hidden");
+  },
+);
+
+it("전역 확인창을 연 상태로 배치를 전환해도 상위 패널이 확인창을 덮지 않는다", () => {
+  const showModal = vi.spyOn(HTMLDialogElement.prototype, "showModal");
+  const view = render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: /웨딩홀 방문/ }));
+  view.rerender(<Harness loginRequiredReason="schedule-creation" />);
+  for (const width of [1024, 390, 1440]) {
+    resize(width);
+    const confirmation = screen.getByRole("dialog", {
+      name: "로그인이 필요해요",
+    });
+    expect(showModal.mock.contexts.at(-1)).toBe(confirmation);
+    expect(document.activeElement?.textContent).toBe("취소");
+  }
+});
+
+it("오버레이는 본문과 배경막 퇴장이 끝날 때까지 내용·스크롤 잠금을 유지한다", async () => {
+  const { container } = render(<Harness />);
+  resize(1024);
+  const trigger = screen.getByRole("button", { name: /웨딩홀 방문/ });
+  trigger.focus();
+  fireEvent.click(trigger);
+  const layer = screen.getByRole("dialog", { name: "웨딩홀 방문" });
+  const scroll = container.querySelector<HTMLElement>(
+    "[data-page-scroll-container]",
+  )!;
+  scroll.scrollTop = 180;
+  let finishPanel!: () => void;
+  let finishDimmer!: () => void;
+  const panelFinished = new Promise<void>((resolve) => {
+    finishPanel = resolve;
+  });
+  const dimmerFinished = new Promise<void>((resolve) => {
+    finishDimmer = resolve;
+  });
+  Object.defineProperty(layer.firstElementChild, "getAnimations", {
+    value: () => [{ finished: panelFinished }],
+  });
+  Object.defineProperty(layer, "getAnimations", {
+    value: () => [{ finished: dimmerFinished }],
+  });
+  const surface = layer.firstElementChild as HTMLElement;
+  surface.style.transform = "matrix(1, 0, 0, 1, 70, 0)";
+  fireEvent.click(
+    within(layer).getByRole("button", { name: "할 일 상세 닫기" }),
+  );
+  expect(layer.dataset.state).toBe("closing");
+  expect(surface.style.getPropertyValue("--panel-overlay-exit-transform")).toBe(
+    "matrix(1, 0, 0, 1, 70, 0)",
+  );
+  expect(within(layer).getByText("등록된 일정이 없어요.")).toBeTruthy();
+  expect(
+    document.querySelector(".checklist-workspace__main")?.hasAttribute("inert"),
+  ).toBe(true);
+  expect(scroll.style.overflow).toBe("hidden");
+  await act(async () => finishPanel());
+  expect((layer as HTMLDialogElement).open).toBe(true);
+  expect(document.body.style.overflow).toBe("hidden");
+  await act(async () => finishDimmer());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.body.style.overflow).toBe("");
+  expect(scroll.style.overflow).toBe("");
+  expect(scroll.scrollTop).toBe(180);
+  expect(document.activeElement).toBe(trigger);
+});
+
+it("작성 취소 확인 뒤에도 퇴장 중인 폼의 입력을 유지하고 확인창은 남기지 않는다", async () => {
+  render(<Harness />);
+  resize(1024);
+  const trigger = screen.getByRole("button", { name: "할 일 추가" });
+  fireEvent.click(trigger);
+  fireEvent.change(screen.getByRole("textbox", { name: /할 일 제목/ }), {
+    target: { value: "퇴장 중 유지할 제목" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "취소" }));
+  const layer = document.querySelector<HTMLDialogElement>(
+    ".bibbidi-panel-overlay",
+  )!;
+  let finish!: () => void;
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  Object.defineProperty(layer.firstElementChild, "getAnimations", {
+    value: () => [{ finished }],
+  });
+  fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+  expect(layer.dataset.state).toBe("closing");
+  expect(layer.querySelector<HTMLInputElement>("input")?.value).toBe(
+    "퇴장 중 유지할 제목",
+  );
+  expect(
+    screen.queryByRole("dialog", { name: "작성 중인 내용을 닫을까요?" }),
+  ).toBeNull();
+  await act(async () => finish());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});

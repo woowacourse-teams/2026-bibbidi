@@ -1,9 +1,9 @@
-import { useId, useLayoutEffect, useRef } from "react";
+import { useId, useRef } from "react";
 import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../button";
 import type { ButtonProps } from "../button";
-import { canRestoreFocus } from "../../shared/focus/useReturnFocus";
+import { useNativeModalLifecycle } from "../../shared/modal/useNativeModalLifecycle";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
 import "./Dialog.css";
 
@@ -70,68 +70,22 @@ function Root({
   const titleId = useId();
   const descriptionId = useId();
   const backdropPress = useRef(false);
-  const restore = useRef<(() => void) | null>(null);
-  const callbacks = useRef({ onEntered, onExited, initialFocusRef });
-  useLayoutEffect(() => {
-    callbacks.current = { onEntered, onExited, initialFocusRef };
+  useNativeModalLifecycle({
+    open,
+    priority: 2,
+    dialogRef,
+    surfaceRef,
+    portalContainer,
+    initialFocusRef,
+    returnFocusRef,
+    fallbackFocusRef,
+    onEntered,
+    onExited,
+    getInitialFocus: () =>
+      actionsRef.current?.querySelector<HTMLElement>(
+        'button:not(:disabled):not([aria-disabled="true"]), a[href], [tabindex="0"]',
+      ),
   });
-
-  useLayoutEffect(
-    () => () => {
-      restore.current?.();
-      restore.current = null;
-    },
-    [portalContainer],
-  );
-  useLayoutEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    let cancelled = false;
-    const afterAnimation = (callback: () => void) => {
-      const animations = surfaceRef.current?.getAnimations?.() ?? [];
-      Promise.allSettled(
-        animations.map((animation) => animation.finished),
-      ).then(() => {
-        if (!cancelled) callback();
-      });
-    };
-    if (open) {
-      if (!dialog.open) {
-        const previous = returnFocusRef?.current ?? document.activeElement;
-        delete dialog.dataset.state;
-        dialog.showModal();
-        restore.current = () => {
-          dialog.close();
-          queueMicrotask(() => {
-            const target = canRestoreFocus(previous)
-              ? previous
-              : fallbackFocusRef?.current;
-            if (target && canRestoreFocus(target))
-              target.focus({ preventScroll: true });
-          });
-        };
-        const initial =
-          callbacks.current.initialFocusRef?.current ??
-          actionsRef.current?.querySelector<HTMLElement>(
-            'button:not(:disabled):not([aria-disabled="true"]), a[href], [tabindex="0"]',
-          );
-        if (initial && dialog.contains(initial))
-          initial.focus({ preventScroll: true });
-      }
-      dialog.dataset.state = "open";
-      afterAnimation(() => callbacks.current.onEntered?.());
-    } else if (dialog.open) {
-      dialog.dataset.state = "closing";
-      afterAnimation(() => {
-        restore.current?.();
-        restore.current = null;
-        callbacks.current.onExited?.();
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [open, portalContainer, returnFocusRef, fallbackFocusRef]);
 
   function rejectDismiss() {
     const panel = panelRef.current;

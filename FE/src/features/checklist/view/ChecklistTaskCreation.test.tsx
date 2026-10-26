@@ -2,7 +2,10 @@ import { useState } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
+import {
+  useIsMobileLayout,
+  MOBILE_LAYOUT_MEDIA_QUERY,
+} from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
 import {
   ChecklistTaskCreationInput,
@@ -10,6 +13,7 @@ import {
   useChecklistTaskCreation,
 } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
+import { ChecklistForeground } from "./ChecklistForeground";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 
 function chooseCategory(select: HTMLElement, value: string) {
@@ -54,6 +58,7 @@ interface CreationHarnessProps {
 }
 
 function CreationHarness({ onSubmit, submissionState }: CreationHarnessProps) {
+  const mobile = useIsMobileLayout();
   const controller = useChecklistTaskCreation({
     onSubmit,
     submissionState,
@@ -65,10 +70,20 @@ function CreationHarness({ onSubmit, submissionState }: CreationHarnessProps) {
         할 일 추가 열기
       </button>
       {controller.isOpen ? (
-        <ChecklistTaskCreation
-          categories={categories}
-          controller={controller}
-        />
+        <ChecklistForeground
+          modal={mobile}
+          overlay={false}
+          blocked={controller.isDiscardDialogOpen}
+          pending={controller.submissionState.status === "submitting"}
+          titleId="checklist-task-creation-title"
+          onClose={controller.requestClose}
+        >
+          <ChecklistTaskCreation
+            modal={mobile}
+            categories={categories}
+            controller={controller}
+          />
+        </ChecklistForeground>
       ) : null}
     </>
   );
@@ -222,7 +237,6 @@ describe("할 일 추가 폼", () => {
     const panel = openForm();
     const title = within(panel).getByRole("textbox", { name: /할 일 제목/ });
 
-    expect(!panel.hasAttribute("data-mobile")).toBe(true);
     expect(document.activeElement).toBe(title);
     expect(within(panel).getByText("0 / 50")).toBeTruthy();
   });
@@ -238,7 +252,7 @@ describe("할 일 추가 폼", () => {
     act(() => media.setMatches(true));
 
     const page = screen.getByRole("dialog", { name: "할 일 추가" });
-    expect(page.hasAttribute("data-mobile")).toBe(true);
+    expect(page.getAttribute("data-placement")).toBe("fullscreen");
     expect(within(page).getByDisplayValue("청첩장 문구 확인")).toBeTruthy();
     expect(
       within(page).getByRole("combobox", { name: /카테고리/ }).textContent,

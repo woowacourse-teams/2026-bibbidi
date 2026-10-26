@@ -99,7 +99,7 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
     }
 
     setIsOpen(false);
-    triggerButtonRef.current?.focus();
+    if (!isMobile) triggerButtonRef.current?.focus();
   };
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
@@ -138,7 +138,7 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
       setSentiment(null);
       setContent("");
       setIsSnackbarVisible(true);
-      triggerButtonRef.current?.focus();
+      if (!isMobile) triggerButtonRef.current?.focus();
       analytics.track(createFeedbackSubmitEvent());
     } catch {
       if (

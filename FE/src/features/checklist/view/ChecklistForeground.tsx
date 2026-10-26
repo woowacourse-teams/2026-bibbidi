@@ -1,51 +1,69 @@
-import { useRef } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import type { ReactNode } from "react";
-import { useModalEnvironment } from "../../../shared/modal/useModalEnvironment";
+import { PanelOverlay } from "../../../components/panel-overlay";
+import { useExitSnapshot } from "../../../shared/modal/useLayerPresence";
+import { usePageScrollContainer } from "../../../shared/scroll/usePageScrollContainer";
 
+/** Connect the service scroll container and close policy to the shared layer. */
 export function ChecklistForeground({
   children,
+  open = true,
+  onExited,
   modal,
   overlay,
   blocked,
+  pending,
+  titleId,
   onClose,
-  onEscape,
-  restoreFocus = true,
 }: {
   children: ReactNode;
+  open?: boolean;
+  onExited?: () => void;
   modal: boolean;
   overlay: boolean;
   blocked: boolean;
+  pending: boolean;
+  titleId: string;
   onClose: () => void;
-  onEscape?: () => void;
-  restoreFocus?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useModalEnvironment({
-    active: modal,
-    rootRef: ref,
-    blocked,
-    onEscape,
-    inertBackground: true,
-    restoreOnlyOnUnmount: true,
-    restoreFocus,
-  });
+  const { ref, environment } = usePageScrollContainer();
+  const presentation = useMemo(
+    () => ({ modal, overlay, titleId }),
+    [modal, overlay, titleId],
+  );
+  const display = useExitSnapshot(open, presentation) ?? presentation;
+  const content = useExitSnapshot(open, children, !blocked);
+  useLayoutEffect(() => {
+    if (!open && (!display.modal || !environment)) onExited?.();
+  }, [open, display.modal, environment, onExited]);
   return (
     <div
-      className="checklist-workspace__foreground-layer"
-      data-overlay={overlay || undefined}
+      className="checklist-workspace__foreground"
       ref={ref}
+      aria-hidden={(open && blocked) || undefined}
+      inert={(open && blocked) || undefined}
     >
-      {overlay && (
-        <button
-          className="checklist-workspace__scrim"
-          type="button"
-          tabIndex={-1}
-          aria-label="패널 닫기"
-          disabled={blocked}
-          onClick={onClose}
-        />
-      )}
-      <div className="checklist-workspace__panel">{children}</div>
+      {display.modal
+        ? environment && (
+            <PanelOverlay
+              open={open}
+              onExited={onExited}
+              aria-labelledby={display.titleId}
+              placement={display.overlay ? "side" : "fullscreen"}
+              scrollContainer={environment.scrollContainer}
+              closeOnEscape={!blocked && !pending}
+              closeOnDimmerClick={!blocked && !pending}
+              aria-hidden={(open && blocked) || undefined}
+              inert={(open && blocked) || undefined}
+              restoreFocus={!open}
+              onClose={onClose}
+            >
+              {content}
+            </PanelOverlay>
+          )
+        : open
+          ? children
+          : null}
     </div>
   );
 }

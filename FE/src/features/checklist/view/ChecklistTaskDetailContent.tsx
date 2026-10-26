@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Result } from "../../../components/result";
 import { Button } from "../../../components/button";
 import { Checkbox } from "../../../components/checkbox";
 import { IconButton } from "../../../components/icon-button";
@@ -224,9 +225,7 @@ export function ChecklistTaskDetailContent({
           ) : null}
         </div>
         {task.appointments.length === 0 ? (
-          <p className="checklist-detail-content__empty">
-            등록된 일정이 없어요.
-          </p>
+          <Result headingLevel={4} title="등록된 일정이 없어요." />
         ) : (
           <ul className="checklist-detail-content__appointments">
             {task.appointments.map((appointment, index) => (

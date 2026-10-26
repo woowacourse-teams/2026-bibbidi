@@ -28,10 +28,17 @@ export function useBottomSheetDrag({
   onDismiss: () => void;
 }) {
   const [offset, setOffset] = useState(0);
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (enabled !== wasEnabled) {
+    setWasEnabled(enabled);
+    if (enabled) setOffset(0);
+  }
   const gesture = useRef<Gesture | null>(null);
   const dismiss = useRef(onDismiss);
+  const enabledRef = useRef(enabled);
   useLayoutEffect(() => {
     dismiss.current = onDismiss;
+    enabledRef.current = enabled;
   });
 
   function begin(
@@ -113,8 +120,14 @@ export function useBottomSheetDrag({
       panel.releasePointerCapture(id);
     const threshold =
       current.height > 0 ? Math.min(96, current.height * 0.2) : 96;
-    if (!cancelled && current.active && current.offset >= threshold)
+    if (!cancelled && current.active && current.offset >= threshold) {
       dismiss.current();
+      // A controlled owner can decline the close request. Restore the drag then.
+      queueMicrotask(() => {
+        if (enabledRef.current) setOffset(0);
+      });
+      return;
+    }
     setOffset(0);
   }
 
@@ -170,7 +183,6 @@ export function useBottomSheetDrag({
       panel.removeEventListener("touchend", end, true);
       panel.removeEventListener("touchcancel", end, true);
       gesture.current = null;
-      setOffset(0);
     };
     // The listeners share the current policy only when these options change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

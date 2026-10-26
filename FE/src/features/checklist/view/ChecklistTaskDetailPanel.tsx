@@ -1,3 +1,4 @@
+import { Panel } from "../../../components/panel";
 import { IconButton } from "../../../components/icon-button";
 import { CloseIcon } from "../../../components/icons/ActionIcons";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
@@ -33,31 +34,42 @@ export function ChecklistTaskDetailPanel({
 }: ChecklistTaskDetailPanelProps) {
   const titleId = `${task.id}-detail-title`;
 
+  const Container = modal ? "div" : "aside";
   return (
-    <aside
-      role={modal ? "dialog" : "complementary"}
-      aria-modal={modal ? true : undefined}
+    <Container
       aria-labelledby={titleId}
       className="checklist-detail-panel"
       id="checklist-task-detail-panel"
     >
-      <header className="checklist-detail-panel__header">
-        <ChecklistTaskHeader editing={editing} task={task} titleId={titleId} />
-        <IconButton
-          aria-label="할 일 상세 닫기"
-          icon={<CloseIcon />}
-          onClick={onClose}
+      <Panel
+        header={
+          <Panel.Header
+            heading={
+              <ChecklistTaskHeader
+                editing={editing}
+                task={task}
+                titleId={titleId}
+              />
+            }
+            actions={
+              <IconButton
+                aria-label="할 일 상세 닫기"
+                icon={<CloseIcon />}
+                onClick={onClose}
+              />
+            }
+          />
+        }
+      >
+        <ChecklistTaskDetailContent
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={categoryTitle}
+          editing={editing}
+          onRequestScheduleCreation={onRequestScheduleCreation}
+          task={task}
         />
-      </header>
-
-      <ChecklistTaskDetailContent
-        appointmentManagement={appointmentManagement}
-        categories={categories}
-        categoryTitle={categoryTitle}
-        editing={editing}
-        onRequestScheduleCreation={onRequestScheduleCreation}
-        task={task}
-      />
-    </aside>
+      </Panel>
+    </Container>
   );
 }

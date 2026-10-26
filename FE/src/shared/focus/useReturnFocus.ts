@@ -1,16 +1,6 @@
+import { canFocus } from "./canFocus";
 import { useEffect } from "react";
 import type { RefObject } from "react";
-
-export function canRestoreFocus(
-  element: Element | null,
-): element is HTMLElement {
-  return (
-    element instanceof HTMLElement &&
-    element.isConnected &&
-    !element.matches(":disabled") &&
-    !element.closest("[hidden], [inert]")
-  );
-}
 
 /** A layer owns focus restoration for its whole lifetime, including layout changes. */
 export function useReturnFocus(
@@ -33,9 +23,8 @@ export function useReturnFocus(
           !root.contains(active)
         )
           return;
-        const target = canRestoreFocus(previous) ? previous : fallback;
-        if (target && canRestoreFocus(target))
-          target.focus({ preventScroll: true });
+        const target = canFocus(previous) ? previous : fallback;
+        if (target && canFocus(target)) target.focus({ preventScroll: true });
       });
     };
   }, [rootRef, returnFocusRef, fallbackFocusRef]);

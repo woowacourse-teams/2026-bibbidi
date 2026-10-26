@@ -216,3 +216,44 @@ it.each([false, true])(
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   },
 );
+
+it.each(["date", "time"] as const)(
+  "모바일 %s 선택기는 퇴장 완료까지 본문을 유지한다",
+  async (kind) => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    const onChange = vi.fn();
+    render(
+      <Harness
+        kind={kind}
+        initial={kind === "date" ? "2026-10-26" : "09:13"}
+        onChange={onChange}
+      />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: kind === "date" ? "날짜 2026-10-26" : "시작 시간 09:13",
+    });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const layer = screen.getByRole("dialog");
+    const picker =
+      kind === "date"
+        ? within(layer).getByRole("grid")
+        : within(layer).getByRole("listbox", { name: "분" });
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    Object.defineProperty(layer.firstElementChild, "getAnimations", {
+      value: () => [{ finished }],
+    });
+    fireEvent.keyDown(layer, { key: "Escape" });
+    expect(layer.dataset.state).toBe("closing");
+    expect(layer.contains(picker)).toBe(true);
+    expect(picker.isConnected).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    await act(async () => finish());
+    expect(picker.isConnected).toBe(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  },
+);

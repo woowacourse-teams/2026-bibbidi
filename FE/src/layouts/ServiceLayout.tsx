@@ -46,7 +46,7 @@ export function ServiceLayout() {
       headerPosition="sticky"
       headerTone="fade"
       header={
-        <div className="service-layout__header" data-modal-background>
+        <div className="service-layout__header">
           <AppHeader
             user={
               authState.status === "authenticated"
@@ -75,7 +75,7 @@ export function ServiceLayout() {
         <Outlet />
       </div>
 
-      <div className="service-layout__mobile-dock" data-modal-background>
+      <div className="service-layout__mobile-dock">
         <AppBottomNavigation />
         <FeedbackFeature />
       </div>

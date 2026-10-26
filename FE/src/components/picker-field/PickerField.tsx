@@ -46,13 +46,24 @@ export function PickerField(props: PickerFieldProps) {
   const id = providedId ?? generatedId;
   const mobile = useIsMobileLayout();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const [draft, setDraft] = useState<string | null>(null);
-  const open = draft !== null && !disabled;
-  if (disabled && draft !== null) setDraft(null);
-
+  const [selection, setSelection] = useState<{
+    open: boolean;
+    draft: string | null;
+  }>({ open: false, draft: null });
+  const { draft } = selection;
+  const setDraft = (next: string) =>
+    setSelection((current) => ({ ...current, draft: next }));
+  const open = selection.open && !disabled;
+  if (disabled && selection.open) setSelection({ ...selection, open: false });
   function changeOpen(next: boolean) {
-    if (next) setDraft(value || (kind === "date" ? localToday() : "00:00"));
-    else setDraft(null);
+    setSelection((current) =>
+      next
+        ? {
+            open: true,
+            draft: value || (kind === "date" ? localToday() : "00:00"),
+          }
+        : { open: false, draft: mobile ? current.draft : null },
+    );
   }
   function confirm() {
     if (draft === null) return;
@@ -82,7 +93,7 @@ export function PickerField(props: PickerFieldProps) {
       onBlur={onBlur}
     />
   );
-  const picker = open && (
+  const picker = draft !== null && (
     <>
       {kind === "date" ? (
         <DatePicker
@@ -137,7 +148,12 @@ export function PickerField(props: PickerFieldProps) {
           id={`${id}-sheet`}
           open={open}
           onClose={() => changeOpen(false)}
-          onExited={() => triggerRef.current?.focus({ preventScroll: true })}
+          onExited={() => {
+            setSelection((current) =>
+              current.open ? current : { open: false, draft: null },
+            );
+          }}
+          returnFocusRef={triggerRef}
           header={<BottomSheet.Header>{label} 선택</BottomSheet.Header>}
           cta={actions}
         >

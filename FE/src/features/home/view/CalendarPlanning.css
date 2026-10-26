@@ -362,13 +362,3 @@
   height: min(720px, 85dvh);
   border: 0;
 }
-
-.calendar-planning .checklist-dialog__actions .calendar-planning__login-action {
-  display: grid;
-  min-height: 48px;
-  border-radius: 10px;
-  background: var(--color-bg-brand-solid);
-  color: var(--color-fg-on-brand);
-  font-weight: 700;
-  place-items: center;
-}

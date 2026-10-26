@@ -1,4 +1,4 @@
-import type { ComponentPropsWithRef, MouseEvent } from "react";
+import type { ComponentPropsWithRef, MouseEvent, ReactNode } from "react";
 import "./Button.css";
 
 export type ButtonSize = "small" | "medium" | "large" | "xlarge";
@@ -16,7 +16,7 @@ export type ButtonProps = Omit<ComponentPropsWithRef<"button">, "color"> & {
   loading?: boolean;
 };
 
-export function Button({
+function Root({
   size = "xlarge",
   color = "primary",
   variant = "fill",
@@ -58,6 +58,20 @@ export function Button({
       aria-busy={loading || ariaBusy}
       onClick={handleClick}
     >
+      <ButtonContent loading={loading}>{children}</ButtonContent>
+    </button>
+  );
+}
+
+function ButtonContent({
+  children,
+  loading = false,
+}: {
+  children: ReactNode;
+  loading?: boolean;
+}) {
+  return (
+    <>
       <span className="bibbidi-button-label">{children}</span>
       {loading && (
         <span className="bibbidi-button-loader" aria-hidden="true">
@@ -66,6 +80,31 @@ export function Button({
           <span />
         </span>
       )}
-    </button>
+    </>
   );
 }
+export type ButtonLinkProps = Omit<ComponentPropsWithRef<"a">, "color"> &
+  Pick<ButtonProps, "size" | "color" | "variant" | "display">;
+function Link({
+  size = "xlarge",
+  color = "primary",
+  variant = "fill",
+  display = "inline",
+  className,
+  children,
+  ...props
+}: ButtonLinkProps) {
+  return (
+    <a
+      {...props}
+      className={["bibbidi-button", className].filter(Boolean).join(" ")}
+      data-size={size}
+      data-color={color}
+      data-variant={variant}
+      data-display={display}
+    >
+      <ButtonContent>{children}</ButtonContent>
+    </a>
+  );
+}
+export const Button = Object.assign(Root, { Link });
