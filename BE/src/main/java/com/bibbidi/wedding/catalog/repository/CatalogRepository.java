@@ -6,6 +6,7 @@ import com.bibbidi.wedding.catalog.persistence.JpaCategoryRepository;
 import com.bibbidi.wedding.catalog.persistence.JpaStepRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemSnapshot;
+import com.bibbidi.wedding.catalog.service.dto.CategoryNameSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Collection;
@@ -58,5 +59,12 @@ public class CatalogRepository {
             return List.of();
         }
         return jpaCatalogItemRepository.findSnapshotsByIdIn(itemIds);
+    }
+
+    public List<CategoryNameSnapshot> findCategoryNames(Collection<Long> categoryIds) {
+        if (categoryIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaCategoryRepository.findNamesByIdIn(categoryIds);
     }
 }
