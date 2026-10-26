@@ -2,6 +2,38 @@ import { IconBase, type IconProps } from "./IconBase";
 
 type ActionIconProps = IconProps;
 
+export function MoreHorizontalIcon(props: ActionIconProps) {
+  return (
+    <IconBase
+      fill="currentColor"
+      stroke="none"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      <circle cx="5" cy="12" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="19" cy="12" r="1.7" />
+    </IconBase>
+  );
+}
+
+export function MoreVerticalIcon(props: ActionIconProps) {
+  return (
+    <IconBase
+      fill="currentColor"
+      stroke="none"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </IconBase>
+  );
+}
+
 export function HamburgerIcon(props: ActionIconProps) {
   return (
     <IconBase strokeWidth={1.8} aria-hidden="true" focusable="false" {...props}>

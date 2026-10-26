@@ -9,9 +9,3 @@
 .checklist-task-header h2 {
   min-width: 0;
 }
-
-@media (width < 768px) {
-  .checklist-task-header {
-    justify-content: center;
-  }
-}

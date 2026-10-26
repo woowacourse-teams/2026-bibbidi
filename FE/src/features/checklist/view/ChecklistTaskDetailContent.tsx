@@ -1,6 +1,7 @@
 import { Button } from "../../../components/button";
 import { Checkbox } from "../../../components/checkbox";
 import { IconButton } from "../../../components/icon-button";
+import { MoreVerticalIcon } from "../../../components/icons/ActionIcons";
 import { Menu } from "../../../components/menu";
 
 import {
@@ -112,17 +113,7 @@ function ChecklistAppointment({
             }}
             trigger={
               <IconButton
-                icon={
-                  <svg
-                    aria-hidden="true"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="12" cy="5" r="1.6" />
-                    <circle cx="12" cy="12" r="1.6" />
-                    <circle cx="12" cy="19" r="1.6" />
-                  </svg>
-                }
+                icon={<MoreVerticalIcon />}
                 iconSize={20}
                 aria-label={`${appointment.title} 일정 더보기`}
                 disabled={isOperationPending}

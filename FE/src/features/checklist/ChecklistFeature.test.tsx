@@ -259,13 +259,11 @@ function getCurrentUrl() {
   return screen.getByTestId("current-url").textContent;
 }
 
-function closeMobileTaskDetail(dialog: HTMLElement) {
-  fireEvent.click(
-    document.querySelector(
-      ".checklist-detail-bottom-sheet__scrim",
-    ) as HTMLButtonElement,
-  );
-  fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+async function closeMobileTaskDetail(dialog: HTMLElement) {
+  await act(async () => {
+    fireEvent.pointerDown(dialog);
+    fireEvent.pointerUp(dialog);
+  });
 }
 
 beforeEach(() => {
@@ -1598,18 +1596,19 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
+    let finishAnimation!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finishAnimation = resolve;
+    });
+    Object.defineProperty(detailSheet.firstElementChild, "getAnimations", {
+      value: () => [{ finished }],
+    });
+    fireEvent.pointerDown(detailSheet);
+    fireEvent.pointerUp(detailSheet);
 
     expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
-    expect(
-      detailSheet.closest(".checklist-detail-bottom-sheet")?.className,
-    ).toContain("bottom-sheet-dismiss--closing");
-
-    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
+    expect(detailSheet.dataset.state).toBe("closing");
+    await act(async () => finishAnimation());
 
     expect(getCurrentUrl()).toBe("/checklist");
 
@@ -1628,7 +1627,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailPage = await screen.findByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
-    closeMobileTaskDetail(detailPage);
+    await closeMobileTaskDetail(detailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(
@@ -1667,7 +1666,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       name: "할 일 상세",
     });
     expect(within(errorDetailPage).getByRole("alert")).toBeTruthy();
-    closeMobileTaskDetail(errorDetailPage);
+    await closeMobileTaskDetail(errorDetailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(screen.queryByRole("dialog", { name: "할 일 상세" })).toBeNull();
@@ -1837,7 +1836,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
-    closeMobileTaskDetail(detailSheet);
+    await closeMobileTaskDetail(detailSheet);
 
     expect(getCurrentUrl()).toBe("/calendar");
   });

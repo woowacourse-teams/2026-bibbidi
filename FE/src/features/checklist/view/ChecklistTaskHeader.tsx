@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { IconButton } from "../../../components/icon-button";
+import { MoreHorizontalIcon } from "../../../components/icons/ActionIcons";
 import { Menu } from "../../../components/menu";
 import type { ChecklistItemEditingController } from "../model/checklistEditing";
 import type { ChecklistTaskViewModel } from "../view-model/createChecklistViewModel";
@@ -23,22 +25,14 @@ interface ChecklistTaskHeaderProps {
     "canEditTitle" | "canDelete" | "checklistItemId" | "id" | "title"
   >;
   titleId: string;
-}
-
-function MoreIcon() {
-  return (
-    <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
-      <circle cx="5" cy="12" r="1.7" />
-      <circle cx="12" cy="12" r="1.7" />
-      <circle cx="19" cy="12" r="1.7" />
-    </svg>
-  );
+  heading?: ReactNode;
 }
 
 export function ChecklistTaskHeader({
   editing,
   task,
   titleId,
+  heading,
 }: ChecklistTaskHeaderProps) {
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreMenuFocus = useRef(false);
@@ -89,7 +83,7 @@ export function ChecklistTaskHeader({
   }
 
   if (itemId === null || !editing || (!canEditTitle && !canDelete)) {
-    return <h2 id={titleId}>{task.title}</h2>;
+    return heading ?? <h2 id={titleId}>{task.title}</h2>;
   }
 
   return (
@@ -99,7 +93,7 @@ export function ChecklistTaskHeader({
         width={160}
         trigger={
           <IconButton
-            icon={<MoreIcon />}
+            icon={<MoreHorizontalIcon />}
             iconSize={20}
             aria-label="할 일 더보기"
             disabled={isSaving}
@@ -126,7 +120,7 @@ export function ChecklistTaskHeader({
           </Menu.Item>
         )}
       </Menu>
-      <h2 id={titleId}>{task.title}</h2>
+      {heading ?? <h2 id={titleId}>{task.title}</h2>}
     </div>
   );
 }

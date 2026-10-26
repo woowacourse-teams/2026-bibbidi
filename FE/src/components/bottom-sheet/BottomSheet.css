@@ -192,7 +192,10 @@
   animation: bibbidi-bottom-sheet-dim-out 240ms ease-in both;
 }
 @media (prefers-reduced-motion: reduce) {
+  .bibbidi-bottom-sheet[open][data-animation][data-state]
+    .bibbidi-bottom-sheet-panel,
   .bibbidi-bottom-sheet[open][data-state] .bibbidi-bottom-sheet-panel,
+  .bibbidi-bottom-sheet[open][data-animation][data-state]::backdrop,
   .bibbidi-bottom-sheet[open][data-state]::backdrop {
     animation: none;
     transition: none;
