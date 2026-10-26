@@ -27,7 +27,10 @@
 }
 
 .checklist__group-trigger {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    auto minmax(0, 1fr) var(--checklist-group-summary-width)
+    20px;
   box-sizing: border-box;
   width: 100%;
   min-height: 80px;
@@ -59,14 +62,14 @@
 }
 
 .checklist__group-title {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
-  margin-inline-end: calc(var(--checklist-group-summary-width) + 12px);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
 
 .checklist__group-chevron {
+  grid-column: 4;
   width: 20px;
   height: 20px;
   flex: none;
