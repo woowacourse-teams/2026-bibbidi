@@ -60,6 +60,7 @@ public class AiChatConfig {
     @Bean
     public ChatModelRouter chatModelRouter(
             @Qualifier("aiChatClient") ChatClient bedrockClient,
+            @Qualifier("qwenChatClient") ObjectProvider<ChatClient> qwenClient,
             @Qualifier("lunaChatClient") ObjectProvider<ChatClient> lunaClient,
             AiChatProperties properties,
             @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel
@@ -73,7 +74,7 @@ public class AiChatConfig {
         }
 
         String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
-        ChatModelRoute qwen = new ChatModelRoute(bedrockClient, properties.qwenModel(),
+        ChatModelRoute qwen = new ChatModelRoute(qwenClient.getIfAvailable(() -> bedrockClient), properties.qwenModel(),
                 () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
         ChatModelRoute sol = new ChatModelRoute(bedrockClient, properties.solModel(),
                 () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)

@@ -11,7 +11,7 @@ spring:
       chat: bedrock-converse
     bedrock:
       aws:
-        region: ap-northeast-1
+        region: ${BIBBIDI_CHAT_SOL_REGION:ap-northeast-1}
         timeout: ${bibbidi.sse.response-timeout-seconds}s
         connection-timeout: 5s
         connection-acquisition-timeout: 5s
@@ -37,8 +37,12 @@ bibbidi:
     response-timeout-seconds: 60
   ai:
     chatbot:
+      accounts-enabled: ${BIBBIDI_CHAT_ACCOUNTS_ENABLED:false}
       memory-max-messages: 20
       conversation-idle-timeout: 1h
+      qwen-access-key: ${BIBBIDI_CHAT_QWEN_ACCESS_KEY_ID:}
+      qwen-secret-key: ${BIBBIDI_CHAT_QWEN_SECRET_ACCESS_KEY:}
+      qwen-region: ${BIBBIDI_CHAT_QWEN_REGION:ap-northeast-1}
       qwen-model: ${BIBBIDI_CHAT_QWEN_MODEL:qwen.qwen3-235b-a22b-2507-v1:0}
       sol-model: ${BIBBIDI_CHAT_SOL_MODEL:global.openai.gpt-6.1-sol}
       luna-model: ${BIBBIDI_CHAT_LUNA_MODEL:gpt-6-luna}
