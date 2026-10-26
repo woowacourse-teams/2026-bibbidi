@@ -3,6 +3,34 @@ import { describe, expect, it } from "vitest";
 import { TextField } from "./TextField";
 
 describe("TextField의 접근성 설명", () => {
+  it("입력과 선택 버튼의 숨긴 라벨은 값이 있어도 숨김 상태와 접근성 이름을 유지한다", () => {
+    const view = render(
+      <TextField
+        label="할 일 제목"
+        labelHidden
+        value="방문 일정"
+        onChange={() => {}}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "할 일 제목" });
+    expect(document.querySelector("label")?.hasAttribute("data-hidden")).toBe(
+      true,
+    );
+    expect(input.hasAttribute("labelHidden")).toBe(false);
+    view.rerender(
+      <TextField.Button label="날짜" labelHidden value="10월 26일" />,
+    );
+    const button = screen.getByRole("button", { name: "날짜 10월 26일" });
+    expect(document.querySelector("label")?.hasAttribute("data-hidden")).toBe(
+      true,
+    );
+    expect(button.hasAttribute("labelHidden")).toBe(false);
+    view.rerender(<TextField.Button label="날짜" value="10월 26일" />);
+    expect(document.querySelector("label")?.hasAttribute("data-hidden")).toBe(
+      false,
+    );
+  });
+
   it("선택 버튼의 필수 안내·외부 설명·오류 메시지를 함께 연결한다", () => {
     render(
       <>
