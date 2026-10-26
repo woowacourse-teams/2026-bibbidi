@@ -28,29 +28,19 @@ interface ChecklistTaskDetailContentProps {
 
 function ChecklistPropertyRow({
   label,
-  labelId,
   first = false,
   children,
 }: {
   label: string;
-  labelId: string;
   first?: boolean;
   children: ReactNode;
 }) {
   return (
-    <ListRow
+    <ListRow.Description
       border={first ? "none" : "indented"}
-      left={
-        <span role="term" id={labelId}>
-          {label}
-        </span>
-      }
-      contents={
-        <span
-          role="definition"
-          aria-labelledby={labelId}
-          className="checklist-detail-content__property-value"
-        >
+      term={label}
+      description={
+        <span className="checklist-detail-content__property-value">
           {children}
         </span>
       }
@@ -197,12 +187,8 @@ export function ChecklistTaskDetailContent({
     <div className="checklist-detail-content">
       <section aria-labelledby={`${task.id}-information-title`}>
         <h3 id={`${task.id}-information-title`}>할 일 정보</h3>
-        <div className="checklist-detail-content__properties">
-          <ChecklistPropertyRow
-            label="카테고리"
-            labelId={`${task.id}-category-label`}
-            first
-          >
+        <dl className="checklist-detail-content__properties">
+          <ChecklistPropertyRow label="카테고리" first>
             <ChecklistTaskCategoryEditor
               categories={categories}
               categoryTitle={categoryTitle}
@@ -210,13 +196,10 @@ export function ChecklistTaskDetailContent({
               task={task}
             />
           </ChecklistPropertyRow>
-          <ChecklistPropertyRow
-            label="상태"
-            labelId={`${task.id}-status-label`}
-          >
+          <ChecklistPropertyRow label="상태">
             <ChecklistTaskStatusEditor editing={editing} task={task} />
           </ChecklistPropertyRow>
-        </div>
+        </dl>
       </section>
 
       <section aria-labelledby={`${task.id}-appointments-title`}>

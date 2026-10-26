@@ -789,6 +789,43 @@ describe("Checklist 웹 상세 패널", () => {
     expect(within(pending).queryByRole("checkbox")).toBeNull();
   });
 
+  it.each([false, true])(
+    "상세 정보의 카테고리·상태와 선택기를 네이티브 정의 목록으로 표시한다 (모바일=%s)",
+    (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(<EditableChecklistHarness />);
+
+      const detail = screen.getByRole(mobile ? "dialog" : "complementary", {
+        name: "청첩장 문구 정하기",
+      });
+      const list = detail.querySelector("dl");
+      expect(list).not.toBeNull();
+      const rows = Array.from(list!.children);
+      expect(rows).toHaveLength(2);
+      rows.forEach((row) => {
+        expect(row.tagName).toBe("DIV");
+        expect(Array.from(row.children).map((child) => child.tagName)).toEqual([
+          "DT",
+          "DD",
+        ]);
+      });
+      expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual([
+        "카테고리",
+        "상태",
+      ]);
+      expect(
+        within(rows[0].lastElementChild as HTMLElement).getByRole("combobox", {
+          name: "카테고리 변경, 현재 예식 준비",
+        }),
+      ).toBeTruthy();
+      expect(
+        within(rows[1].lastElementChild as HTMLElement).getByRole("combobox", {
+          name: "상태 변경, 현재 예정",
+        }),
+      ).toBeTruthy();
+    },
+  );
+
   it("선택한 할 일의 API 기반 상세 정보와 전체 일정을 서버 순서로 표시한다", () => {
     render(<ChecklistHarness />);
 
