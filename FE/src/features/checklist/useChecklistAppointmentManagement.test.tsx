@@ -2,24 +2,17 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppointmentManagementError } from "./model/appointmentManagement";
+import { ChecklistAppointmentEditingInput } from "./model/appointmentForm";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
 import { useChecklistAppointmentManagement } from "./useChecklistAppointmentManagement";
-import { ChecklistAppointmentViewModel } from "./view-model/createChecklistViewModel";
 
-const appointment: ChecklistAppointmentViewModel = {
+const appointment: ChecklistAppointmentEditingInput = {
   date: "2026-09-20",
-  dateLabel: "9월 20일",
-  dayLabel: "20일",
   endTime: "2026-09-20T11:30:00",
   id: 11,
-  isDone: false,
   memo: "견적 확인",
-  memoLabel: "견적 확인",
-  monthLabel: "9월",
   place: "웨딩홀",
-  placeLabel: "웨딩홀",
   startTime: "2026-09-20T10:00:00",
-  timeLabel: "오전 10시–오전 11시 30분",
   title: "웨딩홀 상담",
 };
 

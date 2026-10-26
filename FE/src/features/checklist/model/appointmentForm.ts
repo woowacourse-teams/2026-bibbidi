@@ -1,4 +1,11 @@
+import type { MyChecklistAppointmentModel } from "./myChecklist";
+
 export const CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH = 255;
+
+export type ChecklistAppointmentEditingInput = Pick<
+  MyChecklistAppointmentModel,
+  "id" | "date" | "startTime" | "endTime" | "title" | "place" | "memo"
+>;
 
 export interface ChecklistAppointmentFormDraft {
   date: string;

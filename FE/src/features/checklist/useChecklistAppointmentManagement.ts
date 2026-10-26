@@ -7,17 +7,15 @@ import {
 import { ChecklistAudience } from "./model/checklistQuery";
 import {
   ChecklistAppointmentFormController,
+  ChecklistAppointmentEditingInput,
   ChecklistAppointmentDiscardController,
   ChecklistAppointmentFormDraft,
-  ChecklistAppointmentFormErrors,
-  ChecklistAppointmentFormField,
   emptyAppointmentDraft,
   getFirstAppointmentErrorField,
   toLocalDateTime,
   toOptionalAppointmentText,
   toTimeInputValue,
   validateAppointmentDraft,
-  validateAppointmentEndTime,
 } from "./model/appointmentForm";
 import { AppointmentManagementError } from "./model/appointmentManagement";
 import {
@@ -25,7 +23,7 @@ import {
   MyChecklistRequestAbortedError,
 } from "./repository/myChecklistQueryRepository";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
-import { ChecklistAppointmentViewModel } from "./view-model/createChecklistViewModel";
+import { useAppointmentDraft } from "./useAppointmentDraft";
 
 type AppointmentOperation = "completion" | "delete" | "update";
 
@@ -65,7 +63,7 @@ export interface ChecklistAppointmentManagementController {
   openMenuAppointmentId: number | null;
   operationFeedback: AppointmentOperationFeedback;
   requestDelete: (appointmentId: number) => void;
-  startEditing: (appointment: ChecklistAppointmentViewModel) => void;
+  startEditing: (appointment: ChecklistAppointmentEditingInput) => void;
   toggleMenu: (appointmentId: number) => void;
 }
 
@@ -79,7 +77,7 @@ interface UseChecklistAppointmentManagementOptions {
 }
 
 function createDraft(
-  appointment: ChecklistAppointmentViewModel,
+  appointment: ChecklistAppointmentEditingInput,
 ): ChecklistAppointmentFormDraft {
   return {
     date: appointment.date,
@@ -124,10 +122,10 @@ export function useChecklistAppointmentManagement({
   const [editingAppointmentId, setEditingAppointmentId] = useState<
     number | null
   >(null);
-  const [draft, setDraft] = useState(emptyAppointmentDraft);
+  const { draft, errors, setDraft, setErrors, ...draftFields } =
+    useAppointmentDraft();
   const [initialDraft, setInitialDraft] = useState(emptyAppointmentDraft);
   const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
-  const [errors, setErrors] = useState<ChecklistAppointmentFormErrors>({});
   const [deletionConfirmation, setDeletionConfirmation] =
     useState<AppointmentDeletionConfirmation | null>(null);
   const [operationFeedback, setOperationFeedback] =
@@ -137,19 +135,6 @@ export function useChecklistAppointmentManagement({
   const contextKey = `${audience ?? "unknown"}:${sessionIdentity ?? "unknown"}:${checklistItemId ?? "none"}`;
   const [activeContextKey, setActiveContextKey] = useState(contextKey);
   const isCurrentContext = contextKey === activeContextKey;
-
-  const reset = () => {
-    setDiscardDialogOpen(false);
-    requestControllerRef.current?.abort();
-    requestControllerRef.current = null;
-    inFlightRef.current = false;
-    setOpenMenuAppointmentId(null);
-    setEditingAppointmentId(null);
-    setDraft(emptyAppointmentDraft);
-    setErrors({});
-    setDeletionConfirmation(null);
-    setOperationFeedback({ status: "idle" });
-  };
 
   useEffect(
     () => () => {
@@ -172,29 +157,23 @@ export function useChecklistAppointmentManagement({
       if (!isActive) {
         return;
       }
-      reset();
+      setDiscardDialogOpen(false);
+      requestControllerRef.current?.abort();
+      requestControllerRef.current = null;
+      inFlightRef.current = false;
+      setOpenMenuAppointmentId(null);
+      setEditingAppointmentId(null);
+      setDraft(emptyAppointmentDraft);
+      setErrors({});
+      setDeletionConfirmation(null);
+      setOperationFeedback({ status: "idle" });
       setActiveContextKey(contextKey);
     });
 
     return () => {
       isActive = false;
     };
-  }, [activeContextKey, contextKey]);
-
-  const replaceError = (
-    field: ChecklistAppointmentFormField,
-    message?: string,
-  ) => {
-    setErrors((current) => {
-      const next = { ...current };
-      if (message) {
-        next[field] = message;
-      } else {
-        delete next[field];
-      }
-      return next;
-    });
-  };
+  }, [activeContextKey, contextKey, setDraft, setErrors]);
 
   const run = async (
     appointmentId: number,
@@ -338,58 +317,7 @@ export function useChecklistAppointmentManagement({
       confirmDiscard: () => {
         if (!inFlightRef.current) closeEditing();
       },
-      changeDate: (date) => {
-        setDraft((current) => ({ ...current, date }));
-        if (errors.date) {
-          replaceError(
-            "date",
-            validateAppointmentDraft({ ...draft, date }).date,
-          );
-        }
-      },
-      changeEndTime: (endTime) => {
-        setDraft((current) => ({ ...current, endTime }));
-        if (errors.endTime) {
-          replaceError(
-            "endTime",
-            validateAppointmentEndTime(draft.startTime, endTime),
-          );
-        }
-      },
-      changeMemo: (memo) => setDraft((current) => ({ ...current, memo })),
-      changePlace: (place) => {
-        setDraft((current) => ({ ...current, place }));
-        if (errors.place) {
-          replaceError(
-            "place",
-            validateAppointmentDraft({ ...draft, place }).place,
-          );
-        }
-      },
-      changeStartTime: (startTime) => {
-        setDraft((current) => ({ ...current, startTime }));
-        if (errors.startTime) {
-          replaceError(
-            "startTime",
-            validateAppointmentDraft({ ...draft, startTime }).startTime,
-          );
-        }
-        if (errors.endTime) {
-          replaceError(
-            "endTime",
-            validateAppointmentEndTime(startTime, draft.endTime),
-          );
-        }
-      },
-      changeTitle: (title) => {
-        setDraft((current) => ({ ...current, title }));
-        if (errors.title) {
-          replaceError(
-            "title",
-            validateAppointmentDraft({ ...draft, title }).title,
-          );
-        }
-      },
+      ...draftFields,
       draft,
       errors,
       isOpen: isCurrentContext && editingAppointmentId !== null,
@@ -433,22 +361,6 @@ export function useChecklistAppointmentManagement({
         }
         return null;
       },
-      touchDate: () =>
-        replaceError("date", validateAppointmentDraft(draft).date),
-      touchEndTime: () =>
-        replaceError(
-          "endTime",
-          validateAppointmentEndTime(draft.startTime, draft.endTime),
-        ),
-      touchPlace: () =>
-        replaceError("place", validateAppointmentDraft(draft).place),
-      touchStartTime: () => {
-        const nextErrors = validateAppointmentDraft(draft);
-        replaceError("startTime", nextErrors.startTime);
-        replaceError("endTime", nextErrors.endTime);
-      },
-      touchTitle: () =>
-        replaceError("title", validateAppointmentDraft(draft).title),
     },
     editingAppointmentId: isCurrentContext ? editingAppointmentId : null,
     openMenuAppointmentId: isCurrentContext ? openMenuAppointmentId : null,
