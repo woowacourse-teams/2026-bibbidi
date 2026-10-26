@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
+import com.openai.errors.OpenAIRetryableException;
+import com.openai.errors.RateLimitException;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
@@ -30,6 +32,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.ai.retry.TransientAiException;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.test.publisher.TestPublisher;
@@ -59,7 +63,7 @@ class SpringAiConversationAdapterTest {
                 .maxMessages(18)
                 .build();
         springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
-                chatMemory), new JacksonChatAnswerParser(MAPPER), mock(ModelClassifier.class), "qwen");
+                chatMemory), new JacksonChatAnswerParser(MAPPER), chatMemory, mock(ModelClassifier.class), "qwen");
     }
 
     @Test
@@ -153,15 +157,59 @@ class SpringAiConversationAdapterTest {
     }
 
     @Test
-    @DisplayName("한도 초과가 아닌 모델 실패는 그대로 전달한다")
-    void keepsOtherModelFailures() {
+    @DisplayName("알 수 없는 모델 실패는 내부 오류 코드로 변환한다")
+    void convertsOtherModelFailuresToInternalError() {
         // given
         IllegalStateException failure = new IllegalStateException("모델 오류");
         respondWith(Flux.error(failure));
 
         // when, then
         assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
-                .isSameAs(failure);
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
+    }
+
+    @Test
+    @DisplayName("Spring AI의 일시 오류는 내부 오류 코드로 변환한다")
+    void convertsTransientAiFailureToInternalError() {
+        respondWith(Flux.error(new TransientAiException("provider response")));
+
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
+    }
+
+    @Test
+    @DisplayName("OpenAI 호출 한도 초과는 서비스 불가 코드로 변환한다")
+    void convertsOpenAiRateLimitToCapacityExceeded() {
+        respondWith(Flux.error(new IllegalStateException("wrapped", mock(RateLimitException.class))));
+
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.clientError()).isEqualTo(ClientError.AI_CAPACITY_EXCEEDED));
+    }
+
+    @Test
+    @DisplayName("OpenAI의 재시도 가능 오류는 내부 오류 코드로 변환한다")
+    void convertsOpenAiRetryableFailureToInternalError() {
+        respondWith(Flux.error(new OpenAIRetryableException("provider response")));
+
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
+    }
+
+    @Test
+    @DisplayName("Spring AI의 비일시 오류는 내부 오류 코드로 변환하고 원문을 숨긴다")
+    void convertsNonTransientAiFailureToInternalError() {
+        respondWith(Flux.error(new NonTransientAiException("401 - Incorrect API key provided: secret")));
+
+        assertThatThrownBy(() -> springAiConversationAdapter.stream(USER_ID, CONVERSATION, "질문").blockLast())
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR);
+                    assertThat(exception.getMessage()).doesNotContain("secret");
+                    assertThat(exception.getCause()).isNull();
+                });
     }
 
     @Test
