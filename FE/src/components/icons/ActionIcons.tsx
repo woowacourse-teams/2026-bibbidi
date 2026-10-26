@@ -2,6 +2,14 @@ import { IconBase, type IconProps } from "./IconBase";
 
 type ActionIconProps = IconProps;
 
+export function PlusIcon(props: ActionIconProps) {
+  return (
+    <IconBase aria-hidden="true" focusable="false" {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </IconBase>
+  );
+}
+
 export function MoreHorizontalIcon(props: ActionIconProps) {
   return (
     <IconBase
