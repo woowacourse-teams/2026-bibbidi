@@ -22,7 +22,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("!test & !evaluator")
+@Profile("!test & !evaluator & !loadtest")
 @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
 public class BedrockAccountConfig {
 

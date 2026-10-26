@@ -92,7 +92,7 @@ public class AiChatConfig {
     }
 
     @Bean
-    @Profile("!test & !evaluator")
+    @Profile("!test & !evaluator & !loadtest")
     ChatClient lunaChatClient(
             @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
             @Value("${bibbidi.ai.chatbot.luna-model}") String model,

@@ -13,6 +13,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -29,22 +30,34 @@ public class ModelClassifier {
     private final ModelRoutingProperties properties;
     private final ObjectMapper mapper;
     private final HttpClient httpClient;
+    private final boolean loadTest;
 
     @Autowired
-    public ModelClassifier(ChatMemory memory, ModelRoutingProperties properties, ObjectMapper mapper) {
-        this(memory, properties, mapper, HttpClient.newHttpClient());
+    public ModelClassifier(
+            ChatMemory memory,
+            ModelRoutingProperties properties,
+            ObjectMapper mapper,
+            Environment environment
+    ) {
+        this(memory, properties, mapper, HttpClient.newHttpClient(), environment.matchesProfiles("loadtest"));
     }
 
-    ModelClassifier(ChatMemory memory, ModelRoutingProperties properties, ObjectMapper mapper,
-                       HttpClient httpClient) {
+    ModelClassifier(
+            ChatMemory memory,
+            ModelRoutingProperties properties,
+            ObjectMapper mapper,
+            HttpClient httpClient,
+            boolean loadTest
+    ) {
         this.memory = memory;
         this.properties = properties;
         this.mapper = mapper;
         this.httpClient = httpClient;
+        this.loadTest = loadTest;
     }
 
     public Mono<ChatModelTier> classify(String conversationKey, String userPrompt) {
-        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+        if (loadTest || properties.apiKey() == null || properties.apiKey().isBlank()) {
             return Mono.just(ChatModelTier.SOL);
         }
         return Mono.fromCallable(() -> decide(conversationKey, userPrompt))

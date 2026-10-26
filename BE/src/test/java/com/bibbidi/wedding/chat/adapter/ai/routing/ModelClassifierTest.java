@@ -17,6 +17,7 @@ import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.json.JsonMapper;
 
 class ModelClassifierTest {
@@ -82,6 +83,6 @@ class ModelClassifierTest {
         ModelRoutingProperties properties = new ModelRoutingProperties("test-key",
                 "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/systemone",
                 "jev-latest", Duration.ofSeconds(2), confidence, 6);
-        return new ModelClassifier(memory, properties, JsonMapper.builder().build());
+        return new ModelClassifier(memory, properties, JsonMapper.builder().build(), new MockEnvironment());
     }
 }
