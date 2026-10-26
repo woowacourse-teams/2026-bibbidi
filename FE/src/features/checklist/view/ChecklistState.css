@@ -2,13 +2,5 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 16px;
   padding: 32px;
-  color: var(--color-fg-neutral);
-  text-align: center;
-}
-
-.checklist-state p {
-  margin: 0;
 }

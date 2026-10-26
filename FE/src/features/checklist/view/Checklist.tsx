@@ -1,6 +1,7 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { Button } from "../../../components/button";
+import { Result } from "../../../components/result";
 import { canRestoreFocus } from "../../../shared/focus/useReturnFocus";
 import {
   WorkspaceLayout,
@@ -563,28 +564,32 @@ export function Checklist({
             id="checklist-category-content"
           >
             {selectedCategory && tasks.length === 0 ? (
-              <section className="checklist__empty">
-                <h2>아직 담은 할 일이 없어요</h2>
-                <p>로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
-                <div className="checklist__empty-actions">
-                  <Button
-                    size="large"
-                    onClick={() => onVisitPreparation?.(selectedCategory.id)}
-                    type="button"
-                  >
-                    로드맵에서 추가
-                  </Button>
-                  <Button
-                    size="large"
-                    color="dark"
-                    variant="weak"
-                    onClick={openTaskCreation}
-                    type="button"
-                  >
-                    직접 추가
-                  </Button>
-                </div>
-              </section>
+              <Result
+                title="아직 담은 할 일이 없어요"
+                description="로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요."
+                button={
+                  <>
+                    <Result.Button
+                      size="large"
+                      color="primary"
+                      variant="fill"
+                      onClick={() => onVisitPreparation?.(selectedCategory.id)}
+                      type="button"
+                    >
+                      로드맵에서 추가
+                    </Result.Button>
+                    <Result.Button
+                      size="large"
+                      color="dark"
+                      variant="weak"
+                      onClick={openTaskCreation}
+                      type="button"
+                    >
+                      직접 추가
+                    </Result.Button>
+                  </>
+                }
+              />
             ) : (
               <ChecklistGroups
                 groups={selectedCategory?.groups ?? []}
