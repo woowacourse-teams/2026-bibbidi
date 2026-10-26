@@ -17,6 +17,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -324,12 +326,14 @@ class AppointmentRepositoryTest {
     @Test
     @DisplayName("완료되지 않은 오늘 이후 일정만 가까운 일정으로 조회한다")
     void shouldFindOnlyRemainingUpcomingAppointmentsAsNearby() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
         Long itemId = saveOwnedChecklistItem();
-        Appointment tomorrow = saveAppointmentOnDate(itemId, LocalDate.now().plusDays(1), null, "내일 일정");
-        saveAppointmentOnDate(itemId, LocalDate.now().minusDays(1), null, "지난 일정");
-        saveDoneAppointmentOnDate(itemId, LocalDate.now().plusDays(1), "완료된 미래 일정");
+        LocalDate tomorrowDate = now.toLocalDate().plusDays(1);
+        Appointment tomorrow = saveAppointmentOnDate(itemId, tomorrowDate, tomorrowDate.atTime(9, 0), "내일 일정");
+        saveAppointmentOnDate(itemId, now.toLocalDate().minusDays(1), null, "지난 일정");
+        saveDoneAppointmentOnDate(itemId, tomorrowDate, "완료된 미래 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 6);
 
         assertThat(found)
                 .extracting(Appointment::id)
@@ -337,28 +341,95 @@ class AppointmentRepositoryTest {
     }
 
     @Test
-    @DisplayName("오늘 날짜 일정은 시작 시각이 현재 이후이거나 시각이 없을 때만 가까운 일정에 포함한다")
+    @DisplayName("오늘은 요청 시각 이상이거나 시각 없는 일정만 가까운 일정에 포함한다")
     void shouldIncludeTodaysAppointmentOnlyWhenNotYetStartedOrTimeless() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
         Long itemId = saveOwnedChecklistItem();
-        Appointment upcomingToday = saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().plusHours(1), "이따 일정");
-        Appointment timelessToday = saveAppointmentOnDate(itemId, LocalDate.now(), null, "시각 없는 오늘 일정");
-        saveAppointmentOnDate(itemId, LocalDate.now(), LocalDateTime.now().minusHours(1), "지난 오늘 일정");
+        Appointment timelessToday = saveAppointmentOnDate(itemId, now.toLocalDate(), null, "시각 없는 오늘 일정");
+        Appointment upcomingToday = saveAppointmentOnDate(itemId, now.toLocalDate(), now.plusHours(1), "이따 일정");
+        Appointment startingNow = saveAppointmentOnDate(itemId, now.toLocalDate(), now, "요청 시각 일정");
+        saveAppointmentOnDate(itemId, now.toLocalDate(), now.minusSeconds(1), "지난 오늘 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 6);
 
         assertThat(found)
                 .extracting(Appointment::id)
-                .containsExactlyInAnyOrder(upcomingToday.id(), timelessToday.id());
+                .containsExactly(startingNow.id(), upcomingToday.id(), timelessToday.id());
     }
 
     @Test
     @DisplayName("다른 사용자 소유 일정은 가까운 일정에 포함하지 않는다")
     void shouldExcludeOtherUsersAppointmentFromNearby() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
         JpaChecklistEntity otherUsersChecklist = jpaChecklistRepository.saveAndFlush(new JpaChecklistEntity(null, 2L));
         Long otherUsersItemId = saveChecklistItem(otherUsersChecklist);
-        saveAppointmentOnDate(otherUsersItemId, LocalDate.now().plusDays(1), null, "다른 사용자 일정");
+        saveAppointmentOnDate(otherUsersItemId, now.toLocalDate().plusDays(1), null, "다른 사용자 일정");
 
-        List<Appointment> found = appointmentRepository.findNearby(1L, LocalDateTime.now(), 6);
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 6);
+
+        assertThat(found).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 3, 6})
+    @DisplayName("가까운 일정은 날짜, 시각 유무, 시작 시각, ID 순서로 정렬해 요청한 개수만 조회한다")
+    void shouldOrderAndLimitNearbyAppointments(int limit) {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
+        LocalDate tomorrow = now.toLocalDate().plusDays(1);
+        LocalDate dayAfterTomorrow = tomorrow.plusDays(1);
+        Long itemId = saveOwnedChecklistItem();
+        Appointment last = saveAppointmentOnDate(itemId, dayAfterTomorrow, dayAfterTomorrow.atTime(9, 0), "모레 일정");
+        Appointment timeless = saveAppointmentOnDate(itemId, tomorrow, null, "시각 없는 내일 일정");
+        Appointment later = saveAppointmentOnDate(itemId, tomorrow, tomorrow.atTime(11, 0), "내일 늦은 일정");
+        Appointment earlier = saveAppointmentOnDate(itemId, tomorrow, tomorrow.atTime(9, 0), "내일 이른 일정");
+        Appointment sameTime = saveAppointmentOnDate(itemId, tomorrow, tomorrow.atTime(9, 0), "내일 같은 시각 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, limit);
+
+        List<Long> orderedIds = List.of(earlier.id(), sameTime.id(), later.id(), timeless.id(), last.id());
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactlyElementsOf(orderedIds.subList(0, Math.min(limit, orderedIds.size())));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("날짜와 시작 시각이 같으면 ID 오름차순으로 제한 경계를 결정한다")
+    void shouldLimitNearbyAppointmentsByIdWhenDateAndTimeAreEqual(boolean timed) {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
+        Long itemId = saveOwnedChecklistItem();
+        LocalDateTime startTime = timed ? now.plusHours(1) : null;
+        Appointment first = saveAppointmentOnDate(itemId, now.toLocalDate(), startTime, "첫 번째 일정");
+        Appointment second = saveAppointmentOnDate(itemId, now.toLocalDate(), startTime, "두 번째 일정");
+        saveAppointmentOnDate(itemId, now.toLocalDate(), startTime, "제한 밖 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 2);
+
+        assertThat(found)
+                .extracting(Appointment::id)
+                .containsExactly(first.id(), second.id());
+    }
+
+    @Test
+    @DisplayName("시각 없는 오늘 일정이 시각 있는 내일 일정보다 먼저 가까운 일정으로 반환된다")
+    void shouldPrioritizeTodaysTimelessAppointmentOverTomorrowsTimedNearbyAppointment() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
+        Long itemId = saveOwnedChecklistItem();
+        LocalDate tomorrow = now.toLocalDate().plusDays(1);
+        saveAppointmentOnDate(itemId, tomorrow, tomorrow.atTime(9, 0), "시각 있는 내일 일정");
+        Appointment today = saveAppointmentOnDate(itemId, now.toLocalDate(), null, "시각 없는 오늘 일정");
+
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 1);
+
+        assertThat(found).extracting(Appointment::id).containsExactly(today.id());
+    }
+
+    @Test
+    @DisplayName("가까운 일정이 없으면 빈 목록을 조회한다")
+    void shouldFindNoNearbyAppointmentsWhenNoneExist() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
+
+        List<Appointment> found = appointmentRepository.findNearby(1L, now, 6);
 
         assertThat(found).isEmpty();
     }
