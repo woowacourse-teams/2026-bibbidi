@@ -28,7 +28,10 @@ public final class SpringAiChatClientFixture {
     }
 
     public static SpringAiChatClient create(ChatClient chatClient) {
+        ChatModelRoute route = new ChatModelRoute(chatClient, "test-model", null);
         return new SpringAiChatClient(new ChatModelRouter(Map.of(
-                ChatModelTier.QWEN, new ChatModelRoute(chatClient, "test-model", null))));
+                ChatModelTier.QWEN, route,
+                ChatModelTier.LUNA, route,
+                ChatModelTier.SOL, route)));
     }
 }

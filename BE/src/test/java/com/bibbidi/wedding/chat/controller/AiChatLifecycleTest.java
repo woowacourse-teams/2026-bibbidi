@@ -84,7 +84,7 @@ class AiChatLifecycleTest {
         when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ChatModelTier.QWEN));
         chat = new AiChatService(
                 new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
-                        new JacksonChatAnswerParser(mapper), classifier, ""),
+                        new JacksonChatAnswerParser(mapper), memory, classifier, ""),
                 List.of(new ClientSubscriber()));
         answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
