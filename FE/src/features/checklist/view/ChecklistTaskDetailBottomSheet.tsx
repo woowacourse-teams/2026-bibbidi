@@ -1,6 +1,8 @@
-import { ReactNode } from "react";
+import { useRef, useState } from "react";
+import type { ReactNode } from "react";
 
-import { BottomSheet } from "../../../shared/bottom-sheet/BottomSheet";
+import { BottomSheet } from "../../../components/bottom-sheet";
+import { usePageScrollLock } from "../../../shared/scroll/usePageScrollLock";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
@@ -34,17 +36,32 @@ export function ChecklistTaskDetailBottomSheetShell({
   title,
   titleId = "checklist-task-detail-bottom-sheet-title",
 }: ChecklistTaskDetailBottomSheetShellProps) {
+  const [closing, setClosing] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  usePageScrollLock({ rootRef });
+
   return (
-    <BottomSheet
-      className="checklist-detail-bottom-sheet"
-      closeLabel="할 일 상세 닫기"
-      id="checklist-task-detail-bottom-sheet"
-      onClose={onClose}
-      title={title}
-      titleId={titleId}
-    >
-      {children}
-    </BottomSheet>
+    <div ref={rootRef}>
+      <BottomSheet
+        className="checklist-detail-bottom-sheet"
+        id="checklist-task-detail-bottom-sheet"
+        open={!closing}
+        onClose={() => setClosing(true)}
+        onExited={onClose}
+        aria-labelledby={titleId}
+        hasTextField
+        header={
+          typeof title === "string" ? (
+            <BottomSheet.Header id={titleId}>{title}</BottomSheet.Header>
+          ) : (
+            title
+          )
+        }
+      >
+        {children}
+      </BottomSheet>
+    </div>
   );
 }
 
@@ -63,7 +80,14 @@ export function ChecklistTaskDetailBottomSheet({
     <ChecklistTaskDetailBottomSheetShell
       onClose={onClose}
       title={
-        <ChecklistTaskHeader editing={editing} task={task} titleId={titleId} />
+        <ChecklistTaskHeader
+          editing={editing}
+          task={task}
+          titleId={titleId}
+          heading={
+            <BottomSheet.Header id={titleId}>{task.title}</BottomSheet.Header>
+          }
+        />
       }
       titleId={titleId}
     >

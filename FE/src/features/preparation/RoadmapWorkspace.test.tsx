@@ -875,12 +875,10 @@ describe("내 로드맵 할 일 동작", () => {
       );
       expect(mocks.command.changeItemStatus).not.toHaveBeenCalled();
       if (mobile) {
-        fireEvent.click(
-          document.querySelector(
-            ".checklist-detail-bottom-sheet__scrim",
-          ) as HTMLButtonElement,
-        );
-        fireEvent.transitionEnd(detail, { propertyName: "transform" });
+        await act(async () => {
+          fireEvent.pointerDown(detail);
+          fireEvent.pointerUp(detail);
+        });
       } else {
         fireEvent.click(
           within(detail).getByRole("button", { name: "할 일 상세 닫기" }),

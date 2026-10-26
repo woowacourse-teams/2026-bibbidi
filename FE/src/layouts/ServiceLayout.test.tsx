@@ -806,12 +806,10 @@ describe("ServiceLayout", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "체크리스트 항목 10",
     });
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
-    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
+    await act(async () => {
+      fireEvent.pointerDown(detailSheet);
+      fireEvent.pointerUp(detailSheet);
+    });
 
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist",

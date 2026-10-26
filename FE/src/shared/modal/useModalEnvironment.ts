@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from "react";
 import type { RefObject } from "react";
 import { containTabFocus, focusFirstElement } from "../focus/containTabFocus";
-import { lockScroll } from "../scroll/lockScroll";
+import { usePageScrollLock } from "../scroll/usePageScrollLock";
 
 // Locks are shared by sheets and foreground panels so overlapping lifetimes
 // cannot restore scrolling or background interaction before the last owner exits.
@@ -48,6 +48,8 @@ export function useModalEnvironment({
   /** Disable when a child layer owns restoration across modal/docked changes. */
   restoreFocus?: boolean;
 }) {
+  usePageScrollLock({ rootRef, active, lockBody: true });
+
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     const root = rootRef.current;
     if (
@@ -70,13 +72,7 @@ export function useModalEnvironment({
     if (!active || !root) return;
     const previous = returnFocusRef?.current ?? document.activeElement;
     const scope = root.closest("[data-modal-scope]") ?? document;
-    const scroll =
-      scope instanceof HTMLElement &&
-      scope.matches("[data-page-scroll-container]")
-        ? scope
-        : scope.querySelector<HTMLElement>("[data-page-scroll-container]");
-    const release = [lockScroll(document.body)];
-    if (scroll) release.push(lockScroll(scroll));
+    const release: (() => void)[] = [];
     if (inertBackground) {
       scope
         .querySelectorAll<HTMLElement>("[data-modal-background]")
