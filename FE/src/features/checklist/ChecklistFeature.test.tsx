@@ -306,9 +306,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     renderChecklistFeature();
 
-    expect(screen.getByRole("status").textContent).toBe(
-      "체크리스트를 불러오고 있어요.",
-    );
+    const loadingStatus = screen.getByRole("status");
+    expect(loadingStatus.closest('[aria-busy="true"]')).toBeNull();
+    expect(loadingStatus.textContent).toBe("체크리스트를 불러오고 있어요.");
     expect(repositoryMocks.getChecklist).not.toHaveBeenCalled();
   });
 

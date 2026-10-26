@@ -1,4 +1,5 @@
-import { Button } from "../../../components/button";
+import { Loader } from "../../../components/loader";
+import { Result } from "../../../components/result";
 import "./ChecklistState.css";
 
 interface ChecklistStateProps {
@@ -14,37 +15,31 @@ export function ChecklistState({
 }: ChecklistStateProps) {
   if (status === "loading") {
     return (
-      <div className="checklist-state" role="status">
-        체크리스트를 불러오고 있어요.
+      <div className="checklist-state">
+        <Loader label="체크리스트를 불러오고 있어요." />
       </div>
     );
   }
 
   if (status === "empty") {
-    return (
-      <div className="checklist-state" role="status">
-        표시할 체크리스트가 없어요.
-      </div>
-    );
+    return <Result role="status" title="표시할 체크리스트가 없어요." />;
   }
 
   if (status === "authentication-required") {
     return (
-      <div className="checklist-state" role="alert">
-        <p>로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.</p>
-        <Button size="medium" onClick={onRetry}>
-          다시 시도
-        </Button>
-      </div>
+      <Result
+        role="alert"
+        title="로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요."
+        button={<Result.Button onClick={onRetry}>다시 시도</Result.Button>}
+      />
     );
   }
 
   return (
-    <div className="checklist-state" role="alert">
-      <p>{errorMessage ?? "체크리스트를 불러오지 못했어요."}</p>
-      <Button size="medium" onClick={onRetry}>
-        다시 시도
-      </Button>
-    </div>
+    <Result
+      role="alert"
+      title={errorMessage ?? "체크리스트를 불러오지 못했어요."}
+      button={<Result.Button onClick={onRetry}>다시 시도</Result.Button>}
+    />
   );
 }
