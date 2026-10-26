@@ -137,3 +137,12 @@ ServiceLayout은 AppLayout의 `header` 슬롯에 기존 AppHeader를 넣고 `sti
 퇴장 중 레이아웃 유지와 마지막 표시값 보관은 `useLayerPresence`·`useExitSnapshot`, 서비스 스크롤 영역 탐색은 `usePageScrollContainer`로 분리했다. 화면은 닫기·저장·취소 확인 정책과 컨트롤러 연결만 소유한다. 드래그 닫기를 호출부에서 거절하면 시트가 원래 위치로 돌아오고, 모바일 날짜·시간 선택기는 퇴장이 끝날 때까지 본문을 유지한다.
 
 준비 로드맵의 보기 선택과 모바일 피드백은 공용 `BottomSheet`로 통일했다. 홈의 로그인 안내·일정 상세는 `Dialog`를 사용하고 이동 액션은 `Button.Link`로 실제 링크 의미를 유지한다. 이전 `shared/bottom-sheet`, `useModalEnvironment`, `usePageScrollLock`, `ChecklistModalDialog`와 전용 셸 스타일, 사용하지 않는 배경·모바일 속성은 제거했다. 기존 #635 기록의 모달 훅과 배경 표시는 이 구현으로 대체된다.
+
+## Accordion 동작과 체크리스트 표현 분리 — #676
+
+`bibbidi-design`의 [Accordion 조합 구조](https://github.com/byunghyunkim0/bibbidi-design/pull/3), 기준 커밋 `9be5c25`를 FE에서 직접 관리한다. 저장소 간 import나 새 패키지 의존성은 추가하지 않는다.
+
+- `AccordionPrimitive.Root`·`Item`·`Header`·`Trigger`·`Content`는 외형 CSS 없이 펼침 상태, 키보드 탐색, 접근성 연결과 외부 제어로 접힌 본문의 초점 복귀를 담당한다. 접힌 본문은 DOM에 남겨 입력값을 유지하며, 사용처의 display 스타일과 관계없이 숨긴다.
+- 표준 `Accordion`·`Accordion.Item`은 같은 기본 요소를 사용하고 기존 제목·설명·장식 요소 API와 외형을 유지한다. 준비 요약은 기존 API를 그대로 사용한다.
+- 체크리스트의 `ChecklistGroup`은 기본 요소를 조합하고 완료 개수·진행률·번호·헤더 높이·여백을 feature 안에서 관리한다. 진행률은 제목 버튼 밖에 배치하며, 해당 위치를 눌러도 뒤의 헤더 버튼이 동작한다.
+- 공용 Accordion의 `summary`·`triggerRef` 속성과 요약 배치·패딩 확장을 제거했다. 상세 종료 후 초점 복귀는 `AccordionPrimitive.Trigger`의 표준 ref로 연결한다. 체크리스트 CSS는 공용 Accordion 클래스나 변수를 덮어쓰지 않는다.

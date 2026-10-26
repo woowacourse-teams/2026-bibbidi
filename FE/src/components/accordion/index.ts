@@ -7,3 +7,11 @@ export type {
   AccordionType,
   AccordionHeadingLevel,
 } from "./Accordion";
+export { AccordionPrimitive } from "./AccordionPrimitive";
+export type {
+  AccordionPrimitiveRootProps,
+  AccordionPrimitiveItemProps,
+  AccordionPrimitiveHeaderProps,
+  AccordionPrimitiveTriggerProps,
+  AccordionPrimitiveContentProps,
+} from "./AccordionPrimitive";
