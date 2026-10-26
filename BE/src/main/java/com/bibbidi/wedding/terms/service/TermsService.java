@@ -2,6 +2,7 @@ package com.bibbidi.wedding.terms.service;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.bibbidi.wedding.terms.config.TermsCacheConfig;
 import com.bibbidi.wedding.terms.domain.Terms;
 import com.bibbidi.wedding.terms.domain.TermsAgreement;
 import com.bibbidi.wedding.terms.repository.TermsRepository;
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class TermsService {
         this.termsRepository = termsRepository;
     }
 
+    @Cacheable(cacheNames = TermsCacheConfig.TERMS_CACHE, cacheManager = "termsCacheManager", key = "'all'", sync = true)
     public List<TermsResult> findAll() {
         return termsRepository.findAll().stream().map(TermsResult::from).toList();
     }

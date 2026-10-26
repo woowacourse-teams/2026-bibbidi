@@ -33,6 +33,9 @@ spring:
       mode: never
 
 bibbidi:
+  terms:
+    cache:
+      ttl: ${TERMS_CACHE_TTL:5m}
   sse:
     response-timeout-seconds: 60
   ai:
