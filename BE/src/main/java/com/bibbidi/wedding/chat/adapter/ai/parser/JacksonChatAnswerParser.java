@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.chat.adapter.ai.parser;
 
-import java.util.function.Consumer;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -13,7 +12,7 @@ public class JacksonChatAnswerParser {
         this.mapper = mapper;
     }
 
-    public ReactiveChatAnswerStream newSession(Consumer<String> answerChunk) {
-        return new ReactiveChatAnswerStream(mapper, answerChunk);
+    public ReactiveChatAnswerStream newSession() {
+        return new ReactiveChatAnswerStream(mapper);
     }
 }

@@ -13,9 +13,11 @@ public class ChatTurnMapper {
                 record.conversationId().toString(),
                 record.userPrompt(),
                 record.completion(),
+                record.model(),
                 record.outcome(),
                 record.outcomeReason(),
-                record.startedAt()
+                record.startedAt(),
+                record.durationMs()
         );
     }
 }

@@ -1,6 +1,8 @@
 package com.bibbidi.wedding.chat.support;
 
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRequest;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,7 +36,7 @@ public class ToolCallingFixture {
             receivedPrompts.add(prompt);
             return Flux.just(new ChatResponse(List.of(new Generation(new AssistantMessage("답변")))));
         });
-        this.chatClient = new SpringAiChatClient(ChatClient.builder(model).defaultTools(tools).build());
+        this.chatClient = SpringAiChatClientFixture.create(ChatClient.builder(model).defaultTools(tools).build());
     }
 
     /**
@@ -65,7 +67,8 @@ public class ToolCallingFixture {
     }
 
     private Prompt send(Long userId) {
-        chatClient.streamReply(userId, CONVERSATION, new UserMessage("질문")).blockLast();
+        chatClient.streamReply(new ChatModelRequest(userId, CONVERSATION,
+                new UserMessage("질문"), ChatModelTier.QWEN)).blockLast();
         return receivedPrompts.getLast();
     }
 }

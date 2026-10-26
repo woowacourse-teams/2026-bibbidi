@@ -15,7 +15,8 @@ import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ConversationKey;
-import com.bibbidi.wedding.chat.service.dto.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import java.io.IOException;
 import java.time.Duration;
@@ -110,11 +111,12 @@ class BibbidiEvaluationIntegrationTest {
 
     private void evaluateScenario(EvaluationScenario scenario, Map<String, MetricInformation> metrics) {
         GeneratedAnswer generated = new GeneratedAnswer();
+        GenerationMeasurement measurement = new GenerationMeasurement();
         List<EvaluationResponse> evaluations = new ArrayList<>();
         String phase = PHASE_GENERATION;
         String evaluatingMetric = null;
         try {
-            generate(scenario, generated);
+            generate(scenario, generated, measurement);
 
             phase = PHASE_METRIC_EVALUATION;
             BibbidiEvaluationRequest request = new BibbidiEvaluationRequest(
@@ -127,31 +129,50 @@ class BibbidiEvaluationIntegrationTest {
         } catch (RuntimeException | AssertionError failure) {
             reportWriter.recordFailure(scenario, recordingModel.calls(), generated.answer(),
                     generated.recommendedItemIds(), providedContext(), evaluations,
-                    phase, evaluatingMetric, failure);
+                    phase, evaluatingMetric, failure,
+                    measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
             throw failure;
         }
         reportWriter.record(scenario, recordingModel.calls(), generated.answer(),
-                generated.recommendedItemIds(), providedContext(), evaluations);
+                generated.recommendedItemIds(), providedContext(), evaluations,
+                measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
     }
 
-    private void generate(EvaluationScenario scenario, GeneratedAnswer generated) {
+    private void generate(EvaluationScenario scenario, GeneratedAnswer generated, GenerationMeasurement measurement) {
         UUID conversationId = UUID.randomUUID();
         String memoryKey = new ConversationKey(EVALUATION_USER_ID, conversationId).toMemoryKey();
         Duration timeout = Duration.ofSeconds(responseTimeoutSeconds + CHAT_TIMEOUT_MARGIN_SECONDS);
         recordingModel.reset();
         try {
             chatMemory.add(memoryKey, scenario.chatMemory().stream().map(this::toMessage).toList());
+            long startedAt = System.nanoTime();
             chatService.chat(
                             new ChatCommand(EVALUATION_USER_ID, conversationId, scenario.userMessage()),
                             () -> CancelReason.CLIENT_DISCONNECTED)
+                    .doOnNext(event -> {
+                        if (event instanceof ChatResult.Selected selected) {
+                            measurement.selectedModel = selected.model();
+                        }
+                        if (event instanceof ChatResult.Delta delta && !delta.text().isEmpty()
+                                && measurement.firstDeltaMs == null) {
+                            measurement.firstDeltaMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+                        }
+                    })
                     .doOnNext(generated::accept)
                     .blockLast(timeout);
+            measurement.totalMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
             if (!generated.isComplete()) {
                 throw new IllegalStateException("평가 답변이 정상 완료되지 않았습니다.");
             }
         } finally {
             chatMemory.clear(memoryKey);
         }
+    }
+
+    private static final class GenerationMeasurement {
+        private String selectedModel;
+        private Long firstDeltaMs;
+        private Long totalMs;
     }
 
     private EvaluationResponse evaluateMetric(

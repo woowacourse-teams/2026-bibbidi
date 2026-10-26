@@ -9,8 +9,10 @@ public record ChatTurnRecord(
         UUID conversationId,
         String userPrompt,
         String completion,
+        String model,
         ChatTurnOutcome outcome,
         @Nullable String outcomeReason,
-        LocalDateTime startedAt
+        LocalDateTime startedAt,
+        long durationMs
 ) {
 }

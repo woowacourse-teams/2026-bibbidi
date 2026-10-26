@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bibbidi.wedding.common.exception.BusinessException;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,13 +11,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ReactiveChatAnswerStreamTest {
 
-    private List<String> deltas;
     private ReactiveChatAnswerStream stream;
 
     @BeforeEach
     void setUp() {
-        deltas = new ArrayList<>();
-        stream = new ReactiveChatAnswerStream(JsonMapper.builder().build(), deltas::add);
+        stream = new ReactiveChatAnswerStream(JsonMapper.builder().build());
     }
 
     @Test
@@ -31,12 +27,14 @@ class ReactiveChatAnswerStreamTest {
         String thirdChunk = "\\uDC8A\\n끝\"}";
 
         // when
-        stream.accept(firstChunk);
-        stream.accept(secondChunk);
-        stream.accept(thirdChunk);
+        String firstDelta = stream.accept(firstChunk);
+        String secondDelta = stream.accept(secondChunk);
+        String thirdDelta = stream.accept(thirdChunk);
 
         // then
-        assertThat(deltas).containsExactly("한", "💊\n끝");
+        assertThat(firstDelta).isEmpty();
+        assertThat(secondDelta).isEqualTo("한");
+        assertThat(thirdDelta).isEqualTo("💊\n끝");
         assertThat(stream.finish().recommendedItemIds()).containsExactly(2L);
     }
 
@@ -47,10 +45,10 @@ class ReactiveChatAnswerStreamTest {
         String invalidOutput = "{\"answer\":\"답변\",\"recommendedItemIds\":[\"1\"]}";
 
         // when
-        stream.accept(invalidOutput);
+        String delta = stream.accept(invalidOutput);
 
         // then
-        assertThat(deltas).containsExactly("답변");
+        assertThat(delta).isEqualTo("답변");
         assertThatThrownBy(stream::finish).isInstanceOf(BusinessException.class);
     }
 
@@ -58,22 +56,23 @@ class ReactiveChatAnswerStreamTest {
     @DisplayName("answer 필드가 시작되기 전에는 아무것도 전달하지 않는다")
     void emitsNothingBeforeTheAnswerFieldStarts() {
         // when
-        stream.accept("{\"recommendedItemIds\":[1,");
+        String delta = stream.accept("{\"recommendedItemIds\":[1,");
 
         // then
-        assertThat(deltas).isEmpty();
+        assertThat(delta).isEmpty();
     }
 
     @Test
     @DisplayName("answer 필드가 닫힌 뒤에 오는 조각은 전달하지 않는다")
     void ignoresChunksAfterTheAnswerFieldEnds() {
         // given
-        stream.accept("{\"answer\":\"답변\",");
+        String firstDelta = stream.accept("{\"answer\":\"답변\",");
 
         // when
-        stream.accept("\"recommendedItemIds\":[]}");
+        String nextDelta = stream.accept("\"recommendedItemIds\":[]}");
 
         // then
-        assertThat(deltas).containsExactly("답변");
+        assertThat(firstDelta).isEqualTo("답변");
+        assertThat(nextDelta).isEmpty();
     }
 }
