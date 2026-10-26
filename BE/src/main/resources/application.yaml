@@ -36,6 +36,8 @@ bibbidi:
   sse:
     response-timeout-seconds: 60
   ai:
+    balance-game:
+      model: ${BIBBIDI_BALANCE_GAME_MODEL:global.openai.gpt-6.1-sol}
     chatbot:
       accounts-enabled: ${BIBBIDI_CHAT_ACCOUNTS_ENABLED:false}
       memory-max-messages: 20
