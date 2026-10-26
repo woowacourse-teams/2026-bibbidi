@@ -56,6 +56,10 @@
   flex: 1 1 0;
   min-width: 0;
 }
+.bibbidi-list-row > dt,
+.bibbidi-list-row > dd {
+  margin: 0;
+}
 .bibbidi-list-row-arrow {
   flex: 0 0 auto;
   color: var(--color-fg-neutral-muted);

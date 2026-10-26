@@ -31,6 +31,39 @@ type StaticProps = Omit<
 > & { onClick?: never };
 export type ListRowProps = RowOptions & (ActionProps | StaticProps);
 
+export type ListRowDescriptionProps = Omit<
+  ComponentPropsWithRef<"div">,
+  "children" | "onClick" | "role"
+> &
+  Pick<RowOptions, "border" | "verticalPadding" | "horizontalPadding"> & {
+    term: ReactNode;
+    description: ReactNode;
+  };
+
+/** Render directly inside a dl to preserve native term/description pairs. */
+function ListRowDescription({
+  term,
+  description,
+  border = "indented",
+  verticalPadding = "medium",
+  horizontalPadding = "medium",
+  className,
+  ...props
+}: ListRowDescriptionProps) {
+  return (
+    <div
+      {...props}
+      className={["bibbidi-list-row", className].filter(Boolean).join(" ")}
+      data-border={border}
+      data-vertical-padding={verticalPadding}
+      data-horizontal-padding={horizontalPadding}
+    >
+      <dt className="bibbidi-list-row-left">{term}</dt>
+      <dd className="bibbidi-list-row-contents">{description}</dd>
+    </div>
+  );
+}
+
 function ListRowRoot({
   left,
   contents,
@@ -219,6 +252,7 @@ function ListRowLoader({
 }
 
 export const ListRow = Object.assign(ListRowRoot, {
+  Description: ListRowDescription,
   Texts: ListRowTexts,
   Asset: ListRowAsset,
   Loader: ListRowLoader,
