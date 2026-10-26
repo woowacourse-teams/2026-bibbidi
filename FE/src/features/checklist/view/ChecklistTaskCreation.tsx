@@ -33,7 +33,8 @@ export function ChecklistTaskCreation({
   const pending = controller.submissionState.status === "submitting";
   useReturnFocus(formRef, returnFocusRef, fallbackFocusRef);
   useEffect(() => {
-    titleRef.current?.focus();
+    const title = titleRef.current;
+    if (title && !title.closest("[inert]")) title.focus();
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,5 +1,10 @@
 import { useId, useRef } from "react";
-import type { ComponentPropsWithoutRef, CSSProperties, ReactNode } from "react";
+import type {
+  ComponentPropsWithoutRef,
+  CSSProperties,
+  ReactNode,
+  RefObject,
+} from "react";
 import { Button, type ButtonProps } from "../button";
 import { Checkbox } from "../checkbox";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
@@ -15,6 +20,9 @@ export type BottomSheetProps = Omit<
   onClose: () => void;
   header?: ReactNode;
   headerDescription?: ReactNode;
+  headerActions?: ReactNode;
+  scrollContainer?: HTMLElement | null;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   cta?: ReactNode;
   children?: ReactNode;
   closeOnDimmerClick?: boolean;
@@ -35,6 +43,9 @@ function Root({
   onClose,
   header,
   headerDescription,
+  headerActions,
+  scrollContainer,
+  returnFocusRef,
   cta,
   children,
   closeOnDimmerClick,
@@ -60,7 +71,14 @@ function Root({
   ...props
 }: BottomSheetProps) {
   const { dialogRef, panelRef, titleId, descriptionId } =
-    useBottomSheetLifecycle({ open, hasTextField, onEntered, onExited });
+    useBottomSheetLifecycle({
+      open,
+      hasTextField,
+      scrollContainer,
+      returnFocusRef,
+      onEntered,
+      onExited,
+    });
   const drag = useBottomSheetDrag({
     panelRef,
     enabled: open && draggable,
@@ -141,7 +159,11 @@ function Root({
         backdropPress.current = false;
       }}
     >
-      <div ref={panelRef} className="bibbidi-bottom-sheet-panel">
+      <div
+        ref={panelRef}
+        className="bibbidi-bottom-sheet-panel"
+        inert={!open || undefined}
+      >
         {draggable && (
           <button
             type="button"
@@ -162,6 +184,11 @@ function Root({
               <div id={descriptionId}>{headerDescription}</div>
             )}
           </div>
+          {headerActions && (
+            <div className="bibbidi-bottom-sheet-header-actions">
+              {headerActions}
+            </div>
+          )}
         </div>
         <div className="bibbidi-bottom-sheet-body">{children}</div>
         {cta && <div className="bibbidi-bottom-sheet-footer">{cta}</div>}

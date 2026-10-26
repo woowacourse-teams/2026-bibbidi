@@ -14,7 +14,8 @@ export function useAppointmentFormView<
   const placeRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   useEffect(() => {
-    titleRef.current?.focus();
+    const title = titleRef.current;
+    if (title && !title.closest("[inert]")) title.focus();
   }, []);
   useEffect(() => {
     if (controller.submissionState.status === "error")

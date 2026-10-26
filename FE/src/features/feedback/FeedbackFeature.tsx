@@ -1,3 +1,8 @@
+import { useMemo } from "react";
+import {
+  useExitSnapshot,
+  useLayerPresence,
+} from "../../shared/modal/useLayerPresence";
 import { useIsMobileLayout } from "../../shared/responsive";
 import { useFeedbackForm } from "./useFeedbackForm";
 import { useFeedbackOpeningAnimation } from "./useFeedbackOpeningAnimation";
@@ -51,25 +56,39 @@ export function FeedbackFeature() {
     isOpen,
     isMobile,
   });
-  const FeedbackForm = isMobile ? FeedbackBottomSheet : FeedbackPopover;
+  const { present, onExited } = useLayerPresence(isOpen);
+  const form = {
+    canSubmit,
+    closeButtonRef,
+    content,
+    errorMessage,
+    isSubmitting,
+    onClose: close,
+    onContentChange: setContent,
+    onSentimentChange: setSentiment,
+    onSubmit: submit,
+    sentiment,
+  };
+  const values = useMemo(
+    () => ({ canSubmit, content, errorMessage, isSubmitting, sentiment }),
+    [canSubmit, content, errorMessage, isSubmitting, sentiment],
+  );
+  const snapshot = useExitSnapshot(isOpen, values) ?? values;
 
   return (
     <>
       <div className="feedback-feature" ref={containerRef}>
-        {isOpen ? (
-          <FeedbackForm
-            canSubmit={canSubmit}
-            closeButtonRef={closeButtonRef}
-            content={content}
-            errorMessage={errorMessage}
-            isSubmitting={isSubmitting}
-            onClose={close}
-            onContentChange={setContent}
-            onSentimentChange={setSentiment}
-            onSubmit={submit}
-            sentiment={sentiment}
-          />
-        ) : null}
+        {isMobile
+          ? present && (
+              <FeedbackBottomSheet
+                {...form}
+                {...snapshot}
+                open={isOpen}
+                onExited={onExited}
+                returnFocusRef={triggerButtonRef}
+              />
+            )
+          : isOpen && <FeedbackPopover {...form} />}
 
         <button
           aria-label="의견 보내기"

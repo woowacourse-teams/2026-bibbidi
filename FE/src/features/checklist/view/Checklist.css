@@ -4,47 +4,8 @@
 .checklist-workspace__main {
   min-width: 0;
 }
-.checklist-workspace__foreground-layer,
-.checklist-workspace__foreground,
-.checklist-workspace__panel {
+.checklist-workspace__foreground {
   display: contents;
-}
-.checklist-workspace__panel > .checklist-detail-panel,
-.checklist-workspace__panel > .checklist-form-panel:not([data-mobile]) {
-  position: static;
-  width: 100%;
-  height: 100%;
-}
-.checklist-workspace__foreground-layer[data-overlay="true"] {
-  position: fixed;
-  z-index: 60;
-  inset: 0;
-  display: block;
-}
-.checklist-workspace__scrim {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: rgb(23 23 23 / 40%);
-}
-.checklist-workspace__foreground-layer[data-overlay="true"]
-  > .checklist-workspace__panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: block;
-  width: min(100%, var(--layout-width-detail));
-  height: 100%;
-  background: var(--color-bg-layer-default);
-  box-shadow: -8px 0 32px rgb(23 23 23 / 12%);
-}
-.checklist-workspace__foreground-layer[data-overlay="true"]
-  > .checklist-workspace__panel
-  > aside {
-  height: 100%;
 }
 
 .checklist {

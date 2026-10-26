@@ -1,7 +1,10 @@
-import { createPortal } from "react-dom";
-import { BottomSheet } from "../../../shared/bottom-sheet/BottomSheet";
+import { useRef, useState } from "react";
+import { CheckIcon, CloseIcon } from "../../../components/icons/ActionIcons";
+import { BottomSheet } from "../../../components/bottom-sheet";
+import { IconButton } from "../../../components/icon-button";
+import { ListRow } from "../../../components/list-row";
+import { usePageScrollContainer } from "../../../shared/scroll/usePageScrollContainer";
 import { RoadmapView } from "./RoadmapViewSwitcher";
-import "./RoadmapViewBottomSheet.css";
 
 const options: { view: RoadmapView; label: string; description: string }[] = [
   {
@@ -25,43 +28,56 @@ export function RoadmapViewBottomSheet({
   onClose: () => void;
   onViewChange: (view: RoadmapView) => void;
 }) {
-  return createPortal(
-    <BottomSheet
-      className="roadmap-view-picker"
-      closeLabel="보기 선택 닫기"
-      id="roadmap-view-picker"
-      onClose={onClose}
-      showCloseButton
-      title="보기 선택"
-      titleId="roadmap-view-picker-title"
-    >
-      {(requestClose) => (
-        <div className="roadmap-view-picker__options">
+  const [open, setOpen] = useState(true);
+  const nextView = useRef<RoadmapView | null>(null);
+  const { ref, environment } = usePageScrollContainer();
+  const close = () => setOpen(false);
+  return (
+    <div ref={ref}>
+      {
+        <BottomSheet
+          open={open}
+          onClose={close}
+          id="roadmap-view-picker"
+          scrollContainer={environment?.scrollContainer}
+          header={<BottomSheet.Header>보기 선택</BottomSheet.Header>}
+          headerActions={
+            <IconButton
+              aria-label="보기 선택 닫기"
+              icon={<CloseIcon />}
+              onClick={close}
+            />
+          }
+          onExited={() => {
+            if (nextView.current && nextView.current !== view)
+              onViewChange(nextView.current);
+            else onClose();
+          }}
+        >
           {options.map((option) => (
-            <button
+            <ListRow
+              key={option.view}
               aria-controls="roadmap-view-content"
               aria-pressed={view === option.view}
-              key={option.view}
+              selected={view === option.view}
+              border="none"
+              horizontalPadding="small"
+              contents={
+                <ListRow.Texts top={option.label} bottom={option.description} />
+              }
+              right={
+                view === option.view ? (
+                  <CheckIcon width={20} height={20} />
+                ) : undefined
+              }
               onClick={() => {
-                if (view === option.view) requestClose();
-                else onViewChange(option.view);
+                nextView.current = option.view;
+                close();
               }}
-              type="button"
-            >
-              <span>
-                <strong>{option.label}</strong>
-                <span>{option.description}</span>
-              </span>
-              {view === option.view ? (
-                <svg aria-hidden="true" viewBox="0 0 16 16">
-                  <path d="m2 8 4 4 8-8" />
-                </svg>
-              ) : null}
-            </button>
+            />
           ))}
-        </div>
-      )}
-    </BottomSheet>,
-    document.body,
+        </BottomSheet>
+      }
+    </div>
   );
 }

@@ -1,0 +1,94 @@
+.bibbidi-panel-overlay {
+  position: fixed;
+  inset: var(--panel-overlay-viewport-top, 0px) 0 auto;
+  width: 100%;
+  height: var(--panel-overlay-viewport-height, 100dvh);
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6);
+}
+.bibbidi-panel-overlay[open] {
+  display: flex;
+  justify-content: flex-end;
+}
+.bibbidi-panel-overlay::backdrop {
+  background: color-mix(in srgb, var(--color-palette-ink) 40%, transparent);
+}
+.bibbidi-panel-overlay-surface {
+  width: min(100%, var(--layout-width-detail));
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg-layer-default);
+  box-shadow: -8px 0 32px
+    color-mix(in srgb, var(--color-palette-ink) 12%, transparent);
+}
+.bibbidi-panel-overlay[data-placement="fullscreen"]
+  .bibbidi-panel-overlay-surface {
+  width: 100%;
+  box-shadow: none;
+}
+.bibbidi-panel-overlay[data-placement="fullscreen"] .bibbidi-panel {
+  border-inline-start: 0;
+}
+.bibbidi-panel-overlay-surface > form {
+  height: 100%;
+  min-height: 0;
+}
+@keyframes bibbidi-panel-overlay-enter {
+  from {
+    transform: var(--panel-overlay-enter-transform, translateX(100%));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes bibbidi-panel-overlay-exit {
+  from {
+    transform: var(--panel-overlay-exit-transform, translateX(0));
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes bibbidi-panel-overlay-dim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bibbidi-panel-overlay-dim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.bibbidi-panel-overlay[data-state="open"] > .bibbidi-panel-overlay-surface {
+  animation: bibbidi-panel-overlay-enter 180ms ease-out both;
+}
+.bibbidi-panel-overlay[data-state="closing"] > .bibbidi-panel-overlay-surface {
+  animation: bibbidi-panel-overlay-exit 120ms ease-in both;
+}
+.bibbidi-panel-overlay[data-state="open"]::backdrop {
+  animation: bibbidi-panel-overlay-dim-in 180ms ease-out both;
+}
+.bibbidi-panel-overlay[data-state="closing"]::backdrop {
+  animation: bibbidi-panel-overlay-dim-out 120ms ease-in both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bibbidi-panel-overlay[data-state] > .bibbidi-panel-overlay-surface,
+  .bibbidi-panel-overlay[data-state]::backdrop {
+    animation: none;
+  }
+}

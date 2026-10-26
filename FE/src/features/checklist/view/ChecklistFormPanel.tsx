@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode, RefObject } from "react";
 import { IconButton } from "../../../components/icon-button";
 import { CloseIcon } from "../../../components/icons/ActionIcons";
 import { TopNavigation } from "../../../components/top-navigation";
-import { containTabFocus } from "../../../shared/focus/containTabFocus";
+import { Panel } from "../../../components/panel";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import "./ChecklistFormPanel.css";
 
@@ -43,78 +43,81 @@ export function ChecklistFormPanel({
 }: ChecklistFormPanelProps) {
   const mobile = useIsMobileLayout();
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    if (modal) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
       const form = formRef.current;
       if (
-        !form ||
-        !form.contains(event.target as Node) ||
+        !form?.contains(event.target as Node) ||
+        blocked ||
         event.defaultPrevented ||
-        event.isComposing ||
-        blocked
+        event.isComposing
       )
         return;
-      if (mobile && !modal) containTabFocus(event, form);
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
         if (!isSubmitting) onClose();
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [formRef, mobile, modal, blocked, isSubmitting, onClose]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [formRef, modal, blocked, isSubmitting, onClose]);
+  const Container = modal ? "div" : "aside";
   return (
-    <aside
+    <Container
       className="checklist-form-panel"
-      data-mobile={mobile || undefined}
       aria-labelledby={titleId}
-      role={mobile || modal ? "dialog" : "complementary"}
-      aria-modal={mobile || modal ? true : undefined}
       aria-hidden={blocked || undefined}
       inert={blocked || undefined}
     >
       <form noValidate ref={formRef} onSubmit={onSubmit}>
-        {mobile ? (
-          <TopNavigation
-            title={<span id={titleId}>{title}</span>}
-            subtitle={subtitle}
-            headingLevel={2}
-            sticky={false}
-            safeArea
-            divider
-            leading={
-              mobileAction === "close" ? (
-                <TopNavigation.CloseButton
-                  aria-label={closeLabel}
-                  disabled={isSubmitting}
-                  onClick={onClose}
-                />
-              ) : (
-                <TopNavigation.BackButton
-                  aria-label={backLabel}
-                  disabled={isSubmitting}
-                  onClick={onClose}
-                />
-              )
-            }
-          />
-        ) : (
-          <header className="checklist-form-panel__header">
-            <div className="checklist-form-panel__heading">
-              <h2 id={titleId}>{title}</h2>
-              {subtitle && <p>{subtitle}</p>}
-            </div>
-            <IconButton
-              aria-label={closeLabel}
-              icon={<CloseIcon />}
-              disabled={isSubmitting}
-              onClick={onClose}
-            />
-          </header>
-        )}
-        <div className="checklist-form-panel__body">{children}</div>
-        <footer className="checklist-form-panel__footer">{actions}</footer>
+        <Panel
+          header={
+            mobile ? (
+              <TopNavigation
+                title={<span id={titleId}>{title}</span>}
+                subtitle={subtitle}
+                headingLevel={2}
+                sticky={false}
+                safeArea
+                divider
+                leading={
+                  mobileAction === "close" ? (
+                    <TopNavigation.CloseButton
+                      aria-label={closeLabel}
+                      disabled={isSubmitting}
+                      onClick={onClose}
+                    />
+                  ) : (
+                    <TopNavigation.BackButton
+                      aria-label={backLabel}
+                      disabled={isSubmitting}
+                      onClick={onClose}
+                    />
+                  )
+                }
+              />
+            ) : (
+              <Panel.Header
+                title={title}
+                titleId={titleId}
+                subtitle={subtitle}
+                actions={
+                  <IconButton
+                    aria-label={closeLabel}
+                    icon={<CloseIcon />}
+                    disabled={isSubmitting}
+                    onClick={onClose}
+                  />
+                }
+              />
+            )
+          }
+          footer={actions}
+        >
+          <div className="checklist-form-panel__fields">{children}</div>
+        </Panel>
       </form>
-    </aside>
+    </Container>
   );
 }

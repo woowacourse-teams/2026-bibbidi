@@ -205,7 +205,9 @@ describe("준비 로드맵 보기 전환", () => {
       fireEvent.click(
         within(dialog).getByRole("button", { name: new RegExp(nextView) }),
       );
-      expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull(),
+      );
       expect(document.body.style.overflow).toBe("");
       const nextTrigger = await screen.findByRole("button", { name: nextView });
       await waitFor(() => expect(document.activeElement).toBe(nextTrigger));
@@ -243,7 +245,7 @@ describe("준비 로드맵 보기 전환", () => {
       fireEvent.click(trigger);
       const dialog = screen.getByRole("dialog", { name: "보기 선택" });
       const handle = within(dialog).getByRole("button", {
-        name: "아래로 밀어 보기 선택 닫기",
+        name: "아래로 밀어 닫기",
       });
       expect(document.activeElement).toBe(handle);
       const lastOption = within(dialog).getByRole("button", {
@@ -256,37 +258,28 @@ describe("준비 로드맵 보기 전환", () => {
         fireEvent.click(
           within(dialog).getByRole("button", { name: "보기 선택 닫기" }),
         );
-      else if (method === "바깥 영역")
-        fireEvent.click(
-          screen
-            .getAllByRole("button", { name: "보기 선택 닫기" })
-            .find((button) => !dialog.contains(button))!,
-        );
-      else if (method === "Escape")
+      else if (method === "바깥 영역") {
+        fireEvent.pointerDown(dialog);
+        fireEvent.pointerUp(dialog);
+      } else if (method === "Escape")
         fireEvent.keyDown(handle, { key: "Escape" });
       else if (method === "현재 보기 선택")
         fireEvent.click(
           within(dialog).getByRole("button", { name: /내 로드맵/ }),
         );
       else {
-        fireEvent.pointerDown(handle, {
-          button: 0,
-          clientY: 20,
-          pointerId: 1,
-          pointerType: "touch",
+        const touch = (clientY: number) => ({
+          identifier: 1,
+          clientX: 100,
+          clientY,
         });
-        fireEvent.pointerMove(handle, {
-          clientY: 140,
-          pointerId: 1,
-          pointerType: "touch",
-        });
-        fireEvent.pointerUp(handle, {
-          clientY: 140,
-          pointerId: 1,
-          pointerType: "touch",
+        fireEvent.touchStart(handle, { touches: [touch(20)] });
+        fireEvent.touchMove(handle, { touches: [touch(140)] });
+        fireEvent.touchEnd(handle, {
+          touches: [],
+          changedTouches: [touch(140)],
         });
       }
-      fireEvent.transitionEnd(dialog, { propertyName: "transform" });
       await waitFor(() =>
         expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull(),
       );

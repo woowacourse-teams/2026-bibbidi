@@ -1,16 +1,11 @@
 .checklist-detail-content {
   display: flex;
-  min-height: 0;
-  overflow-y: auto;
-  flex: 1;
   flex-direction: column;
   gap: 32px;
-  padding: 24px;
 }
 
 .checklist-detail-content h3,
 .checklist-detail-content__properties,
-.checklist-detail-content__empty,
 .checklist-detail-content__appointments {
   margin: 0;
 }
@@ -87,16 +82,6 @@
 .checklist-detail-content__appointment-error {
   display: block;
   color: var(--color-fg-critical);
-}
-
-.checklist-detail-content__empty {
-  margin-top: 8px;
-  padding: 32px 16px;
-  border: 1px solid var(--color-stroke-neutral-weak);
-  border-radius: 8px;
-  color: var(--color-fg-neutral-muted);
-  font-size: 14px;
-  text-align: center;
 }
 
 @media (width < 768px) {

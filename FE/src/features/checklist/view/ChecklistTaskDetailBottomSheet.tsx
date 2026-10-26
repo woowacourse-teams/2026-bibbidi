@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { BottomSheet } from "../../../components/bottom-sheet";
-import { usePageScrollLock } from "../../../shared/scroll/usePageScrollLock";
+import { usePageScrollContainer } from "../../../shared/scroll/usePageScrollContainer";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
@@ -11,7 +11,6 @@ import {
 } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
 import { ChecklistTaskHeader } from "./ChecklistTaskHeader";
-import "./ChecklistTaskDetailBottomSheet.css";
 
 interface ChecklistTaskDetailBottomSheetProps {
   categories: ChecklistCategoryViewModel[];
@@ -37,30 +36,31 @@ export function ChecklistTaskDetailBottomSheetShell({
   titleId = "checklist-task-detail-bottom-sheet-title",
 }: ChecklistTaskDetailBottomSheetShellProps) {
   const [closing, setClosing] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  usePageScrollLock({ rootRef });
+  const { ref, environment } = usePageScrollContainer();
 
   return (
-    <div ref={rootRef}>
-      <BottomSheet
-        className="checklist-detail-bottom-sheet"
-        id="checklist-task-detail-bottom-sheet"
-        open={!closing}
-        onClose={() => setClosing(true)}
-        onExited={onClose}
-        aria-labelledby={titleId}
-        hasTextField
-        header={
-          typeof title === "string" ? (
-            <BottomSheet.Header id={titleId}>{title}</BottomSheet.Header>
-          ) : (
-            title
-          )
-        }
-      >
-        {children}
-      </BottomSheet>
+    <div ref={ref}>
+      {
+        <BottomSheet
+          scrollContainer={environment?.scrollContainer}
+          className="checklist-detail-bottom-sheet"
+          id="checklist-task-detail-bottom-sheet"
+          open={!closing}
+          onClose={() => setClosing(true)}
+          onExited={onClose}
+          aria-labelledby={titleId}
+          hasTextField
+          header={
+            typeof title === "string" ? (
+              <BottomSheet.Header id={titleId}>{title}</BottomSheet.Header>
+            ) : (
+              title
+            )
+          }
+        >
+          {children}
+        </BottomSheet>
+      }
     </div>
   );
 }

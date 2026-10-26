@@ -2,7 +2,8 @@ import { MouseEvent, useEffect, useRef, useState } from "react";
 
 import { Button } from "../../../components/button";
 import { Result } from "../../../components/result";
-import { canRestoreFocus } from "../../../shared/focus/useReturnFocus";
+import { useLayerPresence } from "../../../shared/modal/useLayerPresence";
+import { canFocus } from "../../../shared/focus/canFocus";
 import {
   WorkspaceLayout,
   useWorkspaceLayout,
@@ -119,10 +120,15 @@ export function Checklist({
     )
     .find(({ task }) => task.id === selectedTaskId);
   const hasAside = selectedTaskContext !== undefined || !!taskCreation?.isOpen;
-  const { ref: workspaceRef, layout } = useWorkspaceLayout(true, hasAside);
+  const { present: foregroundPresent, onExited: completeForegroundExit } =
+    useLayerPresence(hasAside);
+  const { ref: workspaceRef, layout } = useWorkspaceLayout(
+    true,
+    foregroundPresent,
+  );
   const isMobileLayout = layout.isMobile;
   const isOverlay =
-    !isMobileLayout && layout.asidePlacement === "overlay" && hasAside;
+    !isMobileLayout && layout.asidePlacement === "overlay" && foregroundPresent;
   const revealedCategoryId =
     revealCustomCategory?.requestId === dismissedRevealRequestId
       ? null
@@ -211,13 +217,14 @@ export function Checklist({
     const previousSelectedTaskId = previousSelectedTaskIdRef.current;
 
     if (previousSelectedTaskId !== null && selectedTaskId === null) {
+      if (foregroundPresent) return;
       const previousTaskButton =
         taskButtonRefs.current.get(previousSelectedTaskId) ??
         selectedTaskButtonRef.current;
 
       if (categoryChangeClosingDetailRef.current) {
         categoryChangeClosingDetailRef.current = false;
-      } else if (canRestoreFocus(previousTaskButton)) {
+      } else if (canFocus(previousTaskButton)) {
         previousTaskButton.focus({ preventScroll: true });
       } else {
         (fallbackFocusRef.current ?? addTaskButtonRef.current)?.focus({
@@ -230,7 +237,7 @@ export function Checklist({
       ? (taskButtonRefs.current.get(selectedTaskContext.task.id) ?? null)
       : null;
     previousSelectedTaskIdRef.current = selectedTaskId;
-  }, [selectedTaskContext, selectedTaskId]);
+  }, [foregroundPresent, selectedTaskContext, selectedTaskId]);
 
   useEffect(() => {
     if (
@@ -402,8 +409,7 @@ export function Checklist({
     else onDismissTaskDetail();
   };
   const isMobileForegroundOpen =
-    (isMobileLayout || isOverlay) &&
-    (selectedTaskContext !== undefined || isTaskCreationOpen);
+    (isMobileLayout || isOverlay) && foregroundPresent;
   const backgroundHidden = isMobileForegroundOpen || isForegroundBlocked;
   const navigation = (
     <div
@@ -419,200 +425,8 @@ export function Checklist({
       />
     </div>
   );
-  const foreground = hasAside ? (
-    <div
-      aria-hidden={
-        isLoginRequiredOpen ||
-        isStatusConfirmationOpen ||
-        isAppointmentDeletionOpen
-          ? true
-          : undefined
-      }
-      className="checklist-workspace__foreground"
-      inert={
-        isLoginRequiredOpen ||
-        isStatusConfirmationOpen ||
-        isAppointmentDeletionOpen
-          ? true
-          : undefined
-      }
-    >
-      <ChecklistForeground
-        modal={
-          isOverlay ||
-          (isMobileLayout &&
-            (isTaskCreationOpen ||
-              isAppointmentCreationOpen ||
-              isAppointmentEditingOpen))
-        }
-        overlay={isOverlay}
-        blocked={isForegroundBlocked}
-        restoreFocus={!isTaskCreationOpen}
-        onClose={closeForeground}
-        onEscape={
-          !isTaskCreationOpen &&
-          !isAppointmentCreationOpen &&
-          !isAppointmentEditingOpen
-            ? closeForeground
-            : undefined
-        }
-      >
-        {selectedTaskContext &&
-        !isMobileLayout &&
-        !isTaskCreationOpen &&
-        !isAppointmentCreationOpen &&
-        !isAppointmentEditingOpen ? (
-          <ChecklistTaskDetailPanel
-            modal={isOverlay}
-            appointmentManagement={appointmentManagement}
-            categories={categories}
-            categoryTitle={selectedTaskContext.categoryTitle}
-            editing={itemEditing}
-            onClose={onDismissTaskDetail}
-            onRequestScheduleCreation={onRequestScheduleCreation}
-            task={selectedTaskContext.task}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        isMobileLayout &&
-        !isTaskCreationOpen &&
-        !isAppointmentCreationOpen &&
-        !isAppointmentEditingOpen ? (
-          <ChecklistTaskDetailBottomSheet
-            appointmentManagement={appointmentManagement}
-            categories={categories}
-            categoryTitle={selectedTaskContext.categoryTitle}
-            editing={itemEditing}
-            onClose={onBackTaskDetail}
-            onRequestScheduleCreation={onRequestScheduleCreation}
-            task={selectedTaskContext.task}
-          />
-        ) : null}
-
-        {taskCreation && isTaskCreationOpen ? (
-          <ChecklistTaskCreation
-            modal={isMobileLayout || isOverlay}
-            categories={categories}
-            controller={taskCreation}
-            returnFocusRef={taskCreationTriggerRef}
-            fallbackFocusRef={addTaskButtonRef}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        appointmentCreation &&
-        isAppointmentCreationOpen ? (
-          <ChecklistAppointmentForm
-            modal={isMobileLayout || isOverlay}
-            controller={appointmentCreation}
-            taskTitle={selectedTaskContext.task.title}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        appointmentManagement &&
-        isAppointmentEditingOpen ? (
-          <ChecklistAppointmentForm
-            modal={isMobileLayout || isOverlay}
-            controller={appointmentManagement.editing}
-            heading="일정 수정"
-            taskTitle={selectedTaskContext.task.title}
-          />
-        ) : null}
-      </ChecklistForeground>
-    </div>
-  ) : undefined;
-
-  return (
+  const confirmations = (
     <>
-      <ChecklistHeader
-        categoryTitle={selectedCategory?.title}
-        taskCount={tasks.length}
-        completedCount={completedTaskCount}
-        isAuthenticated={isAuthenticated}
-        hidden={backgroundHidden}
-        onAddTask={openTaskCreation}
-        addTaskButtonRef={addTaskButtonRef}
-      />
-      <WorkspaceLayout
-        ref={workspaceRef}
-        layout={layout}
-        navigation={navigation}
-        aside={foreground}
-        className="checklist-workspace"
-      >
-        <div
-          aria-hidden={backgroundHidden || undefined}
-          className="checklist-workspace__main"
-          inert={backgroundHidden || undefined}
-        >
-          <section
-            aria-label={
-              layout.navigationPlacement === "side"
-                ? "결혼 준비 체크리스트"
-                : undefined
-            }
-            aria-labelledby={
-              layout.navigationPlacement === "top" && selectedCategory
-                ? getChecklistCategoryTabId(selectedCategory.id)
-                : undefined
-            }
-            role={layout.navigationPlacement === "top" ? "tabpanel" : undefined}
-            tabIndex={layout.navigationPlacement === "top" ? 0 : undefined}
-            className="checklist"
-            id="checklist-category-content"
-          >
-            {selectedCategory && tasks.length === 0 ? (
-              <Result
-                title="아직 담은 할 일이 없어요"
-                description="로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요."
-                button={
-                  <>
-                    <Result.Button
-                      size="large"
-                      color="primary"
-                      variant="fill"
-                      onClick={() => onVisitPreparation?.(selectedCategory.id)}
-                      type="button"
-                    >
-                      로드맵에서 추가
-                    </Result.Button>
-                    <Result.Button
-                      size="large"
-                      color="dark"
-                      variant="weak"
-                      onClick={openTaskCreation}
-                      type="button"
-                    >
-                      직접 추가
-                    </Result.Button>
-                  </>
-                }
-              />
-            ) : (
-              <ChecklistGroups
-                groups={selectedCategory?.groups ?? []}
-                value={expandedGroupValues}
-                onValueChange={changeExpandedGroups}
-                selectedTaskId={selectedTaskId}
-                detailId={
-                  isMobileLayout
-                    ? "checklist-task-detail-bottom-sheet"
-                    : "checklist-task-detail-panel"
-                }
-                firstGroupTriggerRef={fallbackFocusRef}
-                onSelectTask={selectTask}
-                onTaskButtonRef={(taskId, button) => {
-                  if (button) taskButtonRefs.current.set(taskId, button);
-                  else taskButtonRefs.current.delete(taskId);
-                }}
-              />
-            )}
-          </section>
-        </div>
-      </WorkspaceLayout>
-
       {isLoginRequiredOpen ? (
         <ChecklistDialog
           actions={
@@ -757,6 +571,188 @@ export function Checklist({
           title="이 할 일을 삭제할까요?"
         />
       ) : null}
+    </>
+  );
+  const foreground = foregroundPresent ? (
+    <ChecklistForeground
+      open={hasAside}
+      onExited={completeForegroundExit}
+      modal={
+        isOverlay ||
+        (isMobileLayout &&
+          (isTaskCreationOpen ||
+            isAppointmentCreationOpen ||
+            isAppointmentEditingOpen))
+      }
+      overlay={isOverlay}
+      blocked={isForegroundBlocked}
+      pending={isSubmitting}
+      titleId={
+        isTaskCreationOpen
+          ? "checklist-task-creation-title"
+          : isAppointmentCreationOpen || isAppointmentEditingOpen
+            ? "checklist-appointment-creation-title"
+            : `${selectedTaskContext?.task.id}-detail-title`
+      }
+      onClose={closeForeground}
+    >
+      {selectedTaskContext &&
+      !isMobileLayout &&
+      !isTaskCreationOpen &&
+      !isAppointmentCreationOpen &&
+      !isAppointmentEditingOpen ? (
+        <ChecklistTaskDetailPanel
+          modal={isOverlay}
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
+          onClose={onDismissTaskDetail}
+          onRequestScheduleCreation={onRequestScheduleCreation}
+          task={selectedTaskContext.task}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      isMobileLayout &&
+      !isTaskCreationOpen &&
+      !isAppointmentCreationOpen &&
+      !isAppointmentEditingOpen ? (
+        <ChecklistTaskDetailBottomSheet
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
+          onClose={onBackTaskDetail}
+          onRequestScheduleCreation={onRequestScheduleCreation}
+          task={selectedTaskContext.task}
+        />
+      ) : null}
+
+      {taskCreation && isTaskCreationOpen ? (
+        <ChecklistTaskCreation
+          modal={isMobileLayout || isOverlay}
+          categories={categories}
+          controller={taskCreation}
+          returnFocusRef={taskCreationTriggerRef}
+          fallbackFocusRef={addTaskButtonRef}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      appointmentCreation &&
+      isAppointmentCreationOpen ? (
+        <ChecklistAppointmentForm
+          modal={isMobileLayout || isOverlay}
+          controller={appointmentCreation}
+          taskTitle={selectedTaskContext.task.title}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      appointmentManagement &&
+      isAppointmentEditingOpen ? (
+        <ChecklistAppointmentForm
+          modal={isMobileLayout || isOverlay}
+          controller={appointmentManagement.editing}
+          heading="일정 수정"
+          taskTitle={selectedTaskContext.task.title}
+        />
+      ) : null}
+      {confirmations}
+    </ChecklistForeground>
+  ) : undefined;
+
+  return (
+    <>
+      <ChecklistHeader
+        categoryTitle={selectedCategory?.title}
+        taskCount={tasks.length}
+        completedCount={completedTaskCount}
+        isAuthenticated={isAuthenticated}
+        hidden={backgroundHidden}
+        onAddTask={openTaskCreation}
+        addTaskButtonRef={addTaskButtonRef}
+      />
+      <WorkspaceLayout
+        ref={workspaceRef}
+        layout={layout}
+        navigation={navigation}
+        aside={foreground}
+        className="checklist-workspace"
+      >
+        <div
+          aria-hidden={backgroundHidden || undefined}
+          className="checklist-workspace__main"
+          inert={backgroundHidden || undefined}
+        >
+          <section
+            aria-label={
+              layout.navigationPlacement === "side"
+                ? "결혼 준비 체크리스트"
+                : undefined
+            }
+            aria-labelledby={
+              layout.navigationPlacement === "top" && selectedCategory
+                ? getChecklistCategoryTabId(selectedCategory.id)
+                : undefined
+            }
+            role={layout.navigationPlacement === "top" ? "tabpanel" : undefined}
+            tabIndex={layout.navigationPlacement === "top" ? 0 : undefined}
+            className="checklist"
+            id="checklist-category-content"
+          >
+            {selectedCategory && tasks.length === 0 ? (
+              <Result
+                title="아직 담은 할 일이 없어요"
+                description="로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요."
+                button={
+                  <>
+                    <Result.Button
+                      size="large"
+                      color="primary"
+                      variant="fill"
+                      onClick={() => onVisitPreparation?.(selectedCategory.id)}
+                      type="button"
+                    >
+                      로드맵에서 추가
+                    </Result.Button>
+                    <Result.Button
+                      size="large"
+                      color="dark"
+                      variant="weak"
+                      onClick={openTaskCreation}
+                      type="button"
+                    >
+                      직접 추가
+                    </Result.Button>
+                  </>
+                }
+              />
+            ) : (
+              <ChecklistGroups
+                groups={selectedCategory?.groups ?? []}
+                value={expandedGroupValues}
+                onValueChange={changeExpandedGroups}
+                selectedTaskId={selectedTaskId}
+                detailId={
+                  isMobileLayout
+                    ? "checklist-task-detail-bottom-sheet"
+                    : "checklist-task-detail-panel"
+                }
+                firstGroupTriggerRef={fallbackFocusRef}
+                onSelectTask={selectTask}
+                onTaskButtonRef={(taskId, button) => {
+                  if (button) taskButtonRefs.current.set(taskId, button);
+                  else taskButtonRefs.current.delete(taskId);
+                }}
+              />
+            )}
+          </section>
+        </div>
+      </WorkspaceLayout>
+
+      {!foregroundPresent ? confirmations : null}
     </>
   );
 }
