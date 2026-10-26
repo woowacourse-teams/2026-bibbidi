@@ -1,9 +1,7 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 
-import { Button } from "../../../components/button";
 import { Result } from "../../../components/result";
 import { useLayerPresence } from "../../../shared/modal/useLayerPresence";
-import { canFocus } from "../../../shared/focus/canFocus";
 import {
   WorkspaceLayout,
   useWorkspaceLayout,
@@ -21,10 +19,11 @@ import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
 import { ChecklistAppointmentForm } from "./ChecklistAppointmentForm";
-import { ChecklistDialog } from "./ChecklistDialog";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
-import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
+import { ChecklistConfirmations } from "./ChecklistConfirmations";
+import { createChecklistConfirmationViewModel } from "../view-model/createChecklistConfirmationViewModel";
+import { useChecklistFocusRestoration } from "../useChecklistFocusRestoration";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
 import { ChecklistGroups } from "./ChecklistGroups";
 
@@ -93,27 +92,6 @@ export function Checklist({
   const [dismissedRevealRequestId, setDismissedRevealRequestId] = useState<
     number | null
   >(null);
-  const fallbackFocusRef = useRef<HTMLButtonElement>(null);
-  const addTaskButtonRef = useRef<HTMLButtonElement>(null);
-  const taskCreationTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const wasAppointmentCreationOpenRef = useRef(
-    appointmentCreation?.isOpen ?? false,
-  );
-  const appointmentCreationTaskIdRef = useRef(
-    appointmentCreation?.isOpen ? selectedTaskId : null,
-  );
-  const wasAppointmentEditingOpenRef = useRef(
-    appointmentManagement?.editing.isOpen ?? false,
-  );
-  const appointmentEditingIdRef = useRef<number | null>(null);
-  const wasDeletionOpenRef = useRef(
-    appointmentManagement?.deletionConfirmation !== null,
-  );
-  const deletionAppointmentIdRef = useRef<number | null>(null);
-  const previousSelectedTaskIdRef = useRef(selectedTaskId);
-  const categoryChangeClosingDetailRef = useRef(false);
-  const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
-  const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const selectedTaskContext = categories
     .flatMap((category) =>
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
@@ -157,162 +135,30 @@ export function Checklist({
   const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
   const isAppointmentEditingOpen =
     appointmentManagement?.editing.isOpen ?? false;
-  const deletionConfirmation =
-    appointmentManagement?.deletionConfirmation ?? null;
-  const isAppointmentDeletionOpen = deletionConfirmation !== null;
-  const appointmentOperationFeedback = appointmentManagement?.operationFeedback;
-  const isAppointmentDeletionPending =
-    deletionConfirmation !== null &&
-    appointmentOperationFeedback?.status === "pending" &&
-    appointmentOperationFeedback.operation === "delete" &&
-    appointmentOperationFeedback.appointmentId ===
-      deletionConfirmation.appointmentId;
-  const appointmentDeletionError =
-    deletionConfirmation !== null &&
-    appointmentOperationFeedback?.status === "error" &&
-    appointmentOperationFeedback.operation === "delete" &&
-    appointmentOperationFeedback.appointmentId ===
-      deletionConfirmation.appointmentId
-      ? appointmentOperationFeedback.errorMessage
-      : undefined;
-  const pendingStatusConfirmation = itemEditing?.statusConfirmation ?? null;
-  const statusConfirmation =
-    pendingStatusConfirmation?.itemId ===
-    selectedTaskContext?.task.checklistItemId
-      ? pendingStatusConfirmation
-      : null;
-  const isStatusConfirmationOpen = statusConfirmation !== null;
-  const isLoginRequiredOpen = loginRequiredReason !== null;
-  const statusFeedback = itemEditing?.changeFeedback;
-  const isStatusChangePending =
-    statusConfirmation !== null &&
-    statusFeedback?.status === "pending" &&
-    statusFeedback.itemId === statusConfirmation.itemId &&
-    statusFeedback.kind === "status";
-  const statusConfirmationError =
-    statusConfirmation !== null &&
-    statusFeedback?.status === "error" &&
-    statusFeedback.itemId === statusConfirmation.itemId &&
-    statusFeedback.kind === "status"
-      ? statusFeedback.errorMessage
-      : undefined;
-  const itemDeletionId = selectedTaskContext?.task.checklistItemId ?? null;
-  const isItemDeletionOpen =
-    itemDeletionId !== null &&
-    itemEditing?.deletionConfirmation === itemDeletionId;
-  const isItemDeletionPending =
-    isItemDeletionOpen &&
-    statusFeedback?.status === "pending" &&
-    statusFeedback.itemId === itemDeletionId &&
-    statusFeedback.kind === "delete";
-  const itemDeletionError =
-    isItemDeletionOpen &&
-    statusFeedback?.status === "error" &&
-    statusFeedback.itemId === itemDeletionId &&
-    statusFeedback.kind === "delete"
-      ? statusFeedback.errorMessage
-      : undefined;
-
-  useEffect(() => {
-    const previousSelectedTaskId = previousSelectedTaskIdRef.current;
-
-    if (previousSelectedTaskId !== null && selectedTaskId === null) {
-      if (foregroundPresent) return;
-      const previousTaskButton =
-        taskButtonRefs.current.get(previousSelectedTaskId) ??
-        selectedTaskButtonRef.current;
-
-      if (categoryChangeClosingDetailRef.current) {
-        categoryChangeClosingDetailRef.current = false;
-      } else if (canFocus(previousTaskButton)) {
-        previousTaskButton.focus({ preventScroll: true });
-      } else {
-        (fallbackFocusRef.current ?? addTaskButtonRef.current)?.focus({
-          preventScroll: true,
-        });
-      }
-    }
-
-    selectedTaskButtonRef.current = selectedTaskContext
-      ? (taskButtonRefs.current.get(selectedTaskContext.task.id) ?? null)
-      : null;
-    previousSelectedTaskIdRef.current = selectedTaskId;
-  }, [foregroundPresent, selectedTaskContext, selectedTaskId]);
-
-  useEffect(() => {
-    if (
-      !wasAppointmentCreationOpenRef.current &&
-      isAppointmentCreationOpen &&
-      selectedTaskContext
-    ) {
-      appointmentCreationTaskIdRef.current = selectedTaskContext.task.id;
-    }
-
-    if (
-      wasAppointmentCreationOpenRef.current &&
-      !isAppointmentCreationOpen &&
-      selectedTaskContext?.task.id === appointmentCreationTaskIdRef.current
-    ) {
-      document
-        .getElementById(`${selectedTaskContext.task.id}-add-appointment`)
-        ?.focus({ preventScroll: true });
-    }
-
-    if (!isAppointmentCreationOpen) {
-      appointmentCreationTaskIdRef.current = null;
-    }
-
-    wasAppointmentCreationOpenRef.current = isAppointmentCreationOpen;
-  }, [isAppointmentCreationOpen, selectedTaskContext]);
-
-  useEffect(() => {
-    if (
-      !wasAppointmentEditingOpenRef.current &&
-      isAppointmentEditingOpen &&
-      selectedTaskContext
-    ) {
-      appointmentEditingIdRef.current =
-        appointmentManagement?.editingAppointmentId ?? null;
-    }
-
-    if (wasAppointmentEditingOpenRef.current && !isAppointmentEditingOpen) {
-      const appointmentId = appointmentEditingIdRef.current;
-      if (appointmentId !== null) {
-        document
-          .getElementById(`${appointmentId}-appointment-menu-button`)
-          ?.focus({ preventScroll: true });
-      }
-    }
-
-    if (!isAppointmentEditingOpen) {
-      appointmentEditingIdRef.current = null;
-    }
-    wasAppointmentEditingOpenRef.current = isAppointmentEditingOpen;
-  }, [appointmentManagement, isAppointmentEditingOpen, selectedTaskContext]);
-
-  useEffect(() => {
-    if (!wasDeletionOpenRef.current && deletionConfirmation) {
-      deletionAppointmentIdRef.current = deletionConfirmation.appointmentId;
-    }
-
-    if (wasDeletionOpenRef.current && !deletionConfirmation) {
-      const trigger =
-        deletionAppointmentIdRef.current === null
-          ? null
-          : document.getElementById(
-              `${deletionAppointmentIdRef.current}-appointment-menu-button`,
-            );
-      (
-        trigger ??
-        document.getElementById(
-          `${selectedTaskContext?.task.id}-add-appointment`,
-        )
-      )?.focus({ preventScroll: true });
-      deletionAppointmentIdRef.current = null;
-    }
-
-    wasDeletionOpenRef.current = deletionConfirmation !== null;
-  }, [deletionConfirmation, selectedTaskContext]);
+  const isAppointmentDeletionOpen =
+    appointmentManagement?.deletionConfirmation != null;
+  const confirmationViewModel = createChecklistConfirmationViewModel({
+    selectedItemId: selectedTaskContext?.task.checklistItemId ?? null,
+    itemEditing,
+    appointmentManagement,
+  });
+  const {
+    fallbackFocusRef,
+    addTaskButtonRef,
+    taskCreationTriggerRef,
+    registerTaskButton,
+    rememberTaskSelection,
+    skipTaskFocusRestoration,
+  } = useChecklistFocusRestoration({
+    selectedTaskId,
+    activeTaskId: selectedTaskContext?.task.id ?? null,
+    foregroundPresent,
+    isAppointmentCreationOpen,
+    isAppointmentEditingOpen,
+    editingAppointmentId: appointmentManagement?.editingAppointmentId ?? null,
+    deletionAppointmentId:
+      appointmentManagement?.deletionConfirmation?.appointmentId ?? null,
+  });
 
   useEffect(() => {
     if (
@@ -371,15 +217,14 @@ export function Checklist({
       return;
     }
 
-    categoryChangeClosingDetailRef.current = selectedTaskId !== null;
+    skipTaskFocusRestoration();
     setSelectedCategoryId(categoryId);
     setDismissedRevealRequestId(revealCustomCategory?.requestId ?? null);
     onCloseTaskDetail();
   };
 
   const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
-    categoryChangeClosingDetailRef.current = false;
-    selectedTaskButtonRef.current = event.currentTarget;
+    rememberTaskSelection(event.currentTarget);
     onSelectTask(taskId);
   };
 
@@ -390,10 +235,9 @@ export function Checklist({
   };
 
   const isForegroundBlocked =
-    isLoginRequiredOpen ||
-    isStatusConfirmationOpen ||
-    isAppointmentDeletionOpen ||
-    isItemDeletionOpen ||
+    loginRequiredReason !== null ||
+    confirmationViewModel.statusChange !== null ||
+    confirmationViewModel.deletions.length > 0 ||
     !!taskCreation?.isDiscardDialogOpen ||
     !!appointmentCreation?.isDiscardDialogOpen ||
     !!appointmentManagement?.editing.isDiscardDialogOpen;
@@ -426,152 +270,14 @@ export function Checklist({
     </div>
   );
   const confirmations = (
-    <>
-      {isLoginRequiredOpen ? (
-        <ChecklistDialog
-          actions={
-            <>
-              <Button
-                size="large"
-                color="dark"
-                variant="weak"
-                onClick={onCancelLoginRequired}
-                type="button"
-              >
-                취소
-              </Button>
-              <Button size="large" onClick={onVisitLogin} type="button">
-                로그인
-              </Button>
-            </>
-          }
-          description={
-            loginRequiredReason === "schedule-creation"
-              ? "일정을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
-              : "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
-          }
-          onBackdropPress={onCancelLoginRequired}
-          onEscape={onCancelLoginRequired}
-          title="로그인이 필요해요"
-          returnFocusRef={
-            loginRequiredReason === "task-creation"
-              ? taskCreationTriggerRef
-              : undefined
-          }
-          fallbackFocusRef={addTaskButtonRef}
-        />
-      ) : null}
-
-      {statusConfirmation ? (
-        <ChecklistStatusConfirmationDialog
-          isPending={isStatusChangePending}
-          errorMessage={statusConfirmationError}
-          onCancel={() =>
-            itemEditing?.cancelStatusChange(statusConfirmation.itemId)
-          }
-          onConfirm={() =>
-            void itemEditing?.confirmStatusChange(statusConfirmation.itemId)
-          }
-        />
-      ) : null}
-
-      {deletionConfirmation && appointmentManagement ? (
-        <ChecklistDialog
-          actions={
-            <>
-              <Button
-                size="large"
-                color="dark"
-                variant="weak"
-                disabled={isAppointmentDeletionPending}
-                onClick={appointmentManagement.cancelDelete}
-                type="button"
-              >
-                취소
-              </Button>
-              <Button
-                size="large"
-                color="danger"
-                aria-busy={isAppointmentDeletionPending}
-                disabled={isAppointmentDeletionPending}
-                onClick={() => void appointmentManagement.confirmDelete()}
-                type="button"
-              >
-                {isAppointmentDeletionPending ? "삭제 중" : "삭제"}
-              </Button>
-            </>
-          }
-          description={
-            <>
-              삭제한 일정은 다시 복구할 수 없어요.
-              {appointmentDeletionError ? (
-                <p role="alert">{appointmentDeletionError}</p>
-              ) : null}
-            </>
-          }
-          onBackdropPress={
-            isAppointmentDeletionPending
-              ? undefined
-              : appointmentManagement.cancelDelete
-          }
-          onEscape={
-            isAppointmentDeletionPending
-              ? undefined
-              : appointmentManagement.cancelDelete
-          }
-          title="이 일정을 삭제할까요?"
-        />
-      ) : null}
-      {isItemDeletionOpen &&
-      itemEditing?.cancelDelete &&
-      itemEditing.confirmDelete ? (
-        <ChecklistDialog
-          actions={
-            <>
-              <Button
-                size="large"
-                color="dark"
-                variant="weak"
-                disabled={isItemDeletionPending}
-                onClick={() => itemEditing.cancelDelete?.()}
-                type="button"
-              >
-                취소
-              </Button>
-              <Button
-                size="large"
-                color="danger"
-                aria-busy={isItemDeletionPending}
-                disabled={isItemDeletionPending}
-                onClick={() => void itemEditing.confirmDelete?.()}
-                type="button"
-              >
-                {isItemDeletionPending ? "삭제 중" : "삭제"}
-              </Button>
-            </>
-          }
-          description={
-            <>
-              삭제한 할 일과 연결된 일정은 다시 복구할 수 없어요.
-              {itemDeletionError ? (
-                <p role="alert">{itemDeletionError}</p>
-              ) : null}
-            </>
-          }
-          onBackdropPress={
-            isItemDeletionPending
-              ? undefined
-              : () => itemEditing.cancelDelete?.()
-          }
-          onEscape={
-            isItemDeletionPending
-              ? undefined
-              : () => itemEditing.cancelDelete?.()
-          }
-          title="이 할 일을 삭제할까요?"
-        />
-      ) : null}
-    </>
+    <ChecklistConfirmations
+      confirmations={confirmationViewModel}
+      loginRequiredReason={loginRequiredReason}
+      onCancelLoginRequired={onCancelLoginRequired}
+      onVisitLogin={onVisitLogin}
+      taskCreationTriggerRef={taskCreationTriggerRef}
+      fallbackFocusRef={addTaskButtonRef}
+    />
   );
   const foreground = foregroundPresent ? (
     <ChecklistForeground
@@ -742,10 +448,7 @@ export function Checklist({
                 }
                 firstGroupTriggerRef={fallbackFocusRef}
                 onSelectTask={selectTask}
-                onTaskButtonRef={(taskId, button) => {
-                  if (button) taskButtonRefs.current.set(taskId, button);
-                  else taskButtonRefs.current.delete(taskId);
-                }}
+                onTaskButtonRef={registerTaskButton}
               />
             )}
           </section>
