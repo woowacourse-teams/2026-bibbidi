@@ -39,11 +39,14 @@ export function ChecklistTaskDetailPanel({
     <Container
       aria-labelledby={titleId}
       className="checklist-detail-panel"
+      data-presentation={modal ? "overlay" : "docked"}
       id="checklist-task-detail-panel"
     >
       <Panel
+        className="checklist-detail-panel__surface"
         header={
           <Panel.Header
+            className="checklist-detail-panel__header"
             heading={
               <ChecklistTaskHeader
                 editing={editing}

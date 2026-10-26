@@ -3,7 +3,7 @@ import { ChevronRight } from "../icons/Chevron";
 import "./ListRow.css";
 
 export type ListRowVerticalPadding = "small" | "medium" | "large" | "xlarge";
-export type ListRowHorizontalPadding = "small" | "medium";
+export type ListRowHorizontalPadding = "none" | "small" | "medium";
 type RowOptions = {
   left?: ReactNode;
   contents: ReactNode;

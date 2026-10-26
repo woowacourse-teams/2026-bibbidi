@@ -1,0 +1,50 @@
+.bibbidi-list-header {
+  --list-header-padding-x: 24px;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px var(--list-header-padding-x);
+  color: var(--color-fg-neutral);
+  letter-spacing: var(--letter-spacing-ui);
+}
+.bibbidi-list-header[hidden] {
+  display: none;
+}
+.bibbidi-list-header[data-horizontal-padding="none"] {
+  --list-header-padding-x: 0px;
+}
+.bibbidi-list-header[data-horizontal-padding="small"] {
+  --list-header-padding-x: 20px;
+}
+.bibbidi-list-header-main {
+  flex: 1 1 12ch;
+  min-width: 0;
+}
+.bibbidi-list-header-title {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6-medium);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.bibbidi-list-header-description {
+  margin-top: 4px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.bibbidi-list-header-right {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

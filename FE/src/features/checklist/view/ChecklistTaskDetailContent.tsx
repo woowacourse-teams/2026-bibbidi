@@ -3,9 +3,13 @@ import { Result } from "../../../components/result";
 import { Button } from "../../../components/button";
 import { Checkbox } from "../../../components/checkbox";
 import { IconButton } from "../../../components/icon-button";
-import { MoreVerticalIcon } from "../../../components/icons/ActionIcons";
+import {
+  MoreVerticalIcon,
+  PlusIcon,
+} from "../../../components/icons/ActionIcons";
 import { Menu } from "../../../components/menu";
 import { ListRow } from "../../../components/list-row";
+import { ListHeader } from "../../../components/list-header";
 
 import {
   ChecklistCategoryViewModel,
@@ -39,6 +43,7 @@ function ChecklistPropertyRow({
   return (
     <ListRow.Description
       border={first ? "none" : "indented"}
+      horizontalPadding="none"
       term={label}
       description={
         <span className="checklist-detail-content__property-value">
@@ -80,6 +85,7 @@ function ChecklistAppointment({
     >
       <ListRow
         border={first ? "none" : "indented"}
+        horizontalPadding="none"
         left={
           <span className="checklist-detail-content__appointment-leading">
             <Checkbox.Circle
@@ -118,16 +124,10 @@ function ChecklistAppointment({
                 {appointment.title}
               </span>
             }
-            middle={
-              <span className="checklist-detail-content__appointment-meta">
-                {appointment.timeLabel} · {appointment.placeLabel}
-              </span>
-            }
+            middle={`${appointment.timeLabel} · ${appointment.placeLabel}`}
             bottom={
               <>
-                <span className="checklist-detail-content__appointment-memo">
-                  {appointment.memoLabel}
-                </span>
+                {appointment.memoLabel}
                 {completionError ? (
                   <span
                     className="checklist-detail-content__appointment-error"
@@ -189,7 +189,12 @@ export function ChecklistTaskDetailContent({
   return (
     <div className="checklist-detail-content">
       <section aria-labelledby={`${task.id}-information-title`}>
-        <h3 id={`${task.id}-information-title`}>할 일 정보</h3>
+        <ListHeader
+          title="할 일 정보"
+          titleId={`${task.id}-information-title`}
+          headingLevel={3}
+          horizontalPadding="none"
+        />
         <dl className="checklist-detail-content__properties">
           <ChecklistPropertyRow label="카테고리" first>
             <ChecklistTaskCategoryEditor
@@ -206,26 +211,29 @@ export function ChecklistTaskDetailContent({
       </section>
 
       <section aria-labelledby={`${task.id}-appointments-title`}>
-        <div className="checklist-detail-content__appointments-header">
-          <h3 id={`${task.id}-appointments-title`}>
-            일정 {task.appointments.length}개
-          </h3>
-          {onRequestScheduleCreation ? (
-            <Button
-              size="small"
-              variant="weak"
-              id={`${task.id}-add-appointment`}
-              onClick={(event) => {
-                event.currentTarget.focus();
-                onRequestScheduleCreation();
-              }}
-              type="button"
-            >
-              <span aria-hidden="true">＋</span>
-              일정 추가
-            </Button>
-          ) : null}
-        </div>
+        <ListHeader
+          title={`일정 ${task.appointments.length}개`}
+          titleId={`${task.id}-appointments-title`}
+          headingLevel={3}
+          horizontalPadding="none"
+          right={
+            onRequestScheduleCreation ? (
+              <Button
+                size="small"
+                variant="weak"
+                id={`${task.id}-add-appointment`}
+                onClick={(event) => {
+                  event.currentTarget.focus();
+                  onRequestScheduleCreation();
+                }}
+                type="button"
+              >
+                <PlusIcon size={16} />
+                일정 추가
+              </Button>
+            ) : null
+          }
+        />
         {task.appointments.length === 0 ? (
           <Result headingLevel={4} title="등록된 일정이 없어요." />
         ) : (

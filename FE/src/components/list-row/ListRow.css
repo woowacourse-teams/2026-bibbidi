@@ -30,6 +30,10 @@
 .bibbidi-list-row[data-vertical-padding="xlarge"] {
   --list-row-padding-y: 24px;
 }
+.bibbidi-list-row[data-horizontal-padding="none"] {
+  --list-row-padding-x: 0px;
+}
+
 .bibbidi-list-row[data-horizontal-padding="small"] {
   --list-row-padding-x: 20px;
 }
