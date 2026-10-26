@@ -52,11 +52,15 @@ describe("Select", () => {
     );
     fireEvent.keyDown(trigger, { key: "End" });
     fireEvent.keyDown(trigger, { key: "Enter" });
+    const active = trigger.getAttribute("aria-activedescendant");
+    fireEvent.pointerMove(screen.getByRole("option", { name: "완료" }));
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(active);
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     expect(onChange).not.toHaveBeenCalled();
     expect(trigger.getAttribute("aria-disabled")).toBe("true");
     expect(document.activeElement).toBe(trigger);
     expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe("true");
   });
 
   it("제어된 선택기의 저장 실패는 활성 옵션과 기존 선택값을 유지해 재시도할 수 있다", () => {

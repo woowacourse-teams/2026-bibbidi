@@ -512,6 +512,7 @@ export function Select(props: SelectProps) {
           aria-label={props.listLabel}
           aria-labelledby={props.listLabel ? undefined : `${id}-label`}
           aria-multiselectable={props.multiple || undefined}
+          aria-busy={loading || undefined}
           className="bibbidi-select-list"
           data-size={size}
           style={position}
@@ -555,7 +556,7 @@ export function Select(props: SelectProps) {
                     className="bibbidi-select-option"
                     data-active={activeIndex === index || undefined}
                     onPointerMove={() => {
-                      if (!option.disabled) setActive(index);
+                      if (!option.disabled && !loading) setActive(index);
                     }}
                     onClick={() => choose(index)}
                   >
