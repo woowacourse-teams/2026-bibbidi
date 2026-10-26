@@ -43,7 +43,11 @@ let media: ReturnType<typeof installMatchMedia>;
 
 function Harness({
   loginRequiredReason = null,
-}: { loginRequiredReason?: "schedule-creation" | null } = {}) {
+  onCancelLoginRequired,
+}: {
+  loginRequiredReason?: "schedule-creation" | null;
+  onCancelLoginRequired?: () => void;
+} = {}) {
   const [selected, setSelected] = useState<string | null>(null);
   const creation = useChecklistTaskCreation({});
   const appointment = useChecklistAppointmentCreation({
@@ -61,6 +65,7 @@ function Harness({
         <Checklist
           categories={categories}
           loginRequiredReason={loginRequiredReason}
+          onCancelLoginRequired={onCancelLoginRequired}
           selectedTaskId={selected}
           onSelectTask={setSelected}
           onCloseTaskDetail={() => setSelected(null)}
@@ -146,9 +151,16 @@ it("상세를 병렬 패널·오버레이·바텀시트로 바꾸고 닫으면 �
   ).toBeTruthy();
   resize(1024);
   const dialog = screen.getByRole("dialog", { name: "웨딩홀 방문" });
+  expect(screen.getAllByRole("dialog", { name: "웨딩홀 방문" })).toHaveLength(
+    1,
+  );
   expect(dialog.tagName).toBe("DIALOG");
+  expect(dialog.classList.contains("bibbidi-panel-overlay")).toBe(true);
   expect((dialog as HTMLDialogElement).open).toBe(true);
   expect(dialog.getAttribute("aria-modal")).toBe("true");
+  const panel = document.getElementById("checklist-task-detail-panel")!;
+  expect(panel.closest("dialog")).toBe(dialog);
+  expect(dialog.querySelector('[role="dialog"], dialog')).toBeNull();
   expect(scroll.style.overflow).toBe("hidden");
   const close = within(dialog).getByRole("button", { name: "할 일 상세 닫기" });
   close.focus();
@@ -341,6 +353,8 @@ it("취소 확인창을 연 채 배치를 바꿔도 확인창이 마지막에 �
     const confirmation = screen.getByRole("dialog", {
       name: "작성 중인 내용을 닫을까요?",
     });
+    expect(confirmation.parentElement).toBe(document.body);
+    expect(confirmation.closest('[inert], [aria-hidden="true"]')).toBeNull();
     expect(showModal.mock.contexts.at(-1)).toBe(confirmation);
     expect(document.activeElement?.textContent).toContain("계속 작성");
   }
@@ -390,17 +404,27 @@ it.each([390, 1024])(
 
 it("전역 확인창을 연 상태로 배치를 전환해도 상위 패널이 확인창을 덮지 않는다", () => {
   const showModal = vi.spyOn(HTMLDialogElement.prototype, "showModal");
+  const onCancelLoginRequired = vi.fn();
   const view = render(<Harness />);
   fireEvent.click(screen.getByRole("button", { name: /웨딩홀 방문/ }));
-  view.rerender(<Harness loginRequiredReason="schedule-creation" />);
+  view.rerender(
+    <Harness
+      loginRequiredReason="schedule-creation"
+      onCancelLoginRequired={onCancelLoginRequired}
+    />,
+  );
   for (const width of [1024, 390, 1440]) {
     resize(width);
     const confirmation = screen.getByRole("dialog", {
       name: "로그인이 필요해요",
     });
+    expect(confirmation.parentElement).toBe(document.body);
+    expect(confirmation.closest('[inert], [aria-hidden="true"]')).toBeNull();
     expect(showModal.mock.contexts.at(-1)).toBe(confirmation);
     expect(document.activeElement?.textContent).toBe("취소");
   }
+  fireEvent.click(screen.getByRole("button", { name: "취소" }));
+  expect(onCancelLoginRequired).toHaveBeenCalledOnce();
 });
 
 it("오버레이는 본문과 배경막 퇴장이 끝날 때까지 내용·스크롤 잠금을 유지한다", async () => {

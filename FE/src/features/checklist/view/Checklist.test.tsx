@@ -968,7 +968,7 @@ describe("Checklist 웹 상세 패널", () => {
   it("모바일 상세는 닫기 애니메이션이 끝난 뒤 목록 초점과 배경 스크롤을 복원한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     const { container } = render(
-      <div data-page-scroll-container>
+      <div data-modal-scope data-page-scroll-container>
         <ChecklistHarness />
       </div>,
     );

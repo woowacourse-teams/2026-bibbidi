@@ -39,4 +39,38 @@ describe("서비스 스크롤 영역 연결", () => {
     render(<Layer />);
     expect(screen.getByLabelText("스크롤 영역").textContent).toBe("없음");
   });
+  it("소속 범위가 없으면 문서의 다른 스크롤 영역을 선택하지 않는다", () => {
+    render(
+      <>
+        <div data-modal-scope>
+          <div data-page-scroll-container id="other" />
+        </div>
+        <Layer />
+      </>,
+    );
+    expect(screen.getByLabelText("스크롤 영역").textContent).toBe("없음");
+  });
+  it("소속 범위 안에 별도 범위만 있으면 그 스크롤 영역을 선택하지 않는다", () => {
+    render(
+      <div data-modal-scope>
+        <div data-modal-scope>
+          <div data-page-scroll-container id="nested" />
+        </div>
+        <Layer />
+      </div>,
+    );
+    expect(screen.getByLabelText("스크롤 영역").textContent).toBe("없음");
+  });
+  it("중첩 범위를 건너뛰고 소속 범위의 스크롤 영역을 찾는다", () => {
+    render(
+      <div data-modal-scope>
+        <div data-modal-scope>
+          <div data-page-scroll-container id="nested" />
+        </div>
+        <div data-page-scroll-container id="own" />
+        <Layer />
+      </div>,
+    );
+    expect(screen.getByLabelText("스크롤 영역").textContent).toBe("own");
+  });
 });
