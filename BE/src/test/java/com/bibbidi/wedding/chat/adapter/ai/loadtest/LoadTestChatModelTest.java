@@ -7,14 +7,37 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.test.StepVerifier;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import tools.jackson.databind.json.JsonMapper;
 
+@Isolated("가상 시간이 다른 스트리밍 테스트의 Reactor 스케줄러에 영향을 주지 않게 한다")
 class LoadTestChatModelTest {
 
     private static final Prompt PROMPT = new Prompt("안녕");
+
+    @Test
+    @DisplayName("첫 토큰 지연과 토큰 간격을 설정대로 유지한다")
+    void waitsForTheConfiguredFirstTokenAndChunkIntervals() {
+        LoadTestChatModel model = new LoadTestChatModel(
+                new LoadTestChatModelProperties(3000, 50, 3, 0), () -> 0.5);
+
+        StepVerifier.withVirtualTime(() -> model.stream(PROMPT))
+                .expectSubscription()
+                .expectNoEvent(Duration.ofMillis(2999))
+                .thenAwait(Duration.ofMillis(1))
+                .expectNextCount(1)
+                .expectNoEvent(Duration.ofMillis(49))
+                .thenAwait(Duration.ofMillis(1))
+                .expectNextCount(1)
+                .expectNoEvent(Duration.ofMillis(49))
+                .thenAwait(Duration.ofMillis(1))
+                .expectNextCount(1)
+                .expectComplete()
+                .verify(Duration.ofSeconds(2));
+    }
 
     @Test
     @DisplayName("설정한 토큰 수만큼 흘리고 끝난다")
