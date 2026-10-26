@@ -34,7 +34,10 @@ public class AiChatService {
         this.turnSubscribers = turnSubscribers;
     }
 
-    public Flux<ChatResult> chat(ChatCommand chatCommand, Supplier<CancelReason> outputCancelReason) {
+    public Flux<ChatResult> chat(
+            ChatCommand chatCommand,
+            Supplier<CancelReason> outputCancelReason
+    ) {
         UUID conversationId = chatCommand.conversationId() == null ? UUID.randomUUID() : chatCommand.conversationId();
         ConversationKey key = new ConversationKey(chatCommand.userId(), conversationId);
 
@@ -62,7 +65,9 @@ public class AiChatService {
     }
 
     private Flux<ChatResult> streamReply(
-            ConversationKey key, String message, Supplier<CancelReason> cancelReason
+            ConversationKey key,
+            String message,
+            Supplier<CancelReason> cancelReason
     ) {
         ChatTurn turn = new ChatTurn();
         TurnContext context = new TurnContext(key.userId(), key.conversationId(), message, LocalDateTime.now());

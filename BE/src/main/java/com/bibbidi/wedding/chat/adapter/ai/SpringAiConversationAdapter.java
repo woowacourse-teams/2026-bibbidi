@@ -6,8 +6,8 @@ import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
-import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.openai.errors.OpenAIException;
@@ -56,13 +56,30 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     @Override
     public Flux<ChatResult> stream(Long userId, String conversationKey, String userPrompt) {
         return mapModelErrors(Flux.defer(() -> {
-            UserMessage userMessage = new UserMessage(userPrompt);
-            Mono<ChatModelTier> selection = forcedTier.isBlank()
-                    ? classifier.classify(conversationKey, userPrompt)
-                    : Mono.just(ChatModelTier.valueOf(forcedTier.toUpperCase()));
-            return selection.flatMapMany(tier -> attempt(
-                    userId, conversationKey, userMessage, tier.fallbackOrder(), 0));
-        }));
+                            UserMessage userMessage = new UserMessage(userPrompt);
+                            Mono<ChatModelTier> selection = chatModel(conversationKey, userPrompt);
+                            return selection.flatMapMany(
+                                    tier -> attempt(
+                                            userId,
+                                            conversationKey,
+                                            userMessage,
+                                            tier.fallbackOrder(),
+                                            0
+                                    )
+                            );
+                        }
+                )
+        );
+    }
+
+    private Mono<ChatModelTier> chatModel(String conversationKey, String userPrompt) {
+        if (forcedTier.isBlank()) {
+            return classifier.classify(conversationKey, userPrompt);
+        }
+
+        return Mono.just(
+                ChatModelTier.valueOf(forcedTier.toUpperCase())
+        );
     }
 
     private static Flux<ChatResult> mapModelErrors(Flux<ChatResult> results) {
