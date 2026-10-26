@@ -4,21 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import com.bibbidi.wedding.chat.service.dto.ChatCommand;
-import com.bibbidi.wedding.chat.service.dto.ChatEvent;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
-import com.bibbidi.wedding.chat.service.port.AiConversationPort;
-import com.bibbidi.wedding.chat.service.port.AiResponse;
+import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
-import com.bibbidi.wedding.chat.service.turn.TurnConsumer;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
-import com.bibbidi.wedding.chat.service.turn.TurnSignal;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -53,36 +48,29 @@ class AiChatServiceTest {
     private static final UUID ANOTHER_CONVERSATION_ID = UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea98");
 
     private final List<ModelCall> modelCalls = new CopyOnWriteArrayList<>();
-    private final List<List<TurnSignal>> recordedTurns = new CopyOnWriteArrayList<>();
+    private final List<List<ChatResult>> recordedTurns = new CopyOnWriteArrayList<>();
     private final List<TurnContext> recordedContexts = new CopyOnWriteArrayList<>();
     private final AtomicBoolean transactionActiveAtModelCall = new AtomicBoolean(true);
     private volatile Supplier<Flux<String>> responder = Flux::empty;
     private AiChatService service;
-    private List<ChatEvent> received;
+    private List<ChatResult> received;
     private ExecutorService executor;
     private AtomicBoolean responseFinished;
 
     @BeforeEach
     void setUp() {
         service = new AiChatService(
-                new AiConversationPort() {
-                    @Override
-                    public String modelName() {
-                        return "test-model";
-                    }
-
-                    @Override
-                    public Flux<AiResponse> stream(Long userId, String conversationKey, String userPrompt) {
-                        transactionActiveAtModelCall.set(TransactionSynchronizationManager.isActualTransactionActive());
-                        modelCalls.add(new ModelCall(userId, conversationKey, userPrompt));
-                        return parsedResponse(responder.get());
-                    }
+                (userId, conversationKey, userPrompt) -> {
+                    transactionActiveAtModelCall.set(TransactionSynchronizationManager.isActualTransactionActive());
+                    modelCalls.add(new ModelCall(userId, conversationKey, userPrompt));
+                    return parsedResponse(responder.get());
                 },
-                List.of((TurnConsumer) (context, signals) -> {
-                    List<TurnSignal> turn = new CopyOnWriteArrayList<>();
+                List.of(new ClientSubscriber(), (context, results) -> {
+                    List<ChatResult> turn = new CopyOnWriteArrayList<>();
                     recordedTurns.add(turn);
                     recordedContexts.add(context);
-                    signals.subscribe(turn::add);
+                    results.subscribe(turn::add);
+                    return Flux.empty();
                 }));
         executor = Executors.newVirtualThreadPerTaskExecutor();
         responseFinished = new AtomicBoolean();
@@ -104,21 +92,21 @@ class AiChatServiceTest {
 
         // when
         publisher.next("{\"answer\":\"웨딩홀 ");
-        await().until(() -> received.contains(new ChatEvent.Delta("웨딩홀 ")));
+        await().until(() -> receivedDelta("웨딩홀 "));
         publisher.next("계약을 확인하세요.\",\"recommendedItemIds\":[]}");
-        await().until(() -> received.contains(new ChatEvent.Delta("계약을 확인하세요.")));
+        await().until(() -> receivedDelta("계약을 확인하세요."));
         publisher.complete();
         responseTask.get(5, TimeUnit.SECONDS);
 
         // then
         assertThat(received).containsExactly(
-                new ChatEvent.Conversation(CONVERSATION_ID.toString()),
-                new ChatEvent.Delta("웨딩홀 "),
-                new ChatEvent.Delta("계약을 확인하세요."),
-                new ChatEvent.Done(CONVERSATION_ID.toString()));
-        assertThat(recordedTurns.getFirst()).filteredOn(TurnSignal.Chunk.class::isInstance)
-                .extracting(signal -> ((TurnSignal.Chunk) signal).text())
-                .containsExactly("{\"answer\":\"웨딩홀 ", "계약을 확인하세요.\",\"recommendedItemIds\":[]}");
+                new ChatResult.Conversation(CONVERSATION_ID.toString()),
+                new ChatResult.Delta("웨딩홀 "),
+                new ChatResult.Delta("계약을 확인하세요."),
+                new ChatResult.Answer("웨딩홀 계약을 확인하세요.", List.of()),
+                new ChatResult.Completed());
+        assertThat(recordedTurns.getFirst()).filteredOn(ChatResult.Delta.class::isInstance)
+                .containsExactly(new ChatResult.Delta("웨딩홀 "), new ChatResult.Delta("계약을 확인하세요."));
     }
 
     @Test
@@ -131,9 +119,10 @@ class AiChatServiceTest {
         runChat(USER_ID, null, "질문");
 
         // then
-        ChatEvent.Conversation conversation = (ChatEvent.Conversation) received.getFirst();
+        ChatResult.Conversation conversation = (ChatResult.Conversation) received.getFirst();
         UUID generatedId = UUID.fromString(conversation.conversationId());
-        assertThat(received.getLast()).isEqualTo(new ChatEvent.Done(generatedId.toString()));
+        assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
+        assertThat(generatedId).isNotNull();
     }
 
     @Test
@@ -153,15 +142,13 @@ class AiChatServiceTest {
     @DisplayName("모델이 낸 추천 ID를 추가 조회 없이 카드로 전달한 뒤 Done을 보낸다")
     void forwardsRecommendedItemIds() {
         // given
-        respondWith(Flux.just(MAPPER.writeValueAsString(new ChatAnswer("답변", List.of(99L, 1L)))));
+        respondWith(Flux.just(MAPPER.writeValueAsString(new ChatResult.Answer("답변", List.of(99L, 1L)))));
 
         // when
         runChat(USER_ID, CONVERSATION_ID, "추천해줘");
 
         // then
-        assertThat(received).containsSubsequence(
-                new ChatEvent.Component(List.of(99L, 1L)),
-                new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(lastAnswer().recommendedItemIds()).containsExactly(99L, 1L);
     }
 
     @Test
@@ -203,13 +190,13 @@ class AiChatServiceTest {
 
         // when
         publisher.next("{\"answer\":\"일부 답변");
-        await().until(() -> received.contains(new ChatEvent.Delta("일부 답변")));
+        await().until(() -> receivedDelta("일부 답변"));
         publisher.error(new IllegalStateException("비공개 제공사 오류"));
 
         // then
         assertThatThrownBy(() -> responseTask.get(5, TimeUnit.SECONDS))
                 .hasCauseInstanceOf(IllegalStateException.class);
-        assertThat(received).noneMatch(event -> event instanceof ChatEvent.Done);
+        assertThat(received).noneMatch(event -> event instanceof ChatResult.Completed);
 
         // given
         respondWith(Flux.just(answerJson("새 답변")));
@@ -218,7 +205,7 @@ class AiChatServiceTest {
         runChat(USER_ID, CONVERSATION_ID, "다시 질문");
 
         // then
-        assertThat(received.getLast()).isEqualTo(new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -232,7 +219,7 @@ class AiChatServiceTest {
         assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "질문"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
-        assertThat(received).noneMatch(event -> event instanceof ChatEvent.Done);
+        assertThat(received).noneMatch(event -> event instanceof ChatResult.Completed);
     }
 
     static Stream<Arguments> emptyAnswers() {
@@ -251,9 +238,8 @@ class AiChatServiceTest {
         // when, then
         assertThatThrownBy(() -> runChat(USER_ID, CONVERSATION_ID, "추천해줘"))
                 .isInstanceOf(BusinessException.class);
-        assertThat(received).contains(new ChatEvent.Delta("부분 답변"));
-        assertThat(received).noneMatch(
-                event -> event instanceof ChatEvent.Component || event instanceof ChatEvent.Done);
+        assertThat(receivedDelta("부분 답변")).isTrue();
+        assertThat(received).noneMatch(event -> event instanceof ChatResult.Completed);
     }
 
     @Test
@@ -282,7 +268,7 @@ class AiChatServiceTest {
         assertThatThrownBy(() -> service.chat(new ChatCommand(USER_ID, CONVERSATION_ID, "질문"),
                         () -> CancelReason.CLIENT_DISCONNECTED)
                 .doOnNext(event -> {
-                    if (event instanceof ChatEvent.Done) {
+                    if (event instanceof ChatResult.Completed) {
                         throw new CancellationException("연결 종료");
                     }
                 }).blockLast()).isInstanceOf(CancellationException.class);
@@ -297,7 +283,7 @@ class AiChatServiceTest {
         Future<?> responseTask = executor.submit(() -> service.chat(new ChatCommand(USER_ID, CONVERSATION_ID, "질문"),
                         () -> CancelReason.CLIENT_DISCONNECTED)
                 .doOnNext(event -> {
-                    if (event instanceof ChatEvent.Delta) {
+                    if (event instanceof ChatResult.Delta delta && !delta.text().isEmpty()) {
                         throw new CancellationException("소비 중단");
                     }
                 }).blockLast());
@@ -321,7 +307,7 @@ class AiChatServiceTest {
                 TestPublisher.Violation.DEFER_CANCELLATION);
         Future<?> responseTask = startStreamingChat(publisher);
         publisher.next("{\"answer\":\"중단할 답변");
-        await().until(() -> received.contains(new ChatEvent.Delta("중단할 답변")));
+        await().until(() -> receivedDelta("중단할 답변"));
 
         // when
         responseTask.cancel(true);
@@ -334,7 +320,7 @@ class AiChatServiceTest {
         publisher.next(answerJson("늦은 답변")).complete();
 
         // then
-        assertThat(received).noneMatch(event -> event instanceof ChatEvent.Done);
+        assertThat(received).noneMatch(event -> event instanceof ChatResult.Completed);
 
         // given
         respondWith(Flux.just(answerJson("재시도")));
@@ -343,7 +329,7 @@ class AiChatServiceTest {
         runChat(USER_ID, CONVERSATION_ID, "재요청");
 
         // then
-        assertThat(received.getLast()).isEqualTo(new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
     }
 
     @Test
@@ -360,9 +346,9 @@ class AiChatServiceTest {
         // then
         firstResponse.get(5, TimeUnit.SECONDS);
         publisher.assertCancelled();
-        assertThat(received).contains(new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(received).anyMatch(event -> event instanceof ChatResult.Completed);
         await().untilAsserted(() -> assertThat(recordedTurns.getFirst()).last()
-                .isInstanceOfSatisfying(TurnSignal.Cancelled.class,
+                .isInstanceOfSatisfying(ChatResult.Cancelled.class,
                         cancelled -> assertThat(cancelled.reason()).isEqualTo(CancelReason.SUPERSEDED)));
     }
 
@@ -373,7 +359,7 @@ class AiChatServiceTest {
         TestPublisher<String> publisher = TestPublisher.create();
         Future<?> firstResponse = startStreamingChat(publisher);
         publisher.next("{\"answer\":\"웨딩홀은 ");
-        await().until(() -> received.contains(new ChatEvent.Delta("웨딩홀은 ")));
+        await().until(() -> receivedDelta("웨딩홀은 "));
         respondWith(Flux.just(answerJson("새 답변")));
 
         // when
@@ -381,7 +367,7 @@ class AiChatServiceTest {
 
         // then
         firstResponse.get(5, TimeUnit.SECONDS);
-        assertThat(received.stream().filter(event -> event instanceof ChatEvent.Done)).hasSize(1);
+        assertThat(received.stream().filter(event -> event instanceof ChatResult.Completed)).hasSize(1);
         assertThat(modelCalls).extracting(ModelCall::prompt).containsExactly("질문", "새 질문");
     }
 
@@ -405,7 +391,7 @@ class AiChatServiceTest {
         // then
         secondResponse.get(5, TimeUnit.SECONDS);
         secondPublisher.assertCancelled();
-        assertThat(received.stream().filter(event -> event instanceof ChatEvent.Done)).hasSize(1);
+        assertThat(received.stream().filter(event -> event instanceof ChatResult.Completed)).hasSize(1);
     }
 
     @Test
@@ -421,7 +407,7 @@ class AiChatServiceTest {
 
         // then
         publisher.assertWasNotCancelled();
-        assertThat(received.getLast()).isEqualTo(new ChatEvent.Done(CONVERSATION_ID.toString()));
+        assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
     }
 
     @Test
@@ -437,7 +423,7 @@ class AiChatServiceTest {
 
         // then
         publisher.assertWasNotCancelled();
-        assertThat(received.getLast()).isEqualTo(new ChatEvent.Done(ANOTHER_CONVERSATION_ID.toString()));
+        assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
     }
 
     @Test
@@ -511,7 +497,7 @@ class AiChatServiceTest {
 
     private void assertCancelReason(CancelReason reason) {
         assertThat(recordedTurns).hasSize(1);
-        assertThat(recordedTurns.getFirst()).last().isInstanceOfSatisfying(TurnSignal.Cancelled.class,
+        assertThat(recordedTurns.getFirst()).last().isInstanceOfSatisfying(ChatResult.Cancelled.class,
                 cancelled -> assertThat(cancelled.reason()).isEqualTo(reason));
     }
 
@@ -535,24 +521,35 @@ class AiChatServiceTest {
                 .doOnNext(received::add).blockLast();
     }
 
+    private boolean receivedDelta(String text) {
+        return received.stream().anyMatch(signal ->
+                signal instanceof ChatResult.Delta delta && delta.text().equals(text));
+    }
+
     private static String answerJson(String text) {
-        return MAPPER.writeValueAsString(new ChatAnswer(text, List.of()));
+        return MAPPER.writeValueAsString(new ChatResult.Answer(text, List.of()));
     }
 
     private void respondWith(Flux<String> response) {
         responder = () -> response;
     }
 
-    private static Flux<AiResponse> parsedResponse(Flux<String> rawResponse) {
+    private ChatResult.Answer lastAnswer() {
+        return received.stream()
+                .filter(ChatResult.Answer.class::isInstance)
+                .map(ChatResult.Answer.class::cast)
+                .reduce((first, second) -> second)
+                .orElseThrow();
+    }
+
+    private static Flux<ChatResult> parsedResponse(Flux<String> rawResponse) {
         return Flux.defer(() -> {
-            List<String> deltas = new ArrayList<>();
-            ReactiveChatAnswerStream parser = new JacksonChatAnswerParser(MAPPER).newSession(deltas::add);
-            Flux<AiResponse> chunks = rawResponse.map(raw -> {
-                deltas.clear();
-                parser.accept(raw);
-                return new AiResponse.Chunk(raw, List.copyOf(deltas));
-            });
-            return chunks.concatWith(Flux.defer(() -> Flux.just(new AiResponse.Answer(parser.finish()))));
+            ReactiveChatAnswerStream parser = new JacksonChatAnswerParser(MAPPER).newSession();
+            Flux<ChatResult> deltas = rawResponse
+                    .map(parser::accept)
+                    .filter(delta -> !delta.isEmpty())
+                    .map(ChatResult.Delta::new);
+            return deltas.concatWith(Flux.defer(() -> Flux.just(parser.finish())));
         });
     }
 

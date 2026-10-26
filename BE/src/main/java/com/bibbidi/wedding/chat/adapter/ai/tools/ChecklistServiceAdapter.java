@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.chat.adapter.ai.tools;
 
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
-import com.bibbidi.wedding.chat.service.dto.ChecklistSnapshot;
+import com.bibbidi.wedding.chat.service.dto.checklist.ChecklistSnapshot;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;

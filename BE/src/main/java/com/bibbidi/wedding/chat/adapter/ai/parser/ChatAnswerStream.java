@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.adapter.ai.parser;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ public final class ChatAnswerStream {
         responseReader = mapper.reader().with(StreamReadFeature.STRICT_DUPLICATE_DETECTION);
     }
 
-    public ChatAnswer read(Stream<String> chunks, Consumer<String> sendAnswerChunk) {
+    public ChatResult.Answer read(Stream<String> chunks, Consumer<String> sendAnswerChunk) {
         try (chunks; JsonParser parser = responseReader.createParser(new ChunkedReader(chunks.iterator()))) {
             return readResponse(parser, new AnswerDeltaWriter(sendAnswerChunk));
         } catch (JacksonException exception) {
@@ -32,7 +32,7 @@ public final class ChatAnswerStream {
         }
     }
 
-    private ChatAnswer readResponse(JsonParser parser, AnswerDeltaWriter answerWriter) {
+    private ChatResult.Answer readResponse(JsonParser parser, AnswerDeltaWriter answerWriter) {
         if (parser.nextToken() != JsonToken.START_OBJECT) {
             throw new BusinessException(ClientError.INTERNAL_ERROR, INVALID_OUTPUT);
         }
@@ -55,7 +55,7 @@ public final class ChatAnswerStream {
                 || answer.isBlank() || answerWriter.hasPendingText() || recommendedItemIds == null) {
             throw new BusinessException(ClientError.INTERNAL_ERROR, INVALID_OUTPUT);
         }
-        return new ChatAnswer(answer, recommendedItemIds);
+        return new ChatResult.Answer(answer, recommendedItemIds);
     }
 
     private List<Long> readRecommendationIds(JsonParser parser) {

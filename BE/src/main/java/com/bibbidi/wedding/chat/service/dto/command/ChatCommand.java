@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.chat.service.dto;
+package com.bibbidi.wedding.chat.service.dto.command;
 
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;

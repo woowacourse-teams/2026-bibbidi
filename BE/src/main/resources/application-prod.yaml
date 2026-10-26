@@ -1,4 +1,10 @@
 spring:
+  ai:
+    bedrock:
+      converse:
+        chat:
+          model: ${bibbidi.ai.chatbot.sol-model}
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bibbidi}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
@@ -19,3 +25,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+bibbidi:
+  ai:
+    chatbot:
+      accounts-enabled: ${BIBBIDI_CHAT_ACCOUNTS_ENABLED:true}

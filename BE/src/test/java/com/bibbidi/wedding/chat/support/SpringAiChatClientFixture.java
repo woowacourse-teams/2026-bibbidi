@@ -1,6 +1,10 @@
 package com.bibbidi.wedding.chat.support;
 
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -20,6 +24,11 @@ public final class SpringAiChatClientFixture {
         ChatClient chatClient = ChatClient.builder(model)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(memory).build())
                 .build();
-        return new SpringAiChatClient(chatClient);
+        return create(chatClient);
+    }
+
+    public static SpringAiChatClient create(ChatClient chatClient) {
+        return new SpringAiChatClient(new ChatModelRouter(Map.of(
+                ChatModelTier.QWEN, new ChatModelRoute(chatClient, "test-model", null))));
     }
 }

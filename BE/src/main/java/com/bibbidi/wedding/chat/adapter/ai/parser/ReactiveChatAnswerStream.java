@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.chat.adapter.ai.parser;
 
-import com.bibbidi.wedding.chat.service.dto.ChatAnswer;
-import java.util.function.Consumer;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -21,23 +20,23 @@ public final class ReactiveChatAnswerStream {
     private int unicodeDigits;
     private int unicodeValue;
 
-    public ReactiveChatAnswerStream(ObjectMapper mapper, Consumer<String> sendAnswerChunk) {
+    public ReactiveChatAnswerStream(ObjectMapper mapper) {
         this.mapper = mapper;
-        this.answerWriter = new AnswerDeltaWriter(sendAnswerChunk);
+        this.answerWriter = new AnswerDeltaWriter();
     }
 
-    public void accept(String chunk) {
+    public String accept(String chunk) {
         json.append(chunk);
         if (!answerStarted) {
             Matcher matcher = ANSWER_FIELD.matcher(json);
             if (!matcher.find()) {
-                return;
+                return "";
             }
             answerStarted = true;
             position = matcher.end();
         }
         if (answerEnded) {
-            return;
+            return "";
         }
 
         StringBuilder decoded = new StringBuilder();
@@ -68,7 +67,7 @@ public final class ReactiveChatAnswerStream {
                         unicodeValue = 0;
                     }
                     default -> {
-                        return;
+                        return "";
                     }
                 }
             } else if (next == '\\') {
@@ -82,12 +81,13 @@ public final class ReactiveChatAnswerStream {
         if (!decoded.isEmpty()) {
             char[] text = new char[decoded.length()];
             decoded.getChars(0, decoded.length(), text, 0);
-            answerWriter.write(text, 0, text.length);
+            return answerWriter.writeDelta(text, 0, text.length);
         }
+        return "";
     }
 
-    public ChatAnswer finish() {
-        ChatAnswer answer = new ChatAnswerStream(mapper).read(Stream.of(json.toString()), ignored -> {
+    public ChatResult.Answer finish() {
+        ChatResult.Answer answer = new ChatAnswerStream(mapper).read(Stream.of(json.toString()), ignored -> {
         });
         if (!answer.answer().equals(answerWriter.text()) || answerWriter.hasPendingText()) {
             throw new IllegalStateException("스트리밍 답변과 검증된 응답이 일치하지 않습니다.");
