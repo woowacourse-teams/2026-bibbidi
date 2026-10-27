@@ -1,6 +1,8 @@
 package com.bibbidi.wedding.chat.adapter.ai.client;
 
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -20,11 +22,11 @@ public final class SpringAiChatClient {
         this.router = router;
     }
 
-    public Flux<ChatResponse> streamReply(ChatModelRequest request) {
-        ChatModelRoute route = router.route(request.tier());
-        ChatClient.ChatClientRequestSpec prompt = route.client().prompt();
-        if (route.options() != null) {
-            prompt = prompt.options(route.options().get());
+    public Flux<ChatResponse> streamReply(ChatModelRequest request, ChatModelTier tier) {
+        ChatModelTarget target = router.route(tier);
+        ChatClient.ChatClientRequestSpec prompt = target.client().prompt();
+        if (target.options() != null) {
+            prompt = prompt.options(target.options().get());
         }
         return prompt
                 .messages(request.userMessage())
@@ -45,6 +47,6 @@ public final class SpringAiChatClient {
         if (toolContext.getContext().get(TOOL_CONTEXT_USER_ID) instanceof Long userId) {
             return userId;
         }
-        throw new IllegalStateException("도구를 호출한 사용자 정보가 없습니다.");
+        throw new BusinessException(ClientError.INTERNAL_ERROR, "도구를 호출한 사용자 정보가 없습니다.");
     }
 }

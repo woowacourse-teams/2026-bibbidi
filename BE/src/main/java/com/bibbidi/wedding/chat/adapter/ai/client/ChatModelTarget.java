@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.ChatOptions;
 
-public record ChatModelRoute(
+public record ChatModelTarget(
         ChatClient client,
         String modelName,
         @Nullable Supplier<ChatOptions.Builder<?>> options

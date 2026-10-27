@@ -6,11 +6,11 @@ import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelSelectPlan;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.openai.errors.OpenAIException;
 import com.openai.errors.RateLimitException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,10 +18,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.ai.retry.TransientAiException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -36,141 +33,110 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     private final ChatMemory chatMemory;
 
     private final ModelClassifier classifier;
-    private final String forcedTier;
 
     @Autowired
     public SpringAiConversationAdapter(
             SpringAiChatClient chatClient,
             JacksonChatAnswerParser answerParser,
             ChatMemory chatMemory,
-            ModelClassifier classifier,
-            @Value("${bibbidi.ai.chatbot.routing.forced-tier:}") String forcedTier
+            ModelClassifier classifier
     ) {
         this.chatClient = chatClient;
         this.answerParser = answerParser;
         this.chatMemory = chatMemory;
         this.classifier = classifier;
-        this.forcedTier = forcedTier;
     }
 
     @Override
     public Flux<ChatResult> stream(Long userId, String conversationKey, String userPrompt) {
         return mapModelErrors(Flux.defer(() -> {
-                            UserMessage userMessage = new UserMessage(userPrompt);
-                            Mono<ChatModelTier> selection = chatModel(conversationKey, userPrompt);
-                            return selection.flatMapMany(
-                                    tier -> attempt(
-                                            userId,
-                                            conversationKey,
-                                            userMessage,
-                                            tier.fallbackOrder(),
-                                            0
-                                    )
+                            ChatModelRequest request = new ChatModelRequest(
+                                    userId, conversationKey, new UserMessage(userPrompt));
+                            Mono<ModelSelectPlan> fallbackPlan = classifier.classify(conversationKey, userPrompt)
+                                    .map(ModelSelectPlan::startingAt);
+                            return fallbackPlan.flatMapMany(
+                                    plan -> attempt(request, plan)
                             );
                         }
                 )
         );
     }
 
-    private Mono<ChatModelTier> chatModel(String conversationKey, String userPrompt) {
-        if (forcedTier.isBlank()) {
-            return classifier.classify(conversationKey, userPrompt);
-        }
+    private Flux<ChatResult> mapModelErrors(Flux<ChatResult> results) {
+        return results
+                .onErrorMap(error -> hasCause(error, ThrottlingException.class),
+                        error -> new BusinessException(
+                                ClientError.AI_CAPACITY_EXCEEDED, "AI 호출 한도 초과", error))
+                .onErrorMap(error -> hasCause(error, RateLimitException.class),
+                        _ -> new BusinessException(
+                                ClientError.AI_CAPACITY_EXCEEDED, "OpenAI 호출 한도 초과"))
+                .onErrorMap(this::isEmptyAdvisorResponse,
+                        error -> new BusinessException(
+                                ClientError.INTERNAL_ERROR, "AI 응답 없음", error))
+                .onErrorMap(error -> !(error instanceof BusinessException),
+                        error -> new BusinessException(
+                                ClientError.INTERNAL_ERROR,
+                                "AI 모델 호출 실패. type=" + error.getClass().getSimpleName()));
+    }
 
-        return Mono.just(
-                ChatModelTier.valueOf(forcedTier.toUpperCase())
+    private Flux<ChatResult> attempt(ChatModelRequest request, ModelSelectPlan plan) {
+        return Flux.defer(() -> {
+                    ChatModelTier tier = plan.tier();
+                    List<Message> previousMessages = chatMemory.get(request.conversationKey());
+                    AtomicBoolean sentDelta = new AtomicBoolean();
+                    return Flux.concat(
+                                    Flux.just(new ChatResult.Selected(tier)),
+                                    streamAnswer(request, tier)
+                            )
+                            .doOnNext(result -> {
+                                if (result instanceof ChatResult.Delta) {
+                                    sentDelta.set(true);
+                                }
+                            })
+                            .onErrorResume(error -> {
+                                        if (sentDelta.get() || !plan.hasFallback()) {
+                                            return Flux.error(error);
+                                        }
+                                        chatMemory.clear(request.conversationKey());
+                                        chatMemory.add(request.conversationKey(), previousMessages);
+                                        return attempt(request, plan.fallback());
+                                    }
+                            );
+                }
         );
     }
 
-    private static Flux<ChatResult> mapModelErrors(Flux<ChatResult> results) {
-        return results
-                .onErrorMap(SpringAiConversationAdapter::isThrottled,
-                        exception -> new BusinessException(
-                                ClientError.AI_CAPACITY_EXCEEDED, "AI 호출 한도 초과", exception))
-                .onErrorMap(SpringAiConversationAdapter::isRateLimited,
-                        exception -> new BusinessException(
-                                ClientError.AI_CAPACITY_EXCEEDED, "OpenAI 호출 한도 초과"))
-                .onErrorMap(exception -> exception instanceof TransientAiException
-                                || exception instanceof NonTransientAiException
-                                || exception instanceof OpenAIException,
-                        exception -> new BusinessException(
-                                ClientError.INTERNAL_ERROR,
-                                "AI 모델 공급자 오류. type=" + exception.getClass().getSimpleName()))
-                .onErrorMap(SpringAiConversationAdapter::isEmptyAdvisorResponse,
-                        exception -> new BusinessException(
-                                ClientError.INTERNAL_ERROR, "AI 응답 없음", exception))
-                .onErrorMap(exception -> !(exception instanceof BusinessException),
-                        exception -> new BusinessException(
-                                ClientError.INTERNAL_ERROR,
-                                "AI 모델 호출 실패. type=" + exception.getClass().getSimpleName()));
-    }
-
-    private Flux<ChatResult> attempt(Long userId, String conversationKey, UserMessage userMessage,
-                                     List<ChatModelTier> order, int index) {
-        return Flux.defer(() -> {
-            ChatModelTier tier = order.get(index);
-            List<Message> previousMessages = chatMemory.get(conversationKey);
-            AtomicBoolean sentDelta = new AtomicBoolean();
-            return Flux.concat(
-                            Flux.just(new ChatResult.Selected(chatClient.modelName(tier))),
-                            streamAnswer(new ChatModelRequest(userId, conversationKey, userMessage, tier))
-                    )
-                    .doOnNext(result -> {
-                        if (result instanceof ChatResult.Delta) {
-                            sentDelta.set(true);
-                        }
-                    })
-                    .onErrorResume(error -> {
-                        if (sentDelta.get() || index + 1 == order.size()) {
-                            return Flux.error(error);
-                        }
-                        chatMemory.clear(conversationKey);
-                        chatMemory.add(conversationKey, previousMessages);
-                        return attempt(userId, conversationKey, userMessage, order, index + 1);
-                    });
-        });
-    }
-
-    private Flux<ChatResult> streamAnswer(ChatModelRequest request) {
+    private Flux<ChatResult> streamAnswer(ChatModelRequest request, ChatModelTier tier) {
         return Flux.defer(() -> {
             ReactiveChatAnswerStream answer = answerParser.newSession();
-            Flux<ChatResult> deltas = chatClient.streamReply(request)
-                    .map(SpringAiConversationAdapter::textOf)
+            Flux<ChatResult> deltas = chatClient.streamReply(request, tier)
+                    .map(this::textOf)
                     .filter(text -> !text.isEmpty())
-                    .publishOn(Schedulers.boundedElastic())
-                    .map(answer::accept)
+                    .publishOn(Schedulers.boundedElastic()) // 사용 가능한 CPU 코어 수 * 10 개
+                    .map(answer::acceptChunk)
                     .filter(delta -> !delta.isEmpty())
                     .map(ChatResult.Delta::new);
-            return deltas.concatWith(Flux.defer(() -> Flux.just(answer.finish())));
+            return deltas.concatWith(Flux.defer(() -> Flux.just(answer.buildAnswer())));
         });
     }
 
-    private static String textOf(ChatResponse response) {
+    private String textOf(ChatResponse response) {
         if (response.getResult() == null || response.getResult().getOutput().getText() == null) {
             return "";
         }
         return response.getResult().getOutput().getText();
     }
 
-    private static boolean isThrottled(Throwable exception) {
-        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ThrottlingException) {
+    private boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean isRateLimited(Throwable exception) {
-        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            if (cause instanceof RateLimitException) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isEmptyAdvisorResponse(Throwable exception) {
+    private boolean isEmptyAdvisorResponse(Throwable exception) {
         return exception instanceof IllegalArgumentException
                 && "conversationId cannot be null".equals(exception.getMessage());
     }

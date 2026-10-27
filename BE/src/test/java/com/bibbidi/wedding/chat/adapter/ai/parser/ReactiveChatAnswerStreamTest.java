@@ -27,15 +27,15 @@ class ReactiveChatAnswerStreamTest {
         String thirdChunk = "\\uDC8A\\n끝\"}";
 
         // when
-        String firstDelta = stream.accept(firstChunk);
-        String secondDelta = stream.accept(secondChunk);
-        String thirdDelta = stream.accept(thirdChunk);
+        String firstDelta = stream.acceptChunk(firstChunk);
+        String secondDelta = stream.acceptChunk(secondChunk);
+        String thirdDelta = stream.acceptChunk(thirdChunk);
 
         // then
         assertThat(firstDelta).isEmpty();
         assertThat(secondDelta).isEqualTo("한");
         assertThat(thirdDelta).isEqualTo("💊\n끝");
-        assertThat(stream.finish().recommendedItemIds()).containsExactly(2L);
+        assertThat(stream.buildAnswer().recommendedItemIds()).containsExactly(2L);
     }
 
     @Test
@@ -45,18 +45,18 @@ class ReactiveChatAnswerStreamTest {
         String invalidOutput = "{\"answer\":\"답변\",\"recommendedItemIds\":[\"1\"]}";
 
         // when
-        String delta = stream.accept(invalidOutput);
+        String delta = stream.acceptChunk(invalidOutput);
 
         // then
         assertThat(delta).isEqualTo("답변");
-        assertThatThrownBy(stream::finish).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(stream::buildAnswer).isInstanceOf(BusinessException.class);
     }
 
     @Test
     @DisplayName("answer 필드가 시작되기 전에는 아무것도 전달하지 않는다")
     void emitsNothingBeforeTheAnswerFieldStarts() {
         // when
-        String delta = stream.accept("{\"recommendedItemIds\":[1,");
+        String delta = stream.acceptChunk("{\"recommendedItemIds\":[1,");
 
         // then
         assertThat(delta).isEmpty();
@@ -66,10 +66,10 @@ class ReactiveChatAnswerStreamTest {
     @DisplayName("answer 필드가 닫힌 뒤에 오는 조각은 전달하지 않는다")
     void ignoresChunksAfterTheAnswerFieldEnds() {
         // given
-        String firstDelta = stream.accept("{\"answer\":\"답변\",");
+        String firstDelta = stream.acceptChunk("{\"answer\":\"답변\",");
 
         // when
-        String nextDelta = stream.accept("\"recommendedItemIds\":[]}");
+        String nextDelta = stream.acceptChunk("\"recommendedItemIds\":[]}");
 
         // then
         assertThat(firstDelta).isEqualTo("답변");

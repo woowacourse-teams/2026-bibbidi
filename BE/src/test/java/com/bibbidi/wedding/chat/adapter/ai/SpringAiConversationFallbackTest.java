@@ -2,9 +2,11 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelTarget;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
@@ -30,6 +32,7 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
 class SpringAiConversationFallbackTest {
@@ -44,47 +47,46 @@ class SpringAiConversationFallbackTest {
     private final List<ChatModelTier> calls = new ArrayList<>();
 
     @Test
-    void limitsFallbackOrderToThreeRetries() {
-        assertThat(ChatModelTier.QWEN.fallbackOrder()).containsExactly(
-                ChatModelTier.QWEN, ChatModelTier.LUNA, ChatModelTier.SOL, ChatModelTier.LUNA);
-        assertThat(ChatModelTier.LUNA.fallbackOrder()).containsExactly(
-                ChatModelTier.LUNA, ChatModelTier.SOL, ChatModelTier.LUNA, ChatModelTier.QWEN);
-        assertThat(ChatModelTier.SOL.fallbackOrder()).containsExactly(
-                ChatModelTier.SOL, ChatModelTier.LUNA, ChatModelTier.QWEN);
+    void triesEachTierOnceStartingFromTheChosenOne() {
+        assertThat(ChatModelTier.LOW.fallbackOrder()).containsExactly(
+                ChatModelTier.LOW, ChatModelTier.MEDIUM, ChatModelTier.HIGH);
+        assertThat(ChatModelTier.MEDIUM.fallbackOrder()).containsExactly(
+                ChatModelTier.MEDIUM, ChatModelTier.HIGH, ChatModelTier.LOW);
+        assertThat(ChatModelTier.HIGH.fallbackOrder()).containsExactly(
+                ChatModelTier.HIGH, ChatModelTier.MEDIUM, ChatModelTier.LOW);
     }
 
     @Test
     void retriesHigherTierAndKeepsOnlySuccessfulTurnInMemory() {
         IllegalStateException failure = new IllegalStateException("qwen failed");
-        SpringAiConversationAdapter adapter = adapter("qwen", Map.of(
-                ChatModelTier.QWEN, prompt -> Flux.error(failure),
-                ChatModelTier.LUNA, prompt -> {
+        SpringAiConversationAdapter adapter = adapter(ChatModelTier.LOW, Map.of(
+                ChatModelTier.LOW, prompt -> Flux.error(failure),
+                ChatModelTier.MEDIUM, prompt -> {
                     assertThat(prompt.getInstructions()).extracting(Message::getText).containsExactly("질문");
                     return answer("대체 답변");
                 },
-                ChatModelTier.SOL, prompt -> Flux.error(new AssertionError("SOL은 호출하지 않아야 한다"))));
+                ChatModelTier.HIGH, prompt -> Flux.error(new AssertionError("HIGH는 호출하지 않아야 한다"))));
 
         List<ChatResult> results = adapter.stream(7L, CONVERSATION, "질문").collectList().block();
 
-        assertThat(calls).containsExactly(ChatModelTier.QWEN, ChatModelTier.LUNA);
+        assertThat(calls).containsExactly(ChatModelTier.LOW, ChatModelTier.MEDIUM);
         assertThat(results).containsExactly(
-                new ChatResult.Selected("qwen"), new ChatResult.Selected("luna"),
+                new ChatResult.Selected(ChatModelTier.LOW), new ChatResult.Selected(ChatModelTier.MEDIUM),
                 new ChatResult.Delta("대체 답변"), new ChatResult.Answer("대체 답변", List.of()));
         assertThat(memory.get(CONVERSATION)).extracting(Message::getText)
                 .containsExactly("질문", answerJson("대체 답변"));
     }
 
     @Test
-    void turnsDownAfterSolAndStopsAfterThreeRetries() {
-        SpringAiConversationAdapter adapter = adapter("luna", Map.of(
-                ChatModelTier.QWEN, prompt -> answer("qwen 답변"),
-                ChatModelTier.LUNA, prompt -> Flux.error(new IllegalStateException("luna failed")),
-                ChatModelTier.SOL, prompt -> Flux.error(new IllegalStateException("sol failed"))));
+    void fallsBackToTheRemainingTierWithoutRetryingAFailedOne() {
+        SpringAiConversationAdapter adapter = adapter(ChatModelTier.MEDIUM, Map.of(
+                ChatModelTier.LOW, prompt -> answer("qwen 답변"),
+                ChatModelTier.MEDIUM, prompt -> Flux.error(new IllegalStateException("luna failed")),
+                ChatModelTier.HIGH, prompt -> Flux.error(new IllegalStateException("sol failed"))));
 
         List<ChatResult> results = adapter.stream(7L, CONVERSATION, "질문").collectList().block();
 
-        assertThat(calls).containsExactly(ChatModelTier.LUNA, ChatModelTier.SOL,
-                ChatModelTier.LUNA, ChatModelTier.QWEN);
+        assertThat(calls).containsExactly(ChatModelTier.MEDIUM, ChatModelTier.HIGH, ChatModelTier.LOW);
         assertThat(results.getLast()).isEqualTo(new ChatResult.Answer("qwen 답변", List.of()));
         assertThat(memory.get(CONVERSATION)).extracting(Message::getText)
                 .containsExactly("질문", answerJson("qwen 답변"));
@@ -93,25 +95,25 @@ class SpringAiConversationFallbackTest {
     @Test
     void stopsWhenNoLowerTierRemains() {
         IllegalStateException failure = new IllegalStateException("all failed");
-        SpringAiConversationAdapter adapter = adapter("sol", Map.of(
-                ChatModelTier.QWEN, prompt -> Flux.error(failure),
-                ChatModelTier.LUNA, prompt -> Flux.error(failure),
-                ChatModelTier.SOL, prompt -> Flux.error(failure)));
+        SpringAiConversationAdapter adapter = adapter(ChatModelTier.HIGH, Map.of(
+                ChatModelTier.LOW, prompt -> Flux.error(failure),
+                ChatModelTier.MEDIUM, prompt -> Flux.error(failure),
+                ChatModelTier.HIGH, prompt -> Flux.error(failure)));
 
         assertThatThrownBy(() -> adapter.stream(7L, CONVERSATION, "질문").blockLast())
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
-        assertThat(calls).containsExactly(ChatModelTier.SOL, ChatModelTier.LUNA, ChatModelTier.QWEN);
+        assertThat(calls).containsExactly(ChatModelTier.HIGH, ChatModelTier.MEDIUM, ChatModelTier.LOW);
     }
 
     @Test
     void doesNotRetryAfterSendingPartOfTheAnswer() {
         IllegalStateException failure = new IllegalStateException("stream failed");
-        SpringAiConversationAdapter adapter = adapter("qwen", Map.of(
-                ChatModelTier.QWEN, prompt -> Flux.concat(
+        SpringAiConversationAdapter adapter = adapter(ChatModelTier.LOW, Map.of(
+                ChatModelTier.LOW, prompt -> Flux.concat(
                         Flux.just(chunk("{\"answer\":\"일부")), Flux.error(failure)),
-                ChatModelTier.LUNA, prompt -> Flux.error(new AssertionError("LUNA는 호출하지 않아야 한다")),
-                ChatModelTier.SOL, prompt -> Flux.error(new AssertionError("SOL은 호출하지 않아야 한다"))));
+                ChatModelTier.MEDIUM, prompt -> Flux.error(new AssertionError("MEDIUM은 호출하지 않아야 한다")),
+                ChatModelTier.HIGH, prompt -> Flux.error(new AssertionError("HIGH는 호출하지 않아야 한다"))));
         List<ChatResult> events = new ArrayList<>();
 
         assertThatThrownBy(() -> adapter.stream(7L, CONVERSATION, "질문")
@@ -119,21 +121,23 @@ class SpringAiConversationFallbackTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.clientError()).isEqualTo(ClientError.INTERNAL_ERROR));
 
-        assertThat(calls).containsExactly(ChatModelTier.QWEN);
-        assertThat(events).containsExactly(new ChatResult.Selected("qwen"), new ChatResult.Delta("일부"));
+        assertThat(calls).containsExactly(ChatModelTier.LOW);
+        assertThat(events).containsExactly(new ChatResult.Selected(ChatModelTier.LOW), new ChatResult.Delta("일부"));
     }
 
-    private SpringAiConversationAdapter adapter(String initial,
+    private SpringAiConversationAdapter adapter(ChatModelTier initial,
                                                  Map<ChatModelTier, Function<Prompt, Flux<ChatResponse>>> responses) {
-        Map<ChatModelTier, ChatModelRoute> routes = Map.of(
-                ChatModelTier.QWEN, route(ChatModelTier.QWEN, responses),
-                ChatModelTier.LUNA, route(ChatModelTier.LUNA, responses),
-                ChatModelTier.SOL, route(ChatModelTier.SOL, responses));
-        return new SpringAiConversationAdapter(new SpringAiChatClient(new ChatModelRouter(routes)),
-                new JacksonChatAnswerParser(MAPPER), memory, mock(ModelClassifier.class), initial);
+        Map<ChatModelTier, ChatModelTarget> targets = Map.of(
+                ChatModelTier.LOW, target(ChatModelTier.LOW, responses),
+                ChatModelTier.MEDIUM, target(ChatModelTier.MEDIUM, responses),
+                ChatModelTier.HIGH, target(ChatModelTier.HIGH, responses));
+        ModelClassifier classifier = mock(ModelClassifier.class);
+        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(initial));
+        return new SpringAiConversationAdapter(new SpringAiChatClient(new ChatModelRouter(targets)),
+                new JacksonChatAnswerParser(MAPPER), memory, classifier);
     }
 
-    private ChatModelRoute route(ChatModelTier tier,
+    private ChatModelTarget target(ChatModelTier tier,
                                  Map<ChatModelTier, Function<Prompt, Flux<ChatResponse>>> responses) {
         ChatClient client = ChatClient.builder(new FakeChatModel(prompt -> {
                     calls.add(tier);
@@ -141,7 +145,7 @@ class SpringAiConversationFallbackTest {
                 }))
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(memory).build())
                 .build();
-        return new ChatModelRoute(client, tier.name().toLowerCase(), null);
+        return new ChatModelTarget(client, tier.name().toLowerCase(), null);
     }
 
     private static Flux<ChatResponse> answer(String text) {
