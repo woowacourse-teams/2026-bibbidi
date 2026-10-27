@@ -1,0 +1,24 @@
+.calendar-day-schedules {
+  padding-block: 12px;
+}
+.calendar-day-schedules ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.calendar-day-schedules__empty,
+.calendar-day-schedules__feedback {
+  margin: 0;
+  padding: 16px 24px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+.calendar-day-schedules__feedback {
+  color: var(--color-fg-critical);
+}
+.calendar-day-schedules__feedback p {
+  margin: 0;
+}
+.calendar-day-schedules__feedback .bibbidi-button {
+  margin-top: 8px;
+}

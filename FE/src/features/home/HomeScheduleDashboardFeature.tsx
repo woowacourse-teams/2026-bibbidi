@@ -55,7 +55,7 @@ function CalendarPlanningFeature({
   recommendedRepository: RecommendedCatalogItemsRepository;
   refreshAuth: () => void;
 }) {
-  const calendarHeadingRef = useRef<HTMLHeadingElement>(null);
+  const calendarHeadingRef = useRef<HTMLElement>(null);
   const { authState } = useAuth();
   const audience =
     authState.status === "authenticated"

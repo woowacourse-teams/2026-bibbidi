@@ -225,3 +225,19 @@
   color: var(--color-fg-neutral-muted);
   line-height: 1.6;
 }
+
+.calendar-recommendations {
+  min-width: 0;
+  padding-block: 12px;
+}
+.calendar-recommendations ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.calendar-recommendations__error {
+  margin: 0;
+  padding: 0 24px 12px;
+  font: var(--typography-t7);
+  color: var(--color-fg-critical);
+}

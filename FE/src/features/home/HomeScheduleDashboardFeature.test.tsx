@@ -284,7 +284,11 @@ describe("calendar planning", () => {
     expect(screen.queryByText("다가오는 일정")).toBeNull();
     expect(screen.queryByText(/추천에서 담기/)).toBeNull();
     expect(screen.queryByText("웨딩홀 정하기")).toBeNull();
-    expect(screen.queryByRole("region", { name: "10월 5일 일정" })).toBeNull();
+    expect(
+      within(screen.getByRole("region", { name: "10월 5일 일정" })).getByText(
+        "이 날짜에 등록된 일정이 없어요.",
+      ),
+    ).toBeTruthy();
   });
   it("비로그인도 담기 이후 일정 추가를 선택하면 항목을 보존한 인증 경로를 제공한다", async () => {
     setAuth("guest");
@@ -352,7 +356,9 @@ describe("calendar planning", () => {
     await screen.findByRole("table", { name: "2026년 11월 달력" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.activeElement).toBe(
-      screen.getByRole("heading", { name: "내 준비 일정", level: 1 }),
+      screen
+        .getByRole("heading", { name: "내 준비 일정", level: 1 })
+        .closest("header"),
     );
     const day = screen.getByRole("region", { name: "11월 12일 일정" });
     fireEvent.click(within(day).getByRole("button"));
@@ -377,7 +383,7 @@ describe("calendar planning", () => {
   it("조회 실패를 빈 상태와 구분하고 재시도를 제공한다", async () => {
     query.getChecklist.mockRejectedValue(new Error("load"));
     mount();
-    await screen.findByText(/내 할 일과 일정을 불러오지 못했어요/);
+    await screen.findByText("일정을 확인하지 못했어요.");
     expect(screen.queryByText("날짜를 정할 할 일이 없어요.")).toBeNull();
     expect(
       screen.getAllByRole("button", { name: "다시 시도" }).length,
@@ -482,14 +488,20 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     const request = deferred<ChecklistQueryModel>();
     query.getChecklist.mockReturnValue(request.promise);
     mount();
-    expect(screen.getByText("내 할 일을 불러오는 중")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "내 할 일을 불러오는 중" }),
+    ).toBeTruthy();
     expect(screen.queryByText("날짜를 정할 할 일이 없어요.")).toBeNull();
     await act(async () => undefined);
-    expect(screen.getByText("추천 할 일을 불러오는 중")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "추천 할 일을 불러오는 중" }),
+    ).toBeTruthy();
     expect(screen.queryByText("지금 추가할 추천 항목이 없어요.")).toBeNull();
     await act(async () => request.resolve(checklist));
     await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
-    expect(screen.queryByText("내 할 일을 불러오는 중")).toBeNull();
+    expect(
+      screen.queryByRole("status", { name: "내 할 일을 불러오는 중" }),
+    ).toBeNull();
   });
 
   it("완료 항목만 있으면 날짜 없는 목록을 빈 상태로 표시한다", async () => {
@@ -508,7 +520,9 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     const request = deferred<(typeof recommendedItem)[]>();
     recommended.getRecommendedCatalogItems.mockReturnValue(request.promise);
     mount();
-    expect(screen.getByText("추천 할 일을 불러오는 중")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "추천 할 일을 불러오는 중" }),
+    ).toBeTruthy();
     await act(async () =>
       request.resolve([
         { ...recommendedItem, catalogItemId: 203, title: "먼저 받은 추천" },
@@ -520,7 +534,9 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
         .getAllByRole("heading", { level: 3 })
         .map((node) => node.textContent),
     ).toEqual(["먼저 받은 추천", "다음 추천"]);
-    expect(screen.queryByText("추천 할 일을 불러오는 중")).toBeNull();
+    expect(
+      screen.queryByRole("status", { name: "추천 할 일을 불러오는 중" }),
+    ).toBeNull();
   });
 
   it("추천 빈 응답을 오류와 구분하고 로드맵 이동을 제공한다", async () => {
@@ -566,7 +582,7 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
   it("내 할 일 조회 실패가 성공한 추천과 캘린더를 가리지 않는다", async () => {
     query.getChecklist.mockRejectedValue(new Error("비공개 서버 오류"));
     mount();
-    await screen.findByText(/내 할 일과 일정을 불러오지 못했어요/);
+    await screen.findByText("일정을 확인하지 못했어요.");
     expect(
       await within(recommendationRegion()).findByRole("heading", {
         name: "웨딩홀 투어",
