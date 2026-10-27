@@ -1,17 +1,15 @@
 package com.bibbidi.wedding.balancegame.service;
 
-import com.bibbidi.wedding.balancegame.adapter.ai.BalanceGameRecommender;
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
-import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion.Choice;
 import com.bibbidi.wedding.balancegame.repository.BalanceGameQuestionRepository;
+import com.bibbidi.wedding.balancegame.repository.BalanceGameRecommendationRuleRepository;
 import com.bibbidi.wedding.balancegame.service.dto.BalanceGameAnswer;
-import com.bibbidi.wedding.balancegame.service.dto.ResolvedBalanceGameAnswer;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,53 +22,64 @@ public class BalanceGameRecommendationService {
 
     private final BalanceGameQuestionRepository questionRepository;
     private final CatalogService catalogService;
-    private final BalanceGameRecommender recommender;
+    private final BalanceGameRecommendationRuleRepository ruleRepository;
 
     public BalanceGameRecommendationService(
             BalanceGameQuestionRepository questionRepository,
             CatalogService catalogService,
-            BalanceGameRecommender recommender
+            BalanceGameRecommendationRuleRepository ruleRepository
     ) {
         this.questionRepository = questionRepository;
         this.catalogService = catalogService;
-        this.recommender = recommender;
+        this.ruleRepository = ruleRepository;
     }
 
     public List<CatalogItemDetailSnapshot> recommend(List<BalanceGameAnswer> answers) {
-        List<ResolvedBalanceGameAnswer> resolved = resolve(answers);
-        List<CatalogItemDetailSnapshot> catalog = catalogService.findAllItemDetails();
-        List<Long> recommendedIds = recommender.recommend(resolved, catalog);
-        Map<Long, CatalogItemDetailSnapshot> itemsById = catalog.stream()
-                .collect(Collectors.toMap(CatalogItemDetailSnapshot::id, Function.identity()));
-        return recommendedIds.stream().distinct().map(id -> {
-            CatalogItemDetailSnapshot item = itemsById.get(id);
-            if (item == null) {
-                throw new BusinessException(ClientError.INTERNAL_ERROR,
-                        "AI가 후보에 없는 준비항목을 추천했습니다: id=" + id);
-            }
-            return item;
-        }).toList();
+        Map<Long, String> optionIdsByQuestion = validateAndIndexAnswers(answers);
+        Map<Long, CatalogItemDetailSnapshot> itemsById = loadAndValidateCatalogItems();
+        List<Long> recommendedIds = selectRecommendationItemIds(optionIdsByQuestion);
+        return recommendedIds.stream().map(itemsById::get).toList();
     }
 
-    private List<ResolvedBalanceGameAnswer> resolve(List<BalanceGameAnswer> answers) {
-        Set<Long> answeredIds = new HashSet<>();
-        List<ResolvedBalanceGameAnswer> resolved = new ArrayList<>();
+    private Map<Long, String> validateAndIndexAnswers(List<BalanceGameAnswer> answers) {
+        Map<Long, String> optionIdsByQuestion = new HashMap<>();
         for (BalanceGameAnswer answer : answers) {
-            if (!answeredIds.add(answer.questionId())) {
+            if (optionIdsByQuestion.putIfAbsent(answer.questionId(), answer.optionId()) != null) {
                 throw new BusinessException(ClientError.INVALID_REQUEST,
                         "밸런스게임 답변 문항이 중복됩니다: questionId=" + answer.questionId());
             }
-            BalanceGameQuestion question = questionRepository.findById(answer.questionId())
-                    .orElseThrow(() -> new BusinessException(ClientError.INVALID_REQUEST,
-                            "밸런스게임 문항이 없습니다: questionId=" + answer.questionId()));
-            Choice option = questionRepository.findOptionById(answer.questionId(), answer.optionId())
-                    .orElseThrow(() -> new BusinessException(ClientError.INVALID_REQUEST,
-                            "밸런스게임 선택지가 없습니다: questionId=" + answer.questionId()));
-            resolved.add(new ResolvedBalanceGameAnswer(question.id(), question.question(), option.id(), option.text()));
+            if (questionRepository.findById(answer.questionId()).isEmpty()) {
+                throw new BusinessException(ClientError.INVALID_REQUEST,
+                        "밸런스게임 문항이 없습니다: questionId=" + answer.questionId());
+            }
+            if (questionRepository.findOptionById(answer.questionId(), answer.optionId()).isEmpty()) {
+                throw new BusinessException(ClientError.INVALID_REQUEST,
+                        "밸런스게임 선택지가 없습니다: questionId=" + answer.questionId());
+            }
         }
-        if (answeredIds.size() != questionRepository.findAll().size()) {
+        if (optionIdsByQuestion.size() != questionRepository.findAll().size()) {
             throw new BusinessException(ClientError.INVALID_REQUEST, "밸런스게임 전체 문항에 답변해야 합니다.");
         }
-        return List.copyOf(resolved);
+        return optionIdsByQuestion;
+    }
+
+    private Map<Long, CatalogItemDetailSnapshot> loadAndValidateCatalogItems() {
+        Map<Long, CatalogItemDetailSnapshot> itemsById = catalogService.findAllItemDetails().stream()
+                .collect(Collectors.toMap(CatalogItemDetailSnapshot::id, Function.identity()));
+        for (Long itemId : ruleRepository.findAllItemIds()) {
+            if (!itemsById.containsKey(itemId)) {
+                throw new BusinessException(ClientError.INTERNAL_ERROR,
+                        "밸런스게임 추천 규칙의 카탈로그 항목이 없습니다: id=" + itemId);
+            }
+        }
+        return itemsById;
+    }
+
+    private List<Long> selectRecommendationItemIds(Map<Long, String> optionIdsByQuestion) {
+        Set<Long> recommendedIds = new LinkedHashSet<>(ruleRepository.findBaseItemIds());
+        for (BalanceGameQuestion question : questionRepository.findAll()) {
+            recommendedIds.addAll(ruleRepository.findOptionItemIds(question.id(), optionIdsByQuestion.get(question.id())));
+        }
+        return List.copyOf(recommendedIds);
     }
 }

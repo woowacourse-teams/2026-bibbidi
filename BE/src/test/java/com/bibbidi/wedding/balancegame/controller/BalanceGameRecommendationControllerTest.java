@@ -89,11 +89,11 @@ class BalanceGameRecommendationControllerTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ClientError.class, names = {"INVALID_REQUEST", "INTERNAL_ERROR", "AI_CAPACITY_EXCEEDED"})
+    @EnumSource(value = ClientError.class, names = {"INVALID_REQUEST", "INTERNAL_ERROR"})
     @DisplayName("서비스 오류를 기존 HTTP 상태와 공개 오류 계약으로 변환한다")
     void shouldUseExistingErrorContract(ClientError error) throws Exception {
         given(recommendationService.recommend(anyList()))
-                .willThrow(new BusinessException(error, "private-provider-error"));
+                .willThrow(new BusinessException(error, "private-rule-error"));
 
         perform(validRequest())
                 .andExpect(status().is(error.httpStatus().value()))
