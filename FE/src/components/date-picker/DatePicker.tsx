@@ -13,7 +13,7 @@ import {
   monthWeeks,
   startOfMonth,
 } from "./date-utils";
-import { DatePickerMonthList } from "./DatePickerMonthList";
+import { DatePickerMonthPicker } from "./DatePickerMonthPicker";
 import "./DatePicker.css";
 
 export type DatePickerRange = { start: string; end?: string };
@@ -63,7 +63,7 @@ function selectedDates(value: Value): string[] {
 }
 
 /** An inline calendar. Values are calendar dates in YYYY-MM-DD format. */
-export function DatePicker(props: DatePickerProps) {
+function DatePickerRoot(props: DatePickerProps) {
   const {
     selectionMode = "single",
     value,
@@ -316,53 +316,18 @@ export function DatePicker(props: DatePickerProps) {
               }
             }}
           >
-            <div className="bibbidi-date-picker-month-fields">
-              <DatePickerMonthList
-                label="연도"
-                disabled={unavailable}
-                value={Number(view.slice(0, 4))}
-                options={Array.from(
-                  {
-                    length:
-                      Number(upper.slice(0, 4)) - Number(lower.slice(0, 4)) + 1,
-                  },
-                  (_, i) => {
-                    const year = Number(lower.slice(0, 4)) + i;
-                    return { value: year, label: `${year}년` };
-                  },
-                )}
-                onChange={(year) => {
-                  const next = clamp(
-                    `${String(year).padStart(4, "0")}-${view.slice(5)}`,
-                  );
-                  setView(startOfMonth(next));
-                  setFocused(next);
-                }}
-              />
-              <DatePickerMonthList
-                label="월"
-                disabled={unavailable}
-                value={Number(view.slice(5, 7))}
-                options={Array.from({ length: 12 }, (_, i) => {
-                  const month = i + 1;
-                  const monthDate = `${view.slice(0, 4)}-${String(month).padStart(2, "0")}`;
-                  return {
-                    value: month,
-                    label: `${month}월`,
-                    disabled:
-                      monthDate < lower.slice(0, 7) ||
-                      monthDate > upper.slice(0, 7),
-                  };
-                })}
-                onChange={(month) => {
-                  const next = clamp(
-                    `${view.slice(0, 4)}-${String(month).padStart(2, "0")}-01`,
-                  );
-                  setView(startOfMonth(next));
-                  setFocused(next);
-                }}
-              />
-            </div>
+            <DatePickerMonthPicker
+              value={view}
+              today={today}
+              yearRange={yearRange}
+              minDate={lower}
+              maxDate={upper}
+              disabled={unavailable}
+              onChange={(next) => {
+                setView(next);
+                setFocused(clamp(next));
+              }}
+            />
             <button
               type="button"
               className="bibbidi-date-picker-return"
@@ -478,3 +443,7 @@ export function DatePicker(props: DatePickerProps) {
     </div>
   );
 }
+
+export const DatePicker = Object.assign(DatePickerRoot, {
+  MonthPicker: DatePickerMonthPicker,
+});

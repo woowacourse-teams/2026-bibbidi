@@ -47,3 +47,9 @@
 ## 제품 공용 조합
 
 `PickerField`는 제품에 둔다. 날짜·시간 필드, 모바일 BottomSheet·데스크톱 Popover 전환, 임시 선택 후 확인은 제품의 공용 조합 정책이다. 구성 요소의 기본 동작은 공용 컴포넌트가 제공하고, 제품 조합이 DS에 없다는 이유만으로 새 DS 컴포넌트를 만들지 않는다.
+
+## DatePicker.MonthPicker
+
+DatePicker 내부의 연도·월 선택을 독립적으로 사용하는 공용 하위 컴포넌트다. `value`는 유효한 ISO 날짜이며 `onChange`는 선택 월의 `YYYY-MM-01`을 전달한다. `today`, `yearRange`, `minDate`, `maxDate`, `disabled`와 표준 div 속성·ref를 지원하며 범위 의미는 DatePicker와 같다.
+
+DatePicker와 캘린더가 같은 하위 컴포넌트를 사용한다. 제품의 기존 연·월 목록은 ScrollFog와 키보드 탐색을 제공하며 디자인 시스템의 네이티브 목록과 렌더링 방식은 다르다. 연·월 선택 의미와 범위 API는 같다. 레이어·이동 버튼·임시 선택·닫기는 사용처가 관리한다. 캘린더는 연·월 이동 시 기존 일자를 유지하며 해당 날짜가 없으면 말일을 선택한다.

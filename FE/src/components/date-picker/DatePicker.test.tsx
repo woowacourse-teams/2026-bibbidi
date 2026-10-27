@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DatePicker, type DatePickerRange } from "./DatePicker";
@@ -192,4 +192,119 @@ describe("DatePicker 연월 목록 탐색", () => {
       screen.getByRole("option", { name: "6월" }),
     );
   });
+});
+
+describe("DatePicker.MonthPicker의 독립 조합", () => {
+  it("날짜 그리드 없이 연·월만 제어하고 YYYY-MM-01을 전달한다", () => {
+    const onChange = vi.fn();
+    const view = render(
+      <DatePicker.MonthPicker
+        value="2027-05-15"
+        today={today}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.queryByRole("grid")).toBeNull();
+    expect(screen.getAllByRole("listbox")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("option", { name: "2028년" }));
+    expect(onChange).toHaveBeenLastCalledWith("2028-05-01");
+    view.rerender(
+      <DatePicker.MonthPicker
+        value="2028-05-01"
+        today={today}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("option", { name: "2월" }));
+    expect(onChange).toHaveBeenLastCalledWith("2028-02-01");
+  });
+
+  it("범위 밖 월과 비활성 상태를 DatePicker와 같은 방식으로 제한한다", () => {
+    const onChange = vi.fn();
+    const view = render(
+      <DatePicker.MonthPicker
+        value="2027-05-01"
+        today={today}
+        minDate="2027-03-10"
+        maxDate="2027-06-20"
+        onChange={onChange}
+      />,
+    );
+    expect(
+      (screen.getByRole("option", { name: "1월" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("option", { name: "1월" }));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("option", { name: "5월" }), {
+      key: "Home",
+    });
+    expect(onChange).toHaveBeenLastCalledWith("2027-03-01");
+    view.rerender(
+      <DatePicker.MonthPicker
+        value="2027-05-01"
+        today={today}
+        disabled
+        onChange={onChange}
+      />,
+    );
+    onChange.mockClear();
+    fireEvent.click(screen.getByRole("option", { name: "6월" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByRole("group", { name: "연·월 선택" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+  });
+});
+
+it("숨겨진 연·월 목록이 열리면 현재 연도가 보이는 위치로 스크롤한다", () => {
+  const callbacks = new Map<Element, () => void>();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      callback: () => void;
+      constructor(callback: () => void) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        callbacks.set(target, this.callback);
+      }
+      disconnect() {}
+    },
+  );
+  try {
+    const onChange = vi.fn();
+    const view = render(
+      <div hidden>
+        <DatePicker.MonthPicker
+          today="2026-10-27"
+          value="2026-10-01"
+          onChange={onChange}
+        />
+      </div>,
+    );
+    const years = screen.getByRole("listbox", { name: "연도", hidden: true });
+    let height = 0;
+    Object.defineProperty(years, "clientHeight", { get: () => height });
+    expect(years.scrollTop).toBe(0);
+    view.rerender(
+      <div>
+        <DatePicker.MonthPicker
+          today="2026-10-27"
+          value="2026-10-01"
+          onChange={onChange}
+        />
+      </div>,
+    );
+    height = 220;
+    act(() => callbacks.get(years)?.());
+    const selectedYearOffset = 20 + 100 * 44;
+    expect(selectedYearOffset).toBeGreaterThanOrEqual(years.scrollTop);
+    expect(selectedYearOffset).toBeLessThan(years.scrollTop + height);
+    expect(onChange).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

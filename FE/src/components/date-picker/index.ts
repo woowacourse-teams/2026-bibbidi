@@ -4,3 +4,5 @@ export type {
   DatePickerRange,
   DatePickerSelectionMode,
 } from "./DatePicker";
+
+export type { DatePickerMonthPickerProps } from "./DatePickerMonthPicker";

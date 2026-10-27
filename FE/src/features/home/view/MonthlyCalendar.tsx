@@ -9,6 +9,7 @@ import {
 } from "../../../components/date-picker/date-utils";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
+import { CalendarMonthSelector } from "./CalendarMonthSelector";
 import "./MonthlyCalendar.css";
 
 const DAYS_OF_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
@@ -53,7 +54,11 @@ export function MonthlyCalendar({
           >
             {monthLabel(selectedDate)}
           </h2>
-          <p className="monthly-calendar__month">{monthLabel(selectedDate)}</p>
+          <CalendarMonthSelector
+            value={selectedDate}
+            today={referenceDate}
+            onSelect={onSelectMonth}
+          />
         </div>
         <div aria-label="월 이동" className="monthly-calendar__controls">
           <IconButton
