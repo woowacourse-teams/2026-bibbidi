@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   dateLabel,
   localToday,
-} from "../../../components/date-picker/date-utils";
+} from "../../../shared/date/calendarDate";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
 import { useChecklistAppointmentCreation } from "../useChecklistAppointmentCreation";

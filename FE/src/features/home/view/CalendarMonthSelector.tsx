@@ -1,3 +1,4 @@
+import { SCHEDULE_YEAR_RANGE } from "../../../shared/date/scheduleDate";
 import { useRef, useState } from "react";
 import { BottomSheet } from "../../../components/bottom-sheet";
 import { Button } from "../../../components/button";
@@ -57,6 +58,7 @@ export function CalendarMonthSelector({
       aria-label="캘린더 연·월 선택"
       value={state.month}
       today={today}
+      yearRange={SCHEDULE_YEAR_RANGE}
       onChange={(month) => setState((current) => ({ ...current, month }))}
     />
   );

@@ -26,7 +26,7 @@ import {
   usePreparationChecklistRepository,
 } from "../preparation";
 import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
-import { dateLabel, localToday } from "../../components/date-picker/date-utils";
+import { dateLabel, localToday } from "../../shared/date/calendarDate";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
 import { HomeScheduleDashboardFeature } from "./HomeScheduleDashboardFeature";

@@ -1,5 +1,9 @@
 import type { ComponentPropsWithRef } from "react";
-import { dateObject, localToday, startOfMonth } from "./date-utils";
+import {
+  getDateBounds,
+  localToday,
+  startOfMonth,
+} from "../../shared/date/calendarDate";
 import { DatePickerMonthList } from "./DatePickerMonthList";
 import "./DatePicker.css";
 
@@ -23,10 +27,7 @@ export function DatePickerMonthPicker({
   today = localToday(),
   minDate,
   maxDate,
-  yearRange = {
-    start: Number(today.slice(0, 4)) - 100,
-    end: Number(today.slice(0, 4)) + 100,
-  },
+  yearRange,
   disabled = false,
   className,
   "aria-label": label = "연·월 선택",
@@ -35,16 +36,12 @@ export function DatePickerMonthPicker({
 }: DatePickerMonthPickerProps) {
   const unavailable =
     disabled || ariaDisabled === true || ariaDisabled === "true";
-  const earliest = `${String(Math.max(1, yearRange.start)).padStart(4, "0")}-01-01`;
-  const latest = `${String(Math.min(9999, yearRange.end)).padStart(4, "0")}-12-31`;
-  const lower = minDate && minDate > earliest ? minDate : earliest;
-  const upper = maxDate && maxDate < latest ? maxDate : latest;
-  const clamp = (date: string) =>
-    dateObject(date) < dateObject(lower)
-      ? lower
-      : dateObject(date) > dateObject(upper)
-        ? upper
-        : date;
+  const { lower, upper, clamp } = getDateBounds({
+    today,
+    yearRange,
+    minDate,
+    maxDate,
+  });
   const current = startOfMonth(clamp(value));
   const years = Array.from(
     { length: Number(upper.slice(0, 4)) - Number(lower.slice(0, 4)) + 1 },

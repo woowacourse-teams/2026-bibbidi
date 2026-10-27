@@ -73,3 +73,34 @@ export function monthWeeks(value: string, weekStartsOn: number) {
     cells.slice(i * 7, i * 7 + 7),
   );
 }
+
+/** Intersects the caller's date limits with the supported year range. */
+export function getDateBounds({
+  today,
+  yearRange = {
+    start: Number(today.slice(0, 4)) - 100,
+    end: Number(today.slice(0, 4)) + 100,
+  },
+  minDate,
+  maxDate,
+}: {
+  today: string;
+  yearRange?: { start: number; end: number };
+  minDate?: string;
+  maxDate?: string;
+}) {
+  const earliest = `${String(Math.max(1, yearRange.start)).padStart(4, "0")}-01-01`;
+  const latest = `${String(Math.min(9999, yearRange.end)).padStart(4, "0")}-12-31`;
+  const lower = minDate && minDate > earliest ? minDate : earliest;
+  const upper = maxDate && maxDate < latest ? maxDate : latest;
+  return {
+    lower,
+    upper,
+    clamp: (date: string) =>
+      dateObject(date) < dateObject(lower)
+        ? lower
+        : dateObject(date) > dateObject(upper)
+          ? upper
+          : date,
+  };
+}

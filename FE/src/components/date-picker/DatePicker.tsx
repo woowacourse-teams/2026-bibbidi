@@ -8,11 +8,12 @@ import {
   dateObject,
   endOfMonth,
   isDate,
+  getDateBounds,
   localToday,
   monthLabel,
   monthWeeks,
   startOfMonth,
-} from "./date-utils";
+} from "../../shared/date/calendarDate";
 import { DatePickerMonthPicker } from "./DatePickerMonthPicker";
 import "./DatePicker.css";
 
@@ -78,10 +79,7 @@ function DatePickerRoot(props: DatePickerProps) {
     readOnly = false,
     numberOfMonths = 1,
     weekStartsOn = 0,
-    yearRange = {
-      start: Number(today.slice(0, 4)) - 100,
-      end: Number(today.slice(0, 4)) + 100,
-    },
+    yearRange,
     className,
     "aria-label": ariaLabel = "날짜 선택",
     "aria-labelledby": labelledBy,
@@ -102,16 +100,12 @@ function DatePickerRoot(props: DatePickerProps) {
     !Array.isArray(current)
       ? current
       : null;
-  const earliest = `${String(Math.max(1, yearRange.start)).padStart(4, "0")}-01-01`;
-  const latest = `${String(Math.min(9999, yearRange.end)).padStart(4, "0")}-12-31`;
-  const lower = minDate && minDate > earliest ? minDate : earliest;
-  const upper = maxDate && maxDate < latest ? maxDate : latest;
-  const clamp = (date: string) =>
-    dateObject(date) < dateObject(lower)
-      ? lower
-      : dateObject(date) > dateObject(upper)
-        ? upper
-        : date;
+  const { lower, upper, clamp } = getDateBounds({
+    today,
+    yearRange,
+    minDate,
+    maxDate,
+  });
   const initial = clamp(
     defaultViewDate && isDate(defaultViewDate)
       ? defaultViewDate

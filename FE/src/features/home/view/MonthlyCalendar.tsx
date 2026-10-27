@@ -6,7 +6,7 @@ import {
   isDate,
   monthLabel,
   startOfMonth,
-} from "../../../components/date-picker/date-utils";
+} from "../../../shared/date/calendarDate";
 import { useIsMobileLayout } from "../../../shared/responsive";
 import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
 import { CalendarMonthSelector } from "./CalendarMonthSelector";

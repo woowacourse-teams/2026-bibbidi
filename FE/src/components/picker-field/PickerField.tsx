@@ -2,7 +2,7 @@ import { useId, useRef, useState } from "react";
 import type { Ref } from "react";
 import { PickerFieldActions } from "./PickerFieldActions";
 import { DatePicker, type DatePickerProps } from "../date-picker";
-import { localToday } from "../date-picker/date-utils";
+import { localToday } from "../../shared/date/calendarDate";
 import { Popover } from "../popover";
 import { TextField } from "../text-field";
 import { TimePicker, type TimePickerMinuteStep } from "../time-picker";
