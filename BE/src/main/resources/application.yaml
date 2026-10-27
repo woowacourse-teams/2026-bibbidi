@@ -36,6 +36,9 @@ bibbidi:
   terms:
     cache:
       ttl: ${TERMS_CACHE_TTL:5m}
+  catalog:
+    cache:
+      ttl: ${CATALOG_CACHE_TTL:1m}
   sse:
     response-timeout-seconds: 60
   ai:

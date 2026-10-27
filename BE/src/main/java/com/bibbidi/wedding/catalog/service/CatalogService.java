@@ -1,5 +1,6 @@
 package com.bibbidi.wedding.catalog.service;
 
+import com.bibbidi.wedding.catalog.config.CatalogCacheConfig;
 import com.bibbidi.wedding.catalog.domain.Catalog;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.dto.CatalogItemDetailSnapshot;
@@ -10,6 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,7 @@ public class CatalogService {
         catalogRepository.validateCategoryExists(categoryId);
     }
 
+    @Cacheable(cacheNames = CatalogCacheConfig.CATALOG_CACHE, cacheManager = "catalogCacheManager", key = "'all'", sync = true)
     @Transactional(readOnly = true)
     public Catalog find() {
         return catalogRepository.findCatalog();
