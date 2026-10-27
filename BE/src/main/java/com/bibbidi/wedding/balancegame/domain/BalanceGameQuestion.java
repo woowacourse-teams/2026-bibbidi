@@ -1,18 +1,27 @@
 package com.bibbidi.wedding.balancegame.domain;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record BalanceGameQuestion(
         @NonNull Long id,
         int order,
-        @NonNull String question,
-        @NonNull List<Choice> options
+        @NonNull String content,
+        @NonNull List<Choice> choices
 ) {
 
     public BalanceGameQuestion {
-        options = List.copyOf(options);
+        choices = List.copyOf(choices);
+        Set<String> choiceIds = new HashSet<>();
+        for (Choice choice : choices) {
+            if (!choiceIds.add(choice.id())) {
+                throw new IllegalStateException("밸런스게임 선택지 ID가 중복됩니다: questionId="
+                        + id + ", choiceId=" + choice.id());
+            }
+        }
     }
 
     public record Choice(

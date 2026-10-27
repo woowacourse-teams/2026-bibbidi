@@ -17,7 +17,7 @@ public record QuestionData(
 
     public BalanceGameQuestion toQuestion(String imageBaseUrl) {
         return new BalanceGameQuestion(id, order, question, options.stream()
-                .map(option -> option.toChoice(imageBaseUrl))
+                .map(choice -> choice.toChoice(imageBaseUrl))
                 .toList());
     }
 }

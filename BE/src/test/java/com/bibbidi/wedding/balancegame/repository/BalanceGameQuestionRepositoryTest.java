@@ -53,7 +53,7 @@ class BalanceGameQuestionRepositoryTest {
 
     @Test
     @DisplayName("문항은 노출 순서대로 정렬하고 선택지는 JSON 배열 순서를 유지한다")
-    void shouldSortQuestionsAndPreserveOptionOrder() {
+    void shouldSortQuestionsAndPreserveChoiceOrder() {
         String laterQuestion = QUESTION.replace("\"id\": 10", "\"id\": 5")
                 .replace("\"order\": 1", "\"order\": 2");
         BalanceGameQuestionRepository repository = fromJson(
@@ -61,23 +61,12 @@ class BalanceGameQuestionRepositoryTest {
 
         assertThat(repository.findAll()).extracting(BalanceGameQuestion::id).containsExactly(10L, 5L);
         assertThat(repository.findAll()).extracting(BalanceGameQuestion::order).containsExactly(1, 2);
-        assertThat(repository.findAll().getFirst().options()).extracting(Choice::id)
+        assertThat(repository.findAll().getFirst().choices()).extracting(Choice::id)
                 .containsExactly("B", "UNKNOWN", "A");
-        assertThat(repository.findOptionById(10L, "B")).contains(
+        assertThat(repository.findAll().getFirst().choices().getFirst()).isEqualTo(
                 new Choice("B", "먼저 표시할 선택지", IMAGE_BASE_URL + "/balance-game/q01-b.webp"));
-        assertThat(repository.findOptionById(10L, "UNKNOWN")).contains(
+        assertThat(repository.findAll().getFirst().choices().get(1)).isEqualTo(
                 new Choice("UNKNOWN", "아직 잘 모르겠어", null));
-    }
-
-    @Test
-    @DisplayName("같은 저장소에서 문항 ID와 문항 안의 선택지 ID로 조회한다")
-    void shouldFindQuestionAndOptionById() {
-        BalanceGameQuestionRepository repository = fromJson(VALID_JSON);
-
-        assertThat(repository.findById(10L)).contains(repository.findAll().getFirst());
-        assertThat(repository.findById(99L)).isEmpty();
-        assertThat(repository.findOptionById(10L, "missing")).isEmpty();
-        assertThat(repository.findOptionById(99L, "A")).isEmpty();
     }
 
     @ParameterizedTest
@@ -90,9 +79,9 @@ class BalanceGameQuestionRepositoryTest {
     void shouldResolveImageUrlWithConfiguredBase(String imageBaseUrl, String expectedImageUrl) {
         BalanceGameQuestionRepository repository = fromJson(VALID_JSON, imageBaseUrl);
 
-        assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+        assertThat(repository.findAll().getFirst().choices().getFirst().imageUrl())
                 .isEqualTo(expectedImageUrl);
-        assertThat(repository.findOptionById(10L, "UNKNOWN").orElseThrow().imageUrl()).isNull();
+        assertThat(repository.findAll().getFirst().choices().get(1).imageUrl()).isNull();
     }
 
     @ParameterizedTest
@@ -108,11 +97,11 @@ class BalanceGameQuestionRepositoryTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     BalanceGameQuestionRepository repository = context.getBean(BalanceGameQuestionRepository.class);
-                    assertThat(repository.findOptionById(1L, "A").orElseThrow().imageUrl())
+                    assertThat(repository.findAll().getFirst().choices().getFirst().imageUrl())
                             .isEqualTo(expectedOrigin + "/balance-game/q01-a.webp");
-                    assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+                    assertThat(repository.findAll().getLast().choices().get(1).imageUrl())
                             .isEqualTo(expectedOrigin + "/balance-game/q10-b.webp");
-                    assertThat(repository.findOptionById(1L, "UNKNOWN").orElseThrow().imageUrl()).isNull();
+                    assertThat(repository.findAll().getFirst().choices().getLast().imageUrl()).isNull();
                 });
     }
 
@@ -122,7 +111,7 @@ class BalanceGameQuestionRepositoryTest {
         BalanceGameQuestionRepository repository = fromJson(
                 VALID_JSON.replace("\"/balance-game/q01-b.webp\"", "null"), "");
 
-        assertThat(repository.findAll().getFirst().options())
+        assertThat(repository.findAll().getFirst().choices())
                 .allSatisfy(option -> assertThat(option.imageUrl()).isNull());
     }
 
@@ -148,12 +137,12 @@ class BalanceGameQuestionRepositoryTest {
 
     @Test
     @DisplayName("문항과 선택지 목록은 외부에서 변경할 수 없다")
-    void shouldKeepQuestionsAndOptionsImmutable() {
+    void shouldKeepQuestionsAndChoicesImmutable() {
         BalanceGameQuestionRepository repository = fromJson(VALID_JSON);
 
         assertThatThrownBy(() -> repository.findAll().clear())
                 .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> repository.findAll().getFirst().options().clear())
+        assertThatThrownBy(() -> repository.findAll().getFirst().choices().clear())
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -167,8 +156,6 @@ class BalanceGameQuestionRepositoryTest {
 
         for (int i = 0; i < 3; i++) {
             assertThat(repository.findAll()).isSameAs(questions);
-            repository.findById(10L);
-            repository.findOptionById(10L, "UNKNOWN");
         }
 
         verify(resource, times(1)).getContentAsByteArray();
@@ -184,16 +171,16 @@ class BalanceGameQuestionRepositoryTest {
         assertThat(repository.findAll()).extracting(BalanceGameQuestion::order)
                 .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
         assertThat(repository.findAll()).allSatisfy(question -> {
-            assertThat(question.options()).extracting(Choice::id).containsExactly("A", "B", "UNKNOWN");
-            assertThat(question.options().getLast().imageUrl()).isNull();
+            assertThat(question.choices()).extracting(Choice::id).containsExactly("A", "B", "UNKNOWN");
+            assertThat(question.choices().getLast().imageUrl()).isNull();
         });
-        assertThat(repository.findById(1L).orElseThrow().options().getFirst().text())
+        assertThat(repository.findAll().getFirst().choices().getFirst().text())
                 .isEqualTo("기본 촬영에 더해, 아이폰으로 생생한 현장 사진도 남길래.");
-        assertThat(repository.findOptionById(1L, "A").orElseThrow().imageUrl())
+        assertThat(repository.findAll().getFirst().choices().getFirst().imageUrl())
                 .isEqualTo(IMAGE_BASE_URL + "/balance-game/q01-a.webp");
-        assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+        assertThat(repository.findAll().getLast().choices().get(1).imageUrl())
                 .isEqualTo(IMAGE_BASE_URL + "/balance-game/q10-b.webp");
-        assertThat(repository.findById(10L).orElseThrow().question()).isEqualTo("결혼 후 함께 살 집을 떠올리면?");
+        assertThat(repository.findAll().getLast().content()).isEqualTo("결혼 후 함께 살 집을 떠올리면?");
     }
 
     @ParameterizedTest(name = "{1}")
@@ -244,15 +231,6 @@ class BalanceGameQuestionRepositoryTest {
     }
 
     @Test
-    @DisplayName("문서 뒤의 JSON과 잘못된 필드명, 소수 순서를 허용하지 않는다")
-    void shouldRejectTrailingJsonAndUnknownFieldsAndFractionalOrder() {
-        for (String json : List.of(VALID_JSON + "{}", VALID_JSON.replace("\"imagePath\"", "\"imageUrl\""),
-                VALID_JSON.replace("\"order\": 1", "\"order\": 1.5"))) {
-            assertThatThrownBy(() -> fromJson(json)).isInstanceOf(IllegalStateException.class);
-        }
-    }
-
-    @Test
     @DisplayName("숫자 문자열은 공용 ObjectMapper의 기본 변환 정책을 따른다")
     void shouldUseSharedMapperCoercionPolicy() {
         BalanceGameQuestionRepository repository = fromJson(VALID_JSON
@@ -270,32 +248,6 @@ class BalanceGameQuestionRepositoryTest {
                 VALID_JSON.replace("\"order\": 1", "\"order\": 1, \"order\": 2"));
 
         assertThat(repository.findAll().getFirst().order()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("문항 ID가 중복되면 문항 ID를 알리며 실패한다")
-    void shouldRejectDuplicateQuestionId() {
-        assertThatThrownBy(() -> fromJson("{\"questions\":[" + QUESTION + ","
-                + QUESTION.replace("\"order\": 1", "\"order\": 2") + "]}"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContainingAll("문항 ID가 중복", "id=10");
-    }
-
-    @Test
-    @DisplayName("문항 노출 순서가 중복되면 해당 순서를 알리며 실패한다")
-    void shouldRejectDuplicateOrder() {
-        assertThatThrownBy(() -> fromJson("{\"questions\":[" + QUESTION + ","
-                + QUESTION.replace("\"id\": 10", "\"id\": 20") + "]}"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContainingAll("노출 순서가 중복", "order=1");
-    }
-
-    @Test
-    @DisplayName("한 문항 안의 선택지 ID가 중복되면 문항과 선택지 ID를 알리며 실패한다")
-    void shouldRejectDuplicateOptionId() {
-        assertThatThrownBy(() -> fromJson(VALID_JSON.replace("\"id\": \"A\"", "\"id\": \"B\"")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContainingAll("선택지 ID가 중복", "questionId=10", "optionId=B");
     }
 
     @Test
