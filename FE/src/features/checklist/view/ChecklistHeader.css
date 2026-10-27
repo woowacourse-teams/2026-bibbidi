@@ -2,29 +2,6 @@
   padding-bottom: 32px;
 }
 
-.checklist-header__breadcrumb ol {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
-}
-
-.checklist-header__breadcrumb li {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.checklist-header__breadcrumb [aria-current] {
-  color: var(--color-fg-neutral);
-  font-weight: var(--font-weight-medium);
-}
-
 @media (width < 768px) {
   .checklist-header {
     padding-bottom: 24px;

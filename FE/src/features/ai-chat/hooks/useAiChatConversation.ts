@@ -9,14 +9,21 @@ import {
 
 type AssistantMessage = Extract<ChatMessage, { role: "assistant" }>;
 
-export function useAiChatConversation(onAuthenticationRequired: () => void) {
+export function useAiChatConversation(
+  onAuthenticationRequired: () => void,
+  contextLabel?: string,
+) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
   const conversationId = useRef<string | undefined>(undefined);
   const nextId = useRef(0);
-  const failedTurn = useRef<{ text: string; answerId: number } | null>(null);
+  const failedTurn = useRef<{
+    text: string;
+    answerId: number;
+    contextLabel?: string;
+  } | null>(null);
 
   useEffect(
     () => () => {
@@ -39,7 +46,11 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
     );
   };
 
-  const receive = async (text: string, answerId: number) => {
+  const receive = async (
+    text: string,
+    answerId: number,
+    currentContext?: string,
+  ) => {
     const controller = new AbortController();
     requestRef.current = controller;
     failedTurn.current = null;
@@ -51,8 +62,17 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
       updateAnswer(answerId, update);
     };
     try {
+      const contextualMessage = currentContext
+        ? `[현재 화면: ${currentContext}]\n${text}`
+        : text;
       await streamAiChat(
-        { message: text, conversationId: conversationId.current },
+        {
+          // Preserve the full question when context would exceed the API's limit.
+          message: isValidChatMessage(contextualMessage)
+            ? contextualMessage
+            : text,
+          conversationId: conversationId.current,
+        },
         {
           onConversation: (id) => {
             if (requestRef.current === controller) conversationId.current = id;
@@ -70,7 +90,7 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
       updateCurrentAnswer((message) => ({ ...message, status: "complete" }));
     } catch (error) {
       if (requestRef.current !== controller) return;
-      failedTurn.current = { text, answerId };
+      failedTurn.current = { text, answerId, contextLabel: currentContext };
       updateCurrentAnswer((message) => ({
         ...message,
         catalogItemIds: undefined,
@@ -103,7 +123,7 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
       { id: id + 1, role: "assistant", text: "", status: "streaming" },
     ]);
     setDraft("");
-    void receive(content, id + 1);
+    void receive(content, id + 1, contextLabel);
   };
 
   const retry = () => {
@@ -115,7 +135,7 @@ export function useAiChatConversation(onAuthenticationRequired: () => void) {
       catalogItemIds: undefined,
       status: "streaming",
     }));
-    void receive(turn.text, turn.answerId);
+    void receive(turn.text, turn.answerId, turn.contextLabel);
   };
 
   const isPending = messages.some(

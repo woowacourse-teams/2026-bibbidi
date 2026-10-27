@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import { MemoryRouter } from "react-router";
 import {
   act,
   fireEvent,
@@ -8,1078 +9,480 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AuthState } from "../auth/model/auth";
+import type { ChecklistQueryModel } from "../checklist/model/checklistQuery";
+import { installMatchMedia } from "../../test/matchMedia";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 
-const analyticsMocks = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
+  auth: { status: "guest" } as AuthState,
+  refreshAuth: vi.fn(),
+  catalog: vi.fn(),
+  getIds: vi.fn(),
+  add: vi.fn(),
+  getChecklist: vi.fn(),
+  revision: 0,
   track: vi.fn(),
 }));
-const authMocks = vi.hoisted(() => ({
-  authState: { status: "guest" } as
-    | { status: "authenticated"; user: { id: number; nickname: string } }
-    | { status: "guest" }
-    | { status: "loading" },
-  refreshAuth: vi.fn(),
-}));
-const repositoryMocks = vi.hoisted(() => ({
-  getCatalog: vi.fn(),
-}));
-const checklistRepositoryMocks = vi.hoisted(() => ({
-  addCatalogItemIds: vi.fn(),
-  getCatalogItemIds: vi.fn(),
-}));
-
 vi.mock("../auth", () => ({
-  useAuth: () => ({
-    authState: authMocks.authState,
-    refreshAuth: authMocks.refreshAuth,
-  }),
+  useAuth: () => ({ authState: mocks.auth, refreshAuth: mocks.refreshAuth }),
 }));
-vi.mock("../checklist/checklistQueryDependencies", () => {
-  const repository = {
-    getChecklist: vi.fn().mockResolvedValue({ categories: [] }),
-  };
-  return {
-    useChecklistQueryRepository: () => repository,
-    useChecklistRevision: () => 0,
-  };
-});
 vi.mock("../../infrastructure/analytics", () => ({
-  analytics: {
-    initialize: vi.fn(),
-    track: analyticsMocks.track,
-  },
+  analytics: { track: mocks.track },
 }));
 vi.mock("./preparationDependencies", () => {
-  const checklistRepository = {
-    addCatalogItemIds: checklistRepositoryMocks.addCatalogItemIds,
-    getCatalogItemIds: checklistRepositoryMocks.getCatalogItemIds,
+  const repository = {
+    getCatalogItemIds: mocks.getIds,
+    addCatalogItemIds: mocks.add,
   };
-
   return {
-    usePreparationChecklistRepository: () => checklistRepository,
-    preparationCatalogRepository: {
-      getCatalog: repositoryMocks.getCatalog,
-    },
+    usePreparationChecklistRepository: () => repository,
+    preparationCatalogRepository: { getCatalog: mocks.catalog },
   };
 });
-
+vi.mock("../checklist/checklistQueryDependencies", () => {
+  const repository = { getChecklist: mocks.getChecklist };
+  return {
+    useChecklistQueryRepository: () => repository,
+    useChecklistRevision: () => mocks.revision,
+  };
+});
 import { AllPreparationStepsFeature } from "./AllPreparationStepsFeature";
+import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
 import {
   PreparationAuthenticationRequiredError,
   PreparationChecklistAdditionError,
 } from "./repository/preparationErrors";
-import { preparationCatalogFixture } from "./test/fixtures/preparationCatalog.fixture";
+import { ChecklistQueryAuthenticationRequiredError } from "../checklist/repository/checklistQueryRepository";
 
-const DESKTOP_ROADMAP_TITLE = "웨딩홀 · 전체 단계";
-const ROADMAP_TITLE_PATTERN = / · 전체 단계$/;
-
-async function renderFeature({
-  strictMode = false,
-  expandFirstStep = false,
-} = {}) {
-  const feature = <AllPreparationStepsFeature />;
-  const page = <div data-page-scroll-container>{feature}</div>;
-
-  const result = render(strictMode ? <StrictMode>{page}</StrictMode> : page);
-  await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
-  await waitFor(() =>
-    expect(analyticsMocks.track).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "preparation_catalog_view" }),
-    ),
+let saved: ChecklistQueryModel;
+let ids: string[];
+function savedItem(id: number, status: "prev" | "done" = "prev") {
+  return {
+    id: `checklist-item-${id}`,
+    checklistItemId: id,
+    sourceCatalogItemId: id,
+    categoryId: "wedding-hall",
+    title: id === 101 ? "내 웨딩홀 투어" : "내 웨딩홀 견적 비교",
+    status,
+    appointments: [],
+  };
+}
+function ui(categoryId?: string) {
+  return (
+    <MemoryRouter>
+      <AllPreparationStepsFeature initialCategoryId={categoryId} />
+    </MemoryRouter>
   );
-
-  if (expandFirstStep) {
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-  }
+}
+async function show(categoryId?: string) {
+  const result = render(ui(categoryId));
+  await screen.findByRole("heading", { level: 1 });
   return result;
 }
-
-function getRoadmapTitle() {
-  return screen.getByRole("heading", { name: ROADMAP_TITLE_PATTERN });
+async function openFirst() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" }),
+  );
+  return screen.findByRole("dialog", { name: "01 웨딩홀 투어와 계약" });
 }
+const modal = () => screen.getByRole("dialog");
 
 beforeEach(() => {
-  checklistRepositoryMocks.addCatalogItemIds.mockReset();
-  checklistRepositoryMocks.addCatalogItemIds.mockImplementation(
-    (_audience: string, catalogItemIds: string[]) =>
-      Promise.resolve([...new Set(catalogItemIds)]),
-  );
-  checklistRepositoryMocks.getCatalogItemIds.mockReset();
-  checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["101"]);
-});
-
-describe("AllPreparationStepsFeature Analytics", () => {
-  beforeEach(() => {
-    authMocks.authState = { status: "guest" };
-    authMocks.refreshAuth.mockReset();
-    analyticsMocks.track.mockReset();
-    repositoryMocks.getCatalog.mockReset();
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-  });
-
-  it("단계 아이콘은 화면 근처에 들어올 때 요청하고 관찰을 해제한다", async () => {
-    let notify!: IntersectionObserverCallback;
-    const observe = vi.fn();
-    const disconnect = vi.fn();
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        constructor(callback: IntersectionObserverCallback) {
-          notify = callback;
-        }
-        observe = observe;
-        disconnect = disconnect;
-      },
-    );
-    try {
-      const { container, unmount } = await renderFeature();
-      const icon = container.querySelector<HTMLImageElement>(
-        ".preparation-roadmap__step-icon",
-      )!;
-      expect(icon.getAttribute("src")).toBeNull();
-      expect(observe).toHaveBeenCalledWith(icon);
-      act(() =>
-        notify(
-          [
+  vi.clearAllMocks();
+  mocks.auth = { status: "guest" };
+  mocks.revision = 0;
+  ids = ["101"];
+  saved = {
+    categories: [
+      { id: "wedding-hall", title: "웨딩홀", items: [savedItem(101, "done")] },
+    ],
+  };
+  mocks.catalog.mockReset().mockResolvedValue(preparationCatalogFixture);
+  mocks.getIds.mockReset().mockImplementation(async () => [...ids]);
+  mocks.getChecklist.mockReset().mockImplementation(async () => saved);
+  mocks.add
+    .mockReset()
+    .mockImplementation(async (audience: string, requested: string[]) => {
+      const added = requested.filter((id) => !ids.includes(id));
+      ids.push(...added);
+      if (audience === "authenticated") {
+        saved = {
+          categories: [
             {
-              boundingClientRect: icon.getBoundingClientRect(),
-              intersectionRatio: 1,
-              intersectionRect: icon.getBoundingClientRect(),
-              isIntersecting: true,
-              rootBounds: null,
-              target: icon,
-              time: 0,
+              id: "wedding-hall",
+              title: "웨딩홀",
+              items: [
+                ...saved.categories[0].items,
+                ...added.map((id) => savedItem(Number(id))),
+              ],
             },
           ],
-          {} as IntersectionObserver,
-        ),
-      );
-      expect(icon.src).toBe("https://example.com/wedding-hall.png");
-      unmount();
-      expect(disconnect).toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("StrictMode에서도 준비 목록 최초 진입 이벤트를 한 번 전송한다", async () => {
-    await renderFeature({ strictMode: true });
-
-    await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_catalog_view",
-      parameters: {
-        initial_category_id: "wedding-hall",
-      },
+        };
+        mocks.revision += 1;
+      }
+      return added;
     });
-  });
-
-  it("카테고리 버튼 선택 이벤트를 전송한다", async () => {
-    await renderFeature();
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
-
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_category_select",
-      parameters: {
-        category_id: "studio-dress-makeup",
-        direction: "direct",
-        input_method: "button",
-        previous_category_id: "wedding-hall",
-      },
-    });
-  });
-
-  it("현재 카테고리 재선택과 열린 단계 접기에는 이벤트를 전송하지 않는다", async () => {
-    await renderFeature();
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: "웨딩홀" }));
-    const firstStepButton = screen.getByRole("button", {
-      name: /01.*웨딩홀 투어와 계약/,
-    });
-
-    fireEvent.click(firstStepButton);
-    analyticsMocks.track.mockClear();
-    fireEvent.click(firstStepButton);
-
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-  });
-
-  it("로드맵 단계 선택 이벤트를 전송한다", async () => {
-    await renderFeature();
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /02.*예식 형태·식순·입장 방식 결정/,
-      }),
-    );
-
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_step_select",
-      parameters: {
-        category_id: "wedding-hall",
-        step_id: "step-2",
-        step_order: 2,
-      },
-    });
-  });
-
-  it("데스크톱에서 세로 스크롤로 카테고리를 변경하지 않는다", async () => {
-    await renderFeature();
-    analyticsMocks.track.mockClear();
-
-    fireEvent.wheel(getRoadmapTitle(), { deltaX: 0, deltaY: 100 });
-
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "웨딩홀", pressed: true }),
-    ).toBeTruthy();
-  });
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
-describe("AllPreparationStepsFeature 서버 상태", () => {
-  beforeEach(() => {
-    authMocks.authState = { status: "guest" };
-    authMocks.refreshAuth.mockReset();
-    analyticsMocks.track.mockReset();
-    repositoryMocks.getCatalog.mockReset();
+describe("단일 준비 로드맵", () => {
+  it.each(["guest", "authenticated"] as const)(
+    "%s도 같은 단계 전체와 카테고리를 보고 보기 전환은 제공하지 않는다",
+    async (audience) => {
+      if (audience === "authenticated")
+        mocks.auth = {
+          status: "authenticated",
+          user: { id: 1, nickname: "비비디" },
+        };
+      await show();
+      expect(
+        within(screen.getByRole("list", { name: "준비 단계" })).getAllByRole(
+          "button",
+        ),
+      ).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: "내 로드맵" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "전체 단계" })).toBeNull();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(
+        screen.getByRole("button", {
+          name: "03 예식 진행자와 당일 도우미 섭외",
+        }),
+      ).toBeTruthy();
+    },
+  );
+  it("초기 카테고리와 이후 URL 선택을 반영하며 카탈로그를 다시 요청하지 않는다", async () => {
+    const { rerender } = await show("studio-dress-makeup");
+    expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
+    rerender(ui("wedding-hall"));
+    expect(screen.getByRole("heading", { name: "웨딩홀" })).toBeTruthy();
+    expect(mocks.catalog).toHaveBeenCalledOnce();
   });
-
-  it("응답을 기다리는 동안 로딩 상태를 표시한다", () => {
-    repositoryMocks.getCatalog.mockReturnValue(new Promise(() => {}));
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(screen.getByRole("status").textContent).toBe(
-      "로드맵을 불러오고 있어요.",
-    );
+  it("존재하지 않는 카테고리는 첫 단계가 있는 카테고리로 돌아간다", async () => {
+    await show("unknown");
+    expect(screen.getByRole("heading", { name: "웨딩홀" })).toBeTruthy();
   });
-
-  it("인증 상태가 확정되기 전에는 준비 목록을 요청하지 않는다", () => {
-    authMocks.authState = { status: "loading" };
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(screen.getByRole("status").textContent).toBe(
-      "로드맵을 불러오고 있어요.",
-    );
-    expect(repositoryMocks.getCatalog).not.toHaveBeenCalled();
-  });
-
-  it("비로그인 사용자도 단일 준비 목록을 요청한다", async () => {
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-
-    await renderFeature({ expandFirstStep: true });
-
-    expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
-      expect.any(AbortSignal),
-    );
-    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
-      "guest",
-      expect.any(AbortSignal),
-    );
-  });
-
-  it("로그인 사용자는 단일 준비 목록과 서버 체크리스트를 요청한다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-
-    await renderFeature({ expandFirstStep: true });
-
-    expect(repositoryMocks.getCatalog).toHaveBeenCalledWith(
-      expect.any(AbortSignal),
-    );
-    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledWith(
-      "authenticated",
-      expect.any(AbortSignal),
-    );
+  it("카드를 선택하면 전체 할 일을 모달에 표시하고 닫으면 카드에 초점을 돌린다", async () => {
+    await show();
+    const trigger = screen.getByRole("button", {
+      name: "01 웨딩홀 투어와 계약",
+    });
+    trigger.focus();
+    const dialog = await openFirst();
     expect(
-      screen
-        .getByRole("button", {
-          name: "웨딩홀 견적 비교 추가",
-        })
-        .hasAttribute("disabled"),
-    ).toBe(false);
-  });
-
-  it("로그인 사용자는 내 체크리스트의 원본 준비 항목 ID로 included를 계산한다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-    checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
-
-    await renderFeature({ expandFirstStep: true });
-
-    expect(screen.getByText("웨딩홀 견적 비교")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", {
-        name: "웨딩홀 견적 비교 추가",
-      }),
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", {
-        name: "웨딩홀 투어 추가",
-      }),
+      within(dialog).getByText("웨딩홀을 둘러보고 계약해요."),
     ).toBeTruthy();
+    expect(within(dialog).getByText("담은 일")).toBeTruthy();
+    expect(
+      within(dialog).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    ).toBeTruthy();
+    expect(
+      within(dialog)
+        .getByRole("link", { name: "체크리스트에서 관리" })
+        .getAttribute("href"),
+    ).toBe("/checklist");
+    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
-
-  it("비로그인 빈 상태에서 로그인하면 인증 조회 동안 로딩 상태를 표시한다", async () => {
-    repositoryMocks.getCatalog
-      .mockResolvedValueOnce({
-        categories: [{ id: "empty", label: "비어 있음" }],
-        roadmaps: [{ categoryId: "empty", steps: [] }],
-        stepDetails: [],
-      })
-      .mockReturnValueOnce(new Promise(() => {}));
-    const { rerender } = render(<AllPreparationStepsFeature />);
-    expect(await screen.findByText("표시할 로드맵이 없어요.")).toBeTruthy();
-
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    rerender(<AllPreparationStepsFeature />);
-
-    expect(screen.getByRole("status").textContent).toBe(
-      "로드맵을 불러오고 있어요.",
+  it("모바일은 보기 선택 없이 바로 단계 바텀시트를 연다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    await show();
+    const dialog = await openFirst();
+    expect(dialog.classList.contains("bibbidi-bottom-sheet")).toBe(true);
+    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "단계 상세 닫기" }),
     );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+  it("크기를 바꿔도 선택한 단계와 담은 일은 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    await show();
+    await openFirst();
+    act(() => media.setMatches(true));
+    const dialog = await screen.findByRole("dialog", {
+      name: "01 웨딩홀 투어와 계약",
+    });
+    expect(dialog.classList.contains("bibbidi-bottom-sheet")).toBe(true);
+    expect(within(dialog).getByText("담은 일")).toBeTruthy();
+  });
+  it("로그인 상태는 내가 담은 일만 분모로 완료율을 표시한다", async () => {
+    mocks.auth = {
+      status: "authenticated",
+      user: { id: 1, nickname: "비비디" },
+    };
+    await show();
+    const progress = await screen.findByRole("progressbar", {
+      name: "웨딩홀 투어와 계약 내 할 일 완료",
+    });
+    expect(progress.getAttribute("aria-valuenow")).toBe("100");
+    expect(progress.getAttribute("aria-valuetext")).toBe("1개 중 1개 완료");
+    expect(screen.getByText("내 할 일 완료")).toBeTruthy();
+    expect(screen.getAllByText("준비 전")).toHaveLength(2);
+  });
+  it("게스트에게는 담은 개수만 표시하고 완료율을 만들지 않는다", async () => {
+    await show();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(mocks.getChecklist).not.toHaveBeenCalled();
+  });
+  it("체크리스트 갱신으로 항목이 제거되면 준비 전으로 되돌린다", async () => {
+    mocks.auth = {
+      status: "authenticated",
+      user: { id: 1, nickname: "비비디" },
+    };
+    const { rerender } = await show();
+    await screen.findByText("내 할 일 완료");
+    saved = { categories: [] };
+    mocks.revision += 1;
+    rerender(ui());
+    await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
+    expect(screen.getAllByText("준비 전")).toHaveLength(3);
+  });
+  it("내 현황 조회 실패에도 단계 탐색을 유지하고 다시 불러온다", async () => {
+    mocks.auth = {
+      status: "authenticated",
+      user: { id: 1, nickname: "비비디" },
+    };
+    mocks.getChecklist.mockRejectedValueOnce(new Error("failed"));
+    await show();
+    await screen.findByText("내 준비 현황을 불러오지 못했어요.");
+    expect(screen.getAllByText("현황 확인 필요")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "현황 다시 불러오기" }));
+    await screen.findByText("내 할 일 완료");
+  });
+  it("현황 조회 인증 만료는 인증 갱신으로 연결한다", async () => {
+    mocks.auth = {
+      status: "authenticated",
+      user: { id: 1, nickname: "비비디" },
+    };
+    mocks.getChecklist.mockRejectedValue(
+      new ChecklistQueryAuthenticationRequiredError(),
+    );
+    await show();
+    await waitFor(() => expect(mocks.refreshAuth).toHaveBeenCalled());
+  });
+  it.each(["guest", "authenticated"] as const)(
+    "%s의 추가 성공은 같은 모달과 카드에 즉시 반영한다",
+    async (audience) => {
+      if (audience === "authenticated")
+        mocks.auth = {
+          status: "authenticated",
+          user: { id: 1, nickname: "비비디" },
+        };
+      await show();
+      const dialog = await openFirst();
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+      );
+      await waitFor(() =>
+        expect(within(modal()).getAllByText(/^(담은 일|완료)$/)).toHaveLength(
+          2,
+        ),
+      );
+      expect(mocks.add).toHaveBeenCalledWith(
+        audience,
+        ["102"],
+        expect.any(AbortSignal),
+      );
+      expect(
+        within(modal()).queryByRole("button", { name: "모두 추가" }),
+      ).toBeNull();
+      expect(mocks.track).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "preparation_item_add",
+          parameters: expect.objectContaining({ item_count: 1 }),
+        }),
+      );
+    },
+  );
+  it("모두 추가는 아직 담지 않은 항목만 요청한다", async () => {
+    await show();
+    const dialog = await openFirst();
+    fireEvent.click(within(dialog).getByRole("button", { name: "모두 추가" }));
     await waitFor(() =>
-      expect(repositoryMocks.getCatalog).toHaveBeenLastCalledWith(
+      expect(mocks.add).toHaveBeenCalledWith(
+        "guest",
+        ["102"],
         expect.any(AbortSignal),
       ),
     );
   });
-
-  it("비로그인 조회 오류 상태에서 로그인하면 이전 오류를 표시하지 않는다", async () => {
-    repositoryMocks.getCatalog
-      .mockRejectedValueOnce(new Error("failed"))
-      .mockReturnValueOnce(new Promise(() => {}));
-    const { rerender } = render(<AllPreparationStepsFeature />);
-    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
-
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    rerender(<AllPreparationStepsFeature />);
-
-    expect(screen.queryByText("로드맵을 불러오지 못했어요.")).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe(
-      "로드맵을 불러오고 있어요.",
-    );
-  });
-
-  it("authenticated 상태에서 계정이 바뀌면 이전 목록을 즉시 숨기고 다시 조회한다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "A" },
-    };
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-    let resolveNext: ((ids: string[]) => void) | undefined;
-    checklistRepositoryMocks.getCatalogItemIds
-      .mockResolvedValueOnce(["101"])
-      .mockReturnValueOnce(
-        new Promise<string[]>((resolve) => {
-          resolveNext = resolve;
-        }),
+  it.each([false, true])(
+    "추가 버튼이 담은 상태로 바뀌면 다음 추가 버튼 또는 닫기로 초점을 옮긴다: %s",
+    async (lastTask) => {
+      ids = lastTask ? ["101"] : [];
+      await show();
+      await openFirst();
+      const button = within(modal()).getByRole<HTMLButtonElement>("button", {
+        name: lastTask ? "웨딩홀 견적 비교 추가" : "웨딩홀 투어 추가",
+      });
+      button.focus();
+      fireEvent.click(button);
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          within(modal()).getByRole("button", {
+            name: lastTask ? "닫기" : "웨딩홀 견적 비교 추가",
+          }),
+        ),
       );
-    const { rerender } = await renderFeature({ expandFirstStep: true });
+    },
+  );
+
+  it("전체 추가의 일부만 저장되면 실제로 저장된 항목만 담은 상태로 표시한다", async () => {
+    ids = [];
+    mocks.add.mockResolvedValue(["102"]);
+    await show();
+    await openFirst();
+    fireEvent.click(within(modal()).getByRole("button", { name: "모두 추가" }));
+    await waitFor(() =>
+      expect(within(modal()).getAllByText("담은 일")).toHaveLength(1),
+    );
     expect(
-      within(
-        screen.getByRole("region", { name: "이 단계의 체크리스트" }),
-      ).getByText("웨딩홀 투어"),
+      within(modal()).getByRole("button", { name: "웨딩홀 투어 추가" }),
     ).toBeTruthy();
-
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 2, nickname: "B" },
-    };
-    rerender(
-      <div data-page-scroll-container>
-        <AllPreparationStepsFeature />
-      </div>,
-    );
-
     expect(
-      screen.queryByRole("region", { name: "이 단계의 체크리스트" }),
+      within(modal()).queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     ).toBeNull();
-    expect(
-      screen.queryByRole("heading", { name: ROADMAP_TITLE_PATTERN }),
-    ).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe(
-      "로드맵을 불러오고 있어요.",
-    );
-    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
-    await act(async () => resolveNext?.(["102"]));
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    const checklist = within(
-      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
-    );
-    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
-    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
   });
 
-  it("계정 전환 후 늦게 도착한 이전 계정의 조회 응답을 무시한다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "A" },
-    };
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-    let resolvePrevious: ((ids: string[]) => void) | undefined;
-    let previousSignal: AbortSignal | undefined;
-    checklistRepositoryMocks.getCatalogItemIds
-      .mockImplementationOnce((_audience: string, signal: AbortSignal) => {
-        previousSignal = signal;
-        return new Promise<string[]>((resolve) => {
-          resolvePrevious = resolve;
-        });
-      })
-      .mockResolvedValueOnce(["102"]);
-    const { rerender } = render(<AllPreparationStepsFeature />);
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 2, nickname: "B" },
-    };
-    rerender(<AllPreparationStepsFeature />);
-    expect(previousSignal?.aborted).toBe(true);
-    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
-    await act(async () => resolvePrevious?.(["101"]));
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
+  it("추가 중에는 중복 실행과 닫기를 막는다", async () => {
+    let finish!: (ids: string[]) => void;
+    mocks.add.mockImplementation(
+      () =>
+        new Promise<string[]>((resolve) => {
+          finish = resolve;
+        }),
     );
-    const checklist = within(
-      screen.getByRole("region", { name: "이 단계의 체크리스트" }),
-    );
-    expect(checklist.getByText("웨딩홀 견적 비교")).toBeTruthy();
-    expect(checklist.queryByText("웨딩홀 투어")).toBeNull();
+    await show();
+    const dialog = await openFirst();
+    const button = within(dialog).getByRole("button", {
+      name: "웨딩홀 견적 비교 추가",
+    });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(mocks.add).toHaveBeenCalledOnce();
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>("button", { name: "닫기" })
+        .disabled,
+    ).toBe(true);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    await act(async () => finish(["102"]));
+    expect(
+      within(modal()).getByRole<HTMLButtonElement>("button", { name: "닫기" })
+        .disabled,
+    ).toBe(false);
   });
-
-  it("화면에서 제거되면 진행 중인 요청을 취소한다", () => {
-    let requestSignal: AbortSignal | undefined;
-    repositoryMocks.getCatalog.mockImplementation((signal?: AbortSignal) => {
-      requestSignal = signal;
+  it("추가 실패는 모달에 남겨 재시도할 수 있다", async () => {
+    mocks.add.mockRejectedValueOnce(
+      new PreparationChecklistAdditionError("저장 실패"),
+    );
+    await show();
+    await openFirst();
+    fireEvent.click(
+      within(modal()).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+    await within(modal()).findByRole("alert");
+    fireEvent.click(
+      within(modal()).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
+    );
+    await waitFor(() =>
+      expect(within(modal()).queryByRole("alert")).toBeNull(),
+    );
+    expect(mocks.add).toHaveBeenCalledTimes(2);
+  });
+  it("서버가 실제 추가한 항목이 없으면 추가 이벤트를 만들지 않는다", async () => {
+    mocks.add.mockResolvedValue([]);
+    await show();
+    await openFirst();
+    mocks.track.mockClear();
+    fireEvent.click(within(modal()).getByRole("button", { name: "모두 추가" }));
+    await waitFor(() =>
+      expect(
+        within(modal()).getByRole<HTMLButtonElement>("button", {
+          name: "모두 추가",
+        }).disabled,
+      ).toBe(false),
+    );
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+  it("추가 요청 인증 만료를 갱신하고 원래 모달에서 안내한다", async () => {
+    mocks.add.mockRejectedValue(new PreparationAuthenticationRequiredError());
+    await show();
+    await openFirst();
+    fireEvent.click(within(modal()).getByRole("button", { name: "모두 추가" }));
+    await within(modal()).findByRole("alert");
+    expect(mocks.refreshAuth).toHaveBeenCalled();
+  });
+  it("계정이 바뀌면 이전 진행 상태를 즉시 숨기고 저장 요청을 취소한다", async () => {
+    mocks.auth = { status: "authenticated", user: { id: 1, nickname: "A" } };
+    let signal!: AbortSignal;
+    mocks.add.mockImplementation((_audience, _ids, s) => {
+      signal = s;
       return new Promise(() => {});
     });
-
-    const { unmount } = render(<AllPreparationStepsFeature />);
-    expect(requestSignal?.aborted).toBe(false);
-
+    const { rerender } = await show();
+    await openFirst();
+    fireEvent.click(within(modal()).getByRole("button", { name: "모두 추가" }));
+    mocks.auth = { status: "authenticated", user: { id: 2, nickname: "B" } };
+    saved = { categories: [] };
+    ids = [];
+    rerender(ui());
+    expect(signal.aborted).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await screen.findByRole("heading", { name: "웨딩홀" });
+    expect(screen.queryByText("내 할 일 완료")).toBeNull();
+  });
+  it("조회 실패는 재시도하고 단계가 없으면 빈 상태를 표시한다", async () => {
+    mocks.catalog.mockRejectedValueOnce(new Error("failed"));
+    render(ui());
+    await screen.findByRole("alert");
+    mocks.catalog.mockResolvedValue({
+      ...preparationCatalogFixture,
+      roadmaps: [],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByText("표시할 로드맵이 없어요.");
+  });
+  it("화면을 떠나면 카탈로그 조회를 취소한다", () => {
+    let signal!: AbortSignal;
+    mocks.catalog.mockImplementation((s) => {
+      signal = s;
+      return new Promise(() => {});
+    });
+    const { unmount } = render(ui());
     unmount();
-
-    expect(requestSignal?.aborted).toBe(true);
+    expect(signal.aborted).toBe(true);
   });
-
-  it("준비 단계가 없으면 빈 상태를 표시한다", async () => {
-    repositoryMocks.getCatalog.mockResolvedValue({
-      categories: [{ id: "empty", label: "비어 있음" }],
-      roadmaps: [{ categoryId: "empty", steps: [] }],
-      stepDetails: [],
-    });
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(await screen.findByText("표시할 로드맵이 없어요.")).toBeTruthy();
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-  });
-
-  it("조회 실패를 안내하고 다시 시도할 수 있다", async () => {
-    repositoryMocks.getCatalog
-      .mockRejectedValueOnce(new Error("failed"))
-      .mockResolvedValueOnce(preparationCatalogFixture);
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
-    expect(authMocks.refreshAuth).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-
+  it("StrictMode 최초 진입은 한 번 기록하고 카테고리·단계 선택을 기록한다", async () => {
+    render(<StrictMode>{ui()}</StrictMode>);
+    await screen.findByRole("heading", { name: "웨딩홀" });
     expect(
-      await screen.findByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
-    ).toBeTruthy();
-    expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
-  });
-
-  it("내 체크리스트의 401 응답을 로그인 만료로 안내한다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
-      new PreparationAuthenticationRequiredError(),
-    );
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(
-      await screen.findByText(
-        "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+      mocks.track.mock.calls.filter(
+        ([e]) => e.name === "preparation_catalog_view",
       ),
-    ).toBeTruthy();
-    expect(authMocks.refreshAuth).toHaveBeenCalledOnce();
-  });
-
-  it("인증 상태 재조회 중에도 로그인 만료 안내에서 다시 시도할 수 있다", async () => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    checklistRepositoryMocks.getCatalogItemIds.mockRejectedValue(
-      new PreparationAuthenticationRequiredError(),
+    ).toHaveLength(1);
+    await openFirst();
+    expect(mocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "preparation_step_select" }),
     );
-    const { rerender } = render(<AllPreparationStepsFeature />);
-    await screen.findByText(
-      "로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.",
+    fireEvent.click(within(modal()).getByRole("button", { name: "닫기" }));
+    fireEvent.click(screen.getByRole("tab", { name: "스드메" }));
+    expect(mocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "preparation_category_select" }),
     );
-
-    authMocks.authState = { status: "loading" };
-    rerender(<AllPreparationStepsFeature />);
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-
-    expect(authMocks.refreshAuth).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("AllPreparationStepsFeature 로그인 체크리스트 추가", () => {
-  beforeEach(() => {
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 1, nickname: "bibbidi" },
-    };
-    authMocks.refreshAuth.mockReset();
-    analyticsMocks.track.mockReset();
-    repositoryMocks.getCatalog.mockReset();
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("개별 할 일을 서버 체크리스트에 추가하고 즉시 화면에 반영한다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce(["102"]);
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
-      "authenticated",
-      ["102"],
-      expect.any(AbortSignal),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-      ).toBeNull(),
-    );
-    expect(screen.getByText("2개")).toBeTruthy();
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_item_add",
-      parameters: {
-        category_id: "wedding-hall",
-        item_count: 1,
-        source: "preparation",
-        step_id: "step-1",
-        step_order: 1,
-      },
-    });
-  });
-
-  it("현재 단계의 남은 할 일을 서버 체크리스트에 모두 추가한다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce(["102"]);
-    await renderFeature({ expandFirstStep: true });
-
-    fireEvent.click(screen.getByRole("button", { name: "모두 추가" }));
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
-      "authenticated",
-      ["102"],
-      expect.any(AbortSignal),
-    );
-    expect(
-      await screen.findByText("추가할 수 있는 할 일이 없어요."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
-    ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", {
-        name: /모두 추가/,
-      }),
-    ).toBeNull();
-  });
-
-  it("추가 요청 중 버튼을 잠가 중복 요청을 막는다", async () => {
-    let resolveAddition: ((catalogItemIds: string[]) => void) | undefined;
-    checklistRepositoryMocks.addCatalogItemIds.mockReturnValueOnce(
-      new Promise<string[]>((resolve) => {
-        resolveAddition = resolve;
-      }),
-    );
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-    const addButton = screen.getByRole("button", {
-      name: "웨딩홀 견적 비교 추가",
-    });
-
-    fireEvent.click(addButton);
-    fireEvent.click(addButton);
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledOnce();
-    expect(
-      screen
-        .getByRole("button", { name: "웨딩홀 견적 비교 추가 중" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-    expect(
-      screen
-        .getByRole("button", { name: "모두 추가 중" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-
-    await act(async () => resolveAddition?.(["102"]));
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-  });
-
-  it("인증 대상이 바뀌면 진행 중인 추가 작업을 취소한다", async () => {
-    let additionSignal: AbortSignal | undefined;
-    let resolveAddition: ((catalogItemIds: string[]) => void) | undefined;
-    checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
-      (_audience: string, _catalogItemIds: string[], signal?: AbortSignal) => {
-        additionSignal = signal;
-        return new Promise<string[]>((resolve) => {
-          resolveAddition = resolve;
-        });
-      },
-    );
-    const { rerender } = await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-    expect(additionSignal?.aborted).toBe(false);
-
-    authMocks.authState = { status: "guest" };
-    rerender(
-      <div data-page-scroll-container>
-        <AllPreparationStepsFeature />
-      </div>,
-    );
-
-    expect(additionSignal?.aborted).toBe(true);
-    await act(async () => resolveAddition?.(["102"]));
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-  });
-
-  it("authenticated 상태에서 계정이 바뀌면 이전 담기를 취소하고 새 계정은 담기를 계속할 수 있다", async () => {
-    let previousSignal: AbortSignal | undefined;
-    let resolvePrevious: ((ids: string[]) => void) | undefined;
-    checklistRepositoryMocks.addCatalogItemIds.mockImplementationOnce(
-      (_audience: string, _ids: string[], signal: AbortSignal) => {
-        previousSignal = signal;
-        return new Promise<string[]>((resolve) => {
-          resolvePrevious = resolve;
-        });
-      },
-    );
-    const { rerender } = await renderFeature({ expandFirstStep: true });
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-    authMocks.authState = {
-      status: "authenticated",
-      user: { id: 2, nickname: "B" },
-    };
-    rerender(
-      <div data-page-scroll-container>
-        <AllPreparationStepsFeature />
-      </div>,
-    );
-    expect(previousSignal?.aborted).toBe(true);
-    await screen.findByRole("heading", { name: ROADMAP_TITLE_PATTERN });
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    const button = screen.getByRole("button", {
-      name: "웨딩홀 견적 비교 추가",
-    });
-    expect(button.hasAttribute("disabled")).toBe(false);
-    analyticsMocks.track.mockClear();
-    await act(async () => resolvePrevious?.(["102"]));
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    ).toBeTruthy();
-    fireEvent.click(button);
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-      ).toBeNull(),
-    );
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledTimes(2);
-  });
-
-  it("추가 실패 시 화면을 유지하고 같은 동작을 다시 시도한다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds
-      .mockRejectedValueOnce(
-        new PreparationChecklistAdditionError("이미 추가된 준비 항목입니다."),
-      )
-      .mockResolvedValueOnce(["102"]);
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "이미 추가된 준비 항목입니다.",
-    );
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-    const retryButton = screen.getByRole("button", {
-      name: "웨딩홀 견적 비교 추가",
-    });
-    expect(retryButton.hasAttribute("disabled")).toBe(false);
-
-    fireEvent.click(retryButton);
-
-    await waitFor(() =>
-      expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledTimes(
-        2,
-      ),
-    );
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-  });
-
-  it("서버가 실제로 추가한 항목이 없으면 성공 이벤트를 전송하지 않는다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds.mockResolvedValueOnce([]);
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    await waitFor(() =>
-      expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledOnce(),
-    );
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-  });
-
-  it("추가 요청의 인증 만료를 인증 상태 재조회로 연결한다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds.mockRejectedValueOnce(
-      new PreparationAuthenticationRequiredError(),
-    );
-    await renderFeature({ expandFirstStep: true });
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
-  });
-});
-
-describe("AllPreparationStepsFeature 비로그인 체크리스트", () => {
-  beforeEach(() => {
-    authMocks.authState = { status: "guest" };
-    authMocks.refreshAuth.mockReset();
-    analyticsMocks.track.mockReset();
-    repositoryMocks.getCatalog.mockReset();
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("로컬에 저장된 항목을 공개 준비 목록의 체크리스트로 복원한다", async () => {
-    checklistRepositoryMocks.getCatalogItemIds.mockResolvedValue(["102"]);
-
-    await renderFeature({ expandFirstStep: true });
-
-    expect(screen.getByText("웨딩홀 견적 비교")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "웨딩홀 투어 추가" }),
-    ).toBeTruthy();
-  });
-
-  it("로컬 저장소 읽기 실패를 안내하고 다시 조회할 수 있다", async () => {
-    checklistRepositoryMocks.getCatalogItemIds
-      .mockRejectedValueOnce(new Error("storage unavailable"))
-      .mockResolvedValueOnce(["101"]);
-
-    render(<AllPreparationStepsFeature />);
-
-    expect(await screen.findByText("로드맵을 불러오지 못했어요.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-
-    expect(
-      await screen.findByRole("heading", { name: DESKTOP_ROADMAP_TITLE }),
-    ).toBeTruthy();
-    expect(repositoryMocks.getCatalog).toHaveBeenCalledTimes(2);
-    expect(checklistRepositoryMocks.getCatalogItemIds).toHaveBeenCalledTimes(2);
-  });
-
-  it("개별 할 일을 로컬 체크리스트에 추가하고 즉시 화면에 반영한다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
-      "guest",
-      ["102"],
-      expect.any(AbortSignal),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-      ).toBeNull(),
-    );
-    expect(screen.getByText("2개")).toBeTruthy();
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
-    expect(analyticsMocks.track).toHaveBeenCalledWith({
-      name: "preparation_item_add",
-      parameters: {
-        category_id: "wedding-hall",
-        item_count: 1,
-        source: "preparation",
-        step_id: "step-1",
-        step_order: 1,
-      },
-    });
-  });
-
-  it("현재 단계의 남은 할 일을 모두 로컬 체크리스트에 추가한다", async () => {
-    await renderFeature({ expandFirstStep: true });
-
-    fireEvent.click(screen.getByRole("button", { name: "모두 추가" }));
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
-      "guest",
-      ["102"],
-      expect.any(AbortSignal),
-    );
-    expect(
-      await screen.findByText("추가할 수 있는 할 일이 없어요."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("이 단계의 모든 할 일을 체크리스트에 추가했어요."),
-    ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", {
-        name: /모두 추가/,
-      }),
-    ).toBeNull();
-  });
-
-  it("로컬 저장 실패 시 화면을 유지하고 같은 동작을 다시 시도할 수 있다", async () => {
-    checklistRepositoryMocks.addCatalogItemIds
-      .mockImplementationOnce(() => {
-        throw new Error("storage unavailable");
-      })
-      .mockReturnValueOnce(["102"]);
-    await renderFeature({ expandFirstStep: true });
-    analyticsMocks.track.mockClear();
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "할 일을 저장하지 못했어요. 다시 시도해 주세요.",
-    );
-    expect(analyticsMocks.track).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    ).toBeTruthy();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    );
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    ).toBeNull();
-    await waitFor(() => expect(analyticsMocks.track).toHaveBeenCalledOnce());
-  });
-
-  it("모바일 인라인 상세에서도 개별 할 일을 추가하고 펼친 상태를 유지한다", async () => {
-    await renderFeature();
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    const detail = screen.getByRole("complementary", {
-      name: "이 단계에서 준비할 일",
-    });
-
-    fireEvent.click(
-      within(detail).getByRole("button", {
-        name: "웨딩홀 견적 비교 추가",
-      }),
-    );
-
-    expect(checklistRepositoryMocks.addCatalogItemIds).toHaveBeenCalledWith(
-      "guest",
-      ["102"],
-      expect.any(AbortSignal),
-    );
-    await waitFor(() =>
-      expect(
-        within(detail).queryByRole("button", {
-          name: "웨딩홀 견적 비교 추가",
-        }),
-      ).toBeNull(),
-    );
-    expect(
-      screen.getByRole("button", {
-        expanded: true,
-        name: /01.*웨딩홀 투어와 계약/,
-      }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("complementary", {
-        name: "이 단계에서 준비할 일",
-      }),
-    ).toBe(detail);
-  });
-
-  it("모바일에서 남은 할 일을 모두 추가하면 빈 상태를 안내하고 전체 추가 버튼을 숨긴다", async () => {
-    await renderFeature();
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    const detail = screen.getByRole("complementary", {
-      name: "이 단계에서 준비할 일",
-    });
-
-    fireEvent.click(
-      within(detail).getByRole("button", {
-        name: "모두 추가",
-      }),
-    );
-
-    expect(
-      await within(detail).findByText("추가할 수 있는 할 일이 없어요."),
-    ).toBeTruthy();
-    expect(
-      within(detail).getByText(
-        "이 단계의 모든 할 일을 체크리스트에 추가했어요.",
-      ),
-    ).toBeTruthy();
-    expect(
-      within(detail).queryByRole("button", {
-        name: /모두 추가/,
-      }),
-    ).toBeNull();
-  });
-});
-
-describe("AllPreparationStepsFeature 목록 상세", () => {
-  beforeEach(() => {
-    authMocks.authState = { status: "guest" };
-    analyticsMocks.track.mockReset();
-    repositoryMocks.getCatalog.mockResolvedValue(preparationCatalogFixture);
-  });
-
-  it("최초 진입 시 상세를 자동으로 펼치지 않는다", async () => {
-    await renderFeature();
-    expect(screen.queryByRole("complementary")).toBeNull();
-    expect(
-      screen
-        .getByRole("button", { name: /01.*웨딩홀 투어와 계약/ })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
-  });
-
-  it("카드 아래에 추가할 일과 내가 담은 일을 펼쳐 표시한다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    const detail = screen.getByRole("complementary", {
-      name: "이 단계에서 준비할 일",
-    });
-    expect(
-      within(detail).getByRole("heading", { name: "아직 안 담은 일" }),
-    ).toBeTruthy();
-    expect(
-      within(detail).getByRole("heading", { name: "내가 담은 일" }),
-    ).toBeTruthy();
-    expect(within(detail).getByText("웨딩홀 투어")).toBeTruthy();
-    expect(
-      within(detail).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
-    ).toBeTruthy();
-    expect(
-      within(detail)
-        .getByRole("link", { name: "내 체크리스트 보기" })
-        .getAttribute("href"),
-    ).toBe("/checklist");
-  });
-
-  it("같은 카드를 다시 누르면 상세를 접는다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    fireEvent.click(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
-  it("접기 버튼은 단계 카드로 포커스를 돌려준다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    fireEvent.click(screen.getByRole("button", { name: "할 일 접기" }));
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: /01.*웨딩홀 투어와 계약/ }),
-    );
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
-  it("다른 단계를 누르면 새 상세를 펼치고 빈 체크리스트를 안내한다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    fireEvent.click(
-      screen.getByRole("button", { name: /02.*예식 형태·식순·입장 방식 결정/ }),
-    );
-    expect(screen.getAllByRole("complementary")).toHaveLength(1);
-    expect(screen.getByText("이 단계에 추가한 할 일이 없어요.")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("button", { name: /01.*웨딩홀 투어와 계약/ })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
-  });
-
-  it("카테고리 변경 시 목록 스크롤과 상세를 초기화하고 페이지는 유지한다", async () => {
-    await renderFeature({ expandFirstStep: true });
-    const list = screen.getByRole("region", { name: "전체 단계 목록" });
-    const page = document.querySelector<HTMLElement>(
-      "[data-page-scroll-container]",
-    )!;
-    list.scrollTop = 400;
-    page.scrollTop = 120;
-    fireEvent.click(screen.getByRole("button", { name: "스드메" }));
-    expect(list.scrollTop).toBe(0);
-    expect(page.scrollTop).toBe(120);
-    expect(screen.queryByRole("complementary")).toBeNull();
   });
 });

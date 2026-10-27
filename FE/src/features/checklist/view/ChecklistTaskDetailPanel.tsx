@@ -43,10 +43,9 @@ export function ChecklistTaskDetailPanel({
       id="checklist-task-detail-panel"
     >
       <Panel
-        className="checklist-detail-panel__surface"
+        variant={modal ? "edge" : "contained"}
         header={
           <Panel.Header
-            className="checklist-detail-panel__header"
             heading={
               <ChecklistTaskHeader
                 editing={editing}

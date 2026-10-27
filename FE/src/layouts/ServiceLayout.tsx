@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 
+import { AiChatFeature } from "../features/ai-chat/AiChatFeature";
 import { AppLayout } from "../components/app-layout";
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth, useLogout } from "../features/auth";
@@ -13,6 +14,17 @@ import { useReservedPanelSpace } from "./useReservedPanelSpace";
 export function ServiceLayout() {
   const { authState, endAuthentication, refreshAuth } = useAuth();
   const { pathname } = useLocation();
+  const aiContext = pathname.startsWith("/preparation")
+    ? "로드맵"
+    : pathname.startsWith("/checklist")
+      ? "체크리스트"
+      : pathname.startsWith("/calendar")
+        ? "캘린더"
+        : "홈";
+  const aiAudience =
+    authState.status === "authenticated"
+      ? `authenticated:${authState.user.id}`
+      : "guest";
   const navigate = useNavigate();
   const handleLogoutSuccess = useCallback(() => {
     endAuthentication();
@@ -48,6 +60,17 @@ export function ServiceLayout() {
       header={
         <div className="service-layout__header">
           <AppHeader
+            actions={
+              authState.status === "authenticated" ||
+              authState.status === "guest" ? (
+                <AiChatFeature
+                  key={aiAudience}
+                  contextLabel={aiContext}
+                  isAuthenticated={authState.status === "authenticated"}
+                  onAuthenticationRequired={refreshAuth}
+                />
+              ) : undefined
+            }
             user={
               authState.status === "authenticated"
                 ? {

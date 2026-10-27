@@ -1,0 +1,22 @@
+.bibbidi-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+
+.bibbidi-breadcrumb li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bibbidi-breadcrumb [aria-current] {
+  color: var(--color-fg-neutral);
+  font-weight: var(--font-weight-medium);
+}

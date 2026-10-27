@@ -2,7 +2,7 @@ import type { MouseEventHandler, Ref } from "react";
 import { Button } from "../../../components/button";
 import { PageHeader } from "../../../components/page-header";
 import { PlusIcon } from "../../../components/icons/ActionIcons";
-import { ChevronRight } from "../../../components/icons/Chevron";
+import { Breadcrumb } from "../../../components/breadcrumb";
 import "./ChecklistHeader.css";
 
 interface ChecklistHeaderProps {
@@ -36,19 +36,12 @@ export function ChecklistHeader({
           : "로그인하면 체크리스트가 그대로 저장돼요."
       }
       navigation={
-        <nav aria-label="현재 위치" className="checklist-header__breadcrumb">
-          <ol>
-            <li>
-              <span>체크리스트</span>
-            </li>
-            {categoryTitle && (
-              <li>
-                <ChevronRight size={14} aria-hidden="true" />
-                <span aria-current="page">{categoryTitle}</span>
-              </li>
-            )}
-          </ol>
-        </nav>
+        <Breadcrumb
+          items={[
+            { label: "체크리스트" },
+            ...(categoryTitle ? [{ label: categoryTitle }] : []),
+          ]}
+        />
       }
       actions={
         <Button

@@ -92,3 +92,8 @@
     animation: none;
   }
 }
+
+.bibbidi-panel-overlay[data-placement="side"][data-width="focus"]
+  > .bibbidi-panel-overlay-surface {
+  width: min(100%, var(--layout-width-focus));
+}

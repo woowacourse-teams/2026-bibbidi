@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { PageContainer } from "../components/page-container";
 
@@ -23,9 +24,10 @@ interface PendingUser {
 
 interface AppHeaderProps {
   user: AuthenticatedUser | GuestUser | PendingUser;
+  actions?: ReactNode;
 }
 
-export function AppHeader({ user }: AppHeaderProps) {
+export function AppHeader({ user, actions }: AppHeaderProps) {
   const { pathname } = useLocation();
   return (
     <header className="app-header">
@@ -53,25 +55,28 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        {user.kind === "authenticated" ? (
-          <AppHeaderAccountMenu navigationKey={pathname} user={user} />
-        ) : user.kind === "guest" ? (
-          <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-            <NavLink className="app-header__login" to="/login">
-              로그인
-            </NavLink>
-          </nav>
-        ) : (
-          <div
-            aria-label="로그인 상태 확인 중"
-            className="app-header__auth-pending"
-            role="status"
-          >
-            <span className="app-header__auth-pending-text">
-              로그인 상태 확인 중
-            </span>
-          </div>
-        )}
+        <div className="app-header__actions">
+          {actions}
+          {user.kind === "authenticated" ? (
+            <AppHeaderAccountMenu navigationKey={pathname} user={user} />
+          ) : user.kind === "guest" ? (
+            <nav aria-label="계정 메뉴" className="app-header__guest-actions">
+              <NavLink className="app-header__login" to="/login">
+                로그인
+              </NavLink>
+            </nav>
+          ) : (
+            <div
+              aria-label="로그인 상태 확인 중"
+              className="app-header__auth-pending"
+              role="status"
+            >
+              <span className="app-header__auth-pending-text">
+                로그인 상태 확인 중
+              </span>
+            </div>
+          )}
+        </div>
       </PageContainer>
     </header>
   );

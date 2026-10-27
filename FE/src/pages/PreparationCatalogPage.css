@@ -1,18 +1,13 @@
 .preparation-catalog-page {
   display: flex;
-  min-width: 320px;
-  height: var(--service-content-height);
-  min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+  min-height: 100%;
   flex-direction: column;
+  background: var(--color-bg-layer-basement);
+  color: var(--color-fg-neutral);
 }
 
 .preparation-catalog-page > main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.preparation-catalog-page > main > * {
-  flex: 1;
+  width: 100%;
+  padding-block: var(--layout-gutter-desktop) 32px;
 }

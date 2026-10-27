@@ -626,7 +626,7 @@ describe("ServiceLayout", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "첫 번째 카테고리 로드맵",
+        name: "첫 번째 카테고리",
       }),
     ).toBeTruthy();
     expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
@@ -929,11 +929,14 @@ describe("ServiceLayout", () => {
         selector: ".bibbidi-accordion-description",
       }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "전체 단계" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "01 준비 단계" }),
     );
-    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    expect(
+      within(
+        await screen.findByRole("dialog", { name: "01 준비 단계" }),
+      ).getByText("체크리스트 항목 10"),
+    ).toBeTruthy();
     fireEvent.click(
       await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
     );
@@ -943,12 +946,26 @@ describe("ServiceLayout", () => {
         selector: ".bibbidi-accordion-description",
       }),
     ).toBeTruthy();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "01 준비 단계" })).getByRole(
+        "button",
+        { name: "닫기" },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "01 준비 단계" })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     expect(
       within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
         "준비 완료율 · 50%",
       ),
     ).toBeTruthy();
-    expect(await screen.findByText("서버가 추가한 두 번째 할 일")).toBeTruthy();
+    expect(
+      await within(screen.getByRole("tabpanel", { name: /1\/2/ })).findByText(
+        "서버가 추가한 두 번째 할 일",
+      ),
+    ).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(
         ([url, init]) => url === "/api/checklists/me" && init?.method === "GET",
@@ -1233,7 +1250,7 @@ describe("ServiceLayout", () => {
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(
-      await screen.findByRole("heading", { name: "첫 번째 카테고리 로드맵" }),
+      await screen.findByRole("heading", { name: "첫 번째 카테고리" }),
     ).toBeTruthy();
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/preparation",
