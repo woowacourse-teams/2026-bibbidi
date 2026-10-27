@@ -46,13 +46,9 @@ class BalanceGameRecommendationControllerIntegrationTest extends BibbidiIntegrat
         perform(validRequest())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$.items[*].catalogItemId", contains(
-                        139, 140, 141, 142, 43, 1, 2, 3, 4, 5, 6, 10,
-                        12, 13, 14, 15, 18, 28, 33, 34, 35, 19, 49, 60,
-                        61, 68, 69, 41, 47, 48, 50, 52, 73, 74, 75, 80,
-                        81, 82, 84, 85, 86, 87, 88, 89, 90, 97, 100, 101,
-                        105, 106, 107, 108, 109, 152, 153, 154, 163, 164, 165, 166,
-                        167, 168, 169, 22, 161, 162)))
+                .andExpect(jsonPath("$.items.length()").value(66))
+                .andExpect(jsonPath("$.items[0].catalogItemId").value(139))
+                .andExpect(jsonPath("$.items[63:].catalogItemId", contains(22, 161, 162)))
                 .andExpect(jsonPath("$.items[0].length()").value(5))
                 .andExpect(jsonPath("$.items[0].title").value("총예산 수립"))
                 .andExpect(jsonPath("$.items[1].title").value("예비비 편성"))

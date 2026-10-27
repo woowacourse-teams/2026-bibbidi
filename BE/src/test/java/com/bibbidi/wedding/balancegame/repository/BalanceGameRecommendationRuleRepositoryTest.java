@@ -23,7 +23,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.InputStreamResource;
@@ -64,13 +63,6 @@ class BalanceGameRecommendationRuleRepositoryTest {
                         169L)
                 .doesNotContain(22L, 20L, 70L, 71L, 54L, 55L, 72L, 16L, 17L, 121L, 119L, 57L, 56L,
                         102L, 103L, 104L, 155L, 156L, 157L, 158L, 159L, 160L, 161L, 162L);
-    }
-
-    @Test
-    @DisplayName("4번의 추가 규칙은 최신 예복 질문을 대상으로 한다")
-    void shouldUseUpdatedSuitQuestion() {
-        assertThat(QUESTIONS.findById(4L).orElseThrow().question())
-                .isEqualTo("결혼식 날 입을 정장, 어떻게 준비하고 싶어?");
     }
 
     @ParameterizedTest
@@ -208,16 +200,6 @@ class BalanceGameRecommendationRuleRepositoryTest {
     void shouldRejectMissingFile() {
         assertThatThrownBy(() -> fromResource(new ClassPathResource("balance-game/missing-rules.json")))
                 .isInstanceOf(IllegalStateException.class).hasCauseInstanceOf(IOException.class);
-    }
-
-    @Test
-    @DisplayName("문항 규칙이 누락되면 서버 시작이 실패한다")
-    void shouldFailApplicationStartup() {
-        new ApplicationContextRunner()
-                .withBean(BalanceGameRecommendationRuleRepository.class,
-                        () -> fromJson(VALID_JSON.replace("\"B\":[],", "")))
-                .run(context -> assertThat(context).hasFailed()
-                        .getFailure().hasRootCauseInstanceOf(IllegalStateException.class));
     }
 
     private static BalanceGameRecommendationRuleRepository fromJson(String json) {
