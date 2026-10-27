@@ -1,23 +1,35 @@
 spring:
   datasource:
     url: jdbc:h2:mem:bibbidi-evaluation;IGNORECASE=TRUE
+
   ai:
     model:
-      chat: ${BIBBIDI_EVALUATION_CHAT_PROVIDER:none}
+      chat: none
     bedrock:
       converse:
         chat:
-          model: ${bibbidi.evaluation.generation.model}
+          model: ${bibbidi.ai.chatbot.sol-model}
 
 bibbidi:
   ai:
     chatbot:
+      # low(qwen)는 실제 Bedrock 계정을 쓴다. 키가 없으면 앱이 뜨지 않도록 기본값을 두지 않는다.
+      accounts-enabled: true
+      qwen-access-key: ${BIBBIDI_CHAT_QWEN_ACCESS_KEY_ID}
+      qwen-secret-key: ${BIBBIDI_CHAT_QWEN_SECRET_ACCESS_KEY}
+      qwen-region: ${BIBBIDI_CHAT_QWEN_REGION:ap-northeast-1}
+      # medium(luna)과 high(sol)는 CLI 모델이라 OpenAI 키가 필요 없다.
+      luna-api-key: ""
       routing:
-        forced-tier: ${BIBBIDI_EVALUATION_ROUTE_TIER:SOL}
+        # 이 키가 없으면 분류가 항상 high로 끝나 단계별 평가가 되지 않으므로 반드시 있어야 한다.
+        api-key: ${TYPESAFE_API_KEY}
+      jev-tool-loop:
+        enabled: ${BIBBIDI_EVALUATION_JEV_TOOL_LOOP_ENABLED:false}
   evaluation:
     generation:
       provider: ${BIBBIDI_EVALUATION_GENERATION_PROVIDER:codex}
-      model: ${BIBBIDI_EVALUATION_GENERATION_MODEL:gpt-6-sol}
+      luna-model: ${BIBBIDI_EVALUATION_GENERATION_LUNA_MODEL:gpt-6-luna}
+      sol-model: ${BIBBIDI_EVALUATION_GENERATION_SOL_MODEL:gpt-6-sol}
       reasoning-effort: ${BIBBIDI_EVALUATION_GENERATION_REASONING_EFFORT:low}
       timeout: ${BIBBIDI_EVALUATION_GENERATION_TIMEOUT:PT3M}
     judge:
@@ -25,3 +37,7 @@ bibbidi:
       model: ${BIBBIDI_EVALUATION_JUDGE_MODEL:sonnet}
       reasoning-effort: ${BIBBIDI_EVALUATION_JUDGE_REASONING_EFFORT:low}
       timeout: ${BIBBIDI_EVALUATION_JUDGE_TIMEOUT:PT2M}
+
+logging:
+  level:
+    com.bibbidi.wedding.chat.adapter.ai.tools.BibbidiToolCallingManager: DEBUG
