@@ -45,7 +45,7 @@ class BalanceGameRecommendationServiceTest {
                 {"id":"A","text":"선택 A"},{"id":"B","text":"선택 B"},
                 {"id":"UNKNOWN","text":"미정"}]}
             ]}
-            """), "");
+            """));
     private static final String RULES = """
             {"baseItemIds":[100,101,100],"rules":[
               {"questionId":10,"optionItemIds":{"A":[103,101],"B":[],"UNKNOWN":[]}},
@@ -172,7 +172,7 @@ class BalanceGameRecommendationServiceTest {
     }
 
     private BalanceGameRecommendationService serviceWithRules(String rules) {
-        return new BalanceGameRecommendationService(QUESTIONS, catalogService,
+        return new BalanceGameRecommendationService(new BalanceGameQuestionService(QUESTIONS), catalogService,
                 new BalanceGameRecommendationRuleRepository(MAPPER, VALIDATOR_FACTORY.getValidator(), QUESTIONS, json(rules)));
     }
 

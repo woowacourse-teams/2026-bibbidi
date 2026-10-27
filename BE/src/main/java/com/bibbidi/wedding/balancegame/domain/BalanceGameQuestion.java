@@ -2,6 +2,7 @@ package com.bibbidi.wedding.balancegame.domain;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -22,6 +23,12 @@ public record BalanceGameQuestion(
                         + id + ", choiceId=" + choice.id());
             }
         }
+    }
+
+    public Optional<Choice> findChoice(String choiceId) {
+        return choices.stream()
+                .filter(choice -> choice.id().equals(choiceId))
+                .findFirst();
     }
 
     public record Choice(

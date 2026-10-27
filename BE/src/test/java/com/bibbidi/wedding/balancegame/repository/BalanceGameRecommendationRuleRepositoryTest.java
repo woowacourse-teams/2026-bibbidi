@@ -35,7 +35,7 @@ class BalanceGameRecommendationRuleRepositoryTest {
     private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
     private static final BalanceGameQuestionRepository QUESTIONS = new BalanceGameQuestionRepository(
             MAPPER, VALIDATOR_FACTORY.getValidator(),
-            new ClassPathResource("balance-game/questions.json"), "https://images.test");
+            new ClassPathResource("balance-game/questions.json"));
     private static final BalanceGameRecommendationRuleRepository RULES = fromResource(
             new ClassPathResource("balance-game/recommendation-rules.json"));
     private static final String VALID_JSON = "{\"baseItemIds\":[100,101],\"rules\":["

@@ -7,6 +7,7 @@ import com.bibbidi.wedding.balancegame.repository.dto.QuestionFile;
 import jakarta.validation.Validator;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -33,6 +34,10 @@ public class BalanceGameQuestionRepository {
 
     public List<BalanceGameQuestion> findAll() {
         return questions.values();
+    }
+
+    public Optional<BalanceGameQuestion> findById(Long questionId) {
+        return questions.findById(questionId);
     }
 
     private static QuestionFile readFile(ObjectMapper mapper, Resource resource) {

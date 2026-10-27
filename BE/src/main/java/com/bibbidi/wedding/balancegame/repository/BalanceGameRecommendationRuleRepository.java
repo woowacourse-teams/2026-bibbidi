@@ -92,7 +92,7 @@ public class BalanceGameRecommendationRuleRepository {
             BalanceGameQuestion question = questionRepository.findById(rule.questionId())
                     .orElseThrow(() -> new IllegalStateException(
                             "밸런스게임 추천 규칙의 문항이 없습니다: questionId=" + rule.questionId()));
-            Set<String> optionIds = question.options().stream()
+            Set<String> optionIds = question.choices().stream()
                     .map(BalanceGameQuestion.Choice::id).collect(Collectors.toSet());
             if (!optionIds.equals(rule.optionItemIds().keySet())) {
                 throw new IllegalStateException("밸런스게임 추천 규칙의 선택지가 누락되거나 존재하지 않습니다: questionId="

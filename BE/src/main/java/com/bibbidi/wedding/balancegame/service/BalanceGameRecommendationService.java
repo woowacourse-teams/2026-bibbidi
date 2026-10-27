@@ -1,7 +1,6 @@
 package com.bibbidi.wedding.balancegame.service;
 
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
-import com.bibbidi.wedding.balancegame.repository.BalanceGameQuestionRepository;
 import com.bibbidi.wedding.balancegame.repository.BalanceGameRecommendationRuleRepository;
 import com.bibbidi.wedding.balancegame.service.dto.BalanceGameAnswer;
 import com.bibbidi.wedding.catalog.service.CatalogService;
@@ -20,16 +19,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class BalanceGameRecommendationService {
 
-    private final BalanceGameQuestionRepository questionRepository;
+    private final BalanceGameQuestionService questionService;
     private final CatalogService catalogService;
     private final BalanceGameRecommendationRuleRepository ruleRepository;
 
     public BalanceGameRecommendationService(
-            BalanceGameQuestionRepository questionRepository,
+            BalanceGameQuestionService questionService,
             CatalogService catalogService,
             BalanceGameRecommendationRuleRepository ruleRepository
     ) {
-        this.questionRepository = questionRepository;
+        this.questionService = questionService;
         this.catalogService = catalogService;
         this.ruleRepository = ruleRepository;
     }
@@ -48,16 +47,16 @@ public class BalanceGameRecommendationService {
                 throw new BusinessException(ClientError.INVALID_REQUEST,
                         "밸런스게임 답변 문항이 중복됩니다: questionId=" + answer.questionId());
             }
-            if (questionRepository.findById(answer.questionId()).isEmpty()) {
+            if (questionService.findById(answer.questionId()).isEmpty()) {
                 throw new BusinessException(ClientError.INVALID_REQUEST,
                         "밸런스게임 문항이 없습니다: questionId=" + answer.questionId());
             }
-            if (questionRepository.findOptionById(answer.questionId(), answer.optionId()).isEmpty()) {
+            if (questionService.findChoice(answer.questionId(), answer.optionId()).isEmpty()) {
                 throw new BusinessException(ClientError.INVALID_REQUEST,
                         "밸런스게임 선택지가 없습니다: questionId=" + answer.questionId());
             }
         }
-        if (optionIdsByQuestion.size() != questionRepository.findAll().size()) {
+        if (optionIdsByQuestion.size() != questionService.findAll().size()) {
             throw new BusinessException(ClientError.INVALID_REQUEST, "밸런스게임 전체 문항에 답변해야 합니다.");
         }
         return optionIdsByQuestion;
@@ -77,7 +76,7 @@ public class BalanceGameRecommendationService {
 
     private List<Long> selectRecommendationItemIds(Map<Long, String> optionIdsByQuestion) {
         Set<Long> recommendedIds = new LinkedHashSet<>(ruleRepository.findBaseItemIds());
-        for (BalanceGameQuestion question : questionRepository.findAll()) {
+        for (BalanceGameQuestion question : questionService.findAll()) {
             recommendedIds.addAll(ruleRepository.findOptionItemIds(question.id(), optionIdsByQuestion.get(question.id())));
         }
         return List.copyOf(recommendedIds);
