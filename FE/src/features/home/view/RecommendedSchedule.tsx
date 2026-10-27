@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { PlusIcon } from "../../../components/icons/ActionIcons";
 
 import { RecommendedScheduleViewModel } from "../view-model/createRecommendedScheduleViewModel";
 import "./RecommendedSchedule.css";
@@ -18,19 +19,6 @@ function ChevronRightIcon() {
       viewBox="0 0 24 24"
     >
       <path d="m9 18 6-6-6-6" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="recommended-schedule-item__plus"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
@@ -86,7 +74,13 @@ export function RecommendedSchedule({
               onClick={() => onAddTask(item.catalogItemId)}
               type="button"
             >
-              {item.addActionLabel === "내 할 일에 추가" && <PlusIcon />}
+              {item.addActionLabel === "내 할 일에 추가" && (
+                <PlusIcon
+                  className="recommended-schedule-item__plus"
+                  size={14}
+                  strokeWidth={1.8}
+                />
+              )}
               {item.addActionLabel}
             </button>
             {item.additionErrorMessage && (

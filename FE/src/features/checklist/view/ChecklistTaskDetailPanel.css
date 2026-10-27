@@ -1,5 +1,27 @@
 .checklist-detail-panel {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-width: 0;
   min-height: 0;
+}
+
+.checklist-detail-panel__surface {
+  box-sizing: border-box;
+}
+
+.checklist-detail-panel[data-presentation="docked"]
+  > .checklist-detail-panel__surface {
+  height: auto;
+  max-height: 100%;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+}
+
+.checklist-detail-panel__header h2 {
+  font: var(--typography-t5-medium);
+}
+
+.checklist-detail-panel .checklist-detail-content {
+  gap: 24px;
 }

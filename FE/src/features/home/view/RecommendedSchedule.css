@@ -159,13 +159,7 @@
 }
 
 .recommended-schedule-item__plus {
-  width: 14px;
-  height: 14px;
   flex: none;
-  stroke: currentcolor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 @media (max-width: 1200px) {

@@ -1,5 +1,7 @@
 import type { MouseEventHandler, Ref } from "react";
 import { Button } from "../../../components/button";
+import { PageHeader } from "../../../components/page-header";
+import { PlusIcon } from "../../../components/icons/ActionIcons";
 import { ChevronRight } from "../../../components/icons/Chevron";
 import "./ChecklistHeader.css";
 
@@ -23,43 +25,41 @@ export function ChecklistHeader({
   addTaskButtonRef,
 }: ChecklistHeaderProps) {
   return (
-    <header
+    <PageHeader
       className="checklist-header"
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
-    >
-      <nav aria-label="현재 위치" className="checklist-header__breadcrumb">
-        <ol>
-          <li>
-            <span>체크리스트</span>
-          </li>
-          {categoryTitle && (
+      title={categoryTitle ?? "체크리스트"}
+      description={
+        isAuthenticated
+          ? `전체 ${taskCount}개 · 완료 ${completedCount}개`
+          : "로그인하면 체크리스트가 그대로 저장돼요."
+      }
+      navigation={
+        <nav aria-label="현재 위치" className="checklist-header__breadcrumb">
+          <ol>
             <li>
-              <ChevronRight size={14} aria-hidden="true" />
-              <span aria-current="page">{categoryTitle}</span>
+              <span>체크리스트</span>
             </li>
-          )}
-        </ol>
-      </nav>
-      <div className="checklist-header__toolbar">
-        <div className="checklist-header__summary">
-          <h1>{categoryTitle ?? "체크리스트"}</h1>
-          <p>
-            {isAuthenticated
-              ? `전체 ${taskCount}개 · 완료 ${completedCount}개`
-              : "로그인하면 체크리스트가 그대로 저장돼요."}
-          </p>
-        </div>
+            {categoryTitle && (
+              <li>
+                <ChevronRight size={14} aria-hidden="true" />
+                <span aria-current="page">{categoryTitle}</span>
+              </li>
+            )}
+          </ol>
+        </nav>
+      }
+      actions={
         <Button
-          className="checklist-header__add-task"
           size="large"
           onClick={onAddTask}
           ref={addTaskButtonRef}
           type="button"
         >
-          <span aria-hidden="true">＋</span>할 일 추가
+          <PlusIcon size={20} />할 일 추가
         </Button>
-      </div>
-    </header>
+      }
+    />
   );
 }

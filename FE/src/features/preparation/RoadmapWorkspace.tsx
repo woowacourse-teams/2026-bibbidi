@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
+import { PageHeader } from "../../components/page-header";
 import { useAuth } from "../auth";
 import { AiChatFeature } from "../ai-chat/AiChatFeature";
 import { PersonalRoadmapFeature } from "./PersonalRoadmapFeature";
@@ -117,10 +118,11 @@ export function RoadmapWorkspace({
   return (
     <div className="roadmap-workspace">
       <div className="roadmap-workspace__roadmap">
-        <header className="roadmap-workspace__hero">
-          <h1>우리 결혼 준비, 한 단계씩</h1>
-          <p>카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요.</p>
-        </header>
+        <PageHeader
+          className="roadmap-workspace__hero"
+          title="우리 결혼 준비, 한 단계씩"
+          description="카테고리별 할 일을 확인하고, 나에게 필요한 준비를 모아보세요."
+        />
         <div id="roadmap-view-content">
           {view === "all" || !isAuthenticated ? (
             renderCatalogRoadmap({

@@ -65,6 +65,7 @@ export type TextFieldButtonProps = Omit<
   help?: ReactNode;
   hasError?: boolean;
   required?: boolean;
+  labelHidden?: boolean;
 };
 
 function FieldButton({
@@ -74,6 +75,7 @@ function FieldButton({
   help,
   hasError,
   required,
+  labelHidden,
   id: providedId,
   className,
   disabled,
@@ -90,6 +92,7 @@ function FieldButton({
       help={help}
       hasError={hasError}
       required={required}
+      labelHidden={labelHidden}
       disabled={disabled}
       className={className}
     >

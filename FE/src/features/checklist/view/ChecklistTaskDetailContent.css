@@ -4,27 +4,9 @@
   gap: 32px;
 }
 
-.checklist-detail-content h3,
 .checklist-detail-content__properties,
 .checklist-detail-content__appointments {
   margin: 0;
-}
-
-.checklist-detail-content h3 {
-  color: var(--color-fg-neutral);
-  font: var(--typography-t6);
-}
-
-.checklist-detail-content__appointments-header {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.checklist-detail-content__properties {
-  margin-top: 8px;
 }
 
 .checklist-detail-content__property-value {
@@ -62,12 +44,8 @@
 }
 
 .checklist-detail-content__appointment--complete
-  .checklist-detail-content__appointment-date,
-.checklist-detail-content__appointment--complete
-  .checklist-detail-content__appointment-meta,
-.checklist-detail-content__appointment--complete
-  .checklist-detail-content__appointment-memo {
-  opacity: 0.68;
+  .checklist-detail-content__appointment-date {
+  color: var(--color-fg-neutral-muted);
 }
 
 .checklist-detail-content__appointment-error {

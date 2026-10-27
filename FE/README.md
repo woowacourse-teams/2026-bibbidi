@@ -42,6 +42,7 @@ pnpm dev
 
 디자인 시스템의 기준을 참고하되 토큰·폰트·스타일은 FE에서 직접 관리합니다.
 현재 C1 적용 범위와 전환 대응표는 [공통 기반 적용 기록](docs/design-foundations-migration.md)을 참고하세요.
+Select·ListRow·TextField의 공통 동작과 제품 지원 범위는 [공용 컴포넌트 계약](docs/component-contracts.md)에서 확인할 수 있습니다.
 
 ## API 연결
 

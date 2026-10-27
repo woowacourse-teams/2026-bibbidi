@@ -1,0 +1,69 @@
+.bibbidi-page-header {
+  container: bibbidi-page-header / inline-size;
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  gap: 12px;
+  color: var(--color-fg-neutral);
+  letter-spacing: var(--letter-spacing-ui);
+}
+
+.bibbidi-page-header[hidden] {
+  display: none;
+}
+
+.bibbidi-page-header-navigation {
+  min-width: 0;
+}
+
+.bibbidi-page-header-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bibbidi-page-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.bibbidi-page-header-title {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t2);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.bibbidi-page-header-description {
+  margin-top: 6px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.bibbidi-page-header-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@container bibbidi-page-header (width < 768px) {
+  .bibbidi-page-header-title {
+    font: var(--typography-t3);
+  }
+}
+
+@container bibbidi-page-header (width < 480px) {
+  .bibbidi-page-header-toolbar {
+    flex-direction: column;
+  }
+}
