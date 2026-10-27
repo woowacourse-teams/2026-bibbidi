@@ -5,14 +5,14 @@ import { CalendarScheduleDetail } from "./CalendarScheduleDetail";
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 
-import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
+import type { CalendarScheduleModel } from "../model/calendarSchedule";
 import { Badge } from "../../../components/badge";
 import { Button } from "../../../components/button";
 import { ListHeader } from "../../../components/list-header";
 import { ListRow } from "../../../components/list-row";
 import { PageHeader } from "../../../components/page-header";
 import { MonthlyCalendar } from "./MonthlyCalendar";
-import { CalendarPlusIcon } from "./UnscheduledTask";
+import { CalendarPlusIcon } from "../../../components/icons/ActionIcons";
 import "./CalendarPlanning.css";
 
 interface CalendarPlanningProps {

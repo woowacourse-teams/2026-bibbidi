@@ -81,3 +81,13 @@ export function CheckIcon(props: ActionIconProps) {
     </IconBase>
   );
 }
+
+export function CalendarPlusIcon(props: ActionIconProps) {
+  return (
+    <IconBase aria-hidden="true" focusable="false" {...props}>
+      <path d="M7 3v3M17 3v3M4 9h16" />
+      <rect height="16" rx="2" width="16" x="4" y="5" />
+      <path d="M15 13v6M12 16h6" />
+    </IconBase>
+  );
+}

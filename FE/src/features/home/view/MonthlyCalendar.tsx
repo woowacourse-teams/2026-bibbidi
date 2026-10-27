@@ -8,7 +8,7 @@ import {
   startOfMonth,
 } from "../../../shared/date/calendarDate";
 import { useIsMobileLayout } from "../../../shared/responsive";
-import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
+import type { CalendarScheduleModel } from "../model/calendarSchedule";
 import { CalendarMonthSelector } from "./CalendarMonthSelector";
 import "./MonthlyCalendar.css";
 

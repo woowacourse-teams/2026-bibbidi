@@ -18,7 +18,7 @@ export function GuestRecommendedTasks({
   onRetry: () => void;
 }) {
   return (
-    <div className="home-dashboard-guest__recommendations">
+    <>
       {status === "complete" && viewModel.items.length > 0 ? (
         <RecommendedSchedule onAddTask={onAddTask} viewModel={viewModel} />
       ) : (
@@ -51,6 +51,6 @@ export function GuestRecommendedTasks({
           )}
         </section>
       )}
-    </div>
+    </>
   );
 }

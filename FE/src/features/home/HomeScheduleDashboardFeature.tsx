@@ -139,7 +139,6 @@ function CalendarPlanningFeature({
       checklist.status !== "loading" &&
       remainingRecommendations.length > 0 ? (
       <RecommendedSchedule
-        compact
         onAddTask={addition.add}
         viewModel={createRecommendedScheduleViewModel(
           { items: remainingRecommendations },
