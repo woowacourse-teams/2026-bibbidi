@@ -1,10 +1,20 @@
 spring:
-  config:
-    import: classpath:monitoring.yaml
   application:
     name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+
   lifecycle:
     timeout-per-shutdown-phase: 30s
+
+  jpa:
+    open-in-view: false
+    show-sql: false
+
+  sql:
+    init:
+      mode: never
+
+  flyway:
+    enabled: false
 
   ai:
     model:
@@ -20,17 +30,24 @@ spring:
         chat:
           model: qwen.qwen3-235b-a22b-2507-v1:0
           max-tokens: 2048
+    tools:
+      observations:
+        include-content: true
+    chat:
+      observations:
+        log-prompt: false
+        log-completion: false
+        include-error-logging: true
+      client:
+        observations:
+          log-prompt: false
+          log-completion: false
 
-  flyway:
-    enabled: false
-
-  jpa:
-    open-in-view: false
-    show-sql: false
-
-  sql:
-    init:
-      mode: never
+server:
+  shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 bibbidi:
   sse:
@@ -47,19 +64,14 @@ bibbidi:
       sol-model: ${BIBBIDI_CHAT_SOL_MODEL:global.openai.gpt-6.1-sol}
       luna-model: ${BIBBIDI_CHAT_LUNA_MODEL:gpt-6-luna}
       luna-api-key: ${OPENAI_API_KEY:}
+      jev-tool-loop:
+        enabled: ${BIBBIDI_CHAT_JEV_TOOL_LOOP_ENABLED:false}
       routing:
         api-key: ${TYPESAFE_API_KEY:}
         endpoint: https://api.typesafe.ai/v1/systemone
         model: jev-latest
         timeout: 1500ms
         min-confidence: 0.7
-        history-messages: 6
-server:
-  shutdown: graceful
-
-discord:
-  url:
-    feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
 
 auth:
   jwt:
@@ -151,3 +163,57 @@ auth:
       - /actuator/prometheus
       - /swagger-ui/**
       - /docs/**
+
+discord:
+  url:
+    feedback: ${DISCORD_FEEDBACK_WEB_HOOK_URL:}
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  observations:
+    enable:
+      db.vector.client.operation: false
+  metrics:
+    tags:
+      service.name: ${OTEL_SERVICE_NAME:bibbidi-backend}
+      deployment.environment.name: ${DEPLOYMENT_ENVIRONMENT_NAME:production}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        gen_ai.chat.client.operation: true
+        gen_ai.client.operation: true
+        spring.ai.tool: true
+        ai.chat.ttft: true
+        hikaricp.connections.usage: true
+        hikaricp.connections.acquire: true
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318}/v1/traces
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+
+logging:
+  structured:
+    format:
+      console: ecs
+  include-application-name: false

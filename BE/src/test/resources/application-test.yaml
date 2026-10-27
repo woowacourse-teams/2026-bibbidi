@@ -1,4 +1,7 @@
 spring:
+  flyway:
+    enabled: false
+
   datasource:
     url: jdbc:h2:mem:bibbidi-test;IGNORECASE=TRUE
     driver-class-name: org.h2.Driver
@@ -15,6 +18,16 @@ spring:
   sql:
     init:
       mode: never
+
+bibbidi:
+  ai:
+    chatbot:
+      accounts-enabled: false
+
+management:
+  metrics:
+    tags:
+      deployment.environment.name: test
 
 discord:
   url:

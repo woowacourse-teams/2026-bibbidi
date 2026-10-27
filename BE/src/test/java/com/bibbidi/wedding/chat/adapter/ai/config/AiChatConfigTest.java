@@ -5,16 +5,15 @@ import static org.mockito.Mockito.mock;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
+import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
 import io.micrometer.observation.ObservationRegistry;
-import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.bedrock.autoconfigure.BedrockAwsConnectionConfiguration;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -22,31 +21,39 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 
-class BedrockAccountConfigTest {
+class AiChatConfigTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(BedrockAccountConfig.class)
+            .withUserConfiguration(AiChatConfig.class)
             .withConfiguration(AutoConfigurations.of(BedrockAwsConnectionConfiguration.class))
-            .withBean(AiChatProperties.class, () -> new AiChatProperties(
-                    10, Duration.ofHours(1), "qwen-test", "sol-test", "luna-test"))
+            .withBean(ChatClient.Builder.class, () -> ChatClient.builder(mock(ChatModel.class)))
             .withBean(ObservationRegistry.class, ObservationRegistry::create)
             .withBean(ToolCallingManager.class, () -> ToolCallingManager.builder().build())
-            .withBean(ChatMemory.class, () -> MessageWindowChatMemory.builder().build())
             .withBean(SystemPrompt.class, SystemPrompt::new)
             .withBean(CatalogServiceAdapter.class, () -> new CatalogServiceAdapter(mock(CatalogService.class)))
             .withBean(ChecklistServiceAdapter.class, () -> mock(ChecklistServiceAdapter.class))
+            .withBean(AppointmentServiceAdapter.class, () -> mock(AppointmentServiceAdapter.class))
             .withPropertyValues(
                     "spring.profiles.active=prod",
-                    "bibbidi.ai.chatbot.accounts-enabled=true",
-                    "bibbidi.ai.chatbot.qwen-access-key=test-qwen-access-key",
-                    "bibbidi.ai.chatbot.qwen-secret-key=test-qwen-secret-key",
-                    "bibbidi.ai.chatbot.qwen-region=ap-northeast-1",
+                    "bibbidi.ai.chatbot.memory-max-messages=10",
+                    "bibbidi.ai.chatbot.conversation-idle-timeout=1h",
+                    "bibbidi.ai.chatbot.qwen-model=qwen-test",
+                    "bibbidi.ai.chatbot.sol-model=sol-test",
+                    "bibbidi.ai.chatbot.luna-model=luna-test",
+                    "bibbidi.ai.chatbot.luna-api-key=test-luna-key",
+                    "spring.ai.bedrock.converse.chat.model=sol-test",
                     "spring.ai.bedrock.converse.chat.max-tokens=2048",
                     "spring.ai.bedrock.aws.region=ap-northeast-1");
 
+    private final ApplicationContextRunner accountsEnabledRunner = runner.withPropertyValues(
+            "bibbidi.ai.chatbot.accounts-enabled=true",
+            "bibbidi.ai.chatbot.qwen-access-key=test-qwen-access-key",
+            "bibbidi.ai.chatbot.qwen-secret-key=test-qwen-secret-key",
+            "bibbidi.ai.chatbot.qwen-region=ap-northeast-1");
+
     @Test
     void keepsSolOnTheInstanceRoleEvenWhenGlobalBedrockKeysAreConfigured() {
-        runner.withPropertyValues(
+        accountsEnabledRunner.withPropertyValues(
                 "spring.ai.bedrock.aws.access-key=unrelated-access-key",
                 "spring.ai.bedrock.aws.secret-key=unrelated-secret-key")
                 .run(context -> {
@@ -60,7 +67,7 @@ class BedrockAccountConfigTest {
 
     @Test
     void enablesSeparateAccountsOnTheDevelopmentServerWhenExplicitlyConfigured() {
-        runner.withPropertyValues("spring.profiles.active=dev")
+        accountsEnabledRunner.withPropertyValues("spring.profiles.active=dev")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasBean("qwenChatClient");
@@ -71,7 +78,7 @@ class BedrockAccountConfigTest {
 
     @Test
     void rejectsAnEmptyQwenKeyInsteadOfUsingTheSolAccount() {
-        runner.withPropertyValues("bibbidi.ai.chatbot.qwen-access-key=")
+        accountsEnabledRunner.withPropertyValues("bibbidi.ai.chatbot.qwen-access-key=")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
@@ -80,29 +87,36 @@ class BedrockAccountConfigTest {
     }
 
     @Test
-    void keepsLocalDevelopmentOnTheExistingClientByDefault() {
-        new ApplicationContextRunner()
-                .withUserConfiguration(BedrockAccountConfig.class)
-                .withPropertyValues("spring.profiles.active=dev")
+    void createsNoSeparateAccountClientsWhileAccountsAreDisabled() {
+        runner.withPropertyValues("spring.profiles.active=dev")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean("qwenChatClient");
+                    assertThat(context).doesNotHaveBean("lunaChatClient");
                     assertThat(context).doesNotHaveBean("solBedrockCredentialsProvider");
                 });
     }
 
+    @Test
+    void createsEverySeparateAccountClientOnceAccountsAreEnabled() {
+        accountsEnabledRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).hasBean("qwenChatClient");
+            assertThat(context).hasBean("lunaChatClient");
+            assertThat(context).hasBean("solBedrockCredentialsProvider");
+        });
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"test", "evaluator", "prod,test", "prod,evaluator"})
-    void excludesProductionAccountsFromTestAndEvaluationProfiles(String profiles) {
-        new ApplicationContextRunner()
-                .withUserConfiguration(BedrockAccountConfig.class)
-                .withPropertyValues(
-                        "spring.profiles.active=" + profiles,
-                        "bibbidi.ai.chatbot.accounts-enabled=true")
+    @ValueSource(strings = {"test", "evaluator", "loadtest"})
+    void doesNotDependOnTheProfileToKeepAccountClientsOut(String profile) {
+        runner.withPropertyValues(
+                        "spring.profiles.active=" + profile,
+                        "bibbidi.ai.chatbot.accounts-enabled=false")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean("qwenChatClient");
-                    assertThat(context).doesNotHaveBean("solBedrockCredentialsProvider");
+                    assertThat(context).doesNotHaveBean("lunaChatClient");
                 });
     }
 }

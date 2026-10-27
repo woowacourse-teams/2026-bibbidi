@@ -2,3 +2,8 @@ spring:
   ai:
     model:
       chat: none
+
+bibbidi:
+  ai:
+    chatbot:
+      accounts-enabled: false
