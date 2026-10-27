@@ -1,3 +1,4 @@
+import { isDate } from "../../../shared/date/calendarDate";
 import type { MyChecklistAppointmentModel } from "./myChecklist";
 
 export const CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH = 255;
@@ -48,50 +49,12 @@ function validateTitle(title: string) {
     : undefined;
 }
 
-function isLeapYear(year: number) {
-  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-}
-
-function isValidDate(date: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-
-  if (!match) {
-    return false;
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const daysPerMonth = [
-    31,
-    isLeapYear(year) ? 29 : 28,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31,
-  ];
-
-  return (
-    year >= 1 &&
-    month >= 1 &&
-    month <= 12 &&
-    day >= 1 &&
-    day <= daysPerMonth[month - 1]
-  );
-}
-
 function validateDate(date: string) {
   if (date.length === 0) {
     return "날짜를 선택해 주세요.";
   }
 
-  return isValidDate(date)
+  return isDate(date)
     ? undefined
     : "날짜를 YYYY-MM-DD 형식의 유효한 날짜로 입력해 주세요.";
 }

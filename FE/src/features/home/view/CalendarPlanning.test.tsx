@@ -120,7 +120,7 @@ describe("CalendarPlanning", () => {
       ).toBeTruthy();
       fireEvent.click(within(picker).getByRole("button", { name: "이동" }));
       expect(
-        screen.getByRole("region", { name: "6월 30일 일정" }),
+        screen.getByRole("region", { name: "2200년 6월 30일 일정" }),
       ).toBeTruthy();
       expect(
         screen.getByRole("table", { name: "2200년 6월 달력" }),
@@ -237,7 +237,9 @@ describe("CalendarPlanning", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "2026년 10월 8일" }));
-    const selected = screen.getByRole("region", { name: "10월 8일 일정" });
+    const selected = screen.getByRole("region", {
+      name: "2026년 10월 8일 일정",
+    });
     expect(within(selected).getByText("14:00")).toBeTruthy();
     fireEvent.click(within(selected).getByRole("button"));
     dialog = screen.getByRole("dialog");
@@ -284,10 +286,10 @@ describe("CalendarPlanning", () => {
     ).toBeTruthy();
   });
   it.each([
-    ["2026-01-31", "다음 달", "2026년 2월 28일", "2월 28일 일정"],
-    ["2028-01-31", "다음 달", "2028년 2월 29일", "2월 29일 일정"],
-    ["2026-12-15", "다음 달", "2027년 1월 15일", "1월 15일 일정"],
-    ["2026-01-15", "이전 달", "2025년 12월 15일", "12월 15일 일정"],
+    ["2026-01-31", "다음 달", "2026년 2월 28일", "2026년 2월 28일 일정"],
+    ["2028-01-31", "다음 달", "2028년 2월 29일", "2028년 2월 29일 일정"],
+    ["2026-12-15", "다음 달", "2027년 1월 15일", "2027년 1월 15일 일정"],
+    ["2026-01-15", "이전 달", "2025년 12월 15일", "2025년 12월 15일 일정"],
   ])(
     "%s에서 월을 이동하면 해당 달의 같은 일자 또는 말일을 선택한다",
     (referenceDate, direction, dateLabel, sectionLabel) => {
@@ -313,9 +315,9 @@ describe("CalendarPlanning", () => {
       screen.getByRole("table", { name: "2026년 10월 달력" }),
     ).toBeTruthy();
     expect(
-      within(screen.getByRole("region", { name: "10월 1일 일정" })).getByText(
-        "0개",
-      ),
+      within(
+        screen.getByRole("region", { name: "2026년 10월 1일 일정" }),
+      ).getByText("이 날짜에 등록된 일정이 없어요."),
     ).toBeTruthy();
   });
 
@@ -328,7 +330,7 @@ describe("CalendarPlanning", () => {
         onRetry={onRetry}
       />,
     );
-    const region = screen.getByRole("region", { name: "9월 16일 일정" });
+    const region = screen.getByRole("region", { name: "2026년 9월 16일 일정" });
     expect(
       within(region).getByRole("status", { name: "일정을 불러오는 중이에요." }),
     ).toBeTruthy();
@@ -343,7 +345,6 @@ describe("CalendarPlanning", () => {
       />,
     );
     expect(within(region).getByRole("alert")).toBeTruthy();
-    expect(within(region).queryByText("0개")).toBeNull();
     fireEvent.click(within(region).getByRole("button", { name: "다시 시도" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
@@ -387,7 +388,7 @@ describe("CalendarPlanning", () => {
           .getAttribute("aria-pressed"),
       ).toBe("true");
       expect(
-        screen.getByRole("region", { name: "2월 29일 일정" }),
+        screen.getByRole("region", { name: "2028년 2월 29일 일정" }),
       ).toBeTruthy();
       await waitFor(() => expect(document.activeElement).toBe(trigger));
       expect(trigger.getAttribute("aria-expanded")).toBe("false");

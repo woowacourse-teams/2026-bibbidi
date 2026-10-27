@@ -19,8 +19,7 @@ export function isDate(value: string) {
   );
 }
 
-export function localToday() {
-  const now = new Date();
+export function localToday(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 

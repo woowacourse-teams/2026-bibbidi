@@ -128,13 +128,29 @@
 .monthly-calendar__schedules li {
   display: flex;
   min-width: 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t7);
+}
+
+.monthly-calendar__schedule-button {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
+  border: 0;
   border-radius: 4px;
   background: var(--color-bg-brand-weak);
-  color: var(--color-fg-neutral);
-  font: var(--typography-t7);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.monthly-calendar__schedule-button:hover {
+  background: var(--color-bg-brand-solid);
 }
 
 .monthly-calendar__schedule-dot {
@@ -152,27 +168,31 @@
   white-space: nowrap;
 }
 
-button.monthly-calendar__schedule-title {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-}
-
 .monthly-calendar__schedules .monthly-calendar__schedule-more {
   justify-content: flex-end;
-  padding-block: 0;
-  background: transparent;
+  padding-inline: 6px;
   color: var(--color-fg-neutral-muted);
 }
 
 .monthly-calendar__date-button:focus-visible,
-button.monthly-calendar__schedule-title:focus-visible {
+.monthly-calendar__schedule-button:focus-visible {
   outline: 2px solid var(--color-stroke-focus-ring);
   outline-offset: 2px;
+}
+
+/* Density is owned by the calendar; the page only decides when it can stick. */
+.monthly-calendar[data-density="compact"] {
+  padding: 16px;
+}
+.monthly-calendar[data-density="compact"] .monthly-calendar__header {
+  margin-bottom: 12px;
+}
+.monthly-calendar[data-density="compact"] .monthly-calendar__grid th {
+  height: 28px;
+}
+.monthly-calendar[data-density="compact"] .monthly-calendar__grid td {
+  height: 72px;
+  padding-block: 2px;
 }
 
 @media (width < 768px) {
@@ -199,24 +219,21 @@ button.monthly-calendar__schedule-title:focus-visible {
   }
 
   .monthly-calendar__schedules {
-    min-height: 14px;
+    min-height: 28px;
     margin-top: 0;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
+    justify-content: flex-start;
+    gap: 2px;
   }
 
   .monthly-calendar__schedules li {
     width: 6px;
     height: 6px;
+    flex: none;
     padding: 0;
     border-radius: 50%;
     background: var(--color-fg-warning);
-  }
-
-  .monthly-calendar__schedule-dot {
-    display: none;
   }
 
   .monthly-calendar__schedule-title {
@@ -230,9 +247,14 @@ button.monthly-calendar__schedule-title:focus-visible {
 
   .monthly-calendar__schedules .monthly-calendar__schedule-more {
     width: auto;
+    max-width: 100%;
     height: auto;
+    justify-content: center;
+    padding: 0;
     background: transparent;
     font: var(--typography-t7);
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 }
 
