@@ -2,6 +2,7 @@ package com.bibbidi.wedding.chat.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bibbidi.wedding.chat.adapter.ai.tools.BibbidiToolCallingManager;
 import com.bibbidi.wedding.chat.evaluation.config.EvaluationModelConfiguration;
 import com.bibbidi.wedding.chat.evaluation.config.EvaluationModelConfiguration.JudgeModel;
 import com.bibbidi.wedding.chat.evaluation.config.EvaluationProperties;
@@ -12,6 +13,7 @@ import com.bibbidi.wedding.chat.evaluation.input.MetricInformation;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluationRequest;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluator;
 import com.bibbidi.wedding.chat.evaluation.report.BibbidiEvaluationReportWriter;
+import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel.ModelCall;
 import com.bibbidi.wedding.chat.evaluation.report.RecordingChatModel;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.ConversationKey;
@@ -21,10 +23,13 @@ import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,6 +43,8 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.tool.DefaultToolCallingManager;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +63,8 @@ import org.springframework.test.context.jdbc.Sql;
 class BibbidiEvaluationIntegrationTest {
 
     private static final String SCENARIO_FILTER_ENV = "BIBBIDI_EVALUATION_SCENARIO";
+    private static final String SCENARIOS_FILTER_ENV = "BIBBIDI_EVALUATION_SCENARIOS";
+    private static final String REPEATS_ENV = "BIBBIDI_EVALUATION_REPEATS";
     private static final long EVALUATION_USER_ID = 900001L;
     private static final long CHAT_TIMEOUT_MARGIN_SECONDS = 15;
 
@@ -69,7 +78,7 @@ class BibbidiEvaluationIntegrationTest {
     private ChatMemory chatMemory;
 
     @Autowired
-    private ChatModel generationModel;
+    private List<ChatModel> generationModels;
 
     @Autowired
     private JudgeModel judgeModel;
@@ -77,15 +86,24 @@ class BibbidiEvaluationIntegrationTest {
     @Autowired
     private EvaluationProperties properties;
 
+    @Autowired
+    private ToolCallingManager toolCallingManager;
+
     @Value("${bibbidi.sse.response-timeout-seconds}")
     private long responseTimeoutSeconds;
 
-    private RecordingChatModel recordingModel;
+    private List<RecordingChatModel> recordingModels;
     private BibbidiEvaluationReportWriter reportWriter;
 
     @BeforeAll
     void prepare() {
-        recordingModel = (RecordingChatModel) generationModel;
+        boolean jevLoopEnabled = Boolean.parseBoolean(
+                System.getenv().getOrDefault("BIBBIDI_EVALUATION_JEV_TOOL_LOOP_ENABLED", "false"));
+        assertThat(toolCallingManager).isInstanceOf(
+                jevLoopEnabled ? BibbidiToolCallingManager.class : DefaultToolCallingManager.class);
+        recordingModels = generationModels.stream()
+                .map(RecordingChatModel.class::cast)
+                .toList();
         reportWriter = new BibbidiEvaluationReportWriter(
                 properties.generation().displayName(), properties.judge().provider(),
                 properties.judge().model(), properties.judge().reasoningEffort());
@@ -102,11 +120,25 @@ class BibbidiEvaluationIntegrationTest {
         Map<String, MetricInformation> metrics = loader.loadMetrics().stream()
                 .collect(Collectors.toMap(MetricInformation::metricType, metric -> metric));
         String onlyScenario = System.getenv().getOrDefault(SCENARIO_FILTER_ENV, "");
+        Set<String> selectedScenarios = Arrays.stream(System.getenv().getOrDefault(SCENARIOS_FILTER_ENV, "").split(","))
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .collect(Collectors.toSet());
+        int repeats = Integer.parseInt(System.getenv().getOrDefault(REPEATS_ENV, "1"));
+        if (repeats < 1 || repeats > 5) {
+            throw new IllegalArgumentException("Evaluation repeats must be between 1 and 5");
+        }
 
         return loader.loadScenarios().stream()
                 .filter(scenario -> onlyScenario.isBlank() || scenario.name().equals(onlyScenario))
-                .map(scenario -> DynamicTest.dynamicTest(
-                        scenario.name(), () -> evaluateScenario(scenario, metrics)));
+                .filter(scenario -> selectedScenarios.isEmpty() || selectedScenarios.contains(scenario.name()))
+                .flatMap(scenario -> IntStream.rangeClosed(1, repeats).mapToObj(iteration -> {
+                    EvaluationScenario run = new EvaluationScenario(
+                            scenario.name() + "-run" + iteration,
+                            scenario.metrics(), scenario.userMessage(), scenario.chatMemory(),
+                            scenario.referenceAnswer(), scenario.expectedRefusal());
+                    return DynamicTest.dynamicTest(run.name(), () -> evaluateScenario(run, metrics));
+                }));
     }
 
     private void evaluateScenario(EvaluationScenario scenario, Map<String, MetricInformation> metrics) {
@@ -127,22 +159,22 @@ class BibbidiEvaluationIntegrationTest {
                 evaluatingMetric = null;
             }
         } catch (RuntimeException | AssertionError failure) {
-            reportWriter.recordFailure(scenario, recordingModel.calls(), generated.answer(),
+            reportWriter.recordFailure(scenario, recordedCalls(), generated.answer(),
                     generated.recommendedItemIds(), providedContext(), evaluations,
                     phase, evaluatingMetric, failure,
-                    measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
+                    measurement.selectedTier, measurement.firstDeltaMs, measurement.totalMs);
             throw failure;
         }
-        reportWriter.record(scenario, recordingModel.calls(), generated.answer(),
+        reportWriter.record(scenario, recordedCalls(), generated.answer(),
                 generated.recommendedItemIds(), providedContext(), evaluations,
-                measurement.selectedModel, measurement.firstDeltaMs, measurement.totalMs);
+                measurement.selectedTier, measurement.firstDeltaMs, measurement.totalMs);
     }
 
     private void generate(EvaluationScenario scenario, GeneratedAnswer generated, GenerationMeasurement measurement) {
         UUID conversationId = UUID.randomUUID();
         String memoryKey = new ConversationKey(EVALUATION_USER_ID, conversationId).toMemoryKey();
         Duration timeout = Duration.ofSeconds(responseTimeoutSeconds + CHAT_TIMEOUT_MARGIN_SECONDS);
-        recordingModel.reset();
+        recordingModels.forEach(RecordingChatModel::reset);
         try {
             chatMemory.add(memoryKey, scenario.chatMemory().stream().map(this::toMessage).toList());
             long startedAt = System.nanoTime();
@@ -151,7 +183,7 @@ class BibbidiEvaluationIntegrationTest {
                             () -> CancelReason.CLIENT_DISCONNECTED)
                     .doOnNext(event -> {
                         if (event instanceof ChatResult.Selected selected) {
-                            measurement.selectedModel = selected.model();
+                            measurement.selectedTier = selected.tier().name();
                         }
                         if (event instanceof ChatResult.Delta delta && !delta.text().isEmpty()
                                 && measurement.firstDeltaMs == null) {
@@ -170,7 +202,7 @@ class BibbidiEvaluationIntegrationTest {
     }
 
     private static final class GenerationMeasurement {
-        private String selectedModel;
+        private String selectedTier;
         private Long firstDeltaMs;
         private Long totalMs;
     }
@@ -187,8 +219,14 @@ class BibbidiEvaluationIntegrationTest {
         return result;
     }
 
+    private List<ModelCall> recordedCalls() {
+        return recordingModels.stream()
+                .flatMap(model -> model.calls().stream())
+                .toList();
+    }
+
     private List<Document> providedContext() {
-        return recordingModel.calls().stream()
+        return recordedCalls().stream()
                 .flatMap(call -> call.prompt().getInstructions().stream())
                 .filter(ToolResponseMessage.class::isInstance)
                 .map(ToolResponseMessage.class::cast)
