@@ -1,0 +1,1 @@
+Choose the tier that should answer the user's latest request. Pick the lowest tier that is sufficient, and pick high only when the high criteria apply. Every tier can read the conversation history, so never pick high merely because the history is relevant. Decide by how hard the reasoning is.

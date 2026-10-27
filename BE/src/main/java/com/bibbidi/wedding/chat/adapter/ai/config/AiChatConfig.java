@@ -1,51 +1,47 @@
 package com.bibbidi.wedding.chat.adapter.ai.config;
 
-import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelTarget;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.memory.ExpiringChatMemoryRepository;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.JevClient;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelRoutingProperties;
+import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.tools.BibbidiToolCallingManager;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.Map;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
+import org.springframework.ai.bedrock.converse.BedrockProxyChatModel;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.model.bedrock.autoconfigure.BedrockAwsConnectionProperties;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AiChatProperties.class, ModelRoutingProperties.class})
 public class AiChatConfig {
-
-    @Bean
-    ChatClient aiChatClient(
-            ChatClient.Builder chatClientBuilder,
-            ChatMemory chatMemory,
-            ChatOptions.Builder<?> structuredAnswerOptions,
-            SystemPrompt systemPrompt,
-            CatalogServiceAdapter catalogTools,
-            ChecklistServiceAdapter checklistTools
-    ) {
-        return chatClientBuilder.defaultOptions(structuredAnswerOptions)
-                .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
-    }
 
     @Bean
     ChatMemory chatMemory(AiChatProperties properties) {
@@ -58,64 +54,9 @@ public class AiChatConfig {
     }
 
     @Bean
-    public ChatModelRouter chatModelRouter(
-            @Qualifier("aiChatClient") ChatClient bedrockClient,
-            @Qualifier("qwenChatClient") ObjectProvider<ChatClient> qwenClient,
-            @Qualifier("lunaChatClient") ObjectProvider<ChatClient> lunaClient,
-            AiChatProperties properties,
-            @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel
-    ) {
-        if (!evaluationModel.isBlank()) {
-            ChatModelRoute route = new ChatModelRoute(bedrockClient, evaluationModel, null);
-            return new ChatModelRouter(Map.of(
-                    ChatModelTier.QWEN, route,
-                    ChatModelTier.LUNA, route,
-                    ChatModelTier.SOL, route));
-        }
-
-        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
-        ChatModelRoute qwen = new ChatModelRoute(qwenClient.getIfAvailable(() -> bedrockClient), properties.qwenModel(),
-                () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
-        ChatModelRoute sol = new ChatModelRoute(bedrockClient, properties.solModel(),
-                () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
-                        .requestParameters(strictJsonFormatParameters()));
-
-        ChatClient openAiClient = lunaClient.getIfAvailable();
-        // OpenAI 클라이언트가 없으면 Luna 요청도 Bedrock Sol 모델이 처리하므로, 기록하는 모델명도 Sol로 맞춘다.
-        ChatModelRoute luna = openAiClient == null
-                ? sol
-                : new ChatModelRoute(openAiClient, properties.lunaModel(), null);
-        return new ChatModelRouter(Map.of(
-                ChatModelTier.QWEN, qwen,
-                ChatModelTier.LUNA, luna,
-                ChatModelTier.SOL, sol));
-    }
-
-    @Bean
-    @Profile("!test & !evaluator & !loadtest")
-    ChatClient lunaChatClient(
-            @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
-            @Value("${bibbidi.ai.chatbot.luna-model}") String model,
-            ChatMemory chatMemory,
-            SystemPrompt systemPrompt,
-            CatalogServiceAdapter catalogTools,
-            ChecklistServiceAdapter checklistTools
-    ) {
-        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
-        OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .options(OpenAiChatOptions.builder()
-                        .apiKey(apiKey)
-                        .model(model)
-                        .reasoningEffort("none")
-                        .outputSchema(schema)
-                        .strict(true)
-                        .build())
-                .build();
-        return ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
+    @ConditionalOnProperty(name = "bibbidi.ai.chatbot.jev-tool-loop.enabled", havingValue = "true")
+    ToolCallingManager toolCallingManager(ModelRoutingProperties properties, JevClient jev) {
+        return new BibbidiToolCallingManager(ToolCallingManager.builder().build(), properties, jev);
     }
 
     @Bean
@@ -133,8 +74,129 @@ public class AiChatConfig {
         return options;
     }
 
-    // requestParameters의 타입은 Map<String, String>이라 중첩된 값을 바로 넣을 수 없다.
-    // 실제로는 값을 JSON으로 바꿔 보내므로, 타입 검사만 피해서 중첩된 맵을 넘긴다.
+    @Bean
+    ChatClient aiChatClient(
+            ChatClient.Builder chatClientBuilder,
+            ChatMemory chatMemory,
+            ChatOptions.Builder<?> structuredAnswerOptions,
+            SystemPrompt systemPrompt,
+            CatalogServiceAdapter catalogTools,
+            ChecklistServiceAdapter checklistTools,
+            AppointmentServiceAdapter appointmentTools
+    ) {
+        return chatClientBuilder.defaultOptions(structuredAnswerOptions)
+                .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+
+    // 자동 구성하는 Bedrock 클라이언트(Sol)는 환경 변수 키 대신 EC2의 IAM 역할만 사용한다.
+    @Bean
+    @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
+    InstanceProfileCredentialsProvider solBedrockCredentialsProvider() {
+        return InstanceProfileCredentialsProvider.builder().build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
+    ChatClient qwenChatClient(
+            @Value("${bibbidi.ai.chatbot.qwen-access-key}") String accessKey,
+            @Value("${bibbidi.ai.chatbot.qwen-secret-key}") String secretKey,
+            @Value("${bibbidi.ai.chatbot.qwen-region}") String region,
+            @Value("${spring.ai.bedrock.converse.chat.max-tokens}") int maxTokens,
+            AiChatProperties properties,
+            BedrockAwsConnectionProperties connection,
+            ObservationRegistry observationRegistry,
+            ToolCallingManager toolCallingManager,
+            ChatMemory chatMemory,
+            SystemPrompt systemPrompt,
+            CatalogServiceAdapter catalogTools,
+            ChecklistServiceAdapter checklistTools,
+            AppointmentServiceAdapter appointmentTools
+    ) {
+        BedrockProxyChatModel model = BedrockProxyChatModel.builder()
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
+                .region(Region.of(region))
+                .timeout(connection.getTimeout())
+                .connectionTimeout(connection.getConnectionTimeout())
+                .asyncReadTimeout(connection.getAsyncReadTimeout())
+                .connectionAcquisitionTimeout(connection.getConnectionAcquisitionTimeout())
+                .socketTimeout(connection.getSocketTimeout())
+                .options(BedrockChatOptions.builder().model(properties.qwenModel()).maxTokens(maxTokens).build())
+                .observationRegistry(observationRegistry)
+                .build();
+        return ChatClient.builder(model)
+                .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        ToolCallingAdvisor.builder().toolCallingManager(toolCallingManager).build())
+                .build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
+    ChatClient lunaChatClient(
+            @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
+            @Value("${bibbidi.ai.chatbot.luna-model}") String model,
+            ChatMemory chatMemory,
+            SystemPrompt systemPrompt,
+            CatalogServiceAdapter catalogTools,
+            ChecklistServiceAdapter checklistTools,
+            AppointmentServiceAdapter appointmentTools
+    ) {
+        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .options(OpenAiChatOptions.builder()
+                        .apiKey(apiKey)
+                        .model(model)
+                        .reasoningEffort("none")
+                        .outputSchema(schema)
+                        .strict(true)
+                        .build())
+                .build();
+        return ChatClient.builder(chatModel)
+                .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+
+    @Bean
+    public ChatModelRouter chatModelRouter(
+            @Qualifier("aiChatClient") ChatClient bedrockClient,
+            @Qualifier("qwenChatClient") ObjectProvider<ChatClient> qwenClient,
+            @Qualifier("lunaChatClient") ObjectProvider<ChatClient> lunaClient,
+            AiChatProperties properties,
+            @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel
+    ) {
+        if (!evaluationModel.isBlank()) {
+            ChatModelTarget target = new ChatModelTarget(bedrockClient, evaluationModel, null);
+            return new ChatModelRouter(Map.of(
+                    ChatModelTier.LOW, target,
+                    ChatModelTier.MEDIUM, target,
+                    ChatModelTier.HIGH, target));
+        }
+
+        String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
+        ChatModelTarget qwen = new ChatModelTarget(qwenClient.getIfAvailable(() -> bedrockClient), properties.qwenModel(),
+                () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
+        ChatModelTarget sol = new ChatModelTarget(bedrockClient, properties.solModel(),
+                () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
+                        .requestParameters(strictJsonFormatParameters()));
+
+        ChatClient openAiClient = lunaClient.getIfAvailable();
+        // accounts-enabled가 꺼진 환경에는 OpenAI 클라이언트가 없다. Luna 요청도 Bedrock Sol 모델이 처리하므로, 기록하는 모델명도 Sol로 맞춘다.
+        ChatModelTarget luna = openAiClient == null
+                ? sol
+                : new ChatModelTarget(openAiClient, properties.lunaModel(), null);
+        return new ChatModelRouter(Map.of(
+                ChatModelTier.LOW, qwen,
+                ChatModelTier.MEDIUM, luna,
+                ChatModelTier.HIGH, sol));
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static Map<String, String> strictJsonFormatParameters() {
         Map<String, Object> parameters = Map.of(

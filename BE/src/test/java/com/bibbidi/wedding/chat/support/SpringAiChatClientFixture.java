@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.chat.support;
 
-import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelTarget;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
@@ -28,10 +28,10 @@ public final class SpringAiChatClientFixture {
     }
 
     public static SpringAiChatClient create(ChatClient chatClient) {
-        ChatModelRoute route = new ChatModelRoute(chatClient, "test-model", null);
+        ChatModelTarget target = new ChatModelTarget(chatClient, "test-model", null);
         return new SpringAiChatClient(new ChatModelRouter(Map.of(
-                ChatModelTier.QWEN, route,
-                ChatModelTier.LUNA, route,
-                ChatModelTier.SOL, route)));
+                ChatModelTier.LOW, target,
+                ChatModelTier.MEDIUM, target,
+                ChatModelTier.HIGH, target)));
     }
 }

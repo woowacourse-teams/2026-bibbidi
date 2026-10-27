@@ -1,6 +1,8 @@
 package com.bibbidi.wedding.chat.adapter.ai.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -12,12 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.json.JsonMapper;
 
 class ModelClassifierTest {
@@ -35,7 +39,7 @@ class ModelClassifierTest {
                 .maxMessages(20)
                 .build();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        responseBody.set("{\"answers\":{\"route\":{\"choice\":\"luna\",\"confidence\":0.95}}}");
+        responseBody.set("{\"answers\":{\"route\":{\"choice\":\"medium\",\"confidence\":0.95}}}");
         status = 200;
         server.createContext("/v1/systemone", exchange -> {
             requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
@@ -59,16 +63,26 @@ class ModelClassifierTest {
 
         ChatModelTier result = classifier(0.7).classify("conversation", "조건에 맞춰 추천해줘").block();
 
-        assertThat(result).isEqualTo(ChatModelTier.LUNA);
+        assertThat(result).isEqualTo(ChatModelTier.MEDIUM);
         assertThat(requestBody.get()).contains("예산은 200만 원", "조건에 맞춰 추천해줘", "\"type\":\"choice\"");
     }
 
     @Test
+    void keepsConfidentQwenChoiceWithoutPromotion() {
+        responseBody.set("{\"answers\":{\"route\":{\"choice\":\"low\",\"confidence\":0.95}}}");
+
+        assertThat(classifier(0.7).classify("conversation", "스드메 상담은 뭘 하는 건가요?").block())
+                .isEqualTo(ChatModelTier.LOW);
+        assertThat(requestBody.get()).contains("\"low\":", "\"medium\":", "\"high\":", "Pick the lowest tier",
+                "Example: 스드메 상담은 뭘 하는 건가요?");
+    }
+
+    @Test
     void promotesUncertainChoiceToAdjacentHigherTier() {
-        responseBody.set("{\"answers\":{\"route\":{\"choice\":\"qwen\",\"confidence\":0.4}}}");
+        responseBody.set("{\"answers\":{\"route\":{\"choice\":\"low\",\"confidence\":0.4}}}");
 
         assertThat(classifier(0.7).classify("conversation", "추천해줘").block())
-                .isEqualTo(ChatModelTier.LUNA);
+                .isEqualTo(ChatModelTier.MEDIUM);
     }
 
     @Test
@@ -76,13 +90,28 @@ class ModelClassifierTest {
         status = 503;
 
         assertThat(classifier(0.7).classify("conversation", "추천해줘").block())
-                .isEqualTo(ChatModelTier.SOL);
+                .isEqualTo(ChatModelTier.HIGH);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t", "\n"})
+    void usesSolWithoutCallingJevWhenTheKeyIsMissing(String apiKey) {
+        ModelRoutingProperties properties = new ModelRoutingProperties(
+                apiKey, "http://unused", "jev-latest", Duration.ofSeconds(2), 0.7);
+        JevClient jev = mock(JevClient.class);
+        ModelClassifier classifier = new ModelClassifier(
+                memory, properties, jev, new ModelRoutingInstruction(), new ModelRoutingCriteria());
+
+        assertThat(classifier.classify("conversation", "추천해줘").block()).isEqualTo(ChatModelTier.HIGH);
+        verifyNoInteractions(jev);
     }
 
     private ModelClassifier classifier(double confidence) {
         ModelRoutingProperties properties = new ModelRoutingProperties("test-key",
                 "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/systemone",
-                "jev-latest", Duration.ofSeconds(2), confidence, 6);
-        return new ModelClassifier(memory, properties, JsonMapper.builder().build(), new MockEnvironment());
+                "jev-latest", Duration.ofSeconds(2), confidence);
+        JevClient jev = new JevClient(properties, JsonMapper.builder().build());
+        return new ModelClassifier(memory, properties, jev, new ModelRoutingInstruction(), new ModelRoutingCriteria());
     }
 }

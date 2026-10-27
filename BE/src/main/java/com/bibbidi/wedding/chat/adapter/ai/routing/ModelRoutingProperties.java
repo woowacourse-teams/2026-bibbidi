@@ -9,7 +9,6 @@ public record ModelRoutingProperties(
         String endpoint,
         String model,
         Duration timeout,
-        double minConfidence,
-        int historyMessages
+        double minConfidence
 ) {
 }

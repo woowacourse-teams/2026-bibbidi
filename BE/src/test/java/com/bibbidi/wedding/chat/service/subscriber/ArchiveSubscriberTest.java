@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.domain.ChatTurnOutcome;
 import com.bibbidi.wedding.chat.domain.ChatTurnRecord;
 import com.bibbidi.wedding.chat.repository.ChatTurnRepository;
@@ -38,7 +39,7 @@ import reactor.core.scheduler.Schedulers;
 
 class ArchiveSubscriberTest {
 
-    private static final String MODEL = "test-model";
+    private static final ChatModelTier TIER = ChatModelTier.HIGH;
     private static final TurnContext CONTEXT = new TurnContext(
             7L, UUID.fromString("7bf4d204-8331-439b-bd8f-271abc0eea99"), "질문", LocalDateTime.of(2026, 10, 22, 9, 0));
 
@@ -63,7 +64,7 @@ class ArchiveSubscriberTest {
         archive.subscribe(CONTEXT, sink.asFlux());
 
         // when
-        sink.tryEmitNext(new ChatResult.Selected(MODEL));
+        sink.tryEmitNext(new ChatResult.Selected(TIER));
         sink.tryEmitNext(new ChatResult.Delta("웨딩홀 "));
         sink.tryEmitNext(new ChatResult.Delta("계약"));
         sink.tryEmitNext(new ChatResult.Answer("웨딩홀 계약", List.of()));
@@ -76,7 +77,7 @@ class ArchiveSubscriberTest {
         assertThat(record.conversationId()).isEqualTo(CONTEXT.conversationId());
         assertThat(record.userPrompt()).isEqualTo("질문");
         assertThat(record.completion()).isEqualTo("웨딩홀 계약");
-        assertThat(record.model()).isEqualTo(MODEL);
+        assertThat(record.model()).isEqualTo(TIER.name());
         assertThat(record.outcome()).isEqualTo(ChatTurnOutcome.COMPLETED);
         assertThat(record.outcomeReason()).isNull();
         assertThat(record.startedAt()).isEqualTo(CONTEXT.startedAt());
@@ -89,7 +90,7 @@ class ArchiveSubscriberTest {
     void archivesACancelledTurnWithItsReason(CancelReason reason) {
         // when
         archive.subscribe(CONTEXT, Flux.just(
-                new ChatResult.Selected(MODEL),
+                new ChatResult.Selected(TIER),
                 new ChatResult.Delta("일부"),
                 new ChatResult.Cancelled(reason)));
 

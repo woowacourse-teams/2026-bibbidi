@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.service.dto.checklist.ChecklistSnapshot;
+import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.checklist.domain.Checklist;
 import com.bibbidi.wedding.checklist.repository.AppointmentRepository;
 import com.bibbidi.wedding.checklist.repository.ChecklistRepository;
@@ -78,7 +79,7 @@ class ChecklistServiceAdapterTest {
     void toolFailsWithoutLookingUpAnythingWhenTheCallingUserIsUnknown() {
         ToolContext withoutUser = new ToolContext(Map.of());
 
-        assertThatThrownBy(() -> adapter.getMyChecklist(withoutUser)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> adapter.getMyChecklist(withoutUser)).isInstanceOf(BusinessException.class);
         verifyNoInteractions(catalogRepository, checklistRepository);
     }
 

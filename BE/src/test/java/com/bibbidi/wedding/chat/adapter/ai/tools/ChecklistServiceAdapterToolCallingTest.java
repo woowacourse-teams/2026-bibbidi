@@ -1,14 +1,19 @@
 package com.bibbidi.wedding.chat.adapter.ai.tools;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.support.ToolCallingFixture;
+import com.bibbidi.wedding.checklist.domain.ChecklistItemStatus;
 import com.bibbidi.wedding.checklist.service.ChecklistService;
+import com.bibbidi.wedding.checklist.service.dto.ChecklistItemResult;
 import com.bibbidi.wedding.checklist.service.dto.ChecklistWithAppointmentsResult;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,10 +35,36 @@ class ChecklistServiceAdapterToolCallingTest {
     }
 
     @Test
-    @DisplayName("체크리스트 조회 도구를 모델 요청에 등록한다")
+    @DisplayName("체크리스트 도구를 모델 요청에 등록한다")
     void registersTheChecklistToolsOnTheModelRequest() {
-        assertThat(toolCalling.registeredToolNames(USER_ID))
-                .containsExactly("getMyChecklist");
+        assertThat(toolCalling.registeredToolNames(USER_ID)).containsExactlyInAnyOrder(
+                "getMyChecklist", "changeChecklistItemStatus", "changeChecklistItemTitle", "deleteChecklistItem");
+    }
+
+    @Test
+    @DisplayName("상태 변경 도구는 모델이 정한 인자가 아니라 요청에 담긴 사용자로 ChecklistService를 호출한다")
+    void changesTheItemStatusForTheUserOfTheRequest() {
+        // given
+        when(checklistService.changeItemStatus(USER_ID, 10L, "done")).thenReturn(
+                new ChecklistItemResult(10L, 5L, 1L, "웨딩홀 투어", ChecklistItemStatus.DONE,
+                        LocalDateTime.of(2026, 10, 1, 9, 0)));
+
+        // when
+        String response = toolCalling.callTool(USER_ID, "changeChecklistItemStatus",
+                "{\"checklistItemId\": 10, \"status\": \"done\", \"userId\": " + OTHER_USER_ID + "}");
+
+        // then
+        verify(checklistService).changeItemStatus(USER_ID, 10L, "done");
+        verify(checklistService, never()).changeItemStatus(eq(OTHER_USER_ID), any(), any());
+        assertThat(response).contains("웨딩홀 투어");
+    }
+
+    @Test
+    @DisplayName("삭제 도구는 요청에 담긴 사용자로 할 일을 삭제한다")
+    void deletesTheItemForTheUserOfTheRequest() {
+        toolCalling.callTool(USER_ID, "deleteChecklistItem", "{\"checklistItemId\": 10}");
+
+        verify(checklistService).deleteItem(USER_ID, 10L);
     }
 
     @Test

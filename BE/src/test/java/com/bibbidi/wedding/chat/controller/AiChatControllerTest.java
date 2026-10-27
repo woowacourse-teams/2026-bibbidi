@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 import com.bibbidi.wedding.auth.token.BibbidiTokenClaims;
 import com.bibbidi.wedding.auth.token.BibbidiTokenParser;
 import com.bibbidi.wedding.chat.adapter.ai.SpringAiConversationAdapter;
-import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRoute;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelTarget;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
@@ -142,8 +142,8 @@ class AiChatControllerTest {
 
         @Bean
         ChatModelRouter chatModelRouter(ChatClient aiChatClient) {
-            return new ChatModelRouter(Map.of(ChatModelTier.QWEN,
-                    new ChatModelRoute(aiChatClient, "test-model", null)));
+            return new ChatModelRouter(Map.of(ChatModelTier.LOW,
+                    new ChatModelTarget(aiChatClient, "test-model", null)));
         }
 
         @Bean
@@ -161,7 +161,7 @@ class AiChatControllerTest {
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         when(classifier.classify(org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString())).thenReturn(Mono.just(ChatModelTier.QWEN));
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(Mono.just(ChatModelTier.LOW));
         RECEIVED_PROMPTS.clear();
         responder = prompt -> Flux.empty();
         mockMvc = webAppContextSetup(context).apply(springSecurity())

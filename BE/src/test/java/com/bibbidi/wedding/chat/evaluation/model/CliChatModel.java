@@ -39,12 +39,13 @@ public abstract class CliChatModel implements ChatModel {
             [도구]
             사용할 수 있는 도구는 아래와 같다. 도구가 필요하면 toolCalls에 {name, arguments(JSON 문자열)}를 채우고 \
             answer는 빈 문자열, recommendedItemIds는 빈 배열로 둔다. \
-            도구 응답을 받은 뒤에는 toolCalls를 빈 배열로 두고 최종 답변을 낸다. 도구 응답은 [tool] 메시지로 전달된다.
+            도구 응답을 받은 뒤에도 추가 정보가 필요하면 도구를 요청한다. 이미 받은 결과로 충분하면 \
+            toolCalls를 빈 배열로 두고 최종 답변을 낸다. 도구 응답은 [tool] 메시지로 전달된다.
             """;
     private static final String TOOL_RESPONSE_HEADER = "[tool] (아래는 방금 호출한 도구들의 실제 응답이다. 이 데이터를 근거로 답한다)";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
+    private ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
     private final String structuredSchema;
     private ChatModel toolLoopModel = this;
 
@@ -76,6 +77,10 @@ public abstract class CliChatModel implements ChatModel {
         this.toolLoopModel = model;
     }
 
+    public void useToolCallingManager(ToolCallingManager manager) {
+        this.toolCallingManager = manager;
+    }
+
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
         return Flux.defer(() -> Flux.just(call(prompt)));
@@ -96,6 +101,10 @@ public abstract class CliChatModel implements ChatModel {
                 .map(Message::getText)
                 .collect(Collectors.joining("\n\n"));
         List<ToolDefinition> tools = toolDefinitionsOf(prompt);
+        if (structuredSchema == null && tools.isEmpty()) {
+            throw new IllegalStateException("평가 모델에 도구가 전달되지 않았습니다. options="
+                    + (prompt.getOptions() == null ? "null" : prompt.getOptions().getClass().getName()));
+        }
         if (tools.isEmpty()) {
             return instructions.isBlank() ? null : instructions;
         }

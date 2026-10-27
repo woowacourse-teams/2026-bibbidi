@@ -3,11 +3,14 @@ package com.bibbidi.wedding.chat.adapter.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.openai.errors.OpenAIRetryableException;
 import com.openai.errors.RateLimitException;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
@@ -36,6 +39,7 @@ import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.publisher.TestPublisher;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import tools.jackson.databind.json.JsonMapper;
@@ -62,8 +66,10 @@ class SpringAiConversationAdapterTest {
                 .chatMemoryRepository(new InMemoryChatMemoryRepository())
                 .maxMessages(18)
                 .build();
+        ModelClassifier classifier = mock(ModelClassifier.class);
+        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ChatModelTier.LOW));
         springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
-                chatMemory), new JacksonChatAnswerParser(MAPPER), chatMemory, mock(ModelClassifier.class), "qwen");
+                chatMemory), new JacksonChatAnswerParser(MAPPER), chatMemory, classifier);
     }
 
     @Test
@@ -93,7 +99,7 @@ class SpringAiConversationAdapterTest {
 
         // then
         assertThat(content).containsExactly(
-                new ChatResult.Selected("test-model"),
+                new ChatResult.Selected(ChatModelTier.LOW),
                 new ChatResult.Delta("웨딩홀 "),
                 new ChatResult.Delta("계약"),
                 new ChatResult.Answer("웨딩홀 계약", List.of()));
@@ -224,7 +230,7 @@ class SpringAiConversationAdapterTest {
 
         // then
         assertThat(content).containsExactly(
-                new ChatResult.Selected("test-model"),
+                new ChatResult.Selected(ChatModelTier.LOW),
                 new ChatResult.Delta("답변"),
                 new ChatResult.Answer("답변", List.of()));
     }

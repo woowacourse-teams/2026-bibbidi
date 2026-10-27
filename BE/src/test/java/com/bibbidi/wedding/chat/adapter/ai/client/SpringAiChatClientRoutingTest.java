@@ -49,11 +49,11 @@ class SpringAiChatClientRoutingTest {
                         "qwen-id", "global.openai.gpt-6.1-sol", "gpt-6-luna"), "");
         SpringAiChatClient client = new SpringAiChatClient(router);
 
-        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("인사"), ChatModelTier.QWEN))
+        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("인사")), ChatModelTier.LOW)
                 .blockLast();
-        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("비교"), ChatModelTier.SOL))
+        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("비교")), ChatModelTier.HIGH)
                 .blockLast();
-        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천"), ChatModelTier.LUNA))
+        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천")), ChatModelTier.MEDIUM)
                 .blockLast();
 
         assertThat(qwenPrompts).hasSize(1);
@@ -61,7 +61,7 @@ class SpringAiChatClientRoutingTest {
         assertThat(qwenPrompts.get(0).getOptions().getModel()).isEqualTo("qwen-id");
         assertThat(solPrompts.get(0).getOptions().getModel()).isEqualTo("global.openai.gpt-6.1-sol");
         assertThat(lunaPrompts).hasSize(1);
-        assertThat(client.modelName(ChatModelTier.LUNA)).isEqualTo("gpt-6-luna");
+        assertThat(client.modelName(ChatModelTier.MEDIUM)).isEqualTo("gpt-6-luna");
     }
 
     @Test
@@ -77,9 +77,9 @@ class SpringAiChatClientRoutingTest {
                         "qwen-id", "global.openai.gpt-6.1-sol", "gpt-6-luna"), "");
         SpringAiChatClient client = new SpringAiChatClient(router);
 
-        assertThat(client.modelName(ChatModelTier.LUNA)).isEqualTo("global.openai.gpt-6.1-sol");
-        assertThat(client.modelName(ChatModelTier.QWEN)).isEqualTo("qwen-id");
-        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천"), ChatModelTier.LUNA))
+        assertThat(client.modelName(ChatModelTier.MEDIUM)).isEqualTo("global.openai.gpt-6.1-sol");
+        assertThat(client.modelName(ChatModelTier.LOW)).isEqualTo("qwen-id");
+        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천")), ChatModelTier.MEDIUM)
                 .blockLast();
     }
 
@@ -101,7 +101,7 @@ class SpringAiChatClientRoutingTest {
         SpringAiChatClient client = new SpringAiChatClient(router);
 
         for (ChatModelTier tier : ChatModelTier.values()) {
-            client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("평가"), tier)).blockLast();
+            client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("평가")), tier).blockLast();
             assertThat(client.modelName(tier)).isEqualTo("evaluation-model");
         }
 

@@ -1,12 +1,15 @@
 package com.bibbidi.wedding.chat.adapter.ai.client;
 
-import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.ai.chat.messages.UserMessage;
 
 public record ChatModelRequest(
         Long userId,
         String conversationKey,
         UserMessage userMessage,
-        ChatModelTier tier
+        AtomicBoolean writeAttempted
 ) {
+    public ChatModelRequest(Long userId, String conversationKey, UserMessage userMessage) {
+        this(userId, conversationKey, userMessage, new AtomicBoolean());
+    }
 }
