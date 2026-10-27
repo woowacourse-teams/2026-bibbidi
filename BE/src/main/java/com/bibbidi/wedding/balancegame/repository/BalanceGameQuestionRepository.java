@@ -34,8 +34,9 @@ public class BalanceGameQuestionRepository {
         QuestionFile file = readFile(mapper, resource);
         validateRequiredValues(file, validator, resource);
         validateDuplicates(file.questions());
+        String baseUrl = prepareImageBaseUrl(file, imageBaseUrl);
         this.questions = file.questions().stream()
-                .map(question -> question.toQuestion(imageBaseUrl))
+                .map(question -> question.toQuestion(baseUrl))
                 .sorted(Comparator.comparingInt(BalanceGameQuestion::order))
                 .toList();
     }
@@ -100,5 +101,15 @@ public class BalanceGameQuestionRepository {
                 }
             }
         }
+    }
+
+    private static String prepareImageBaseUrl(QuestionFile file, String imageBaseUrl) {
+        boolean hasImage = file.questions().stream()
+                .flatMap(question -> question.options().stream())
+                .anyMatch(option -> option.imagePath() != null);
+        if (hasImage && imageBaseUrl.isBlank()) {
+            throw new IllegalStateException("밸런스게임 이미지가 있으면 bibbidi.balance-game.image-base-url 설정이 필요합니다");
+        }
+        return imageBaseUrl.endsWith("/") ? imageBaseUrl.substring(0, imageBaseUrl.length() - 1) : imageBaseUrl;
     }
 }

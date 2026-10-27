@@ -126,24 +126,24 @@ class BalanceGameQuestionRepositoryTest {
                 .allSatisfy(option -> assertThat(option.imageUrl()).isNull());
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"", "bibbidi/fe/development/balance-game/", "https://", "file:///images/"})
-    @DisplayName("이미지가 있는데 공개 기본 URL이 올바르지 않으면 설정과 선택지 ID를 알리며 실패한다")
-    void shouldRejectInvalidImageBaseUrl(String imageBaseUrl) {
-        assertThatThrownBy(() -> fromJson(VALID_JSON, imageBaseUrl))
+    @Test
+    @DisplayName("이미지가 있는데 기본 URL이 빠지면 필요한 설정 이름을 알리며 실패한다")
+    void shouldRejectMissingImageBaseUrl() {
+        assertThatThrownBy(() -> fromJson(VALID_JSON, ""))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContainingAll("optionId=B", "image-base-url=" + imageBaseUrl)
-                .hasCauseInstanceOf(IllegalArgumentException.class);
+                .hasMessageContaining("bibbidi.balance-game.image-base-url");
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", " ", "//other.test/option.webp", "https://other.test/option.webp", "["})
-    @DisplayName("이미지 경로는 기본 URL 아래의 유효한 상대 경로여야 한다")
+    @ValueSource(strings = {
+            "", " ", "//other.test/option.webp", "https://other.test/option.webp", "[",
+            "balance-game/q01-b.webp", "/balance-game/../q01-b.webp", "/balance-game/q01-b.png"
+    })
+    @DisplayName("이미지 경로는 밸런스게임 디렉터리 아래의 WebP 파일이어야 한다")
     void shouldRejectInvalidImagePath(String imagePath) {
         assertThatThrownBy(() -> fromJson(VALID_JSON.replace("/balance-game/q01-b.webp", imagePath)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContainingAll("optionId=B", "imagePath=" + imagePath)
-                .hasCauseInstanceOf(IllegalArgumentException.class);
+                .hasMessageContainingAll("test-questions.json", "options[0].imagePath");
     }
 
     @Test

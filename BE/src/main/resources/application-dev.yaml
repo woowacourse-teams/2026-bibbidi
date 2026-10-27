@@ -26,4 +26,4 @@ spring:
 
 bibbidi:
   balance-game:
-    image-base-url: ${BIBBIDI_BALANCE_GAME_IMAGE_BASE_URL:https://dev.bibbidi.kr}
+    image-base-url: https://dev.bibbidi.kr
