@@ -2,6 +2,7 @@ package com.bibbidi.wedding.balancegame.repository;
 
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestions;
+import com.bibbidi.wedding.balancegame.repository.dto.QuestionData;
 import com.bibbidi.wedding.balancegame.repository.dto.QuestionFile;
 import jakarta.validation.Validator;
 import java.io.IOException;
@@ -21,14 +22,12 @@ public class BalanceGameQuestionRepository {
     public BalanceGameQuestionRepository(
             ObjectMapper mapper,
             Validator validator,
-            @Value("classpath:balance-game/questions.json") Resource resource,
-            @Value("${bibbidi.balance-game.image-base-url:}") String imageBaseUrl
+            @Value("classpath:balance-game/questions.json") Resource resource
     ) {
         QuestionFile file = readFile(mapper, resource);
         validateRequiredValues(file, validator, resource);
-        String baseUrl = prepareImageBaseUrl(file, imageBaseUrl);
         this.questions = new BalanceGameQuestions(file.questions().stream()
-                .map(question -> question.toQuestion(baseUrl))
+                .map(QuestionData::toQuestion)
                 .toList());
     }
 
@@ -58,13 +57,4 @@ public class BalanceGameQuestionRepository {
         }
     }
 
-    private static String prepareImageBaseUrl(QuestionFile file, String imageBaseUrl) {
-        boolean hasImage = file.questions().stream()
-                .flatMap(question -> question.options().stream())
-                .anyMatch(choice -> choice.imagePath() != null);
-        if (hasImage && imageBaseUrl.isBlank()) {
-            throw new IllegalStateException("밸런스게임 이미지가 있으면 bibbidi.balance-game.image-base-url 설정이 필요합니다");
-        }
-        return imageBaseUrl.endsWith("/") ? imageBaseUrl.substring(0, imageBaseUrl.length() - 1) : imageBaseUrl;
-    }
 }

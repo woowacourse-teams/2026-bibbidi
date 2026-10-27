@@ -13,7 +13,7 @@ public record ChoiceData(
         String imagePath
 ) {
 
-    public Choice toChoice(String imageBaseUrl) {
-        return new Choice(id, text, imagePath == null ? null : imageBaseUrl + imagePath);
+    public Choice toChoice() {
+        return new Choice(id, text, imagePath);
     }
 }

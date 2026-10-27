@@ -15,9 +15,9 @@ public record QuestionData(
         @NotEmpty List<@NotNull @Valid ChoiceData> options
 ) {
 
-    public BalanceGameQuestion toQuestion(String imageBaseUrl) {
+    public BalanceGameQuestion toQuestion() {
         return new BalanceGameQuestion(id, order, question, options.stream()
-                .map(choice -> choice.toChoice(imageBaseUrl))
+                .map(ChoiceData::toChoice)
                 .toList());
     }
 }

@@ -27,7 +27,7 @@ public record BalanceGameQuestion(
     public record Choice(
             @NonNull String id,
             @NonNull String text,
-            @Nullable String imageUrl
+            @Nullable String imagePath
     ) {
     }
 }

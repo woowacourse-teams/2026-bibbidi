@@ -36,11 +36,11 @@ public record BalanceGameQuestionsResponse(
     public record ChoiceResponse(
             String id,
             String text,
-            String imageUrl
+            String imagePath
     ) {
 
         public static ChoiceResponse from(Choice choice) {
-            return new ChoiceResponse(choice.id(), choice.text(), choice.imageUrl());
+            return new ChoiceResponse(choice.id(), choice.text(), choice.imagePath());
         }
     }
 }

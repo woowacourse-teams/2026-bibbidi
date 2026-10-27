@@ -23,6 +23,7 @@ import com.bibbidi.wedding.support.AuthenticationTestSupport;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
 import jakarta.persistence.EntityManagerFactory;
+import java.util.stream.IntStream;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
@@ -56,19 +57,19 @@ class BalanceGameQuestionControllerIntegrationTest extends BibbidiIntegrationTes
                     .andExpect(jsonPath("$.questions[0].options[0].text")
                             .value("기본 촬영에 더해, 아이폰으로 생생한 현장 사진도 남길래."))
                     .andExpect(jsonPath("$.questions[0].options[2].text").value("아직 잘 모르겠어"))
-                    .andExpect(jsonPath("$.questions[*].options[*].imageUrl", hasSize(30)))
-                    .andExpect(jsonPath("$.questions[0].options[0].imageUrl")
-                            .value("https://images.test/balance-game/q01-a.webp"))
-                    .andExpect(jsonPath("$.questions[9].options[1].imageUrl")
-                            .value("https://images.test/balance-game/q10-b.webp"))
-                    .andExpect(jsonPath("$.questions[*].options[2].imageUrl", everyItem(nullValue())))
-                    .andExpect(jsonPath("$.questions[*].options[*].imagePath").doesNotExist())
+                    .andExpect(jsonPath("$.questions[*].options[*].imagePath", hasSize(30)))
+                    .andExpect(jsonPath("$.questions[*].options[0].imagePath", contains(imagePaths("a"))))
+                    .andExpect(jsonPath("$.questions[*].options[1].imagePath", contains(imagePaths("b"))))
+                    .andExpect(jsonPath("$.questions[*].options[2].imagePath", hasSize(10)))
+                    .andExpect(jsonPath("$.questions[*].options[2].imagePath", everyItem(nullValue())))
+                    .andExpect(jsonPath("$.questions[*].options[*].imageUrl").doesNotExist())
                     .andDo(document("balance-game-questions-find-all",
                             resource(ResourceSnippetParameters.builder()
                                     .tag("Balance Game")
                                     .summary("밸런스게임 전체 문항 조회")
                                     .description("로그인과 약관 동의가 필요합니다. 전체 문항은 order 오름차순으로, "
-                                            + "선택지는 문항 파일의 배열 순서로 반환합니다. 이미지가 없으면 imageUrl은 null입니다.")
+                                            + "선택지는 문항 파일의 배열 순서로 반환합니다. imagePath는 FE origin 기준의 경로이며, "
+                                            + "이미지가 없으면 null입니다.")
                                     .responseSchema(schema("BalanceGameQuestionsResponse"))
                                     .requestHeaders(headerWithName(AUTHORIZATION)
                                             .description(DOCUMENTED_AUTHORIZATION_HEADER))
@@ -81,8 +82,8 @@ class BalanceGameQuestionControllerIntegrationTest extends BibbidiIntegrationTes
                                             fieldWithPath("questions[].options[].id")
                                                     .description("선택지 ID. UNKNOWN은 아직 모르겠다는 선택"),
                                             fieldWithPath("questions[].options[].text").description("선택지 문구"),
-                                            fieldWithPath("questions[].options[].imageUrl").type(JsonFieldType.STRING)
-                                                    .description("실행 환경의 공개 도메인과 이미지 경로를 합친 URL. 이미지가 없으면 null")
+                                            fieldWithPath("questions[].options[].imagePath").type(JsonFieldType.STRING)
+                                                    .description("FE origin 기준 이미지 경로. 이미지가 없으면 null")
                                                     .optional())
                                     .build())));
             assertThat(statistics.getPrepareStatementCount()).isEqualTo(statementCount);
@@ -111,5 +112,11 @@ class BalanceGameQuestionControllerIntegrationTest extends BibbidiIntegrationTes
 
     private String bearerToken(UserStatus status) {
         return AuthenticationTestSupport.bearerTokenOf(tokenIssuer, 1L, "balance", status);
+    }
+
+    private static String[] imagePaths(String choice) {
+        return IntStream.rangeClosed(1, 10)
+                .mapToObj(order -> "/balance-game/q%02d-%s.webp".formatted(order, choice))
+                .toArray(String[]::new);
     }
 }
