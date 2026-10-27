@@ -2,6 +2,9 @@ package com.bibbidi.wedding.chat.adapter.ai.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.bibbidi.wedding.catalog.service.CatalogService;
 import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
@@ -9,26 +12,42 @@ import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
 import io.micrometer.observation.ObservationRegistry;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.bedrock.autoconfigure.BedrockAwsConnectionConfiguration;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.Ordered;
+import reactor.core.publisher.Flux;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 
 class AiChatConfigTest {
+
+    private final ToolCallingManager toolCallingManager = spy(ToolCallingManager.builder().build());
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(AiChatConfig.class)
             .withConfiguration(AutoConfigurations.of(BedrockAwsConnectionConfiguration.class))
             .withBean(ChatClient.Builder.class, () -> ChatClient.builder(mock(ChatModel.class)))
             .withBean(ObservationRegistry.class, ObservationRegistry::create)
-            .withBean(ToolCallingManager.class, () -> ToolCallingManager.builder().build())
+            .withBean(ToolCallingManager.class, () -> toolCallingManager)
             .withBean(SystemPrompt.class, SystemPrompt::new)
             .withBean(CatalogServiceAdapter.class, () -> new CatalogServiceAdapter(mock(CatalogService.class)))
             .withBean(ChecklistServiceAdapter.class, () -> mock(ChecklistServiceAdapter.class))
@@ -104,6 +123,43 @@ class AiChatConfigTest {
             assertThat(context).hasBean("qwenChatClient");
             assertThat(context).hasBean("lunaChatClient");
             assertThat(context).hasBean("solBedrockCredentialsProvider");
+        });
+    }
+
+    @Test
+    void qwenUsesTheConfiguredToolCallingManagerThroughItsAdvisor() {
+        AtomicInteger modelCalls = new AtomicInteger();
+        StreamAdvisor model = new StreamAdvisor() {
+            @Override
+            public Flux<ChatClientResponse> adviseStream(ChatClientRequest request, StreamAdvisorChain chain) {
+                AssistantMessage message = modelCalls.getAndIncrement() == 0
+                        ? AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+                                "read-1", "function", "getMyChecklist", "{}"))).build()
+                        : new AssistantMessage("답변");
+                return Flux.just(ChatClientResponse.builder()
+                        .chatResponse(new ChatResponse(List.of(new Generation(message))))
+                        .context(request.context()).build());
+            }
+
+            @Override
+            public String getName() {
+                return "Test model";
+            }
+
+            @Override
+            public int getOrder() {
+                return Ordered.LOWEST_PRECEDENCE - 1;
+            }
+        };
+        accountsEnabledRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            context.getBean("qwenChatClient", ChatClient.class).prompt().user("체크리스트 조회")
+                    .toolContext(Map.of("userId", 7L))
+                    .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, "qwen-test"))
+                    .advisors(model).stream().chatResponse().blockLast();
+
+            assertThat(modelCalls).hasValue(2);
+            verify(toolCallingManager).executeToolCalls(any(Prompt.class), any(ChatResponse.class));
         });
     }
 
