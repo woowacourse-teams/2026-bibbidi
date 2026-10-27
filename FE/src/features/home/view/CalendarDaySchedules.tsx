@@ -1,10 +1,9 @@
-import { Badge } from "../../../components/badge";
 import { Button } from "../../../components/button";
 import { ListHeader } from "../../../components/list-header";
 import { ListRow } from "../../../components/list-row";
 import type { CalendarScheduleModel } from "../model/calendarSchedule";
 
-import "./CalendarDaySchedules.css";
+import "./CalendarList.css";
 
 export function CalendarDaySchedules({
   date,
@@ -19,28 +18,25 @@ export function CalendarDaySchedules({
   onSelect: (id: number) => void;
   onRetry?: () => void;
 }) {
+  const [year, month, day] = date.split("-").map(Number);
+
   return (
     <section
-      className="calendar-day-schedules"
+      className="calendar-list-section"
       aria-labelledby="selected-date-title"
     >
       <ListHeader
-        headingLevel={3}
         titleId="selected-date-title"
-        title={`${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 일정`}
-        right={
-          status === "complete" && (
-            <Badge color="dark" size="xsmall">
-              {schedules.length}개
-            </Badge>
-          )
+        title={
+          <time dateTime={date}>
+            {year}년 {month}월 {day}일 일정
+          </time>
         }
-        description={<time dateTime={date}>{date.slice(0, 4)}년</time>}
       />
       {status === "loading" ? (
         <ListRow.Loader type="bar" aria-label="일정을 불러오는 중이에요." />
       ) : status === "error" ? (
-        <div className="calendar-day-schedules__feedback" role="alert">
+        <div className="calendar-list-feedback" role="alert">
           <p>일정을 확인하지 못했어요.</p>
           {onRetry && (
             <Button size="small" color="dark" variant="weak" onClick={onRetry}>
@@ -49,11 +45,9 @@ export function CalendarDaySchedules({
           )}
         </div>
       ) : schedules.length === 0 ? (
-        <p className="calendar-day-schedules__empty">
-          이 날짜에 등록된 일정이 없어요.
-        </p>
+        <p className="calendar-list-empty">이 날짜에 등록된 일정이 없어요.</p>
       ) : (
-        <ul>
+        <ul className="calendar-list-items">
           {schedules.map((schedule, index) => (
             <li key={schedule.id}>
               <ListRow

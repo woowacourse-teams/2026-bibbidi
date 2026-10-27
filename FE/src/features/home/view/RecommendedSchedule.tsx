@@ -1,12 +1,11 @@
-import { Link } from "react-router";
-import { Badge } from "../../../components/badge";
 import { Button } from "../../../components/button";
 import { ListHeader } from "../../../components/list-header";
 import { ListRow } from "../../../components/list-row";
 import { PlusIcon } from "../../../components/icons/ActionIcons";
 
 import { RecommendedScheduleViewModel } from "../view-model/createRecommendedScheduleViewModel";
-import "./RecommendedSchedule.css";
+import { CalendarSectionLink } from "./CalendarSectionLink";
+import "./CalendarList.css";
 
 interface RecommendedScheduleProps {
   onAddTask: (catalogItemId: number) => void;
@@ -20,14 +19,18 @@ export function RecommendedSchedule({
   return (
     <section
       aria-labelledby="recommended-schedule-title"
-      className="calendar-recommendations"
+      className="calendar-list-section"
     >
       <ListHeader
         titleId="recommended-schedule-title"
         title={viewModel.title}
-        right={<Link to="/preparation">로드맵 전체 보기 ›</Link>}
+        right={
+          <CalendarSectionLink to="/preparation">
+            로드맵 전체 보기
+          </CalendarSectionLink>
+        }
       />
-      <ul>
+      <ul className="calendar-list-items">
         {viewModel.items.map((item, index) => (
           <li key={item.catalogItemId}>
             <ListRow
@@ -39,11 +42,7 @@ export function RecommendedSchedule({
                       {item.title}
                     </span>
                   }
-                  bottom={
-                    <Badge color="dark" size="xsmall">
-                      {item.categoryLabel}
-                    </Badge>
-                  }
+                  bottom={item.categoryLabel}
                 />
               }
               right={
@@ -57,7 +56,7 @@ export function RecommendedSchedule({
                   onClick={() => onAddTask(item.catalogItemId)}
                 >
                   {item.addActionLabel === "내 할 일에 추가" && (
-                    <PlusIcon size={14} />
+                    <PlusIcon size={16} />
                   )}
                   {item.addActionLabel === "내 할 일에 추가"
                     ? "추가"
@@ -66,7 +65,7 @@ export function RecommendedSchedule({
               }
             />
             {item.additionErrorMessage && (
-              <p className="calendar-recommendations__error" role="alert">
+              <p className="calendar-list-error" role="alert">
                 {item.additionErrorMessage}
               </p>
             )}

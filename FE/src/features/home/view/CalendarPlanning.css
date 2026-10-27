@@ -16,80 +16,6 @@
   border-top: 1px solid var(--color-stroke-neutral-weak);
 }
 
-.calendar-planning__card {
-  min-width: 0;
-  padding-block: 12px;
-}
-
-.calendar-planning .bibbidi-list-header-right a,
-.calendar-planning__card > a {
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-.calendar-planning .bibbidi-list-header-right a {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-}
-
-.calendar-planning a:hover {
-  text-decoration: underline;
-}
-
-.calendar-planning a:focus-visible {
-  outline: 2px solid var(--color-stroke-focus-ring);
-  outline-offset: 2px;
-}
-
-.calendar-planning .bibbidi-list-header-title .bibbidi-badge {
-  margin-inline-start: 4px;
-  vertical-align: middle;
-}
-
-.calendar-planning__empty,
-.calendar-planning__feedback,
-.calendar-planning__card > p {
-  margin: 0;
-  padding: 12px 24px;
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
-  overflow-wrap: anywhere;
-}
-
-.calendar-planning__empty p,
-.calendar-planning__feedback p {
-  margin: 0;
-}
-
-.calendar-planning__empty p + p,
-.calendar-planning__feedback .bibbidi-button {
-  margin-top: 8px;
-}
-
-.calendar-planning__feedback[role="alert"] {
-  color: var(--color-fg-critical);
-}
-
-.calendar-planning__tasks {
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.calendar-planning__card > a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  margin-inline: 24px;
-}
-
-.calendar-planning__retry {
-  margin: 0 24px 12px;
-}
-
 @media (width < 768px) {
   .calendar-planning {
     gap: 20px;
@@ -108,11 +34,30 @@
   border-radius: var(--radius-lg);
   background: var(--color-bg-layer-default);
 }
+
+.calendar-planning__calendar {
+  --calendar-sticky-enabled: 0;
+  --calendar-bottom-gap: var(--layout-gutter-desktop);
+  min-width: 0;
+  top: calc(
+    var(--app-layout-header-height, 0px) + var(--layout-gutter-desktop)
+  );
+}
+
 @media (min-width: 1280px) {
   @container calendar-planning (min-width: 984px) {
     .calendar-planning__layout {
       grid-template-columns: minmax(0, 1fr) var(--layout-width-detail);
       gap: var(--layout-gutter-desktop);
+    }
+
+    .calendar-planning__calendar {
+      --calendar-sticky-enabled: 1;
+    }
+
+    .calendar-planning__calendar[data-calendar-sticky="true"] {
+      position: sticky;
+      align-self: start;
     }
   }
 }

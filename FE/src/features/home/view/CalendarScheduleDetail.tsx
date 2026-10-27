@@ -1,8 +1,9 @@
 import { useHref, useLinkClickHandler } from "react-router";
 import { Button } from "../../../components/button";
 import { Dialog } from "../../../components/dialog";
+import { ListRow } from "../../../components/list-row";
 
-import { CalendarScheduleModel } from "../model/calendarSchedule";
+import type { CalendarScheduleModel } from "../model/calendarSchedule";
 import "./CalendarScheduleDetail.css";
 
 interface CalendarScheduleDetailProps {
@@ -20,6 +21,29 @@ export function CalendarScheduleDetail({
   const [year, month, day] = schedule.date.split("-").map(Number);
   const startTime = schedule.startTime?.slice(11, 16);
   const endTime = schedule.endTime?.slice(11, 16);
+  const properties = [
+    {
+      term: "날짜",
+      description: (
+        <time dateTime={schedule.date}>
+          {year}년 {month}월 {day}일
+        </time>
+      ),
+    },
+    {
+      term: "시간",
+      description: startTime
+        ? `${startTime}${endTime ? ` – ${endTime}` : ""}`
+        : "시간 미정",
+    },
+    {
+      term: "할 일",
+      description:
+        schedule.taskTitle !== schedule.title ? schedule.taskTitle : null,
+    },
+    { term: "장소", description: schedule.place },
+    { term: "메모", description: schedule.memo },
+  ].filter((property) => property.description);
 
   return (
     <Dialog
@@ -27,42 +51,6 @@ export function CalendarScheduleDetail({
       className="calendar-schedule-detail"
       title={<Dialog.Title>{schedule.title}</Dialog.Title>}
       onClose={onClose}
-      description={
-        <dl>
-          <div>
-            <dt>날짜</dt>
-            <dd>
-              {year}년 {month}월 {day}일
-            </dd>
-          </div>
-          <div>
-            <dt>시간</dt>
-            <dd>
-              {startTime
-                ? `${startTime}${endTime ? ` – ${endTime}` : ""}`
-                : "시간 미정"}
-            </dd>
-          </div>
-          {schedule.taskTitle && schedule.taskTitle !== schedule.title && (
-            <div>
-              <dt>할 일</dt>
-              <dd>{schedule.taskTitle}</dd>
-            </div>
-          )}
-          {schedule.place && (
-            <div>
-              <dt>장소</dt>
-              <dd>{schedule.place}</dd>
-            </div>
-          )}
-          {schedule.memo && (
-            <div>
-              <dt>메모</dt>
-              <dd>{schedule.memo}</dd>
-            </div>
-          )}
-        </dl>
-      }
       actions={
         <>
           <div>
@@ -90,6 +78,27 @@ export function CalendarScheduleDetail({
           )}
         </>
       }
-    />
+    >
+      <dl className="calendar-schedule-detail__properties">
+        {properties.map((property, index) => (
+          <ListRow.Description
+            key={property.term}
+            className="calendar-schedule-detail__property"
+            horizontalPadding="none"
+            border={index === 0 ? "none" : "indented"}
+            term={
+              <span className="calendar-schedule-detail__term">
+                {property.term}
+              </span>
+            }
+            description={
+              <span className="calendar-schedule-detail__value">
+                {property.description}
+              </span>
+            }
+          />
+        ))}
+      </dl>
+    </Dialog>
   );
 }

@@ -1,4 +1,5 @@
 import { SCHEDULE_YEAR_RANGE } from "../../../shared/date/scheduleDate";
+import { monthLabel } from "../../../shared/date/calendarDate";
 import { useRef, useState } from "react";
 import { BottomSheet } from "../../../components/bottom-sheet";
 import { Button } from "../../../components/button";
@@ -22,7 +23,7 @@ export function CalendarMonthSelector({
     open: false,
     month: `${value.slice(0, 7)}-01`,
   });
-  const monthLabel = `${Number(value.slice(0, 4))}년 ${Number(value.slice(5, 7))}월`;
+  const label = monthLabel(value);
 
   function changeOpen(open: boolean) {
     setState((current) =>
@@ -45,9 +46,9 @@ export function CalendarMonthSelector({
       ref={triggerRef}
       type="button"
       className="calendar-month-selector-trigger"
-      aria-label={`${monthLabel}, 연·월 선택`}
+      aria-label={`${label}, 연·월 선택`}
     >
-      {monthLabel}
+      {label}
       <ChevronDown size={16} aria-hidden="true" />
     </button>
   );

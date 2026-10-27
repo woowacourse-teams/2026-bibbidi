@@ -23,6 +23,12 @@
 
 헤더와 행은 같은 좌우 여백을 사용한다. 부모가 여백을 제공하지 않으면 기본 `medium`을, 패널 본문처럼 부모가 여백을 제공하면 둘 다 `none`을 사용한다. 섹션의 `aria-labelledby`, 일정 개수와 권한·이벤트·포커스 복귀는 화면에서 연결한다. 체크리스트 상세의 ‘할 일 정보’와 ‘일정 N개’에 적용하며 패널 전체 제목은 `Panel.Header`가 담당한다.
 
+## ListFooter
+
+목록 바로 아래에서 추가 조회·펼치기·접기를 실행하는 네이티브 버튼이다. `icon`, `border`, `horizontalPadding`, `loading`, `disabled`와 표준 button 속성·ref를 디자인 시스템과 같은 의미로 지원한다. 헤더·행과 같은 좌우 여백을 사용하고, 내부 클래스에 의존해 외형을 덮어쓰지 않는다. loading과 aria-disabled는 포커스를 유지하며 실행을 막고, disabled는 Tab 순서에서 제외한다.
+
+캘린더의 ‘날짜를 정할 일’은 기본 3개를 표시하고 ListFooter로 나머지를 같은 목록 안에서 펼치고 접는다. `aria-controls`로 목록을 연결하고 `aria-expanded`로 상태를 전달한다. 개수·펼침 상태·표시 여부는 화면에서 관리한다. 체크리스트 이동은 상단의 ‘내 할 일 전체 보기’ 링크가 담당한다.
+
 ## TextField
 
 공통으로 기본 입력·Button, label·help·hasError·labelHidden, 폼과 접근성 연결을 지원한다. labelHidden은 값이 있어도 시각적 라벨을 숨기며 접근성 이름을 유지한다. Button의 required는 필수 표시·설명을 제공하고, 선택값 검증과 제출 차단은 사용처가 맡는다.

@@ -1,18 +1,17 @@
-.calendar-schedule-detail dl {
-  display: grid;
-  gap: 16px;
-  margin: 16px 0 0;
-  font-size: 16px;
+.calendar-schedule-detail__properties {
+  margin: 12px 0 0;
 }
 
-.calendar-schedule-detail dl > div {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 12px;
+.calendar-schedule-detail__property {
+  align-items: flex-start;
 }
 
-.calendar-schedule-detail dd {
-  margin: 0;
-  color: var(--color-fg-neutral);
+.calendar-schedule-detail__term {
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+
+.calendar-schedule-detail__value {
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

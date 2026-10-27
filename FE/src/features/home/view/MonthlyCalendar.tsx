@@ -1,4 +1,5 @@
 import { IconButton } from "../../../components/icon-button";
+import type { Ref } from "react";
 import { ChevronLeft, ChevronRight } from "../../../components/icons/Chevron";
 import {
   addDays,
@@ -15,6 +16,7 @@ import "./MonthlyCalendar.css";
 const DAYS_OF_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 
 interface MonthlyCalendarProps {
+  ref?: Ref<HTMLElement>;
   referenceDate: string;
   selectedDate: string;
   schedulesByDate: ReadonlyMap<string, readonly CalendarScheduleModel[]>;
@@ -25,6 +27,7 @@ interface MonthlyCalendarProps {
 
 /** Calendar display; the planning screen owns selection and adjacent content. */
 export function MonthlyCalendar({
+  ref,
   referenceDate,
   selectedDate,
   schedulesByDate,
@@ -42,6 +45,7 @@ export function MonthlyCalendar({
   );
   return (
     <section
+      ref={ref}
       aria-labelledby="monthly-calendar-title"
       className="monthly-calendar"
     >
@@ -134,19 +138,21 @@ export function MonthlyCalendar({
                       >
                         {visibleSchedules.map((schedule) => (
                           <li key={schedule.id}>
-                            <span
-                              aria-hidden="true"
-                              className="monthly-calendar__schedule-dot"
-                            />
                             {!isMobileLayout ? (
                               <button
                                 type="button"
-                                className="monthly-calendar__schedule-title"
+                                className="monthly-calendar__schedule-button"
                                 onClick={() => onSelectSchedule(schedule.id)}
                                 title={schedule.title}
                               >
-                                {schedule.startTime?.slice(11, 16)}{" "}
-                                {schedule.title}
+                                <span
+                                  aria-hidden="true"
+                                  className="monthly-calendar__schedule-dot"
+                                />
+                                <span className="monthly-calendar__schedule-title">
+                                  {schedule.startTime?.slice(11, 16)}{" "}
+                                  {schedule.title}
+                                </span>
                               </button>
                             ) : (
                               <span className="monthly-calendar__schedule-title">

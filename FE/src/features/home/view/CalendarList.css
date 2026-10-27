@@ -1,0 +1,71 @@
+.calendar-list-section {
+  min-width: 0;
+  padding-block: 12px;
+}
+
+.calendar-section-link {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 4px;
+  padding-block: 4px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.calendar-section-link svg {
+  flex: none;
+}
+
+.calendar-section-link:hover {
+  text-decoration: underline;
+}
+
+.calendar-section-link:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 4px;
+}
+
+.calendar-list-items {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.calendar-list-empty,
+.calendar-list-feedback {
+  margin: 0;
+  padding: 12px 24px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.calendar-list-empty p,
+.calendar-list-feedback p {
+  margin: 0;
+}
+
+.calendar-list-empty p + p,
+.calendar-list-feedback .bibbidi-button {
+  margin-top: 8px;
+}
+
+.calendar-list-feedback[role="alert"],
+.calendar-list-error {
+  color: var(--color-fg-critical);
+}
+
+.calendar-list-error {
+  margin: 0;
+  padding: 0 24px 12px;
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}

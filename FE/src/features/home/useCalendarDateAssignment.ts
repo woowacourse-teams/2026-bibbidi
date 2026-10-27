@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
-import type { ChecklistQueryModel } from "../checklist";
-import {
+import type {
   CalendarPlanningLoadState,
   CalendarPlanningTask,
-  createCalendarPlanningModel,
 } from "./model/calendarPlanning";
 
 export function useCalendarDateAssignment({
   audience,
-  checklist,
+  checklistStatus,
+  tasks,
   refreshChecklist,
 }: {
   audience: "guest" | "authenticated" | undefined;
-  checklist: CalendarPlanningLoadState<ChecklistQueryModel>;
+  checklistStatus: CalendarPlanningLoadState<unknown>["status"];
+  tasks: readonly CalendarPlanningTask[];
   refreshChecklist: () => void;
 }) {
   const [selectedTask, setSelectedTask] = useState<CalendarPlanningTask | null>(
@@ -32,11 +32,11 @@ export function useCalendarDateAssignment({
   useEffect(() => {
     if (
       audience !== "authenticated" ||
-      checklist.status !== "complete" ||
+      checklistStatus !== "complete" ||
       !pendingCatalogId
     )
       return;
-    const task = createCalendarPlanningModel(checklist.data).tasks.find(
+    const task = tasks.find(
       (item) => String(item.sourceCatalogItemId) === pendingCatalogId,
     );
     let active = true;
@@ -55,7 +55,7 @@ export function useCalendarDateAssignment({
     return () => {
       active = false;
     };
-  }, [audience, checklist, pendingCatalogId, setSearchParams]);
+  }, [audience, checklistStatus, tasks, pendingCatalogId, setSearchParams]);
   const closeDate = useCallback(() => setSelectedTask(null), []);
   const onSaved = useCallback(
     (date: string) => {

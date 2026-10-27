@@ -179,7 +179,7 @@ beforeEach(() => {
   };
 });
 describe("calendar planning", () => {
-  it("이미 담은 항목, 완료한 항목, 일정이 있는 항목을 구분해 실제 개수를 표시한다", async () => {
+  it("이미 담은 항목, 완료한 항목, 일정이 있는 항목을 구분해 날짜 미정 항목을 표시한다", async () => {
     checklist.categories[0].items = [
       task(1, 101),
       task(2, 102, [], "done"),
@@ -197,10 +197,10 @@ describe("calendar planning", () => {
       ]),
     ];
     mount();
-    const undated = await screen.findByRole("region", {
-      name: "날짜를 정할 일 1개",
+    const undated = screen.getByRole("region", {
+      name: "날짜를 정할 일",
     });
-    expect(within(undated).getByText("내 할 일 1")).toBeTruthy();
+    expect(await within(undated).findByText("내 할 일 1")).toBeTruthy();
     expect(within(undated).queryByText("내 할 일 2")).toBeNull();
     expect(screen.queryByRole("heading", { name: "웨딩홀 투어" })).toBeNull();
     expect(screen.queryByText("다가오는 일정")).toBeNull();
@@ -222,9 +222,11 @@ describe("calendar planning", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "내 할 일에 추가" }),
     );
-    await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
+
     expect(screen.queryByText("내 할 일에 추가했어요.")).toBeNull();
-    await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
+    await within(
+      screen.getByRole("region", { name: "날짜를 정할 일" }),
+    ).findByRole("heading", { name: "웨딩홀 투어" });
     expect(
       screen.queryByRole("button", { name: "내 할 일에 추가" }),
     ).toBeNull();
@@ -270,13 +272,13 @@ describe("calendar planning", () => {
     setAuth("guest");
     mount();
     await screen.findByRole("heading", { name: "웨딩홀 투어" });
-    const undated = screen.getByRole("region", { name: "날짜를 정할 일 0개" });
+    const undated = screen.getByRole("region", { name: "날짜를 정할 일" });
     expect(
       within(undated).getByText(/로그인하면 담은 할 일에 날짜를 정하고/),
     ).toBeTruthy();
     expect(
       within(undated)
-        .getByRole("link", { name: "로그인하고 일정 관리하기 ›" })
+        .getByRole("link", { name: "로그인하고 일정 관리하기" })
         .getAttribute("href"),
     ).toBe("/login?returnTo=%2Fcalendar");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -285,9 +287,9 @@ describe("calendar planning", () => {
     expect(screen.queryByText(/추천에서 담기/)).toBeNull();
     expect(screen.queryByText("웨딩홀 정하기")).toBeNull();
     expect(
-      within(screen.getByRole("region", { name: "10월 5일 일정" })).getByText(
-        "이 날짜에 등록된 일정이 없어요.",
-      ),
+      within(
+        screen.getByRole("region", { name: "2026년 10월 5일 일정" }),
+      ).getByText("이 날짜에 등록된 일정이 없어요."),
     ).toBeTruthy();
   });
   it("비로그인도 담기 이후 일정 추가를 선택하면 항목을 보존한 인증 경로를 제공한다", async () => {
@@ -307,10 +309,12 @@ describe("calendar planning", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "내 할 일에 추가" }),
     );
-    await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
+    await within(
+      screen.getByRole("region", { name: "날짜를 정할 일" }),
+    ).findByRole("heading", { name: "웨딩홀 투어" });
     expect(screen.queryByText("내 할 일에 추가했어요.")).toBeNull();
     const undated = await screen.findByRole("region", {
-      name: "날짜를 정할 일 1개",
+      name: "날짜를 정할 일",
     });
     expect(
       within(undated).getByRole("heading", { name: "웨딩홀 투어" }),
@@ -352,7 +356,9 @@ describe("calendar planning", () => {
     await waitFor(() =>
       expect(command.createAppointment).toHaveBeenCalledTimes(1),
     );
-    await screen.findByRole("region", { name: "날짜를 정할 일 0개" });
+    await within(
+      screen.getByRole("region", { name: "날짜를 정할 일" }),
+    ).findByText("날짜를 정할 할 일이 없어요.");
     await screen.findByRole("table", { name: "2026년 11월 달력" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.activeElement).toBe(
@@ -360,7 +366,7 @@ describe("calendar planning", () => {
         .getByRole("heading", { name: "내 준비 일정", level: 1 })
         .closest("header"),
     );
-    const day = screen.getByRole("region", { name: "11월 12일 일정" });
+    const day = screen.getByRole("region", { name: "2026년 11월 12일 일정" });
     fireEvent.click(within(day).getByRole("button"));
     expect(
       within(screen.getByRole("dialog")).getByRole("link").getAttribute("href"),
@@ -460,7 +466,7 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     );
   });
 
-  it("날짜 없는 목록은 조회 순서대로 최대 3개를 표시하고 나머지는 체크리스트로 연결한다", async () => {
+  it("날짜 없는 목록은 조회 순서대로 3개를 표시하고 푸터로 나머지를 펼치고 접는다", async () => {
     checklist.categories[0].items = [
       task(4, 104),
       task(3, 103),
@@ -468,9 +474,10 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
       task(1, 100),
     ];
     mount();
-    const region = await screen.findByRole("region", {
-      name: "날짜를 정할 일 4개",
+    const region = screen.getByRole("region", {
+      name: "날짜를 정할 일",
     });
+    await within(region).findByRole("heading", { name: "내 할 일 4" });
     expect(
       within(region)
         .getAllByRole("heading", { level: 3 })
@@ -479,9 +486,33 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     expect(within(region).queryByText("내 할 일 1")).toBeNull();
     expect(
       within(region)
-        .getByRole("link", { name: "나머지 1개 전체 보기" })
+        .getByRole("link", { name: "내 할 일 전체 보기" })
         .getAttribute("href"),
     ).toBe("/checklist");
+
+    const more = within(region).getByRole("button", {
+      name: "날짜를 정할 일 나머지 1개 더 보기",
+    });
+    const list = document.getElementById(more.getAttribute("aria-controls")!);
+    expect(list?.tagName).toBe("UL");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    const queryCount = query.getChecklist.mock.calls.length;
+    more.focus();
+    fireEvent.click(more);
+    expect(
+      within(region)
+        .getAllByRole("heading", { level: 3 })
+        .map((node) => node.textContent),
+    ).toEqual(["내 할 일 4", "내 할 일 3", "내 할 일 2", "내 할 일 1"]);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(more);
+    fireEvent.click(
+      within(region).getByRole("button", { name: "날짜를 정할 일 접기" }),
+    );
+    expect(within(region).queryByText("내 할 일 1")).toBeNull();
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(more);
+    expect(query.getChecklist).toHaveBeenCalledTimes(queryCount);
   });
 
   it("조회 중에는 빈 상태를 표시하지 않고 응답 이후 실제 목록으로 전환한다", async () => {
@@ -498,7 +529,9 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     ).toBeTruthy();
     expect(screen.queryByText("지금 추가할 추천 항목이 없어요.")).toBeNull();
     await act(async () => request.resolve(checklist));
-    await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
+    await within(
+      screen.getByRole("region", { name: "날짜를 정할 일" }),
+    ).findByRole("heading", { name: "내 할 일 1" });
     expect(
       screen.queryByRole("status", { name: "내 할 일을 불러오는 중" }),
     ).toBeNull();
@@ -511,9 +544,7 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
     expect(
       screen.queryByText("아래 추천에서 필요한 준비를 담아보세요."),
     ).toBeNull();
-    expect(
-      screen.getByRole("region", { name: "날짜를 정할 일 0개" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "날짜를 정할 일" })).toBeTruthy();
   });
 
   it("추천 조회 중 상태를 표시하고 API 순서를 유지한 목록으로 전환한다", async () => {
@@ -603,7 +634,9 @@ describe("캘린더의 기존 조회·인증·비동기 회귀 계약", () => {
       recommended.getRecommendedCatalogItems.mock.calls.length;
     query.getChecklist.mockResolvedValue(checklist);
     fireEvent.click(within(region).getByRole("button", { name: "다시 시도" }));
-    await screen.findByRole("region", { name: "날짜를 정할 일 1개" });
+    await within(
+      screen.getByRole("region", { name: "날짜를 정할 일" }),
+    ).findByRole("heading", { name: "내 할 일 1" });
     expect(recommended.getRecommendedCatalogItems).toHaveBeenCalledTimes(
       recommendationCount,
     );
