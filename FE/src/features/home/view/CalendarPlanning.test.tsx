@@ -1,8 +1,17 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryRouter } from "react-router";
 
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
+import { installMatchMedia } from "../../../test/matchMedia";
 import type { ComponentProps } from "react";
 import { CalendarPlanning } from "./CalendarPlanning";
 
@@ -45,6 +54,81 @@ function CalendarPlanningHarness({
 afterEach(() => vi.unstubAllGlobals());
 
 describe("CalendarPlanning", () => {
+  it.each([
+    ["0005-01-01", "5년 1월 달력", "5년 1월 1일, 오늘"],
+    ["0099-12-31", "99년 12월 달력", "99년 12월 31일, 오늘"],
+  ])("%s의 연도를 1900년대로 바꾸지 않는다", (referenceDate, heading, date) => {
+    render(<CalendarPlanningHarness referenceDate={referenceDate} />);
+    expect(screen.getByRole("table", { name: heading })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: date }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "다음 달" }));
+    expect(
+      screen.getByRole("table", {
+        name: referenceDate.startsWith("0099")
+          ? "100년 1월 달력"
+          : "5년 2월 달력",
+      }),
+    ).toBeTruthy();
+  });
+
+  it.each([
+    ["0001-01-01", "이전 달"],
+    ["9999-12-31", "다음 달"],
+  ])(
+    "%s에서 지원 범위 밖 월 이동과 날짜 선택을 막는다",
+    (referenceDate, direction) => {
+      render(<CalendarPlanningHarness referenceDate={referenceDate} />);
+      const navigation = screen.getByRole("button", {
+        name: direction,
+      }) as HTMLButtonElement;
+      expect(navigation.disabled).toBe(true);
+      fireEvent.click(navigation);
+      const cells = within(screen.getByRole("table")).getAllByRole("cell");
+      expect(cells).toHaveLength(42);
+      expect(cells.some((cell) => cell.childElementCount === 0)).toBe(true);
+      expect(
+        document.querySelector(
+          'time[datetime^="0000"], time[datetime^="10000"]',
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it.each([false, true])(
+    "모바일 여부 %s에서 2200년 일정과 연·월 선택 값을 일치시킨다",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(
+        <CalendarPlanningHarness
+          referenceDate="2026-10-27"
+          focusDate="2200-06-30"
+          focusDateRevision={1}
+        />,
+      );
+      const trigger = await screen.findByRole("button", {
+        name: "2200년 6월, 연·월 선택",
+      });
+      fireEvent.click(trigger);
+      const picker = screen.getByRole("dialog", { name: "연·월 선택" });
+      expect(
+        within(picker).getByRole("option", { name: "2200년", selected: true }),
+      ).toBeTruthy();
+      expect(
+        within(picker).getByRole("option", { name: "6월", selected: true }),
+      ).toBeTruthy();
+      fireEvent.click(within(picker).getByRole("button", { name: "이동" }));
+      expect(
+        screen.getByRole("region", { name: "6월 30일 일정" }),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("table", { name: "2200년 6월 달력" }),
+      ).toBeTruthy();
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+    },
+  );
+
   it("일요일 시작 6주 그리드에 앞뒤 달 날짜와 오늘을 표시한다", () => {
     render(<CalendarPlanningHarness referenceDate="2026-09-16" />);
 
@@ -262,5 +346,130 @@ describe("CalendarPlanning", () => {
     expect(within(region).queryByText("0개")).toBeNull();
     fireEvent.click(within(region).getByRole("button", { name: "다시 시도" }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])(
+    "모바일 여부 %s에서 DatePicker의 연·월 선택만 사용하고 이동 시 말일을 보정한다",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(<CalendarPlanningHarness referenceDate="2026-01-31" />);
+      const trigger = screen.getByRole("button", {
+        name: "2026년 1월, 연·월 선택",
+      });
+      fireEvent.click(trigger);
+      const picker = screen.getByRole("dialog", { name: "연·월 선택" });
+      expect(picker.getAttribute("aria-modal")).toBe(String(mobile));
+      expect(within(picker).queryByRole("grid")).toBeNull();
+      expect(within(picker).queryByRole("gridcell")).toBeNull();
+      expect(within(picker).getAllByRole("listbox")).toHaveLength(2);
+      fireEvent.click(
+        within(within(picker).getByRole("listbox", { name: "연도" })).getByRole(
+          "option",
+          { name: "2028년" },
+        ),
+      );
+      fireEvent.click(
+        within(within(picker).getByRole("listbox", { name: "월" })).getByRole(
+          "option",
+          { name: "2월" },
+        ),
+      );
+      expect(
+        screen.getByRole("table", { name: "2026년 1월 달력" }),
+      ).toBeTruthy();
+      fireEvent.click(within(picker).getByRole("button", { name: "이동" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "연·월 선택" })).toBeNull(),
+      );
+      expect(
+        screen
+          .getByRole("button", { name: "2028년 2월 29일" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(
+        screen.getByRole("region", { name: "2월 29일 일정" }),
+      ).toBeTruthy();
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    },
+  );
+
+  it.each([false, true])(
+    "모바일 여부 %s에서 연·월 선택 취소와 재열기는 기존 날짜를 유지한다",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(<CalendarPlanningHarness referenceDate="2026-09-16" />);
+      const trigger = screen.getByRole("button", {
+        name: "2026년 9월, 연·월 선택",
+      });
+      fireEvent.click(trigger);
+      let picker = screen.getByRole("dialog", { name: "연·월 선택" });
+      const year = within(
+        within(picker).getByRole("listbox", { name: "연도" }),
+      ).getByRole("option", { name: "2027년" });
+      fireEvent.click(year);
+      fireEvent.keyDown(year, { key: "Escape" });
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "연·월 선택" })).toBeNull(),
+      );
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(
+        screen
+          .getByRole("button", { name: "2026년 9월 16일, 오늘" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+      fireEvent.click(trigger);
+      picker = screen.getByRole("dialog", { name: "연·월 선택" });
+      expect(
+        within(picker)
+          .getByRole("option", { name: "2026년" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      expect(
+        within(picker)
+          .getByRole("option", { name: "9월" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      fireEvent.click(
+        within(picker).getByRole("button", { name: "연·월 선택 닫기" }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "연·월 선택" })).toBeNull(),
+      );
+    },
+  );
+
+  it("열린 연·월 선택을 PC와 모바일 전환 시 유지하고 기존 일자로 이동한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
+    render(<CalendarPlanningHarness referenceDate="2026-09-16" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "2026년 9월, 연·월 선택" }),
+    );
+    let picker = screen.getByRole("dialog", { name: "연·월 선택" });
+    fireEvent.click(within(picker).getByRole("option", { name: "2027년" }));
+    fireEvent.click(within(picker).getByRole("option", { name: "12월" }));
+    await act(async () => media.setMatches(true));
+    picker = screen.getByRole("dialog", { name: "연·월 선택" });
+    expect(picker.getAttribute("aria-modal")).toBe("true");
+    expect(
+      within(picker)
+        .getByRole("option", { name: "2027년" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      within(picker)
+        .getByRole("option", { name: "12월" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(within(picker).queryByRole("grid")).toBeNull();
+    await act(async () => media.setMatches(false));
+    picker = screen.getByRole("dialog", { name: "연·월 선택" });
+    expect(picker.getAttribute("aria-modal")).toBe("false");
+    fireEvent.click(within(picker).getByRole("button", { name: "이동" }));
+    expect(
+      screen
+        .getByRole("button", { name: "2027년 12월 16일" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });

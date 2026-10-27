@@ -1,3 +1,4 @@
+import { SCHEDULE_YEAR_RANGE } from "../../../shared/date/scheduleDate";
 import { useAppointmentFormView } from "../useAppointmentFormView";
 import { Button } from "../../../components/button";
 import { TextField } from "../../../components/text-field";
@@ -106,7 +107,7 @@ export function AppointmentForm({
         id={`${idPrefix}-date`}
         label="날짜"
         kind="date"
-        yearRange={{ start: 1, end: 9999 }}
+        yearRange={SCHEDULE_YEAR_RANGE}
         required
         value={controller.draft.date}
         disabled={pending}

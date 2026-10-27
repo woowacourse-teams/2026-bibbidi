@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { addMonths, isDate } from "../../components/date-picker/date-utils";
+import {
+  addMonths,
+  getDateBounds,
+  isDate,
+} from "../../shared/date/calendarDate";
+import { SCHEDULE_YEAR_RANGE } from "../../shared/date/scheduleDate";
 
 export function useCalendarSelection(
   referenceDate: string,
@@ -22,7 +27,11 @@ export function useCalendarSelection(
       (year - Number(selectedDate.slice(0, 4))) * 12 +
       monthIndex -
       (Number(selectedDate.slice(5, 7)) - 1);
-    setSelectedDate(addMonths(selectedDate, offset));
+    const { clamp } = getDateBounds({
+      today: referenceDate,
+      yearRange: SCHEDULE_YEAR_RANGE,
+    });
+    setSelectedDate(clamp(addMonths(selectedDate, offset)));
   }
   return { selectedDate, selectDate: setSelectedDate, selectMonth };
 }

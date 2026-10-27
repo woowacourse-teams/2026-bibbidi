@@ -7,12 +7,10 @@ export interface RecommendedScheduleItemViewModel {
   categoryLabel: string;
   catalogItemId: number;
   isAddActionDisabled: boolean;
-  stepName: string;
   title: string;
 }
 
 export interface RecommendedScheduleViewModel {
-  catalogActionLabel: string;
   items: RecommendedScheduleItemViewModel[];
   title: string;
 }
@@ -22,7 +20,6 @@ export function createRecommendedScheduleViewModel(
   addition: CatalogTaskAdditionState,
 ): RecommendedScheduleViewModel {
   return {
-    catalogActionLabel: "로드맵 보기",
     items: model.items.map((item) => {
       const isAdding = addition.addingCatalogItemIds.includes(
         item.catalogItemId,
@@ -42,7 +39,6 @@ export function createRecommendedScheduleViewModel(
         categoryLabel: item.category,
         catalogItemId: item.catalogItemId,
         isAddActionDisabled: isAdding || isAdded,
-        stepName: item.stepName,
         title: item.title,
       };
     }),

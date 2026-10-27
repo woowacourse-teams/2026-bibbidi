@@ -2,7 +2,7 @@ import { useHref, useLinkClickHandler } from "react-router";
 import { Button } from "../../../components/button";
 import { Dialog } from "../../../components/dialog";
 
-import { CalendarScheduleModel } from "../model/homeScheduleDashboard";
+import { CalendarScheduleModel } from "../model/calendarSchedule";
 import "./CalendarScheduleDetail.css";
 
 interface CalendarScheduleDetailProps {

@@ -6,10 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  dateLabel,
-  localToday,
-} from "../../../components/date-picker/date-utils";
+import { dateLabel, localToday } from "../../../shared/date/calendarDate";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";
 import { useChecklistAppointmentCreation } from "../useChecklistAppointmentCreation";

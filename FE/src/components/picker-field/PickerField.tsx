@@ -1,13 +1,11 @@
-import { useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import type { Ref } from "react";
 import { PickerFieldActions } from "./PickerFieldActions";
 import { DatePicker, type DatePickerProps } from "../date-picker";
-import { localToday } from "../date-picker/date-utils";
-import { Popover } from "../popover";
+import { localToday } from "../../shared/date/calendarDate";
+import { PickerLayer } from "../picker-layer";
 import { TextField } from "../text-field";
 import { TimePicker, type TimePickerMinuteStep } from "../time-picker";
-import { BottomSheet } from "../bottom-sheet";
-import { useIsMobileLayout } from "../../shared/responsive";
 import "./PickerField.css";
 
 interface FieldProps {
@@ -44,7 +42,6 @@ export function PickerField(props: PickerFieldProps) {
   } = props;
   const generatedId = useId();
   const id = providedId ?? generatedId;
-  const mobile = useIsMobileLayout();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [selection, setSelection] = useState<{
     open: boolean;
@@ -62,14 +59,13 @@ export function PickerField(props: PickerFieldProps) {
             open: true,
             draft: value || (kind === "date" ? localToday() : "00:00"),
           }
-        : { open: false, draft: mobile ? current.draft : null },
+        : { ...current, open: false },
     );
   }
   function confirm() {
     if (draft === null) return;
     onChange(draft);
     changeOpen(false);
-    if (!mobile) triggerRef.current?.focus({ preventScroll: true });
   }
   const trigger = (
     <TextField.Button
@@ -86,10 +82,6 @@ export function PickerField(props: PickerFieldProps) {
       required={required}
       hasError={!!error}
       help={error && <span role="alert">{error}</span>}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      aria-controls={mobile && open ? `${id}-sheet` : undefined}
-      onClick={() => changeOpen(!open)}
       onBlur={onBlur}
     />
   );
@@ -115,7 +107,7 @@ export function PickerField(props: PickerFieldProps) {
       </p>
     </>
   );
-  const actions = (
+  const actions = (mobile: boolean) => (
     <PickerFieldActions
       mobile={mobile}
       clearable={kind === "time"}
@@ -125,41 +117,26 @@ export function PickerField(props: PickerFieldProps) {
     />
   );
 
+  const clearDraft = useCallback(() => {
+    setSelection((current) =>
+      current.open || current.draft === null
+        ? current
+        : { open: false, draft: null },
+    );
+  }, []);
   return (
-    <>
-      {mobile ? (
-        trigger
-      ) : (
-        <Popover
-          title={`${label} 선택`}
-          placement="left-start"
-          width={360}
-          trigger={trigger}
-          disabled={disabled}
-          open={open}
-          onOpenChange={changeOpen}
-          footer={actions}
-        >
-          {picker}
-        </Popover>
-      )}
-      {mobile && (
-        <BottomSheet
-          id={`${id}-sheet`}
-          open={open}
-          onClose={() => changeOpen(false)}
-          onExited={() => {
-            setSelection((current) =>
-              current.open ? current : { open: false, draft: null },
-            );
-          }}
-          returnFocusRef={triggerRef}
-          header={<BottomSheet.Header>{label} 선택</BottomSheet.Header>}
-          cta={actions}
-        >
-          {picker}
-        </BottomSheet>
-      )}
-    </>
+    <PickerLayer
+      trigger={trigger}
+      title={`${label} 선택`}
+      placement="left-start"
+      disabled={disabled}
+      open={open}
+      onOpenChange={changeOpen}
+      returnFocusRef={triggerRef}
+      footer={actions}
+      onExited={clearDraft}
+    >
+      {picker}
+    </PickerLayer>
   );
 }

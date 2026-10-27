@@ -2,7 +2,7 @@ import { Badge } from "../../../components/badge";
 import { Button } from "../../../components/button";
 import { ListHeader } from "../../../components/list-header";
 import { ListRow } from "../../../components/list-row";
-import type { CalendarScheduleModel } from "../model/homeScheduleDashboard";
+import type { CalendarScheduleModel } from "../model/calendarSchedule";
 
 import "./CalendarDaySchedules.css";
 

@@ -36,18 +36,27 @@ export function DatePickerMonthList({
   const selectedVisible = selectedIndex >= start && selectedIndex < end;
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
-    if (viewport) {
-      viewport.scrollTop = Math.max(
-        0,
-        20 + selectedIndex * 44 - (viewport.clientHeight - 40) / 2,
-      );
+    if (!viewport) return;
+    const alignSelection = () => {
+      // A Popover/Sheet can mount this list before its viewport is visible.
+      if (viewport.clientHeight > 0) {
+        viewport.scrollTop = Math.max(
+          0,
+          20 + selectedIndex * 44 - (viewport.clientHeight - 40) / 2,
+        );
+      }
       if (pendingFocus.current) {
         viewport
           .querySelector<HTMLButtonElement>(`[data-value="${value}"]`)
           ?.focus({ preventScroll: true });
         pendingFocus.current = false;
       }
-    }
+    };
+    alignSelection();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(alignSelection);
+    observer.observe(viewport);
+    return () => observer.disconnect();
   }, [value, selectedIndex]);
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: number) {

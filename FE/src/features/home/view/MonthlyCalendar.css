@@ -244,9 +244,3 @@ button.monthly-calendar__schedule-title:focus-visible {
     border: 1px solid CanvasText;
   }
 }
-
-.monthly-calendar__month {
-  margin: 4px 0 0;
-  font: var(--typography-t4);
-  font-weight: var(--font-weight-bold);
-}

@@ -10,7 +10,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
-import { dateLabel } from "../date-picker/date-utils";
+import { dateLabel } from "../../shared/date/calendarDate";
 import { PickerField } from "./PickerField";
 
 afterEach(() => vi.unstubAllGlobals());

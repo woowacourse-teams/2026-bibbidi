@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
-import { dateLabel, localToday } from "../../components/date-picker/date-utils";
+import { dateLabel, localToday } from "../../shared/date/calendarDate";
 
 function chooseCategory(select: HTMLElement, value: string) {
   fireEvent.click(select);
