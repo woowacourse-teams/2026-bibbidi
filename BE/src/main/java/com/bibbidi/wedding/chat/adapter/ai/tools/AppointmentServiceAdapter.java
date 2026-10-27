@@ -41,6 +41,7 @@ public class AppointmentServiceAdapter {
             @ToolParam(description = "메모", required = false) String memo,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         return appointmentService.create(
                 new AppointmentCreationCommand(
                         SpringAiChatClient.userIdOf(toolContext),
@@ -70,6 +71,7 @@ public class AppointmentServiceAdapter {
             @ToolParam(description = "메모", required = false) String memo,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         return appointmentService.update(
                 new AppointmentUpdateCommand(
                         appointmentId,
@@ -93,6 +95,7 @@ public class AppointmentServiceAdapter {
             @ToolParam(description = "완료하면 true, 완료를 취소하면 false") boolean isDone,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         return appointmentService.changeStatus(
                 AppointmentCompletionCommand.fromRequest(
                         appointmentId,
@@ -110,6 +113,7 @@ public class AppointmentServiceAdapter {
             @ToolParam(description = "일정 id") Long appointmentId,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         appointmentService.delete(
                 SpringAiChatClient.userIdOf(toolContext),
                 appointmentId

@@ -94,7 +94,7 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                                 }
                             })
                             .onErrorResume(error -> {
-                                        if (sentDelta.get() || !plan.hasFallback()) {
+                                        if (sentDelta.get() || request.writeAttempted().get() || !plan.hasFallback()) {
                                             return Flux.error(error);
                                         }
                                         chatMemory.clear(request.conversationKey());

@@ -41,6 +41,7 @@ public class ChecklistServiceAdapter {
             @ToolParam(description = "새 상태. prev(시작 전), continue(진행 중), done(완료) 중 하나") String status,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         return checklistService.changeItemStatus(
                 SpringAiChatClient.userIdOf(toolContext),
                 checklistItemId,
@@ -57,6 +58,7 @@ public class ChecklistServiceAdapter {
             @ToolParam(description = "새 이름") String title,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         return checklistService.changeItemTitle(
                 SpringAiChatClient.userIdOf(toolContext),
                 checklistItemId,
@@ -72,6 +74,7 @@ public class ChecklistServiceAdapter {
             @ToolParam(description = "할 일 id") Long checklistItemId,
             ToolContext toolContext
     ) {
+        SpringAiChatClient.markWriteAttempt(toolContext);
         checklistService.deleteItem(
                 SpringAiChatClient.userIdOf(toolContext), checklistItemId
         );

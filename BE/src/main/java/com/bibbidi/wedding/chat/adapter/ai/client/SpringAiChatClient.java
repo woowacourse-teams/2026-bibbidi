@@ -4,6 +4,7 @@ import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -15,6 +16,7 @@ import reactor.core.publisher.Flux;
 public final class SpringAiChatClient {
 
     private static final String TOOL_CONTEXT_USER_ID = "userId";
+    private static final String TOOL_CONTEXT_WRITE_ATTEMPTED = "writeAttempted";
 
     private final ChatModelRouter router;
 
@@ -31,13 +33,23 @@ public final class SpringAiChatClient {
         return prompt
                 .messages(request.userMessage())
                 .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey()))
-                .toolContext(Map.of(TOOL_CONTEXT_USER_ID, request.userId()))
+                .toolContext(Map.of(
+                        TOOL_CONTEXT_USER_ID, request.userId(),
+                        TOOL_CONTEXT_WRITE_ATTEMPTED, request.writeAttempted()))
                 .stream()
                 .chatResponse();
     }
 
     public String modelName(ChatModelTier tier) {
         return router.route(tier).modelName();
+    }
+
+    public static void markWriteAttempt(ToolContext toolContext) {
+        if (toolContext.getContext().get(TOOL_CONTEXT_WRITE_ATTEMPTED) instanceof AtomicBoolean attempted) {
+            attempted.set(true);
+            return;
+        }
+        throw new BusinessException(ClientError.INTERNAL_ERROR, "쓰기 도구 실행 상태가 없습니다.");
     }
 
     /**

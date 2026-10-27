@@ -39,7 +39,7 @@ public class ModelClassifier {
     }
 
     public Mono<ChatModelTier> classify(String conversationKey, String userPrompt) {
-        if (properties.apiKey() == null) {
+        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             return Mono.just(ChatModelTier.HIGH);
         }
 

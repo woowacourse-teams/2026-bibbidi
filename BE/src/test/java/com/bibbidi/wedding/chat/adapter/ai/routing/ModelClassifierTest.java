@@ -1,6 +1,8 @@
 package com.bibbidi.wedding.chat.adapter.ai.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -12,6 +14,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -86,6 +91,20 @@ class ModelClassifierTest {
 
         assertThat(classifier(0.7).classify("conversation", "추천해줘").block())
                 .isEqualTo(ChatModelTier.HIGH);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t", "\n"})
+    void usesSolWithoutCallingJevWhenTheKeyIsMissing(String apiKey) {
+        ModelRoutingProperties properties = new ModelRoutingProperties(
+                apiKey, "http://unused", "jev-latest", Duration.ofSeconds(2), 0.7);
+        JevClient jev = mock(JevClient.class);
+        ModelClassifier classifier = new ModelClassifier(
+                memory, properties, jev, new ModelRoutingInstruction(), new ModelRoutingCriteria());
+
+        assertThat(classifier.classify("conversation", "추천해줘").block()).isEqualTo(ChatModelTier.HIGH);
+        verifyNoInteractions(jev);
     }
 
     private ModelClassifier classifier(double confidence) {
