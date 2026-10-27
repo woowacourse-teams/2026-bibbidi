@@ -1456,47 +1456,6 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 });
 
 describe("ChecklistFeature 상세 URL 선택", () => {
-  it("로드맵에서 열고 다른 할 일을 선택한 상세도 Escape로 로드맵에 복귀한다", async () => {
-    const checklist = createChecklist("첫 번째 할 일");
-    checklist.categories[0]!.items.push({
-      ...checklist.categories[0]!.items[0]!,
-      id: "catalog-item-102",
-      sourceCatalogItemId: 102,
-      title: "두 번째 할 일",
-    });
-    repositoryMocks.getChecklist.mockResolvedValue(checklist);
-    renderChecklistFeature([
-      "/preparation?categoryId=10",
-      {
-        pathname: "/checklist",
-        search: "?taskId=catalog-item-101",
-        state: { checklistDetailDepth: 1, checklistDetailSource: "roadmap" },
-      },
-    ]);
-    await screen.findByRole("complementary", { name: "첫 번째 할 일" });
-    fireEvent.click(screen.getByRole("button", { name: /두 번째 할 일/ }));
-    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-102");
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() =>
-      expect(getCurrentUrl()).toBe("/preparation?categoryId=10"),
-    );
-  });
-
-  it("로드맵에서 연 상세에서 체크리스트 카테고리를 바꾸면 체크리스트에 머문다", async () => {
-    renderChecklistFeature([
-      "/preparation",
-      {
-        pathname: "/checklist",
-        search: "?taskId=catalog-item-101",
-        state: { checklistDetailDepth: 1, checklistDetailSource: "roadmap" },
-      },
-    ]);
-    await screen.findByRole("complementary", { name: "로컬 체크리스트 항목" });
-    fireEvent.click(screen.getByRole("tab", { name: "두 번째 카테고리 0/0" }));
-    expect(getCurrentUrl()).toBe("/checklist");
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
   it("할 일 클릭과 닫기·Escape를 URL에 반영하고 다른 query와 포커스를 유지한다", async () => {
     const checklist = createChecklist("URL 인코딩 할 일");
     checklist.categories[0]!.items[0]!.id = "task-한글";

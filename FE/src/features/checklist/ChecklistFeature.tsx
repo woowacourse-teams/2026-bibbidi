@@ -435,18 +435,6 @@ export function ChecklistFeature({
       updateTaskSelection(null, { replace: true });
     }
   }, [location.state, navigate, selectedTaskId, updateTaskSelection]);
-  const dismissTaskDetail = useCallback(() => {
-    const state = location.state;
-    if (
-      state !== null &&
-      typeof state === "object" &&
-      Reflect.get(state, "checklistDetailSource") === "roadmap"
-    ) {
-      backFromTaskDetail();
-    } else {
-      closeTaskDetail();
-    }
-  }, [backFromTaskDetail, closeTaskDetail, location.state]);
   const selectTask = useCallback(
     (taskId: string) => {
       if (taskId !== selectedTaskId || isTaskCreationOpen) {
@@ -633,7 +621,7 @@ export function ChecklistFeature({
       onBackTaskDetail={backFromTaskDetail}
       onCancelLoginRequired={() => setLoginRequiredReason(null)}
       onCloseTaskDetail={closeTaskDetail}
-      onDismissTaskDetail={dismissTaskDetail}
+      onDismissTaskDetail={closeTaskDetail}
       onOpenTaskCreation={() => {
         if (audience === "authenticated") {
           taskCreation.open();

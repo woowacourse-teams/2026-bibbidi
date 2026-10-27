@@ -27,12 +27,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 15px;
+  font: var(--typography-t5-medium);
 }
 
 .ai-recommendations__header > span {
   color: var(--color-fg-neutral-muted);
-  font-size: 13px;
+  font: var(--typography-t7);
 }
 
 .ai-recommendations__direction,
@@ -40,7 +40,7 @@
   position: relative;
   margin: 12px 0;
   color: var(--color-fg-neutral-muted);
-  font-size: 12px;
+  font: var(--typography-t6);
   text-align: center;
 }
 
@@ -131,9 +131,7 @@
 .ai-recommendations__number {
   margin-bottom: clamp(10px, 4.8cqw, 20px);
   color: var(--color-bg-brand-solid-pressed);
-  font-size: clamp(18px, 6cqw, 25px);
-  font-weight: 700;
-  line-height: 1.2;
+  font: var(--typography-t2);
 }
 
 .ai-recommendations__title {
@@ -143,8 +141,7 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  font-size: clamp(16px, 6cqw, 23px);
-  line-height: 1.4;
+  font: var(--typography-t3);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -159,7 +156,7 @@
   justify-content: center;
   margin-top: 12px;
   color: var(--color-fg-neutral-muted);
-  font-size: 12px;
+  font: var(--typography-t6);
 }
 
 .ai-recommendations__step img {
@@ -179,7 +176,7 @@
 .ai-recommendations__description {
   margin-top: clamp(8px, 4.8cqw, 20px);
   color: var(--color-fg-neutral-muted);
-  font-size: clamp(11px, 3.5cqw, 14px);
+  font: var(--typography-t6);
 }
 
 .ai-recommendations__peek {
@@ -200,10 +197,10 @@
   left: calc(50% + min(140px, 50cqw - 24px) + 12px);
 }
 .ai-recommendations__peek .ai-recommendations__title {
-  font-size: 20px;
+  font: var(--typography-t4);
 }
 .ai-recommendations__peek .ai-recommendations__number {
-  color: #bd8b7c;
+  color: var(--color-fg-neutral-muted);
 }
 .ai-recommendations__peek .ai-recommendations__step {
   width: 130px;
@@ -218,8 +215,8 @@
   width: 78px;
   height: 34px;
   place-items: center;
-  font-size: 13px;
-  font-weight: 700;
+  font: var(--typography-t7);
+  font-weight: var(--font-weight-bold);
 }
 
 .ai-recommendations__badge img {
@@ -230,16 +227,15 @@
 .ai-recommendations__saving {
   position: absolute;
   inset: auto 16px 12px auto;
-  font-size: 12px;
+  font: var(--typography-t6);
   color: var(--color-fg-brand);
 }
-.ai-chat-panel:has(.ai-recommendations--pressed)::after,
-.ai-chat-dialog:has(.ai-recommendations--pressed)::after {
+.global-ai-content:has(.ai-recommendations--pressed)::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: rgb(50 50 45 / 28%);
+  background: color-mix(in srgb, var(--color-palette-ink) 28%, transparent);
   pointer-events: none;
 }
 

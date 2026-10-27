@@ -59,3 +59,16 @@
 DatePicker 내부의 연도·월 선택을 독립적으로 사용하는 공용 하위 컴포넌트다. `value`는 유효한 ISO 날짜이며 `onChange`는 선택 월의 `YYYY-MM-01`을 전달한다. `today`, `yearRange`, `minDate`, `maxDate`, `disabled`와 표준 div 속성·ref를 지원하며 범위 의미는 DatePicker와 같다.
 
 DatePicker와 캘린더가 같은 하위 컴포넌트를 사용한다. 제품의 기존 연·월 목록은 ScrollFog와 키보드 탐색을 제공하며 디자인 시스템의 네이티브 목록과 렌더링 방식은 다르다. 연·월 선택 의미와 범위 API는 같다. 레이어·이동 버튼·임시 선택·닫기는 사용처가 관리한다. 캘린더는 연·월 이동 시 기존 일자를 유지하며 해당 날짜가 없으면 말일을 선택한다.
+
+
+## Panel과 PanelOverlay
+
+Panel의 variant는 edge(기본 영역 경계선)와 contained(전체 테두리·공통 모서리·내용 높이)를 지원한다. 제목 글꼴은 Panel.Header가 제공하며 화면에서 덮어쓰지 않는다. PanelOverlay의 width는 detail(기본)과 focus이며 각각 공통 레이아웃 너비 토큰을 사용한다. fullscreen에서는 전체 너비다. 두 옵션은 디자인 시스템과 같은 의미로 지원한다.
+
+PanelOverlay는 첫 열림 후 자식 DOM을 유지한다. AI의 대화·입력·스크롤은 이 수명을 따르며 계정 변경은 ServiceLayout의 key가 처리한다. AI는 1024px 미만 fullscreen, 그 외 focus 너비의 side로 표시한다. Escape·포커스·배경 클릭·스크롤 잠금은 공통 레이어가 관리한다.
+
+## 제품 Breadcrumb과 로드맵
+
+Breadcrumb은 체크리스트와 로드맵에서 사용하는 제품 공용 조합이다. 경로 항목과 페이지 문구는 기능에서 전달하며 마지막 항목에 aria-current를 제공한다. 디자인 시스템의 별도 지원 API로 간주하지 않는다. 페이지 바깥 여백은 각 화면이 관리한다.
+
+로드맵 카테고리는 공통 Tab fluid를 사용하고 tabpanel을 연결한다. 카테고리 선택은 roadmapSelection, 완료·다음 할 일·문구·단계 목록과 요약은 createPreparationRoadmapViewModel에서 생성한다. View는 표시와 모달 열기·닫기를 관리한다. 단계 상세의 모두 추가도 같은 단계 목록의 미포함 항목에서 파생한다.

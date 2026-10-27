@@ -42,7 +42,7 @@
   margin: 0;
   padding: 12px 24px;
   color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
+  font: var(--typography-t6);
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
@@ -65,7 +65,7 @@
 .calendar-list-error {
   margin: 0;
   padding: 0 24px 12px;
-  font: var(--typography-t7);
+  font: var(--typography-t6);
   overflow-wrap: anywhere;
   word-break: keep-all;
 }

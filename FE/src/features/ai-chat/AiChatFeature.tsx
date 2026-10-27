@@ -1,32 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-
-import { useIsMobileLayout } from "../../shared/responsive";
+import { Button } from "../../components/button";
 import type { AiChatSession } from "./AiChatSession";
 import "./view/AiChat.css";
 
 export function AiChatFeature({
   isAuthenticated,
   onAuthenticationRequired,
-  onTaskAdded,
-  isRevealingTask = false,
+  contextLabel,
 }: {
   isAuthenticated: boolean;
   onAuthenticationRequired: () => void;
-  onTaskAdded?: (catalogItemId: number) => void;
-  isRevealingTask?: boolean;
+  contextLabel?: string;
 }) {
-  const isMobile = useIsMobileLayout();
   const [isOpen, setOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [Session, setSession] = useState<typeof AiChatSession | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const returnFocusRef = useRef<HTMLButtonElement>(null);
-  const shouldLoad = !isMobile || hasOpened;
-  const loading = shouldLoad && !Session && !loadFailed;
-
+  const loading = hasOpened && !Session && !loadFailed;
   useEffect(() => {
-    if (!shouldLoad || Session) return;
+    if (!hasOpened || Session) return;
     let cancelled = false;
     import("./AiChatSession").then(
       (module) => {
@@ -39,67 +33,49 @@ export function AiChatFeature({
     return () => {
       cancelled = true;
     };
-  }, [shouldLoad, Session, loadAttempt]);
-
-  const retryLoad = () => {
-    setLoadFailed(false);
-    setLoadAttempt((attempt) => attempt + 1);
-  };
-
+  }, [hasOpened, Session, loadAttempt]);
   return (
     <div className="ai-chat-feature">
-      {isMobile ? (
-        <div
-          className={`ai-chat-launchers${loadFailed ? " ai-chat-launchers--error" : ""}`}
-        >
-          {loadFailed ? <p role="alert">채팅을 불러오지 못했어요.</p> : null}
-          <button
-            className="ai-chat-launchers__action"
-            disabled={loading || isRevealingTask}
-            onClick={() => {
-              if (loadFailed) retryLoad();
-              setHasOpened(true);
-              setOpen(true);
-            }}
-            ref={returnFocusRef}
-            type="button"
-          >
-            {loading ? (
-              <span role="status">채팅을 불러오고 있어요.</span>
-            ) : loadFailed ? (
-              "다시 시도"
-            ) : (
-              "AI와 대화하기"
-            )}
-          </button>
-        </div>
-      ) : null}
-      {Session ? (
+      <Button
+        size="medium"
+        variant="weak"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-label={loadFailed ? "AI 도움 다시 시도" : "AI 도움"}
+        disabled={loading}
+        onClick={() => {
+          if (loadFailed) {
+            setLoadFailed(false);
+            setLoadAttempt((attempt) => attempt + 1);
+          }
+          setHasOpened(true);
+          setOpen(true);
+        }}
+        ref={returnFocusRef}
+      >
+        {loading ? (
+          <span role="status">채팅을 불러오고 있어요.</span>
+        ) : loadFailed ? (
+          "다시 시도"
+        ) : (
+          "AI 도움"
+        )}
+      </Button>
+      {loadFailed && (
+        <span className="ai-chat__sr-only" role="alert">
+          채팅을 불러오지 못했어요. AI 도움 다시 시도를 선택해 주세요.
+        </span>
+      )}
+      {Session && (
         <Session
+          contextLabel={contextLabel}
           isAuthenticated={isAuthenticated}
-          isMobile={isMobile}
-          isOpen={isOpen && !isRevealingTask}
+          isOpen={isOpen}
           onAuthenticationRequired={onAuthenticationRequired}
-          onTaskAdded={onTaskAdded}
           onClose={() => setOpen(false)}
           returnFocusRef={returnFocusRef}
         />
-      ) : !isMobile ? (
-        <aside aria-label="AI 채팅" className="ai-chat-panel">
-          <div className="ai-chat">
-            {loadFailed ? (
-              <div role="alert">
-                <p>채팅을 불러오지 못했어요.</p>
-                <button onClick={retryLoad} type="button">
-                  다시 시도
-                </button>
-              </div>
-            ) : (
-              <p role="status">채팅을 불러오고 있어요.</p>
-            )}
-          </div>
-        </aside>
-      ) : null}
+      )}
     </div>
   );
 }

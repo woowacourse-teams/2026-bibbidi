@@ -1,0 +1,9 @@
+.roadmap-header {
+  padding-bottom: 32px;
+}
+
+@media (width < 768px) {
+  .roadmap-header {
+    padding-bottom: 24px;
+  }
+}

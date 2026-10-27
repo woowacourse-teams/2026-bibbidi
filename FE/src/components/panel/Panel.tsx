@@ -2,6 +2,7 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 import "./Panel.css";
 
 export type PanelProps = Omit<ComponentPropsWithRef<"div">, "children"> & {
+  variant?: "edge" | "contained";
   header?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
@@ -20,10 +21,18 @@ export type PanelHeaderProps = Omit<
     | { heading: ReactNode; title?: never }
   );
 
-function Root({ header, children, footer, className, ...props }: PanelProps) {
+function Root({
+  header,
+  children,
+  footer,
+  variant = "edge",
+  className,
+  ...props
+}: PanelProps) {
   return (
     <div
       {...props}
+      data-variant={variant}
       className={["bibbidi-panel", className].filter(Boolean).join(" ")}
     >
       {header != null && (

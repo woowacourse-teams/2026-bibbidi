@@ -1,21 +1,10 @@
 import type {
-  CatalogCategoryModel,
   CatalogItemModel,
   CatalogModel,
   CatalogRoadmapModel,
-  CatalogStepModel,
 } from "../../catalog/model/catalog";
 
-export type PreparationStepStatus = "complete" | "in-progress" | "upcoming";
 export type PreparationAudience = "authenticated" | "guest";
-
-export type PreparationCategoryModel = CatalogCategoryModel;
-export type PreparationStepModel = CatalogStepModel;
-
-export interface PreparationStepProgressModel {
-  status: PreparationStepStatus;
-  stepId: string;
-}
 
 export interface PreparationDetailTaskModel extends CatalogItemModel {
   included: boolean;

@@ -26,6 +26,7 @@ export type PanelOverlayProps = Omit<
     onClose: () => void;
     children: ReactNode;
     placement?: PanelOverlayPlacement;
+    width?: "detail" | "focus";
     closeOnEscape?: boolean;
     closeOnDimmerClick?: boolean;
     portalContainer?: HTMLElement | null;
@@ -46,6 +47,7 @@ export function PanelOverlay({
   onClose,
   children,
   placement = "side",
+  width = "detail",
   closeOnEscape = true,
   closeOnDimmerClick = true,
   portalContainer,
@@ -96,6 +98,7 @@ export function PanelOverlay({
       aria-modal="true"
       className={["bibbidi-panel-overlay", className].filter(Boolean).join(" ")}
       data-placement={placement}
+      data-width={width}
       onKeyDown={(event) => {
         onKeyDown?.(event);
         // React events also bubble through portals; a nested modal owns its keys.

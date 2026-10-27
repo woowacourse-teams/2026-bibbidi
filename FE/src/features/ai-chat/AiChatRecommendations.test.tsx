@@ -1,4 +1,5 @@
-import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
+import { AI_CHAT_FULLSCREEN_MEDIA_QUERY as MOBILE_LAYOUT_MEDIA_QUERY } from "./view/GlobalAiChatDialog";
+import { MemoryRouter } from "react-router";
 import {
   act,
   cleanup,
@@ -62,11 +63,21 @@ function ChecklistObserver() {
 
 function chat(observe = false) {
   return (
-    <MyChecklistProvider sessionKey="recommendation-test">
-      <AiChatFeature isAuthenticated onAuthenticationRequired={authRequired} />
-      {observe ? <ChecklistObserver /> : null}
-    </MyChecklistProvider>
+    <MemoryRouter>
+      <MyChecklistProvider sessionKey="recommendation-test">
+        <AiChatFeature
+          isAuthenticated
+          onAuthenticationRequired={authRequired}
+        />
+        {observe ? <ChecklistObserver /> : null}
+      </MyChecklistProvider>
+    </MemoryRouter>
   );
+}
+function renderChat(ui: Parameters<typeof render>[0]) {
+  const result = render(ui);
+  fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+  return result;
 }
 async function send() {
   fireEvent.change(await screen.findByRole("textbox"), {
@@ -101,7 +112,6 @@ function mockChatScrollHeight() {
 
 function mockMobileDialog() {
   const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
-  restoreDialog = installDialogMock();
   return media;
 }
 
@@ -120,6 +130,7 @@ function pendingCatalog() {
 }
 
 beforeEach(() => {
+  restoreDialog = installDialogMock();
   vi.resetAllMocks();
   installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
   mocks.catalog.mockResolvedValue(preparationCatalogFixture);
@@ -160,7 +171,7 @@ describe("AI 추천 카드 연결", () => {
   it("첫 추천 데이터가 늦게 도착하면 카드 아래까지 내리고 다음 추천도 하단에 표시한다", async () => {
     mockChatScrollHeight();
     const finishCatalog = pendingCatalog();
-    render(chat());
+    renderChat(chat());
     await send();
     await screen.findByText("추천 카드를 불러오고 있어요.");
     const log = screen.getByRole("log");
@@ -184,8 +195,8 @@ describe("AI 추천 카드 연결", () => {
     mockMobileDialog();
     mockChatScrollHeight();
     const finishCatalog = pendingCatalog();
-    render(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    renderChat(chat());
+    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
     await send();
     await screen.findByText("추천 카드를 불러오고 있어요.");
     const log = screen.getByRole("log");
@@ -195,7 +206,7 @@ describe("AI 추천 카드 연결", () => {
     await finishCatalog();
     expect(log.querySelector('[aria-label="추천 할 일"]')).toBeTruthy();
     expect(log.scrollTop).toBe(600);
-    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
     expect(log.scrollTop).toBe(1000);
 
     log.scrollTop = 250;
@@ -203,7 +214,7 @@ describe("AI 추천 카드 연결", () => {
     fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
     log.scrollTop = 0;
     fireEvent.scroll(log);
-    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
     expect(log.scrollTop).toBe(250);
   });
 
@@ -218,7 +229,7 @@ describe("AI 추천 카드 연결", () => {
         });
       },
     );
-    render(chat());
+    renderChat(chat());
     await send();
     expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
     expect(mocks.catalog).not.toHaveBeenCalled();
@@ -240,7 +251,7 @@ describe("AI 추천 카드 연결", () => {
         throw new Error("failure");
       },
     );
-    render(chat());
+    renderChat(chat());
     await send();
     await screen.findByText("미완료 답변");
     expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
@@ -251,7 +262,7 @@ describe("AI 추천 카드 연결", () => {
 
   it("카탈로그 조회만 재시도하고 텍스트와 AI 호출 횟수를 유지한다", async () => {
     mocks.catalog.mockRejectedValueOnce(new Error("network"));
-    render(chat());
+    renderChat(chat());
     await send();
     await screen.findByRole("button", { name: "카드 다시 불러오기" });
     expect(screen.getByText("마음에 드는 일을 담아보세요.")).toBeTruthy();
@@ -261,7 +272,7 @@ describe("AI 추천 카드 연결", () => {
   });
 
   it("옆 카드 선택과 키보드 이동·스킵을 지원하고 모두 처리하면 완료 안내를 남긴다", async () => {
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "다음 추천: 예식 형태 결정" }),
@@ -290,7 +301,7 @@ describe("AI 추천 카드 연결", () => {
 
   it("옆 카드를 바꿔도 현재 카드의 키보드 조작 대상과 읽던 위치를 유지한다", async () => {
     mockChatScrollHeight();
-    render(chat());
+    renderChat(chat());
     await send();
     const card = await screen.findByRole("button", {
       name: "현재 추천: 웨딩홀 투어",
@@ -316,7 +327,7 @@ describe("AI 추천 카드 연결", () => {
     "%s로 새 추천에 포커스를 옮겨도 대화 스크롤을 움직이지 않는다",
     async (key) => {
       mockChatScrollHeight();
-      render(chat());
+      renderChat(chat());
       await send();
       const card = await screen.findByRole("button", {
         name: "현재 추천: 웨딩홀 투어",
@@ -344,7 +355,7 @@ describe("AI 추천 카드 연결", () => {
 
       while (screen.queryByRole("button", { name: /^현재 추천:/ }))
         fireEvent.keyDown(currentCard(), { key: "Delete" });
-      expect(document.activeElement).toBe(screen.getByRole("status"));
+      expect(document.activeElement).toBe(within(log).getByRole("status"));
       expect(log.scrollTop).toBe(120);
     },
   );
@@ -358,7 +369,7 @@ describe("AI 추천 카드 연결", () => {
           })
         : json({ id: 1, items: [] }),
     );
-    render(chat(true));
+    renderChat(chat(true));
     await send();
     await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
     fireEvent.click(currentCard());
@@ -401,7 +412,7 @@ describe("AI 추천 카드 연결", () => {
           : json({ items: [addedItem] })
         : json({ id: 1, items: [] }),
     );
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -420,7 +431,7 @@ describe("AI 추천 카드 연결", () => {
     mocks.fetch.mockResolvedValue(
       json({ id: 1, items: [{ ...addedItem, appointments: [] }] }),
     );
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -438,7 +449,7 @@ describe("AI 추천 카드 연결", () => {
           })
         : json({ id: 1, items: [] }),
     );
-    render(chat());
+    renderChat(chat());
     await send();
     await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" });
     await send();
@@ -469,7 +480,7 @@ describe("AI 추천 카드 연결", () => {
             items: reads++ ? [{ ...addedItem, appointments: [] }] : [],
           }),
     );
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -492,7 +503,7 @@ describe("AI 추천 카드 연결", () => {
         items: reads > 2 ? [{ ...addedItem, appointments: [] }] : [],
       });
     });
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -516,7 +527,7 @@ describe("AI 추천 카드 연결", () => {
         ? json({ errorCode: 201, message: "login" }, 401)
         : json({ id: 1, items: [] });
     });
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -537,7 +548,7 @@ describe("AI 추천 카드 연결", () => {
           })
         : json({ id: 1, items: [] }),
     );
-    const view = render(chat());
+    const view = renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -546,7 +557,7 @@ describe("AI 추천 카드 연결", () => {
     const signal = postCalls()[0][1].signal as AbortSignal;
     view.unmount();
     expect(signal.aborted).toBe(true);
-    render(chat());
+    renderChat(chat());
     await act(async () => finish(json({ items: [addedItem] })));
     expect(screen.queryByRole("region", { name: "추천 할 일" })).toBeNull();
     expect(
@@ -558,7 +569,7 @@ describe("AI 추천 카드 연결", () => {
     mocks.fetch.mockResolvedValue(
       json({ errorCode: 201, message: "login" }, 401),
     );
-    render(chat());
+    renderChat(chat());
     await send();
     fireEvent.click(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -572,8 +583,8 @@ describe("AI 추천 카드 연결", () => {
 
   it("모바일 닫기·재열기와 PC 전환에서 선택·스킵 상태를 유지한다", async () => {
     const media = mockMobileDialog();
-    render(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    renderChat(chat());
+    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
     await send();
     fireEvent.keyDown(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -583,7 +594,7 @@ describe("AI 추천 카드 연결", () => {
       screen.getByRole("button", { name: "다음 추천: 사회자 섭외" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI와 대화하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
     expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");
     act(() => media.setMatches(false));
     expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");

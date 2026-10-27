@@ -1,230 +1,165 @@
 import {
-  PreparationCatalogModel,
-  PreparationRoadmapModel,
-  PreparationStepProgressModel,
-  PreparationStepStatus,
-} from "../model/preparationRoadmap";
+  getChecklistCategoryItems,
+  type ChecklistQueryModel,
+} from "../../checklist/model/checklistQuery";
+import type { PreparationCatalogModel } from "../model/preparationRoadmap";
 
+import { getAvailablePreparationCategories } from "../model/roadmapSelection";
+
+export type RoadmapProgressStatus = "ready" | "loading" | "error";
 export interface PreparationCategoryViewModel {
   id: string;
-  isCurrent: boolean;
   label: string;
 }
-
-export interface PreparationStepViewModel {
-  id: string;
-  iconUrl?: string;
-  isSelected: boolean;
-  numberLabel: string;
-  order: number;
-  title: string;
-}
-
 export interface PreparationRoadmapViewModel {
   categories: PreparationCategoryViewModel[];
-  selectedStepDetail: PreparationStepDetailViewModel;
-  steps: PreparationStepViewModel[];
+  categoryTitle?: string;
+  stages: RoadmapStage[];
+  summary: string;
+  progressStatus: RoadmapProgressStatus;
 }
-
-export interface PreparationStepDetailViewModel {
-  checklistTasks: PreparationStepTaskViewModel[];
-  description: string;
-  detailTasks: PreparationStepTaskViewModel[];
-}
-
-export interface PreparationStepTaskViewModel {
+export interface RoadmapTask {
   id: string;
-  isEssential: boolean;
   title: string;
+  isEssential: boolean;
+  isIncluded: boolean;
+  isComplete: boolean;
 }
 
-export interface PreparationRoadmapSelection {
-  categoryId: string;
-  stepId: string;
+export interface RoadmapStage {
+  id: string;
+  title: string;
+  order: number;
+  isComplete: boolean;
+  statusLabel: string;
+  badgeColor: "positive" | "primary" | "dark";
+  progress?: number;
+  progressLabel: string;
+  nextTask?: RoadmapTask;
+  previewLabel?: string;
+  numberLabel: string;
+  iconUrl?: string;
+  description: string;
+  tasks: RoadmapTask[];
+  includedCount: number;
+  completedCount: number;
 }
 
-function getRoadmap(
-  model: PreparationCatalogModel,
-  categoryId: string,
-): PreparationRoadmapModel {
-  const roadmap = model.roadmaps.find(
-    (candidate) => candidate.categoryId === categoryId,
-  );
-
-  if (!roadmap) {
-    throw new Error("선택한 준비 카테고리의 로드맵이 없습니다.");
-  }
-
-  return roadmap;
-}
-
-function getAvailableCategories(model: PreparationCatalogModel) {
-  return model.categories.filter((category) => {
-    const roadmap = model.roadmaps.find(
-      (candidate) => candidate.categoryId === category.id,
-    );
-
-    return Boolean(roadmap?.steps.length);
-  });
-}
-
-export function hasSelectablePreparationSteps(
-  model: PreparationCatalogModel,
-): boolean {
-  return getAvailableCategories(model).length > 0;
-}
-
-export function getInitialSelectedCategoryId(
-  model: PreparationCatalogModel,
-): string {
-  const initialCategory = getAvailableCategories(model)[0];
-
-  if (!initialCategory) {
-    throw new Error("선택할 준비 카테고리가 없습니다.");
-  }
-
-  return initialCategory.id;
-}
-
-export function getInitialSelectedStepId(
-  model: PreparationCatalogModel,
-  categoryId: string,
-  stepProgress: PreparationStepProgressModel[] = [],
-): string {
-  const roadmap = getRoadmap(model, categoryId);
-  const statusByStepId = createStatusByStepId(stepProgress);
-  const orderedSteps = [...roadmap.steps].sort(
-    (firstStep, secondStep) => firstStep.order - secondStep.order,
-  );
-  const firstStep = orderedSteps[0];
-
-  if (!firstStep) {
-    throw new Error("준비 로드맵에 선택할 단계가 없습니다.");
-  }
-
-  if (
-    orderedSteps.every(
-      (step) => getStepStatus(statusByStepId, step.id) === "complete",
-    )
-  ) {
-    return orderedSteps[orderedSteps.length - 1].id;
-  }
-
-  return (
-    orderedSteps.find(
-      (step) => getStepStatus(statusByStepId, step.id) === "in-progress",
-    )?.id ?? firstStep.id
-  );
-}
-
-export function createInitialPreparationRoadmapSelection(
-  model: PreparationCatalogModel,
-  stepProgress: PreparationStepProgressModel[] = [],
-): PreparationRoadmapSelection {
-  const categoryId = getInitialSelectedCategoryId(model);
-
-  return {
-    categoryId,
-    stepId: getInitialSelectedStepId(model, categoryId, stepProgress),
-  };
-}
-
-export function selectPreparationCategory(
-  model: PreparationCatalogModel,
-  currentSelection: PreparationRoadmapSelection,
-  categoryId: string,
-  stepProgress: PreparationStepProgressModel[] = [],
-): PreparationRoadmapSelection {
-  if (currentSelection.categoryId === categoryId) {
-    return currentSelection;
-  }
-
-  return {
-    categoryId,
-    stepId: getInitialSelectedStepId(model, categoryId, stepProgress),
-  };
-}
-
-function createStatusByStepId(stepProgress: PreparationStepProgressModel[]) {
-  return new Map(
-    stepProgress.map((progress) => [progress.stepId, progress.status]),
-  );
-}
-
-function getStepStatus(
-  statusByStepId: Map<string, PreparationStepStatus>,
-  stepId: string,
-): PreparationStepStatus {
-  return statusByStepId.get(stepId) ?? "upcoming";
-}
-
-function createSelectedStepDetailViewModel(
-  model: PreparationCatalogModel,
-  roadmap: PreparationRoadmapModel,
-  selectedStepId: string,
-): PreparationStepDetailViewModel {
-  const selectedStep = roadmap.steps.find((step) => step.id === selectedStepId);
-  const selectedDetail = model.stepDetails.find(
-    (detail) => detail.stepId === selectedStepId,
-  );
-
-  if (!selectedStep || !selectedDetail) {
-    throw new Error("준비 로드맵의 선택 단계 상세 데이터가 올바르지 않습니다.");
-  }
-
-  const tasks = selectedDetail.tasks.reduce<{
-    checklistTasks: PreparationStepTaskViewModel[];
-    detailTasks: PreparationStepTaskViewModel[];
-  }>(
-    (result, task) => {
-      const taskViewModel = {
-        id: task.id,
-        isEssential: task.essential ?? false,
-        title: task.title,
-      };
-
-      (task.included ? result.checklistTasks : result.detailTasks).push(
-        taskViewModel,
-      );
-
-      return result;
-    },
-    { checklistTasks: [], detailTasks: [] },
-  );
-
-  return {
-    checklistTasks: tasks.checklistTasks,
-    description: selectedDetail.description,
-    detailTasks: tasks.detailTasks,
-  } satisfies PreparationStepDetailViewModel;
-}
-
+/** Catalog order is stable even when a stage has no selected tasks. */
 export function createPreparationRoadmapViewModel(
-  model: PreparationCatalogModel,
-  selectedCategoryId: string,
-  selectedStepId: string,
+  catalog: PreparationCatalogModel,
+  categoryId: string,
+  {
+    checklist,
+    isGuest,
+    progressStatus,
+  }: {
+    checklist?: ChecklistQueryModel;
+    isGuest: boolean;
+    progressStatus: RoadmapProgressStatus;
+  },
 ): PreparationRoadmapViewModel {
-  const roadmap = getRoadmap(model, selectedCategoryId);
-  const availableCategories = getAvailableCategories(model);
-
+  const category = checklist?.categories.find((item) => item.id === categoryId);
+  const saved = new Map(
+    category
+      ? getChecklistCategoryItems(category)
+          .filter((item) => item.sourceCatalogItemId !== null)
+          .map((item) => [String(item.sourceCatalogItemId), item])
+      : [],
+  );
+  const stages: RoadmapStage[] = [
+    ...(catalog.roadmaps.find((item) => item.categoryId === categoryId)
+      ?.steps ?? []),
+  ]
+    .sort((a, b) => a.order - b.order)
+    .map((step) => {
+      const detail = catalog.stepDetails.find(
+        (item) => item.stepId === step.id,
+      );
+      const tasks = (detail?.tasks ?? []).map((task) => {
+        const item = saved.get(task.id);
+        return {
+          id: task.id,
+          title: item?.title ?? task.title,
+          isEssential: task.essential ?? false,
+          isIncluded: task.included || item !== undefined,
+          isComplete: item?.status === "done",
+        };
+      });
+      const includedCount = tasks.filter((task) => task.isIncluded).length;
+      const completedCount = tasks.filter(
+        (task) => task.isIncluded && task.isComplete,
+      ).length;
+      const isComplete =
+        !isGuest &&
+        progressStatus === "ready" &&
+        includedCount > 0 &&
+        includedCount === completedCount;
+      const nextTask =
+        tasks.find((task) => task.isIncluded && !task.isComplete) ??
+        tasks.find((task) => !task.isIncluded) ??
+        tasks[0];
+      return {
+        id: step.id,
+        order: step.order,
+        isComplete,
+        statusLabel:
+          progressStatus === "loading"
+            ? "현황 확인 중"
+            : progressStatus === "error"
+              ? "현황 확인 필요"
+              : isComplete
+                ? "내 할 일 완료"
+                : includedCount
+                  ? isGuest
+                    ? "준비 중"
+                    : "진행 중"
+                  : "준비 전",
+        badgeColor: isComplete
+          ? "positive"
+          : includedCount
+            ? "primary"
+            : "dark",
+        progress:
+          !isGuest && progressStatus === "ready" && includedCount > 0
+            ? completedCount / includedCount
+            : undefined,
+        progressLabel:
+          progressStatus === "ready"
+            ? `내 할 일 ${includedCount}개${isGuest ? "" : ` · 완료 ${completedCount}개`}`
+            : progressStatus === "loading"
+              ? "내 준비 현황을 확인하고 있어요."
+              : "내 준비 현황을 확인해 주세요.",
+        nextTask,
+        previewLabel: nextTask
+          ? isComplete && nextTask.isComplete
+            ? "완료한 할 일"
+            : nextTask.isIncluded
+              ? "다음 할 일"
+              : "준비할 일"
+          : undefined,
+        title: step.title,
+        numberLabel: String(step.order).padStart(2, "0"),
+        iconUrl: step.iconUrl,
+        description: detail?.description ?? "",
+        tasks,
+        includedCount,
+        completedCount,
+      };
+    });
+  const taskCount = stages.reduce((sum, stage) => sum + stage.includedCount, 0);
+  const completedCount = stages.reduce(
+    (sum, stage) => sum + stage.completedCount,
+    0,
+  );
   return {
-    categories: availableCategories.map((category) => ({
-      id: category.id,
-      isCurrent: category.id === selectedCategoryId,
-      label: category.label,
-    })),
-    selectedStepDetail: createSelectedStepDetailViewModel(
-      model,
-      roadmap,
-      selectedStepId,
+    categories: getAvailablePreparationCategories(catalog).map(
+      ({ id, label }) => ({ id, label }),
     ),
-    steps: roadmap.steps.map((step) => ({
-      id: step.id,
-      iconUrl: step.iconUrl,
-      isSelected: step.id === selectedStepId,
-      numberLabel: String(step.order).padStart(2, "0"),
-      order: step.order,
-      title: step.title,
-    })),
+    categoryTitle: catalog.categories.find((item) => item.id === categoryId)
+      ?.label,
+    stages,
+    progressStatus,
+    summary: `${stages.length}개 단계 · ${progressStatus === "ready" ? `내 할 일 ${taskCount}개${isGuest ? "" : ` · 완료 ${completedCount}개`}` : progressStatus === "loading" ? "준비 현황 확인 중" : "준비 현황 확인 필요"}`,
   };
 }

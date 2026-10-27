@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth";
 import { analytics } from "../../infrastructure/analytics";
 import {
@@ -23,16 +23,18 @@ import {
 } from "./repository/preparationErrors";
 import {
   createInitialPreparationRoadmapSelection,
-  createPreparationRoadmapViewModel,
   hasSelectablePreparationSteps,
   PreparationRoadmapSelection,
-  PreparationCategoryViewModel,
   selectPreparationCategory,
-} from "./view-model/createPreparationRoadmapViewModel";
+} from "./model/roadmapSelection";
 import { PreparationRoadmap } from "./view/PreparationRoadmap";
 import { PreparationRoadmapState } from "./view/PreparationRoadmapState";
-import { RoadmapSectionHeader } from "./view/RoadmapSectionHeader";
-import { AllPreparationStepsSummaryFeature } from "./AllPreparationStepsSummaryFeature";
+import { useRoadmapChecklist } from "./hooks/useRoadmapChecklist";
+import { getChecklistCategoryItems } from "../checklist/model/checklistQuery";
+import {
+  createPreparationRoadmapViewModel,
+  type RoadmapProgressStatus,
+} from "./view-model/createPreparationRoadmapViewModel";
 
 type CatalogRequestState = { owner: string | undefined } & (
   | { audience?: PreparationAudience; status: "loading" }
@@ -53,16 +55,8 @@ type CatalogRequestState = { owner: string | undefined } & (
 export function AllPreparationStepsFeature({
   initialCategoryId,
   onCategoryChange,
-  viewSwitcher,
-  renderRoadmap,
 }: {
   initialCategoryId?: string | null;
-  viewSwitcher?: ReactNode;
-  renderRoadmap?: (props: {
-    catalog: PreparationCatalogModel;
-    categories: readonly PreparationCategoryViewModel[];
-    onCategorySelect: (id: string) => void;
-  }) => ReactNode;
   onCategoryChange?: (categoryId: string) => void;
 } = {}) {
   const { authState, refreshAuth } = useAuth();
@@ -79,6 +73,11 @@ export function AllPreparationStepsFeature({
   });
   const [requestRevision, setRequestRevision] = useState(0);
   const [requestedInitialCategoryId] = useState(initialCategoryId);
+  const {
+    request: checklistRequest,
+    isRefreshing,
+    retry: retryChecklist,
+  } = useRoadmapChecklist(authState.status === "authenticated");
   const additionControllerRef = useRef<AbortController | null>(null);
   const hasTrackedCatalogViewRef = useRef(false);
   const audience: PreparationAudience | undefined =
@@ -124,13 +123,19 @@ export function AllPreparationStepsFeature({
 
         const initialSelection =
           createInitialPreparationRoadmapSelection(nextCatalog);
-        const selection = requestedInitialCategoryId
-          ? selectPreparationCategory(
-              nextCatalog,
-              initialSelection,
-              requestedInitialCategoryId,
-            )
-          : initialSelection;
+        const selection =
+          requestedInitialCategoryId &&
+          nextCatalog.roadmaps.some(
+            (item) =>
+              item.categoryId === requestedInitialCategoryId &&
+              item.steps.length,
+          )
+            ? selectPreparationCategory(
+                nextCatalog,
+                initialSelection,
+                requestedInitialCategoryId,
+              )
+            : initialSelection;
 
         setRequestState({
           audience,
@@ -238,11 +243,45 @@ export function AllPreparationStepsFeature({
     return <PreparationRoadmapState status={requestState.status} />;
   }
 
-  const { catalog, selection } = requestState;
+  const { catalog: loadedCatalog } = requestState;
+  const checklist =
+    checklistRequest.status === "success"
+      ? checklistRequest.checklist
+      : undefined;
+  const catalog =
+    checklist && !isRefreshing
+      ? applyChecklistCatalogItemIds(
+          loadedCatalog,
+          checklist.categories
+            .flatMap(getChecklistCategoryItems)
+            .flatMap((item) =>
+              item.sourceCatalogItemId === null
+                ? []
+                : [String(item.sourceCatalogItemId)],
+            ),
+        )
+      : loadedCatalog;
+  const selection =
+    initialCategoryId &&
+    catalog.roadmaps.some(
+      (item) => item.categoryId === initialCategoryId && item.steps.length,
+    )
+      ? selectPreparationCategory(
+          catalog,
+          requestState.selection,
+          initialCategoryId,
+        )
+      : requestState.selection;
+  const progressStatus: RoadmapProgressStatus =
+    audience === "guest" || checklistRequest.status === "success"
+      ? "ready"
+      : checklistRequest.status === "loading"
+        ? "loading"
+        : "error";
   const viewModel = createPreparationRoadmapViewModel(
     catalog,
     selection.categoryId,
-    selection.stepId,
+    { checklist, isGuest: audience === "guest", progressStatus },
   );
 
   const handleCategorySelect = (categoryId: string) => {
@@ -270,16 +309,8 @@ export function AllPreparationStepsFeature({
     });
   };
 
-  if (renderRoadmap) {
-    return renderRoadmap({
-      catalog,
-      categories: viewModel.categories,
-      onCategorySelect: handleCategorySelect,
-    });
-  }
-
   const handleStepSelect = (stepId: string) => {
-    const selectedStep = viewModel.steps.find((step) => step.id === stepId);
+    const selectedStep = viewModel.stages.find((step) => step.id === stepId);
 
     if (!selectedStep) {
       return;
@@ -311,7 +342,7 @@ export function AllPreparationStepsFeature({
     const additionContext = {
       categoryId: selection.categoryId,
       stepId: selection.stepId,
-      stepOrder: viewModel.steps.find((step) => step.id === selection.stepId)
+      stepOrder: viewModel.stages.find((step) => step.id === selection.stepId)
         ?.order,
     };
 
@@ -393,41 +424,26 @@ export function AllPreparationStepsFeature({
 
   const handleAddAllTasks = () => {
     void addTasksToChecklist(
-      viewModel.selectedStepDetail.detailTasks.map((task) => task.id),
+      viewModel.stages
+        .find((stage) => stage.id === selection.stepId)
+        ?.tasks.filter((task) => !task.isIncluded)
+        .map((task) => task.id) ?? [],
     );
   };
 
   return (
     <PreparationRoadmap
-      header={
-        <RoadmapSectionHeader
-          id="preparation-roadmap-title"
-          title={`${viewModel.categories.find((category) => category.isCurrent)?.label ?? "준비"} · 전체 단계`}
-          summary={
-            <AllPreparationStepsSummaryFeature
-              categoryId={selection.categoryId}
-              stepCount={viewModel.steps.length}
-              guestTaskCount={
-                catalog.stepDetails
-                  .filter((detail) =>
-                    viewModel.steps.some((step) => step.id === detail.stepId),
-                  )
-                  .flatMap((detail) => detail.tasks)
-                  .filter((task) => task.included).length
-              }
-            />
-          }
-          viewSwitcher={viewSwitcher}
-        />
-      }
+      categoryId={selection.categoryId}
+      viewModel={viewModel}
+      selectedStepId={selection.stepId}
+      isGuest={audience === "guest"}
+      onRetryProgress={retryChecklist}
       additionErrorMessage={additionErrorMessage}
       addingCatalogItemIds={addingCatalogItemIds}
-      canAddTasks
       onAddAllTasks={handleAddAllTasks}
       onCategorySelect={handleCategorySelect}
       onStepSelect={handleStepSelect}
       onTaskAdd={handleTaskAdd}
-      viewModel={viewModel}
     />
   );
 }
