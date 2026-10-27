@@ -2,6 +2,7 @@ package com.bibbidi.wedding.balancegame.repository;
 
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion.Choice;
+import com.bibbidi.wedding.balancegame.repository.dto.ChoiceData;
 import com.bibbidi.wedding.balancegame.repository.dto.QuestionData;
 import com.bibbidi.wedding.balancegame.repository.dto.QuestionFile;
 import jakarta.validation.Validator;
@@ -27,13 +28,14 @@ public class BalanceGameQuestionRepository {
     public BalanceGameQuestionRepository(
             ObjectMapper mapper,
             Validator validator,
-            @Value("classpath:balance-game/questions.json") Resource resource
+            @Value("classpath:balance-game/questions.json") Resource resource,
+            @Value("${bibbidi.balance-game.image-base-url:}") String imageBaseUrl
     ) {
         QuestionFile file = readFile(mapper, resource);
         validateRequiredValues(file, validator, resource);
         validateDuplicates(file.questions());
         this.questions = file.questions().stream()
-                .map(QuestionData::toQuestion)
+                .map(question -> question.toQuestion(imageBaseUrl))
                 .sorted(Comparator.comparingInt(BalanceGameQuestion::order))
                 .toList();
     }
@@ -91,7 +93,7 @@ public class BalanceGameQuestionRepository {
                 throw new IllegalStateException("밸런스게임 문항 노출 순서가 중복됩니다: order=" + question.order());
             }
             Set<String> optionIds = new HashSet<>();
-            for (Choice option : question.options()) {
+            for (ChoiceData option : question.options()) {
                 if (!optionIds.add(option.id())) {
                     throw new IllegalStateException("밸런스게임 선택지 ID가 중복됩니다: questionId="
                             + question.id() + ", optionId=" + option.id());

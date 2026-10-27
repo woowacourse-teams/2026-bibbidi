@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion.Choice;
 import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -20,8 +21,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
@@ -31,13 +34,14 @@ import tools.jackson.databind.ObjectMapper;
 
 class BalanceGameQuestionRepositoryTest {
 
+    private static final String IMAGE_BASE_URL = "https://images.test";
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
     private static final String QUESTION = """
             {"id": 10, "order": 1, "question": "먼저 표시할 질문", "options": [
-              {"id": "B", "text": "먼저 표시할 선택지", "imageUrl": "https://images.test/option.webp"},
-              {"id": "UNKNOWN", "text": "아직 잘 모르겠어", "imageUrl": null},
-              {"id": "A", "text": "나중에 표시할 선택지", "imageUrl": null}
+              {"id": "B", "text": "먼저 표시할 선택지", "imagePath": "/balance-game/q01-b.webp"},
+              {"id": "UNKNOWN", "text": "아직 잘 모르겠어", "imagePath": null},
+              {"id": "A", "text": "나중에 표시할 선택지", "imagePath": null}
             ]}
             """;
     private static final String VALID_JSON = "{\"questions\":[" + QUESTION + "]}";
@@ -60,7 +64,7 @@ class BalanceGameQuestionRepositoryTest {
         assertThat(repository.findAll().getFirst().options()).extracting(Choice::id)
                 .containsExactly("B", "UNKNOWN", "A");
         assertThat(repository.findOptionById(10L, "B")).contains(
-                new Choice("B", "먼저 표시할 선택지", "https://images.test/option.webp"));
+                new Choice("B", "먼저 표시할 선택지", IMAGE_BASE_URL + "/balance-game/q01-b.webp"));
         assertThat(repository.findOptionById(10L, "UNKNOWN")).contains(
                 new Choice("UNKNOWN", "아직 잘 모르겠어", null));
     }
@@ -74,6 +78,72 @@ class BalanceGameQuestionRepositoryTest {
         assertThat(repository.findById(99L)).isEmpty();
         assertThat(repository.findOptionById(10L, "missing")).isEmpty();
         assertThat(repository.findOptionById(99L, "A")).isEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "https://dev.bibbidi.kr, https://dev.bibbidi.kr/balance-game/q01-b.webp",
+            "https://www.bibbidi.kr, https://www.bibbidi.kr/balance-game/q01-b.webp",
+            "https://www.bibbidi.kr/, https://www.bibbidi.kr/balance-game/q01-b.webp"
+    })
+    @DisplayName("같은 JSON에 환경별 기본 URL을 붙이고 마지막 슬래시 유무와 관계없이 경로를 유지한다")
+    void shouldResolveImageUrlWithConfiguredBase(String imageBaseUrl, String expectedImageUrl) {
+        BalanceGameQuestionRepository repository = fromJson(VALID_JSON, imageBaseUrl);
+
+        assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+                .isEqualTo(expectedImageUrl);
+        assertThat(repository.findOptionById(10L, "UNKNOWN").orElseThrow().imageUrl()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"dev, https://dev.bibbidi.kr", "prod, https://www.bibbidi.kr"})
+    @DisplayName("개발과 운영 프로필의 공개 도메인을 실제 문항 로딩에 적용한다")
+    void shouldUseProfileImageBaseUrl(String profile, String expectedOrigin) {
+        new ApplicationContextRunner()
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.profiles.active=" + profile)
+                .withBean(ObjectMapper.class, () -> MAPPER)
+                .withBean(Validator.class, VALIDATOR_FACTORY::getValidator)
+                .withUserConfiguration(BalanceGameQuestionRepository.class)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    BalanceGameQuestionRepository repository = context.getBean(BalanceGameQuestionRepository.class);
+                    assertThat(repository.findOptionById(1L, "A").orElseThrow().imageUrl())
+                            .isEqualTo(expectedOrigin + "/balance-game/q01-a.webp");
+                    assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+                            .isEqualTo(expectedOrigin + "/balance-game/q10-b.webp");
+                    assertThat(repository.findOptionById(1L, "UNKNOWN").orElseThrow().imageUrl()).isNull();
+                });
+    }
+
+    @Test
+    @DisplayName("이미지가 없는 문항은 기본 URL이 없어도 null을 유지한다")
+    void shouldKeepNullImagesWithoutBaseUrl() {
+        BalanceGameQuestionRepository repository = fromJson(
+                VALID_JSON.replace("\"/balance-game/q01-b.webp\"", "null"), "");
+
+        assertThat(repository.findAll().getFirst().options())
+                .allSatisfy(option -> assertThat(option.imageUrl()).isNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "bibbidi/fe/development/balance-game/", "https://", "file:///images/"})
+    @DisplayName("이미지가 있는데 공개 기본 URL이 올바르지 않으면 설정과 선택지 ID를 알리며 실패한다")
+    void shouldRejectInvalidImageBaseUrl(String imageBaseUrl) {
+        assertThatThrownBy(() -> fromJson(VALID_JSON, imageBaseUrl))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContainingAll("optionId=B", "image-base-url=" + imageBaseUrl)
+                .hasCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "//other.test/option.webp", "https://other.test/option.webp", "["})
+    @DisplayName("이미지 경로는 기본 URL 아래의 유효한 상대 경로여야 한다")
+    void shouldRejectInvalidImagePath(String imagePath) {
+        assertThatThrownBy(() -> fromJson(VALID_JSON.replace("/balance-game/q01-b.webp", imagePath)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContainingAll("optionId=B", "imagePath=" + imagePath)
+                .hasCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -115,10 +185,14 @@ class BalanceGameQuestionRepositoryTest {
                 .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
         assertThat(repository.findAll()).allSatisfy(question -> {
             assertThat(question.options()).extracting(Choice::id).containsExactly("A", "B", "UNKNOWN");
-            assertThat(question.options()).allSatisfy(option -> assertThat(option.imageUrl()).isNull());
+            assertThat(question.options().getLast().imageUrl()).isNull();
         });
         assertThat(repository.findById(1L).orElseThrow().options().getFirst().text())
                 .isEqualTo("기본 촬영에 더해, 아이폰으로 생생한 현장 사진도 남길래.");
+        assertThat(repository.findOptionById(1L, "A").orElseThrow().imageUrl())
+                .isEqualTo(IMAGE_BASE_URL + "/balance-game/q01-a.webp");
+        assertThat(repository.findOptionById(10L, "B").orElseThrow().imageUrl())
+                .isEqualTo(IMAGE_BASE_URL + "/balance-game/q10-b.webp");
         assertThat(repository.findById(10L).orElseThrow().question()).isEqualTo("결혼 후 함께 살 집을 떠올리면?");
     }
 
@@ -172,7 +246,7 @@ class BalanceGameQuestionRepositoryTest {
     @Test
     @DisplayName("문서 뒤의 JSON과 잘못된 필드명, 소수 순서를 허용하지 않는다")
     void shouldRejectTrailingJsonAndUnknownFieldsAndFractionalOrder() {
-        for (String json : List.of(VALID_JSON + "{}", VALID_JSON.replace("\"imageUrl\"", "\"image\""),
+        for (String json : List.of(VALID_JSON + "{}", VALID_JSON.replace("\"imagePath\"", "\"imageUrl\""),
                 VALID_JSON.replace("\"order\": 1", "\"order\": 1.5"))) {
             assertThatThrownBy(() -> fromJson(json)).isInstanceOf(IllegalStateException.class);
         }
@@ -252,10 +326,15 @@ class BalanceGameQuestionRepositoryTest {
     }
 
     private static BalanceGameQuestionRepository fromJson(String json) {
-        return fromResource(new ByteArrayResource(json.getBytes(StandardCharsets.UTF_8), "test-questions.json"));
+        return fromJson(json, IMAGE_BASE_URL);
+    }
+
+    private static BalanceGameQuestionRepository fromJson(String json, String imageBaseUrl) {
+        return new BalanceGameQuestionRepository(MAPPER, VALIDATOR_FACTORY.getValidator(),
+                new ByteArrayResource(json.getBytes(StandardCharsets.UTF_8), "test-questions.json"), imageBaseUrl);
     }
 
     private static BalanceGameQuestionRepository fromResource(Resource resource) {
-        return new BalanceGameQuestionRepository(MAPPER, VALIDATOR_FACTORY.getValidator(), resource);
+        return new BalanceGameQuestionRepository(MAPPER, VALIDATOR_FACTORY.getValidator(), resource, IMAGE_BASE_URL);
     }
 }

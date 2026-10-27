@@ -33,6 +33,8 @@ spring:
       mode: never
 
 bibbidi:
+  balance-game:
+    image-base-url: ${BIBBIDI_BALANCE_GAME_IMAGE_BASE_URL:}
   sse:
     response-timeout-seconds: 60
   ai:

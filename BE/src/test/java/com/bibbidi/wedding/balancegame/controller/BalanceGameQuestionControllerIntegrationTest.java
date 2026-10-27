@@ -57,7 +57,12 @@ class BalanceGameQuestionControllerIntegrationTest extends BibbidiIntegrationTes
                             .value("기본 촬영에 더해, 아이폰으로 생생한 현장 사진도 남길래."))
                     .andExpect(jsonPath("$.questions[0].options[2].text").value("아직 잘 모르겠어"))
                     .andExpect(jsonPath("$.questions[*].options[*].imageUrl", hasSize(30)))
-                    .andExpect(jsonPath("$.questions[*].options[*].imageUrl", everyItem(nullValue())))
+                    .andExpect(jsonPath("$.questions[0].options[0].imageUrl")
+                            .value("https://images.test/balance-game/q01-a.webp"))
+                    .andExpect(jsonPath("$.questions[9].options[1].imageUrl")
+                            .value("https://images.test/balance-game/q10-b.webp"))
+                    .andExpect(jsonPath("$.questions[*].options[2].imageUrl", everyItem(nullValue())))
+                    .andExpect(jsonPath("$.questions[*].options[*].imagePath").doesNotExist())
                     .andDo(document("balance-game-questions-find-all",
                             resource(ResourceSnippetParameters.builder()
                                     .tag("Balance Game")
@@ -77,7 +82,7 @@ class BalanceGameQuestionControllerIntegrationTest extends BibbidiIntegrationTes
                                                     .description("선택지 ID. UNKNOWN은 아직 모르겠다는 선택"),
                                             fieldWithPath("questions[].options[].text").description("선택지 문구"),
                                             fieldWithPath("questions[].options[].imageUrl").type(JsonFieldType.STRING)
-                                                    .description("선택지 이미지 URL. 이미지가 없으면 null")
+                                                    .description("실행 환경의 공개 도메인과 이미지 경로를 합친 URL. 이미지가 없으면 null")
                                                     .optional())
                                     .build())));
             assertThat(statistics.getPrepareStatementCount()).isEqualTo(statementCount);

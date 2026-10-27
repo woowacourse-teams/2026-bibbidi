@@ -1,6 +1,5 @@
 package com.bibbidi.wedding.balancegame.domain;
 
-import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -17,8 +16,8 @@ public record BalanceGameQuestion(
     }
 
     public record Choice(
-            @NonNull @NotBlank String id,
-            @NonNull @NotBlank String text,
+            @NonNull String id,
+            @NonNull String text,
             @Nullable String imageUrl
     ) {
     }

@@ -16,6 +16,10 @@ spring:
     init:
       mode: never
 
+bibbidi:
+  balance-game:
+    image-base-url: https://images.test
+
 discord:
   url:
     feedback: https://discord.test/webhook
