@@ -23,7 +23,3 @@ spring:
         - classpath:load_catalog.sql
         - classpath:load_terms.sql
         - classpath:load_dev_users.sql
-
-bibbidi:
-  balance-game:
-    image-base-url: https://dev.bibbidi.kr

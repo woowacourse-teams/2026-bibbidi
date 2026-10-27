@@ -1,6 +1,7 @@
 package com.bibbidi.wedding.balancegame.controller.dto;
 
 import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion;
+import com.bibbidi.wedding.balancegame.domain.BalanceGameQuestion.Choice;
 import java.util.List;
 
 public record BalanceGameQuestionsResponse(
@@ -9,11 +10,7 @@ public record BalanceGameQuestionsResponse(
 
     public static BalanceGameQuestionsResponse from(List<BalanceGameQuestion> questions) {
         return new BalanceGameQuestionsResponse(questions.stream()
-                .map(question -> new QuestionResponse(
-                        question.id(), question.order(), question.question(),
-                        question.options().stream()
-                                .map(option -> new OptionResponse(option.id(), option.text(), option.imageUrl()))
-                                .toList()))
+                .map(QuestionResponse::from)
                 .toList());
     }
 
@@ -21,14 +18,29 @@ public record BalanceGameQuestionsResponse(
             Long id,
             int order,
             String question,
-            List<OptionResponse> options
+            List<ChoiceResponse> options
     ) {
+
+        public static QuestionResponse from(BalanceGameQuestion question) {
+            return new QuestionResponse(
+                    question.id(),
+                    question.order(),
+                    question.content(),
+                    question.choices().stream()
+                            .map(ChoiceResponse::from)
+                            .toList()
+            );
+        }
     }
 
-    public record OptionResponse(
+    public record ChoiceResponse(
             String id,
             String text,
-            String imageUrl
+            String imagePath
     ) {
+
+        public static ChoiceResponse from(Choice choice) {
+            return new ChoiceResponse(choice.id(), choice.text(), choice.imagePath());
+        }
     }
 }
