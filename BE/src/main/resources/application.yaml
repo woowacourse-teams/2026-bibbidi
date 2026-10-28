@@ -59,6 +59,8 @@ bibbidi:
     questions-location: ${BIBBIDI_BALANCE_GAME_QUESTIONS_LOCATION}
     types-location: ${BIBBIDI_BALANCE_GAME_TYPES_LOCATION}
   ai:
+    balance-game:
+      model: ${BIBBIDI_BALANCE_GAME_MODEL:qwen}
     chatbot:
       accounts-enabled: ${BIBBIDI_CHAT_ACCOUNTS_ENABLED:false}
       memory-max-messages: 20
