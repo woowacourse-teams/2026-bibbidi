@@ -1,6 +1,10 @@
 import type { AnalyticsEvent } from "../../infrastructure/analytics";
 
 const PAGE_DEFINITIONS = {
+  "/balance-game": {
+    pageTitle: "우리 결혼 밸런스게임",
+    screenName: "balance_game",
+  },
   "/landing": {
     pageTitle: "비비디 서비스 소개",
     screenName: "landing",

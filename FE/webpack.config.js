@@ -173,6 +173,14 @@ module.exports = (_environment, arguments_) => {
             proxy: [
               {
                 changeOrigin: true,
+                context: (pathname) =>
+                  /^\/balance-game\/[^/]+\.webp$/.test(pathname),
+                target:
+                  process.env.BIBBIDI_ASSET_PROXY_TARGET ||
+                  "https://dev.bibbidi.kr",
+              },
+              {
+                changeOrigin: true,
                 context: "/api",
                 target: apiProxyTarget,
               },

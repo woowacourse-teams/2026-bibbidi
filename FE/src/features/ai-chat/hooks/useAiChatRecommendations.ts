@@ -8,7 +8,7 @@ import {
   usePreparationChecklistRepository,
   PreparationAuthenticationRequiredError,
 } from "../../preparation";
-import { addRecommendedTasks } from "../commands/addRecommendedTasks";
+import { addRecommendedTasks } from "../../preparation/commands/addRecommendedTasks";
 import { useAiChatRecommendationCatalog } from "./useAiChatRecommendationCatalog";
 import type { ChatMessage } from "../model/aiChat";
 import type {
