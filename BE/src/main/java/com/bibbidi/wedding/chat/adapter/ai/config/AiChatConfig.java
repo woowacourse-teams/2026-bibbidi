@@ -180,17 +180,28 @@ public class AiChatConfig {
         }
 
         String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
-        ChatModelTarget qwen = new ChatModelTarget(qwenClient.getIfAvailable(() -> bedrockClient), properties.qwenModel(),
+        ChatClient accountQwenClient = qwenClient.getIfAvailable();
+        ChatClient selectedQwenClient = bedrockClient;
+        if (accountQwenClient != null) {
+            selectedQwenClient = accountQwenClient;
+        }
+        ChatModelTarget qwen = new ChatModelTarget(selectedQwenClient, properties.qwenModel(),
                 () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
+        if (accountQwenClient == null) {
+            return new ChatModelRouter(Map.of(
+                    ChatModelTier.LOW, qwen,
+                    ChatModelTier.MEDIUM, qwen,
+                    ChatModelTier.HIGH, qwen));
+        }
         ChatModelTarget sol = new ChatModelTarget(bedrockClient, properties.solModel(),
                 () -> BedrockChatOptions.builder().model(properties.solModel()).outputSchema(schema)
                         .requestParameters(strictJsonFormatParameters()));
 
         ChatClient openAiClient = lunaClient.getIfAvailable();
-        // accounts-enabled가 꺼진 환경에는 OpenAI 클라이언트가 없다. Luna 요청도 Bedrock Sol 모델이 처리하므로, 기록하는 모델명도 Sol로 맞춘다.
-        ChatModelTarget luna = openAiClient == null
-                ? sol
-                : new ChatModelTarget(openAiClient, properties.lunaModel(), null);
+        ChatModelTarget luna = sol;
+        if (openAiClient != null) {
+            luna = new ChatModelTarget(openAiClient, properties.lunaModel(), null);
+        }
         return new ChatModelRouter(Map.of(
                 ChatModelTier.LOW, qwen,
                 ChatModelTier.MEDIUM, luna,

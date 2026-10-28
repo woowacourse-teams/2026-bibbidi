@@ -84,8 +84,12 @@ class SpringAiChatClientRoutingTest {
     }
 
     @Test
-    void recordsTheBedrockSolModelForLunaWhenNoOpenAiClientExists() {
-        ChatClient bedrock = ChatClient.create(new FakeChatModel(prompt -> Flux.empty()));
+    void routesEveryTierToBedrockQwenWithoutAccountClients() {
+        List<Prompt> bedrockPrompts = new ArrayList<>();
+        ChatClient bedrock = ChatClient.create(new FakeChatModel(prompt -> {
+            bedrockPrompts.add(prompt);
+            return Flux.empty();
+        }));
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatClient> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
@@ -96,10 +100,13 @@ class SpringAiChatClientRoutingTest {
                         "qwen-id", "global.openai.gpt-6.1-sol", "gpt-6-luna"), "");
         SpringAiChatClient client = new SpringAiChatClient(router);
 
-        assertThat(client.modelName(ChatModelTier.MEDIUM)).isEqualTo("global.openai.gpt-6.1-sol");
-        assertThat(client.modelName(ChatModelTier.LOW)).isEqualTo("qwen-id");
-        client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천")), ChatModelTier.MEDIUM)
-                .blockLast();
+        for (ChatModelTier tier : ChatModelTier.values()) {
+            assertThat(client.modelName(tier)).isEqualTo("qwen-id");
+            client.streamReply(new ChatModelRequest(7L, "conversation", new UserMessage("추천")), tier)
+                    .blockLast();
+        }
+        assertThat(bedrockPrompts).hasSize(3)
+                .allSatisfy(prompt -> assertThat(prompt.getOptions().getModel()).isEqualTo("qwen-id"));
     }
 
     @Test
