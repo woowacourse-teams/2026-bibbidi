@@ -17,6 +17,7 @@ public final class SpringAiChatClient {
 
     private static final String TOOL_CONTEXT_USER_ID = "userId";
     private static final String TOOL_CONTEXT_WRITE_ATTEMPTED = "writeAttempted";
+    private static final String TOOL_CONTEXT_WRITE_SUCCEEDED = "writeSucceeded";
 
     private final ChatModelRouter router;
 
@@ -35,7 +36,8 @@ public final class SpringAiChatClient {
                 .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey()))
                 .toolContext(Map.of(
                         TOOL_CONTEXT_USER_ID, request.userId(),
-                        TOOL_CONTEXT_WRITE_ATTEMPTED, request.writeAttempted()))
+                        TOOL_CONTEXT_WRITE_ATTEMPTED, request.writeAttempted(),
+                        TOOL_CONTEXT_WRITE_SUCCEEDED, request.writeSucceeded()))
                 .stream()
                 .chatResponse();
     }
@@ -50,6 +52,14 @@ public final class SpringAiChatClient {
             return;
         }
         throw new BusinessException(ClientError.INTERNAL_ERROR, "쓰기 도구 실행 상태가 없습니다.");
+    }
+
+    public static void markWriteSucceeded(ToolContext toolContext) {
+        if (toolContext.getContext().get(TOOL_CONTEXT_WRITE_SUCCEEDED) instanceof AtomicBoolean succeeded) {
+            succeeded.set(true);
+            return;
+        }
+        throw new BusinessException(ClientError.INTERNAL_ERROR, "쓰기 도구 성공 상태가 없습니다.");
     }
 
     /**

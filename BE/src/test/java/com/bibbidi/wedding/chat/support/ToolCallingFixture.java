@@ -5,6 +5,7 @@ import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -59,6 +60,13 @@ public class ToolCallingFixture {
 
         Message last = result.conversationHistory().getLast();
         return ((ToolResponseMessage) last).getResponses().getFirst().responseData();
+    }
+
+    public boolean writeSucceeded() {
+        Prompt prompt = receivedPrompts.getLast();
+        AtomicBoolean succeeded = (AtomicBoolean) ((ToolCallingChatOptions) prompt.getOptions())
+                .getToolContext().get("writeSucceeded");
+        return succeeded.get();
     }
 
     private Prompt send(Long userId) {

@@ -3,12 +3,13 @@ package com.bibbidi.wedding.chat.adapter.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.openai.errors.OpenAIRetryableException;
-import com.openai.errors.RateLimitException;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRequest;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
@@ -17,6 +18,8 @@ import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.chat.support.SpringAiChatClientFixture;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import com.openai.errors.OpenAIRetryableException;
+import com.openai.errors.RateLimitException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -40,6 +43,7 @@ import org.springframework.ai.retry.TransientAiException;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 import reactor.test.publisher.TestPublisher;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import tools.jackson.databind.json.JsonMapper;
@@ -103,6 +107,67 @@ class SpringAiConversationAdapterTest {
                 new ChatResult.Delta("웨딩홀 "),
                 new ChatResult.Delta("계약"),
                 new ChatResult.Answer("웨딩홀 계약", List.of()));
+    }
+
+    @Test
+    @DisplayName("쓰기 도구가 성공하면 답변 뒤에 갱신 신호를 한 번 전달한다")
+    void sendsRefreshAfterSuccessfulWrite() {
+        SpringAiChatClient client = mock(SpringAiChatClient.class);
+        when(client.streamReply(any(ChatModelRequest.class), any(ChatModelTier.class))).thenAnswer(invocation -> {
+            ChatModelRequest request = invocation.getArgument(0);
+            request.writeSucceeded().set(true);
+            return Flux.just(chunk(answerJson("완료했어요.")));
+        });
+        SpringAiConversationAdapter adapter = adapterWith(client);
+
+        assertThat(adapter.stream(USER_ID, CONVERSATION, "수정해줘").collectList().block())
+                .containsExactly(
+                        new ChatResult.Selected(ChatModelTier.LOW),
+                        new ChatResult.Delta("완료했어요."),
+                        new ChatResult.Answer("완료했어요.", List.of()),
+                        new ChatResult.Refresh());
+    }
+
+    @Test
+    @DisplayName("쓰기 성공 뒤 모델 응답이 실패해도 갱신 신호를 전달한다")
+    void sendsRefreshWhenAnswerFailsAfterWrite() {
+        SpringAiChatClient client = mock(SpringAiChatClient.class);
+        when(client.streamReply(any(ChatModelRequest.class), any(ChatModelTier.class))).thenAnswer(invocation -> {
+            ChatModelRequest request = invocation.getArgument(0);
+            request.writeAttempted().set(true);
+            request.writeSucceeded().set(true);
+            return Flux.error(new IllegalStateException("모델 오류"));
+        });
+        SpringAiConversationAdapter adapter = adapterWith(client);
+
+        StepVerifier.create(adapter.stream(USER_ID, CONVERSATION, "수정해줘"))
+                .expectNext(new ChatResult.Selected(ChatModelTier.LOW), new ChatResult.Refresh())
+                .expectError(BusinessException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("쓰기 도구가 실패하면 갱신 신호를 보내지 않는다")
+    void doesNotSendRefreshAfterFailedWrite() {
+        SpringAiChatClient client = mock(SpringAiChatClient.class);
+        when(client.streamReply(any(ChatModelRequest.class), any(ChatModelTier.class))).thenAnswer(invocation -> {
+            ChatModelRequest request = invocation.getArgument(0);
+            request.writeAttempted().set(true);
+            return Flux.just(chunk(answerJson("변경하지 못했어요.")));
+        });
+        SpringAiConversationAdapter adapter = adapterWith(client);
+
+        assertThat(adapter.stream(USER_ID, CONVERSATION, "수정해줘").collectList().block())
+                .containsExactly(
+                        new ChatResult.Selected(ChatModelTier.LOW),
+                        new ChatResult.Delta("변경하지 못했어요."),
+                        new ChatResult.Answer("변경하지 못했어요.", List.of()));
+    }
+
+    private SpringAiConversationAdapter adapterWith(SpringAiChatClient client) {
+        ModelClassifier classifier = mock(ModelClassifier.class);
+        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ChatModelTier.LOW));
+        return new SpringAiConversationAdapter(client, new JacksonChatAnswerParser(MAPPER), chatMemory, classifier);
     }
 
     @Test

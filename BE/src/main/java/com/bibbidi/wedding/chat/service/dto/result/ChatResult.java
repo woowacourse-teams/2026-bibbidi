@@ -18,6 +18,9 @@ public sealed interface ChatResult {
     record Answer(String answer, List<Long> recommendedItemIds) implements ChatResult {
     }
 
+    record Refresh() implements ChatResult {
+    }
+
     record Completed() implements ChatResult {
     }
 

@@ -74,6 +74,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -210,6 +211,27 @@ class AiChatControllerTest {
     }
 
     @Test
+    @DisplayName("쓰기 성공 시 refresh SSE를 답변 뒤, done 앞에 전송한다")
+    void streamsRefreshAfterSuccessfulWrite() throws Exception {
+        responder = prompt -> {
+            AtomicBoolean succeeded = (AtomicBoolean) ((ToolCallingChatOptions) prompt.getOptions())
+                    .getToolContext().get("writeSucceeded");
+            succeeded.set(true);
+            return Flux.just(chunk("{\"answer\":\"수정했어요.\",\"recommendedItemIds\":[]}"));
+        };
+
+        MvcResult initial = mockMvc.perform(post("/api/ai/chat").with(authenticatedUser(USER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChatRequest(null, "수정해줘"))))
+                .andReturn();
+        initial.getAsyncResult(5000);
+        mockMvc.perform(asyncDispatch(initial));
+
+        assertThat(body(initial)).containsSubsequence("event:delta", "수정했어요.",
+                "event:refresh", "data:{}", "event:done");
+    }
+
+    @Test
     @DisplayName("첫 delta 전송 시 요청당 TTFT를 한 번 기록한다")
     void recordsTtftOnceAfterTheFirstDeltaIsSent() throws Exception {
         // given
@@ -278,6 +300,7 @@ class AiChatControllerTest {
                                 .description("로그인 사용자의 결혼 준비 질문에 SSE로 답변합니다. "
                                         + "대화 ID와 답변 조각을 전송하고, 추천 카드가 있으면 component 이벤트의 catalogItemIds 배열로 전달합니다. "
                                         + "배열 순서가 추천 순서이며, component는 도구 실행 시 답변 조각 사이에도 올 수 있습니다. "
+                                        + "쓰기 도구가 데이터 변경에 성공하면 refresh 이벤트(data:{})를 한 번 보내며, 화면 갱신이나 이동은 클라이언트가 결정합니다. "
                                         + "정상 완료 시 done, 실패 시 failure 이벤트를 보냅니다.")
                                 .requestSchema(schema("ChatRequest"))
                                 .responseSchema(schema("ChatEventStream"))

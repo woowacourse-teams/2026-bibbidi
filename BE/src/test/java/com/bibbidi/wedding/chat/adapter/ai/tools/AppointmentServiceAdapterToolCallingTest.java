@@ -57,6 +57,7 @@ class AppointmentServiceAdapterToolCallingTest {
         // then
         verify(appointmentService).create(command);
         assertThat(response).contains("\"id\":40");
+        assertThat(toolCalling.writeSucceeded()).isTrue();
     }
 
     @Test
@@ -74,6 +75,7 @@ class AppointmentServiceAdapterToolCallingTest {
         // then
         verify(appointmentService).changeStatus(command);
         assertThat(response).contains("\"id\":31");
+        assertThat(toolCalling.writeSucceeded()).isTrue();
     }
 
     @Test
@@ -82,5 +84,6 @@ class AppointmentServiceAdapterToolCallingTest {
         toolCalling.callTool(USER_ID, "deleteAppointment", "{\"appointmentId\": 31}");
 
         verify(appointmentService).delete(USER_ID, 31L);
+        assertThat(toolCalling.writeSucceeded()).isTrue();
     }
 }
