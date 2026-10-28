@@ -118,7 +118,6 @@ export function BalanceGameResults({
       className="balance-game__results"
       aria-labelledby="balance-game-result-title"
     >
-      <p className="balance-game__eyebrow">우리의 선택을 준비 목록으로</p>
       <h1 id="balance-game-result-title" ref={heading} tabIndex={-1}>
         우리에게 맞는
         <br />
