@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/button";
 import { Checkbox } from "../../../components/checkbox";
 import { ProgressBar } from "../../../components/progress-bar";
-import { ChevronRight } from "../../../components/icons/Chevron";
 import type {
   BalanceGameOption,
   BalanceGameQuestion,
@@ -23,6 +22,7 @@ export function BalanceGameQuestionView({
   submitting,
   error,
   onSelect,
+  onPrevious,
   onNext,
 }: {
   question: BalanceGameQuestion;
@@ -32,6 +32,7 @@ export function BalanceGameQuestionView({
   submitting: boolean;
   error: string | null;
   onSelect: (id: BalanceGameOption["id"]) => void;
+  onPrevious: () => void;
   onNext: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -42,7 +43,6 @@ export function BalanceGameQuestionView({
   return (
     <div className="balance-game__question">
       <div className="balance-game__progress-label">
-        <span>가볍게 골라보는 우리의 결혼 준비</span>
         <span>
           <strong>{String(index + 1).padStart(2, "0")}</strong> /{" "}
           {String(total).padStart(2, "0")}
@@ -54,7 +54,6 @@ export function BalanceGameQuestionView({
         size="light"
         animate
       />
-      <p className="balance-game__eyebrow">우리 결혼 밸런스게임</p>
       <h1 id="balance-game-question" ref={heading} tabIndex={-1}>
         {question.question}
       </h1>
@@ -95,10 +94,7 @@ export function BalanceGameQuestionView({
             ))}
         </div>
         {unknown && (
-          <label
-            className="balance-game__unknown"
-            data-selected={selected === "UNKNOWN" || undefined}
-          >
+          <label className="balance-game__unknown">
             <Checkbox
               inputType="radio"
               name={`question-${question.id}`}
@@ -109,21 +105,28 @@ export function BalanceGameQuestionView({
           </label>
         )}
       </fieldset>
-      <p className="balance-game__hint">
-        지금 마음에 가까운 쪽을 골라요. 정답은 없어요.
-      </p>
       {error && (
         <p className="balance-game__error" role="alert">
           {error}
         </p>
       )}
       <div className="balance-game__footer">
-        <span className="balance-game__hint">
-          이전 질문으로 돌아가 답을 바꿀 수 있어요.
-        </span>
-        <Button disabled={!selected} loading={submitting} onClick={onNext}>
+        <Button
+          size="large"
+          color="dark"
+          variant="weak"
+          disabled={index === 0 || submitting}
+          onClick={onPrevious}
+        >
+          이전 질문
+        </Button>
+        <Button
+          size="large"
+          disabled={!selected}
+          loading={submitting}
+          onClick={onNext}
+        >
           {index === total - 1 ? "추천 할 일 보기" : "다음 질문"}
-          <ChevronRight size={18} />
         </Button>
       </div>
     </div>

@@ -1,26 +1,17 @@
 .balance-game-layout {
-  background: var(--color-bg-layer-default);
+  background: var(--color-bg-layer-basement);
   color: var(--color-fg-neutral);
 }
 
 .balance-game {
   width: min(100% - 48px, 640px);
   margin: 0 auto;
-  padding: 16px 0 48px;
-}
-
-.balance-game__navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 40px;
-  font: var(--typography-t6-medium);
+  padding: 48px 0;
 }
 
 .balance-game__progress-label {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin-bottom: 10px;
   color: var(--color-fg-neutral-muted);
@@ -29,12 +20,6 @@
 
 .balance-game__progress-label strong {
   color: var(--color-fg-warning);
-}
-
-.balance-game__eyebrow {
-  margin: 32px 0 8px;
-  color: var(--color-fg-warning);
-  font: var(--typography-t7);
 }
 
 .balance-game h1 {
@@ -46,6 +31,10 @@
 
 .balance-game h1:focus {
   outline: none;
+}
+
+.balance-game__question h1 {
+  margin-top: 32px;
 }
 
 .balance-game__choices {
@@ -152,40 +141,28 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: fit-content;
+  max-width: 100%;
   min-height: 48px;
-  margin-top: 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  margin: 16px auto 0;
   color: var(--color-fg-neutral-muted);
   font: var(--typography-t6-medium);
   cursor: pointer;
 }
 
-.balance-game__unknown[data-selected] {
-  border-color: var(--color-stroke-brand-solid);
-  background: var(--color-bg-brand-weak);
-  color: var(--color-fg-neutral);
+.balance-game__footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 32px;
 }
 
-.balance-game__hint {
-  color: var(--color-fg-neutral-muted);
-  font: var(--typography-t7);
-  text-align: center;
-}
-
-.balance-game__footer,
 .balance-game__result-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-top: 48px;
-}
-
-.balance-game__footer .bibbidi-button-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .balance-game__status {
@@ -281,7 +258,7 @@
   position: sticky;
   bottom: 0;
   padding: 16px 0 max(16px, env(safe-area-inset-bottom));
-  background: var(--color-bg-layer-default);
+  background: var(--color-bg-layer-basement);
   font: var(--typography-t6-medium);
 }
 
@@ -303,11 +280,7 @@
 @media (width < 768px) {
   .balance-game {
     width: calc(100% - 32px);
-    padding-top: 0;
-  }
-
-  .balance-game__navigation {
-    margin-bottom: 24px;
+    padding-top: 32px;
   }
 
   .balance-game h1 {
@@ -333,15 +306,14 @@
     font: var(--typography-t6-medium);
   }
 
-  .balance-game__footer,
+  .balance-game__footer {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .balance-game__result-footer {
     flex-direction: column;
     align-items: stretch;
     text-align: center;
-  }
-
-  .balance-game__footer .bibbidi-button {
-    width: 100%;
   }
 
   .balance-game__selection-toolbar {

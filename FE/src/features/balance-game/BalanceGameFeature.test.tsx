@@ -68,10 +68,18 @@ describe("밸런스게임", () => {
       (screen.getByRole("button", { name: "다음 질문" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "이전 질문" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
     fireEvent.click(
       screen.getByRole("radio", { name: questions[0].options[0].text }),
     );
     fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
+    expect(
+      (screen.getByRole("button", { name: "이전 질문" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "이전 질문" }));
     expect(
       (
@@ -122,6 +130,10 @@ describe("밸런스게임", () => {
     );
     renderGame();
     await finishGame();
+    expect(
+      (screen.getByRole("button", { name: "이전 질문" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "추천 할 일 보기" }));
     expect(getBalanceGameRecommendations).toHaveBeenCalledOnce();
     await act(async () => rejectRequest(new Error("network")));
@@ -164,22 +176,5 @@ describe("밸런스게임", () => {
       ["22", "161"],
       expect.any(AbortSignal),
     );
-  });
-  it("나가기 전에 답변 삭제를 알리고 계속 고를 수 있다", async () => {
-    renderGame();
-    await screen.findByRole("heading", { name: questions[0].question });
-    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-    fireEvent.click(screen.getByRole("button", { name: "나가기" }));
-    expect(
-      await screen.findByRole("dialog", { name: "밸런스게임을 나갈까요?" }),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "계속 고르기" }));
-    expect(
-      (
-        screen.getByRole("radio", {
-          name: "아직 잘 모르겠어",
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
   });
 });

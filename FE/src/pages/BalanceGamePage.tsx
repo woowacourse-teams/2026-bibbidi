@@ -3,7 +3,6 @@ import { AppLayout } from "../components/app-layout";
 import { Result } from "../components/result";
 import { useAuth } from "../features/auth";
 import { BalanceGameFeature } from "../features/balance-game/BalanceGameFeature";
-import { BrandHeader } from "../layouts/BrandHeader";
 
 export function BalanceGamePage() {
   const { authState, refreshAuth } = useAuth();
@@ -11,11 +10,7 @@ export function BalanceGamePage() {
   if (authState.status === "onboardingRequired")
     return <Navigate replace to="/onboarding" />;
   return (
-    <AppLayout
-      header={<BrandHeader />}
-      scroll="document"
-      className="balance-game-layout"
-    >
+    <AppLayout scroll="document" className="balance-game-layout">
       {authState.status === "authenticated" ? (
         <BalanceGameFeature
           key={authState.user.id}
