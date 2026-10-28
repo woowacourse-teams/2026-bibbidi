@@ -42,11 +42,13 @@ public class ChecklistServiceAdapter {
             ToolContext toolContext
     ) {
         SpringAiChatClient.markWriteAttempt(toolContext);
-        return checklistService.changeItemStatus(
+        ChecklistItemResult result = checklistService.changeItemStatus(
                 SpringAiChatClient.userIdOf(toolContext),
                 checklistItemId,
                 status
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
+        return result;
     }
 
     @Tool(
@@ -59,11 +61,13 @@ public class ChecklistServiceAdapter {
             ToolContext toolContext
     ) {
         SpringAiChatClient.markWriteAttempt(toolContext);
-        return checklistService.changeItemTitle(
+        ChecklistItemResult result = checklistService.changeItemTitle(
                 SpringAiChatClient.userIdOf(toolContext),
                 checklistItemId,
                 title
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
+        return result;
     }
 
     @Tool(
@@ -78,5 +82,6 @@ public class ChecklistServiceAdapter {
         checklistService.deleteItem(
                 SpringAiChatClient.userIdOf(toolContext), checklistItemId
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
     }
 }

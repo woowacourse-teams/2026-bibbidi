@@ -11,15 +11,34 @@ import com.bibbidi.wedding.chat.support.FakeChatModel;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import reactor.core.publisher.Flux;
 
 class SpringAiChatClientRoutingTest {
+
+    @Test
+    void sharesWriteSuccessStateWithToolContext() {
+        ChatModelRequest request = new ChatModelRequest(7L, "conversation", new UserMessage("수정"));
+        ChatClient chatClient = ChatClient.create(new FakeChatModel(prompt -> {
+            Map<String, Object> context = ((ToolCallingChatOptions) prompt.getOptions()).getToolContext();
+            ((AtomicBoolean) context.get("writeSucceeded")).set(true);
+            return Flux.empty();
+        }));
+        SpringAiChatClient client = new SpringAiChatClient(new ChatModelRouter(Map.of(ChatModelTier.LOW,
+                new ChatModelTarget(chatClient, "test-model", null))));
+
+        client.streamReply(request, ChatModelTier.LOW).blockLast();
+
+        assertThat(request.writeSucceeded()).isTrue();
+    }
 
     @Test
     void routesEachTierThroughItsOwnAccountClient() {

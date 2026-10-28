@@ -13,6 +13,9 @@ public final class ChatResponse {
     public record Component(List<Long> catalogItemIds) {
     }
 
+    public record Refresh() {
+    }
+
     public record Failure(int errorCode, String message) {
     }
 }

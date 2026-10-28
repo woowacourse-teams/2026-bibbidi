@@ -7,9 +7,10 @@ public record ChatModelRequest(
         Long userId,
         String conversationKey,
         UserMessage userMessage,
-        AtomicBoolean writeAttempted
+        AtomicBoolean writeAttempted,
+        AtomicBoolean writeSucceeded
 ) {
     public ChatModelRequest(Long userId, String conversationKey, UserMessage userMessage) {
-        this(userId, conversationKey, userMessage, new AtomicBoolean());
+        this(userId, conversationKey, userMessage, new AtomicBoolean(), new AtomicBoolean());
     }
 }

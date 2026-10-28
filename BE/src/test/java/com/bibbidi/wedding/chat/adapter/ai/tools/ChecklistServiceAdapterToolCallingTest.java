@@ -57,6 +57,7 @@ class ChecklistServiceAdapterToolCallingTest {
         verify(checklistService).changeItemStatus(USER_ID, 10L, "done");
         verify(checklistService, never()).changeItemStatus(eq(OTHER_USER_ID), any(), any());
         assertThat(response).contains("웨딩홀 투어");
+        assertThat(toolCalling.writeSucceeded()).isTrue();
     }
 
     @Test
@@ -65,6 +66,7 @@ class ChecklistServiceAdapterToolCallingTest {
         toolCalling.callTool(USER_ID, "deleteChecklistItem", "{\"checklistItemId\": 10}");
 
         verify(checklistService).deleteItem(USER_ID, 10L);
+        assertThat(toolCalling.writeSucceeded()).isTrue();
     }
 
     @Test
@@ -93,6 +95,7 @@ class ChecklistServiceAdapterToolCallingTest {
 
         // then
         assertThat(response).contains("\"exists\":false");
+        assertThat(toolCalling.writeSucceeded()).isFalse();
     }
 
     @Test

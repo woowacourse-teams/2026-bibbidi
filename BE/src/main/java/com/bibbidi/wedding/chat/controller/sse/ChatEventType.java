@@ -4,6 +4,7 @@ public enum ChatEventType {
     CONVERSATION("conversation"),
     DELTA("delta"),
     COMPONENT("component"),
+    REFRESH("refresh"),
     DONE("done"),
     FAILURE("failure");
 

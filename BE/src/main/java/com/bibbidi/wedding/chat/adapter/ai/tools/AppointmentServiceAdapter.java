@@ -42,7 +42,7 @@ public class AppointmentServiceAdapter {
             ToolContext toolContext
     ) {
         SpringAiChatClient.markWriteAttempt(toolContext);
-        return appointmentService.create(
+        AppointmentResult result = appointmentService.create(
                 new AppointmentCreationCommand(
                         SpringAiChatClient.userIdOf(toolContext),
                         checklistItemId,
@@ -54,6 +54,8 @@ public class AppointmentServiceAdapter {
                         memo
                 )
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
+        return result;
     }
 
     @Tool(
@@ -72,7 +74,7 @@ public class AppointmentServiceAdapter {
             ToolContext toolContext
     ) {
         SpringAiChatClient.markWriteAttempt(toolContext);
-        return appointmentService.update(
+        AppointmentResult result = appointmentService.update(
                 new AppointmentUpdateCommand(
                         appointmentId,
                         SpringAiChatClient.userIdOf(toolContext),
@@ -84,6 +86,8 @@ public class AppointmentServiceAdapter {
                         memo
                 )
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
+        return result;
     }
 
     @Tool(
@@ -96,13 +100,15 @@ public class AppointmentServiceAdapter {
             ToolContext toolContext
     ) {
         SpringAiChatClient.markWriteAttempt(toolContext);
-        return appointmentService.changeStatus(
+        AppointmentCompletionResult result = appointmentService.changeStatus(
                 AppointmentCompletionCommand.fromRequest(
                         appointmentId,
                         SpringAiChatClient.userIdOf(toolContext),
                         isDone
                 )
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
+        return result;
     }
 
     @Tool(
@@ -118,5 +124,6 @@ public class AppointmentServiceAdapter {
                 SpringAiChatClient.userIdOf(toolContext),
                 appointmentId
         );
+        SpringAiChatClient.markWriteSucceeded(toolContext);
     }
 }

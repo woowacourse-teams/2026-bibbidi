@@ -8,6 +8,7 @@ import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelSelectPlan;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult.Refresh;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
@@ -56,10 +57,24 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                                     .map(ModelSelectPlan::startingAt);
                             return fallbackPlan.flatMapMany(
                                     plan -> attempt(request, plan)
+                                            .concatWith(refreshIfWritten(request))
+                                            .onErrorResume(
+                                                    error -> refreshIfWritten(request)
+                                                            .concatWith(Mono.error(error))
+                                            )
                             );
                         }
                 )
         );
+    }
+
+    private Mono<ChatResult> refreshIfWritten(ChatModelRequest request) {
+        return Mono.defer(() -> {
+            if (request.writeSucceeded().get()) {
+                return Mono.just(new Refresh());
+            }
+            return Mono.empty();
+        });
     }
 
     private Flux<ChatResult> mapModelErrors(Flux<ChatResult> results) {
