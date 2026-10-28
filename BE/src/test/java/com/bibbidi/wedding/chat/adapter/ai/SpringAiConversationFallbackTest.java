@@ -237,7 +237,7 @@ class SpringAiConversationFallbackTest {
                 ChatModelTier.MEDIUM, target(ChatModelTier.MEDIUM, responses, tools),
                 ChatModelTier.HIGH, target(ChatModelTier.HIGH, responses, tools));
         ModelClassifier classifier = mock(ModelClassifier.class);
-        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(initial));
+        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ModelClassifier.Classification.allow(initial)));
         return new SpringAiConversationAdapter(new SpringAiChatClient(new ChatModelRouter(targets)),
                 new JacksonChatAnswerParser(MAPPER), memory, classifier);
     }

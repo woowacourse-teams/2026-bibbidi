@@ -81,7 +81,7 @@ class AiChatLifecycleTest {
         memory = MessageWindowChatMemory.builder().chatMemoryRepository(repository).maxMessages(18).build();
         JsonMapper mapper = JsonMapper.builder().findAndAddModules().build();
         ModelClassifier classifier = mock(ModelClassifier.class);
-        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ChatModelTier.LOW));
+        when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ModelClassifier.Classification.allow(ChatModelTier.LOW)));
         chat = new AiChatService(
                 new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
                         new JacksonChatAnswerParser(mapper), memory, classifier),

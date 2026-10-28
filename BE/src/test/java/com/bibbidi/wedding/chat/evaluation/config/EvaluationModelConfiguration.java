@@ -58,8 +58,8 @@ public class EvaluationModelConfiguration {
             ModelRoutingInstruction instruction, ModelRoutingCriteria criteria) {
         return new ModelClassifier(memory, properties, jev, instruction, criteria) {
             @Override
-            public Mono<ChatModelTier> classify(String conversationKey, String userPrompt) {
-                return Mono.just(ChatModelTier.HIGH);
+            public Mono<Classification> classify(String conversationKey, String userPrompt) {
+                return Mono.just(Classification.allow(ChatModelTier.HIGH));
             }
         };
     }

@@ -15,6 +15,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.openai.errors.RateLimitException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -27,7 +28,11 @@ import reactor.core.scheduler.Schedulers;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 @Component
+@Slf4j
 public class SpringAiConversationAdapter implements AiConversationPort {
+
+    private static final String OUT_OF_SCOPE_REFUSAL =
+            "저는 결혼 준비를 돕는 도우미라 그 요청은 도와드리기 어려워요. 웨딩홀, 스드메, 일정·체크리스트 같은 결혼 준비 질문을 말씀해 주세요.";
 
     private final SpringAiChatClient chatClient;
     private final JacksonChatAnswerParser answerParser;
@@ -53,16 +58,27 @@ public class SpringAiConversationAdapter implements AiConversationPort {
         return mapModelErrors(Flux.defer(() -> {
                             ChatModelRequest request = new ChatModelRequest(
                                     userId, conversationKey, new UserMessage(userPrompt));
-                            Mono<ModelSelectPlan> fallbackPlan = classifier.classify(conversationKey, userPrompt)
-                                    .map(ModelSelectPlan::startingAt);
-                            return fallbackPlan.flatMapMany(
-                                    plan -> attempt(request, plan)
-                                            .concatWith(refreshIfWritten(request))
-                                            .onErrorResume(
-                                                    error -> refreshIfWritten(request)
-                                                            .concatWith(Mono.error(error))
-                                            )
-                            );
+                            return classifier.classify(conversationKey, userPrompt)
+                                    .flatMapMany(classification -> {
+                                        if (classification.isBlocked()) {
+                                            log.info(
+                                                    "도메인 밖 또는 인젝션 요청 차단. injection={}, hijack={}",
+                                                    classification.injection(),
+                                                    classification.hijack()
+                                            );
+                                            return Flux.just(
+                                                    new ChatResult.Delta(OUT_OF_SCOPE_REFUSAL),
+                                                    new ChatResult.Answer(OUT_OF_SCOPE_REFUSAL, List.of())
+                                            );
+                                        }
+                                        ModelSelectPlan plan = ModelSelectPlan.startingAt(classification.tier());
+                                        return attempt(request, plan)
+                                                .concatWith(refreshIfWritten(request))
+                                                .onErrorResume(
+                                                        error -> refreshIfWritten(request)
+                                                                .concatWith(Mono.error(error))
+                                                );
+                                    });
                         }
                 )
         );
