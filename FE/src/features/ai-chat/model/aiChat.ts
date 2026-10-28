@@ -17,7 +17,6 @@ export type ChatMessage =
       text: string;
       status: "streaming" | "complete" | "failed";
       catalogItemIds?: string[];
-      loginRequired?: boolean;
     };
 
 export function createUserChatMessage(
@@ -34,20 +33,4 @@ export function createUserChatMessage(
       hour12: false,
     }),
   };
-}
-
-export function createGuestChatMessages(
-  question: string,
-): ChatMessage[] | null {
-  if (!suggestedQuestions.includes(question)) return null;
-  return [
-    createUserChatMessage(0, question),
-    {
-      id: 1,
-      role: "assistant",
-      text: "로그인하면 나에게 맞는 준비를 추천받을 수 있어요.",
-      status: "complete",
-      loginRequired: true,
-    },
-  ];
 }

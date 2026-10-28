@@ -39,7 +39,7 @@ function chat(isAuthenticated = true) {
 }
 function renderChat(ui: Parameters<typeof render>[0]) {
   const result = render(ui);
-  fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+  fireEvent.click(screen.getByRole("button", { name: "AI" }));
   return result;
 }
 async function send(text: string) {
@@ -107,10 +107,10 @@ afterEach(() => {
 });
 
 describe("실제 AI 채팅", () => {
-  it("추천 질문으로 실제 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
+  it("직접 작성한 질문으로 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
     renderChat(chat());
     const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
-    fireEvent.click(await screen.findByRole("button", { name: question }));
+    await send(question);
     await screen.findByText("실제 AI 답변이에요.");
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     expect(within(screen.getByRole("log")).getByText(question)).toBeTruthy();
@@ -191,8 +191,7 @@ describe("실제 AI 채팅", () => {
       const reply = pendingReply();
       if (isMobile) mockMobileDialog();
       renderChat(chat());
-      if (isMobile)
-        fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+      if (isMobile) fireEvent.click(screen.getByRole("button", { name: "AI" }));
       await send("**준비** 알려줘");
       expect(screen.getByText("**준비** 알려줘").tagName).toBe("P");
       reply.delta("## 준비 순서\n\n**웨딩");
@@ -251,8 +250,7 @@ describe("실제 AI 채팅", () => {
       const reply = pendingReply();
       if (isMobile) mockMobileDialog();
       renderChat(chat());
-      if (isMobile)
-        fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+      if (isMobile) fireEvent.click(screen.getByRole("button", { name: "AI" }));
       await send("질문");
       reply.delta("중간 답변");
       await reply.fail(new AiChatApiError(undefined, 902));
@@ -313,7 +311,11 @@ describe("실제 AI 채팅", () => {
       if (isMobile) mockMobileDialog();
       renderChat(chat(false));
       if (isMobile)
-        fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+        fireEvent.click(
+          await screen.findByRole("button", {
+            name: "로그인 후 AI와 대화할 수 있어요",
+          }),
+        );
 
       expect(
         await screen.findByRole("heading", {
@@ -327,10 +329,7 @@ describe("실제 AI 채팅", () => {
         "웨딩홀을 정한 다음엔 뭘 준비할까?",
         "촬영 전에 준비할 일을 정리해줘",
       ]) {
-        const button = screen.getByRole<HTMLButtonElement>("button", {
-          name: question,
-        });
-        expect(button.disabled).toBe(false);
+        expect(screen.queryByRole("button", { name: question })).toBeNull();
       }
       expect(
         screen.getByRole<HTMLButtonElement>("button", { name: "메시지 전송" })
@@ -346,26 +345,22 @@ describe("실제 AI 채팅", () => {
   );
 
   it.each([false, true])(
-    "모바일 여부 %s에서 비로그인 추천 질문은 질문·로그인 안내·로그인 링크를 표시한다",
+    "모바일 여부 %s에서 비로그인 첫 화면에 로그인 링크를 바로 표시한다",
     async (isMobile) => {
       if (isMobile) mockMobileDialog();
       const { rerender } = renderChat(chat(false));
       if (isMobile)
-        fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
-      const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";
-      fireEvent.click(await screen.findByRole("button", { name: question }));
-      const log = screen.getByRole("log");
-      expect(within(log).getByText(question)).toBeTruthy();
+        fireEvent.click(
+          await screen.findByRole("button", {
+            name: "로그인 후 AI와 대화할 수 있어요",
+          }),
+        );
       expect(
-        within(log).getByText(
-          "로그인하면 나에게 맞는 준비를 추천받을 수 있어요.",
+        (await screen.findByRole("link", { name: "로그인하기" })).getAttribute(
+          "href",
         ),
-      ).toBeTruthy();
-      expect(
-        within(log)
-          .getByRole("link", { name: "로그인하기" })
-          .getAttribute("href"),
       ).toBe("/login");
+      expect(screen.queryByRole("log")).toBeNull();
       expect(screen.getByRole<HTMLTextAreaElement>("textbox").disabled).toBe(
         true,
       );
@@ -417,11 +412,10 @@ describe("실제 AI 채팅", () => {
   });
 
   it.each(["AI 채팅 닫기", "Escape"])(
-    "AI 도움로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
+    "AI로 열고 %s로 닫으면 실행 버튼에 포커스를 복원한다",
     async (closeName) => {
-      mockMobileDialog();
       renderChat(chat());
-      const launcher = screen.getByRole("button", { name: "AI 도움" });
+      const launcher = screen.getByRole("button", { name: "AI" });
       expect(screen.queryByRole("button", { name: "AI 채팅 열기" })).toBeNull();
       fireEvent.click(launcher);
       const dialog = await screen.findByRole("dialog");
@@ -442,7 +436,7 @@ describe("실제 AI 채팅", () => {
     });
     vi.stubGlobal("visualViewport", viewport);
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send("질문");
     await screen.findByText("실제 AI 답변이에요.");
     const dialog = screen.getByRole("dialog");
@@ -460,9 +454,7 @@ describe("실제 AI 채팅", () => {
               value,
               1000 -
                 Number.parseFloat(
-                  dialog.style.getPropertyValue(
-                    "--panel-overlay-viewport-height",
-                  ),
+                  dialog.style.getPropertyValue("--global-ai-viewport-height"),
                 ),
             ),
           );
@@ -472,19 +464,23 @@ describe("실제 AI 채팅", () => {
     log.scrollTop = log.scrollHeight;
     expect(log.scrollTop).toBe(156);
 
-    viewport.height = 400;
-    viewport.dispatchEvent(new Event("resize"));
-    expect(
-      dialog.style.getPropertyValue("--panel-overlay-viewport-height"),
-    ).toBe("400px");
+    act(() => {
+      viewport.height = 400;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(dialog.style.getPropertyValue("--global-ai-viewport-height")).toBe(
+      "400px",
+    );
     expect(log.scrollTop).toBe(600);
 
-    viewport.height = 844;
-    viewport.dispatchEvent(new Event("resize"));
+    act(() => {
+      viewport.height = 844;
+      viewport.dispatchEvent(new Event("resize"));
+    });
     expect(log.scrollTop).toBe(156);
   });
 
-  it("모바일을 닫아도 답변을 계속 받고 다시 열면 대화와 작성 중 입력을 유지한다", async () => {
+  it("모바일을 접어도 답변을 계속 받고 다시 확장하면 대화와 작성 중 입력을 유지한다", async () => {
     const reply = pendingReply();
     mockMobileDialog();
     const viewport = Object.assign(new EventTarget(), {
@@ -493,17 +489,17 @@ describe("실제 AI 채팅", () => {
     });
     vi.stubGlobal("visualViewport", viewport);
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send("질문");
     reply.delta("앞부분 ");
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "작성 중" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
     expect(reply.signal().aborted).toBe(false);
     reply.delta("뒷부분");
     await reply.complete();
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    act(() => screen.getByRole("textbox").focus());
     expect(screen.getByText("앞부분 뒷부분")).toBeTruthy();
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       "작성 중",
@@ -511,26 +507,28 @@ describe("실제 AI 채팅", () => {
     expect(
       screen
         .getByRole("dialog")
-        .style.getPropertyValue("--panel-overlay-viewport-height"),
+        .style.getPropertyValue("--global-ai-viewport-height"),
     ).toBe("844px");
     const log = screen.getByRole("log");
     Object.defineProperty(log, "scrollHeight", {
       configurable: true,
       value: 500,
     });
-    viewport.height = 400;
-    viewport.offsetTop = 24;
-    viewport.dispatchEvent(new Event("resize"));
+    act(() => {
+      viewport.height = 400;
+      viewport.offsetTop = 24;
+      viewport.dispatchEvent(new Event("resize"));
+    });
     expect(log.scrollTop).toBe(500);
     expect(
       screen
         .getByRole("dialog")
-        .style.getPropertyValue("--panel-overlay-viewport-height"),
+        .style.getPropertyValue("--global-ai-viewport-height"),
     ).toBe("400px");
     expect(
       screen
         .getByRole("dialog")
-        .style.getPropertyValue("--panel-overlay-viewport-top"),
+        .style.getPropertyValue("--global-ai-viewport-top"),
     ).toBe("24px");
   });
 });

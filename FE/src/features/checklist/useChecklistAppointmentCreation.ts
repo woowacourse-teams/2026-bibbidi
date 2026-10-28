@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useAppointmentDraft } from "./useAppointmentDraft";
 
 import { analytics } from "../../infrastructure/analytics";
 import {
@@ -20,8 +21,6 @@ import {
   validateAppointmentDraft,
 } from "./model/appointmentForm";
 import { MyChecklistRequestAbortedError } from "./repository/myChecklistQueryRepository";
-
-import { useAppointmentDraft } from "./useAppointmentDraft";
 
 export interface ChecklistAppointmentCreationInput {
   checklistItemId: number;
@@ -71,8 +70,8 @@ export function useChecklistAppointmentCreation({
   onRetryRefresh,
   sessionIdentity,
 }: UseChecklistAppointmentCreationOptions): ChecklistAppointmentCreationController {
-  const { draft, errors, setDraft, setErrors, ...draftFields } =
-    useAppointmentDraft();
+  const { form, setDraft, setErrors } = useAppointmentDraft();
+  const { draft } = form;
   const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [submissionState, setSubmissionState] =
@@ -201,9 +200,7 @@ export function useChecklistAppointmentCreation({
     confirmDiscard: () => {
       if (!submissionInFlightRef.current) resetAndClose();
     },
-    ...draftFields,
-    draft,
-    errors,
+    ...form,
     isOpen: isCurrentContext && isOpen,
     open: (source = "checklist") => {
       if (isAuthenticated && checklistItemId !== null) {

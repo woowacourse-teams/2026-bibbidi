@@ -1,4 +1,4 @@
-import { RefObject, useRef, useState, useEffect } from "react";
+import { RefObject, useRef, useState, useEffect, useLayoutEffect } from "react";
 
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
 import { useAiChatRecommendations } from "./hooks/useAiChatRecommendations";
@@ -7,32 +7,42 @@ import { Button } from "../../components/button";
 import { useLinkClickHandler } from "react-router";
 import { useMyChecklistQueryRepository } from "../checklist";
 import { AiChatView } from "./view/AiChatView";
-import { createGuestChatMessages, type ChatMessage } from "./model/aiChat";
+import { useIsMobileLayout } from "../../shared/responsive";
+import {
+  useViewportMetrics,
+  type ViewportMetrics,
+} from "../../shared/viewport";
+import { useAiChatKeyboard } from "./hooks/useAiChatKeyboard";
 import type { RecommendationController } from "./model/recommendation";
 
 function GuestAiChatView({
   active,
   recommendations,
+  compact,
+  onComposerFocus,
+  viewport,
 }: {
   active: boolean;
   recommendations: RecommendationController;
+  compact: boolean;
+  onComposerFocus: () => void;
+  viewport: ViewportMetrics;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   return (
     <AiChatView
       active={active}
+      viewport={viewport}
       isAuthenticated={false}
+      compact={compact}
+      onComposerFocus={onComposerFocus}
       draft=""
-      messages={messages}
+      messages={[]}
       errorMessage={null}
       isPending={false}
       recommendations={recommendations}
       onDraftChange={() => {}}
       onRetry={() => {}}
-      onSend={(question) => {
-        const nextMessages = createGuestChatMessages(question);
-        if (nextMessages) setMessages(nextMessages);
-      }}
+      onSend={() => {}}
     />
   );
 }
@@ -76,6 +86,7 @@ export function AiChatSession({
   onClose,
   returnFocusRef,
   contextLabel,
+  onKeyboardVisibilityChange,
 }: {
   isAuthenticated: boolean;
   isOpen: boolean;
@@ -83,7 +94,33 @@ export function AiChatSession({
   onClose: () => void;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
   contextLabel?: string;
+  onKeyboardVisibilityChange?: (visible: boolean) => void;
 }) {
+  const isMobile = useIsMobileLayout();
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  if (!isOpen && editing) setEditing(false);
+  const viewport = useViewportMetrics(isOpen);
+  const keyboardOpen = useAiChatKeyboard(
+    viewport,
+    isOpen && isMobile && editing,
+  );
+  useLayoutEffect(() => {
+    onKeyboardVisibilityChange?.(keyboardOpen);
+    return () => onKeyboardVisibilityChange?.(false);
+  }, [keyboardOpen, onKeyboardVisibilityChange]);
+  if (!isOpen && mobileExpanded) setMobileExpanded(false);
+  const compact = isMobile && !mobileExpanded;
+  const expand = () => setMobileExpanded(true);
+  const collapse = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.closest(".global-ai-window"))
+      active.blur();
+    setMobileExpanded(false);
+    queueMicrotask(() =>
+      returnFocusRef.current?.focus({ preventScroll: true }),
+    );
+  };
   const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
     useAiChatConversation(onAuthenticationRequired, contextLabel);
   const query = useMyChecklistQueryRepository();
@@ -118,34 +155,53 @@ export function AiChatSession({
         .catch(() => {});
     },
   );
-  const active = isOpen;
+  const active = isOpen && !compact;
   const view = isAuthenticated ? (
     <AiChatView
       active={active}
       isAuthenticated
+      compact={compact}
+      viewport={viewport}
+      onComposerFocus={() => {
+        setEditing(true);
+        expand();
+      }}
+      onComposerBlur={() => setEditing(false)}
       draft={draft}
       messages={messages}
       errorMessage={errorMessage}
       isPending={isPending}
       recommendations={recommendations}
       onDraftChange={setDraft}
-      onSend={send}
+      onSend={(text) => {
+        expand();
+        void send(text);
+      }}
       onRetry={retry}
     />
   ) : (
-    <GuestAiChatView active={active} recommendations={recommendations} />
+    <GuestAiChatView
+      active={active}
+      recommendations={recommendations}
+      compact={compact}
+      viewport={viewport}
+      onComposerFocus={expand}
+    />
   );
 
   return (
     <GlobalAiChatDialog
       open={isOpen}
+      viewport={viewport}
+      keyboardOpen={keyboardOpen}
+      mobileExpanded={mobileExpanded}
+      onMobileCollapse={collapse}
       onClose={onClose}
       returnFocusRef={returnFocusRef}
-      contextLabel={contextLabel}
     >
       {view}
       {addedTask && (
-        <div className="global-ai-result">
+        <div className="global-ai-result" hidden={compact}>
           <p role="status">{addedTask.title}</p>
           <AddedTaskLink taskId={addedTask.taskId} onClose={onClose} />
         </div>

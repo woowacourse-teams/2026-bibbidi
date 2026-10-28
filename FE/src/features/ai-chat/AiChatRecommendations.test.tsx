@@ -1,4 +1,4 @@
-import { AI_CHAT_FULLSCREEN_MEDIA_QUERY as MOBILE_LAYOUT_MEDIA_QUERY } from "./view/GlobalAiChatDialog";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { MemoryRouter } from "react-router";
 import {
   act,
@@ -76,7 +76,7 @@ function chat(observe = false) {
 }
 function renderChat(ui: Parameters<typeof render>[0]) {
   const result = render(ui);
-  fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+  fireEvent.click(screen.getByRole("button", { name: "AI" }));
   return result;
 }
 async function send() {
@@ -196,25 +196,25 @@ describe("AI 추천 카드 연결", () => {
     mockChatScrollHeight();
     const finishCatalog = pendingCatalog();
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send();
     await screen.findByText("추천 카드를 불러오고 있어요.");
     const log = screen.getByRole("log");
     expect(log.scrollTop).toBe(600);
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
 
     await finishCatalog();
     expect(log.querySelector('[aria-label="추천 할 일"]')).toBeTruthy();
     expect(log.scrollTop).toBe(600);
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    act(() => screen.getByRole("textbox").focus());
     expect(log.scrollTop).toBe(1000);
 
     log.scrollTop = 250;
     fireEvent.scroll(log);
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
     log.scrollTop = 0;
     fireEvent.scroll(log);
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    act(() => screen.getByRole("textbox").focus());
     expect(log.scrollTop).toBe(250);
   });
 
@@ -584,7 +584,7 @@ describe("AI 추천 카드 연결", () => {
   it("모바일 닫기·재열기와 PC 전환에서 선택·스킵 상태를 유지한다", async () => {
     const media = mockMobileDialog();
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send();
     fireEvent.keyDown(
       await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
@@ -593,8 +593,8 @@ describe("AI 추천 카드 연결", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "다음 추천: 사회자 섭외" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI 도움" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
+    act(() => screen.getByRole("textbox").focus());
     expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");
     act(() => media.setMatches(false));
     expect(currentCard().getAttribute("aria-label")).toContain("사회자 섭외");

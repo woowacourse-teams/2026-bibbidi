@@ -5,11 +5,12 @@ import {
   ChatMessage,
   MAX_CHAT_MESSAGE_LENGTH,
   isValidChatMessage,
-  suggestedQuestions,
 } from "../model/aiChat";
 import { AiChatMarkdown } from "./AiChatMarkdown";
 import { AiChatRecommendations } from "./AiChatRecommendations";
 import { AiChatAssistantMessage } from "./AiChatAssistantMessage";
+import { IconButton } from "../../../components/icon-button";
+import type { ViewportMetrics } from "../../../shared/viewport";
 import type { RecommendationController } from "../model/recommendation";
 
 export function AiChatView({
@@ -23,6 +24,10 @@ export function AiChatView({
   onSend,
   onRetry,
   recommendations,
+  compact = false,
+  onComposerFocus,
+  onComposerBlur,
+  viewport,
 }: {
   active: boolean;
   isAuthenticated: boolean;
@@ -34,6 +39,10 @@ export function AiChatView({
   onSend: (text: string) => void;
   onRetry: () => void;
   recommendations: RecommendationController;
+  compact?: boolean;
+  onComposerFocus?: () => void;
+  onComposerBlur?: () => void;
+  viewport: ViewportMetrics;
 }) {
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
@@ -58,27 +67,20 @@ export function AiChatView({
     lastCatalogStatus.current = recommendations.catalogStatus;
   }, [active, messages, recommendations.catalogStatus]);
 
+  const previousViewport = useRef(viewport);
   useEffect(() => {
-    if (!active) return;
-    const scrollToEnd = () => {
-      if (logRef.current) {
-        logRef.current.scrollTop = logRef.current.scrollHeight;
-        scrollPosition.current = logRef.current.scrollTop;
-      }
-    };
-    const viewport = window.visualViewport;
-    viewport?.addEventListener("resize", scrollToEnd);
-    viewport?.addEventListener("scroll", scrollToEnd);
-    return () => {
-      viewport?.removeEventListener("resize", scrollToEnd);
-      viewport?.removeEventListener("scroll", scrollToEnd);
-    };
-  }, [active]);
+    const changed = previousViewport.current !== viewport;
+    previousViewport.current = viewport;
+    if (active && changed && logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+      scrollPosition.current = logRef.current.scrollTop;
+    }
+  }, [active, viewport]);
 
   return (
     <div className="ai-chat">
       {messages.length === 0 ? (
-        <div className="ai-chat__welcome">
+        <div className="ai-chat__welcome" hidden={compact}>
           <span aria-hidden="true" className="ai-chat__brand-mark">
             <img alt="" draggable={false} src={bibbidiLogo} />
           </span>
@@ -88,20 +90,15 @@ export function AiChatView({
             <br />
             안내를 드려요.
           </p>
-          <div className="ai-chat__questions">
-            {suggestedQuestions.map((question) => (
-              <button
-                key={question}
-                onClick={() => onSend(question)}
-                type="button"
-              >
-                {question}
-              </button>
-            ))}
-          </div>
+          {!isAuthenticated && (
+            <a className="ai-chat__login" href="/login">
+              로그인하기
+            </a>
+          )}
         </div>
       ) : (
         <div
+          hidden={compact}
           aria-label="AI와 나눈 대화"
           aria-busy={isPending}
           aria-live="polite"
@@ -138,11 +135,6 @@ export function AiChatView({
                 ) : message.status === "failed" ? (
                   <span className="ai-chat__incomplete">미완료 답변</span>
                 ) : null}
-                {message.role === "assistant" && message.loginRequired ? (
-                  <a className="ai-chat__login" href="/login">
-                    로그인하기
-                  </a>
-                ) : null}
                 {message.role === "assistant" &&
                 message.status === "complete" &&
                 Boolean(message.catalogItemIds?.length) ? (
@@ -162,19 +154,30 @@ export function AiChatView({
         </div>
       )}
       {isPending ? (
-        <p className="ai-chat__status" role="status">
+        <p className="ai-chat__status" role="status" hidden={compact}>
           답변을 작성하고 있어요.
         </p>
       ) : null}
       {errorMessage ? (
-        <div className="ai-chat__error" role="alert">
+        <div className="ai-chat__error" role="alert" hidden={compact}>
           <p>{errorMessage}</p>
           <button onClick={onRetry} type="button">
             다시 시도
           </button>
         </div>
       ) : null}
+      {compact && !isAuthenticated && (
+        <button
+          className="ai-chat__composer-preview"
+          data-ai-composer-preview
+          type="button"
+          onClick={onComposerFocus}
+        >
+          로그인 후 AI와 대화할 수 있어요
+        </button>
+      )}
       <form
+        hidden={compact && !isAuthenticated}
         className="ai-chat__composer"
         onSubmit={(event) => {
           event.preventDefault();
@@ -186,6 +189,8 @@ export function AiChatView({
         </label>
         <textarea
           disabled={!isAuthenticated}
+          onFocus={onComposerFocus}
+          onBlur={onComposerBlur}
           id={inputId}
           maxLength={MAX_CHAT_MESSAGE_LENGTH}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -212,16 +217,35 @@ export function AiChatView({
               ? "궁금한 준비를 이야기해요"
               : "로그인 후 AI와 대화할 수 있어요"
           }
-          rows={2}
+          rows={compact ? 1 : 2}
           value={draft}
         />
-        <button
-          aria-label="메시지 전송"
-          disabled={!isAuthenticated || isPending || !isValidChatMessage(draft)}
-          type="submit"
-        >
-          ↑
-        </button>
+        <div className="ai-chat__send">
+          <IconButton
+            aria-label="메시지 전송"
+            disabled={
+              !isAuthenticated || isPending || !isValidChatMessage(draft)
+            }
+            type="submit"
+            variant="fill"
+            color="var(--color-fg-on-brand)"
+            bgColor="var(--color-bg-brand-solid)"
+            iconSize={20}
+            icon={
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m6 10 6-6 6 6M12 4v16" />
+              </svg>
+            }
+          />
+        </div>
       </form>
     </div>
   );

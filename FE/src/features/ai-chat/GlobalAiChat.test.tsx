@@ -6,14 +6,21 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import {
+  Link,
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MyChecklistProvider } from "../checklist";
 import { ServiceLayout } from "../../layouts/ServiceLayout";
 import { PreparationRoadmapFeature } from "../preparation";
 import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
 import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
-import { AI_CHAT_FULLSCREEN_MEDIA_QUERY as MOBILE_LAYOUT_MEDIA_QUERY } from "./view/GlobalAiChatDialog";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
 import type { AuthState } from "../auth/model/auth";
 
@@ -73,6 +80,27 @@ function Location() {
     </output>
   );
 }
+function NavigationControls() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return (
+    <div>
+      <Link to="/calendar">본문 캘린더 링크</Link>
+      <button type="button" onClick={() => navigate("/checklist")}>
+        화면 이동 버튼
+      </button>
+      <Link to={`${location.pathname}${location.search}`}>
+        현재 화면 다시 열기
+      </Link>
+      <button type="button" onClick={() => navigate(-1)}>
+        이전 화면
+      </button>
+      <button type="button" onClick={() => navigate(1)}>
+        다음 화면
+      </button>
+    </div>
+  );
+}
 function app() {
   return (
     <MyChecklistProvider sessionKey="global-ai">
@@ -88,12 +116,13 @@ function app() {
           </Route>
         </Routes>
         <Location />
+        <NavigationControls />
       </MemoryRouter>
     </MyChecklistProvider>
   );
 }
 async function openChat() {
-  fireEvent.click(await screen.findByRole("button", { name: "AI 도움" }));
+  fireEvent.click(await screen.findByRole("button", { name: "AI" }));
   return screen.findByRole("dialog", { name: "AI 채팅" });
 }
 async function send(text: string) {
@@ -103,7 +132,10 @@ async function send(text: string) {
   fireEvent.click(screen.getByRole("button", { name: "메시지 전송" }));
 }
 async function closeChat() {
-  fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+  const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  if ((dialog as HTMLDialogElement).open)
+    fireEvent.keyDown(dialog, { key: "Escape" });
   await waitFor(() =>
     expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
   );
@@ -153,11 +185,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("전역 AI 도움", () => {
-  it("로드맵은 AI 열 없이 전체 본문을 사용하고 헤더에 하나의 진입점만 제공한다", async () => {
+describe("전역 AI", () => {
+  it("로드맵은 전체 본문을 사용하고 헤더 밖에 하나의 AI 진입점만 제공한다", async () => {
     const { container } = render(app());
     await screen.findByRole("heading", { name: "스드메", level: 1 });
-    expect(screen.getAllByRole("button", { name: "AI 도움" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "AI" })).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: "AI" }).closest("header"),
+    ).toBeNull();
+    expect(
+      within(screen.getByRole("navigation", { name: "하단 메뉴" })).queryByRole(
+        "button",
+        { name: "AI" },
+      ),
+    ).toBeNull();
     expect(
       container.querySelector(".roadmap-workspace [data-aside]"),
     ).toBeNull();
@@ -171,6 +212,15 @@ describe("전역 AI 도움", () => {
   it("페이지 이동과 열고 닫기 후에도 대화·작성 중 입력을 유지하고 현재 화면을 참고한다", async () => {
     render(app());
     await openChat();
+    expect(
+      screen.queryByRole("button", {
+        name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
+    ).toBeNull();
+    expect(screen.queryByText(/현재 화면 참고/)).toBeNull();
     await send("다음 준비는?");
     await screen.findByText("준비 안내 답변");
     expect(mocks.stream.mock.calls[0][0]).toMatchObject({
@@ -181,7 +231,7 @@ describe("전역 AI 도움", () => {
     });
     await closeChat();
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "AI 도움" }),
+      screen.getByRole("button", { name: "AI" }),
     );
     fireEvent.click(
       within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
@@ -191,7 +241,7 @@ describe("전역 AI 도움", () => {
     );
     await screen.findByRole("heading", { name: "체크리스트 화면" });
     await openChat();
-    expect(screen.getByText("현재 화면 참고 · 체크리스트")).toBeTruthy();
+    expect(screen.queryByText(/현재 화면 참고/)).toBeNull();
     expect(screen.getByText("준비 안내 답변")).toBeTruthy();
     expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(
       "다음 질문 작성 중",
@@ -206,41 +256,282 @@ describe("전역 AI 도움", () => {
     fireEvent.click(screen.getAllByRole("link", { name: "캘린더" })[0]);
     await screen.findByRole("heading", { name: "캘린더 화면" });
     await openChat();
-    expect(screen.getByText("현재 화면 참고 · 캘린더")).toBeTruthy();
+    expect(screen.queryByText(/현재 화면 참고/)).toBeNull();
     expect(screen.getAllByText("준비 안내 답변")).toHaveLength(2);
   });
-  it("배경의 보조 버튼 클릭은 무시하고 기본 버튼 클릭으로 닫는다", async () => {
+  it("플로팅 창을 연 채 배경 페이지를 이동해도 대화와 창을 유지한다", async () => {
+    render(app());
+    await openChat();
+    await send("준비 질문");
+    await screen.findByText("준비 안내 답변");
+    const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
+    expect(dialog.getAttribute("aria-modal")).toBe("false");
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(
+      screen.getByRole("region", { name: "서비스 화면" }).style.overflow,
+    ).not.toBe("hidden");
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "주요 메뉴" })).getByRole(
+        "link",
+        { name: "캘린더" },
+      ),
+    );
+    await screen.findByRole("heading", { name: "캘린더 화면" });
+    expect(screen.getByRole("dialog", { name: "AI 채팅" })).toBe(dialog);
+    expect(screen.queryByText(/현재 화면 참고/)).toBeNull();
+    expect(screen.getByText("준비 안내 답변")).toBeTruthy();
+  });
+  it("플로팅 버튼으로 다시 닫을 수 있다", async () => {
+    render(app());
+    await openChat();
+    const launcher = screen.getByRole("button", { name: "AI" });
+    expect(launcher.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(launcher);
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    expect(launcher.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(launcher);
+  });
+  it("모바일은 작은 입력창부터 열고 입력에 초점을 주면 확장하며 접기·메뉴 이동 후에도 대화를 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(app());
+    const nav = screen.getByRole("navigation", { name: "하단 메뉴" });
+    expect(
+      Array.from(nav.querySelectorAll("a, button"), (item) => item.textContent),
+    ).toEqual(["로드맵", "체크리스트", "캘린더", "AI"]);
+    const launcher = within(nav).getByRole("button", { name: "AI" });
+    launcher.focus();
+    await openChat();
+    const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    const layout = screen.getByRole("region", { name: "서비스 화면" });
+    expect(dialog.getAttribute("data-expanded")).toBe("false");
+    expect(dialog.getAttribute("aria-modal")).toBe("false");
+    expect(document.activeElement).toBe(launcher);
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(layout.style.overflow).not.toBe("hidden");
+    expect(
+      screen.queryByRole("heading", { name: "어떤 준비를 도와드릴까요?" }),
+    ).toBeNull();
+    expect(screen.getByLabelText("현재 주소").textContent).toBe(
+      "/preparation?categoryId=20",
+    );
+    fireEvent.click(launcher);
+    expect(dialog.getAttribute("data-expanded")).toBe("false");
+    act(() => input.focus());
+    expect(dialog.getAttribute("data-expanded")).toBe("true");
+    expect(screen.getByRole("textbox")).toBe(input);
+    expect(document.activeElement).toBe(input);
+    await send("다음 준비");
+    await screen.findByText("준비 안내 답변");
+    fireEvent.change(input, { target: { value: "작성 중인 다음 질문" } });
+    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
+    expect(dialog.getAttribute("data-expanded")).toBe("false");
+    expect(screen.queryByRole("log")).toBeNull();
+    expect(input.value).toBe("작성 중인 다음 질문");
+    act(() => input.focus());
+    expect(screen.getByRole("log").textContent).toContain("준비 안내 답변");
+    fireEvent.click(within(nav).getByRole("link", { name: "캘린더" }));
+    await screen.findByRole("heading", { name: "캘린더 화면" });
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    await openChat();
+    expect(dialog.getAttribute("data-expanded")).toBe("false");
+    expect(screen.getByRole("textbox")).toBe(input);
+    expect(input.value).toBe("작성 중인 다음 질문");
+    act(() => input.focus());
+    expect(screen.getByRole("log").textContent).toContain("준비 안내 답변");
+  });
+  it.each(["본문 링크", "이동 버튼", "쿼리 변경", "같은 주소"] as const)(
+    "모바일의 %s 이동도 AI 기능에서 감지해 숨기고 대화·입력을 보존한다",
+    async (navigation) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+      render(app());
+      await openChat();
+      await send("이동 전 질문");
+      await screen.findByText("준비 안내 답변");
+      const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+      fireEvent.change(input, { target: { value: "이동 전 작성 중" } });
+      if (navigation === "본문 링크")
+        fireEvent.click(screen.getByRole("link", { name: "본문 캘린더 링크" }));
+      else if (navigation === "이동 버튼")
+        fireEvent.click(screen.getByRole("button", { name: "화면 이동 버튼" }));
+      else if (navigation === "쿼리 변경")
+        fireEvent.click(screen.getByRole("tab", { name: "웨딩홀" }));
+      else
+        fireEvent.click(
+          screen.getByRole("link", { name: "현재 화면 다시 열기" }),
+        );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
+      );
+      const target =
+        navigation === "본문 링크"
+          ? "/calendar"
+          : navigation === "이동 버튼"
+            ? "/checklist"
+            : navigation === "쿼리 변경"
+              ? "/preparation?categoryId=10"
+              : "/preparation?categoryId=20";
+      expect(screen.getByLabelText("현재 주소").textContent).toBe(target);
+      await openChat();
+      expect(screen.getByRole("textbox")).toBe(input);
+      expect(input.value).toBe("이동 전 작성 중");
+      act(() => input.focus());
+      expect(screen.getByRole("log").textContent).toContain("준비 안내 답변");
+      expect(mocks.stream).toHaveBeenCalledOnce();
+    },
+  );
+  it("모바일 뒤로·앞으로가기도 AI를 숨기고 예전 주소로 돌아와도 자동으로 다시 열지 않는다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(app());
+    await openChat();
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    fireEvent.change(input, { target: { value: "보존할 입력" } });
+    fireEvent.click(screen.getByRole("link", { name: "본문 캘린더 링크" }));
+    await screen.findByRole("heading", { name: "캘린더 화면" });
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    await openChat();
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("현재 주소").textContent).toBe(
+        "/preparation?categoryId=20",
+      ),
+    );
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    await openChat();
+    fireEvent.click(screen.getByRole("button", { name: "다음 화면" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("현재 주소").textContent).toBe("/calendar"),
+    );
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("현재 주소").textContent).toBe(
+        "/preparation?categoryId=20",
+      ),
+    );
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    await openChat();
+    expect(screen.getByRole("textbox")).toBe(input);
+    expect(input.value).toBe("보존할 입력");
+  });
+  it("입력에 초점을 주지 않은 화면 높이 변경은 키보드로 판정하지 않는다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal("innerHeight", 844);
+    const viewport = Object.assign(new EventTarget(), {
+      height: 844,
+      offsetTop: 0,
+      scale: 1,
+    });
+    vi.stubGlobal("visualViewport", viewport);
     render(app());
     await openChat();
     const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
-    const press = (button: number) => {
-      fireEvent(
-        dialog,
-        new MouseEvent("pointerdown", { button, bubbles: true }),
-      );
-      fireEvent(dialog, new MouseEvent("pointerup", { button, bubbles: true }));
-    };
-    press(2);
-    expect((dialog as HTMLDialogElement).open).toBe(true);
-    press(0);
-    await waitFor(() => expect((dialog as HTMLDialogElement).open).toBe(false));
+    const layout = screen.getByRole("region", { name: "서비스 화면" });
+    expect(dialog.getAttribute("data-expanded")).toBe("false");
+    act(() => {
+      viewport.height = 640;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(dialog.getAttribute("data-keyboard-open")).toBe("false");
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(false);
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    act(() => input.focus());
+    act(() => {
+      viewport.height = 400;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(true);
+    act(() => input.blur());
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(false);
   });
-  it("side와 fullscreen을 전환해도 대화 DOM과 입력을 유지한다", async () => {
+  it("키보드 표시 중에만 네비게이션 바를 숨기고 입력창을 보이는 뷰포트 아래에 붙이며 닫으면 정리한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    vi.stubGlobal("innerHeight", 844);
+    const viewport = Object.assign(new EventTarget(), {
+      height: 844,
+      offsetTop: 0,
+      scale: 1,
+    });
+    vi.stubGlobal("visualViewport", viewport);
+    render(app());
+    await openChat();
+    const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
+    const layout = screen.getByRole("region", { name: "서비스 화면" });
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox");
+    act(() => input.focus());
+    fireEvent.change(input, { target: { value: "키보드 입력" } });
+    act(() => {
+      viewport.height = 420;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(dialog.getAttribute("data-keyboard-open")).toBe("true");
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(true);
+    expect(dialog.style.getPropertyValue("--global-ai-bottom-inset")).toBe(
+      "424px",
+    );
+    expect(dialog.style.getPropertyValue("--global-ai-viewport-height")).toBe(
+      "420px",
+    );
+    expect(document.activeElement).toBe(input);
+    // Layout viewport resizing on Android should not restore the dock prematurely.
+    act(() => {
+      vi.stubGlobal("innerHeight", 420);
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(dialog.getAttribute("data-keyboard-open")).toBe("true");
+    expect(dialog.style.getPropertyValue("--global-ai-bottom-inset")).toBe(
+      "0px",
+    );
+    vi.stubGlobal("innerHeight", 844);
+
+    act(() => {
+      viewport.height = 844;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(false);
+    expect(dialog.getAttribute("data-expanded")).toBe("true");
+    expect(input.value).toBe("키보드 입력");
+    act(() => {
+      viewport.height = 420;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    act(() => {
+      viewport.scale = 2;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(false);
+    act(() => {
+      viewport.scale = 1;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "하단 메뉴" })).getByRole(
+        "link",
+        { name: "체크리스트" },
+      ),
+    );
+    expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    expect(layout.hasAttribute("data-ai-keyboard-open")).toBe(false);
+  });
+  it("모바일과 플로팅을 전환해도 대화 DOM·입력·초점을 유지한다", async () => {
     const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
     render(app());
     await openChat();
     const dialog = screen.getByRole("dialog", { name: "AI 채팅" });
     const input = screen.getByRole<HTMLTextAreaElement>("textbox");
     fireEvent.change(input, { target: { value: "작성 중" } });
-    expect(dialog.getAttribute("data-placement")).toBe("side");
+    act(() => input.focus());
     act(() => media.setMatches(true));
-    expect(dialog.getAttribute("data-placement")).toBe("fullscreen");
+    expect(dialog.getAttribute("data-placement")).toBe("mobile");
+    expect(dialog.getAttribute("data-expanded")).toBe("true");
     expect(screen.getByRole("textbox")).toBe(input);
+    expect(document.activeElement).toBe(input);
+    expect(document.body.style.overflow).not.toBe("hidden");
     expect(input.value).toBe("작성 중");
-    await closeChat();
-    await openChat();
+    act(() => media.setMatches(false));
+    expect(dialog.getAttribute("data-placement")).toBe("floating");
     expect(screen.getByRole("textbox")).toBe(input);
-    expect(input.value).toBe("작성 중");
+    expect(document.activeElement).toBe(input);
   });
   it("4000자 질문은 화면명 때문에 API 제한을 넘기거나 잘리지 않는다", async () => {
     render(app());
@@ -314,7 +605,7 @@ describe("전역 AI 도움", () => {
     fireEvent.click(screen.getByRole("button", { name: "저장 다시 시도" }));
     await screen.findByRole("link", { name: "추가한 일 보기" });
   });
-  it("모바일과 데스크톱을 오가도 대화와 입력을 유지하고 Escape로 닫으면 헤더로 복귀한다", async () => {
+  it("모바일과 데스크톱을 오가도 대화와 입력을 유지하고 Escape로 닫으면 플로팅 버튼으로 복귀한다", async () => {
     const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(app());
     await openChat();
@@ -335,7 +626,7 @@ describe("전역 AI 도움", () => {
     );
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("button", { name: "AI 도움" }),
+        screen.getByRole("button", { name: "AI" }),
       ),
     );
     await openChat();
@@ -359,22 +650,29 @@ describe("전역 AI 도움", () => {
     expect(screen.queryByText("이전 계정 질문")).toBeNull();
     expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe("");
   });
-  it("게스트의 예시 대화는 닫았다 열어도 남아 있고 실제 AI 요청은 보내지 않는다", async () => {
+  it("게스트는 추천 질문 없이 로그인 링크를 제공하고 재열기 후에도 실제 AI 요청을 보내지 않는다", async () => {
     mocks.auth = { status: "guest" };
     render(app());
     await openChat();
-    fireEvent.click(
-      await screen.findByRole("button", {
+    expect(
+      await screen.findByRole("link", { name: "로그인하기" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", {
         name: "웨딩홀을 정한 다음엔 뭘 준비할까?",
       }),
-    );
-    await screen.findByRole("log");
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "촬영 전에 준비할 일을 정리해줘" }),
+    ).toBeNull();
+    expect(screen.queryByText(/현재 화면 참고/)).toBeNull();
     await closeChat();
     fireEvent.click(screen.getAllByRole("link", { name: "캘린더" })[0]);
     await openChat();
-    expect(screen.getByRole("log").textContent).toContain(
-      "웨딩홀을 정한 다음엔 뭘 준비할까?",
-    );
+    expect(
+      screen.getByRole("link", { name: "로그인하기" }).getAttribute("href"),
+    ).toBe("/login");
+    expect(screen.queryByRole("log")).toBeNull();
     expect(mocks.stream).not.toHaveBeenCalled();
   });
 });

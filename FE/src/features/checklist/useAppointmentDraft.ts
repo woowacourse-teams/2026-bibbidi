@@ -1,81 +1,103 @@
 import { useState } from "react";
-
 import {
-  ChecklistAppointmentFormDraft,
-  ChecklistAppointmentFormErrors,
-  ChecklistAppointmentFormField,
   emptyAppointmentDraft,
   validateAppointmentDraft,
   validateAppointmentEndTime,
+  type ChecklistAppointmentFormController,
+  type ChecklistAppointmentFormErrors,
+  type ChecklistAppointmentFormField,
 } from "./model/appointmentForm";
 
-/** Shared input state only; each flow owns commands and when to reset. */
-export function useAppointmentDraft() {
-  const [draft, setDraft] = useState<ChecklistAppointmentFormDraft>(
-    emptyAppointmentDraft,
-  );
-  const [errors, setErrors] = useState<ChecklistAppointmentFormErrors>({});
+type AppointmentDraftController = Pick<
+  ChecklistAppointmentFormController,
+  | "draft"
+  | "errors"
+  | "changeDate"
+  | "changeEndTime"
+  | "changeMemo"
+  | "changePlace"
+  | "changeStartTime"
+  | "changeTitle"
+  | "touchDate"
+  | "touchEndTime"
+  | "touchPlace"
+  | "touchStartTime"
+  | "touchTitle"
+>;
 
+/** Shared field state and validation; callers own submission and discard policy. */
+export function useAppointmentDraft() {
+  const [draft, setDraft] = useState(emptyAppointmentDraft);
+  const [errors, setErrors] = useState<ChecklistAppointmentFormErrors>({});
   const replaceError = (
     field: ChecklistAppointmentFormField,
     message?: string,
   ) => {
     setErrors((current) => {
       const next = { ...current };
-      if (message) next[field] = message;
-      else delete next[field];
+
+      if (message) {
+        next[field] = message;
+      } else {
+        delete next[field];
+      }
+
       return next;
     });
   };
 
-  return {
-    draft,
-    errors,
-    setDraft,
-    setErrors,
-    changeDate: (date: string) => {
+  const form: AppointmentDraftController = {
+    changeDate: (date) => {
       setDraft((current) => ({ ...current, date }));
-      if (errors.date)
+      if (errors.date) {
         replaceError("date", validateAppointmentDraft({ ...draft, date }).date);
+      }
     },
-    changeEndTime: (endTime: string) => {
+    changeEndTime: (endTime) => {
       setDraft((current) => ({ ...current, endTime }));
-      if (errors.endTime)
+      if (errors.endTime) {
         replaceError(
           "endTime",
           validateAppointmentEndTime(draft.startTime, endTime),
         );
+      }
     },
-    changeMemo: (memo: string) => setDraft((current) => ({ ...current, memo })),
-    changePlace: (place: string) => {
+    changeMemo: (memo) => setDraft((current) => ({ ...current, memo })),
+    changePlace: (place) => {
       setDraft((current) => ({ ...current, place }));
-      if (errors.place)
+      if (errors.place) {
         replaceError(
           "place",
           validateAppointmentDraft({ ...draft, place }).place,
         );
+      }
     },
-    changeStartTime: (startTime: string) => {
+    changeStartTime: (startTime) => {
       setDraft((current) => ({ ...current, startTime }));
-      if (errors.startTime)
+      if (errors.startTime) {
         replaceError(
           "startTime",
           validateAppointmentDraft({ ...draft, startTime }).startTime,
         );
-      if (errors.endTime)
+      }
+      if (errors.endTime) {
         replaceError(
           "endTime",
           validateAppointmentEndTime(startTime, draft.endTime),
         );
+      }
     },
-    changeTitle: (title: string) => {
+    changeTitle: (title) => {
       setDraft((current) => ({ ...current, title }));
-      if (errors.title)
+      if (errors.title) {
         replaceError(
           "title",
           validateAppointmentDraft({ ...draft, title }).title,
         );
+      }
     },
+    draft,
+    errors,
     touchDate: () => replaceError("date", validateAppointmentDraft(draft).date),
     touchEndTime: () =>
       replaceError(
@@ -92,4 +114,5 @@ export function useAppointmentDraft() {
     touchTitle: () =>
       replaceError("title", validateAppointmentDraft(draft).title),
   };
+  return { form, setDraft, setErrors };
 }

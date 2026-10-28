@@ -1,6 +1,10 @@
 /* Viewport margins shared by PageContainer and fixed service controls.
    Keep media conditions in sync with --layout-breakpoint-md/lg and responsive.ts. */
 :root {
+  --mobile-dock-size: 64px;
+  --mobile-dock-offset: max(12px, env(safe-area-inset-bottom));
+  --mobile-dock-max-width: 438px;
+  --mobile-dock-gap: 12px;
   --service-page-margin: var(--layout-margin-mobile);
 }
 
