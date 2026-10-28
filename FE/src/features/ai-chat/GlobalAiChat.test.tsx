@@ -47,7 +47,6 @@ vi.mock("../auth", () => ({
   }),
 }));
 vi.mock("../app-header", () => ({ AppHeaderSummaryFeature: () => null }));
-vi.mock("../feedback", () => ({ FeedbackFeature: () => null }));
 vi.mock("../catalog", () => ({
   catalogRepository: { getCatalog: mocks.catalog },
 }));

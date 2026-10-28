@@ -25,11 +25,15 @@ const id = "d67a9265-3f45-4d7f-99f1-b5823054c8d9";
 let restoreDialog: (() => void) | undefined;
 const authRequired = vi.fn();
 
-function chat(isAuthenticated = true) {
+function chat(
+  isAuthenticated = true,
+  onKeyboardVisibilityChange?: (visible: boolean) => void,
+) {
   return (
     <MemoryRouter>
       <MyChecklistProvider sessionKey="ai-chat-test">
         <AiChatFeature
+          onKeyboardVisibilityChange={onKeyboardVisibilityChange}
           isAuthenticated={isAuthenticated}
           onAuthenticationRequired={authRequired}
         />
@@ -81,6 +85,7 @@ function pendingReply() {
 
 beforeEach(() => {
   restoreDialog = installDialogMock();
+  localStorage.clear();
   authRequired.mockReset();
   mocks.stream.mockReset();
   mocks.stream.mockImplementation(async (_request, receiver) => {
@@ -107,6 +112,81 @@ afterEach(() => {
 });
 
 describe("실제 AI 채팅", () => {
+  it.each([false, true])(
+    "모바일 여부 %s에서 세 번째 완료 답변 뒤에만 피드백을 표시하고 계속 대화할 수 있다",
+    async (mobile) => {
+      if (mobile) mockMobileDialog();
+      renderChat(chat());
+      await send("첫 질문");
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+      await send("두 번째 질문");
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+      expect(
+        screen.queryByRole("region", { name: "AI 대화 피드백" }),
+      ).toBeNull();
+      const reply = pendingReply();
+      await send("세 번째 질문");
+      reply.delta("세 번째 답변");
+      expect(
+        screen.queryByRole("region", { name: "AI 대화 피드백" }),
+      ).toBeNull();
+      await reply.complete();
+      const card = screen.getByRole("region", { name: "AI 대화 피드백" });
+      expect(screen.getByRole("log").contains(card)).toBe(true);
+      expect(card.previousElementSibling?.textContent).toContain(
+        "세 번째 답변",
+      );
+      expect(within(card).queryByRole("textbox")).toBeNull();
+      await send("계속 대화할게");
+      await waitFor(() => expect(mocks.stream).toHaveBeenCalledTimes(4));
+      expect(
+        screen.getAllByRole("region", { name: "AI 대화 피드백" }),
+      ).toHaveLength(1);
+      expect(card.nextElementSibling?.textContent).toContain("계속 대화할게");
+    },
+  );
+
+  it("모바일 피드백 의견을 입력할 때도 키보드 상태를 반영한다", async () => {
+    mockMobileDialog();
+    const viewport = Object.assign(new EventTarget(), {
+      height: 844,
+      offsetTop: 0,
+    });
+    vi.stubGlobal("visualViewport", viewport);
+    const keyboard = vi.fn();
+    renderChat(chat(true, keyboard));
+    for (const question of ["첫 질문", "두 번째 질문", "세 번째 질문"]) {
+      await send(question);
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    }
+    fireEvent.click(screen.getByRole("button", { name: "도움됐어요" }));
+    const input = screen.getByRole("textbox", {
+      name: "어떤 점이 그랬나요? (선택)",
+    });
+    act(() => input.focus());
+    act(() => {
+      viewport.height = 480;
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    await waitFor(() => expect(keyboard).toHaveBeenLastCalledWith(true));
+  });
+
+  it("실패한 답변은 세지 않고 성공한 재시도를 한 번만 센다", async () => {
+    renderChat(chat());
+    await send("첫 질문");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    const reply = pendingReply();
+    await send("두 번째 질문");
+    reply.delta("미완성");
+    await reply.fail();
+    expect(screen.queryByRole("region", { name: "AI 대화 피드백" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.queryByRole("region", { name: "AI 대화 피드백" })).toBeNull();
+    await send("세 번째 질문");
+    await screen.findByRole("region", { name: "AI 대화 피드백" });
+  });
+
   it("직접 작성한 질문으로 답변을 받고 후속 메시지에 같은 대화 ID를 보낸다", async () => {
     renderChat(chat());
     const question = "웨딩홀을 정한 다음엔 뭘 준비할까?";

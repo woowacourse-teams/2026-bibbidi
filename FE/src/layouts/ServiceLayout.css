@@ -1,5 +1,4 @@
 .service-layout {
-  --service-side-panel-width: 0px;
   --service-bottom-inset: 0px;
   --service-viewport-height: 100vh;
   min-width: 320px;

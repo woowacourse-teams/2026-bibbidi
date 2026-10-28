@@ -6,6 +6,7 @@ import { GlobalAiChatDialog } from "./view/GlobalAiChatDialog";
 import { Button } from "../../components/button";
 import { useLinkClickHandler } from "react-router";
 import { useMyChecklistQueryRepository } from "../checklist";
+import { getAiChatFeedbackAnchor } from "./model/aiChatFeedback";
 import { AiChatView } from "./view/AiChatView";
 import { useIsMobileLayout } from "../../shared/responsive";
 import {
@@ -81,6 +82,7 @@ function AddedTaskLink({
 
 export function AiChatSession({
   isAuthenticated,
+  feedbackAudienceKey,
   isOpen,
   onAuthenticationRequired,
   onClose,
@@ -89,6 +91,7 @@ export function AiChatSession({
   onKeyboardVisibilityChange,
 }: {
   isAuthenticated: boolean;
+  feedbackAudienceKey: string;
   isOpen: boolean;
   onAuthenticationRequired: () => void;
   onClose: () => void;
@@ -151,6 +154,8 @@ export function AiChatSession({
     <AiChatView
       active={active}
       isAuthenticated
+      feedbackAudienceKey={feedbackAudienceKey}
+      feedbackAfterMessageId={getAiChatFeedbackAnchor(messages)}
       compact={compact}
       viewport={viewport}
       onComposerFocus={() => {

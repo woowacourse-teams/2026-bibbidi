@@ -6,6 +6,7 @@ import "./view/AiChat.css";
 
 export function AiChatFeature({
   isAuthenticated,
+  feedbackAudienceKey = "authenticated",
   onAuthenticationRequired,
   contextLabel,
   launcherLabel = "AI",
@@ -14,6 +15,7 @@ export function AiChatFeature({
   onKeyboardVisibilityChange,
 }: {
   isAuthenticated: boolean;
+  feedbackAudienceKey?: string;
   onAuthenticationRequired: () => void;
   contextLabel?: string;
   launcherLabel?: string;
@@ -97,6 +99,7 @@ export function AiChatFeature({
       )}
       {Session && (
         <Session
+          feedbackAudienceKey={feedbackAudienceKey}
           contextLabel={contextLabel}
           onKeyboardVisibilityChange={onKeyboardVisibilityChange}
           isAuthenticated={isAuthenticated}
