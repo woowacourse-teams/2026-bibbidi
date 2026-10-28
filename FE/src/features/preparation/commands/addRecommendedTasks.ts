@@ -1,6 +1,6 @@
 import type { MyChecklistQueryRepository } from "../../checklist";
-import type { ChecklistRepository } from "../../preparation";
-import { PreparationDuplicateChecklistItemError } from "../../preparation/repository/preparationErrors";
+import type { ChecklistRepository } from "../repository/checklistRepository";
+import { PreparationDuplicateChecklistItemError } from "../repository/preparationErrors";
 
 /** Save the selection and reconcile one concurrent addition without duplicating it. */
 export async function addRecommendedTasks({

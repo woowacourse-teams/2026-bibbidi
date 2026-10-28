@@ -7,6 +7,12 @@ import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 
 export const appRoutes: RouteObject[] = [
   {
+    path: "/balance-game",
+    lazy: async () => ({
+      Component: (await import("../pages/BalanceGamePage")).BalanceGamePage,
+    }),
+  },
+  {
     path: "/landing",
     lazy: async () => {
       const { LandingPage } = await import("../pages/LandingPage");

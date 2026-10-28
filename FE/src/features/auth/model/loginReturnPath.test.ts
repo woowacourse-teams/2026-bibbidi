@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { getSafeLoginReturnPath } from "./loginReturnPath";
 
 describe("loginReturnPath", () => {
+  it("밸런스게임으로 복귀하되 임의의 하위 경로는 허용하지 않는다", () => {
+    expect(getSafeLoginReturnPath("?returnTo=%2Fbalance-game")).toBe(
+      "/balance-game",
+    );
+    expect(
+      getSafeLoginReturnPath("?returnTo=%2Fbalance-game%2Fevil"),
+    ).toBeNull();
+  });
   it("허용한 내부 캘린더 경로만 복귀 경로로 사용한다", () => {
     expect(getSafeLoginReturnPath("?returnTo=%2Fcalendar")).toBe("/calendar");
     expect(getSafeLoginReturnPath("?returnTo=%2Fplanner")).toBe(null);

@@ -1,0 +1,357 @@
+.balance-game-layout {
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+}
+
+.balance-game {
+  width: min(100% - 48px, 640px);
+  margin: 0 auto;
+  padding: 16px 0 48px;
+}
+
+.balance-game__navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 40px;
+  font: var(--typography-t6-medium);
+}
+
+.balance-game__progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+
+.balance-game__progress-label strong {
+  color: var(--color-fg-warning);
+}
+
+.balance-game__eyebrow {
+  margin: 32px 0 8px;
+  color: var(--color-fg-warning);
+  font: var(--typography-t7);
+}
+
+.balance-game h1 {
+  margin: 0 0 24px;
+  font: var(--typography-t2);
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+.balance-game h1:focus {
+  outline: none;
+}
+
+.balance-game__choices {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.balance-game__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.balance-game__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 280px;
+  padding: 48px 24px 28px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-layer-default);
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background-color 150ms;
+}
+
+.balance-game__card:hover {
+  border-color: var(--color-stroke-selected);
+}
+
+.balance-game__card[data-selected] {
+  border-color: var(--color-stroke-brand-solid);
+  background: var(--color-bg-brand-weak);
+  box-shadow: inset 0 0 0 1px var(--color-stroke-brand-solid);
+}
+
+.balance-game__card:has(input:focus-visible),
+.balance-game__unknown:has(input:focus-visible) {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 3px;
+}
+
+.balance-game__choice-marker {
+  position: absolute;
+  inset: 16px auto auto 16px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-bg-neutral-weak);
+  font: var(--typography-t7);
+  font-weight: var(--font-weight-bold);
+}
+
+.balance-game__card[data-selected] .balance-game__choice-marker {
+  background: var(--color-bg-brand-solid);
+}
+
+.balance-game__card > .bibbidi-checkbox {
+  position: absolute;
+  inset: 17px 16px auto auto;
+}
+
+.balance-game__image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 160px;
+  width: 100%;
+  height: 160px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.balance-game__image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.balance-game__image:not(:has(img)) {
+  display: none;
+}
+
+.balance-game__choice-text {
+  margin-block: auto;
+  font: var(--typography-t5-medium);
+  text-align: center;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.balance-game__unknown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t6-medium);
+  cursor: pointer;
+}
+
+.balance-game__unknown[data-selected] {
+  border-color: var(--color-stroke-brand-solid);
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-neutral);
+}
+
+.balance-game__hint {
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  text-align: center;
+}
+
+.balance-game__footer,
+.balance-game__result-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.balance-game__footer .bibbidi-button-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.balance-game__status {
+  padding: 80px 0;
+  text-align: center;
+}
+
+.balance-game__description {
+  margin: 0 0 20px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t6);
+  word-break: keep-all;
+}
+
+.balance-game__selection-toolbar,
+.balance-game__selection-toolbar label,
+.balance-game__groups label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.balance-game__selection-toolbar {
+  justify-content: space-between;
+  margin: 32px 0 16px;
+  font: var(--typography-t7);
+}
+
+.balance-game__groups details {
+  margin-bottom: 12px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: var(--radius-lg);
+  overflow: clip;
+}
+
+.balance-game__groups summary {
+  padding: 20px;
+  background: var(--color-bg-neutral-weak);
+  font: var(--typography-t5-medium);
+  cursor: pointer;
+}
+
+.balance-game__groups summary span {
+  float: right;
+  font: var(--typography-t6);
+}
+
+.balance-game__groups ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 20px;
+}
+
+.balance-game__groups li + li {
+  border-top: 1px solid var(--color-stroke-neutral-weak);
+}
+
+.balance-game__groups label {
+  padding: 16px 0;
+  cursor: pointer;
+}
+
+.balance-game__groups strong {
+  display: block;
+  font: var(--typography-t6-medium);
+}
+
+.balance-game__groups small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+}
+
+.balance-game__added {
+  margin-left: auto;
+  color: var(--color-fg-positive);
+  white-space: nowrap;
+  font: var(--typography-t7);
+}
+
+.balance-game__notice {
+  color: var(--color-fg-positive);
+  font: var(--typography-t6);
+}
+
+.balance-game__error {
+  color: var(--color-fg-critical);
+  font: var(--typography-t6);
+}
+
+.balance-game__result-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 0 max(16px, env(safe-area-inset-bottom));
+  background: var(--color-bg-layer-default);
+  font: var(--typography-t6-medium);
+}
+
+.balance-game__result-footer a {
+  color: var(--color-fg-neutral);
+}
+
+.balance-game__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (width < 768px) {
+  .balance-game {
+    width: calc(100% - 32px);
+    padding-top: 0;
+  }
+
+  .balance-game__navigation {
+    margin-bottom: 24px;
+  }
+
+  .balance-game h1 {
+    font: var(--typography-t3);
+  }
+
+  .balance-game__cards {
+    gap: 12px;
+  }
+
+  .balance-game__card {
+    min-height: 280px;
+    padding: 48px 14px 20px;
+  }
+
+  .balance-game__image {
+    flex-basis: 120px;
+    height: 120px;
+    margin-bottom: 16px;
+  }
+
+  .balance-game__choice-text {
+    font: var(--typography-t6-medium);
+  }
+
+  .balance-game__footer,
+  .balance-game__result-footer {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .balance-game__footer .bibbidi-button {
+    width: 100%;
+  }
+
+  .balance-game__selection-toolbar {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .balance-game__card {
+    transition: none;
+  }
+}
