@@ -6,22 +6,19 @@ import { createFeedbackSubmitEvent } from "./analytics/feedbackAnalytics";
 import { createFeedback } from "./api/createFeedback";
 import type { FeedbackSentiment } from "./model/feedback";
 
-const SNACKBAR_DURATION_MS = 2_000;
-
-interface UseFeedbackFormOptions {
-  isMobile: boolean;
+interface UseFeedbackSubmissionOptions {
+  source?: "service_layout" | "ai_chat";
+  onSuccess: () => void;
 }
 
-export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
-  const [isOpen, setIsOpen] = useState(false);
+export function useFeedbackSubmission({
+  source = "service_layout",
+  onSuccess,
+}: UseFeedbackSubmissionOptions) {
   const [sentiment, setSentiment] = useState<FeedbackSentiment | null>(null);
   const [content, setContent] = useState("");
-  const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const triggerButtonRef = useRef<HTMLButtonElement>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
   const submissionInFlightRef = useRef(false);
@@ -38,69 +35,6 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
       submissionInFlightRef.current = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!isOpen || isMobile) {
-      return;
-    }
-
-    closeButtonRef.current?.focus();
-
-    const closeAndRestoreFocus = () => {
-      if (isSubmitting) {
-        return;
-      }
-
-      setIsOpen(false);
-      triggerButtonRef.current?.focus();
-    };
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        closeAndRestoreFocus();
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeAndRestoreFocus();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMobile, isOpen, isSubmitting]);
-
-  useEffect(() => {
-    if (!isSnackbarVisible) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(
-      () => setIsSnackbarVisible(false),
-      SNACKBAR_DURATION_MS,
-    );
-
-    return () => window.clearTimeout(timeoutId);
-  }, [isSnackbarVisible]);
-
-  const open = () => {
-    setIsSnackbarVisible(false);
-    setErrorMessage(null);
-    setIsOpen(true);
-  };
-
-  const close = () => {
-    if (isSubmitting) {
-      return;
-    }
-
-    setIsOpen(false);
-    if (!isMobile) triggerButtonRef.current?.focus();
-  };
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -120,7 +54,12 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
     try {
       await createFeedback(
         {
-          content: content.trim() === "" ? null : content,
+          content:
+            source === "ai_chat"
+              ? `[AI 대화 피드백]${content.trim() ? `\n${content}` : ""}`
+              : content.trim() === ""
+                ? null
+                : content,
           sentiment,
         },
         controller.signal,
@@ -134,12 +73,10 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
         return;
       }
 
-      setIsOpen(false);
       setSentiment(null);
       setContent("");
-      setIsSnackbarVisible(true);
-      if (!isMobile) triggerButtonRef.current?.focus();
-      analytics.track(createFeedbackSubmitEvent());
+      analytics.track(createFeedbackSubmitEvent(source));
+      onSuccess();
     } catch {
       if (
         isMountedRef.current &&
@@ -161,20 +98,14 @@ export function useFeedbackForm({ isMobile }: UseFeedbackFormOptions) {
   };
 
   return {
+    clearError: () => setErrorMessage(null),
     canSubmit: sentiment !== null && !isSubmitting,
-    close,
-    closeButtonRef,
-    containerRef,
     content,
     errorMessage,
-    isOpen,
-    isSnackbarVisible,
     isSubmitting,
-    open,
     sentiment,
     setContent,
     setSentiment,
     submit,
-    triggerButtonRef,
   };
 }

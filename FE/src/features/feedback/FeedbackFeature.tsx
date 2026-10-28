@@ -1,110 +1,82 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import {
   useExitSnapshot,
   useLayerPresence,
 } from "../../shared/modal/useLayerPresence";
 import { useIsMobileLayout } from "../../shared/responsive";
-import { useFeedbackForm } from "./useFeedbackForm";
-import { useFeedbackOpeningAnimation } from "./useFeedbackOpeningAnimation";
+import { useFeedbackSubmission } from "./useFeedbackSubmission";
 import { FeedbackBottomSheet } from "./view/FeedbackBottomSheet";
-import { FeedbackPopover } from "./view/FeedbackPopover";
+import { FeedbackDialog } from "./view/FeedbackDialog";
 import { FeedbackSnackbar } from "./view/FeedbackSnackbar";
 import "./FeedbackFeature.css";
 
-function FeedbackIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M4.75 5.75h14.5v10.5H10l-4.5 3v-3h-.75v-10.5Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M8 10h8M8 13h5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-export function FeedbackFeature() {
+export function FeedbackFeature({
+  renderTrigger,
+}: {
+  renderTrigger: (
+    open: () => void,
+    returnFocusRef: RefObject<HTMLButtonElement | null>,
+  ) => ReactNode;
+}) {
   const isMobile = useIsMobileLayout();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const submission = useFeedbackSubmission({
+    onSuccess: () => {
+      setIsOpen(false);
+      setIsSnackbarVisible(true);
+    },
+  });
   const {
+    clearError,
     canSubmit,
-    close,
-    closeButtonRef,
-    containerRef,
     content,
     errorMessage,
-    isOpen,
-    isSnackbarVisible,
     isSubmitting,
-    open,
     sentiment,
     setContent,
     setSentiment,
     submit,
-    triggerButtonRef,
-  } = useFeedbackForm({ isMobile });
-
-  useFeedbackOpeningAnimation({
-    containerRef,
-    triggerRef: triggerButtonRef,
-    isOpen,
-    isMobile,
-  });
+  } = submission;
+  useEffect(() => {
+    if (!isSnackbarVisible) return;
+    const timeout = window.setTimeout(() => setIsSnackbarVisible(false), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [isSnackbarVisible]);
   const { present, onExited } = useLayerPresence(isOpen);
-  const form = {
-    canSubmit,
-    closeButtonRef,
-    content,
-    errorMessage,
-    isSubmitting,
-    onClose: close,
-    onContentChange: setContent,
-    onSentimentChange: setSentiment,
-    onSubmit: submit,
-    sentiment,
-  };
   const values = useMemo(
     () => ({ canSubmit, content, errorMessage, isSubmitting, sentiment }),
     [canSubmit, content, errorMessage, isSubmitting, sentiment],
   );
   const snapshot = useExitSnapshot(isOpen, values) ?? values;
-
+  const form = {
+    ...snapshot,
+    onClose: () => {
+      if (!isSubmitting) setIsOpen(false);
+    },
+    onContentChange: setContent,
+    onSentimentChange: setSentiment,
+    onSubmit: submit,
+    open: isOpen,
+    onExited,
+    returnFocusRef: triggerRef,
+  };
   return (
     <>
-      <div className="feedback-feature" ref={containerRef}>
-        {isMobile
-          ? present && (
-              <FeedbackBottomSheet
-                {...form}
-                {...snapshot}
-                open={isOpen}
-                onExited={onExited}
-                returnFocusRef={triggerButtonRef}
-              />
-            )
-          : isOpen && <FeedbackPopover {...form} />}
-
-        <button
-          aria-label="의견 보내기"
-          aria-expanded={isOpen}
-          aria-haspopup="dialog"
-          className="feedback-feature__trigger"
-          onClick={open}
-          ref={triggerButtonRef}
-          type="button"
-        >
-          <FeedbackIcon />
-          <span className="feedback-feature__trigger-label">의견 보내기</span>
-        </button>
-      </div>
-
-      {isSnackbarVisible ? <FeedbackSnackbar /> : null}
+      {renderTrigger(() => {
+        clearError();
+        setIsSnackbarVisible(false);
+        setIsOpen(true);
+      }, triggerRef)}
+      {present &&
+        (isMobile ? (
+          <FeedbackBottomSheet {...form} />
+        ) : (
+          <FeedbackDialog {...form} />
+        ))}
+      {isSnackbarVisible && <FeedbackSnackbar />}
     </>
   );
 }

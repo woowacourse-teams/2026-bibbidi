@@ -10,7 +10,19 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createFeedback } from "./api/createFeedback";
-import { FeedbackFeature } from "./FeedbackFeature";
+import { FeedbackFeature as Feature } from "./FeedbackFeature";
+
+function FeedbackFeature() {
+  return (
+    <Feature
+      renderTrigger={(open, ref) => (
+        <button ref={ref} onClick={open}>
+          의견 보내기
+        </button>
+      )}
+    />
+  );
+}
 
 const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
 
@@ -159,7 +171,7 @@ describe("FeedbackFeature", () => {
       (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement)
         .disabled,
     ).toBe(true);
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.click(submitButton);
     expect(createFeedbackMock).toHaveBeenCalledOnce();
@@ -212,14 +224,14 @@ describe("FeedbackFeature", () => {
     expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
-  it("Escape 키로 닫고 플로팅 버튼에 포커스를 돌려준다", () => {
+  it("Escape 키로 닫고 메뉴 버튼에 포커스를 돌려준다", async () => {
     render(<FeedbackFeature />);
     openFeedback();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const trigger = screen.getByRole("button", { name: "의견 보내기" });
-    expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 

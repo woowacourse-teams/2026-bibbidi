@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from "react";
+import { Fragment, useEffect, useId, useRef } from "react";
 
+import { AiChatFeedback } from "./AiChatFeedback";
 import bibbidiLogo from "../../../assets/bibbidi-logo.webp";
 import {
   ChatMessage,
@@ -15,6 +16,7 @@ import type { RecommendationController } from "../model/recommendation";
 
 export function AiChatView({
   active,
+  feedbackAudienceKey,
   isAuthenticated,
   draft,
   messages,
@@ -30,6 +32,7 @@ export function AiChatView({
   viewport,
 }: {
   active: boolean;
+  feedbackAudienceKey?: string;
   isAuthenticated: boolean;
   draft: string;
   messages: ChatMessage[];
@@ -44,6 +47,13 @@ export function AiChatView({
   onComposerBlur?: () => void;
   viewport: ViewportMetrics;
 }) {
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const feedbackAnchor = messages.filter(
+    (message) =>
+      message.role === "assistant" &&
+      message.status === "complete" &&
+      message.text.trim(),
+  )[2]?.id;
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
   const lastMessages = useRef(messages);
@@ -115,40 +125,54 @@ export function AiChatView({
             const Message =
               message.role === "assistant" ? AiChatAssistantMessage : "div";
             return (
-              <Message
-                className={
-                  message.role === "user"
-                    ? "ai-chat__message ai-chat__message--user"
-                    : undefined
-                }
-                key={message.id}
-              >
-                {message.text ? (
-                  message.role === "assistant" ? (
-                    <AiChatMarkdown text={message.text} />
-                  ) : (
-                    <p>{message.text}</p>
-                  )
-                ) : null}
-                {message.role === "user" ? (
-                  <time>{message.time}</time>
-                ) : message.status === "failed" ? (
-                  <span className="ai-chat__incomplete">미완료 답변</span>
-                ) : null}
-                {message.role === "assistant" &&
-                message.status === "complete" &&
-                Boolean(message.catalogItemIds?.length) ? (
-                  <AiChatRecommendations
-                    key={String(active)}
-                    {...recommendations.forAnswer(
-                      message.id,
-                      message.catalogItemIds!,
-                    )}
-                    status={recommendations.catalogStatus}
-                    onRetry={recommendations.retryCatalog}
-                  />
-                ) : null}
-              </Message>
+              <Fragment key={message.id}>
+                <Message
+                  className={
+                    message.role === "user"
+                      ? "ai-chat__message ai-chat__message--user"
+                      : undefined
+                  }
+                >
+                  {message.text ? (
+                    message.role === "assistant" ? (
+                      <AiChatMarkdown text={message.text} />
+                    ) : (
+                      <p>{message.text}</p>
+                    )
+                  ) : null}
+                  {message.role === "user" ? (
+                    <time>{message.time}</time>
+                  ) : message.status === "failed" ? (
+                    <span className="ai-chat__incomplete">미완료 답변</span>
+                  ) : null}
+                  {message.role === "assistant" &&
+                  message.status === "complete" &&
+                  Boolean(message.catalogItemIds?.length) ? (
+                    <AiChatRecommendations
+                      key={String(active)}
+                      {...recommendations.forAnswer(
+                        message.id,
+                        message.catalogItemIds!,
+                      )}
+                      status={recommendations.catalogStatus}
+                      onRetry={recommendations.retryCatalog}
+                    />
+                  ) : null}
+                </Message>
+                {isAuthenticated &&
+                  feedbackAudienceKey &&
+                  message.id === feedbackAnchor && (
+                    <AiChatFeedback
+                      key={feedbackAudienceKey}
+                      audienceKey={feedbackAudienceKey}
+                      onInputFocus={onComposerFocus}
+                      onInputBlur={onComposerBlur}
+                      onDismiss={() =>
+                        composerRef.current?.focus({ preventScroll: true })
+                      }
+                    />
+                  )}
+              </Fragment>
             );
           })}
         </div>
@@ -188,6 +212,7 @@ export function AiChatView({
           AI에게 보낼 메시지
         </label>
         <textarea
+          ref={composerRef}
           disabled={!isAuthenticated}
           onFocus={onComposerFocus}
           onBlur={onComposerBlur}

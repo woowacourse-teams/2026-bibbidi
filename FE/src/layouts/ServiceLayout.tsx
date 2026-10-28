@@ -5,11 +5,9 @@ import { AiChatFeature } from "../features/ai-chat/AiChatFeature";
 import { AppLayout } from "../components/app-layout";
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth, useLogout } from "../features/auth";
-import { FeedbackFeature } from "../features/feedback";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
-import { useReservedPanelSpace } from "./useReservedPanelSpace";
 import { useIsMobileLayout } from "../shared/responsive";
 
 export function ServiceLayout() {
@@ -35,7 +33,6 @@ export function ServiceLayout() {
   }, [endAuthentication, navigate]);
   const logout = useLogout({ onSuccess: handleLogoutSuccess });
   const layoutRef = useRef<HTMLDivElement>(null);
-  useReservedPanelSpace(layoutRef);
 
   useLayoutEffect(() => {
     if (layoutRef.current) {
@@ -100,6 +97,7 @@ export function ServiceLayout() {
         authState.status === "guest" ? (
           <AiChatFeature
             key={aiAudience}
+            feedbackAudienceKey={aiAudience}
             contextLabel={aiContext}
             onKeyboardVisibilityChange={setAiKeyboardVisible}
             isAuthenticated={authState.status === "authenticated"}
@@ -119,7 +117,6 @@ export function ServiceLayout() {
         ) : (
           <AppBottomNavigation />
         )}
-        <FeedbackFeature />
       </div>
     </AppLayout>
   );

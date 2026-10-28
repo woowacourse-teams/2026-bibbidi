@@ -4,6 +4,8 @@ interface FeedbackRatingFieldProps {
   disabled: boolean;
   onChange: (sentiment: FeedbackSentiment) => void;
   value: FeedbackSentiment | null;
+  positiveLabel?: string;
+  negativeLabel?: string;
 }
 
 function ThumbIcon({ direction }: { direction: "down" | "up" }) {
@@ -31,6 +33,8 @@ export function FeedbackRatingField({
   disabled,
   onChange,
   value,
+  positiveLabel = "좋았어요",
+  negativeLabel = "아쉬워요",
 }: FeedbackRatingFieldProps) {
   return (
     <fieldset className="feedback-rating">
@@ -43,7 +47,7 @@ export function FeedbackRatingField({
         type="button"
       >
         <ThumbIcon direction="up" />
-        좋았어요
+        {positiveLabel}
       </button>
       <button
         aria-pressed={value === "bad"}
@@ -53,7 +57,7 @@ export function FeedbackRatingField({
         type="button"
       >
         <ThumbIcon direction="down" />
-        아쉬워요
+        {negativeLabel}
       </button>
     </fieldset>
   );

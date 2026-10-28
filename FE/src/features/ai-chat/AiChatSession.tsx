@@ -81,6 +81,7 @@ function AddedTaskLink({
 
 export function AiChatSession({
   isAuthenticated,
+  feedbackAudienceKey,
   isOpen,
   onAuthenticationRequired,
   onClose,
@@ -89,6 +90,7 @@ export function AiChatSession({
   onKeyboardVisibilityChange,
 }: {
   isAuthenticated: boolean;
+  feedbackAudienceKey: string;
   isOpen: boolean;
   onAuthenticationRequired: () => void;
   onClose: () => void;
@@ -151,6 +153,7 @@ export function AiChatSession({
     <AiChatView
       active={active}
       isAuthenticated
+      feedbackAudienceKey={feedbackAudienceKey}
       compact={compact}
       viewport={viewport}
       onComposerFocus={() => {

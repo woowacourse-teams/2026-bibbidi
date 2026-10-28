@@ -843,7 +843,7 @@ describe("ServiceLayout", () => {
     expect(appHeader?.hasAttribute("hidden")).toBe(false);
     expect(appHeader?.hasAttribute("inert")).toBe(false);
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /체크리스트 항목 10/ }),
     ).toBeNull();
@@ -865,7 +865,7 @@ describe("ServiceLayout", () => {
     expect(appHeader?.hasAttribute("hidden")).toBe(false);
     expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(content.style.overflow).toBe("");
     expect(scrollRoot.style.overflow).toBe("");
     expect(scrollRoot.style.overscrollBehaviorY).toBe("");
@@ -917,7 +917,7 @@ describe("ServiceLayout", () => {
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(
       container
         .querySelector(".service-layout__content")

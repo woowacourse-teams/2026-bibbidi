@@ -28,9 +28,10 @@ function renderHeader(
 }
 
 describe("AppHeader", () => {
-  it("비로그인 사용자에게 계정 메뉴를 표시한다", () => {
+  it("비로그인 사용자에게 로그인 링크를 표시하고 메뉴 버튼은 숨긴다", () => {
     renderHeader({ kind: "guest" });
 
+    expect(screen.queryByRole("button", { name: "계정 메뉴" })).toBeNull();
     expect(screen.getByRole("navigation", { name: "계정 메뉴" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "로그인" }).getAttribute("href"),

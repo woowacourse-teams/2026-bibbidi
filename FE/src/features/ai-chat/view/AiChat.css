@@ -277,11 +277,11 @@
 }
 .global-ai-window {
   position: fixed;
-  inset: auto 28px 148px auto;
+  inset: auto 28px 92px auto;
   z-index: 30;
   width: 400px;
   max-width: calc(100vw - 56px);
-  height: min(640px, calc(100dvh - 176px));
+  height: min(640px, calc(100dvh - 120px));
   max-height: none;
   margin: 0;
   padding: 0;
@@ -302,7 +302,7 @@
     position: fixed;
     z-index: 20;
     right: 28px;
-    bottom: 84px;
+    bottom: 28px;
     display: flex;
     align-items: center;
     justify-content: center;

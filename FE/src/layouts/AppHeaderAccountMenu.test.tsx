@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Link, MemoryRouter, useNavigate } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,6 +35,22 @@ function renderMenu() {
 }
 
 describe("헤더 계정 패널", () => {
+  it("메뉴의 의견 보내기를 열고 닫으면 메뉴 아이콘으로 돌아온다", async () => {
+    renderMenu();
+    const trigger = screen.getByRole("button", { name: "계정 메뉴" });
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "의견 보내기" }));
+    expect(screen.queryByRole("dialog", { name: "계정 메뉴" })).toBeNull();
+    const feedback = screen.getByRole("dialog", {
+      name: "비비디, 어떠셨나요?",
+    });
+    expect(feedback.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(feedback, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("아이콘 하나로 열고 닫으며 숨겨진 항목은 탐색에서 제외한다", () => {
     renderMenu();
     const trigger = screen.getByRole("button", { name: "계정 메뉴" });
