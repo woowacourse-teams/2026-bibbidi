@@ -11,7 +11,7 @@ import "./Landing.css";
 
 const features = [
   {
-    label: "AI 챗",
+    label: "AI",
     title: ["궁금한 것부터,", "편하게 물어보세요."],
     description: [
       "무엇부터 해야 할지 모르겠다면,",

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { PageContainer } from "../components/page-container";
 
@@ -24,10 +23,9 @@ interface PendingUser {
 
 interface AppHeaderProps {
   user: AuthenticatedUser | GuestUser | PendingUser;
-  actions?: ReactNode;
 }
 
-export function AppHeader({ user, actions }: AppHeaderProps) {
+export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   return (
     <header className="app-header">
@@ -56,7 +54,6 @@ export function AppHeader({ user, actions }: AppHeaderProps) {
         </div>
 
         <div className="app-header__actions">
-          {actions}
           {user.kind === "authenticated" ? (
             <AppHeaderAccountMenu navigationKey={pathname} user={user} />
           ) : user.kind === "guest" ? (

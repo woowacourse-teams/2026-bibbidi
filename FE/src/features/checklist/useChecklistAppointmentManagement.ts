@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { useAppointmentDraft } from "./useAppointmentDraft";
 
 import {
   addErrorAction,
@@ -23,7 +30,6 @@ import {
   MyChecklistRequestAbortedError,
 } from "./repository/myChecklistQueryRepository";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
-import { useAppointmentDraft } from "./useAppointmentDraft";
 
 type AppointmentOperation = "completion" | "delete" | "update";
 
@@ -122,8 +128,8 @@ export function useChecklistAppointmentManagement({
   const [editingAppointmentId, setEditingAppointmentId] = useState<
     number | null
   >(null);
-  const { draft, errors, setDraft, setErrors, ...draftFields } =
-    useAppointmentDraft();
+  const { form, setDraft, setErrors } = useAppointmentDraft();
+  const { draft } = form;
   const [initialDraft, setInitialDraft] = useState(emptyAppointmentDraft);
   const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [deletionConfirmation, setDeletionConfirmation] =
@@ -135,6 +141,19 @@ export function useChecklistAppointmentManagement({
   const contextKey = `${audience ?? "unknown"}:${sessionIdentity ?? "unknown"}:${checklistItemId ?? "none"}`;
   const [activeContextKey, setActiveContextKey] = useState(contextKey);
   const isCurrentContext = contextKey === activeContextKey;
+
+  const reset = useCallback(() => {
+    setDiscardDialogOpen(false);
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    inFlightRef.current = false;
+    setOpenMenuAppointmentId(null);
+    setEditingAppointmentId(null);
+    setDraft(emptyAppointmentDraft);
+    setErrors({});
+    setDeletionConfirmation(null);
+    setOperationFeedback({ status: "idle" });
+  }, [setDraft, setErrors]);
 
   useEffect(
     () => () => {
@@ -157,23 +176,14 @@ export function useChecklistAppointmentManagement({
       if (!isActive) {
         return;
       }
-      setDiscardDialogOpen(false);
-      requestControllerRef.current?.abort();
-      requestControllerRef.current = null;
-      inFlightRef.current = false;
-      setOpenMenuAppointmentId(null);
-      setEditingAppointmentId(null);
-      setDraft(emptyAppointmentDraft);
-      setErrors({});
-      setDeletionConfirmation(null);
-      setOperationFeedback({ status: "idle" });
+      reset();
       setActiveContextKey(contextKey);
     });
 
     return () => {
       isActive = false;
     };
-  }, [activeContextKey, contextKey, setDraft, setErrors]);
+  }, [activeContextKey, contextKey, reset]);
 
   const run = async (
     appointmentId: number,
@@ -317,9 +327,7 @@ export function useChecklistAppointmentManagement({
       confirmDiscard: () => {
         if (!inFlightRef.current) closeEditing();
       },
-      ...draftFields,
-      draft,
-      errors,
+      ...form,
       isOpen: isCurrentContext && editingAppointmentId !== null,
       submissionState: editingSubmissionState,
       submit: async () => {

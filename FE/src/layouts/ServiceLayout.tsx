@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 
 import { AiChatFeature } from "../features/ai-chat/AiChatFeature";
@@ -10,10 +10,13 @@ import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
 import { useReservedPanelSpace } from "./useReservedPanelSpace";
+import { useIsMobileLayout } from "../shared/responsive";
 
 export function ServiceLayout() {
   const { authState, endAuthentication, refreshAuth } = useAuth();
   const { pathname } = useLocation();
+  const isMobile = useIsMobileLayout();
+  const [aiKeyboardVisible, setAiKeyboardVisible] = useState(false);
   const aiContext = pathname.startsWith("/preparation")
     ? "로드맵"
     : pathname.startsWith("/checklist")
@@ -48,6 +51,7 @@ export function ServiceLayout() {
     <AppLayout
       className="service-layout"
       data-modal-scope
+      data-ai-keyboard-open={(isMobile && aiKeyboardVisible) || undefined}
       data-page-scroll-container
       ref={layoutRef}
       role="region"
@@ -60,17 +64,6 @@ export function ServiceLayout() {
       header={
         <div className="service-layout__header">
           <AppHeader
-            actions={
-              authState.status === "authenticated" ||
-              authState.status === "guest" ? (
-                <AiChatFeature
-                  key={aiAudience}
-                  contextLabel={aiContext}
-                  isAuthenticated={authState.status === "authenticated"}
-                  onAuthenticationRequired={refreshAuth}
-                />
-              ) : undefined
-            }
             user={
               authState.status === "authenticated"
                 ? {
@@ -99,7 +92,29 @@ export function ServiceLayout() {
       </div>
 
       <div className="service-layout__mobile-dock">
-        <AppBottomNavigation />
+        {authState.status === "authenticated" ||
+        authState.status === "guest" ? (
+          <AiChatFeature
+            key={aiAudience}
+            contextLabel={aiContext}
+            onKeyboardVisibilityChange={setAiKeyboardVisible}
+            isAuthenticated={authState.status === "authenticated"}
+            onAuthenticationRequired={refreshAuth}
+            launcherClassName={
+              isMobile ? "app-bottom-navigation__item" : undefined
+            }
+            renderLauncher={(launcher) => (
+              <>
+                <AppBottomNavigation>
+                  {isMobile ? launcher : null}
+                </AppBottomNavigation>
+                {!isMobile && launcher}
+              </>
+            )}
+          />
+        ) : (
+          <AppBottomNavigation />
+        )}
         <FeedbackFeature />
       </div>
     </AppLayout>

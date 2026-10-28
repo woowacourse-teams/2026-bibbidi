@@ -18,7 +18,10 @@
     position: relative;
     display: flex;
     min-width: 0;
-    margin: 6px;
+    margin: 6px 2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
     flex: 1;
     align-items: center;
     justify-content: center;
@@ -29,6 +32,8 @@
     font-size: 11px;
     font-weight: 600;
     text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
   }
 
   .app-bottom-navigation__item svg {
@@ -41,7 +46,11 @@
     stroke-width: 1.8;
   }
 
-  .app-bottom-navigation__item[aria-current="page"] {
+  .app-bottom-navigation:not(
+      :has(.app-bottom-navigation__item[aria-expanded="true"])
+    )
+    .app-bottom-navigation__item[aria-current="page"],
+  .app-bottom-navigation__item[aria-expanded="true"] {
     background: var(--color-bg-neutral-weak);
     color: var(--color-fg-brand);
   }
