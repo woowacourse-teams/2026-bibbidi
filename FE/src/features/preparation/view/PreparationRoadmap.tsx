@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "../../../components/badge";
 import { ProgressBar } from "../../../components/progress-bar";
 import { Button } from "../../../components/button";
+import {
+  useExitSnapshot,
+  useLayerPresence,
+} from "../../../shared/modal/useLayerPresence";
 import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
 import { RoadmapStageDetail } from "./RoadmapStageDetail";
 import { RoadmapHeader } from "./RoadmapHeader";
@@ -155,6 +159,9 @@ export function PreparationRoadmap({
     openStage?.categoryId === categoryId && openStage.stepId === selectedStepId
       ? viewModel.stages.find((item) => item.id === openStage.stepId)
       : undefined;
+  const detailOpen = stage !== undefined;
+  const { present, onExited } = useLayerPresence(detailOpen);
+  const displayedStage = useExitSnapshot(detailOpen, stage);
   const pending = addingCatalogItemIds.length > 0;
   const close = () => {
     if (!pending) setOpenStage(null);
@@ -204,9 +211,11 @@ export function PreparationRoadmap({
           </ol>
         </section>
       </div>
-      {stage && (
+      {present && displayedStage && (
         <RoadmapStageDetail
-          stage={stage}
+          stage={displayedStage}
+          open={detailOpen}
+          onExited={onExited}
           isGuest={isGuest}
           onClose={close}
           pending={pending}

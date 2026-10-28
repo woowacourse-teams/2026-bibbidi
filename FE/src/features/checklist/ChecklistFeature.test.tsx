@@ -261,8 +261,9 @@ function getCurrentUrl() {
 
 async function closeMobileTaskDetail(dialog: HTMLElement) {
   await act(async () => {
-    fireEvent.pointerDown(dialog);
+    fireEvent.pointerDown(dialog, { isPrimary: true });
     fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
   });
 }
 
@@ -546,8 +547,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     );
     expect(backdrop).not.toBeNull();
     if (backdrop) {
-      fireEvent.pointerDown(backdrop);
+      fireEvent.pointerDown(backdrop, { isPrimary: true });
       fireEvent.pointerUp(backdrop);
+      fireEvent.click(backdrop);
     }
     expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
@@ -1562,8 +1564,9 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     Object.defineProperty(detailSheet.firstElementChild, "getAnimations", {
       value: () => [{ finished }],
     });
-    fireEvent.pointerDown(detailSheet);
+    fireEvent.pointerDown(detailSheet, { isPrimary: true });
     fireEvent.pointerUp(detailSheet);
+    fireEvent.click(detailSheet);
 
     expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
     expect(detailSheet.dataset.state).toBe("closing");

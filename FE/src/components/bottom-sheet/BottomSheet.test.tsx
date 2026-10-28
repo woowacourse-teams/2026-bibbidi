@@ -258,9 +258,12 @@ describe("디자인 시스템 BottomSheet", () => {
     const dialog = screen.getByRole("dialog", { name: "날짜 선택" });
     fireEvent.pointerDown(screen.getByLabelText("메모"));
     fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
     expect((dialog as HTMLDialogElement).open).toBe(true);
-    fireEvent.pointerDown(dialog);
+    fireEvent.pointerDown(dialog, { isPrimary: true });
     fireEvent.pointerUp(dialog);
+    expect((dialog as HTMLDialogElement).open).toBe(true);
+    fireEvent.click(dialog);
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "날짜 선택" })).toBeNull(),
     );
@@ -271,8 +274,9 @@ describe("디자인 시스템 BottomSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "날짜 선택 열기" }));
     const dialog = screen.getByRole("dialog", { name: "날짜 선택" });
     fireEvent.keyDown(screen.getByLabelText("메모"), { key: "Escape" });
-    fireEvent.pointerDown(dialog);
+    fireEvent.pointerDown(dialog, { isPrimary: true });
     fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
     expect((dialog as HTMLDialogElement).open).toBe(true);
     expect(screen.queryByRole("button", { name: "닫기" })).toBeNull();
     const handle = screen.getByRole("button", { name: "아래로 밀어 닫기" });

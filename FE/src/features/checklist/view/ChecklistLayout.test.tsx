@@ -82,7 +82,7 @@ function Harness({
 
 function clickDimmer() {
   const layer = document.querySelector(".bibbidi-panel-overlay[open]")!;
-  for (const type of ["pointerdown", "pointerup"])
+  for (const type of ["pointerdown", "pointerup", "click"])
     fireEvent(layer, new MouseEvent(type, { bubbles: true, button: 0 }));
 }
 

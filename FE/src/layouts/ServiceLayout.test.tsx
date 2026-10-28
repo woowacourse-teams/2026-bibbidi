@@ -881,8 +881,9 @@ describe("ServiceLayout", () => {
       name: "체크리스트 항목 10",
     });
     await act(async () => {
-      fireEvent.pointerDown(detailSheet);
+      fireEvent.pointerDown(detailSheet, { isPrimary: true });
       fireEvent.pointerUp(detailSheet);
+      fireEvent.click(detailSheet);
     });
 
     expect(screen.getByTestId("service-location").textContent).toBe(
@@ -1025,7 +1026,7 @@ describe("ServiceLayout", () => {
     fireEvent.click(
       within(screen.getByRole("dialog", { name: "01 준비 단계" })).getByRole(
         "button",
-        { name: "닫기" },
+        { name: "확인" },
       ),
     );
     await waitFor(() =>

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import { useLinkClickHandler } from "react-router";
 import { Dialog } from "../../../components/dialog";
 import { BottomSheet } from "../../../components/bottom-sheet";
 import { Button } from "../../../components/button";
@@ -7,10 +6,13 @@ import { Badge } from "../../../components/badge";
 import { ListHeader } from "../../../components/list-header";
 import { ListRow } from "../../../components/list-row";
 import { useIsMobileLayout } from "../../../shared/responsive";
+import { useExitSnapshot } from "../../../shared/modal/useLayerPresence";
 import type { RoadmapStage } from "../view-model/createPreparationRoadmapViewModel";
 
 export function RoadmapStageDetail({
   stage,
+  open,
+  onExited,
   isGuest,
   onClose,
   pending,
@@ -21,6 +23,8 @@ export function RoadmapStageDetail({
   returnFocusRef,
 }: {
   stage: RoadmapStage;
+  open: boolean;
+  onExited: () => void;
   isGuest: boolean;
   onClose: () => void;
   pending: boolean;
@@ -31,9 +35,9 @@ export function RoadmapStageDetail({
   returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
   const isMobile = useIsMobileLayout();
-  const navigate = useLinkClickHandler<HTMLAnchorElement>("/checklist");
+  const mobilePresentation = useExitSnapshot(open, isMobile) ?? isMobile;
   const contentRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const additionTriggerRef = useRef<HTMLButtonElement | null>(null);
   useLayoutEffect(() => {
     if (pending) return;
@@ -45,7 +49,11 @@ export function RoadmapStageDetail({
     const next = contentRef.current?.querySelector<HTMLButtonElement>(
       'button[data-roadmap-add]:not(:disabled):not([aria-disabled="true"])',
     );
-    (next ?? closeRef.current)?.focus();
+    (
+      next ??
+      confirmRef.current ??
+      contentRef.current?.closest<HTMLDialogElement>("dialog")
+    )?.focus();
   }, [pending, stage.tasks]);
   const title = `${stage.numberLabel} ${stage.title}`;
   const remaining = stage.tasks.filter((task) => !task.isIncluded);
@@ -129,71 +137,41 @@ export function RoadmapStageDetail({
       {stage.tasks.length === 0 && <p>이 단계에 등록된 할 일이 없어요.</p>}
     </div>
   );
-  const checklistLink = (
-    <Button.Link
-      size="large"
-      display="block"
-      href="/checklist"
-      aria-disabled={pending || undefined}
-      onClick={(event) => {
-        if (pending) event.preventDefault();
-        else navigate(event);
-      }}
-    >
-      체크리스트에서 관리
-    </Button.Link>
-  );
-  return isMobile ? (
+  return mobilePresentation ? (
     <BottomSheet
-      open
+      open={open}
+      onExited={onExited}
       aria-label={title}
-      header={title}
+      header={<BottomSheet.Header>{title}</BottomSheet.Header>}
       onClose={onClose}
       returnFocusRef={returnFocusRef}
       closeOnEscape={!pending}
       closeOnDimmerClick={!pending}
       draggable={!pending}
-      headerActions={
-        <Button
-          size="small"
-          color="light"
-          onClick={onClose}
-          disabled={pending}
-          aria-label="단계 상세 닫기"
-          ref={closeRef}
-        >
-          닫기
-        </Button>
-      }
-      cta={checklistLink}
     >
       {content}
     </BottomSheet>
   ) : (
     <Dialog
-      open
+      open={open}
+      onExited={onExited}
       title={<Dialog.Title>{title}</Dialog.Title>}
       onClose={onClose}
       returnFocusRef={returnFocusRef}
       closeOnEscape={!pending}
       closeOnDimmerClick={!pending}
       actions={
-        <>
-          <div>
-            <Button
-              size="large"
-              color="dark"
-              variant="weak"
-              display="block"
-              onClick={onClose}
-              ref={closeRef}
-              disabled={pending}
-            >
-              닫기
-            </Button>
-          </div>
-          <div>{checklistLink}</div>
-        </>
+        <div>
+          <Button
+            size="large"
+            display="block"
+            onClick={onClose}
+            ref={confirmRef}
+            disabled={pending}
+          >
+            확인
+          </Button>
+        </div>
       }
     >
       {content}

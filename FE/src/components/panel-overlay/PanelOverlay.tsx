@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
 import { useNativeModalLifecycle } from "../../shared/modal/useNativeModalLifecycle";
+import { useBackdropDismiss } from "../../shared/modal/useBackdropDismiss";
 import { useVisualViewport } from "../../shared/modal/useVisualViewport";
 import "./PanelOverlay.css";
 
@@ -63,11 +64,11 @@ export function PanelOverlay({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
+  onClick,
   ...props
 }: PanelOverlayProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const dimmerPress = useRef(false);
   const ready = useNativeModalLifecycle({
     open,
     deferContents: true,
@@ -87,6 +88,16 @@ export function PanelOverlay({
     active: open,
     rootRef: dialogRef,
     prefix: "panel-overlay",
+  });
+
+  const backdrop = useBackdropDismiss({
+    onDismiss: () => {
+      if (open && closeOnDimmerClick && placement === "side") onClose();
+    },
+    onPointerDown,
+    onPointerUp,
+    onPointerCancel,
+    onClick,
   });
 
   if (typeof document === "undefined") return null;
@@ -123,28 +134,7 @@ export function PanelOverlay({
         event.stopPropagation();
         if (open && closeOnEscape) onClose();
       }}
-      onPointerDown={(event) => {
-        onPointerDown?.(event);
-        dimmerPress.current =
-          !event.defaultPrevented &&
-          event.button === 0 &&
-          event.isPrimary !== false &&
-          event.target === event.currentTarget;
-      }}
-      onPointerUp={(event) => {
-        onPointerUp?.(event);
-        const outside =
-          !event.defaultPrevented &&
-          dimmerPress.current &&
-          event.target === event.currentTarget;
-        dimmerPress.current = false;
-        if (outside && open && closeOnDimmerClick && placement === "side")
-          onClose();
-      }}
-      onPointerCancel={(event) => {
-        onPointerCancel?.(event);
-        dimmerPress.current = false;
-      }}
+      {...backdrop}
     >
       <div
         ref={surfaceRef}

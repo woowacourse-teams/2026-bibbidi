@@ -188,26 +188,60 @@ describe("단일 준비 로드맵", () => {
     expect(
       within(dialog).getByRole("button", { name: "웨딩홀 견적 비교 추가" }),
     ).toBeTruthy();
-    expect(
-      within(dialog)
-        .getByRole("link", { name: "체크리스트에서 관리" })
-        .getAttribute("href"),
-    ).toBe("/checklist");
-    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    expect(within(dialog).queryByRole("link")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "닫기" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "확인" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
-  it("모바일은 보기 선택 없이 바로 단계 바텀시트를 연다", async () => {
-    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
-    await show();
-    const dialog = await openFirst();
-    expect(dialog.classList.contains("bibbidi-bottom-sheet")).toBe(true);
-    expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "단계 상세 닫기" }),
-    );
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  });
+  it.each(["backdrop", "drag", "Escape"] as const)(
+    "모바일은 닫기·관리 버튼 없이 단계 바텀시트를 열고 %s로 닫는다",
+    async (dismiss) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+      await show();
+      const trigger = screen.getByRole("button", {
+        name: "01 웨딩홀 투어와 계약",
+      });
+      trigger.focus();
+      const dialog = await openFirst();
+      expect(dialog.classList.contains("bibbidi-bottom-sheet")).toBe(true);
+      expect(screen.queryByRole("dialog", { name: "보기 선택" })).toBeNull();
+      expect(within(dialog).queryByRole("link")).toBeNull();
+      expect(
+        within(dialog).queryByRole("button", {
+          name: /^(단계 상세 닫기|닫기|확인)$/,
+        }),
+      ).toBeNull();
+      expect(
+        dialog.querySelector(".bibbidi-bottom-sheet-header-actions"),
+      ).toBeNull();
+      expect(dialog.querySelector(".bibbidi-bottom-sheet-footer")).toBeNull();
+      if (dismiss === "backdrop") {
+        fireEvent.pointerDown(dialog, { isPrimary: true });
+        fireEvent.pointerUp(dialog);
+        fireEvent.click(dialog);
+      } else if (dismiss === "drag") {
+        const handle = within(dialog).getByRole("button", {
+          name: "아래로 밀어 닫기",
+        });
+        const touch = (clientY: number) => ({
+          identifier: 1,
+          clientX: 100,
+          clientY,
+        });
+        fireEvent.touchStart(handle, { touches: [touch(100)] });
+        fireEvent.touchMove(handle, { touches: [touch(240)] });
+        fireEvent.touchEnd(handle, {
+          touches: [],
+          changedTouches: [touch(240)],
+        });
+      } else {
+        fireEvent.keyDown(dialog, { key: "Escape" });
+      }
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+    },
+  );
   it("크기를 바꿔도 선택한 단계와 담은 일은 유지한다", async () => {
     const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, false);
     await show();
@@ -219,6 +253,49 @@ describe("단일 준비 로드맵", () => {
     expect(dialog.classList.contains("bibbidi-bottom-sheet")).toBe(true);
     expect(within(dialog).getByText("담은 일")).toBeTruthy();
   });
+  it.each([false, true])(
+    "닫힘 전환 중 본문·레이어·잠금을 유지하고 완료 후 초점을 복귀한다: mobile=%s",
+    async (mobile) => {
+      const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      await show();
+      const trigger = screen.getByRole("button", {
+        name: "01 웨딩홀 투어와 계약",
+      });
+      trigger.focus();
+      const dialog = await openFirst();
+      expect(
+        within(dialog).getByRole("heading", {
+          name: "01 웨딩홀 투어와 계약",
+          level: 2,
+        }),
+      ).toBeTruthy();
+      let finish!: () => void;
+      const finished = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      Object.defineProperty(dialog.firstElementChild, "getAnimations", {
+        value: () => [{ finished }],
+      });
+      if (mobile) {
+        fireEvent.pointerDown(dialog, { isPrimary: true });
+        fireEvent.pointerUp(dialog);
+        fireEvent.click(dialog);
+      } else
+        fireEvent.click(within(dialog).getByRole("button", { name: "확인" }));
+      expect(dialog.dataset.state).toBe("closing");
+      expect((dialog as HTMLDialogElement).open).toBe(true);
+      expect(
+        within(dialog).getByText("웨딩홀을 둘러보고 계약해요."),
+      ).toBeTruthy();
+      expect(document.body.style.overflow).toBe("hidden");
+      act(() => media.setMatches(!mobile));
+      expect(screen.getByRole("dialog")).toBe(dialog);
+      await act(async () => finish());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(document.body.style.overflow).not.toBe("hidden");
+    },
+  );
   it("로그인 상태는 내가 담은 일만 분모로 완료율을 표시한다", async () => {
     mocks.auth = {
       status: "authenticated",
@@ -321,7 +398,7 @@ describe("단일 준비 로드맵", () => {
     );
   });
   it.each([false, true])(
-    "추가 버튼이 담은 상태로 바뀌면 다음 추가 버튼 또는 닫기로 초점을 옮긴다: %s",
+    "추가 버튼이 담은 상태로 바뀌면 다음 추가 버튼 또는 확인으로 초점을 옮긴다: %s",
     async (lastTask) => {
       ids = lastTask ? ["101"] : [];
       await show();
@@ -334,12 +411,27 @@ describe("단일 준비 로드맵", () => {
       await waitFor(() =>
         expect(document.activeElement).toBe(
           within(modal()).getByRole("button", {
-            name: lastTask ? "닫기" : "웨딩홀 견적 비교 추가",
+            name: lastTask ? "확인" : "웨딩홀 견적 비교 추가",
           }),
         ),
       );
     },
   );
+
+  it("모바일에서 마지막 할 일을 추가하면 바텀시트로 초점을 옮긴다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    await show();
+    const dialog = await openFirst();
+    const button = within(dialog).getByRole("button", {
+      name: "웨딩홀 견적 비교 추가",
+    });
+    button.focus();
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(within(dialog).getAllByText("담은 일")).toHaveLength(2);
+      expect(document.activeElement).toBe(dialog);
+    });
+  });
 
   it("전체 추가의 일부만 저장되면 실제로 저장된 항목만 담은 상태로 표시한다", async () => {
     ids = [];
@@ -375,14 +467,14 @@ describe("단일 준비 로드맵", () => {
     fireEvent.click(button);
     expect(mocks.add).toHaveBeenCalledOnce();
     expect(
-      within(dialog).getByRole<HTMLButtonElement>("button", { name: "닫기" })
+      within(dialog).getByRole<HTMLButtonElement>("button", { name: "확인" })
         .disabled,
     ).toBe(true);
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.getByRole("dialog")).toBe(dialog);
     await act(async () => finish(["102"]));
     expect(
-      within(modal()).getByRole<HTMLButtonElement>("button", { name: "닫기" })
+      within(modal()).getByRole<HTMLButtonElement>("button", { name: "확인" })
         .disabled,
     ).toBe(false);
   });
@@ -479,7 +571,7 @@ describe("단일 준비 로드맵", () => {
     expect(mocks.track).toHaveBeenCalledWith(
       expect.objectContaining({ name: "preparation_step_select" }),
     );
-    fireEvent.click(within(modal()).getByRole("button", { name: "닫기" }));
+    fireEvent.click(within(modal()).getByRole("button", { name: "확인" }));
     fireEvent.click(screen.getByRole("tab", { name: "스드메" }));
     expect(mocks.track).toHaveBeenCalledWith(
       expect.objectContaining({ name: "preparation_category_select" }),
