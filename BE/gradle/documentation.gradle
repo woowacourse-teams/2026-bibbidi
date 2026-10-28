@@ -86,13 +86,14 @@ tasks.register('copySwaggerUI', Copy) {
     }
 }
 
+// JAR 루트에 두면 Dockerfile의 layer 추출에서 빠지므로 클래스패스인 BOOT-INF/classes 아래에 넣는다.
 tasks.named('bootJar') {
     dependsOn 'generateSwaggerUIBibbidi'
     from(layout.buildDirectory.dir('swagger-ui-bibbidi')) {
-        into 'static/swagger-ui'
+        into 'BOOT-INF/classes/static/swagger-ui'
     }
     from('build/api-spec') {
-        into 'static/docs'
+        into 'BOOT-INF/classes/static/docs'
     }
 }
 
