@@ -143,10 +143,12 @@ describe("WeddingDateDialog", () => {
 
     const second = renderDialog();
     fireEvent.pointerDown(screen.getByRole("dialog"), {
+      isPrimary: true,
       clientX: -1,
       clientY: -1,
     });
     fireEvent.pointerUp(screen.getByRole("dialog"));
+    fireEvent.click(screen.getByRole("dialog"));
     expect(second.props.onClose).toHaveBeenCalledOnce();
   });
 
@@ -194,6 +196,7 @@ describe("WeddingDateDialog", () => {
     expect(document.activeElement).toBe(dialog);
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.pointerDown(screen.getByRole("dialog"), {
+      isPrimary: true,
       clientX: -1,
       clientY: -1,
     });

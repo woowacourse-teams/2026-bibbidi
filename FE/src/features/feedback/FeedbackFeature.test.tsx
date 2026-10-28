@@ -247,8 +247,9 @@ describe("FeedbackFeature", () => {
     Object.defineProperty(dialog.firstElementChild, "getAnimations", {
       value: () => [{ finished }],
     });
-    fireEvent.pointerDown(dialog);
+    fireEvent.pointerDown(dialog, { isPrimary: true });
     fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
     expect(dialog.dataset.state).toBe("closing");
     expect(screen.getByRole("dialog")).toBeTruthy();
     await act(async () => finish());
@@ -304,8 +305,9 @@ describe("FeedbackFeature", () => {
       within(dialog).queryByRole("button", { name: "아래로 밀어 닫기" }),
     ).toBeNull();
     fireEvent.keyDown(dialog, { key: "Escape" });
-    fireEvent.pointerDown(dialog);
+    fireEvent.pointerDown(dialog, { isPrimary: true });
     fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(dialog.dataset.state).toBe("open");
 

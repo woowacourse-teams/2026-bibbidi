@@ -1,4 +1,4 @@
-import { useId, useRef } from "react";
+import { useId } from "react";
 import type {
   ComponentPropsWithoutRef,
   CSSProperties,
@@ -10,6 +10,7 @@ import { Checkbox } from "../checkbox";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
 import { useBottomSheetLifecycle } from "./useBottomSheetLifecycle";
 import { useBottomSheetDrag } from "./useBottomSheetDrag";
+import { useBackdropDismiss } from "../../shared/modal/useBackdropDismiss";
 import "./BottomSheet.css";
 
 export type BottomSheetProps = Omit<
@@ -67,6 +68,7 @@ function Root({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onClick,
   onKeyDown,
   ...props
 }: BottomSheetProps) {
@@ -85,8 +87,25 @@ function Root({
     disableChildrenDragging,
     onDismiss: onClose,
   });
-  const backdropPress = useRef(false);
   const dismissOnDimmer = closeOnDimmerClick ?? closeOnBackdrop;
+  const backdrop = useBackdropDismiss({
+    onDismiss: () => {
+      if (dismissOnDimmer && open) onClose();
+    },
+    onPointerDown: (event) => {
+      onPointerDown?.(event);
+      drag.onPointerDown(event);
+    },
+    onPointerUp: (event) => {
+      onPointerUp?.(event);
+      drag.onPointerUp(event);
+    },
+    onPointerCancel: (event) => {
+      onPointerCancel?.(event);
+      drag.onPointerCancel(event);
+    },
+    onClick,
+  });
   return (
     <dialog
       tabIndex={-1}
@@ -130,33 +149,10 @@ function Root({
         event.stopPropagation();
         if (closeOnEscape && open) onClose();
       }}
-      onPointerDown={(event) => {
-        onPointerDown?.(event);
-        drag.onPointerDown(event);
-        backdropPress.current =
-          !event.defaultPrevented && event.target === event.currentTarget;
-      }}
+      {...backdrop}
       onPointerMove={(event) => {
         onPointerMove?.(event);
         drag.onPointerMove(event);
-      }}
-      onPointerCancel={(event) => {
-        onPointerCancel?.(event);
-        drag.onPointerCancel(event);
-        backdropPress.current = false;
-      }}
-      onPointerUp={(event) => {
-        onPointerUp?.(event);
-        drag.onPointerUp(event);
-        if (
-          !event.defaultPrevented &&
-          backdropPress.current &&
-          event.target === event.currentTarget &&
-          dismissOnDimmer &&
-          open
-        )
-          onClose();
-        backdropPress.current = false;
       }}
     >
       <div

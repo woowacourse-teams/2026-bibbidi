@@ -5,7 +5,13 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthState } from "../auth/model/auth";
 import { installMatchMedia } from "../../test/matchMedia";
@@ -70,7 +76,6 @@ function workspace(url = "/preparation") {
     <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/preparation" element={<PreparationRoadmapFeature />} />
-        <Route path="/checklist" element={<h1>체크리스트 관리</h1>} />
       </Routes>
       <Location />
     </MemoryRouter>,
@@ -156,18 +161,18 @@ describe("통합 로드맵 작업 공간", () => {
       screen.getByRole("button", { name: "01 스드메 상담·견적과 패키지 계약" }),
     ).toBeTruthy();
   });
-  it("단계 모달의 관리 링크는 클라이언트 탐색으로 체크리스트를 연다", async () => {
+  it("단계 모달은 관리 링크 없이 확인으로 닫고 로드맵에 머문다", async () => {
     workspace();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "01 웨딩홀 투어와 계약" }),
-    );
-    fireEvent.click(
-      within(await screen.findByRole("dialog")).getByRole("link", {
-        name: "체크리스트에서 관리",
-      }),
-    );
-    await screen.findByRole("heading", { name: "체크리스트 관리" });
-    expect(screen.getByLabelText("현재 주소").textContent).toBe("/checklist");
+    const trigger = await screen.findByRole("button", {
+      name: "01 웨딩홀 투어와 계약",
+    });
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("link")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "닫기" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "확인" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByLabelText("현재 주소").textContent).toBe("/preparation");
   });
   it("모바일도 보기 선택 시트를 거치지 않고 카테고리와 단계만 선택한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);

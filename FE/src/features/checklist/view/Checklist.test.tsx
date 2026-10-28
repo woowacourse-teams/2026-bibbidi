@@ -1060,8 +1060,9 @@ describe("Checklist 웹 상세 패널", () => {
     fireEvent.click(task);
     const reopened = screen.getByRole("dialog", { name: "웨딩홀 계약" });
     await act(async () => {
-      fireEvent.pointerDown(reopened);
+      fireEvent.pointerDown(reopened, { isPrimary: true });
       fireEvent.pointerUp(reopened);
+      fireEvent.click(reopened);
     });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);

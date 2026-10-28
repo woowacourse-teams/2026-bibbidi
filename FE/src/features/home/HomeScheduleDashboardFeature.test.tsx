@@ -1015,7 +1015,7 @@ describe("캘린더 일정 폼의 공용 입력·레이어 계약", () => {
       )!;
       expect(document.body.style.overflow).toBe("hidden");
       expect(scroll.style.overflow).toBe("hidden");
-      for (const type of ["pointerdown", "pointerup"])
+      for (const type of ["pointerdown", "pointerup", "click"])
         fireEvent(layer, new MouseEvent(type, { bubbles: true, button: 0 }));
       expect(screen.getByRole("dialog", { name: "내 할 일 1 일정 추가" })).toBe(
         layer,

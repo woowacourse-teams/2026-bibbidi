@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../button";
 import type { ButtonProps } from "../button";
 import { useNativeModalLifecycle } from "../../shared/modal/useNativeModalLifecycle";
+import { useBackdropDismiss } from "../../shared/modal/useBackdropDismiss";
 import { containTabFocus } from "../../shared/focus/containTabFocus";
 import "./Dialog.css";
 
@@ -60,6 +61,8 @@ function Root({
   "aria-describedby": describedBy,
   onPointerDown,
   onPointerUp,
+  onPointerCancel,
+  onClick,
   onKeyDown,
   ...props
 }: DialogProps) {
@@ -69,7 +72,6 @@ function Root({
   const actionsRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
-  const backdropPress = useRef(false);
   useNativeModalLifecycle({
     open,
     priority: 2,
@@ -107,6 +109,17 @@ function Root({
       { duration: 220, easing: "ease-out" },
     );
   }
+  const backdrop = useBackdropDismiss({
+    onDismiss: () => {
+      if (!open) return;
+      if (closeOnDimmerClick) (onDimmerClick ?? onClose)();
+      else rejectDismiss();
+    },
+    onPointerDown,
+    onPointerUp,
+    onPointerCancel,
+    onClick,
+  });
   if (typeof document === "undefined") return null;
   return createPortal(
     <dialog
@@ -138,25 +151,13 @@ function Root({
         if (closeOnEscape) (onEscape ?? onClose)();
         else rejectDismiss();
       }}
-      onPointerDown={(event) => {
-        onPointerDown?.(event);
-        backdropPress.current =
-          !event.defaultPrevented && event.target === event.currentTarget;
-      }}
-      onPointerUp={(event) => {
-        onPointerUp?.(event);
-        const outside =
-          !event.defaultPrevented &&
-          backdropPress.current &&
-          event.target === event.currentTarget;
-        backdropPress.current = false;
-        if (outside) {
-          if (closeOnDimmerClick) (onDimmerClick ?? onClose)();
-          else rejectDismiss();
-        }
-      }}
+      {...backdrop}
     >
-      <div className="bibbidi-dialog-surface" ref={surfaceRef}>
+      <div
+        className="bibbidi-dialog-surface"
+        ref={surfaceRef}
+        inert={!open || undefined}
+      >
         <div className="bibbidi-dialog-panel" ref={panelRef}>
           <div
             className="bibbidi-dialog-body"

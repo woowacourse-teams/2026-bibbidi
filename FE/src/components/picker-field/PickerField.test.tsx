@@ -138,8 +138,9 @@ describe.each([false, true])("PickerField (모바일=%s)", (mobile) => {
     );
     expect(onChange).not.toHaveBeenCalled();
     if (mobile) {
-      fireEvent.pointerDown(panel);
+      fireEvent.pointerDown(panel, { isPrimary: true });
       fireEvent.pointerUp(panel);
+      fireEvent.click(panel);
     } else fireEvent.pointerDown(document.body);
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "날짜 선택" })).toBeNull(),
