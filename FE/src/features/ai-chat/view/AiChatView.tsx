@@ -17,6 +17,7 @@ import type { RecommendationController } from "../model/recommendation";
 export function AiChatView({
   active,
   feedbackAudienceKey,
+  feedbackAfterMessageId,
   isAuthenticated,
   draft,
   messages,
@@ -33,6 +34,7 @@ export function AiChatView({
 }: {
   active: boolean;
   feedbackAudienceKey?: string;
+  feedbackAfterMessageId?: number;
   isAuthenticated: boolean;
   draft: string;
   messages: ChatMessage[];
@@ -48,12 +50,6 @@ export function AiChatView({
   viewport: ViewportMetrics;
 }) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const feedbackAnchor = messages.filter(
-    (message) =>
-      message.role === "assistant" &&
-      message.status === "complete" &&
-      message.text.trim(),
-  )[2]?.id;
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
   const lastMessages = useRef(messages);
@@ -161,7 +157,7 @@ export function AiChatView({
                 </Message>
                 {isAuthenticated &&
                   feedbackAudienceKey &&
-                  message.id === feedbackAnchor && (
+                  message.id === feedbackAfterMessageId && (
                     <AiChatFeedback
                       key={feedbackAudienceKey}
                       audienceKey={feedbackAudienceKey}

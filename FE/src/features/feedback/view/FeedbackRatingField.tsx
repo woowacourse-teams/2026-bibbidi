@@ -1,3 +1,4 @@
+import { Button, type ButtonSize } from "../../../components/button";
 import type { FeedbackSentiment } from "../model/feedback";
 
 interface FeedbackRatingFieldProps {
@@ -6,6 +7,7 @@ interface FeedbackRatingFieldProps {
   value: FeedbackSentiment | null;
   positiveLabel?: string;
   negativeLabel?: string;
+  size?: ButtonSize;
 }
 
 function ThumbIcon({ direction }: { direction: "down" | "up" }) {
@@ -13,7 +15,9 @@ function ThumbIcon({ direction }: { direction: "down" | "up" }) {
     <svg
       aria-hidden="true"
       className={
-        direction === "down" ? "feedback-rating__thumb--down" : undefined
+        direction === "down"
+          ? "feedback-rating__icon feedback-rating__icon--down"
+          : "feedback-rating__icon"
       }
       fill="none"
       viewBox="0 0 24 24"
@@ -35,30 +39,37 @@ export function FeedbackRatingField({
   value,
   positiveLabel = "좋았어요",
   negativeLabel = "아쉬워요",
+  size = "large",
 }: FeedbackRatingFieldProps) {
   return (
     <fieldset className="feedback-rating">
       <legend className="feedback-feature__sr-only">만족도</legend>
-      <button
+      <Button
         aria-pressed={value === "good"}
-        className="feedback-rating__button"
+        display="block"
+        size={size}
+        variant="weak"
+        color={value === "good" ? "primary" : "dark"}
         disabled={disabled}
         onClick={() => onChange("good")}
         type="button"
       >
         <ThumbIcon direction="up" />
         {positiveLabel}
-      </button>
-      <button
+      </Button>
+      <Button
         aria-pressed={value === "bad"}
-        className="feedback-rating__button"
+        display="block"
+        size={size}
+        variant="weak"
+        color={value === "bad" ? "primary" : "dark"}
         disabled={disabled}
         onClick={() => onChange("bad")}
         type="button"
       >
         <ThumbIcon direction="down" />
         {negativeLabel}
-      </button>
+      </Button>
     </fieldset>
   );
 }

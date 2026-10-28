@@ -99,7 +99,6 @@ export function useFeedbackSubmission({
 
   return {
     clearError: () => setErrorMessage(null),
-    canSubmit: sentiment !== null && !isSubmitting,
     content,
     errorMessage,
     isSubmitting,

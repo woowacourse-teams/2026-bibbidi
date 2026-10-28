@@ -2,16 +2,13 @@ import { useId, useRef } from "react";
 import type { RefObject } from "react";
 import { Dialog } from "../../../components/dialog";
 import { Button } from "../../../components/button";
-import { TextArea } from "../../../components/text-area";
-import { FeedbackRatingField } from "./FeedbackRatingField";
-import { MAX_FEEDBACK_LENGTH } from "../model/feedback";
+import { FeedbackFormFields } from "./FeedbackFormFields";
 import type { FeedbackFormViewProps } from "./feedbackFormView";
 
 export function FeedbackDialog({
   open,
   onExited,
   returnFocusRef,
-  canSubmit,
   content,
   errorMessage,
   isSubmitting,
@@ -56,10 +53,10 @@ export function FeedbackDialog({
               display="block"
               form={formId}
               type="submit"
-              disabled={!canSubmit}
+              disabled={sentiment === null}
               loading={isSubmitting}
             >
-              {isSubmitting ? "보내는 중..." : "의견 보내기"}
+              의견 보내기
             </Button>
           </div>
         </>
@@ -67,29 +64,18 @@ export function FeedbackDialog({
     >
       <form
         id={formId}
-        className="feedback-form"
+        className="feedback-form feedback-form--dialog"
         aria-busy={isSubmitting}
         onSubmit={onSubmit}
       >
-        <FeedbackRatingField
-          disabled={isSubmitting}
-          onChange={onSentimentChange}
-          value={sentiment}
+        <FeedbackFormFields
+          content={content}
+          errorMessage={errorMessage}
+          isSubmitting={isSubmitting}
+          onContentChange={onContentChange}
+          onSentimentChange={onSentimentChange}
+          sentiment={sentiment}
         />
-        <TextArea
-          label="의견을 들려주세요"
-          disabled={isSubmitting}
-          maxLength={MAX_FEEDBACK_LENGTH}
-          onChange={(event) => onContentChange(event.target.value)}
-          placeholder="조금 더 자세히 알려주실래요? (선택)"
-          value={content}
-          rows={4}
-        />
-        {errorMessage && (
-          <p className="feedback-form__error" role="alert">
-            {errorMessage}
-          </p>
-        )}
       </form>
     </Dialog>
   );

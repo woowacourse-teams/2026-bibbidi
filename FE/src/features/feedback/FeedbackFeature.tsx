@@ -31,7 +31,6 @@ export function FeedbackFeature({
   });
   const {
     clearError,
-    canSubmit,
     content,
     errorMessage,
     isSubmitting,
@@ -47,12 +46,13 @@ export function FeedbackFeature({
   }, [isSnackbarVisible]);
   const { present, onExited } = useLayerPresence(isOpen);
   const values = useMemo(
-    () => ({ canSubmit, content, errorMessage, isSubmitting, sentiment }),
-    [canSubmit, content, errorMessage, isSubmitting, sentiment],
+    () => ({ content, errorMessage, isSubmitting, sentiment, isMobile }),
+    [content, errorMessage, isSubmitting, sentiment, isMobile],
   );
-  const snapshot = useExitSnapshot(isOpen, values) ?? values;
+  const { isMobile: mobilePresentation, ...fieldSnapshot } =
+    useExitSnapshot(isOpen, values) ?? values;
   const form = {
-    ...snapshot,
+    ...fieldSnapshot,
     onClose: () => {
       if (!isSubmitting) setIsOpen(false);
     },
@@ -71,7 +71,7 @@ export function FeedbackFeature({
         setIsOpen(true);
       }, triggerRef)}
       {present &&
-        (isMobile ? (
+        (mobilePresentation ? (
           <FeedbackBottomSheet {...form} />
         ) : (
           <FeedbackDialog {...form} />

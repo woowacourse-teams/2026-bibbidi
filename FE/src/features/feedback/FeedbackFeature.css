@@ -1,8 +1,12 @@
-.feedback-form {
+.feedback-form,
+.feedback-form__fields {
   display: flex;
-  margin-top: 20px;
   flex-direction: column;
   gap: 18px;
+}
+
+.feedback-form--dialog {
+  margin-top: 20px;
 }
 
 .feedback-rating {
@@ -14,49 +18,20 @@
   gap: 10px;
 }
 
-.feedback-rating__button {
-  display: flex;
-  height: 48px;
-  border: 1px solid var(--color-stroke-neutral);
-  border-radius: 10px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--color-bg-layer-default);
-  color: var(--color-fg-neutral);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.feedback-rating__button:focus-visible {
-  outline: 2px solid var(--color-stroke-focus-ring);
-  outline-offset: 2px;
-}
-
-.feedback-rating__button:disabled {
-  cursor: not-allowed;
-}
-
-.feedback-rating__button[aria-pressed="true"] {
-  border-color: var(--color-stroke-brand-solid);
-  color: var(--color-fg-brand);
-}
-
-.feedback-rating__button svg {
+.feedback-rating__icon {
   width: 18px;
   height: 18px;
+  flex: none;
 }
 
-.feedback-rating__thumb--down {
+.feedback-rating__icon--down {
   transform: rotate(180deg);
 }
 
 .feedback-form__error {
   margin: 0;
   color: var(--color-fg-critical);
-  font-size: 13px;
-  line-height: 1.5;
+  font: var(--typography-t7);
   text-align: center;
 }
 
@@ -75,8 +50,7 @@
   background: var(--color-fg-neutral);
   box-shadow: 0 5px 18px rgb(54 56 61 / 22%);
   color: var(--color-fg-on-brand);
-  font-size: 14px;
-  font-weight: 600;
+  font: var(--typography-t6-medium);
 }
 
 .feedback-snackbar__icon {
@@ -87,7 +61,7 @@
   place-items: center;
   background: var(--color-bg-positive-weak);
   color: var(--color-fg-positive);
-  font-size: 13px;
+  font: var(--typography-t7);
 }
 
 .feedback-feature__sr-only {
@@ -106,14 +80,5 @@
     bottom: calc(var(--mobile-dock-size) + var(--mobile-dock-offset) + 12px);
     width: max-content;
     max-width: calc(100vw - 32px);
-  }
-
-  .feedback-bottom-sheet form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .feedback-bottom-sheet .feedback-rating__button {
-    min-height: 74px;
   }
 }

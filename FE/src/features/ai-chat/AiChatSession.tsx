@@ -6,6 +6,7 @@ import { GlobalAiChatDialog } from "./view/GlobalAiChatDialog";
 import { Button } from "../../components/button";
 import { useLinkClickHandler } from "react-router";
 import { useMyChecklistQueryRepository } from "../checklist";
+import { getAiChatFeedbackAnchor } from "./model/aiChatFeedback";
 import { AiChatView } from "./view/AiChatView";
 import { useIsMobileLayout } from "../../shared/responsive";
 import {
@@ -154,6 +155,7 @@ export function AiChatSession({
       active={active}
       isAuthenticated
       feedbackAudienceKey={feedbackAudienceKey}
+      feedbackAfterMessageId={getAiChatFeedbackAnchor(messages)}
       compact={compact}
       viewport={viewport}
       onComposerFocus={() => {

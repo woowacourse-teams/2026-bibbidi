@@ -23,11 +23,6 @@
   flex-direction: column;
   gap: 16px;
 }
-.ai-chat-feedback .feedback-rating__button {
-  min-width: 0;
-  padding: 8px;
-  font: var(--typography-t7);
-}
 .ai-chat-feedback__thanks {
   margin: 0 0 28px;
   color: var(--color-fg-neutral-muted);

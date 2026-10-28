@@ -3,7 +3,6 @@ import type { SubmitEvent } from "react";
 import type { FeedbackSentiment } from "../model/feedback";
 
 export interface FeedbackFormViewProps {
-  canSubmit: boolean;
   content: string;
   errorMessage: string | null;
   isSubmitting: boolean;

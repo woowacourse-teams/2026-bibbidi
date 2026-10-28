@@ -118,7 +118,15 @@ describe("AI 대화 피드백", () => {
     );
     const view = render(card());
     fireEvent.click(screen.getByRole("button", { name: "도움됐어요" }));
-    fireEvent.click(screen.getByRole("button", { name: "피드백 보내기" }));
+    const submit = screen.getByRole("button", {
+      name: "피드백 보내기",
+    }) as HTMLButtonElement;
+    submit.focus();
+    fireEvent.click(submit);
+    expect(submit.disabled).toBe(false);
+    expect(document.activeElement).toBe(submit);
+    expect(submit.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(submit);
     expect(
       screen
         .getByRole("button", { name: "대화 피드백 닫기" })

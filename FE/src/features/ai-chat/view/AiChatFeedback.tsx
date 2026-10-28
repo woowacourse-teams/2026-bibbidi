@@ -1,15 +1,13 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Button } from "../../../components/button";
 import { IconButton } from "../../../components/icon-button";
 import { CloseIcon } from "../../../components/icons/ActionIcons";
 import { TextArea } from "../../../components/text-area";
 import { FeedbackRatingField } from "../../feedback/view/FeedbackRatingField";
 import { MAX_FEEDBACK_LENGTH } from "../../feedback/model/feedback";
-import { useFeedbackSubmission } from "../../feedback/useFeedbackSubmission";
+import { useAiChatFeedback } from "../hooks/useAiChatFeedback";
 import "../../feedback/FeedbackFeature.css";
 import "./AiChatFeedback.css";
-
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function AiChatFeedback({
   audienceKey,
@@ -23,25 +21,9 @@ export function AiChatFeedback({
   onInputBlur?: () => void;
 }) {
   const cardRef = useRef<HTMLElement>(null);
-  const storageKey = `bibbidi:ai-chat-feedback:${audienceKey}`;
-  const [hidden, setHidden] = useState(() => {
-    try {
-      const nextPromptAt = Number(localStorage.getItem(storageKey));
-      return Number.isFinite(nextPromptAt) && nextPromptAt > Date.now();
-    } catch {
-      return false;
-    }
-  });
-  const [submitted, setSubmitted] = useState(false);
-  const snooze = () => {
-    try {
-      localStorage.setItem(storageKey, String(Date.now() + COOLDOWN_MS));
-    } catch {
-      /* Keep the session dismissal when browser storage is unavailable. */
-    }
-  };
   const {
-    canSubmit,
+    status,
+    dismiss,
     content,
     errorMessage,
     isSubmitting,
@@ -49,16 +31,11 @@ export function AiChatFeedback({
     setContent,
     setSentiment,
     submit,
-  } = useFeedbackSubmission({
-    source: "ai_chat",
-    onSuccess: () => {
-      snooze();
-      if (cardRef.current?.contains(document.activeElement)) onDismiss();
-      setSubmitted(true);
-    },
+  } = useAiChatFeedback(audienceKey, () => {
+    if (cardRef.current?.contains(document.activeElement)) onDismiss();
   });
-  if (hidden) return null;
-  if (submitted)
+  if (status === "hidden") return null;
+  if (status === "submitted")
     return (
       <p className="ai-chat-feedback__thanks" role="status">
         의견 감사해요. 더 도움이 되는 대화를 준비할게요.
@@ -78,8 +55,7 @@ export function AiChatFeedback({
           iconSize={16}
           disabled={isSubmitting}
           onClick={() => {
-            snooze();
-            setHidden(true);
+            dismiss();
             onDismiss();
           }}
         />
@@ -90,6 +66,7 @@ export function AiChatFeedback({
         onSubmit={submit}
       >
         <FeedbackRatingField
+          size="medium"
           disabled={isSubmitting}
           onChange={setSentiment}
           value={sentiment}
@@ -113,7 +90,7 @@ export function AiChatFeedback({
               type="submit"
               size="small"
               display="block"
-              disabled={!canSubmit}
+              disabled={sentiment === null}
               loading={isSubmitting}
             >
               피드백 보내기
