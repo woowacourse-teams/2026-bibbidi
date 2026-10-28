@@ -10,6 +10,7 @@ import {
 import { AiChatMarkdown } from "./AiChatMarkdown";
 import { AiChatRecommendations } from "./AiChatRecommendations";
 import { AiChatAssistantMessage } from "./AiChatAssistantMessage";
+import { Button } from "../../../components/button";
 import { IconButton } from "../../../components/icon-button";
 import type { ViewportMetrics } from "../../../shared/viewport";
 import type { RecommendationController } from "../model/recommendation";
@@ -181,9 +182,9 @@ export function AiChatView({
       {errorMessage ? (
         <div className="ai-chat__error" role="alert" hidden={compact}>
           <p>{errorMessage}</p>
-          <button onClick={onRetry} type="button">
+          <Button size="small" variant="weak" onClick={onRetry}>
             다시 시도
-          </button>
+          </Button>
         </div>
       ) : null}
       {compact && !isAuthenticated && (

@@ -12,6 +12,7 @@ type AssistantMessage = Extract<ChatMessage, { role: "assistant" }>;
 export function useAiChatConversation(
   onAuthenticationRequired: () => void,
   contextLabel?: string,
+  onRefresh?: () => void,
 ) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -82,6 +83,9 @@ export function useAiChatConversation(
               ...message,
               text: message.text + delta,
             })),
+          onRefresh: () => {
+            if (requestRef.current === controller) onRefresh?.();
+          },
           onRecommendations: (catalogItemIds) =>
             updateCurrentAnswer((message) => ({ ...message, catalogItemIds })),
         },

@@ -33,6 +33,7 @@ function receive(conversationId?: string) {
     onConversation: vi.fn(),
     onDelta: vi.fn(),
     onRecommendations: vi.fn(),
+    onRefresh: vi.fn(),
   };
   const controller = new AbortController();
   const promise = streamAiChat(
@@ -55,6 +56,69 @@ afterEach(() => {
 });
 
 describe("AI 채팅 SSE 통신", () => {
+  it.each([false, true])(
+    "쓰기 갱신은 답변 실패(%s)와 상관없이 한 번 전달한다",
+    async (failed) => {
+      const refresh = "event: refresh\ndata: {}\n\n";
+      const end = failed
+        ? 'event: failure\ndata: {"errorCode":901,"message":"failed"}\n\n'
+        : delta("완료") + done;
+      fetchMock.mockResolvedValue(
+        response([encoder.encode(conversation + refresh + refresh + end)]),
+      );
+      const { receiver, promise } = receive();
+      if (failed) await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
+      else await promise;
+      expect(receiver.onRefresh).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("추천 뒤 refresh를 처리하고 done까지 정상 수신한다", async () => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          conversation +
+            delta("추천") +
+            'event: component\ndata: {"catalogItemIds":[101]}\n\n' +
+            "event: refresh\ndata: {}\n\n" +
+            done,
+        ),
+      ]),
+    );
+    const { receiver, promise } = receive();
+    await promise;
+    expect(receiver.onRefresh).toHaveBeenCalledOnce();
+    expect(receiver.onRecommendations).toHaveBeenCalledWith(["101"]);
+  });
+
+  it("갱신 신호가 없는 답변은 조회를 요청하지 않는다", async () => {
+    fetchMock.mockResolvedValue(
+      response([encoder.encode(conversation + delta("조회") + done)]),
+    );
+    const { receiver, promise } = receive();
+    await promise;
+    expect(receiver.onRefresh).not.toHaveBeenCalled();
+  });
+
+  it.each(["[]", "null", '{"unexpected":true}'])(
+    "잘못된 refresh 본문 %s는 거절한다",
+    async (data) => {
+      fetchMock.mockResolvedValue(
+        response([
+          encoder.encode(
+            conversation +
+              `event: refresh\ndata: ${data}\n\n` +
+              delta("답변") +
+              done,
+          ),
+        ]),
+      );
+      const { receiver, promise } = receive();
+      await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
+      expect(receiver.onRefresh).not.toHaveBeenCalled();
+    },
+  );
+
   it("바이트 단위로 나뉜 추천 ID를 서버 순서대로 중복 제거해 전달한다", async () => {
     const bytes = encoder.encode(
       conversation +

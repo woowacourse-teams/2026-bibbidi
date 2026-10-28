@@ -2,17 +2,18 @@ export interface RecommendedTask {
   id: string;
   title: string;
   stepTitle: string;
-  order: number;
 }
 
 export interface AnswerRecommendations {
   tasks: RecommendedTask[];
-  selectedId?: string;
+  selectedIds: string[];
   saving: boolean;
+  dismissed: boolean;
   error?: string;
   onSelect: (id: string) => void;
-  onSkip: (id: string) => void;
-  onAdd: (id: string) => void;
+  onAdd: () => void;
+  onDismiss: () => void;
+  onRestore: () => void;
 }
 
 export interface RecommendationController {

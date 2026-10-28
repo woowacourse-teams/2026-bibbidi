@@ -15,18 +15,3 @@ export function AiChatAssistantMessage({
     </div>
   );
 }
-
-export function AiChatRecommendationComplete({
-  ref,
-}: Pick<ComponentPropsWithRef<"div">, "ref">) {
-  return (
-    <AiChatAssistantMessage
-      className="ai-chat__recommendation-complete"
-      ref={ref}
-      role="status"
-      tabIndex={-1}
-    >
-      <p>추천을 모두 확인했어요. 더 궁금한 준비가 있나요?</p>
-    </AiChatAssistantMessage>
-  );
-}

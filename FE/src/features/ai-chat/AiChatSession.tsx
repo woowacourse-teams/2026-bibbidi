@@ -1,5 +1,6 @@
 import { RefObject, useRef, useState, useEffect, useLayoutEffect } from "react";
 
+import { useAiChatChecklistRefresh } from "./hooks/useAiChatChecklistRefresh";
 import { useAiChatConversation } from "./hooks/useAiChatConversation";
 import { useAiChatRecommendations } from "./hooks/useAiChatRecommendations";
 import { GlobalAiChatDialog } from "./view/GlobalAiChatDialog";
@@ -115,8 +116,13 @@ export function AiChatSession({
   if (!isOpen && mobileExpanded) setMobileExpanded(false);
   const compact = isMobile && !mobileExpanded;
   const expand = () => setMobileExpanded(true);
+  const checklistRefresh = useAiChatChecklistRefresh(onAuthenticationRequired);
   const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
-    useAiChatConversation(onAuthenticationRequired, contextLabel);
+    useAiChatConversation(
+      onAuthenticationRequired,
+      contextLabel,
+      checklistRefresh.refresh,
+    );
   const query = useMyChecklistQueryRepository();
   const [addedTask, setAddedTask] = useState<{
     title: string;
@@ -128,17 +134,20 @@ export function AiChatSession({
     messages,
     isAuthenticated,
     onAuthenticationRequired,
-    (catalogItemId) => {
+    (catalogItemIds) => {
       additionRequestRef.current?.abort();
       const controller = new AbortController();
       additionRequestRef.current = controller;
-      setAddedTask({ title: "할 일을 체크리스트에 추가했어요." });
+      setAddedTask({
+        title: `${catalogItemIds.length}개의 할 일을 체크리스트에 추가했어요.`,
+      });
+      if (catalogItemIds.length !== 1) return;
       void query
         .getChecklist(controller.signal)
         .then((checklist) => {
           if (controller.signal.aborted) return;
           const item = checklist.items.find(
-            (item) => item.sourceCatalogItemId === catalogItemId,
+            (item) => item.sourceCatalogItemId === catalogItemIds[0],
           );
           if (item)
             setAddedTask({
@@ -196,6 +205,19 @@ export function AiChatSession({
       returnFocusRef={returnFocusRef}
     >
       {view}
+      {checklistRefresh.error && (
+        <div className="global-ai-result" hidden={compact}>
+          <p role="alert">{checklistRefresh.error}</p>
+          <Button
+            size="small"
+            variant="weak"
+            loading={checklistRefresh.refreshing}
+            onClick={checklistRefresh.refresh}
+          >
+            체크리스트 다시 불러오기
+          </Button>
+        </div>
+      )}
       {addedTask && (
         <div className="global-ai-result" hidden={compact}>
           <p role="status">{addedTask.title}</p>

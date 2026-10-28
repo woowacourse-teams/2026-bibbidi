@@ -679,8 +679,9 @@ describe("전역 AI", () => {
     await openChat();
     await send("추천해줘");
     fireEvent.click(
-      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
+      await screen.findByRole("checkbox", { name: "웨딩홀 투어" }),
     );
+    fireEvent.click(screen.getByRole("button", { name: "1개 추가" }));
     const link = await screen.findByRole("link", { name: "추가한 일 보기" });
     await waitFor(() =>
       expect(link.getAttribute("href")).toBe(
@@ -692,7 +693,7 @@ describe("전역 AI", () => {
     );
     expect(screen.getByRole("dialog", { name: "AI 채팅" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "현재 추천: 예식 형태 결정" }),
+      screen.getByRole("checkbox", { name: "예식 형태 결정" }),
     ).toBeTruthy();
     fireEvent.click(link);
     await screen.findByRole("heading", { name: "체크리스트 화면" });
@@ -714,8 +715,9 @@ describe("전역 AI", () => {
       url.endsWith("catalog-items") ? json({}, 500) : fallback(url, init),
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "현재 추천: 웨딩홀 투어" }),
+      await screen.findByRole("checkbox", { name: "웨딩홀 투어" }),
     );
+    fireEvent.click(screen.getByRole("button", { name: "1개 추가" }));
     await screen.findByRole("button", { name: "저장 다시 시도" });
     expect(screen.queryByRole("link", { name: "추가한 일 보기" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "AI 채팅" })).toBeTruthy();
