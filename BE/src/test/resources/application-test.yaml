@@ -20,6 +20,8 @@ spring:
       mode: never
 
 bibbidi:
+  balance-game:
+    questions-location: classpath:balance-game/test-questions.json
   ai:
     chatbot:
       accounts-enabled: false

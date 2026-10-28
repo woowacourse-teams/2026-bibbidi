@@ -55,6 +55,8 @@ bibbidi:
       ttl: ${TERMS_CACHE_TTL:5m}
   sse:
     response-timeout-seconds: 60
+  balance-game:
+    questions-location: ${BIBBIDI_BALANCE_GAME_QUESTIONS_LOCATION}
   ai:
     chatbot:
       accounts-enabled: ${BIBBIDI_CHAT_ACCOUNTS_ENABLED:false}
