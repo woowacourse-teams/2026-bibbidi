@@ -8,17 +8,31 @@ export function usePageScrollContainer() {
   const ref = useCallback((element: HTMLDivElement | null) => {
     if (!element) return;
     const scope = element.closest<HTMLElement>("[data-modal-scope]");
-    setEnvironment({
-      scrollContainer: scope?.matches("[data-page-scroll-container]")
-        ? scope
-        : (Array.from(
-            scope?.querySelectorAll<HTMLElement>(
-              "[data-page-scroll-container]",
-            ) ?? [],
-          ).find(
-            (container) => container.closest("[data-modal-scope]") === scope,
-          ) ?? null),
-    });
+    const container = scope?.matches("[data-page-scroll-container]")
+      ? scope
+      : (Array.from(
+          scope?.querySelectorAll<HTMLElement>(
+            "[data-page-scroll-container]",
+          ) ?? [],
+        ).find(
+          (container) => container.closest("[data-modal-scope]") === scope,
+        ) ?? null);
+    const update = () =>
+      setEnvironment({
+        scrollContainer:
+          container?.dataset.scroll === "document"
+            ? element.ownerDocument.documentElement
+            : container,
+      });
+    update();
+    // A mounted sheet must follow the actual scroll root across breakpoints.
+    const observer = new MutationObserver(update);
+    if (container)
+      observer.observe(container, {
+        attributes: true,
+        attributeFilter: ["data-scroll"],
+      });
+    return () => observer.disconnect();
   }, []);
   return { ref, environment };
 }

@@ -1,4 +1,5 @@
-import type { ComponentPropsWithRef, MouseEvent, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
+import { getButtonInteractionProps } from "../../shared/button/getButtonInteractionProps";
 import "./ListFooter.css";
 
 export type ListFooterBorder = "full" | "indented" | "none";
@@ -25,28 +26,21 @@ export function ListFooter({
   "aria-busy": ariaBusy,
   ...props
 }: ListFooterProps) {
-  const unavailable =
-    disabled || loading || ariaDisabled === true || ariaDisabled === "true";
-  function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    if (unavailable) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    onClick?.(event);
-  }
   return (
     <button
       {...props}
+      {...getButtonInteractionProps({
+        disabled,
+        loading,
+        onClick,
+        "aria-disabled": ariaDisabled,
+        "aria-busy": ariaBusy,
+      })}
       type={type}
       className={["bibbidi-list-footer", className].filter(Boolean).join(" ")}
       data-border={border}
       data-horizontal-padding={horizontalPadding}
       data-loading={loading || undefined}
-      disabled={disabled}
-      aria-disabled={unavailable || ariaDisabled}
-      aria-busy={loading || ariaBusy}
-      onClick={handleClick}
     >
       {loading ? (
         <span className="bibbidi-list-footer-spinner" aria-hidden="true" />

@@ -2,21 +2,14 @@
   --service-side-panel-width: 0px;
   --service-bottom-inset: 0px;
   --service-viewport-height: 100vh;
-  /* Public height for pages that keep an internal scrolling workspace. */
-  --service-content-height: max(
-    0px,
-    calc(
-      var(--service-viewport-height) - var(--app-layout-header-height, 0px) -
-        var(--service-bottom-inset)
-    )
-  );
-
   min-width: 320px;
 }
 
 .service-layout__content {
   display: flow-root;
-  min-height: calc(100% - var(--app-layout-header-height, 0px));
+  min-height: calc(
+    var(--service-viewport-height) - var(--app-layout-header-height, 0px)
+  );
   padding-bottom: var(--service-bottom-inset);
 }
 
@@ -40,6 +33,13 @@
 }
 
 @media (width < 768px) {
+  html:has(.service-layout[data-scroll="document"]) {
+    scroll-padding-bottom: calc(
+      var(--mobile-dock-size) + var(--mobile-dock-offset) +
+        var(--layout-margin-mobile)
+    );
+  }
+
   .service-layout {
     --service-bottom-inset: calc(
       var(--mobile-dock-size) + var(--mobile-dock-offset) +

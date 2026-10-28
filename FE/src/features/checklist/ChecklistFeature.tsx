@@ -621,7 +621,6 @@ export function ChecklistFeature({
       onBackTaskDetail={backFromTaskDetail}
       onCancelLoginRequired={() => setLoginRequiredReason(null)}
       onCloseTaskDetail={closeTaskDetail}
-      onDismissTaskDetail={closeTaskDetail}
       onOpenTaskCreation={() => {
         if (audience === "authenticated") {
           taskCreation.open();

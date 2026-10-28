@@ -7,12 +7,33 @@ function Layer() {
   return (
     <div ref={ref}>
       <output aria-label="스크롤 영역">
-        {environment?.scrollContainer?.id ?? "없음"}
+        {environment?.scrollContainer === document.documentElement
+          ? "문서"
+          : (environment?.scrollContainer?.id ?? "없음")}
       </output>
     </div>
   );
 }
 describe("서비스 스크롤 영역 연결", () => {
+  it("문서 스크롤을 사용하면 문서 루트를 반환하고 모바일 전환도 반영한다", async () => {
+    const view = (mode: "document" | "contained") => (
+      <div
+        data-modal-scope
+        data-page-scroll-container
+        data-scroll={mode}
+        id="scope"
+      >
+        <Layer />
+      </div>
+    );
+    const { rerender } = render(view("document"));
+    expect(screen.getByLabelText("스크롤 영역").textContent).toBe("문서");
+    rerender(view("contained"));
+    expect(await screen.findByText("scope")).toBeTruthy();
+    rerender(view("document"));
+    expect(await screen.findByText("문서")).toBeTruthy();
+  });
+
   it("다른 레이아웃의 영역 대신 소속 범위의 스크롤 영역을 찾는다", () => {
     render(
       <>

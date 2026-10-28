@@ -54,6 +54,8 @@
 
 `PickerField`는 제품에 둔다. 날짜·시간 필드, 모바일 BottomSheet·데스크톱 Popover 전환, 임시 선택 후 확인은 제품의 공용 조합 정책이다. 구성 요소의 기본 동작은 공용 컴포넌트가 제공하고, 제품 조합이 DS에 없다는 이유만으로 새 DS 컴포넌트를 만들지 않는다.
 
+Button·IconButton·ListFooter의 로딩·비활성 상태와 실행 차단은 내부 `getButtonInteractionProps`에서 공유한다. 외형과 콘텐츠는 각 컴포넌트가 관리하며 공개 API는 유지한다. 추천 할 일의 추가 상태는 ViewModel의 `addActionStatus`로 전달하고, 표시 문구를 해석해 동작을 결정하지 않는다. 추가 중에는 Button의 loading으로 중복 실행을 막고 초점을 유지한다.
+
 ## DatePicker.MonthPicker
 
 DatePicker 내부의 연도·월 선택을 독립적으로 사용하는 공용 하위 컴포넌트다. `value`는 유효한 ISO 날짜이며 `onChange`는 선택 월의 `YYYY-MM-01`을 전달한다. `today`, `yearRange`, `minDate`, `maxDate`, `disabled`와 표준 div 속성·ref를 지원하며 범위 의미는 DatePicker와 같다.
@@ -68,6 +70,8 @@ Panel의 variant는 edge(기본 영역 경계선)와 contained(전체 테두리�
 PanelOverlay는 첫 열림 후 자식 DOM을 유지한다.
 
 AI는 제품 전용 비모달 채팅창을 사용한다. 768px 이상에서는 플로팅 창으로 표시하며, 모바일에서는 하단 메뉴의 AI를 선택하면 네비게이션 바 위에 작은 입력창을 연다. 입력창에 초점을 주면 배경 상단을 남기는 큰 대화 시트로 확장한다. 접으면 입력창을 유지하고 모바일 라우터 이동은 AI 기능에서 공통으로 감지해 숨긴다. 본문 링크·이동 버튼·쿼리 변경·뒤로/앞으로가기도 같은 동작을 따르며 이동 요소에 AI 닫기 이벤트를 연결하지 않는다. 뷰포트 측정은 공용 useViewportMetrics에서 공유하며 AI 입력에 초점이 있을 때만 키보드로 판정한다. 키보드 표시 상태를 레이아웃에 전달하면 레이아웃이 네비게이션 바를 숨기고, 채팅창은 보이는 뷰포트에 맞춰 입력창을 배치한다. dock 높이·간격·최대 너비는 서비스 layout.css에서 한 번 정의한다. 전송은 IconButton의 공개 API와 최소 44px 클릭 영역을 사용한다. 같은 입력·대화 DOM을 유지하며 계정 변경은 ServiceLayout의 key가 처리한다. 데스크톱 닫기와 모바일 접기는 AI 버튼으로 초점을 돌리고 메뉴 이동은 선택한 메뉴의 초점을 유지한다.
+
+AI 창의 DOM·초점 처리는 GlobalAiChatDialog가 담당한다. AiChatSession은 대화·입력·확장 상태를 관리하며 창의 CSS 클래스에 접근하지 않는다. 모바일에서 창 바깥을 터치하면 닫고 현재 화면 메뉴 표시로 돌아가며, 창 내부와 AI 실행 버튼은 바깥 터치에서 제외한다. 접을 때는 입력 초점을 해제해 하단 메뉴가 다시 보인 뒤 AI 버튼으로 초점을 돌린다.
 
 ## 제품 Breadcrumb과 로드맵
 

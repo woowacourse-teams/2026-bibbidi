@@ -1,6 +1,13 @@
-import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "../../../components/icons/ActionIcons";
+import { ChevronDown } from "../../../components/icons/Chevron";
 import { IconButton } from "../../../components/icon-button";
 import { canFocus } from "../../../shared/focus/canFocus";
 import { viewportStyles, type ViewportMetrics } from "../../../shared/viewport";
@@ -30,9 +37,29 @@ export function GlobalAiChatDialog({
   const closeRef = useRef<HTMLButtonElement>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
+  const wasExpandedRef = useRef(false);
   const isMobile = useIsMobileLayout();
   const compact = isMobile && !mobileExpanded;
   const dismiss = isMobile && mobileExpanded ? onMobileCollapse : onClose;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !isMobile || !dialog) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (event.button !== 0 || event.isPrimary === false) return;
+      const path = event.composedPath();
+      if (
+        path.includes(dialog) ||
+        (returnFocusRef.current && path.includes(returnFocusRef.current))
+      )
+        return;
+      onClose();
+    };
+    const document = dialog.ownerDocument;
+    document.addEventListener("pointerdown", closeOnOutside, true);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutside, true);
+  }, [open, isMobile, onClose, returnFocusRef]);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -62,17 +89,30 @@ export function GlobalAiChatDialog({
   }, [open, isMobile, returnFocusRef]);
 
   useLayoutEffect(() => {
+    const collapsed = wasExpandedRef.current && !mobileExpanded;
+    wasExpandedRef.current = open && isMobile && mobileExpanded;
+    if (!open || !isMobile) return;
     const active = document.activeElement;
+    if (collapsed) {
+      if (active instanceof HTMLElement && dialogRef.current?.contains(active))
+        active.blur();
+      // Blur first so the layout can reveal the dock before restoring focus.
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) returnFocusRef.current?.focus({ preventScroll: true });
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     if (
-      open &&
-      isMobile &&
       mobileExpanded &&
       active instanceof HTMLElement &&
       dialogRef.current?.contains(active) &&
       !canFocus(active)
     )
       closeRef.current?.focus({ preventScroll: true });
-  }, [open, isMobile, mobileExpanded]);
+  }, [open, isMobile, mobileExpanded, returnFocusRef]);
 
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -117,17 +157,7 @@ export function GlobalAiChatDialog({
             onClick={dismiss}
             icon={
               isMobile ? (
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
+                <ChevronDown aria-hidden="true" />
               ) : (
                 <CloseIcon size={20} />
               )
