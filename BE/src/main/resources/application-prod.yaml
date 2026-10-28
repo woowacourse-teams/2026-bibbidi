@@ -24,6 +24,10 @@ spring:
   flyway:
     enabled: true
 
+  web:
+    resources:
+      add-mappings: false
+
   ai:
     model:
       chat: bedrock-converse
