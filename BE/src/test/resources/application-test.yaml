@@ -61,6 +61,7 @@ auth:
       - /api/terms
       - /api/users/nickname/availability
       - /api/feedbacks
+      - /api/balance-game/**
       - /actuator/health
       - /actuator/health/**
       - /actuator/info
