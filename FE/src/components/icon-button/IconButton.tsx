@@ -1,9 +1,5 @@
-import type {
-  ComponentPropsWithRef,
-  CSSProperties,
-  MouseEvent,
-  ReactNode,
-} from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { getButtonInteractionProps } from "../../shared/button/getButtonInteractionProps";
 import "./IconButton.css";
 
 export type IconButtonVariant = "clear" | "fill" | "border";
@@ -39,8 +35,6 @@ export function IconButton({
   "aria-busy": ariaBusy,
   ...props
 }: IconButtonProps) {
-  const unavailable =
-    disabled || loading || ariaDisabled === true || ariaDisabled === "true";
   const resolvedSize =
     Number.isFinite(iconSize) && iconSize > 0 ? iconSize : 24;
   const variables = {
@@ -50,28 +44,22 @@ export function IconButton({
     ...style,
   } as CSSProperties;
 
-  function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    if (unavailable) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    onClick?.(event);
-  }
-
   return (
     <button
       {...props}
+      {...getButtonInteractionProps({
+        disabled,
+        loading,
+        onClick,
+        "aria-disabled": ariaDisabled,
+        "aria-busy": ariaBusy,
+      })}
       type={type}
       aria-label={label}
       className={["bibbidi-icon-button", className].filter(Boolean).join(" ")}
       style={variables}
       data-variant={variant}
       data-loading={loading || undefined}
-      disabled={disabled}
-      aria-disabled={unavailable || ariaDisabled}
-      aria-busy={loading || ariaBusy}
-      onClick={handleClick}
     >
       <span className="bibbidi-icon-button-icon" aria-hidden="true">
         {icon}

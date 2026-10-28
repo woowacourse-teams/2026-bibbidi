@@ -37,7 +37,6 @@ interface ChecklistProps {
   onBackTaskDetail: () => void;
   onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
-  onDismissTaskDetail?: () => void;
   onOpenTaskCreation?: () => void;
   onRequestScheduleCreation?: () => void;
   onSelectTask: (taskId: string) => void;
@@ -58,7 +57,6 @@ export function Checklist({
   onBackTaskDetail,
   onCancelLoginRequired,
   onCloseTaskDetail,
-  onDismissTaskDetail = onCloseTaskDetail,
   onOpenTaskCreation,
   onRequestScheduleCreation,
   onSelectTask,
@@ -174,7 +172,7 @@ export function Checklist({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onDismissTaskDetail();
+        onCloseTaskDetail();
       }
     };
 
@@ -187,7 +185,7 @@ export function Checklist({
     isAppointmentEditingOpen,
     isMobileLayout,
     isOverlay,
-    onDismissTaskDetail,
+    onCloseTaskDetail,
     selectedTaskContext,
   ]);
 
@@ -250,7 +248,7 @@ export function Checklist({
     if (isTaskCreationOpen) taskCreation?.requestClose();
     else if (isAppointmentCreationOpen) appointmentCreation?.cancel();
     else if (isAppointmentEditingOpen) appointmentManagement?.editing.cancel();
-    else onDismissTaskDetail();
+    else onCloseTaskDetail();
   };
   const isMobileForegroundOpen =
     (isMobileLayout || isOverlay) && foregroundPresent;
@@ -313,7 +311,7 @@ export function Checklist({
           categories={categories}
           categoryTitle={selectedTaskContext.categoryTitle}
           editing={itemEditing}
-          onClose={onDismissTaskDetail}
+          onClose={onCloseTaskDetail}
           onRequestScheduleCreation={onRequestScheduleCreation}
           task={selectedTaskContext.task}
         />

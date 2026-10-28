@@ -112,15 +112,6 @@ export function AiChatSession({
   if (!isOpen && mobileExpanded) setMobileExpanded(false);
   const compact = isMobile && !mobileExpanded;
   const expand = () => setMobileExpanded(true);
-  const collapse = () => {
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && active.closest(".global-ai-window"))
-      active.blur();
-    setMobileExpanded(false);
-    queueMicrotask(() =>
-      returnFocusRef.current?.focus({ preventScroll: true }),
-    );
-  };
   const { draft, messages, errorMessage, isPending, setDraft, send, retry } =
     useAiChatConversation(onAuthenticationRequired, contextLabel);
   const query = useMyChecklistQueryRepository();
@@ -195,7 +186,7 @@ export function AiChatSession({
       viewport={viewport}
       keyboardOpen={keyboardOpen}
       mobileExpanded={mobileExpanded}
-      onMobileCollapse={collapse}
+      onMobileCollapse={() => setMobileExpanded(false)}
       onClose={onClose}
       returnFocusRef={returnFocusRef}
     >

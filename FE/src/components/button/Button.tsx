@@ -1,4 +1,5 @@
-import type { ComponentPropsWithRef, MouseEvent, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
+import { getButtonInteractionProps } from "../../shared/button/getButtonInteractionProps";
 import "./Button.css";
 
 export type ButtonSize = "small" | "medium" | "large" | "xlarge";
@@ -31,21 +32,16 @@ function Root({
   "aria-busy": ariaBusy,
   ...props
 }: ButtonProps) {
-  const unavailable =
-    disabled || loading || ariaDisabled === true || ariaDisabled === "true";
-
-  function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    if (unavailable) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    onClick?.(event);
-  }
-
   return (
     <button
       {...props}
+      {...getButtonInteractionProps({
+        disabled,
+        loading,
+        onClick,
+        "aria-disabled": ariaDisabled,
+        "aria-busy": ariaBusy,
+      })}
       type={type}
       className={["bibbidi-button", className].filter(Boolean).join(" ")}
       data-size={size}
@@ -53,10 +49,6 @@ function Root({
       data-variant={variant}
       data-display={display}
       data-loading={loading || undefined}
-      disabled={disabled}
-      aria-disabled={unavailable || ariaDisabled}
-      aria-busy={loading || ariaBusy}
-      onClick={handleClick}
     >
       <ButtonContent loading={loading}>{children}</ButtonContent>
     </button>

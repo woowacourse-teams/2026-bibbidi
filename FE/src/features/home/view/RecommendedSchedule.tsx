@@ -51,14 +51,12 @@ export function RecommendedSchedule({
                   size="small"
                   color="dark"
                   variant="weak"
-                  disabled={item.isAddActionDisabled}
-                  loading={item.addActionLabel === "추가 중..."}
+                  disabled={item.addActionStatus === "added"}
+                  loading={item.addActionStatus === "adding"}
                   onClick={() => onAddTask(item.catalogItemId)}
                 >
-                  {item.addActionLabel === "내 할 일에 추가" && (
-                    <PlusIcon size={16} />
-                  )}
-                  {item.addActionLabel === "내 할 일에 추가"
+                  {item.addActionStatus === "idle" && <PlusIcon size={16} />}
+                  {item.addActionStatus === "idle"
                     ? "추가"
                     : item.addActionLabel}
                 </Button>

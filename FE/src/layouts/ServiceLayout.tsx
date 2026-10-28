@@ -40,6 +40,10 @@ export function ServiceLayout() {
   useLayoutEffect(() => {
     if (layoutRef.current) {
       layoutRef.current.scrollTop = 0;
+      const document = layoutRef.current.ownerDocument;
+      const scrollRoot = document.scrollingElement ?? document.documentElement;
+      scrollRoot.scrollTop = 0;
+      scrollRoot.scrollLeft = 0;
     }
   }, [pathname]);
 
@@ -57,7 +61,7 @@ export function ServiceLayout() {
       role="region"
       aria-label="서비스 화면"
       tabIndex={0}
-      scroll="contained"
+      scroll={isMobile ? "document" : "contained"}
       hideScrollBar
       headerPosition="sticky"
       headerTone="fade"

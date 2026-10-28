@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { Button } from "./Button";
 import { IconButton } from "../icon-button";
+import { ListFooter } from "../list-footer";
 import { HamburgerIcon } from "../icons/ActionIcons";
 
 type InteractionProps = Pick<
@@ -14,6 +15,10 @@ type InteractionProps = Pick<
 
 describe.each([
   ["Button", (props: InteractionProps) => <Button {...props}>실행</Button>],
+  [
+    "ListFooter",
+    (props: InteractionProps) => <ListFooter {...props}>실행</ListFooter>,
+  ],
   [
     "IconButton",
     (props: InteractionProps) => (
@@ -39,6 +44,7 @@ describe.each([
     { loading: true },
     { disabled: true },
     { "aria-disabled": true },
+    { "aria-disabled": "true" },
   ] as const)(
     "사용할 수 없는 상태 %j에서는 클릭과 폼 제출을 막는다",
     (state) => {

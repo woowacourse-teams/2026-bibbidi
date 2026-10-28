@@ -76,7 +76,10 @@ export function useNativeModalLifecycle({
         const closeLayer = showLayer(dialog, priority);
         setReady(true);
         setPresent(true);
-        const unlocks = [lockScroll(dialog.ownerDocument.body)];
+        const unlocks = [
+          lockScroll(dialog.ownerDocument.body),
+          lockScroll(dialog.ownerDocument.documentElement),
+        ];
         release.current = () => {
           closeLayer();
           unlocks.reverse().forEach((unlock) => unlock());
@@ -130,7 +133,8 @@ export function useNativeModalLifecycle({
     if (
       !present ||
       !scrollContainer ||
-      scrollContainer === dialogRef.current?.ownerDocument.body
+      scrollContainer === dialogRef.current?.ownerDocument.body ||
+      scrollContainer === dialogRef.current?.ownerDocument.documentElement
     )
       return;
     return lockScroll(scrollContainer);

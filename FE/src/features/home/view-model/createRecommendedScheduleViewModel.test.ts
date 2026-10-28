@@ -41,19 +41,19 @@ describe("createRecommendedScheduleViewModel", () => {
         addActionLabel: "추가 중...",
         additionErrorMessage: undefined,
         catalogItemId: 101,
-        isAddActionDisabled: true,
+        addActionStatus: "adding",
       }),
       expect.objectContaining({
         addActionLabel: "추가됨",
         additionErrorMessage: undefined,
         catalogItemId: 102,
-        isAddActionDisabled: true,
+        addActionStatus: "added",
       }),
       expect.objectContaining({
         addActionLabel: "다시 시도",
         additionErrorMessage: "할 일을 추가하지 못했어요. 다시 시도해 주세요.",
         catalogItemId: 103,
-        isAddActionDisabled: false,
+        addActionStatus: "error",
       }),
     ]);
   });
@@ -69,7 +69,7 @@ describe("createRecommendedScheduleViewModel", () => {
       viewModel.items.every(
         (item) =>
           item.addActionLabel === "내 할 일에 추가" &&
-          !item.isAddActionDisabled,
+          item.addActionStatus === "idle",
       ),
     ).toBe(true);
   });

@@ -101,6 +101,75 @@ function renderServiceLayout(
 }
 
 describe("ServiceLayout", () => {
+  it("모바일은 문서를 스크롤하고 브라우저 당김을 가로채지 않으며 데스크톱은 내부 스크롤을 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    installLegacyWebSessionFetch(
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+    renderServiceLayout(
+      <Route path="/preparation" element={<p>서비스 본문</p>} />,
+      ["/preparation"],
+    );
+    await screen.findByRole("link", { name: "로그인" });
+    const layout = screen.getByRole("region", { name: "서비스 화면" });
+    expect(layout.getAttribute("data-scroll")).toBe("document");
+    const content = screen.getByText("서비스 본문");
+    const touch = { identifier: 1, clientX: 100, clientY: 100 };
+    fireEvent.touchStart(content, { touches: [touch] });
+    const move = new TouchEvent("touchmove", {
+      bubbles: true,
+      cancelable: true,
+      touches: [{ ...touch, clientY: 260 } as Touch],
+    });
+    fireEvent(content, move);
+    fireEvent.touchEnd(content, { touches: [] });
+    expect(move.defaultPrevented).toBe(false);
+    expect(screen.queryByText("놓아서 새로고침")).toBeNull();
+    expect(screen.queryByText("새로고침 중이에요")).toBeNull();
+    act(() => media.setMatches(false));
+    expect(layout.getAttribute("data-scroll")).toBe("contained");
+    act(() => media.setMatches(true));
+    expect(layout.getAttribute("data-scroll")).toBe("document");
+  });
+
+  it("모바일 서비스 경로가 바뀌면 문서 스크롤을 맨 위로 초기화한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    installLegacyWebSessionFetch(
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+    renderServiceLayout(
+      <>
+        <Route path="/preparation" element={<p>준비 목록 화면</p>} />
+        <Route path="/calendar" element={<p>캘린더 화면</p>} />
+      </>,
+      ["/preparation"],
+    );
+    await screen.findByRole("link", { name: "로그인" });
+    document.documentElement.scrollTop = 700;
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "하단 메뉴" })).getByRole(
+        "link",
+        { name: "캘린더" },
+      ),
+    );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
+    expect(document.documentElement.scrollTop).toBe(0);
+  });
+
   it("모바일에서 중복 로그아웃을 막고 실패 후 재시도해 홈과 guest 상태로 전환한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     const logoutResolvers: Array<(response: Response) => void> = [];
@@ -760,7 +829,8 @@ describe("ServiceLayout", () => {
     if (!content) {
       return;
     }
-    content.scrollTop = 320;
+    const scrollRoot = document.documentElement;
+    scrollRoot.scrollTop = 320;
 
     fireEvent.click(taskButton);
 
@@ -779,8 +849,10 @@ describe("ServiceLayout", () => {
     ).toBeNull();
     expect(taskButton.isConnected).toBe(true);
     expect(taskButton.closest("[inert]")).not.toBeNull();
-    expect(content.style.overflow).toBe("hidden");
-    expect(content.scrollTop).toBe(320);
+    expect(content.style.overflow).toBe("");
+    expect(scrollRoot.style.overflow).toBe("hidden");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("contain");
+    expect(scrollRoot.scrollTop).toBe(320);
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -795,6 +867,8 @@ describe("ServiceLayout", () => {
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
     expect(content.style.overflow).toBe("");
+    expect(scrollRoot.style.overflow).toBe("");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("");
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist?taskId=checklist-item-10",
     );
@@ -814,7 +888,9 @@ describe("ServiceLayout", () => {
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist",
     );
-    expect(content.scrollTop).toBe(320);
+    expect(scrollRoot.scrollTop).toBe(320);
+    expect(scrollRoot.style.overflow).toBe("");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("");
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

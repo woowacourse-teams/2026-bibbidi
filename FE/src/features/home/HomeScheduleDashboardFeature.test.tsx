@@ -244,17 +244,23 @@ describe("calendar planning", () => {
         }),
     );
     mount();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "내 할 일에 추가" }),
-    );
+    const addButton = await screen.findByRole("button", {
+      name: "내 할 일에 추가",
+    });
+    addButton.focus();
+    fireEvent.click(addButton);
     const busy = screen.getByRole("button", { name: "추가 중..." });
-    expect(busy.hasAttribute("disabled")).toBe(true);
+    expect(busy.hasAttribute("disabled")).toBe(false);
+    expect(busy.getAttribute("aria-disabled")).toBe("true");
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(busy);
     fireEvent.click(busy);
     expect(addition.addCatalogItemIds).toHaveBeenCalledTimes(1);
     await act(async () => reject(new Error("failed")));
     expect(
       await screen.findByRole("button", { name: "다시 시도" }),
     ).toBeTruthy();
+    expect(document.activeElement).toBe(busy);
     expect(screen.getByRole("heading", { name: "웨딩홀 투어" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     await waitFor(() => expect(analytics.track).toHaveBeenCalledTimes(1));
