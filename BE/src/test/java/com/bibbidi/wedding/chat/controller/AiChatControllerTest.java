@@ -162,7 +162,7 @@ class AiChatControllerTest {
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         when(classifier.classify(org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString())).thenReturn(Mono.just(ChatModelTier.LOW));
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(Mono.just(ModelClassifier.Classification.allow(ChatModelTier.LOW)));
         RECEIVED_PROMPTS.clear();
         responder = prompt -> Flux.empty();
         mockMvc = webAppContextSetup(context).apply(springSecurity())

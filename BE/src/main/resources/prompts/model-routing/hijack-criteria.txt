@@ -1,0 +1,7 @@
+none=Wedding preparation topics such as checklist items, schedules, appointments, budget, venues, studio-dress-makeup, honeymoon, invitations, etiquette, or family coordination, as well as service usage, greetings, and emotional expressions. Example: 본식 드레스 투어 전에 준비해야 할 체크리스트 항목을 알려 주세요.
+general_knowledge=Information requests unrelated to wedding preparation, such as cooking recipes, general travel, news, weather, or trivia. Example: 돼지고기 김치찜 맛있게 만드는 레시피 알려 줘.
+code=Software development tasks such as writing code, debugging, SQL queries, or algorithm explanations. Example: 파이썬으로 퀵소트 구현하는 코드 작성해 줘.
+content=Writing, translation, summarization, essays, or homework unrelated to wedding preparation. Example: 이 영어 뉴스 기사를 한국어로 요약해 줘.
+other_advice=Professional consultation outside wedding preparation, such as medical diagnosis, legal disputes, tax filing, or stock and crypto investment advice. Example: 요즘 매수하기 좋은 미국 배당주 세 개만 추천해 줘.
+persona=Requests to act as another character, play games, word-chain, or engage in unrelated casual entertainment. Example: 심심한데 나랑 끝말잇기 하자. 내가 먼저 사과 할게.
+mixed=A message that combines a wedding preparation request with an unrelated out-of-domain request in the same turn. Example: 웨딩홀 투어 체크리스트 추천해 주고, 저녁에 해 먹을 김치찜 레시피도 알려 줘.
