@@ -1,0 +1,25 @@
+{
+  "baseItemIds": [
+    139, 140, 141, 142, 43,
+    1, 2,
+    3, 4, 5, 6, 10, 12, 13, 14, 15, 18, 28, 33, 34, 35,
+    19, 49, 60, 61, 68, 69,
+    41, 47, 48, 50, 52, 73, 74, 75, 80, 81, 82, 84, 85,
+    86, 87, 88, 89, 90, 97, 100, 101, 105, 106, 107, 108, 109,
+    152, 153, 154,
+    163, 164, 165, 166, 167, 168,
+    169
+  ],
+  "rules": [
+    { "questionId": 1, "optionItemIds": { "A": [22], "B": [], "UNKNOWN": [] } },
+    { "questionId": 2, "optionItemIds": { "A": [], "B": [20], "UNKNOWN": [] } },
+    { "questionId": 3, "optionItemIds": { "A": [], "B": [70, 71], "UNKNOWN": [] } },
+    { "questionId": 4, "optionItemIds": { "A": [], "B": [54, 55], "UNKNOWN": [72] } },
+    { "questionId": 5, "optionItemIds": { "A": [], "B": [16, 17], "UNKNOWN": [] } },
+    { "questionId": 6, "optionItemIds": { "A": [], "B": [121], "UNKNOWN": [119] } },
+    { "questionId": 7, "optionItemIds": { "A": [], "B": [57], "UNKNOWN": [56] } },
+    { "questionId": 8, "optionItemIds": { "A": [], "B": [102, 103, 104], "UNKNOWN": [] } },
+    { "questionId": 9, "optionItemIds": { "A": [], "B": [155, 156, 157, 158, 159, 160], "UNKNOWN": [] } },
+    { "questionId": 10, "optionItemIds": { "A": [161, 162], "B": [], "UNKNOWN": [] } }
+  ]
+}
