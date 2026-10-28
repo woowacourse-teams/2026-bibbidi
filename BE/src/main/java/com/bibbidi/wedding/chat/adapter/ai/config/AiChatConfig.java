@@ -34,6 +34,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -136,6 +139,7 @@ public class AiChatConfig {
     }
 
     @Bean
+    @Profile("!dev")
     @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
     ChatClient lunaChatClient(
             @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
@@ -169,7 +173,8 @@ public class AiChatConfig {
             @Qualifier("qwenChatClient") ObjectProvider<ChatClient> qwenClient,
             @Qualifier("lunaChatClient") ObjectProvider<ChatClient> lunaClient,
             AiChatProperties properties,
-            @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel
+            @Value("${bibbidi.evaluation.generation.model:}") String evaluationModel,
+            Environment environment
     ) {
         if (!evaluationModel.isBlank()) {
             ChatModelTarget target = new ChatModelTarget(bedrockClient, evaluationModel, null);
@@ -187,7 +192,8 @@ public class AiChatConfig {
         }
         ChatModelTarget qwen = new ChatModelTarget(selectedQwenClient, properties.qwenModel(),
                 () -> BedrockChatOptions.builder().model(properties.qwenModel()).outputSchema(schema));
-        if (accountQwenClient == null) {
+        // dev는 Qwen만 사용한다. 폴백도 Sol·Luna로 넘어가지 않도록 모든 티어를 Qwen으로 둔다.
+        if (accountQwenClient == null || environment.acceptsProfiles(Profiles.of("dev"))) {
             return new ChatModelRouter(Map.of(
                     ChatModelTier.LOW, qwen,
                     ChatModelTier.MEDIUM, qwen,
