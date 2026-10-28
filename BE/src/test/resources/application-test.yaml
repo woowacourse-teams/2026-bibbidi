@@ -22,6 +22,7 @@ spring:
 bibbidi:
   balance-game:
     questions-location: classpath:balance-game/test-questions.json
+    types-location: classpath:balance-game/test-types.json
   ai:
     chatbot:
       accounts-enabled: false
