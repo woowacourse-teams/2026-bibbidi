@@ -34,22 +34,42 @@ interface ChatReceiver {
   onConversation: (id: string) => void;
   onDelta: (text: string) => void;
   onRecommendations?: (catalogItemIds: string[]) => void;
+  onRefresh?: () => void;
 }
 
 function createChatEventHandler(request: ChatRequest, receiver: ChatReceiver) {
   let conversationId: string | undefined;
   let hasAnswer = false;
   let hasComponent = false;
+  let hasRefresh = false;
 
   return (event: SseEvent): boolean => {
     if (
-      !["conversation", "delta", "component", "done", "failure"].includes(
-        event.type,
-      )
+      ![
+        "conversation",
+        "delta",
+        "component",
+        "refresh",
+        "done",
+        "failure",
+      ].includes(event.type)
     )
       return false;
     const value: unknown = JSON.parse(event.data);
     if (typeof value !== "object" || value === null) throw new AiChatApiError();
+    if (event.type === "refresh") {
+      if (
+        !conversationId ||
+        Array.isArray(value) ||
+        Object.keys(value).length > 0
+      )
+        throw new AiChatApiError();
+      if (!hasRefresh) {
+        hasRefresh = true;
+        receiver.onRefresh?.();
+      }
+      return false;
+    }
     if (event.type === "failure") {
       if (
         !("errorCode" in value) ||

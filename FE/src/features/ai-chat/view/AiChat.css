@@ -12,24 +12,11 @@
   padding: 24px 20px 18px;
 }
 
-.ai-chat__error button,
-.ai-chat__composer-preview,
-.ai-recommendations button {
+.ai-chat__composer-preview {
   cursor: pointer;
 }
 
-.ai-recommendations button:disabled {
-  cursor: default;
-}
-
-.ai-chat
-  :is(
-    a,
-    [role="log"],
-    .ai-chat__composer-preview,
-    .ai-chat__error button,
-    .ai-recommendations button
-  ):focus-visible {
+.ai-chat :is(a, [role="log"], .ai-chat__composer-preview):focus-visible {
   outline: 3px solid var(--color-stroke-focus-ring);
   outline-offset: 3px;
 }
@@ -133,14 +120,6 @@
   font: var(--typography-t6);
 }
 
-.ai-chat__recommendation-complete {
-  margin: 24px 0 0;
-}
-
-.ai-chat__recommendation-complete p {
-  margin: 0;
-}
-
 .ai-chat__login {
   display: inline-flex;
   align-items: center;
@@ -169,12 +148,6 @@
 
 .ai-chat__error p {
   margin: 0 0 8px;
-}
-
-.ai-chat__error button {
-  border: 0;
-  background: transparent;
-  color: var(--color-fg-brand);
 }
 
 .ai-chat__composer {
