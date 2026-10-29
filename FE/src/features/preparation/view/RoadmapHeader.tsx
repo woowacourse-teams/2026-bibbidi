@@ -1,5 +1,6 @@
 import { PageHeader } from "../../../components/page-header";
 import { Breadcrumb } from "../../../components/breadcrumb";
+import { RoadmapGameInvitation } from "./RoadmapGameInvitation";
 import "./RoadmapHeader.css";
 
 export function RoadmapHeader({
@@ -15,6 +16,7 @@ export function RoadmapHeader({
       titleId="preparation-roadmap-title"
       title={categoryTitle ?? "로드맵"}
       description={summary}
+      actions={<RoadmapGameInvitation />}
       navigation={
         <Breadcrumb
           items={[

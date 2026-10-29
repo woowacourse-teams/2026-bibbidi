@@ -16,6 +16,35 @@
   display: contents;
 }
 
+.service-layout > .bibbidi-app-layout-header {
+  background: transparent;
+}
+
+.service-layout > .bibbidi-app-layout-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg-layer-basement) calc(100% - var(--layout-gutter-desktop)),
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity 280ms ease;
+}
+
+.service-layout
+  > .bibbidi-app-layout-header:has(.app-header[data-compact])::before {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-layout > .bibbidi-app-layout-header::before {
+    transition: none;
+  }
+}
+
 .service-layout__header[hidden],
 .service-layout__mobile-dock[hidden] {
   display: none;

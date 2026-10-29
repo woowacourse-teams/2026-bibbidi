@@ -60,8 +60,6 @@ export function BalanceGameFeature({
           submitting={game.submitting}
           error={game.error}
           onSelect={game.select}
-          onPrevious={game.previous}
-          onNext={game.next}
         />
       )}
       {game.state.status === "result" && (
@@ -78,7 +76,6 @@ export function BalanceGameFeature({
             onLoginRequired?.();
             return true;
           }}
-          onEdit={game.edit}
           onAuthenticationRequired={handleAuthenticationRequired}
         />
       )}

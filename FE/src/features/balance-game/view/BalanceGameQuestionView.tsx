@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "../../../components/button";
-import { Checkbox } from "../../../components/checkbox";
 import { ProgressBar } from "../../../components/progress-bar";
 import type {
   BalanceGameOption,
@@ -22,8 +20,6 @@ export function BalanceGameQuestionView({
   submitting,
   error,
   onSelect,
-  onPrevious,
-  onNext,
 }: {
   question: BalanceGameQuestion;
   index: number;
@@ -32,8 +28,6 @@ export function BalanceGameQuestionView({
   submitting: boolean;
   error: string | null;
   onSelect: (id: BalanceGameOption["id"]) => void;
-  onPrevious: () => void;
-  onNext: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -63,9 +57,13 @@ export function BalanceGameQuestionView({
           {question.options
             .filter((option) => option.id !== "UNKNOWN")
             .map((option) => (
-              <label
+              <button
+                type="button"
                 className="balance-game__card"
                 data-selected={selected === option.id || undefined}
+                aria-pressed={selected === option.id}
+                aria-label={option.text}
+                onClick={() => onSelect(option.id)}
                 key={option.id}
               >
                 <span
@@ -74,35 +72,27 @@ export function BalanceGameQuestionView({
                 >
                   {option.id}
                 </span>
-                <Checkbox
-                  inputType="radio"
-                  name={`question-${question.id}`}
-                  checked={selected === option.id}
-                  onCheckedChange={() => onSelect(option.id)}
-                  aria-label={option.text}
-                />
                 {option.imagePath && (
-                  <div className="balance-game__image">
+                  <span className="balance-game__image">
                     <OptionImage
                       key={option.imagePath}
                       path={option.imagePath}
                     />
-                  </div>
+                  </span>
                 )}
                 <span className="balance-game__choice-text">{option.text}</span>
-              </label>
+              </button>
             ))}
         </div>
         {unknown && (
-          <label className="balance-game__unknown">
-            <Checkbox
-              inputType="radio"
-              name={`question-${question.id}`}
-              checked={selected === "UNKNOWN"}
-              onCheckedChange={() => onSelect("UNKNOWN")}
-            />
+          <button
+            type="button"
+            className="balance-game__unknown"
+            aria-pressed={selected === "UNKNOWN"}
+            onClick={() => onSelect("UNKNOWN")}
+          >
             {unknown.text}
-          </label>
+          </button>
         )}
       </fieldset>
       {error && (
@@ -110,25 +100,7 @@ export function BalanceGameQuestionView({
           {error}
         </p>
       )}
-      <div className="balance-game__footer">
-        <Button
-          size="large"
-          color="dark"
-          variant="weak"
-          disabled={index === 0 || submitting}
-          onClick={onPrevious}
-        >
-          이전 질문
-        </Button>
-        <Button
-          size="large"
-          disabled={!selected}
-          loading={submitting}
-          onClick={onNext}
-        >
-          {index === total - 1 ? "결과 카드 보기" : "다음 질문"}
-        </Button>
-      </div>
+      {submitting && <p role="status">결과를 불러오고 있어요.</p>}
     </div>
   );
 }

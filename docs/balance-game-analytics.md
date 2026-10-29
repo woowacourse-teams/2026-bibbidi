@@ -1,10 +1,10 @@
 # 밸런스 게임 측정 연결
 
-[측정 계획](https://app.notion.com/p/408aec9466d680cf8348df97de240c83)과 [API PR #743](https://github.com/woowacourse-teams/2026-bibbidi/pull/743)을 기준으로 연결한다. 게임과 결과 카드는 공개하며, 실제 할 일 생성은 기존 회원용 API를 사용한다.
+[측정 계획](https://app.notion.com/p/408aec9466d680cf8348df97de240c83), [API PR #743](https://github.com/woowacourse-teams/2026-bibbidi/pull/743), [선택지 이미지 응답 PR #750](https://github.com/woowacourse-teams/2026-bibbidi/pull/750)을 기준으로 연결한다. 게임과 결과 카드는 공개하며, 실제 할 일 생성은 기존 회원용 API를 사용한다.
 
 ## 실제 제품 흐름
 
-1. 공개 `GET /api/balance-game/questions`로 질문을 받는다. 서버 순서와 문자열 질문·선택지 ID를 유지한다.
+1. 공개 `GET /api/balance-game/questions`로 질문을 받는다. 서버 순서와 문자열 질문·선택지 ID를 유지하고, 선택지의 필수 문자열 `imageUrl`을 카드 이미지에 연결한다. 이미지 로딩에 실패하면 문구로 선택할 수 있다.
 2. 첫 답변 선택을 게임 시작으로 센다. `UNKNOWN`은 제품의 건너뛰기이며 제출 답변에서 제외한다. 전부 건너뛰면 결과 요청을 보내지 않는다.
 3. 공개 `POST /api/balance-game/results`에 `{ answers: { Q1: "A" } }` 형태로 답변을 보낸다.
 4. 응답의 `id`를 `card_type`으로 사용한다. 같은 응답의 `catalogItemIds`를 공개 카탈로그에 대조해 추천 목록을 표시한다. 별도 추천 버튼·템플릿 적용·삭제된 `/recommendations` API를 추가하지 않는다.
@@ -17,11 +17,10 @@
 | --- | --- | --- | --- |
 | `page_view` | O | `$pageview` | 기존 라우터 계측 재사용 |
 | `balance_game_start` | O | O | 플레이의 첫 답변 선택, 한 번 |
-| `balance_game_question_view` | — | O | 문항 표시. 되돌아가기도 별도 방문 |
+| `balance_game_question_view` | — | O | 문항 표시. 결과 요청 실패 후 재개도 별도 방문 |
 | `balance_game_answer_select` | — | O | 실제 선택·변경. 같은 답 반복 선택 제외 |
 | `balance_game_question_next` | — | O | 다음 문항·결과로 진행, API 호출 전 |
 | `balance_game_answer_submit` | — | O | 결과 요청 시도 |
-| `balance_game_answer_edit` | — | O | 결과에서 답변 수정 |
 | `balance_game_card_view` | — | O | 유형 카드 표시 |
 | `balance_game_recommendation_request` | — | O | 결과의 추천 ID를 카탈로그와 기존 보유 목록에 대조하는 로딩 시도 |
 | `balance_game_recommendation_view` | — | O | 목록 준비 완료, 빈 목록도 수집 |
@@ -46,7 +45,7 @@ GA에는 게임 시작의 `source`, `auth_state`, `question_count`, 생성 성�
 | --- | --- |
 | `game_run_id` | 화면에서 시작한 플레이. API 재시도·로그인 복귀에도 유지 |
 | `answer_revision` | 답을 새로 고르거나 바꿀 때 증가. 같은 답 반복·API 재시도는 유지 |
-| `question_visit_id` | 문항 방문. 이전/수정/결과 요청 실패 후 재개는 새 방문 |
+| `question_visit_id` | 문항 방문. 결과 요청 실패 후 재개는 새 방문 |
 | `attempt_id` | 실제 요청/저장 작업 시도마다 새 UUID |
 | `recommendation_id` | 성공한 결과 요청의 UUID. 서버 ID를 의미하지 않는다. 같은 답변으로 결과를 다시 받아도 별도 회차이며 로그인 복귀 시 유지 |
 | `card_type` | 응답의 고정 유형 코드. 카드 제목·설명 원문은 전송하지 않음 |
@@ -60,10 +59,12 @@ GA에는 게임 시작의 `source`, `auth_state`, `question_count`, 생성 성�
 
 ## 문항 시간과 중단
 
-`active_elapsed_ms`는 해당 문항 방문부터 누적한 활성 시간이다. `performance.now()`를 사용하고 탭 숨김·창 포커스 이탈을 제외한다. 마지막 다음 버튼에서 시계를 멈춰 API 대기 시간을 제외한다.
+답변 카드를 누르면 선택을 기록하고 바로 다음 문항으로 진행한다. 마지막 문항은 방금 고른 답을 포함해 결과를 요청한다. 이전·다음 버튼과 결과 화면의 답변 수정 버튼은 제공하지 않는다. 결과 요청 재시도에서 같은 답을 다시 눌러도 답변 변경으로 기록하지 않는다. 결과는 카드 앞면 이미지만 표시하며, 별도의 제목·설명과 카드 클릭 동작은 제공하지 않는다.
+
+`active_elapsed_ms`는 해당 문항 방문부터 누적한 활성 시간이다. `performance.now()`를 사용하고 탭 숨김·창 포커스 이탈을 제외한다. 카드 선택 후 문항 진행 시 시계를 멈춰 API 대기 시간을 제외한다.
 
 - 첫 선택 시간: `answer_select`의 `is_first_selection=true`에서 중앙값·P90·표본 수를 본다.
-- 문항 진행 시간: `question_next`의 활성 시간에서 중앙값·P90을 본다. 첫 방문과 previous/edit/retry 방문을 구분한다.
+- 문항 진행 시간: `question_next`의 활성 시간에서 중앙값·P90을 본다. 첫 방문과 retry 방문을 구분한다.
 - 문항별 중단 후보: `(game_run_id, question_id)`의 첫 방문에 다음 진행이 없고 마지막 활동 후 30분이 지난 경우. 영구 이탈이나 불편의 원인으로 단정하지 않는다.
 - 답변 변경은 `is_change`, 모르겠어요는 `option_id=UNKNOWN`으로 본다. 최종 답 분포는 제출 시점 전 각 문항의 마지막 선택을 사용하며 클릭 수를 분모로 삼지 않는다.
 

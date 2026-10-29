@@ -22,7 +22,6 @@ type GameState =
   | { status: "playing"; questions: BalanceGameQuestion[] }
   | {
       status: "result";
-      questions: BalanceGameQuestion[];
       result: BalanceGameResult;
       requestDurationMs: number;
       instanceId: string;
@@ -39,7 +38,17 @@ export function useBalanceGame(
       restored: draft?.tracking,
     }),
   );
-  const [state, setState] = useState<GameState>({ status: "loading" });
+  const [state, setState] = useState<GameState>(() =>
+    draft
+      ? {
+          status: "result",
+          result: draft.result,
+          instanceId: draft.tracking.resultId ?? crypto.randomUUID(),
+          requestDurationMs: 0,
+          selectedIds: draft.selectedIds,
+        }
+      : { status: "loading" },
+  );
   const [revision, setRevision] = useState(0);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<BalanceGameAnswer[]>(
@@ -48,7 +57,6 @@ export function useBalanceGame(
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef<AbortController | null>(null);
-  const visitReason = useRef("initial");
 
   useEffect(() => {
     const updateVisibility = () =>
@@ -68,24 +76,16 @@ export function useBalanceGame(
   }, [tracking]);
 
   useEffect(() => {
+    if (draft) return;
     const controller = new AbortController();
     const request = tracking.request("questions");
     getBalanceGameQuestions(controller.signal).then(
       (questions) => {
         if (controller.signal.aborted) return;
         setState(
-          draft
-            ? {
-                status: "result",
-                questions,
-                result: draft.result,
-                instanceId: draft.tracking.resultId ?? crypto.randomUUID(),
-                requestDurationMs: 0,
-                selectedIds: draft.selectedIds,
-              }
-            : questions.length
-              ? { status: "playing", questions }
-              : { status: "empty" },
+          questions.length
+            ? { status: "playing", questions }
+            : { status: "empty" },
         );
       },
       (cause: unknown) => {
@@ -115,17 +115,18 @@ export function useBalanceGame(
         state.questions[index],
         index,
         state.questions.length,
-        visitReason.current,
+        index === 0 ? "initial" : "next",
       );
     if (state.status === "result" && audience === "authenticated")
       clearBalanceGameDraft();
   }, [state, index, tracking, audience]);
 
-  const question = "questions" in state ? state.questions[index] : undefined;
+  const question =
+    state.status === "playing" ? state.questions[index] : undefined;
   const selected = answers.find(
     (answer) => answer.questionId === question?.id,
   )?.optionId;
-  const submit = async () => {
+  const submit = async (submittedAnswers: BalanceGameAnswer[]) => {
     if (state.status !== "playing" || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
@@ -133,14 +134,17 @@ export function useBalanceGame(
     setError(null);
     const request = tracking.request("answers", "balance_game_answer_submit", {
       question_count: state.questions.length,
-      answered_count: answers.filter((a) => a.optionId !== "UNKNOWN").length,
+      answered_count: submittedAnswers.filter((a) => a.optionId !== "UNKNOWN")
+        .length,
     });
     try {
-      const result = await getBalanceGameResult(answers, controller.signal);
+      const result = await getBalanceGameResult(
+        submittedAnswers,
+        controller.signal,
+      );
       if (!controller.signal.aborted)
         setState({
           status: "result",
-          questions: state.questions,
           result,
           instanceId: request.id,
           requestDurationMs: tracking.duration(request),
@@ -187,7 +191,6 @@ export function useBalanceGame(
     selected,
     submitting,
     error,
-    answers,
     tracking,
     retry: () => {
       setState({ status: "loading" });
@@ -195,55 +198,29 @@ export function useBalanceGame(
     },
     select: (optionId: BalanceGameAnswer["optionId"]) => {
       if (
+        state.status !== "playing" ||
         !question ||
         pending.current ||
-        selected === optionId ||
         !question.options.some((option) => option.id === optionId)
       )
         return;
       tracking.select(optionId, selected);
-      setAnswers((current) => [
-        ...current.filter((answer) => answer.questionId !== question.id),
+      const nextAnswers = [
+        ...answers.filter((answer) => answer.questionId !== question.id),
         { questionId: question.id, optionId },
-      ]);
+      ];
+      setAnswers(nextAnswers);
       setError(null);
-    },
-    previous: () => {
-      if (!pending.current && index > 0) {
-        visitReason.current = "previous";
-        setIndex((value) => value - 1);
-        setError(null);
-      }
-    },
-    next: () => {
-      if (!selected || state.status !== "playing" || pending.current) return;
       if (
         index === state.questions.length - 1 &&
-        !answers.some((a) => a.optionId !== "UNKNOWN")
+        !nextAnswers.some((a) => a.optionId !== "UNKNOWN")
       ) {
         setError("결과를 보려면 한 개 이상의 질문에 답을 골라주세요.");
         return;
       }
       tracking.next();
-      if (index === state.questions.length - 1) void submit();
-      else {
-        visitReason.current = "next";
-        setIndex((value) => value + 1);
-        setError(null);
-      }
-    },
-    edit: () => {
-      if (state.status !== "result") return;
-      tracking.emit("balance_game_answer_edit");
-      clearBalanceGameDraft();
-      visitReason.current = "edit";
-      setState(
-        state.questions.length
-          ? { status: "playing", questions: state.questions }
-          : { status: "empty" },
-      );
-      setIndex(0);
-      setError(null);
+      if (index === state.questions.length - 1) void submit(nextAnswers);
+      else setIndex(index + 1);
     },
     rememberForLogin,
   };

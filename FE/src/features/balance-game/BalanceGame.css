@@ -49,43 +49,68 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-height: 280px;
-  padding: 48px 24px 28px;
+  align-items: stretch;
+  justify-content: center;
+  isolation: isolate;
+  min-height: 420px;
+  padding: 64px 20px 20px;
+  overflow: hidden;
   border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: var(--radius-lg);
   background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  font: inherit;
   cursor: pointer;
   transition:
     border-color 150ms,
     background-color 150ms;
 }
 
-.balance-game__card:hover {
+.balance-game__card:enabled:hover {
   border-color: var(--color-stroke-selected);
+}
+
+.balance-game__card:has(.balance-game__image img) {
+  justify-content: flex-end;
+}
+
+.balance-game__card:has(.balance-game__image img)::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-stroke-neutral-contrast) 55%, transparent),
+    transparent 65%
+  );
+  content: "";
+  pointer-events: none;
 }
 
 .balance-game__card[data-selected] {
   border-color: var(--color-stroke-brand-solid);
   background: var(--color-bg-brand-weak);
-  box-shadow: inset 0 0 0 1px var(--color-stroke-brand-solid);
+  box-shadow: 0 0 0 1px var(--color-stroke-brand-solid);
 }
 
-.balance-game__card:has(input:focus-visible),
-.balance-game__unknown:has(input:focus-visible) {
+.balance-game__card:focus-visible,
+.balance-game__unknown:focus-visible {
   outline: 2px solid var(--color-stroke-focus-ring);
   outline-offset: 3px;
 }
 
 .balance-game__choice-marker {
   position: absolute;
+  z-index: 2;
   inset: 16px auto auto 16px;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: 50%;
-  background: var(--color-bg-neutral-weak);
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
   font: var(--typography-t7);
   font-weight: var(--font-weight-bold);
 }
@@ -94,20 +119,11 @@
   background: var(--color-bg-brand-solid);
 }
 
-.balance-game__card > .bibbidi-checkbox {
-  position: absolute;
-  inset: 17px 16px auto auto;
-}
-
 .balance-game__image {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 160px;
-  width: 100%;
-  height: 160px;
-  margin-bottom: 20px;
-  overflow: hidden;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
 }
 
 .balance-game__image img {
@@ -116,7 +132,7 @@
   height: 100%;
   min-height: 0;
   max-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .balance-game__image:not(:has(img)) {
@@ -124,11 +140,24 @@
 }
 
 .balance-game__choice-text {
-  margin-block: auto;
+  position: relative;
+  z-index: 2;
   font: var(--typography-t5-medium);
   text-align: center;
   word-break: keep-all;
   overflow-wrap: anywhere;
+}
+
+.balance-game__card:has(.balance-game__image img) .balance-game__choice-text {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(
+    in srgb,
+    var(--color-stroke-neutral-contrast) 78%,
+    transparent
+  );
+  color: var(--color-palette-white);
+  text-align: left;
 }
 
 .balance-game__unknown {
@@ -140,22 +169,23 @@
   max-width: 100%;
   min-height: 48px;
   margin: 16px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-fg-neutral-muted);
   font: var(--typography-t6-medium);
   cursor: pointer;
 }
 
-.balance-game__footer {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 32px;
+.balance-game__card:disabled,
+.balance-game__unknown:disabled {
+  cursor: wait;
 }
 
 .balance-game__result-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   margin-top: 48px;
 }
@@ -186,22 +216,29 @@
   font: var(--typography-t7);
 }
 
-.balance-game__groups details {
+.balance-game__recommendation-group {
   margin-bottom: 12px;
   border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: var(--radius-lg);
   overflow: clip;
 }
 
-.balance-game__groups summary {
+.balance-game__group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 20px;
   background: var(--color-bg-neutral-weak);
-  font: var(--typography-t5-medium);
-  cursor: pointer;
 }
 
-.balance-game__groups summary span {
-  float: right;
+.balance-game__group-header h3 {
+  margin: 0;
+  font: var(--typography-t5-medium);
+}
+
+.balance-game__group-header > span {
+  flex: none;
   font: var(--typography-t6);
 }
 
@@ -257,10 +294,6 @@
   font: var(--typography-t6-medium);
 }
 
-.balance-game__result-footer a {
-  color: var(--color-fg-neutral);
-}
-
 .balance-game__sr-only {
   position: absolute;
   width: 1px;
@@ -287,22 +320,12 @@
   }
 
   .balance-game__card {
-    min-height: 280px;
-    padding: 48px 14px 20px;
-  }
-
-  .balance-game__image {
-    flex-basis: 120px;
-    height: 120px;
-    margin-bottom: 16px;
+    min-height: 360px;
+    padding: 56px 14px 14px;
   }
 
   .balance-game__choice-text {
     font: var(--typography-t6-medium);
-  }
-
-  .balance-game__footer {
-    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .balance-game__result-footer {
@@ -321,22 +344,6 @@
   .balance-game__card {
     transition: none;
   }
-}
-
-.balance-game__type-card {
-  padding: 24px;
-  margin-bottom: 32px;
-  border: 1px solid var(--color-stroke-neutral-weak);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-layer-default);
-}
-
-.balance-game__type-card img {
-  display: block;
-  max-width: 100%;
-  max-height: 280px;
-  margin: 0 auto 24px;
-  object-fit: contain;
 }
 
 .balance-game__results h2 {

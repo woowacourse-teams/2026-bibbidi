@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +17,10 @@ import {
   getBalanceGameResult,
 } from "./api/balanceGame";
 import { catalog, questions, result } from "./test/fixtures";
-import { readBalanceGameDraft } from "./model/balanceGameDraft";
+import {
+  readBalanceGameDraft,
+  writeBalanceGameDraft,
+} from "./model/balanceGameDraft";
 
 const mocks = vi.hoisted(() => ({
   checklist: { getCatalogItemIds: vi.fn(), addCatalogItemIds: vi.fn() },
@@ -63,11 +67,9 @@ function renderGame(
 async function finishGame() {
   await screen.findByRole("heading", { name: questions[0].question });
   fireEvent.click(
-    screen.getByRole("radio", { name: questions[0].options[0].text }),
+    screen.getByRole("button", { name: questions[0].options[0].text }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
-  fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-  fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+  fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
 }
 const events = (name: string) =>
   mocks.track.mock.calls
@@ -94,6 +96,109 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("공개 밸런스게임과 행동 계측", () => {
+  it("각 카테고리는 미담은 항목부터 3개씩 보이고 펼침·저장 후에도 담은 항목은 맨 아래에 둔다", async () => {
+    const weddingTasks = Array.from({ length: 4 }, (_, index) => ({
+      id: String(201 + index),
+      title: `예식 추천 ${index + 1}`,
+    }));
+    const homeTasks = Array.from({ length: 4 }, (_, index) => ({
+      id: String(205 + index),
+      title: `신혼 추천 ${index + 1}`,
+    }));
+    mocks.getCatalog.mockResolvedValue({
+      ...catalog,
+      stepDetails: [
+        {
+          ...catalog.stepDetails[0],
+          tasks: [...catalog.stepDetails[0].tasks, ...weddingTasks],
+        },
+        {
+          ...catalog.stepDetails[1],
+          tasks: [...catalog.stepDetails[1].tasks, ...homeTasks],
+        },
+      ],
+    });
+    vi.mocked(getBalanceGameResult).mockResolvedValue({
+      ...result,
+      catalogItemIds: [
+        ...result.catalogItemIds,
+        ...[...weddingTasks, ...homeTasks].map((task) => Number(task.id)),
+      ],
+    });
+    renderGame();
+    await finishGame();
+    await screen.findByRole("button", { name: "10개 할 일 담기" });
+    const wedding = within(screen.getByRole("region", { name: "예식" }));
+    const home = within(screen.getByRole("region", { name: "신혼생활" }));
+    expect(wedding.getAllByRole("listitem")).toHaveLength(3);
+    expect(home.getAllByRole("listitem")).toHaveLength(3);
+    expect(wedding.queryByText("이미 담음")).toBeNull();
+    expect(
+      wedding
+        .getAllByRole("checkbox")
+        .map(
+          (item) => item.closest("label")?.querySelector("strong")?.textContent,
+        ),
+    ).toEqual(["아이폰스냅 계약", "예식 추천 1", "예식 추천 2"]);
+    const more = wedding.getByRole("button", { name: "예식 더보기 (3개)" });
+    expect(more.getAttribute("aria-label")).toContain(more.textContent);
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      home.getByRole("button", { name: "신혼생활 더보기 (2개)" }),
+    ).toBeTruthy();
+    fireEvent.click(wedding.getByRole("checkbox", { name: /예식 추천 1/ }));
+    fireEvent.click(more);
+    expect(wedding.getAllByRole("listitem")).toHaveLength(6);
+    expect(home.getAllByRole("listitem")).toHaveLength(3);
+    expect(wedding.getAllByRole("listitem").at(-1)?.textContent).toContain(
+      "본식스냅 계약",
+    );
+    const hiddenChoice = wedding.getByRole("checkbox", { name: /예식 추천 3/ });
+    expect((hiddenChoice as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(hiddenChoice);
+    fireEvent.click(wedding.getByRole("button", { name: "예식 접기" }));
+    expect(wedding.getAllByRole("listitem")).toHaveLength(3);
+    expect(events("balance_game_task_select")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "8개 할 일 담기" }));
+    await waitFor(() =>
+      expect(events("balance_game_save_success")).toHaveLength(1),
+    );
+    expect(mocks.checklist.addCatalogItemIds).toHaveBeenCalledWith(
+      "authenticated",
+      ["22", "161", "202", "204", "205", "206", "207", "208"],
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
+    fireEvent.click(wedding.getByRole("button", { name: "예식 더보기 (3개)" }));
+    expect(
+      wedding
+        .getAllByRole("listitem")
+        .slice(0, 2)
+        .map((item) => item.querySelector("strong")?.textContent),
+    ).toEqual(["예식 추천 1", "예식 추천 3"]);
+    expect(
+      wedding
+        .getAllByRole("listitem")
+        .slice(2)
+        .every((item) => item.textContent?.includes("이미 담음")),
+    ).toBe(true);
+  });
+  it("3개 이하인 카테고리는 모든 항목을 표시하고 더보기를 제공하지 않는다", async () => {
+    renderGame();
+    await finishGame();
+    await screen.findByRole("button", { name: "2개 할 일 담기" });
+    expect(
+      within(screen.getByRole("region", { name: "예식" })).getAllByRole(
+        "listitem",
+      ),
+    ).toHaveLength(2);
+    expect(
+      within(screen.getByRole("region", { name: "신혼생활" })).getAllByRole(
+        "listitem",
+      ),
+    ).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /더보기/ })).toBeNull();
+  });
   it("저장 중 인증이 만료되어도 현재 결과와 최종 선택을 보관한다", async () => {
     mocks.checklist.addCatalogItemIds.mockRejectedValue(
       new PreparationAuthenticationRequiredError(),
@@ -111,49 +216,82 @@ describe("공개 밸런스게임과 행동 계측", () => {
     expect(events("balance_game_save_success")).toHaveLength(0);
   });
 
-  it("선택 전 다음을 막고 이전 답을 유지하며 선택을 바꾼다", async () => {
+  it("이동 버튼 없이 카드를 누르면 다음 질문으로 이동하고 마지막 선택을 제출한다", async () => {
     renderGame();
     await screen.findByRole("heading", { name: questions[0].question });
-    expect(
-      (screen.getByRole("button", { name: "다음 질문" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect(screen.queryByRole("button", { name: "이전 질문" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "다음 질문" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "결과 카드 보기" })).toBeNull();
     fireEvent.click(
-      screen.getByRole("radio", { name: questions[0].options[0].text }),
+      screen.getByRole("button", { name: questions[0].options[0].text }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
-    fireEvent.click(screen.getByRole("button", { name: "이전 질문" }));
-    expect(
-      (
-        screen.getByRole("radio", {
-          name: questions[0].options[0].text,
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-    expect(events("balance_game_start")).toHaveLength(1);
-    expect(
-      events("balance_game_answer_select").at(-1).parameters,
-    ).toMatchObject({
-      question_id: "Q1",
-      option_id: "UNKNOWN",
-      is_change: true,
-      is_first_selection: false,
+    const heading = screen.getByRole("heading", {
+      name: questions[1].question,
     });
+    expect(document.activeElement).toBe(heading);
+    expect(getBalanceGameResult).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: questions[1].options[1].text }),
+    );
+    await screen.findByRole("heading", { name: result.name });
+    expect(getBalanceGameResult).toHaveBeenCalledExactlyOnceWith(
+      [
+        { questionId: "Q1", optionId: "A" },
+        { questionId: "Q10", optionId: "B" },
+      ],
+      expect.any(AbortSignal),
+    );
+    expect(events("balance_game_question_next")).toHaveLength(2);
+    expect(events("balance_game_start")).toHaveLength(1);
+  });
+  it("결과는 앞면 이미지만 표시하며 클릭해도 제목·설명이나 뒷면이 나타나지 않는다", async () => {
+    renderGame();
+    await finishGame();
+    const image = await screen.findByRole("img", { name: result.name });
+    expect(image.getAttribute("src")).toBe(result.imageUrl);
+    expect(image.closest("button")).toBeNull();
+    expect(screen.queryByText(result.summary)).toBeNull();
+    expect(screen.queryByText("카드를 눌러 뒤집어 보세요")).toBeNull();
+    expect(screen.queryByRole("button", { name: "답변 수정하기" })).toBeNull();
     expect(
-      events("balance_game_question_view").at(-1).parameters.visit_reason,
-    ).toBe("previous");
+      screen.queryByRole("link", { name: "체크리스트로 이동" }),
+    ).toBeNull();
+    fireEvent.click(image);
+    expect(screen.queryByText(result.summary)).toBeNull();
+    expect(getBalanceGameResult).toHaveBeenCalledOnce();
+    expect(events("balance_game_card_view")).toHaveLength(1);
+  });
+  it("결과 이미지를 불러오지 못해도 추천 할 일을 담을 수 있다", async () => {
+    renderGame();
+    await finishGame();
+    const image = await screen.findByRole("img", { name: result.name });
+    fireEvent.error(image);
+    expect(screen.queryByRole("img", { name: result.name })).toBeNull();
+    expect(screen.queryByText(result.summary)).toBeNull();
+    expect(
+      await screen.findByRole("button", { name: "2개 할 일 담기" }),
+    ).toBeTruthy();
+    expect(getBalanceGameResult).toHaveBeenCalledOnce();
   });
   it("모든 질문을 건너뛰면 빈 답변 API를 호출하지 않는다", async () => {
     renderGame();
     await screen.findByRole("heading", { name: questions[0].question });
-    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-    fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
-    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-    fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
+    fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
     expect(screen.getByRole("alert").textContent).toContain("한 개 이상");
     expect(getBalanceGameResult).not.toHaveBeenCalled();
     expect(events("balance_game_answer_submit")).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole("button", { name: questions[1].options[0].text }),
+    );
+    await screen.findByRole("heading", { name: result.name });
+    expect(getBalanceGameResult).toHaveBeenLastCalledWith(
+      [
+        { questionId: "Q1", optionId: "UNKNOWN" },
+        { questionId: "Q10", optionId: "A" },
+      ],
+      expect.any(AbortSignal),
+    );
   });
   it("문항 실패를 재시도하며 오류 원문을 분석에 보내지 않는다", async () => {
     vi.mocked(getBalanceGameQuestions).mockRejectedValueOnce(
@@ -182,11 +320,12 @@ describe("공개 밸런스게임과 행동 계측", () => {
     );
     renderGame();
     await finishGame();
-    fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+    expect(screen.getByRole("status").textContent).toContain("결과를 불러오고");
+    fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
     expect(getBalanceGameResult).toHaveBeenCalledOnce();
     await act(async () => reject(new TypeError("network-private")));
     await screen.findByRole("alert");
-    fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
     await screen.findByRole("heading", { name: result.name });
     expect(getBalanceGameResult).toHaveBeenLastCalledWith(
       [
@@ -300,6 +439,49 @@ describe("공개 밸런스게임과 행동 계측", () => {
     expect(events("balance_game_task_created")).toHaveLength(0);
     expect(mocks.checklist.addCatalogItemIds).not.toHaveBeenCalled();
   });
+  it.each([false, true])(
+    "질문 API를 호출하지 않고 저장된 결과·선택을 복원한다 (StrictMode: %s)",
+    async (strict) => {
+      writeBalanceGameDraft({
+        result,
+        answers: [{ questionId: "Q1", optionId: "A" }],
+        selectedIds: [22],
+        tracking: {
+          runId: "restored-run",
+          resultId: "restored-result",
+          started: true,
+          answerRevision: 1,
+        },
+      });
+      vi.mocked(getBalanceGameQuestions).mockRejectedValue(
+        new TypeError("questions unavailable"),
+      );
+
+      renderGame("authenticated", strict);
+
+      await screen.findByRole("button", { name: "1개 할 일 담기" });
+      expect(screen.getByRole("img", { name: result.name })).toBeTruthy();
+      expect(
+        (
+          screen.getByRole("checkbox", {
+            name: /아이폰스냅 계약/,
+          }) as HTMLInputElement
+        ).checked,
+      ).toBe(true);
+      expect(
+        (
+          screen.getByRole("checkbox", {
+            name: /신혼집 후보 조사/,
+          }) as HTMLInputElement
+        ).checked,
+      ).toBe(false);
+      expect(getBalanceGameQuestions).not.toHaveBeenCalled();
+      expect(getBalanceGameResult).not.toHaveBeenCalled();
+      expect(events("balance_game_card_view")).toHaveLength(1);
+      expect(events("balance_game_recommendation_view")).toHaveLength(1);
+      expect(readBalanceGameDraft()).toBeUndefined();
+    },
+  );
   it("로그인 전에는 저장 API를 호출하지 않고 결과·선택·플레이 ID를 로그인 후 복원한다", async () => {
     const guest = renderGame("guest");
     await finishGame();
@@ -316,6 +498,7 @@ describe("공개 밸런스게임과 행동 계측", () => {
     guest.unmount();
     renderGame("authenticated");
     await screen.findByRole("button", { name: "1개 할 일 담기" });
+    expect(getBalanceGameQuestions).toHaveBeenCalledOnce();
     expect(getBalanceGameResult).toHaveBeenCalledOnce();
     expect(events("balance_game_start")).toHaveLength(1);
     expect(events("balance_game_card_view")).toHaveLength(1);
@@ -333,11 +516,14 @@ describe("공개 밸런스게임과 행동 계측", () => {
     const button = await screen.findByRole("button", {
       name: "로그인하고 2개 할 일 담기",
     });
-    vi.spyOn(window.Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
+    const storageWrite = vi
+      .spyOn(Object.getPrototypeOf(window.sessionStorage), "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
     fireEvent.click(button);
-    expect(screen.getByRole("alert").textContent).toContain(
+    expect(storageWrite).toHaveBeenCalledOnce();
+    expect((await screen.findByRole("alert")).textContent).toContain(
       "선택을 보관하지 못했어요",
     );
     expect(loginRequired).not.toHaveBeenCalled();

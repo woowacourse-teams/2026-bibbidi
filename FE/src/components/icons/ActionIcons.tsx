@@ -58,6 +58,14 @@ export function CloseIcon(props: ActionIconProps) {
   );
 }
 
+export function LoginIcon(props: ActionIconProps) {
+  return (
+    <IconBase strokeWidth={1.8} aria-hidden="true" focusable="false" {...props}>
+      <path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5M10 8l4 4-4 4M3 12h11" />
+    </IconBase>
+  );
+}
+
 export function LogoutIcon(props: ActionIconProps) {
   return (
     <IconBase strokeWidth={1.8} aria-hidden="true" focusable="false" {...props}>

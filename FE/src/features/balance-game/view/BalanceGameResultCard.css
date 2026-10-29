@@ -1,0 +1,13 @@
+.balance-result-card {
+  width: min(100%, 360px);
+  margin: 0 auto 36px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.balance-result-card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto 4 / 5;
+}
