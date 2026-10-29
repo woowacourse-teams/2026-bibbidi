@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.balancegame.adapter.ai;
+package com.bibbidi.wedding.balancegame.client;
 
 import com.bibbidi.wedding.balancegame.domain.Answer;
 import com.bibbidi.wedding.balancegame.domain.WeddingType;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 @Component
-public class SpringAiWeddingTypeClassifier {
+public class BalanceGameAiClient {
 
     private static final String UNKNOWN_TYPE_MESSAGE = "AI가 후보에 없는 밸런스게임 유형을 골랐습니다. typeId=";
     private static final String CAPACITY_EXCEEDED_MESSAGE = "밸런스게임 AI 호출 한도를 넘었습니다.";
@@ -26,7 +26,7 @@ public class SpringAiWeddingTypeClassifier {
 
     private final ChatClient client;
 
-    public SpringAiWeddingTypeClassifier(
+    public BalanceGameAiClient(
             ChatClient.Builder chatClientBuilder,
             @Value("classpath:prompts/balance-game-system.txt") Resource systemPrompt
     ) {

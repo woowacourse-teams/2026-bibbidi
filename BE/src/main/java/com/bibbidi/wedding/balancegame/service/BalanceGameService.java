@@ -1,6 +1,6 @@
 package com.bibbidi.wedding.balancegame.service;
 
-import com.bibbidi.wedding.balancegame.adapter.ai.SpringAiWeddingTypeClassifier;
+import com.bibbidi.wedding.balancegame.client.BalanceGameAiClient;
 import com.bibbidi.wedding.balancegame.domain.Answer;
 import com.bibbidi.wedding.balancegame.domain.Questions;
 import com.bibbidi.wedding.balancegame.domain.WeddingType;
@@ -15,16 +15,16 @@ public class BalanceGameService {
 
     private final QuestionRepository questionRepository;
     private final WeddingTypeRepository weddingTypeRepository;
-    private final SpringAiWeddingTypeClassifier classifier;
+    private final BalanceGameAiClient aiClient;
 
     public BalanceGameService(
             QuestionRepository questionRepository,
             WeddingTypeRepository weddingTypeRepository,
-            SpringAiWeddingTypeClassifier classifier
+            BalanceGameAiClient aiClient
     ) {
         this.questionRepository = questionRepository;
         this.weddingTypeRepository = weddingTypeRepository;
-        this.classifier = classifier;
+        this.aiClient = aiClient;
     }
 
     public Questions findQuestions() {
@@ -34,6 +34,6 @@ public class BalanceGameService {
     public WeddingType judge(Map<String, String> optionIds) {
         List<Answer> answers = questionRepository.findAll().resolve(optionIds);
 
-        return classifier.classify(answers, weddingTypeRepository.findAll());
+        return aiClient.classify(answers, weddingTypeRepository.findAll());
     }
 }
