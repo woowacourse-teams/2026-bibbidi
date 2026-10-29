@@ -142,11 +142,9 @@ describe("appRoutes", () => {
     ).toBe(false);
 
     fireEvent.click(
-      screen.getByRole("radio", { name: questions[0].options[0].text }),
+      screen.getByRole("button", { name: questions[0].options[0].text }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
-    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-    fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "로그인하고 2개 할 일 담기" }),
     );
@@ -172,11 +170,9 @@ describe("appRoutes", () => {
       ).toBeNull();
       expect(document.querySelectorAll(".bibbidi-app-layout")).toHaveLength(1);
       fireEvent.click(
-        screen.getByRole("radio", { name: questions[0].options[0].text }),
+        screen.getByRole("button", { name: questions[0].options[0].text }),
       );
-      fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
-      fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-      fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+      fireEvent.click(screen.getByRole("button", { name: "아직 잘 모르겠어" }));
 
       await screen.findByRole("heading", { name: /우리에게 맞는/ });
       expect(screen.getByRole("banner")).toBe(header);

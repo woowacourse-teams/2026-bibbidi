@@ -1,6 +1,27 @@
 import type { CatalogModel } from "../../catalog";
 import type { BalanceGameRecommendation } from "./balanceGame";
 
+export function groupRecommendations(
+  items: BalanceGameRecommendation[],
+  addedIds: string[],
+) {
+  const added = new Set(addedIds);
+  const categories = new Map<string, BalanceGameRecommendation[]>();
+  for (const item of items) {
+    const group = categories.get(item.categoryName);
+    if (group) group.push(item);
+    else categories.set(item.categoryName, [item]);
+  }
+  return Array.from(categories, ([category, items]) => ({
+    category,
+    items: items.sort(
+      (left, right) =>
+        Number(added.has(String(left.catalogItemId))) -
+        Number(added.has(String(right.catalogItemId))),
+    ),
+  }));
+}
+
 export function resolveRecommendations(
   ids: number[],
   catalog: CatalogModel,

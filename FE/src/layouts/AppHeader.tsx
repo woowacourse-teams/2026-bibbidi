@@ -1,5 +1,8 @@
-import { Link, NavLink, useLocation } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { PageContainer } from "../components/page-container";
+import { LoginIcon } from "../components/icons/ActionIcons";
+import { IconButton } from "../components/icon-button";
+import { useCompactHeaderLogin } from "./useCompactHeaderLogin";
 
 import "./AppHeader.css";
 import { HeaderBrandLink } from "./HeaderBrandLink";
@@ -27,10 +30,16 @@ interface AppHeaderProps {
 
 export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { ref, compact } = useCompactHeaderLogin();
   return (
-    <header className="app-header">
+    <header className="app-header" data-compact={compact || undefined}>
       <PageContainer width="wide" className="app-header__inner">
-        <div className="app-header__left">
+        <div
+          className="app-header__left"
+          inert={compact}
+          aria-hidden={compact || undefined}
+        >
           <HeaderBrandLink to="/" />
 
           <nav aria-label="주요 메뉴" className="app-header__navigation">
@@ -53,14 +62,32 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        <div className="app-header__actions">
+        <div className="app-header__actions" ref={ref}>
           {user.kind === "authenticated" ? (
             <AppHeaderAccountMenu navigationKey={pathname} user={user} />
           ) : user.kind === "guest" ? (
             <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-              <NavLink className="app-header__login" to="/login">
-                로그인
+              <NavLink
+                className="app-header__login"
+                to="/login"
+                aria-hidden={compact || undefined}
+                inert={compact}
+                tabIndex={compact ? -1 : undefined}
+              >
+                <LoginIcon />
+                <span className="app-header__login-label">로그인</span>
               </NavLink>
+              <IconButton
+                className="app-header__login-icon"
+                icon={<LoginIcon />}
+                aria-label="로그인"
+                aria-hidden={!compact || undefined}
+                inert={!compact}
+                tabIndex={compact ? undefined : -1}
+                color="var(--color-fg-neutral-muted)"
+                variant="clear"
+                onClick={() => void navigate("/login")}
+              />
             </nav>
           ) : (
             <div

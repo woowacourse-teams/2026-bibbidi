@@ -1,0 +1,129 @@
+.roadmap-game-invitation {
+  --invitation-paper: var(--color-bg-brand-solid);
+  --invitation-ink: var(--color-fg-on-brand);
+  --invitation-stroke: var(--color-stroke-neutral-contrast);
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 18px max-content 30px;
+  min-height: 0;
+  border: 1px solid var(--invitation-stroke);
+  border-radius: var(--radius-sm);
+  background-color: var(--invitation-paper);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--invitation-ink) 8%, transparent) 0.45px,
+    transparent 0.7px
+  );
+  background-size: 3px 3px;
+  box-shadow: 0 2px 3px
+    color-mix(in srgb, var(--invitation-ink) 8%, transparent);
+  color: var(--invitation-ink);
+  font: var(--typography-t7);
+  text-decoration: none;
+}
+
+.roadmap-game-invitation::before,
+.roadmap-game-invitation::after,
+.roadmap-game-invitation__stub::before,
+.roadmap-game-invitation__stub::after {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--invitation-stroke);
+  border-radius: 50%;
+  background: var(--color-bg-layer-basement);
+  content: "";
+  pointer-events: none;
+}
+
+.roadmap-game-invitation::before,
+.roadmap-game-invitation::after {
+  top: calc(50% - 4px);
+}
+
+.roadmap-game-invitation::before {
+  left: -5px;
+  clip-path: inset(0 0 0 calc(50% - 1px));
+}
+
+.roadmap-game-invitation::after {
+  right: -5px;
+  clip-path: inset(0 calc(50% - 1px) 0 0);
+}
+
+.roadmap-game-invitation__copy {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.roadmap-game-invitation__eyebrow {
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--invitation-stroke);
+  font-size: 9px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+}
+
+.roadmap-game-invitation__title {
+  font-family: var(--font-family-ui);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.4;
+}
+
+.roadmap-game-invitation__strip {
+  display: grid;
+  place-items: center;
+  border-right: 1px dashed var(--invitation-stroke);
+}
+
+.roadmap-game-invitation__strip::before {
+  width: 7px;
+  height: 28px;
+  background: repeating-linear-gradient(
+    0deg,
+    currentColor 0 1px,
+    transparent 1px 3px,
+    currentColor 3px 5px,
+    transparent 5px 7px,
+    currentColor 7px 8px,
+    transparent 8px 11px
+  );
+  opacity: 0.65;
+  content: "";
+}
+
+.roadmap-game-invitation__stub {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-left: 1px dashed var(--invitation-stroke);
+}
+
+.roadmap-game-invitation__stub::before,
+.roadmap-game-invitation__stub::after {
+  left: -4.5px;
+}
+
+.roadmap-game-invitation__stub::before {
+  top: -5px;
+  clip-path: inset(calc(50% - 1px) 0 0);
+}
+
+.roadmap-game-invitation__stub::after {
+  bottom: -5px;
+  clip-path: inset(0 0 calc(50% - 1px));
+}
+
+.roadmap-game-invitation:hover .roadmap-game-invitation__title {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.roadmap-game-invitation:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 4px;
+}

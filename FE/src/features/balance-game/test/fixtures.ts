@@ -73,7 +73,7 @@ export const wireQuestions = {
     text: q.question,
     options: q.options
       .filter((o) => o.id !== "UNKNOWN")
-      .map((o) => ({ id: o.id, text: o.text })),
+      .map((o) => ({ id: o.id, text: o.text, imageUrl: o.imagePath ?? "" })),
   })),
 };
 export const catalog = {

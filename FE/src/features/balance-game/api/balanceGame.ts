@@ -25,6 +25,10 @@ export function isContentId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value);
 }
 
+function isImageUrl(value: string): boolean {
+  return !value || /^https?:\/\//.test(value) || /^\/(?!\/)/.test(value);
+}
+
 export function parseQuestions(value: unknown): BalanceGameQuestion[] {
   if (!isRecord(value) || !Array.isArray(value.questions))
     throw new Error("밸런스게임 문항 응답 형식이 올바르지 않습니다.");
@@ -40,7 +44,9 @@ export function parseQuestions(value: unknown): BalanceGameQuestion[] {
           isRecord(option) &&
           isContentId(option.id) &&
           option.id !== "UNKNOWN" &&
-          typeof option.text === "string",
+          typeof option.text === "string" &&
+          typeof option.imageUrl === "string" &&
+          isImageUrl(option.imageUrl),
       ) ||
       new Set(question.options.map((option) => option.id)).size !== 2
     )
@@ -53,7 +59,7 @@ export function parseQuestions(value: unknown): BalanceGameQuestion[] {
         ...question.options.map((option) => ({
           id: option.id as string,
           text: option.text as string,
-          imagePath: null,
+          imagePath: option.imageUrl as string,
         })),
         { id: "UNKNOWN" as const, text: "아직 잘 모르겠어", imagePath: null },
       ],
@@ -79,11 +85,7 @@ export function parseResult(value: unknown): BalanceGameResult {
     )
   )
     throw new Error("밸런스게임 결과 응답 형식이 올바르지 않습니다.");
-  if (
-    value.imageUrl &&
-    !/^https?:\/\//.test(value.imageUrl) &&
-    !/^\/(?!\/)/.test(value.imageUrl)
-  )
+  if (!isImageUrl(value.imageUrl))
     throw new Error("밸런스게임 이미지 주소가 올바르지 않습니다.");
   return {
     id: value.id,
