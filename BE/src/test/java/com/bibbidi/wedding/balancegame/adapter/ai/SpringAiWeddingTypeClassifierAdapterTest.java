@@ -6,13 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bibbidi.wedding.balancegame.adapter.ai.client.BalanceGameModelTarget;
 import com.bibbidi.wedding.balancegame.domain.Answer;
 import com.bibbidi.wedding.balancegame.domain.Option;
 import com.bibbidi.wedding.balancegame.domain.Question;
 import com.bibbidi.wedding.balancegame.domain.WeddingType;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,10 +26,8 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.core.io.ByteArrayResource;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 class SpringAiWeddingTypeClassifierAdapterTest {
 
@@ -44,7 +42,6 @@ class SpringAiWeddingTypeClassifierAdapterTest {
     ));
     private static final List<Answer> ANSWERS = List.of(QUESTION.answerFrom(Map.of("Q1", "B")).orElseThrow());
 
-    private final ObjectMapper mapper = JsonMapper.builder().build();
     private final ChatModel model = mock(ChatModel.class);
     private final AtomicReference<Prompt> captured = new AtomicReference<>();
     private SpringAiWeddingTypeClassifierAdapter adapter;
@@ -52,15 +49,14 @@ class SpringAiWeddingTypeClassifierAdapterTest {
     @BeforeEach
     void setUp() {
         when(model.getOptions()).thenReturn(BedrockChatOptions.builder().model("default-model").build());
-        ChatClient chatClient = ChatClient.builder(model).defaultSystem("시스템 프롬프트").build();
-        BalanceGameModelTarget target = new BalanceGameModelTarget(chatClient, schema -> BedrockChatOptions.builder()
-                .model("balance-game-model")
-                .outputSchema(schema));
-        adapter = new SpringAiWeddingTypeClassifierAdapter(target, mapper);
+        adapter = new SpringAiWeddingTypeClassifierAdapter(
+                ChatClient.builder(model),
+                new ByteArrayResource("시스템 프롬프트".getBytes(StandardCharsets.UTF_8))
+        );
     }
 
     @Test
-    @DisplayName("답변 문구를 보내고 후보 ID만 고를 수 있게 제한한 뒤, AI가 고른 후보 유형을 돌려준다")
+    @DisplayName("답변 문구와 후보 유형을 보내고, AI가 고른 후보 유형을 돌려준다")
     void shouldReturnCandidateChosenByAi() {
         respond("{\"typeId\":\"LUXURY\"}");
 
@@ -68,10 +64,9 @@ class SpringAiWeddingTypeClassifierAdapterTest {
 
         Prompt prompt = captured.get();
         assertThat(prompt.getUserMessage().getText())
-                .contains("기념일 데이트, 더 끌리는 쪽은? → 한 달 전에 예약한 파인다이닝");
-        BedrockChatOptions options = (BedrockChatOptions) prompt.getOptions();
-        JsonNode typeIdSchema = mapper.readTree(options.getOutputSchema()).get("properties").get("typeId");
-        assertThat(typeIdSchema.get("enum")).extracting(JsonNode::asString).containsExactly("SIMPLE", "LUXURY");
+                .contains("기념일 데이트, 더 끌리는 쪽은? → 한 달 전에 예약한 파인다이닝")
+                .contains("- SIMPLE: 담백한 미니멀파 (꼭 필요한 준비만 골라 담는 커플)")
+                .contains("- LUXURY: 한 번뿐인 날 풀코스파 (하나도 놓치지 않고 제대로 하고 싶은 커플)");
     }
 
     @Test
