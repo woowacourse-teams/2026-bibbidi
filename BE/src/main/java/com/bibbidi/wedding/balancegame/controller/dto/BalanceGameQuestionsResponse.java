@@ -22,10 +22,10 @@ public record BalanceGameQuestionsResponse(List<QuestionResponse> questions) {
         }
     }
 
-    public record OptionResponse(String id, String text) {
+    public record OptionResponse(String id, String text, String imageUrl) {
 
         public static OptionResponse from(Option option) {
-            return new OptionResponse(option.id(), option.text());
+            return new OptionResponse(option.id(), option.text(), option.imageUrl());
         }
     }
 }

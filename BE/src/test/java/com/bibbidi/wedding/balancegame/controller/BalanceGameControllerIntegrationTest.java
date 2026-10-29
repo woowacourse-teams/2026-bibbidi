@@ -48,7 +48,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
     private BalanceGameAiClient aiClient;
 
     @Test
-    @DisplayName("로그인하지 않아도 문항과 두 선택지 문구를 조회한다")
+    @DisplayName("로그인하지 않아도 문항과 두 선택지 문구·이미지 주소를 조회한다")
     void shouldFindQuestionsWithoutLogin() throws Exception {
         mockMvc.perform(get(QUESTIONS_PATH))
                 .andExpect(status().isOk())
@@ -57,6 +57,10 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.questions[0].options[*].id", contains("A", "B")))
                 .andExpect(jsonPath("$.questions[0].options[0].text").value("동네 단골집에서 편하게"))
                 .andExpect(jsonPath("$.questions[0].options[1].text").value("한 달 전에 예약한 파인다이닝"))
+                .andExpect(jsonPath("$.questions[0].options[0].imageUrl")
+                        .value("https://example.com/balance-game/q1-a.webp"))
+                .andExpect(jsonPath("$.questions[0].options[1].imageUrl")
+                        .value("https://example.com/balance-game/q1-b.webp"))
                 .andDo(document("balance-game-questions-find",
                         resource(ResourceSnippetParameters.builder()
                                 .tag("Balance Game")
@@ -70,7 +74,8 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                                         fieldWithPath("questions[].options").description("선택지 목록"),
                                         fieldWithPath("questions[].options[].id")
                                                 .description("선택지 ID. 결과 요청 answers의 값으로 쓴다"),
-                                        fieldWithPath("questions[].options[].text").description("선택지 문구"))
+                                        fieldWithPath("questions[].options[].text").description("선택지 문구"),
+                                        fieldWithPath("questions[].options[].imageUrl").description("선택지 이미지 URL"))
                                 .build())));
     }
 
