@@ -1,0 +1,1187 @@
+{
+  "apiVersion": "dashboard.grafana.app/v1",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "bibbidi-spring-ai"
+  },
+  "spec": {
+    "title": "비비디 · AI 채팅",
+    "description": "첫 응답과 전체 응답 시간, 턴의 완료·실패·취소, 모델별 사용량을 확인합니다.",
+    "schemaVersion": 41,
+    "version": 1,
+    "editable": false,
+    "tags": [
+      "bibbidi",
+      "managed"
+    ],
+    "timezone": "Asia/Seoul",
+    "refresh": "1m",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "집계 기준",
+        "description": "",
+        "type": "text",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 4
+        },
+        "targets": [],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "**TTFT 집계에는 Prometheus를, 턴 결과·전체 응답 시간·대화 내용 집계에는 운영 MySQL의 `chat_turns`를 사용합니다.** 사용자와 대화 필터는 DB 패널에만 적용됩니다. DB 집계는 환경 선택과 무관하게 운영 기록을 사용합니다. 취소는 실패와 분리하며 저장 실패 시 DB 집계에서 누락될 수 있습니다. 테스트 ID(900000000 이상)는 제외합니다."
+        }
+      },
+      {
+        "id": 2,
+        "title": "운영 대화 턴 수",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(*) AS turns FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "운영 실패율",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 6,
+          "y": 4,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT SUM(outcome='FAILED') / NULLIF(COUNT(*),0) AS failure_rate FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "운영 완료율",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT SUM(outcome='COMPLETED') / NULLIF(COUNT(*),0) AS completion_rate FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "운영 취소 수",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 18,
+          "y": 4,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT SUM(outcome='CANCELLED') AS cancelled FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 6,
+        "title": "전체 TTFT · P50·P95·P99·평균",
+        "description": "선택한 기간의 첫 SSE 이벤트 전달 시간을 집계합니다. 사용자·대화 필터는 적용되지 않습니다.",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 9,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "(label_replace(histogram_quantile(0.5,sum by(le)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\"}[$__range]))),\"stat\",\"P50\",\"__name__\",\".*\")) or (label_replace(histogram_quantile(0.95,sum by(le)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\"}[$__range]))),\"stat\",\"P95\",\"__name__\",\".*\")) or (label_replace(histogram_quantile(0.99,sum by(le)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\"}[$__range]))),\"stat\",\"P99\",\"__name__\",\".*\")) or (label_replace(sum(increase(ai_chat_ttft_seconds_sum{deployment_environment_name=\"$env\"}[$__range])) / sum(increase(ai_chat_ttft_seconds_count{deployment_environment_name=\"$env\"}[$__range])),\"stat\",\"평균\",\"__name__\",\".*\"))",
+            "instant": true,
+            "range": false,
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "stat",
+              "desc": false
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "stat": "통계",
+                "Value": "TTFT"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "운영 전체 응답 시간 · 모델별 평균",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 70,
+          "w": 24,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT $__timeGroupAlias(started_at,'$__interval'), model AS metric, AVG(duration_ms) / 1000 AS value FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring}) GROUP BY 1,2 ORDER BY 1",
+            "format": "time_series",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "운영 결과별 턴 추세",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT $__timeGroupAlias(started_at,'$__interval'), outcome AS metric, COUNT(*) AS value FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring}) GROUP BY 1,2 ORDER BY 1",
+            "format": "time_series",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "운영 실패·취소 원인",
+        "description": "",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT outcome, COALESCE(outcome_reason,'unknown') AS reason, COUNT(*) AS turns FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring}) AND outcome <> 'COMPLETED' GROUP BY outcome,reason ORDER BY turns DESC",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "모델·입출력별 토큰 사용량",
+        "description": "채팅 외 AI 기능이 같은 모델 관측을 쓰면 함께 포함될 수 있습니다. 비용은 모델별 단가와 과금 기준을 정한 뒤 계산합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 23,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum by(gen_ai_request_model,gen_ai_token_type)(increase(gen_ai_client_token_usage_total{deployment_environment_name=\"$env\"}[$__range]))",
+            "range": false,
+            "instant": true,
+            "editorMode": "code",
+            "legendFormat": "{{gen_ai_request_model}} · {{gen_ai_token_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "title": "턴 저장 실패",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 23,
+          "w": 6,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(increase(ai_chat_archive_failures_total{deployment_environment_name=\"$env\"}[$__range]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "턴 저장 실패"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 12,
+        "title": "TTFT 측정 표본",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 18,
+          "y": 23,
+          "w": 6,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(increase(ai_chat_ttft_seconds_count{deployment_environment_name=\"$env\"}[$__range]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "TTFT 측정 표본"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 13,
+        "title": "AI 오류 트레이스",
+        "description": "",
+        "type": "table",
+        "datasource": {
+          "type": "tempo",
+          "uid": "tempo"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 30,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "tempo",
+              "uid": "tempo"
+            },
+            "query": "{resource.deployment.environment.name=\"$env\" && status=error && name =~ \".*(chat|Chat|gen_ai).*\"}",
+            "queryType": "traceql",
+            "limit": 30,
+            "tableType": "traces"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 14,
+        "title": "AI 오류 로그",
+        "description": "",
+        "type": "logs",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 30,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "loki",
+              "uid": "loki"
+            },
+            "expr": "{service_name=\"bibbidi-backend\",deployment_environment_name=\"$env\"} | severity_text=~\"(?i)error|fatal\" | scope_name=~\".*(chat|Chat).*\"",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "AI 오류 로그",
+            "queryType": "range"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "wrapLogMessage": true,
+          "sortOrder": "Descending",
+          "enableLogDetails": true
+        }
+      },
+      {
+        "id": 15,
+        "title": "대화별 요약 · ID를 눌러 상세 보기",
+        "description": "",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 38,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT t.conversation_id, t.user_id, COALESCE(u.nickname,'삭제된 사용자') AS nickname, DATE_FORMAT(MIN(t.started_at),'%Y-%m-%d %H:%i:%s') AS first_turn, DATE_FORMAT(MAX(t.started_at),'%Y-%m-%d %H:%i:%s') AS last_turn, COUNT(*) AS turns, SUM(t.outcome='COMPLETED') AS completed, SUM(t.outcome='FAILED') AS failed, SUM(t.outcome='CANCELLED') AS cancelled FROM chat_turns t LEFT JOIN users u ON u.id=t.user_id WHERE t.user_id < 900000000 AND $__timeFilter(t.started_at) AND ($user_id = -1 OR t.user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR t.conversation_id = ${conversation_id:sqlstring}) GROUP BY t.conversation_id,t.user_id,u.nickname ORDER BY last_turn DESC LIMIT 200",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "conversation_id"
+              },
+              "properties": [
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "이 대화 보기",
+                      "url": "/d/bibbidi-spring-ai?var-user_id=${__data.fields.user_id}&var-conversation_id=${__value.raw}&from=${__from}&to=${__to}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "title": "대화 턴 상세 · 저장 필드 전체",
+        "description": "선택 기간·사용자·대화에 해당하는 턴을 시간순으로 최대 400건 표시합니다. 질문·답변은 셀 검사에서 전체 내용을 확인할 수 있습니다. 기간이나 대화를 좁혀 나머지 기록을 조회합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 46,
+          "w": 24,
+          "h": 16
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COALESCE(u.nickname,'삭제된 사용자') AS nickname,t.user_prompt,t.completion,t.model,t.outcome,t.outcome_reason,t.duration_ms,DATE_FORMAT(t.started_at,'%Y-%m-%d %H:%i:%s') AS started_at,t.conversation_id,t.id,t.user_id,DATE_FORMAT(t.created_at,'%Y-%m-%d %H:%i:%s') AS created_at,DATE_FORMAT(t.updated_at,'%Y-%m-%d %H:%i:%s') AS updated_at FROM chat_turns t LEFT JOIN users u ON u.id=t.user_id WHERE t.user_id < 900000000 AND $__timeFilter(t.started_at) AND ($user_id = -1 OR t.user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR t.conversation_id = ${conversation_id:sqlstring}) ORDER BY t.started_at ASC,t.id ASC LIMIT 400",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "user_prompt"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 400
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "auto",
+                    "wrapText": false
+                  }
+                },
+                {
+                  "id": "custom.inspect",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "completion"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 400
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "auto",
+                    "wrapText": false
+                  }
+                },
+                {
+                  "id": "custom.inspect",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "lg",
+          "sortBy": []
+        }
+      },
+      {
+        "id": 17,
+        "title": "?? ??? ?? ?? ?? ? P50?P95?P99???",
+        "description": "chat_turns.model? LOW?MEDIUM?HIGH? ?? ?? ?????. ?????? ?????. ??: ms.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 62,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "WITH ranked AS (SELECT model,duration_ms,ROW_NUMBER() OVER(PARTITION BY model ORDER BY duration_ms) AS rn,COUNT(*) OVER(PARTITION BY model) AS n FROM chat_turns WHERE model IN ('LOW','MEDIUM','HIGH') AND user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})) SELECT model,MAX(n) AS turns,AVG(duration_ms) AS avg_ms,MAX(CASE WHEN rn=CEIL(n*0.5) THEN duration_ms END) AS p50_ms,MAX(CASE WHEN rn=CEIL(n*0.95) THEN duration_ms END) AS p95_ms,MAX(CASE WHEN rn=CEIL(n*0.99) THEN duration_ms END) AS p99_ms FROM ranked GROUP BY model ORDER BY turns DESC",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "title": "난도별 TTFT · P50·P95·P99·평균",
+        "description": "?? ?? ???? LOW?MEDIUM?HIGH? model ??? ?????. ? delta? ??? ? ??? TTFT??, DB? ?? ?? ??? ?????.",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 9,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "(label_replace(histogram_quantile(0.5,sum by(le,model)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\",model=~\"LOW|MEDIUM|HIGH\"}[$__range]))),\"stat\",\"P50\",\"__name__\",\".*\")) or (label_replace(histogram_quantile(0.95,sum by(le,model)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\",model=~\"LOW|MEDIUM|HIGH\"}[$__range]))),\"stat\",\"P95\",\"__name__\",\".*\")) or (label_replace(histogram_quantile(0.99,sum by(le,model)(increase(ai_chat_ttft_seconds_bucket{deployment_environment_name=\"$env\",model=~\"LOW|MEDIUM|HIGH\"}[$__range]))),\"stat\",\"P99\",\"__name__\",\".*\")) or (label_replace(sum by(model)(increase(ai_chat_ttft_seconds_sum{deployment_environment_name=\"$env\",model=~\"LOW|MEDIUM|HIGH\"}[$__range])) / sum by(model)(increase(ai_chat_ttft_seconds_count{deployment_environment_name=\"$env\",model=~\"LOW|MEDIUM|HIGH\"}[$__range])),\"stat\",\"평균\",\"__name__\",\".*\"))",
+            "instant": true,
+            "range": false,
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": []
+        },
+        "transformations": [
+          {
+            "id": "groupingToMatrix",
+            "options": {
+              "rowField": "model",
+              "columnField": "stat",
+              "valueField": "Value"
+            }
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "전체 응답 시간 · P50·P95·P99·평균",
+        "description": "선택한 기간·사용자·대화의 전체 턴을 집계합니다. 실패·취소도 포함합니다. 단위: ms.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 62,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "WITH ranked AS (SELECT model,duration_ms,ROW_NUMBER() OVER(ORDER BY duration_ms) AS rn,COUNT(*) OVER() AS n FROM chat_turns WHERE user_id < 900000000 AND $__timeFilter(started_at) AND ($user_id = -1 OR user_id = $user_id) AND (${conversation_id:sqlstring} = '__all__' OR conversation_id = ${conversation_id:sqlstring})) SELECT MAX(n) AS turns,AVG(duration_ms) AS avg_ms,MAX(CASE WHEN rn=CEIL(n*0.5) THEN duration_ms END) AS p50_ms,MAX(CASE WHEN rn=CEIL(n*0.95) THEN duration_ms END) AS p95_ms,MAX(CASE WHEN rn=CEIL(n*0.99) THEN duration_ms END) AS p99_ms FROM ranked",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      }
+    ],
+    "links": [
+      {
+        "title": "에러 대응",
+        "url": "/d/bibbidi-alerts?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 성능",
+        "url": "/d/bibbidi-spring?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "AI 채팅",
+        "url": "/d/bibbidi-spring-ai?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "인프라",
+        "url": "/d/bibbidi-infra?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "부하 테스트",
+        "url": "/d/bibbidi-loadtest?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 이용 현황",
+        "url": "/d/bibbidi-product?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "env",
+          "label": "환경",
+          "type": "custom",
+          "query": "production,development",
+          "current": {
+            "text": "production",
+            "value": "production"
+          },
+          "options": [
+            {
+              "text": "production",
+              "value": "production",
+              "selected": true
+            },
+            {
+              "text": "development",
+              "value": "development",
+              "selected": false
+            }
+          ],
+          "multi": false,
+          "includeAll": false
+        },
+        {
+          "name": "user_id",
+          "label": "사용자 닉네임",
+          "type": "query",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql"
+          },
+          "query": "SELECT '모든 사용자' AS __text, -1 AS __value UNION ALL SELECT DISTINCT CONCAT(COALESCE(u.nickname,'삭제된 사용자'),' (#',t.user_id,')') AS __text, t.user_id AS __value FROM chat_turns t LEFT JOIN users u ON u.id=t.user_id WHERE t.user_id < 900000000 AND $__timeFilter(t.started_at) ORDER BY __text LIMIT 1000",
+          "definition": "SELECT '모든 사용자' AS __text, -1 AS __value UNION ALL SELECT DISTINCT CONCAT(COALESCE(u.nickname,'삭제된 사용자'),' (#',t.user_id,')') AS __text, t.user_id AS __value FROM chat_turns t LEFT JOIN users u ON u.id=t.user_id WHERE t.user_id < 900000000 AND $__timeFilter(t.started_at) ORDER BY __text LIMIT 1000",
+          "current": {
+            "text": "모든 사용자",
+            "value": "-1"
+          },
+          "refresh": 2,
+          "multi": false,
+          "includeAll": false,
+          "options": [],
+          "sort": 1
+        },
+        {
+          "name": "conversation_id",
+          "label": "대화 ID",
+          "type": "query",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql"
+          },
+          "query": "SELECT '모든 대화' AS __text, '__all__' AS __value UNION ALL SELECT DISTINCT conversation_id AS __text, conversation_id AS __value FROM chat_turns WHERE user_id < 900000000 AND ($user_id = -1 OR user_id = $user_id) AND $__timeFilter(started_at) ORDER BY __text LIMIT 1000",
+          "definition": "SELECT '모든 대화' AS __text, '__all__' AS __value UNION ALL SELECT DISTINCT conversation_id AS __text, conversation_id AS __value FROM chat_turns WHERE user_id < 900000000 AND ($user_id = -1 OR user_id = $user_id) AND $__timeFilter(started_at) ORDER BY __text LIMIT 1000",
+          "current": {
+            "text": "모든 대화",
+            "value": "__all__"
+          },
+          "refresh": 2,
+          "multi": false,
+          "includeAll": false,
+          "options": [],
+          "sort": 1
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1397 @@
+apiVersion: 1
+groups:
+- orgId: 1
+  name: critical
+  folder: Bibbidi
+  interval: 60s
+  rules:
+  - uid: fg0kkj6b6w4cga
+    title: '500 반복 : C1'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: ''
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        editorMode: code
+        expr: round(sum(increase(http_server_requests_seconds_count{deployment_environment_name="production", status=~"5.."}[5m])))
+          >= 2
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '27'
+      description: 운영 서버에서 5xx가 반복됩니다. 에러 대응 화면의 [에러 요청] 트레이스와 [backend ERROR] 로그에서 공통 API와 예외를 찾으세요. 직전 배포가 원인이면 이전 이미지로
+        되돌리는 것을 먼저 검토합니다.
+      summary: 운영 5xx {{ $value }}건 (최근 5분, 2건 이상)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C1
+      severity: critical
+  - uid: bg0kk45kmp2psa
+    title: 'backend 수집 실패 : C2'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(up{job="prometheus.scrape.bibbidi_backend", deployment_environment_name="production"}) < 1 or absent(up{job="prometheus.scrape.bibbidi_backend",
+          deployment_environment_name="production"})
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 60s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '11'
+      description: backend가 죽었거나, Alloy 또는 모니터링 서버로 가는 전송이 끊겼습니다. 앱 서버에서 docker ps 로 bibbidi-backend와 alloy 상태를 보고, docker
+        logs alloy --since 10m 으로 401이나 연결 오류를 확인하세요.
+      summary: 운영 backend 지표가 1분 넘게 수집되지 않음
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C2
+      severity: critical
+  - uid: dg0kk69f876dca
+    title: 'nginx 게이트웨이 오류 : C3'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: instant
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: loki
+      model:
+        datasource:
+          type: loki
+          uid: loki
+        editorMode: code
+        expr: sum(count_over_time({service_name="nginx", deployment_environment_name="production"} | json | http_response_status_code=~"502|503|504"
+          [5m])) or vector(0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 9
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '42'
+      description: nginx가 backend에 연결하지 못하고 있습니다. 배포 중 교체 구간이 아닌데 계속되면 backend가 죽었거나 응답이 없는 것입니다. 앱 서버에서 docker ps 와 docker
+        logs bibbidi-backend --since 10m 을 확인하세요.
+      summary: 운영 nginx 502·503·504 {{ $values.A.Value }}건 (최근 5분)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C3
+      severity: critical
+  - uid: eg0kk7jxsmneof
+    title: '디스크 90% : C4'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: 1 - max(disk_free_bytes{deployment_environment_name="production"}) / max(disk_total_bytes{deployment_environment_name="production"})
+          > 0.9
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 60s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-infra
+      __panelId__: '2'
+      description: 디스크가 가득 차면 로그와 DB 쓰기가 멈춥니다. 앱 서버에서 docker system prune -f 로 안 쓰는 이미지를 지우고, du -sh /var/lib/docker/containers/*
+        로 큰 컨테이너 로그를 찾으세요.
+      summary: 운영 앱 서버 디스크 {{ humanizePercentage $value }} 사용 (1분 넘게 90% 초과)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C4
+      severity: critical
+  - uid: cg0kk9sd9xgqoe
+    title: 'Hikari 포화 : C5'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(hikaricp_connections_pending{deployment_environment_name="production"}) >= 3 or max(hikaricp_connections_active{deployment_environment_name="production"})
+          >= max(hikaricp_connections_max{deployment_environment_name="production"})
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 60s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-spring
+      __panelId__: '34'
+      description: 요청이 DB 커넥션을 못 받아 타임아웃이 납니다. 에러 대응 화면의 [느린 요청] 트레이스에서 오래 걸리는 쿼리나 긴 트랜잭션을 찾고, bibbidi-mysql 서버 CPU도 함께 보세요.
+      summary: 운영 DB 커넥션 풀 포화 (30초 넘게 대기 3개 이상 또는 전부 사용 중, 값 {{ $value }})
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C5
+      severity: critical
+  - uid: ag16vertkydc0a
+    title: '힙 고갈 직전 : C6'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(jvm_gc_live_data_size_bytes{deployment_environment_name="production"}) / max(jvm_gc_max_data_size_bytes{deployment_environment_name="production"})
+          > 0.8
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-spring
+      __panelId__: '37'
+      description: GC를 해도 메모리가 비지 않아 곧 OutOfMemoryError가 납니다. 앱 서버 대시보드의 [힙]에서 언제부터 올랐는지 보고, 필요하면 재시작으로 먼저 살린 뒤 원인(캐시, 큰 조회)을
+        찾으세요.
+      summary: 운영 GC 직후 남은 데이터 {{ humanizePercentage $value }} (1분 넘게 80% 초과)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      __grafana_managed_route__: bibbidi-critical
+      alert_id: C6
+      severity: critical
+- orgId: 1
+  name: warning
+  folder: Bibbidi
+  interval: 60s
+  rules:
+  - uid: eg0kjg2scmrcwc
+    title: '500 발생 : W1'
+    condition: C
+    data:
+    - refId: A
+      queryType: ''
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        editorMode: code
+        expr: round(sum(increase(http_server_requests_seconds_count{deployment_environment_name="production", status=~"5.."}[5m])))
+          or vector(0)
+        instant: true
+        intervalMs: 1000
+        legendFormat: __auto
+        maxDataPoints: 43200
+        range: false
+        refId: A
+    - refId: C
+      queryType: expression
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+          operator:
+            type: and
+          query:
+            params:
+            - C
+          reducer:
+            params: []
+            type: last
+          type: query
+        datasource:
+          type: __expr__
+          uid: __expr__
+        expression: A
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: C
+        type: threshold
+    noDataState: OK
+    execErrState: Error
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '27'
+      description: 운영 서버에서 5xx 응답이 발생했습니다. 에러 대응 화면의 '에러 요청' 트레이스와 'backend ERROR' 로그에서 원인을 확인하세요.
+      runbook_url: 대시보드 비비디 경고 → 패널 W1·C1 5xx (5분)
+      summary: 운영 5xx {{ $values.A.Value }}건 (최근 5분)
+    labels:
+      __grafana_managed_route__: bibbidi-warning
+      alert_id: W1
+      severity: warning
+  - uid: bg0kjv4gwg2dcb
+    title: 'API p95 1초 초과 : W2'
+    condition: B
+    data:
+    - refId: A
+      datasourceUid: prometheus
+      relativeTimeRange:
+        from: 600
+        to: 0
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name="production",
+          uri!~"/actuator.*|/api/ai/chat|.*/callback"}[5m])))
+        instant: true
+        range: false
+        refId: A
+    - refId: B
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        type: threshold
+        expression: A
+        refId: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 1
+    noDataState: OK
+    execErrState: Error
+    for: 10m
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '21'
+      summary: 운영 일반 API p95 {{ humanizeDuration $values.A.Value }}
+      description: AI 채팅·Actuator·소셜 콜백을 제외한 p95가 1초를 초과한 채 10분 지속됐습니다. 에러 대응 화면에서 느린 요청 트레이스와 Hikari·GC를 확인하세요.
+    labels:
+      alert_id: W2
+      severity: warning
+  - uid: ag0kjty63uhogc
+    title: '소셜 로그인 p95 3초 초과 : W3'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{deployment_environment_name="production",
+          span_kind="SPAN_KIND_SERVER", span_name=~".*/callback"}[5m]))) > 3
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 600s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '32'
+      description: web, native OIDC 콜백 또는 탈퇴 동의 철회 콜백이 느립니다. [느린 요청] 트레이스에서 외부 제공자 호출 구간을 확인하세요.
+      summary: 운영 소셜 로그인 p95 {{ humanizeDuration $value }} (10분 넘게 3초 초과)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      alert_id: W3
+      severity: warning
+  - uid: fg0kjdkcfzdvkd
+    title: 'ERROR 로그 : W4'
+    condition: C
+    data:
+    - refId: A
+      queryType: instant
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        datasource:
+          type: loki
+          uid: loki
+        editorMode: code
+        expr: sum(count_over_time({service_name="bibbidi-backend", deployment_environment_name="production"} | severity_text=~"(?i)error|fatal"
+          | scope_name!~".*GlobalExceptionHandler" [5m])) or vector(0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        range: false
+        refId: A
+    - refId: C
+      queryType: expression
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+          operator:
+            type: and
+          query:
+            params:
+            - C
+          reducer:
+            params: []
+            type: last
+          type: query
+        datasource:
+          type: __expr__
+          uid: __expr__
+        expression: A
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: C
+        type: threshold
+    noDataState: OK
+    execErrState: Error
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '41'
+      description: 요청 처리 밖(스케줄러, 비동기, 외부 연동 등)에서 ERROR 로그가 났습니다. 요청 처리 중 예외는 GlobalExceptionHandler가 5xx로 바꾸고 W1에서 잡으므로 여기서는
+        뺐습니다. 에러 대응 화면의 [backend ERROR] 로그를 펼쳐 trace_id로 같은 요청의 트레이스를 함께 보세요.
+      summary: 운영 ERROR 로그 {{ $values.A.Value }}건 (최근 5분)
+    labels:
+      __grafana_managed_route__: bibbidi-warning
+      alert_id: ''
+      severity: warning
+  - uid: eg0kjroiaujggf
+    title: 'OIDC 공개 키 갱신 실패 : W5'
+    condition: C
+    data:
+    - refId: A
+      queryType: instant
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        datasource:
+          type: loki
+          uid: loki
+        editorMode: code
+        expr: sum(count_over_time({service_name="bibbidi-backend", deployment_environment_name="production"} | severity_text=~"(?i)warn"
+          | scope_name=~".*OidcPublicKeyWarmUpScheduler" [5m])) or vector(0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        range: false
+        refId: A
+    - refId: C
+      queryType: expression
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+          operator:
+            type: and
+          query:
+            params:
+            - C
+          reducer:
+            params: []
+            type: last
+          type: query
+        datasource:
+          type: __expr__
+          uid: __expr__
+        expression: A
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: C
+        type: threshold
+    noDataState: OK
+    execErrState: Error
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-alerts
+      __panelId__: '43'
+      description: OidcPublicKeyWarmUpScheduler가 소셜 로그인 제공자(카카오, 구글, 애플)의 서명 공개 키를 미리 받아 두지 못했습니다. 키가 없으면 로그인 토큰 검증이 실패할 수
+        있습니다. 에러 대응 화면의 [OIDC 공개 키] 로그에서 provider와 예외 메시지를 확인하고, 제공자 장애나 네트워크 문제인지 보세요.
+      summary: OIDC 공개 키를 미리 받아 두지 못함 ({{ $values.A.Value }}건)
+    labels:
+      __grafana_managed_route__: bibbidi-warning
+      alert_id: W5
+      severity: warning
+  - uid: dg0kjppv78268b
+    title: '디스크 80% : W6'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: 1 - max(disk_free_bytes{deployment_environment_name="production"}) / max(disk_total_bytes{deployment_environment_name="production"})
+          > 0.8
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 600s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-infra
+      __panelId__: '2'
+      description: 90%가 되면 Critical(C4)입니다. 앱 서버에서 docker system df 와 du -sh /var/lib/docker/containers/* 로 큰 로그와 이미지를 확인하세요.
+      summary: 운영 앱 서버 디스크 {{ humanizePercentage $value }} 사용 (10분 넘게 80% 초과)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      alert_id: W6
+      severity: warning
+  - uid: ag0kjo10jrta8f
+    title: 'Loki 수집 거부 : W7'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: round(sum(increase(loki_discarded_samples_total[10m]))) > 0
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 0s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-infra
+      __panelId__: '14'
+      description: 환경 구분 없음. 크기나 속도 제한에 걸렸습니다. 인프라 대시보드의 [컨테이너별 로그량]에서 폭주한 컨테이너를 찾고, 모니터링 서버에서 journalctl -u loki 로 거부 사유(reason)를
+        확인하세요.
+      summary: Loki가 로그 {{ $value }}건을 버림 (최근 10분)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      alert_id: W7
+      severity: warning
+  - uid: bg0kjmwo3bb40c
+    title: 'Hikari 대기 : W8'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(hikaricp_connections_pending{deployment_environment_name="production"}) > 0
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 60s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-spring
+      __panelId__: '34'
+      description: 커넥션 풀이 모자랍니다. 3개 이상이면 Critical(C5)입니다. [느린 요청] 트레이스에서 오래 걸리는 쿼리나 커넥션을 오래 잡는 트랜잭션을 찾으세요.
+      summary: 운영 DB 커넥션 대기 {{ $value }}개 (1분 넘게 지속)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      alert_id: W8
+      severity: warning
+  - uid: dg0kjlvht7pxcb
+    title: '힙 사용률 75% : W9'
+    condition: threshold
+    data:
+    - refId: query
+      queryType: prometheus
+      relativeTimeRange:
+        from: 660
+        to: 60
+      datasourceUid: prometheus
+      model:
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: sum(jvm_memory_used_bytes{area="heap", deployment_environment_name="production"}) / sum(jvm_memory_max_bytes{area="heap",
+          deployment_environment_name="production"} > 0) > 0.75
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        range: false
+        refId: query
+    - refId: prometheus_math
+      queryType: math
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: is_number($query) || is_nan($query) || is_inf($query)
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: prometheus_math
+        type: math
+    - refId: threshold
+      queryType: threshold
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: gt
+        datasource:
+          IsPrunable: false
+          access: ''
+          apiVersion: ''
+          basicAuth: false
+          basicAuthUser: ''
+          created: '0001-01-01T00:00:00Z'
+          database: ''
+          id: -100
+          isDefault: false
+          jsonData: {}
+          name: __expr__
+          readOnly: false
+          secureJsonData: {}
+          type: __expr__
+          uid: __expr__
+          updated: '0001-01-01T00:00:00Z'
+          url: ''
+          user: ''
+          withCredentials: false
+        expression: prometheus_math
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: threshold
+        type: threshold
+    noDataState: OK
+    execErrState: OK
+    for: 180s
+    isPaused: false
+    annotations:
+      __dashboardUid__: bibbidi-spring
+      __panelId__: '31'
+      description: GC 전 잠깐 높은 건 정상입니다. 앱 서버 대시보드의 [힙]에서 [GC 직후 남은 데이터]가 함께 오르는지 보세요. 그 값이 80%를 넘으면 Critical(C6)입니다.
+      summary: 운영 힙 {{ humanizePercentage $value }} 사용 (3분 넘게 75% 초과)
+    labels:
+      __converted_prometheus_rule__: 'true'
+      alert_id: W9
+      severity: warning
