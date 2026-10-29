@@ -1,0 +1,1108 @@
+{
+  "apiVersion": "dashboard.grafana.app/v1",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "bibbidi-spring"
+  },
+  "spec": {
+    "title": "비비디 · 서비스 성능",
+    "description": "일반 API의 트래픽·응답 시간·실패율을 자원 사용과 비교해 병목과 용량을 판단합니다.",
+    "schemaVersion": 41,
+    "version": 1,
+    "editable": false,
+    "tags": [
+      "bibbidi",
+      "managed"
+    ],
+    "timezone": "Asia/Seoul",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "판단할 것",
+        "description": "",
+        "type": "text",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 3
+        },
+        "targets": [],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "요청량이 늘 때 **지연·실패율과 어떤 자원이 함께 상승하는지** 비교합니다. 일반 API 집계는 AI 채팅과 Actuator를 제외하고 지연은 소셜 콜백도 제외합니다. 공유 JVM·DB 자원에는 AI 부하도 포함됩니다. 임계선은 잠정 기준이며 요청 수가 적을 때는 p99 해석에 주의합니다."
+        }
+      },
+      {
+        "id": 11,
+        "title": "일반 API 요청량",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 3,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "일반 API 요청량"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 12,
+        "title": "일반 API 실패율",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 6,
+          "y": 3,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "(sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",status=~\"5..\"}[$__rate_interval])) or (0 * sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval])))) / (sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval])) > 0)",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "일반 API 실패율"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "thresholds"
+            },
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 0.001
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 14,
+        "title": "일반 API p95",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 3,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.95,sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",uri!~\".*/callback\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "일반 API p95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 0.5
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 15,
+        "title": "일반 API p99",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 18,
+          "y": 3,
+          "w": 6,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.99,sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",uri!~\".*/callback\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "일반 API p99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 16,
+        "title": "요청량과 실패 요청",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "전체"
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",status=~\"5..\"}[$__rate_interval]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "5xx"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 17,
+        "title": "응답 시간 추세",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 8,
+          "y": 8,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.95,sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",uri!~\".*/callback\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "p95"
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.99,sum by (le) (rate(http_server_requests_seconds_bucket{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",uri!~\".*/callback\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "p99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 18,
+        "title": "실패율 추세",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 16,
+          "y": 8,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "(sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\",status=~\"5..\"}[$__rate_interval])) or (0 * sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval])))) / (sum(rate(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__rate_interval])) > 0)",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "실패율 추세"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 19,
+        "title": "요청 많은 API Top 10",
+        "description": "선택한 기간의 일반 API 요청 수를 method·uri별로 집계합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 15,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "topk(10,sum by(method,uri)(increase(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat\"}[$__range])))",
+            "range": false,
+            "instant": true,
+            "editorMode": "code",
+            "legendFormat": "{{method}} {{uri}}",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 20,
+        "title": "느린 API Top 10 · 평균 응답 시간",
+        "description": "선택한 기간의 API별 총 처리 시간을 요청 수로 나눈 평균입니다. AI 채팅·Actuator·소셜 콜백은 제외합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 15,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "topk(10, sum by(method,uri)(increase(http_server_requests_seconds_sum{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat|.*/callback\"}[$__range])) / (sum by(method,uri)(increase(http_server_requests_seconds_count{deployment_environment_name=\"$env\",uri!~\"/actuator.*|/api/ai/chat|.*/callback\"}[$__range])) > 0))",
+            "range": false,
+            "instant": true,
+            "editorMode": "code",
+            "legendFormat": "{{method}} {{uri}}",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 30,
+        "title": "앱 CPU",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 22,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(process_cpu_usage{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "앱 CPU"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 31,
+        "title": "JVM 힙 사용률",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 8,
+          "y": 22,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(jvm_memory_used_bytes{deployment_environment_name=\"$env\",area=\"heap\"}) / sum(jvm_memory_max_bytes{deployment_environment_name=\"$env\",area=\"heap\"} > 0)",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "JVM 힙 사용률"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 33,
+        "title": "GC 소요 시간 비율",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 16,
+          "y": 22,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(jvm_gc_pause_seconds_sum{deployment_environment_name=\"$env\"}[$__rate_interval]))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "GC 소요 시간 비율"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 34,
+        "title": "Hikari 연결",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 29,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(hikaricp_connections_active{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "사용"
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(hikaricp_connections_idle{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "유휴"
+          },
+          {
+            "refId": "C",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(hikaricp_connections_pending{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "대기"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 35,
+        "title": "Hikari 획득·사용 p95",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 8,
+          "y": 29,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.95,sum by(le)(rate(hikaricp_connections_acquire_seconds_bucket{deployment_environment_name=\"$env\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "획득"
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.95,sum by(le)(rate(hikaricp_connections_usage_seconds_bucket{deployment_environment_name=\"$env\"}[$__rate_interval])))",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "사용"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 36,
+        "title": "Tomcat 사용 스레드",
+        "description": "가상 스레드 사용 시 전체 동시 처리량을 나타내는 값으로 해석하지 않습니다.",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 16,
+          "y": 29,
+          "w": 8,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(tomcat_threads_busy_threads{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "Tomcat 사용 스레드"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 37,
+        "title": "GC 후 생존 데이터 비율",
+        "description": "GC 뒤에도 남은 데이터와 최대 데이터 크기의 비율입니다. 힙 고갈 경고(C6)를 확인할 때 사용합니다.",
+        "type": "timeseries",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 36,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(jvm_gc_live_data_size_bytes{deployment_environment_name=\"$env\"}) / max(jvm_gc_max_data_size_bytes{deployment_environment_name=\"$env\"})",
+            "range": true,
+            "instant": false,
+            "editorMode": "code",
+            "legendFormat": "JVM 힙 사용률"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "max": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      }
+    ],
+    "links": [
+      {
+        "title": "에러 대응",
+        "url": "/d/bibbidi-alerts?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 성능",
+        "url": "/d/bibbidi-spring?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "AI 채팅",
+        "url": "/d/bibbidi-spring-ai?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "인프라",
+        "url": "/d/bibbidi-infra?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "부하 테스트",
+        "url": "/d/bibbidi-loadtest?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 이용 현황",
+        "url": "/d/bibbidi-product?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "env",
+          "label": "환경",
+          "type": "custom",
+          "query": "production,development",
+          "current": {
+            "text": "production",
+            "value": "production"
+          },
+          "options": [
+            {
+              "text": "production",
+              "value": "production",
+              "selected": true
+            },
+            {
+              "text": "development",
+              "value": "development",
+              "selected": false
+            }
+          ],
+          "multi": false,
+          "includeAll": false
+        }
+      ]
+    }
+  }
+}

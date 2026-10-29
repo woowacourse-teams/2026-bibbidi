@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: notifications.alerting.grafana.app/v1beta1
+  kind: RoutingTree
+  metadata:
+    name: bibbidi-critical
+    namespace: default
+  spec:
+    defaults:
+      receiver: irm-critical
+      group_by:
+      - grafana_folder
+      - alertname
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+    routes: []
+- apiVersion: notifications.alerting.grafana.app/v1beta1
+  kind: RoutingTree
+  metadata:
+    name: bibbidi-warning
+    namespace: default
+  spec:
+    defaults:
+      receiver: bibbidi-warning
+      group_by:
+      - grafana_folder
+      - alertname
+      repeat_interval: 1h
+    routes: []
+- apiVersion: notifications.alerting.grafana.app/v1beta1
+  kind: RoutingTree
+  metadata:
+    name: user-defined
+    namespace: default
+  spec:
+    defaults:
+      receiver: bibbidi-warning
+      group_by:
+      - grafana_folder
+      - alertname
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 1h
+    routes: []

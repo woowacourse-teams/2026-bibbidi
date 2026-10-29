@@ -1,0 +1,1137 @@
+{
+  "apiVersion": "dashboard.grafana.app/v1",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "bibbidi-product"
+  },
+  "spec": {
+    "title": "비비디 · 서비스 이용 현황",
+    "description": "주간 회의에서 가입·재방문과 기능별 생성 기록을 확인합니다. 운영 DB의 로그인 사용자만 집계합니다.",
+    "schemaVersion": 41,
+    "version": 1,
+    "editable": false,
+    "tags": [
+      "bibbidi",
+      "managed"
+    ],
+    "timezone": "Asia/Seoul",
+    "refresh": "5m",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "집계 한계",
+        "description": "",
+        "type": "text",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 4
+        },
+        "targets": [],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "**운영 DB·로그인 사용자 기준입니다.** 팀원 ID를 상단에 입력하면 제외합니다(기본값 -1은 아무도 제외하지 않음). 재방문은 세션 발급 기록으로 추정하며 실제 행동·비로그인 방문과 다릅니다. 폐기 세션 보관 기간은 30일이므로 최근 30일 안에서 해석합니다. 가입 후 7일 재방문율은 관찰 기간이 끝난 가입자만 표시합니다. 홍보 시각은 Grafana 주석으로 남깁니다."
+        }
+      },
+      {
+        "id": 2,
+        "title": "선택 기간 가입 수",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(*) AS signups FROM users u WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(u.created_at)",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "전체 가입자",
+        "description": "현재 DB에 남은 사용자 수입니다. 탈퇴 이력은 포함하지 않습니다.",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 8,
+          "y": 4,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(*) AS users FROM users u WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv})",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "선택 기간 재방문 사용자",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 16,
+          "y": 4,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(DISTINCT rs.user_id) AS returning_users FROM refresh_sessions rs JOIN users u ON u.id=rs.user_id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND DATE(rs.created_at)>DATE(u.created_at) AND $__timeFilter(rs.created_at) AND rs.created_at >= NOW()-INTERVAL 30 DAY",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "일별 가입 수 · KST",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 9,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT FLOOR((UNIX_TIMESTAMP(u.created_at)+32400)/86400)*86400-32400 AS time, COUNT(*) AS signups FROM users u WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(u.created_at) GROUP BY 1 ORDER BY 1",
+            "format": "time_series",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 70,
+              "lineWidth": 0,
+              "showPoints": "never"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "일별 재방문 사용자 · KST",
+        "description": "",
+        "type": "timeseries",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 9,
+          "w": 12,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT FLOOR((UNIX_TIMESTAMP(rs.created_at)+32400)/86400)*86400-32400 AS time, COUNT(DISTINCT rs.user_id) AS returning_users FROM refresh_sessions rs JOIN users u ON u.id=rs.user_id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND DATE(rs.created_at)>DATE(u.created_at) AND $__timeFilter(rs.created_at) AND rs.created_at >= NOW()-INTERVAL 30 DAY GROUP BY 1 ORDER BY 1",
+            "format": "time_series",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 70,
+              "lineWidth": 0,
+              "showPoints": "never"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "가입일별 7일 내 재방문 · 관찰 완료 코호트",
+        "description": "가입 후 24시간 이후부터 8일이 되기 전까지의 세션 발급을 재방문으로 봅니다. 비율과 함께 분모(가입자 수)를 확인합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT DATE_FORMAT(u.created_at,'%Y-%m-%d') AS cohort, COUNT(DISTINCT u.id) AS signups, COUNT(DISTINCT CASE WHEN rs.created_at >= u.created_at + INTERVAL 1 DAY AND rs.created_at < u.created_at + INTERVAL 8 DAY THEN u.id END) AS returned, COUNT(DISTINCT CASE WHEN rs.created_at >= u.created_at + INTERVAL 1 DAY AND rs.created_at < u.created_at + INTERVAL 8 DAY THEN u.id END) / NULLIF(COUNT(DISTINCT u.id),0) AS return_rate FROM users u LEFT JOIN refresh_sessions rs ON rs.user_id=u.id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(u.created_at) AND u.created_at >= NOW()-INTERVAL 30 DAY AND u.created_at < NOW()-INTERVAL 8 DAY GROUP BY 1 ORDER BY 1",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "return_rate"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percentunit"
+                },
+                {
+                  "id": "decimals",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "기간 생성 체크리스트",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(*) AS created FROM checklists c JOIN users u ON u.id=c.owner_id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(c.created_at)",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 9,
+        "title": "기간 생성 일정",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 8,
+          "y": 24,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(*) AS created FROM appointments a JOIN checklist_items ci ON ci.id=a.checklist_item_id JOIN checklists c ON c.id=ci.checklist_id JOIN users u ON u.id=c.owner_id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(a.created_at)",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 10,
+        "title": "기간 AI 이용 사용자",
+        "description": "",
+        "type": "stat",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 16,
+          "y": 24,
+          "w": 8,
+          "h": 5
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "rawSql": "SELECT COUNT(DISTINCT t.user_id) AS users FROM chat_turns t JOIN users u ON u.id=t.user_id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(t.started_at)",
+            "format": "table",
+            "editorMode": "code",
+            "rawQuery": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "측정 없음",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "colorMode": "value",
+          "graphMode": "none",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 11,
+        "title": "신규 가입자 목록",
+        "description": "선택한 기간에 가입한 사용자입니다. 기존 가입 수와 같은 제외 조건을 적용하며 최근 가입 순으로 최대 1000명을 표시합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 29,
+          "w": 24,
+          "h": 10
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "format": "table",
+            "rawSql": "SELECT u.id AS user_id,u.nickname,u.email,u.status,u.role,DATE_FORMAT(u.wedding_date,'%Y-%m-%d') AS wedding_date,si.provider AS login_provider,DATE_FORMAT(u.created_at,'%Y-%m-%d %H:%i:%s') AS signed_up_at,DATE_FORMAT(u.updated_at,'%Y-%m-%d %H:%i:%s') AS updated_at FROM users u LEFT JOIN social_identities si ON si.user_id=u.id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND $__timeFilter(u.created_at) ORDER BY u.created_at DESC,u.id DESC LIMIT 1000",
+            "rawQuery": true,
+            "editorMode": "code"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "—"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "user_id"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "사용자 ID"
+                },
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "AI 대화 기록 보기",
+                      "url": "/d/bibbidi-spring-ai?var-env=production&var-user_id=${__value.raw}&from=${__from}&to=${__to}",
+                      "targetBlank": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "nickname"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "닉네임"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 180
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "email"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "이메일"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 180
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "status"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "계정 상태"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "role"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "역할"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "wedding_date"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "결혼 예정일"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "login_provider"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "로그인 방식"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "signed_up_at"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "가입 시각"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "updated_at"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "수정 시각"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "first_return_in_range"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "기간 내 첫 재방문"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "last_return_in_range"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "기간 내 마지막 재방문"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "return_days"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "접속일 수"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "sessions_issued"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "세션 발급 수"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "client_types"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "접속 플랫폼"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "가입 시각",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "title": "재방문 사용자 목록",
+        "description": "가입 당일을 제외하고 선택 기간에 세션을 발급받은 사용자입니다. 첫·마지막 재방문과 접속일 수는 선택 기간 안의 값입니다. 세션 발급 수는 방문 횟수와 다르며, 최근 30일 기록에서 최대 1000명을 표시합니다.",
+        "type": "table",
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 39,
+          "w": 24,
+          "h": 12
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "mysql",
+              "uid": "mysql"
+            },
+            "format": "table",
+            "rawSql": "SELECT u.id AS user_id,u.nickname,u.email,u.status,u.role,DATE_FORMAT(u.wedding_date,'%Y-%m-%d') AS wedding_date,si.provider AS login_provider,DATE_FORMAT(u.created_at,'%Y-%m-%d %H:%i:%s') AS signed_up_at,DATE_FORMAT(MIN(rs.created_at),'%Y-%m-%d %H:%i:%s') AS first_return_in_range,DATE_FORMAT(MAX(rs.created_at),'%Y-%m-%d %H:%i:%s') AS last_return_in_range,COUNT(DISTINCT DATE(rs.created_at)) AS return_days,COUNT(*) AS sessions_issued,GROUP_CONCAT(DISTINCT rs.client_type ORDER BY rs.client_type SEPARATOR ', ') AS client_types FROM refresh_sessions rs JOIN users u ON u.id=rs.user_id LEFT JOIN social_identities si ON si.user_id=u.id WHERE u.id < 900000000 AND u.id NOT IN (${excluded_user_ids:csv}) AND DATE(rs.created_at)>DATE(u.created_at) AND $__timeFilter(rs.created_at) AND rs.created_at >= NOW()-INTERVAL 30 DAY GROUP BY u.id,u.nickname,u.email,u.status,u.role,u.wedding_date,u.created_at,si.provider ORDER BY last_return_in_range DESC,u.id DESC LIMIT 1000",
+            "rawQuery": true,
+            "editorMode": "code"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "noValue": "—"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "user_id"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "사용자 ID"
+                },
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "AI 대화 기록 보기",
+                      "url": "/d/bibbidi-spring-ai?var-env=production&var-user_id=${__value.raw}&from=${__from}&to=${__to}",
+                      "targetBlank": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "nickname"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "닉네임"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 180
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "email"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "이메일"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 180
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "status"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "계정 상태"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "role"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "역할"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "wedding_date"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "결혼 예정일"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "login_provider"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "로그인 방식"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "signed_up_at"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "가입 시각"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "updated_at"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "수정 시각"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "first_return_in_range"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "기간 내 첫 재방문"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "last_return_in_range"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "기간 내 마지막 재방문"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "return_days"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "접속일 수"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "sessions_issued"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "세션 발급 수"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "client_types"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "접속 플랫폼"
+                },
+                {
+                  "id": "custom.filterable",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "cellHeight": "sm",
+          "sortBy": [
+            {
+              "displayName": "기간 내 마지막 재방문",
+              "desc": true
+            }
+          ]
+        }
+      }
+    ],
+    "links": [
+      {
+        "title": "에러 대응",
+        "url": "/d/bibbidi-alerts?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 성능",
+        "url": "/d/bibbidi-spring?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "AI 채팅",
+        "url": "/d/bibbidi-spring-ai?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "인프라",
+        "url": "/d/bibbidi-infra?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "부하 테스트",
+        "url": "/d/bibbidi-loadtest?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 이용 현황",
+        "url": "/d/bibbidi-product?var-env=production&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "excluded_user_ids",
+          "label": "제외할 팀원 ID(csv)",
+          "type": "textbox",
+          "current": {
+            "text": "-1",
+            "value": "-1"
+          },
+          "query": "-1"
+        }
+      ]
+    }
+  }
+}
