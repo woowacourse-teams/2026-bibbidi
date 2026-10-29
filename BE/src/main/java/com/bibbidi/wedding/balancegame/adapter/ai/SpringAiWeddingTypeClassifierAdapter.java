@@ -6,7 +6,6 @@ import com.bibbidi.wedding.balancegame.domain.WeddingType;
 import com.bibbidi.wedding.balancegame.service.port.WeddingTypeClassifierPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
-import com.openai.errors.RateLimitException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -58,7 +57,7 @@ public class SpringAiWeddingTypeClassifierAdapter implements WeddingTypeClassifi
 
             return mapper.readValue(output, Output.class).typeId();
         } catch (RuntimeException exception) {
-            if (hasCause(exception, ThrottlingException.class) || hasCause(exception, RateLimitException.class)) {
+            if (hasCause(exception, ThrottlingException.class)) {
                 throw new BusinessException(ClientError.AI_CAPACITY_EXCEEDED, CAPACITY_EXCEEDED_MESSAGE, exception);
             }
             throw new BusinessException(
