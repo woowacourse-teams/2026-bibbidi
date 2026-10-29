@@ -16,10 +16,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bibbidi.wedding.balancegame.adapter.ai.SpringAiWeddingTypeClassifier;
 import com.bibbidi.wedding.balancegame.controller.dto.BalanceGameResultRequest;
 import com.bibbidi.wedding.balancegame.domain.Answer;
 import com.bibbidi.wedding.balancegame.domain.WeddingType;
-import com.bibbidi.wedding.balancegame.service.port.WeddingTypeClassifierPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.BibbidiIntegrationTest;
@@ -45,7 +45,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private WeddingTypeClassifierPort classifierPort;
+    private SpringAiWeddingTypeClassifier classifier;
 
     @Test
     @DisplayName("로그인하지 않아도 문항과 두 선택지 문구를 조회한다")
@@ -77,7 +77,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
     @Test
     @DisplayName("로그인하지 않아도 답변을 보내면 판정된 유형 카드를 받는다")
     void shouldJudgeTypeWithoutLogin() throws Exception {
-        given(classifierPort.classify(any(), any()))
+        given(classifier.classify(any(), any()))
                 .willAnswer(invocation -> invocation.<List<WeddingType>>getArgument(1).getLast());
 
         judge(Map.of("Q1", "B"))
@@ -112,7 +112,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
     void shouldClassifyOnlyAnsweredCurrentQuestions() throws Exception {
         AtomicReference<List<Answer>> sentAnswers = new AtomicReference<>();
         AtomicReference<List<WeddingType>> sentCandidates = new AtomicReference<>();
-        given(classifierPort.classify(any(), any())).willAnswer(invocation -> {
+        given(classifier.classify(any(), any())).willAnswer(invocation -> {
             sentAnswers.set(invocation.getArgument(0));
             sentCandidates.set(invocation.getArgument(1));
             return sentCandidates.get().getFirst();
@@ -146,7 +146,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .responseSchema(schema("ValidationErrorResponse"))
                                 .responseFields(validationResponseFields())
                                 .build())));
-        then(classifierPort).shouldHaveNoInteractions();
+        then(classifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -156,7 +156,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(ClientError.INVALID_REQUEST.errorCode()))
                 .andExpect(jsonPath("$.errors[0].message").value("선택지 ID는 비어 있을 수 없습니다."));
-        then(classifierPort).shouldHaveNoInteractions();
+        then(classifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -173,7 +173,7 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .responseSchema(schema("ErrorResponse"))
                                 .responseFields(errorResponseFields())
                                 .build())));
-        then(classifierPort).shouldHaveNoInteractions();
+        then(classifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -191,13 +191,13 @@ class BalanceGameControllerIntegrationTest extends BibbidiIntegrationTest {
                                 .responseSchema(schema("ErrorResponse"))
                                 .responseFields(errorResponseFields())
                                 .build())));
-        then(classifierPort).shouldHaveNoInteractions();
+        then(classifier).shouldHaveNoInteractions();
     }
 
     @Test
     @DisplayName("AI 호출 한도를 넘으면 잠시 후 다시 시도하라는 503 오류를 받는다")
     void shouldRespondServiceUnavailableWhenAiCapacityExceeded() throws Exception {
-        given(classifierPort.classify(any(), any()))
+        given(classifier.classify(any(), any()))
                 .willThrow(new BusinessException(ClientError.AI_CAPACITY_EXCEEDED, "밸런스게임 AI 호출 한도를 넘었습니다."));
 
         judge(Map.of("Q1", "B"))

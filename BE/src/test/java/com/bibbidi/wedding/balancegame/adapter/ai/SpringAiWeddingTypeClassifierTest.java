@@ -29,7 +29,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.io.ByteArrayResource;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
-class SpringAiWeddingTypeClassifierAdapterTest {
+class SpringAiWeddingTypeClassifierTest {
 
     private static final WeddingType SIMPLE = new WeddingType(
             "SIMPLE", "담백한 미니멀파", "꼭 필요한 준비만 골라 담는 커플", "https://example.com/s.webp", List.of(1L));
@@ -44,12 +44,12 @@ class SpringAiWeddingTypeClassifierAdapterTest {
 
     private final ChatModel model = mock(ChatModel.class);
     private final AtomicReference<Prompt> captured = new AtomicReference<>();
-    private SpringAiWeddingTypeClassifierAdapter adapter;
+    private SpringAiWeddingTypeClassifier classifier;
 
     @BeforeEach
     void setUp() {
         when(model.getOptions()).thenReturn(BedrockChatOptions.builder().model("default-model").build());
-        adapter = new SpringAiWeddingTypeClassifierAdapter(
+        classifier = new SpringAiWeddingTypeClassifier(
                 ChatClient.builder(model),
                 new ByteArrayResource("시스템 프롬프트".getBytes(StandardCharsets.UTF_8))
         );
@@ -60,7 +60,7 @@ class SpringAiWeddingTypeClassifierAdapterTest {
     void shouldReturnCandidateChosenByAi() {
         respond("{\"typeId\":\"LUXURY\"}");
 
-        assertThat(adapter.classify(ANSWERS, CANDIDATES)).isEqualTo(LUXURY);
+        assertThat(classifier.classify(ANSWERS, CANDIDATES)).isEqualTo(LUXURY);
 
         Prompt prompt = captured.get();
         assertThat(prompt.getUserMessage().getText())
@@ -74,7 +74,7 @@ class SpringAiWeddingTypeClassifierAdapterTest {
     void shouldFailWithCapacityErrorWhenThrottled() {
         when(model.call(any(Prompt.class))).thenThrow(ThrottlingException.builder().message("throttled").build());
 
-        assertThatThrownBy(() -> adapter.classify(ANSWERS, CANDIDATES))
+        assertThatThrownBy(() -> classifier.classify(ANSWERS, CANDIDATES))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).clientError())
                 .isEqualTo(ClientError.AI_CAPACITY_EXCEEDED);
