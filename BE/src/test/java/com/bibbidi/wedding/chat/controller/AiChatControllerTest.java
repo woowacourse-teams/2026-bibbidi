@@ -44,6 +44,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import com.bibbidi.wedding.support.SecurityTestConfig;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
@@ -64,6 +65,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
@@ -143,8 +145,11 @@ class AiChatControllerTest {
 
         @Bean
         ChatModelRouter chatModelRouter(ChatClient aiChatClient) {
-            return new ChatModelRouter(Map.of(ChatModelTier.LOW,
-                    new ChatModelTarget(aiChatClient, "test-model", null)));
+            ChatModelTarget target = new ChatModelTarget(aiChatClient, "test-model", null);
+            return new ChatModelRouter(Map.of(
+                    ChatModelTier.LOW, target,
+                    ChatModelTier.MEDIUM, target,
+                    ChatModelTier.HIGH, target));
         }
 
         @Bean
@@ -231,11 +236,17 @@ class AiChatControllerTest {
                 "event:refresh", "data:{}", "event:done");
     }
 
-    @Test
-    @DisplayName("첫 delta 전송 시 요청당 TTFT를 한 번 기록한다")
-    void recordsTtftOnceAfterTheFirstDeltaIsSent() throws Exception {
+    @ParameterizedTest
+    @EnumSource(ChatModelTier.class)
+    @DisplayName("첫 delta 전송 시 선택한 모델 난도로 TTFT를 한 번 기록한다")
+    void recordsTtftOnceAfterTheFirstDeltaIsSent(ChatModelTier model) throws Exception {
         // given
-        long previousCount = registry.get("ai.chat.ttft").timer().count();
+        when(classifier.classify(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(Mono.just(ModelClassifier.Classification.allow(model)));
+        Timer ttft = registry.timer("ai.chat.ttft", "model", model.name());
+        long previousCount = ttft.count();
+        long previousTotal = registry.find("ai.chat.ttft").timers().stream().mapToLong(Timer::count).sum();
         respondWith(Flux.just(
                 chunk("{\"answer\":\"웨딩홀 "),
                 chunk("계약\",\"recommendedItemIds\":[]}")));
@@ -250,14 +261,16 @@ class AiChatControllerTest {
 
         // then
         assertThat(body(initial)).contains("event:delta");
-        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(previousCount + 1);
+        assertThat(ttft.count()).isEqualTo(previousCount + 1);
+        assertThat(registry.find("ai.chat.ttft").timers().stream().mapToLong(Timer::count).sum())
+                .isEqualTo(previousTotal + 1);
     }
 
     @Test
     @DisplayName("delta 없이 종료된 요청은 TTFT를 기록하지 않는다")
     void doesNotRecordTtftWithoutDelta() throws Exception {
         // given
-        long previousCount = registry.get("ai.chat.ttft").timer().count();
+        long previousCount = registry.find("ai.chat.ttft").timers().stream().mapToLong(Timer::count).sum();
         respondWith(Flux.empty());
 
         // when
@@ -270,7 +283,8 @@ class AiChatControllerTest {
 
         // then
         assertThat(body(initial)).doesNotContain("event:delta");
-        assertThat(registry.get("ai.chat.ttft").timer().count()).isEqualTo(previousCount);
+        assertThat(registry.find("ai.chat.ttft").timers().stream().mapToLong(Timer::count).sum())
+                .isEqualTo(previousCount);
     }
 
     @Test
