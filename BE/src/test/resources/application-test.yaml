@@ -1,4 +1,7 @@
 spring:
+  flyway:
+    enabled: false
+
   datasource:
     url: jdbc:h2:mem:bibbidi-test;IGNORECASE=TRUE
     driver-class-name: org.h2.Driver
@@ -15,6 +18,19 @@ spring:
   sql:
     init:
       mode: never
+
+bibbidi:
+  balance-game:
+    questions-location: classpath:balance-game/test-questions.json
+    types-location: classpath:balance-game/test-types.json
+  ai:
+    chatbot:
+      accounts-enabled: false
+
+management:
+  metrics:
+    tags:
+      deployment.environment.name: test
 
 discord:
   url:
@@ -45,6 +61,7 @@ auth:
       - /api/terms
       - /api/users/nickname/availability
       - /api/feedbacks
+      - /api/balance-game/**
       - /actuator/health
       - /actuator/health/**
       - /actuator/info

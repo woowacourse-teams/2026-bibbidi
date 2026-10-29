@@ -41,6 +41,7 @@ class ArchitectureConventionTest {
     private static final String BASE_PACKAGE = "com.bibbidi.wedding";
     private static final List<String> FEATURES = List.of(
             "auth",
+            "balancegame",
             "catalog",
             "chat",
             "checklist",
@@ -75,6 +76,12 @@ class ArchitectureConventionTest {
             .that().resideInAPackage("..chat.service..")
             .should().dependOnClassesThat()
             .resideInAnyPackage("org.springframework.http..", "org.springframework.web..", "org.springframework.ai..");
+
+    @ArchTest
+    static final ArchRule 밸런스게임_서비스는_Spring_AI_타입에_직접_의존하지_않는다 = noClasses()
+            .that().resideInAPackage("..balancegame.service..")
+            .should().dependOnClassesThat()
+            .resideInAPackage("org.springframework.ai..");
 
     @ArchTest
     static final ArchRule SSE_연결_관리는_대화_처리와_AI_모델에_의존하지_않는다 = noClasses()

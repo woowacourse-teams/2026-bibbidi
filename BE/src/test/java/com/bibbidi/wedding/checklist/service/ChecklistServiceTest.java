@@ -236,6 +236,36 @@ class ChecklistServiceTest {
     }
 
     @Test
+    @DisplayName("랜덤으로 선택한 할 일의 카테고리 이름만 중복 없이 조회한다")
+    void shouldFindCategoryNamesOnlyForPickedItems() {
+        // given
+        ChecklistItem unpickedItem = new ChecklistItem(
+                200L, 3L, "선택되지 않은 할 일", null, ChecklistItemStatus.PREV, null);
+        ChecklistItem catalogItem = constructTestItem(201L, ChecklistItemStatus.PREV, CONTRACT_ITEM_ID);
+        ChecklistItem honeymoonItem = new ChecklistItem(
+                202L, 4L, "여행지 정하기", null, ChecklistItemStatus.CONTINUE, null);
+        ChecklistItem customItem = constructTestItem(203L);
+        List<ChecklistItem> candidates = List.of(unpickedItem, catalogItem, honeymoonItem, customItem);
+        given(checklistRepository.getByOwnerId(OWNER_ID))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, candidates));
+        given(shuffler.shuffle(candidates)).willReturn(candidates.reversed());
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID, 4L)))
+                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀", 4L, "신혼여행")));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 3);
+
+        // then
+        assertThat(results).containsExactly(
+                new UnscheduledChecklistItemResult(203L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV),
+                new UnscheduledChecklistItemResult(202L, "여행지 정하기", "신혼여행", ChecklistItemStatus.CONTINUE),
+                new UnscheduledChecklistItemResult(201L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV)
+        );
+        then(catalogService).should().findCategoryNames(Set.of(CATEGORY_ID, 4L));
+        then(catalogService).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
     @DisplayName("일정이 필요한 할 일이 없으면 빈 목록을 돌려준다")
     void shouldReturnEmptyWhenNoItemNeedsSchedule() {
         // given

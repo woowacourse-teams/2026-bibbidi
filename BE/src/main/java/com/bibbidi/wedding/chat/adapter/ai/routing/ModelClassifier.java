@@ -1,106 +1,125 @@
 package com.bibbidi.wedding.chat.adapter.ai.routing;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import com.bibbidi.wedding.chat.adapter.ai.routing.JevClient.Choice;
+import com.bibbidi.wedding.chat.adapter.ai.routing.JevClient.Question;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Slf4j
 public class ModelClassifier {
 
-    private static final String QUESTION_ID = "route";
+    private static final String ROUTE_QUESTION_ID = "route";
+    private static final String INJECTION_QUESTION_ID = "injection";
+    private static final String HIJACK_QUESTION_ID = "hijack";
 
     private final ChatMemory memory;
     private final ModelRoutingProperties properties;
-    private final ObjectMapper mapper;
-    private final HttpClient httpClient;
+    private final JevClient jev;
+    private final ModelRoutingInstruction instruction;
+    private final ModelRoutingCriteria criteria;
 
-    @Autowired
-    public ModelClassifier(ChatMemory memory, ModelRoutingProperties properties, ObjectMapper mapper) {
-        this(memory, properties, mapper, HttpClient.newHttpClient());
-    }
-
-    ModelClassifier(ChatMemory memory, ModelRoutingProperties properties, ObjectMapper mapper,
-                       HttpClient httpClient) {
+    public ModelClassifier(
+            ChatMemory memory,
+            ModelRoutingProperties properties,
+            JevClient jev,
+            ModelRoutingInstruction instruction,
+            ModelRoutingCriteria criteria
+    ) {
         this.memory = memory;
         this.properties = properties;
-        this.mapper = mapper;
-        this.httpClient = httpClient;
+        this.jev = jev;
+        this.instruction = instruction;
+        this.criteria = criteria;
     }
 
-    public Mono<ChatModelTier> classify(String conversationKey, String userPrompt) {
+    public Mono<Classification> classify(String conversationKey, String userPrompt) {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
-            return Mono.just(ChatModelTier.SOL);
+            return Mono.just(Classification.allow(ChatModelTier.HIGH));
         }
-        return Mono.fromCallable(() -> decide(conversationKey, userPrompt))
+
+        return Mono.fromSupplier(() -> decide(conversationKey, userPrompt))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorResume(error -> {
-                    log.warn("Jev 분류 실패. Sol로 처리합니다. type={}", error.getClass().getSimpleName());
-                    return Mono.just(ChatModelTier.SOL);
-                });
+                            log.warn(
+                                    "Jev 분류 실패. 기본 HIGH 으로 처리합니다. type={}",
+                                    error.getClass().getSimpleName()
+                            );
+                            return Mono.just(Classification.allow(ChatModelTier.HIGH));
+                        }
+                );
     }
 
-    private ChatModelTier decide(String conversationKey, String userPrompt) throws IOException, InterruptedException {
-        Map<String, Object> question = Map.of(
-                "type", "choice",
-                "instructions", "사용자의 이번 요청에 필요한 답변 모델을 선택하세요. 이전 대화나 현재 상태와 비교해야 하면 sol을 선택하세요.",
-                "criteria", Map.of(
-                        "qwen", "인사나 조건이 거의 없는 단순 설명",
-                        "luna", "조건을 반영하는 일반적인 상담이나 추천",
-                        "sol", "여러 조건의 우선순위 조정 또는 이전 대화와 현재 상태의 대조"
-                )
+    private Classification decide(String conversationKey, String userPrompt) {
+        String currentState = state(conversationKey, userPrompt);
+        List<Question> questions = List.of(
+                new Question(ROUTE_QUESTION_ID, currentState, instruction.route(), criteria.route()),
+                new Question(INJECTION_QUESTION_ID, currentState, instruction.injection(), criteria.injection()),
+                new Question(HIJACK_QUESTION_ID, currentState, instruction.hijack(), criteria.hijack())
         );
-        String body = mapper.writeValueAsString(Map.of(
-                "state", state(conversationKey, userPrompt),
-                "model", properties.model(),
-                "questions", Map.of(QUESTION_ID, question)
-        ));
-        HttpRequest request = HttpRequest.newBuilder(URI.create(properties.endpoint()))
-                .timeout(properties.timeout())
-                .header("Authorization", "Bearer " + properties.apiKey())
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() / 100 != 2) {
-            throw new IOException("Jev HTTP " + response.statusCode());
+
+        Map<String, Choice> answers = jev.choose(currentState, questions);
+        ChatModelTier tier = decideTier(answers.get(ROUTE_QUESTION_ID));
+        String injection = decideGuard(answers.get(INJECTION_QUESTION_ID), criteria.injection());
+        String hijack = decideGuard(answers.get(HIJACK_QUESTION_ID), criteria.hijack());
+        return new Classification(tier, injection, hijack);
+    }
+
+    private ChatModelTier decideTier(Choice answer) {
+        String value = answer == null ? "" : answer.value();
+        ChatModelTier choice = ChatModelTier.fromChoice(value)
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.INTERNAL_ERROR, "Jev 선택지가 없거나 유효하지 않습니다. choice=" + value));
+        return answer.isUnsure(properties.minConfidence()) ? choice.higher() : choice;
+    }
+
+    private String decideGuard(Choice answer, Map<String, String> allowedCriteria) {
+        if (answer == null || !allowedCriteria.containsKey(answer.value())) {
+            return Classification.NONE;
         }
-        JsonNode answer = mapper.readTree(response.body()).path("answers").path(QUESTION_ID);
-        ChatModelTier choice = ChatModelTier.fromChoice(answer.path("choice").asText())
-                .orElseThrow(() -> new IOException("Jev choice missing or invalid"));
-        if (!answer.path("confidence").isNumber()) {
-            return choice.higher();
+        if (Classification.NONE.equals(answer.value())) {
+            return Classification.NONE;
         }
-        return answer.path("confidence").asDouble() < properties.minConfidence()
-                ? choice.higher() : choice;
+        return answer.isUnsure(properties.minConfidence()) ? Classification.NONE : answer.value();
     }
 
     private String state(String conversationKey, String userPrompt) {
-        List<Message> history = memory.get(conversationKey).stream()
-                .filter(message -> message.getMessageType() == MessageType.USER
-                        || message.getMessageType() == MessageType.ASSISTANT)
+        List<String> lines = new ArrayList<>(
+                getRecentConversationFromChatMemory(conversationKey)
+        );
+        lines.add("user: " + userPrompt);
+        return String.join("\n", lines);
+    }
+
+    private List<String> getRecentConversationFromChatMemory(String conversationKey) {
+        return memory.get(conversationKey)
+                .stream()
+                .filter(message -> message.getMessageType() != MessageType.SYSTEM)
+                .filter(message -> message.getMessageType() != MessageType.TOOL)
+                .map(message -> message.getMessageType().getValue() + ": " + message.getText())
                 .toList();
-        int from = Math.max(0, history.size() - properties.historyMessages());
-        StringBuilder state = new StringBuilder();
-        for (Message message : history.subList(from, history.size())) {
-            state.append(message.getMessageType().getValue()).append(": ")
-                    .append(message.getText()).append('\n');
+    }
+
+    public record Classification(ChatModelTier tier, String injection, String hijack) {
+
+        public static final String NONE = "none";
+        public static final String MIXED = "mixed";
+
+        public static Classification allow(ChatModelTier tier) {
+            return new Classification(tier, NONE, NONE);
         }
-        return state.append("user: ").append(userPrompt).toString();
+
+        public boolean isBlocked() {
+            return !NONE.equals(injection) || (!NONE.equals(hijack) && !MIXED.equals(hijack));
+        }
     }
 }

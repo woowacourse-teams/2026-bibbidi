@@ -25,7 +25,7 @@ public final class ReactiveChatAnswerStream {
         this.answerWriter = new AnswerDeltaWriter();
     }
 
-    public String accept(String chunk) {
+    public String acceptChunk(String chunk) {
         json.append(chunk);
         if (!answerStarted) {
             Matcher matcher = ANSWER_FIELD.matcher(json);
@@ -86,7 +86,7 @@ public final class ReactiveChatAnswerStream {
         return "";
     }
 
-    public ChatResult.Answer finish() {
+    public ChatResult.Answer buildAnswer() {
         ChatResult.Answer answer = new ChatAnswerStream(mapper).read(Stream.of(json.toString()), ignored -> {
         });
         if (!answer.answer().equals(answerWriter.text()) || answerWriter.hasPendingText()) {

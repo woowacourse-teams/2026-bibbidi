@@ -1,0 +1,12 @@
+spring:
+  ai:
+    model:
+      chat: none
+
+bibbidi:
+  balance-game:
+    questions-location: classpath:balance-game/none.json
+    types-location: classpath:balance-game/none.json
+  ai:
+    chatbot:
+      accounts-enabled: false

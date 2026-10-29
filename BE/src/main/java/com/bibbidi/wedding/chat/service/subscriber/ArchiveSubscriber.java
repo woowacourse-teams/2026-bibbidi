@@ -62,7 +62,7 @@ public class ArchiveSubscriber implements TurnSubscriber {
 
         private void onResult(ChatResult result) {
             switch (result) {
-                case ChatResult.Selected selected -> model = selected.model();
+                case ChatResult.Selected selected -> model = selected.tier().name();
                 case ChatResult.Delta delta -> completion.append(delta.text());
                 case ChatResult.Completed ignored -> archive(ChatTurnOutcome.COMPLETED, null);
                 case ChatResult.Failed failed ->

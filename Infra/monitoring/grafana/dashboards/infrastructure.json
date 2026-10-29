@@ -1,0 +1,1011 @@
+{
+  "kind": "Dashboard",
+  "apiVersion": "dashboard.grafana.app/v1",
+  "metadata": {
+    "name": "bibbidi-infra"
+  },
+  "spec": {
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "description": "서버별 상태·CPU·네트워크·디스크·메모리 여유를 확인하고 용량 조치가 필요한지 판단합니다. DB·모니터링 서버의 메모리·디스크는 수집하지 않습니다.",
+    "editable": false,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "links": [
+      {
+        "title": "에러 대응",
+        "url": "/d/bibbidi-alerts?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 성능",
+        "url": "/d/bibbidi-spring?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "AI 채팅",
+        "url": "/d/bibbidi-spring-ai?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "인프라",
+        "url": "/d/bibbidi-infra?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "부하 테스트",
+        "url": "/d/bibbidi-loadtest?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "서비스 이용 현황",
+        "url": "/d/bibbidi-product?var-env=$env&from=${__from}&to=${__to}",
+        "type": "link",
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      }
+    ],
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "panels": [],
+        "title": "앱 서버 호스트 ($env)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "앱 서버 루트 디스크. 80% 주황(W6), 90% 빨강(C4).",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "decimals": 1,
+            "max": 1,
+            "min": 0,
+            "noValue": "-",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "orange",
+                  "value": 0.8
+                },
+                {
+                  "color": "red",
+                  "value": 0.9
+                }
+              ]
+            },
+            "unit": "percentunit"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 4,
+          "x": 0,
+          "y": 1
+        },
+        "id": 2,
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "showThresholdMarkers": true
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "1 - max(disk_free_bytes{deployment_environment_name=\"$env\"}) / max(disk_total_bytes{deployment_environment_name=\"$env\"})",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "title": "디스크 사용률",
+        "type": "gauge"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "서버 전체 CPU 사용률과 1분 평균 부하(코어 수로 나눈 값). 부하가 1을 넘으면 CPU가 밀린다.",
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "unit": "percentunit"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 4,
+          "y": 1
+        },
+        "id": 3,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(system_cpu_usage{deployment_environment_name=\"$env\"})",
+            "legendFormat": "CPU",
+            "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "max(system_load_average_1m{deployment_environment_name=\"$env\"}) / max(system_cpu_count{deployment_environment_name=\"$env\"})",
+            "legendFormat": "부하 / 코어",
+            "refId": "B"
+          }
+        ],
+        "title": "서버 CPU · 부하",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 80,
+              "stacking": {
+                "mode": "normal"
+              }
+            },
+            "decimals": 0
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byRegexp",
+                "options": "5.."
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byRegexp",
+                "options": "4.."
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "orange",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 1
+        },
+        "id": 4,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "loki"
+            },
+            "expr": "sum by (http_response_status_code) (count_over_time({service_name=\"nginx\", deployment_environment_name=\"$env\"} | json | __error__=\"\" | http_response_status_code != \"\" [$__auto]))",
+            "legendFormat": "{{http_response_status_code}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ],
+        "title": "nginx 상태 코드",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "description": "갑자기 튀면 로그 폭주. Loki 수집 거부(W7)의 원인이 되기도 한다.",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 80,
+              "stacking": {
+                "mode": "normal"
+              }
+            },
+            "decimals": 0
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 1
+        },
+        "id": 5,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "loki"
+            },
+            "expr": "sum by (service_name) (count_over_time({deployment_environment_name=\"$env\"} [$__auto]))",
+            "legendFormat": "{{service_name}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ],
+        "title": "컨테이너별 로그량",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 9
+        },
+        "id": 10,
+        "panels": [],
+        "title": "모니터링 스택",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "color": "red",
+                    "text": "DOWN"
+                  },
+                  "1": {
+                    "color": "green",
+                    "text": "UP"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red"
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 4,
+          "x": 0,
+          "y": 10
+        },
+        "id": 11,
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "orientation": "horizontal",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "textMode": "value_and_name"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "up{job=~\"prometheus|loki|tempo|grafana\"}",
+            "instant": true,
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "title": "구성 요소",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "systemd MemoryMax: Prometheus 400M, Loki 384M, Tempo 384M, Grafana 400M. 점선(384M)에 붙으면 OOM 위험.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "thresholdsStyle": {
+                "mode": "dashed"
+              }
+            },
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "transparent"
+                },
+                {
+                  "color": "red",
+                  "value": 402653184
+                }
+              ]
+            },
+            "unit": "bytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 4,
+          "y": 10
+        },
+        "id": 12,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "process_resident_memory_bytes{job=~\"prometheus|loki|tempo|grafana\"}",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "title": "메모리 (RSS)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "Loki는 초당 받은 로그 바이트를, Tempo는 초당 받은 스팬을, Prometheus는 초당 remote write 요청을 표시합니다.",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Loki (B/s)"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "Bps"
+                },
+                {
+                  "id": "custom.axisPlacement",
+                  "value": "right"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 12,
+          "y": 10
+        },
+        "id": 13,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(loki_distributor_bytes_received_total[$__rate_interval]))",
+            "legendFormat": "Loki (B/s)",
+            "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(tempo_distributor_spans_received_total[$__rate_interval]))",
+            "legendFormat": "Tempo (spans/s)",
+            "refId": "B"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum(rate(prometheus_http_requests_total{handler=\"/api/v1/write\"}[$__rate_interval]))",
+            "legendFormat": "Prometheus (req/s)",
+            "refId": "C"
+          }
+        ],
+        "title": "수집량",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "0이 아니면 로그가 버려지고 있다(W7).",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "orange",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 20,
+          "y": 10
+        },
+        "id": 14,
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "textMode": "value"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "round(sum(increase(loki_discarded_samples_total[10m]))) or vector(0)",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Loki 수집 거부 (10분)",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "갑자기 늘면 라벨 값이 폭증(카디널리티)한 것. 메모리 400M를 압박한다.",
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 0
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 20,
+          "y": 14
+        },
+        "id": 15,
+        "options": {
+          "colorMode": "none",
+          "graphMode": "area",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "textMode": "value"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "prometheus_tsdb_head_series",
+            "refId": "A"
+          }
+        ],
+        "title": "Prometheus 시리즈",
+        "type": "stat"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 18
+        },
+        "id": 20,
+        "panels": [],
+        "repeat": "instance",
+        "title": "EC2: ${instance:text}",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "max": 100,
+            "min": 0,
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 0,
+          "y": 19
+        },
+        "id": 21,
+        "interval": "5m",
+        "options": {
+          "legend": {
+            "showLegend": false
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "cloudwatch"
+            },
+            "dimensions": {
+              "InstanceId": "$instance"
+            },
+            "label": "CPU",
+            "matchExact": true,
+            "metricEditorMode": 0,
+            "metricName": "CPUUtilization",
+            "metricQueryType": 0,
+            "namespace": "AWS/EC2",
+            "period": "300",
+            "queryMode": "Metrics",
+            "refId": "A",
+            "region": "default",
+            "statistic": "Average"
+          }
+        ],
+        "title": "CPU 사용률",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "description": "t4g 버스터블 인스턴스. 0에 가까워지면 CPU가 기준 성능으로 묶이거나(standard) 추가 요금이 붙는다(unlimited).",
+        "fieldConfig": {
+          "defaults": {
+            "decimals": 0,
+            "min": 0
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 6,
+          "y": 19
+        },
+        "id": 22,
+        "interval": "5m",
+        "options": {
+          "legend": {
+            "showLegend": false
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "cloudwatch"
+            },
+            "dimensions": {
+              "InstanceId": "$instance"
+            },
+            "label": "크레딧",
+            "matchExact": true,
+            "metricEditorMode": 0,
+            "metricName": "CPUCreditBalance",
+            "metricQueryType": 0,
+            "namespace": "AWS/EC2",
+            "period": "300",
+            "queryMode": "Metrics",
+            "refId": "A",
+            "region": "default",
+            "statistic": "Average"
+          }
+        ],
+        "title": "CPU 크레딧 잔액",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 12,
+          "y": 19
+        },
+        "id": 25,
+        "interval": "5m",
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "cloudwatch"
+            },
+            "dimensions": {
+              "InstanceId": "$instance"
+            },
+            "label": "수신",
+            "matchExact": true,
+            "metricEditorMode": 0,
+            "metricName": "NetworkIn",
+            "metricQueryType": 0,
+            "namespace": "AWS/EC2",
+            "period": "300",
+            "queryMode": "Metrics",
+            "refId": "A",
+            "region": "default",
+            "statistic": "Sum"
+          },
+          {
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "cloudwatch"
+            },
+            "dimensions": {
+              "InstanceId": "$instance"
+            },
+            "label": "송신",
+            "matchExact": true,
+            "metricEditorMode": 0,
+            "metricName": "NetworkOut",
+            "metricQueryType": 0,
+            "namespace": "AWS/EC2",
+            "period": "300",
+            "queryMode": "Metrics",
+            "refId": "B",
+            "region": "default",
+            "statistic": "Sum"
+          }
+        ],
+        "title": "네트워크 (5분 합계)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "description": "1이면 실패. 모니터링 서버의 실패는 CloudWatch 경보 → Discord로 따로 알린다.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "red",
+              "mode": "fixed"
+            },
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 80
+            },
+            "decimals": 0,
+            "max": 1,
+            "min": 0
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 18,
+          "y": 19
+        },
+        "id": 26,
+        "interval": "5m",
+        "options": {
+          "legend": {
+            "showLegend": false
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "cloudwatch"
+            },
+            "dimensions": {
+              "InstanceId": "$instance"
+            },
+            "label": "실패",
+            "matchExact": true,
+            "metricEditorMode": 0,
+            "metricName": "StatusCheckFailed",
+            "metricQueryType": 0,
+            "namespace": "AWS/EC2",
+            "period": "300",
+            "queryMode": "Metrics",
+            "refId": "A",
+            "region": "default",
+            "statistic": "Maximum"
+          }
+        ],
+        "title": "상태 검사 실패",
+        "type": "timeseries"
+      }
+    ],
+    "refresh": "5m",
+    "schemaVersion": 42,
+    "tags": [
+      "bibbidi",
+      "managed"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "production",
+            "value": "production"
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "definition": "label_values(up{job=\"prometheus.scrape.bibbidi_backend\"}, deployment_environment_name)",
+          "includeAll": false,
+          "label": "환경",
+          "multi": false,
+          "name": "env",
+          "options": [],
+          "query": {
+            "qryType": 1,
+            "query": "label_values(up{job=\"prometheus.scrape.bibbidi_backend\"}, deployment_environment_name)",
+            "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          },
+          "refresh": 1,
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "description": "Name 태그 : 인스턴스 ID. 인스턴스를 새로 만들어 ID가 바뀌면 여기를 고친다(중지·시작, 재부팅으로는 안 바뀜).",
+          "includeAll": true,
+          "label": "EC2",
+          "multi": true,
+          "name": "instance",
+          "options": [
+            {
+              "selected": true,
+              "text": "All",
+              "value": "$__all"
+            },
+            {
+              "selected": false,
+              "text": "bibbidi-prod",
+              "value": "i-049efca6957f003f9"
+            },
+            {
+              "selected": false,
+              "text": "bibbidi-dev",
+              "value": "i-010173f9f8cdefac1"
+            },
+            {
+              "selected": false,
+              "text": "bibbidi-mysql",
+              "value": "i-0c1af0e4c7dcf98de"
+            },
+            {
+              "selected": false,
+              "text": "bibbidi-monitoring",
+              "value": "i-0a7f693109ce0b4ed"
+            }
+          ],
+          "query": "bibbidi-prod : i-049efca6957f003f9,bibbidi-dev : i-010173f9f8cdefac1,bibbidi-mysql : i-0c1af0e4c7dcf98de,bibbidi-monitoring : i-0a7f693109ce0b4ed",
+          "type": "custom"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "비비디 · 인프라",
+    "weekStart": ""
+  },
+  "status": {}
+}

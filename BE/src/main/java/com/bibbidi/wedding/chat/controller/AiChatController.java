@@ -7,12 +7,14 @@ import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseProperties;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,11 +26,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 public class AiChatController {
 
+    private static final String UNSELECTED_MODEL = "unselected";
+
     private final AiChatService aiChatService;
     private final SseStreamManager sseStreamManager;
     private final SseProperties properties;
     private final MeterRegistry meterRegistry;
-    private final Timer ttft;
 
     public AiChatController(AiChatService aiChatService, SseStreamManager sseStreamManager,
                             SseProperties properties, MeterRegistry meterRegistry) {
@@ -36,7 +39,6 @@ public class AiChatController {
         this.sseStreamManager = sseStreamManager;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
-        this.ttft = Timer.builder("ai.chat.ttft").register(meterRegistry);
     }
 
     @PostMapping(
@@ -65,10 +67,14 @@ public class AiChatController {
         return connection -> {
             ChatSseHandler handler = new ChatSseHandler(connection);
             AtomicBoolean firstDeltaSent = new AtomicBoolean();
+            AtomicReference<String> model = new AtomicReference<>(UNSELECTED_MODEL);
             aiChatService.chat(chatCommand, () -> cancelReasonOf(connection))
                     .doOnNext(event -> {
+                        if (event instanceof ChatResult.Selected selected) {
+                            model.set(selected.tier().name());
+                        }
                         if (handler.send(event) && firstDeltaSent.compareAndSet(false, true)) {
-                            ttftSample.stop(ttft);
+                            ttftSample.stop(meterRegistry.timer("ai.chat.ttft", "model", model.get()));
                         }
                     })
                     .blockLast();

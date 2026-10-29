@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Local AI evaluation
+src/test/resources/application-evaluator.yaml

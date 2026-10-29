@@ -546,10 +546,10 @@ class AiChatServiceTest {
         return Flux.defer(() -> {
             ReactiveChatAnswerStream parser = new JacksonChatAnswerParser(MAPPER).newSession();
             Flux<ChatResult> deltas = rawResponse
-                    .map(parser::accept)
+                    .map(parser::acceptChunk)
                     .filter(delta -> !delta.isEmpty())
                     .map(ChatResult.Delta::new);
-            return deltas.concatWith(Flux.defer(() -> Flux.just(parser.finish())));
+            return deltas.concatWith(Flux.defer(() -> Flux.just(parser.buildAnswer())));
         });
     }
 

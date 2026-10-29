@@ -8,6 +8,7 @@ import com.bibbidi.wedding.common.exception.ClientError;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -101,8 +102,8 @@ public class AppointmentRepository {
                 .toList();
     }
 
-    public List<Appointment> findNearby(Long userId, LocalDateTime now) {
-        return jpaAppointmentRepository.findNearby(userId, now.toLocalDate(), now)
+    public List<Appointment> findNearby(Long userId, LocalDateTime now, int limit) {
+        return jpaAppointmentRepository.findNearby(userId, now.toLocalDate(), now, Limit.of(limit))
                 .stream()
                 .map(appointmentMapper::toDomain)
                 .toList();

@@ -86,8 +86,8 @@ public class ChecklistService {
         Checklist checklist = checklistRepository.getByOwnerId(ownerId);
 
         List<ChecklistItem> unscheduledItems = excludeScheduledItems(checklist);
-        CategoryNames categoryNames = findCategoryNames(unscheduledItems);
         List<ChecklistItem> pickedItems = pickRandomly(unscheduledItems, limit);
+        CategoryNames categoryNames = findCategoryNames(pickedItems);
 
         return toResults(pickedItems, categoryNames);
     }

@@ -89,10 +89,10 @@ tasks.register('copySwaggerUI', Copy) {
 tasks.named('bootJar') {
     dependsOn 'generateSwaggerUIBibbidi'
     from(layout.buildDirectory.dir('swagger-ui-bibbidi')) {
-        into 'static/swagger-ui'
+        into 'BOOT-INF/classes/static/swagger-ui'
     }
     from('build/api-spec') {
-        into 'static/docs'
+        into 'BOOT-INF/classes/static/docs'
     }
 }
 
