@@ -1,19 +1,18 @@
-package com.bibbidi.wedding.balancegame.adapter.storage;
+package com.bibbidi.wedding.balancegame.repository;
 
 import com.bibbidi.wedding.balancegame.domain.Question;
 import com.bibbidi.wedding.balancegame.domain.Questions;
-import com.bibbidi.wedding.balancegame.service.port.QuestionPort;
 import com.bibbidi.wedding.common.exception.BusinessException;
 import com.bibbidi.wedding.common.exception.ClientError;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 @Slf4j
-@Component
-public class QuestionJsonAdapter implements QuestionPort {
+@Repository
+public class QuestionRepository {
 
     private static final String LOCATION_NOT_SET_MESSAGE = "밸런스게임 문항 위치가 설정되지 않았습니다.";
     private static final String NOT_LOADED_MESSAGE = "밸런스게임 문항을 읽지 못해 응답할 수 없습니다. location=";
@@ -22,7 +21,7 @@ public class QuestionJsonAdapter implements QuestionPort {
     private final String location;
     private final @Nullable Questions questions;
 
-    public QuestionJsonAdapter(
+    public QuestionRepository(
             JsonContentReader reader,
             @Value("${bibbidi.balance-game.questions-location}") String location
     ) {
@@ -33,7 +32,6 @@ public class QuestionJsonAdapter implements QuestionPort {
         this.questions = load(reader);
     }
 
-    @Override
     public Questions findAll() {
         if (questions == null) {
             throw new BusinessException(ClientError.INTERNAL_ERROR, NOT_LOADED_MESSAGE + location);

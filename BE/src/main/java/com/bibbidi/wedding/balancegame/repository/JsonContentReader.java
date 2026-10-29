@@ -1,4 +1,4 @@
-package com.bibbidi.wedding.balancegame.adapter.storage;
+package com.bibbidi.wedding.balancegame.repository;
 
 import java.io.IOException;
 import java.util.List;
