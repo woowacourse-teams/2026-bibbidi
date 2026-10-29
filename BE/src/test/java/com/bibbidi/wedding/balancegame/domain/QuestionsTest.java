@@ -23,8 +23,8 @@ class QuestionsTest {
 
     private static Question question(String id) {
         return new Question(id, id + " 질문", List.of(
-                new Option("A", id + " 선택지 A"),
-                new Option("B", id + " 선택지 B")
+                new Option("A", id + " 선택지 A", "https://example.com/a.webp"),
+                new Option("B", id + " 선택지 B", "https://example.com/b.webp")
         ));
     }
 }

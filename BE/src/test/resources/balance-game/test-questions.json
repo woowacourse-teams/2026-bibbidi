@@ -3,16 +3,32 @@
     "id": "Q1",
     "text": "기념일 데이트, 더 끌리는 쪽은?",
     "options": [
-      { "id": "A", "text": "동네 단골집에서 편하게" },
-      { "id": "B", "text": "한 달 전에 예약한 파인다이닝" }
+      {
+        "id": "A",
+        "text": "동네 단골집에서 편하게",
+        "imageUrl": "https://example.com/balance-game/q1-a.webp"
+      },
+      {
+        "id": "B",
+        "text": "한 달 전에 예약한 파인다이닝",
+        "imageUrl": "https://example.com/balance-game/q1-b.webp"
+      }
     ]
   },
   {
     "id": "Q2",
     "text": "여행 숙소를 고른다면?",
     "options": [
-      { "id": "A", "text": "깔끔하고 가성비 좋은 숙소" },
-      { "id": "B", "text": "뷰가 좋은 호텔 스위트룸" }
+      {
+        "id": "A",
+        "text": "깔끔하고 가성비 좋은 숙소",
+        "imageUrl": "https://example.com/balance-game/q2-a.webp"
+      },
+      {
+        "id": "B",
+        "text": "뷰가 좋은 호텔 스위트룸",
+        "imageUrl": "https://example.com/balance-game/q2-b.webp"
+      }
     ]
   }
 ]

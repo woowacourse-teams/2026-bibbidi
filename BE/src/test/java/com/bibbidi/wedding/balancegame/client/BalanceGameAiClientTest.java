@@ -37,8 +37,8 @@ class BalanceGameAiClientTest {
             "LUXURY", "한 번뿐인 날 풀코스파", "하나도 놓치지 않고 제대로 하고 싶은 커플", "https://example.com/l.webp", List.of(1L));
     private static final List<WeddingType> CANDIDATES = List.of(SIMPLE, LUXURY);
     private static final Question QUESTION = new Question("Q1", "기념일 데이트, 더 끌리는 쪽은?", List.of(
-            new Option("A", "동네 단골집에서 편하게"),
-            new Option("B", "한 달 전에 예약한 파인다이닝")
+            new Option("A", "동네 단골집에서 편하게", "https://example.com/a.webp"),
+            new Option("B", "한 달 전에 예약한 파인다이닝", "https://example.com/b.webp")
     ));
     private static final List<Answer> ANSWERS = List.of(QUESTION.answerFrom(Map.of("Q1", "B")).orElseThrow());
 
