@@ -1,0 +1,16 @@
+[
+  {
+    "id": "PRACTICAL",
+    "name": "알뜰살뜰 실속파",
+    "summary": "꼭 필요한 것만 골라 담는 커플",
+    "imageUrl": "https://example.com/balance-game/practical.webp",
+    "catalogItemIds": [1, 2]
+  },
+  {
+    "id": "LUXURY",
+    "name": "한 번뿐인 날 화려파",
+    "summary": "평생 한 번인 날을 제대로 남기고 싶은 커플",
+    "imageUrl": "https://example.com/balance-game/luxury.webp",
+    "catalogItemIds": [1, 2, 19]
+  }
+]
