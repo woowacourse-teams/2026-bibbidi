@@ -126,7 +126,7 @@ export function BalanceGameQuestionView({
           loading={submitting}
           onClick={onNext}
         >
-          {index === total - 1 ? "추천 할 일 보기" : "다음 질문"}
+          {index === total - 1 ? "결과 카드 보기" : "다음 질문"}
         </Button>
       </div>
     </div>

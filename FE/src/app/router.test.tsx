@@ -11,7 +11,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
-import { questions, items } from "../features/balance-game/test/fixtures";
+import {
+  questions,
+  wireQuestions,
+  result,
+} from "../features/balance-game/test/fixtures";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { installLegacyWebSessionFetch } from "../test/webAuth";
 import { installMatchMedia } from "../test/matchMedia";
@@ -44,11 +48,15 @@ function installFetch(currentUserResponse: Response) {
       }
 
       if (url === "/api/balance-game/questions") {
-        return Promise.resolve(new Response(JSON.stringify({ questions })));
+        return Promise.resolve(new Response(JSON.stringify(wireQuestions)));
       }
 
-      if (url === "/api/balance-game/recommendations") {
-        return Promise.resolve(new Response(JSON.stringify({ items })));
+      if (url === "/api/balance-game/results") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ ...result, catalogItemIds: [1001, 1002] }),
+          ),
+        );
       }
 
       if (url === "/api/checklists/me") {
@@ -109,7 +117,7 @@ afterEach(() => {
 });
 
 describe("appRoutes", () => {
-  it("밸런스게임 로그인 안내에 공통 헤더를 표시하고 로그인 복귀 주소를 유지한다", async () => {
+  it("비로그인으로 게임·카드를 보고 저장할 때 로그인 복귀 주소를 유지한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     installFetch(
       new Response(
@@ -119,7 +127,7 @@ describe("appRoutes", () => {
     );
     const router = renderRouter(["/balance-game"]);
 
-    await screen.findByRole("button", { name: "로그인하고 시작하기" });
+    await screen.findByRole("heading", { name: questions[0].question });
     const header = screen.getByRole("banner");
     expect(
       within(header).getByRole("link", { name: "비비디 홈" }),
@@ -134,7 +142,13 @@ describe("appRoutes", () => {
     ).toBe(false);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "로그인하고 시작하기" }),
+      screen.getByRole("radio", { name: questions[0].options[0].text }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
+    fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
+    fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "로그인하고 2개 할 일 담기" }),
     );
     await screen.findByRole("region", { name: "소셜 로그인" });
     expect(router.state.location.pathname).toBe("/login");
@@ -162,7 +176,7 @@ describe("appRoutes", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
       fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
-      fireEvent.click(screen.getByRole("button", { name: "추천 할 일 보기" }));
+      fireEvent.click(screen.getByRole("button", { name: "결과 카드 보기" }));
 
       await screen.findByRole("heading", { name: /우리에게 맞는/ });
       expect(screen.getByRole("banner")).toBe(header);

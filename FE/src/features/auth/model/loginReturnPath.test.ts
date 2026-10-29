@@ -1,8 +1,33 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getSafeLoginReturnPath } from "./loginReturnPath";
+import {
+  getSafeLoginReturnPath,
+  rememberLoginReturnPath,
+  readLoginReturnPath,
+  consumeLoginReturnPath,
+} from "./loginReturnPath";
 
+afterEach(() => {
+  window.sessionStorage.clear();
+  vi.useRealTimers();
+});
 describe("loginReturnPath", () => {
+  it("OAuth 왕복용 복귀 주소는 한 번만 소비하고 30분 후 만료한다", () => {
+    vi.useFakeTimers();
+    rememberLoginReturnPath("?returnTo=%2Fbalance-game");
+    expect(readLoginReturnPath()).toBe("/balance-game");
+    expect(consumeLoginReturnPath()).toBe("/balance-game");
+    expect(readLoginReturnPath()).toBeNull();
+    rememberLoginReturnPath("?returnTo=%2Fbalance-game");
+    vi.advanceTimersByTime(30 * 60 * 1000 + 1);
+    expect(readLoginReturnPath()).toBeNull();
+  });
+  it("일반 로그인과 외부 주소는 이전 복귀 주소를 남기지 않는다", () => {
+    rememberLoginReturnPath("?returnTo=%2Fbalance-game");
+    rememberLoginReturnPath("?returnTo=https%3A%2F%2Fevil.example");
+    expect(readLoginReturnPath()).toBeNull();
+  });
+
   it("밸런스게임으로 복귀하되 임의의 하위 경로는 허용하지 않는다", () => {
     expect(getSafeLoginReturnPath("?returnTo=%2Fbalance-game")).toBe(
       "/balance-game",

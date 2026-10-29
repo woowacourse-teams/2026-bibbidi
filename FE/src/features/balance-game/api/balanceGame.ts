@@ -1,9 +1,7 @@
-import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import type {
   BalanceGameAnswer,
-  BalanceGameOption,
   BalanceGameQuestion,
-  BalanceGameRecommendation,
+  BalanceGameResult,
 } from "../model/balanceGame";
 
 const endpoint = `${__BIBBIDI_API_BASE_URL__.replace(/\/+$/, "")}/api/balance-game`;
@@ -23,80 +21,87 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isId(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-}
-
-function isOption(value: unknown): value is BalanceGameOption {
-  return (
-    isRecord(value) &&
-    ["A", "B", "UNKNOWN"].includes(String(value.id)) &&
-    typeof value.text === "string" &&
-    (value.imagePath === null ||
-      (typeof value.imagePath === "string" &&
-        /^\/balance-game\/[\w-]+\.webp$/.test(value.imagePath)))
-  );
+export function isContentId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value);
 }
 
 export function parseQuestions(value: unknown): BalanceGameQuestion[] {
-  if (
-    !isRecord(value) ||
-    !Array.isArray(value.questions) ||
-    !value.questions.every(
-      (question): question is BalanceGameQuestion =>
-        isRecord(question) &&
-        isId(question.id) &&
-        isId(question.order) &&
-        typeof question.question === "string" &&
-        Array.isArray(question.options) &&
-        question.options.every(isOption) &&
-        question.options.length === 3 &&
-        new Set(question.options.map((option) => option.id)).size === 3,
-    )
-  ) {
+  if (!isRecord(value) || !Array.isArray(value.questions))
     throw new Error("밸런스게임 문항 응답 형식이 올바르지 않습니다.");
-  }
-  const questions = value.questions;
+  const questions = value.questions.map((question, index) => {
+    if (
+      !isRecord(question) ||
+      !isContentId(question.id) ||
+      typeof question.text !== "string" ||
+      !Array.isArray(question.options) ||
+      question.options.length !== 2 ||
+      !question.options.every(
+        (option) =>
+          isRecord(option) &&
+          isContentId(option.id) &&
+          option.id !== "UNKNOWN" &&
+          typeof option.text === "string",
+      ) ||
+      new Set(question.options.map((option) => option.id)).size !== 2
+    )
+      throw new Error("밸런스게임 문항 응답 형식이 올바르지 않습니다.");
+    return {
+      id: question.id,
+      order: index + 1,
+      question: question.text,
+      options: [
+        ...question.options.map((option) => ({
+          id: option.id as string,
+          text: option.text as string,
+          imagePath: null,
+        })),
+        { id: "UNKNOWN" as const, text: "아직 잘 모르겠어", imagePath: null },
+      ],
+    };
+  });
   if (
-    new Set(questions.map((question) => question.id)).size !==
-      questions.length ||
-    new Set(questions.map((question) => question.order)).size !==
-      questions.length
-  ) {
+    new Set(questions.map((question) => question.id)).size !== questions.length
+  )
     throw new Error("밸런스게임 문항이 중복되었습니다.");
-  }
-  return [...questions].sort((a, b) => a.order - b.order);
+  return questions;
 }
 
-export function parseRecommendations(
-  value: unknown,
-): BalanceGameRecommendation[] {
+export function parseResult(value: unknown): BalanceGameResult {
   if (
     !isRecord(value) ||
-    !Array.isArray(value.items) ||
-    !value.items.every(
-      (item): item is BalanceGameRecommendation =>
-        isRecord(item) &&
-        isId(item.catalogItemId) &&
-        typeof item.title === "string" &&
-        typeof item.categoryName === "string" &&
-        Number.isSafeInteger(item.phase) &&
-        typeof item.stepName === "string",
+    !isContentId(value.id) ||
+    typeof value.name !== "string" ||
+    typeof value.summary !== "string" ||
+    typeof value.imageUrl !== "string" ||
+    !Array.isArray(value.catalogItemIds) ||
+    !value.catalogItemIds.every(
+      (id) => typeof id === "number" && Number.isSafeInteger(id) && id > 0,
     )
-  ) {
-    throw new Error("밸런스게임 추천 응답 형식이 올바르지 않습니다.");
-  }
-  return [
-    ...new Map(value.items.map((item) => [item.catalogItemId, item])).values(),
-  ];
+  )
+    throw new Error("밸런스게임 결과 응답 형식이 올바르지 않습니다.");
+  if (
+    value.imageUrl &&
+    !/^https?:\/\//.test(value.imageUrl) &&
+    !/^\/(?!\/)/.test(value.imageUrl)
+  )
+    throw new Error("밸런스게임 이미지 주소가 올바르지 않습니다.");
+  return {
+    id: value.id,
+    name: value.name,
+    summary: value.summary,
+    imageUrl: value.imageUrl,
+    catalogItemIds: [...new Set(value.catalogItemIds as number[])],
+  };
 }
 
 async function request(path: string, init: RequestInit, signal: AbortSignal) {
-  const timeout = AbortSignal.timeout(15_000);
-  const response = await authenticatedFetch(`${endpoint}/${path}`, {
+  const response = await fetch(`${endpoint}/${path}`, {
     ...init,
-    credentials: "include",
-    signal: AbortSignal.any([signal, timeout]),
+    credentials: "omit",
+    signal: AbortSignal.any([
+      signal,
+      AbortSignal.timeout(path === "results" ? 30_000 : 15_000),
+    ]),
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
@@ -117,17 +122,23 @@ export async function getBalanceGameQuestions(signal: AbortSignal) {
   return parseQuestions(await request("questions", { method: "GET" }, signal));
 }
 
-export async function getBalanceGameRecommendations(
+export async function getBalanceGameResult(
   answers: BalanceGameAnswer[],
   signal: AbortSignal,
 ) {
-  return parseRecommendations(
+  return parseResult(
     await request(
-      "recommendations",
+      "results",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({
+          answers: Object.fromEntries(
+            answers
+              .filter((answer) => answer.optionId !== "UNKNOWN")
+              .map((answer) => [answer.questionId, answer.optionId]),
+          ),
+        }),
       },
       signal,
     ),

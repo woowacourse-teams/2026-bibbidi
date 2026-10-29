@@ -194,12 +194,43 @@ export function ChecklistFeature({
     },
     [audience, setRequestState],
   );
-  const selectedTaskCategoryId =
+  const selectedTask =
     requestState.status === "success"
       ? requestState.checklist.categories
           .flatMap(getChecklistCategoryItems)
-          .find((item) => item.id === selectedTaskId)?.categoryId
-      : null;
+          .find((item) => item.id === selectedTaskId)
+      : undefined;
+  const selectedTaskCategoryId = selectedTask?.categoryId;
+  const viewedTaskRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedTaskId === null) {
+      viewedTaskRef.current = null;
+      return;
+    }
+    if (
+      audience !== "authenticated" ||
+      requestState.status !== "success" ||
+      requestState.sessionIdentity !== sessionIdentity
+    )
+      return;
+    const task = requestState.checklist.categories
+      .flatMap(getChecklistCategoryItems)
+      .find((item) => item.id === selectedTaskId);
+    if (!task?.checklistItemId) return;
+    const key = `${sessionIdentity}:${task.checklistItemId}`;
+    if (viewedTaskRef.current === key) return;
+    viewedTaskRef.current = key;
+    analytics.track({
+      name: "checklist_task_view",
+      parameters: {
+        checklist_item_id: task.checklistItemId,
+        source: "checklist",
+        ...(task.sourceCatalogItemId === null
+          ? {}
+          : { catalog_item_id: task.sourceCatalogItemId }),
+      },
+    });
+  }, [audience, requestState, selectedTaskId, sessionIdentity]);
   const itemEditing = useChecklistItemEditing(
     checklistCommandRepository,
     refreshAuth,
@@ -207,6 +238,7 @@ export function ChecklistFeature({
     selectedChecklistItemId,
     handleRefreshFailed,
     selectedTaskCategoryId,
+    selectedTask?.status,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,

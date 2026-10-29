@@ -66,6 +66,49 @@ export function createGoogleAnalyticsProvider(
       googleTag("config", measurementId, { send_page_view: false });
     },
     track(event: AnalyticsEvent) {
+      if (event.name.startsWith("balance_game_")) {
+        if (
+          !["balance_game_start", "balance_game_save_success"].includes(
+            event.name,
+          )
+        )
+          return;
+        if (
+          event.name === "balance_game_save_success" &&
+          !(
+            typeof event.parameters.created_count === "number" &&
+            event.parameters.created_count > 0
+          )
+        )
+          return;
+        const allowed = new Set([
+          "origin",
+          "source",
+          "card_type",
+          "created_count",
+          "auth_state",
+          "question_count",
+          "entry_source",
+        ]);
+        googleTag?.(
+          "event",
+          event.name,
+          Object.fromEntries(
+            Object.entries(event.parameters).filter(([key]) =>
+              allowed.has(key),
+            ),
+          ),
+        );
+        return;
+      }
+      if (
+        [
+          "checklist_task_view",
+          "checklist_task_status_change",
+          "checklist_task_delete",
+        ].includes(event.name)
+      )
+        return;
       if (event.name.startsWith("social_login_callback_")) {
         // 콜백 첫 로드에는 page_view가 없으므로 GA 기본 URL에 code/state가 붙지 않게 한다.
         googleTag?.("event", event.name, {
@@ -82,7 +125,18 @@ export function createGoogleAnalyticsProvider(
         googleTag?.("set", pageContext);
       }
 
-      googleTag?.("event", event.name, event.parameters);
+      const parameters = Object.fromEntries(
+        Object.entries(event.parameters).filter(
+          ([key]) =>
+            ![
+              "checklist_item_id",
+              "catalog_item_id",
+              "game_run_id",
+              "recommendation_id",
+            ].includes(key),
+        ),
+      );
+      googleTag?.("event", event.name, parameters);
     },
   };
 }

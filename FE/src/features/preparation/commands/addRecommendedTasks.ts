@@ -1,5 +1,6 @@
 import type { MyChecklistQueryRepository } from "../../checklist";
 import type { ChecklistRepository } from "../repository/checklistRepository";
+import type { CreatedCatalogItem } from "../repository/checklistRepository";
 import { PreparationDuplicateChecklistItemError } from "../repository/preparationErrors";
 
 /** Save the selection and reconcile one concurrent addition without duplicating it. */
@@ -8,11 +9,13 @@ export async function addRecommendedTasks({
   checklist,
   query,
   signal,
+  onCreated,
 }: {
   ids: string[];
   checklist: ChecklistRepository;
   query: MyChecklistQueryRepository;
   signal: AbortSignal;
+  onCreated?: (items: readonly CreatedCatalogItem[]) => void;
 }): Promise<{ addedIds: string[]; confirmedIds: string[] }> {
   let known = new Set(
     await checklist.getCatalogItemIds("authenticated", signal),
@@ -24,11 +27,14 @@ export async function addRecommendedTasks({
     const missing = ids.filter((id) => !known.has(id));
     if (!missing.length) break;
     try {
-      addedIds = await checklist.addCatalogItemIds(
-        "authenticated",
-        missing,
-        signal,
-      );
+      addedIds = onCreated
+        ? await checklist.addCatalogItemIds(
+            "authenticated",
+            missing,
+            signal,
+            onCreated,
+          )
+        : await checklist.addCatalogItemIds("authenticated", missing, signal);
       for (const id of addedIds) known.add(id);
       break;
     } catch (error) {

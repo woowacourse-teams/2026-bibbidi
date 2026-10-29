@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
 
+import { consumeLoginReturnPath } from "../features/auth/model/loginReturnPath";
+
 import { useAuth, useLogout } from "../features/auth";
 import { OnboardingFeature } from "../features/onboarding/OnboardingFeature";
 
@@ -15,7 +17,7 @@ export function OnboardingPage() {
 
   const handleSuccess = useCallback(() => {
     refreshAuth();
-    navigate("/", { replace: true });
+    navigate(consumeLoginReturnPath() ?? "/", { replace: true });
   }, [navigate, refreshAuth]);
   const switchAccount = useLogout({ onSuccess: handleAuthenticationExpired });
 

@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { readBalanceGameDraft } from "./model/balanceGameDraft";
 import { useNavigate } from "react-router";
 import { Result } from "../../components/result";
 import { useBalanceGame } from "./useBalanceGame";
@@ -7,11 +9,24 @@ import "./BalanceGame.css";
 
 export function BalanceGameFeature({
   onAuthenticationRequired,
+  onLoginRequired,
+  audience = "authenticated",
 }: {
   onAuthenticationRequired: () => void;
+  onLoginRequired?: () => void;
+  audience?: "guest" | "authenticated";
 }) {
-  const game = useBalanceGame(onAuthenticationRequired);
+  const [draft] = useState(readBalanceGameDraft);
+  const game = useBalanceGame(audience, draft);
   const navigate = useNavigate();
+  const rememberForLogin = game.rememberForLogin;
+  const handleAuthenticationRequired = useCallback(
+    (ids: number[]) => {
+      rememberForLogin(ids);
+      onAuthenticationRequired();
+    },
+    [rememberForLogin, onAuthenticationRequired],
+  );
   return (
     <main className="balance-game" aria-label="우리 결혼 밸런스게임">
       {game.state.status === "loading" && (
@@ -51,9 +66,20 @@ export function BalanceGameFeature({
       )}
       {game.state.status === "result" && (
         <BalanceGameResults
-          items={game.state.items}
+          result={game.state.result}
+          audience={audience}
+          tracking={game.tracking}
+          requestDurationMs={game.state.requestDurationMs}
+          resultInstanceId={game.state.instanceId}
+          initialSelection={game.state.selectedIds}
+          onLoginRequired={(ids) => {
+            if (!game.rememberForLogin(ids)) return false;
+            game.tracking.emit("balance_game_login_click");
+            onLoginRequired?.();
+            return true;
+          }}
           onEdit={game.edit}
-          onAuthenticationRequired={onAuthenticationRequired}
+          onAuthenticationRequired={handleAuthenticationRequired}
         />
       )}
     </main>

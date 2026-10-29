@@ -143,3 +143,82 @@ describe("createGoogleAnalyticsProvider", () => {
     ]);
   });
 });
+
+describe("밸런스게임의 GA 최소 수집", () => {
+  it("상세 행동·오류·최종 선택은 GA로 보내지 않는다", () => {
+    const googleTag = vi.fn();
+    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
+    provider.initialize();
+    googleTag.mockClear();
+    for (const name of [
+      "balance_game_question_view",
+      "balance_game_answer_select",
+      "balance_game_card_view",
+      "balance_game_task_decision",
+      "balance_game_task_created",
+      "balance_game_error",
+      "checklist_task_view",
+      "checklist_task_status_change",
+      "checklist_task_delete",
+    ])
+      provider.track({ name, parameters: { game_run_id: "run-private" } });
+    expect(googleTag).not.toHaveBeenCalled();
+  });
+  it("시작과 신규 생성만 요약 속성으로 보내며 연결 ID는 제거한다", () => {
+    const googleTag = vi.fn();
+    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
+    provider.initialize();
+    googleTag.mockClear();
+    provider.track({
+      name: "balance_game_start",
+      parameters: {
+        question_count: 10,
+        auth_state: "guest",
+        game_run_id: "private",
+        question_id: "Q1",
+      },
+    });
+    provider.track({
+      name: "balance_game_save_success",
+      parameters: { created_count: 0, card_type: "LUXURY" },
+    });
+    provider.track({
+      name: "balance_game_save_success",
+      parameters: {
+        created_count: 2,
+        card_type: "LUXURY",
+        origin: "balance_game",
+        game_run_id: "private",
+        attempt_id: "private",
+      },
+    });
+    expect(googleTag.mock.calls).toEqual([
+      [
+        "event",
+        "balance_game_start",
+        { question_count: 10, auth_state: "guest" },
+      ],
+      [
+        "event",
+        "balance_game_save_success",
+        { created_count: 2, card_type: "LUXURY", origin: "balance_game" },
+      ],
+    ]);
+  });
+  it("기존 일정 생성 이벤트의 내부 할 일 ID도 GA에서 제거한다", () => {
+    const googleTag = vi.fn();
+    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
+    provider.initialize();
+    provider.track({
+      name: "appointment_create",
+      parameters: {
+        source: "checklist",
+        checklist_item_id: 500,
+        catalog_item_id: 19,
+      },
+    });
+    expect(googleTag).toHaveBeenLastCalledWith("event", "appointment_create", {
+      source: "checklist",
+    });
+  });
+});

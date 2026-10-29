@@ -322,3 +322,24 @@
     transition: none;
   }
 }
+
+.balance-game__type-card {
+  padding: 24px;
+  margin-bottom: 32px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-layer-default);
+}
+
+.balance-game__type-card img {
+  display: block;
+  max-width: 100%;
+  max-height: 280px;
+  margin: 0 auto 24px;
+  object-fit: contain;
+}
+
+.balance-game__results h2 {
+  margin: 0 0 16px;
+  font: var(--typography-t5-medium);
+}

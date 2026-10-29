@@ -16,6 +16,10 @@ vi.mock("../features/auth", () => ({
   }),
 }));
 
+import {
+  rememberLoginReturnPath,
+  readLoginReturnPath,
+} from "../features/auth/model/loginReturnPath";
 import { SocialLoginCallbackPage } from "./SocialLoginCallbackPage";
 
 function OnboardingView() {
@@ -36,12 +40,43 @@ afterEach(() => {
   authMocks.beginOnboarding.mockReset();
   authMocks.refreshAuth.mockReset();
   vi.unstubAllGlobals();
+  window.sessionStorage.clear();
 });
 
 describe("SocialLoginCallbackPage", () => {
+  it("기존 회원 OAuth 성공은 보관한 게임 복귀 주소를 로그인 경유로 전달한다", async () => {
+    rememberLoginReturnPath("?returnTo=%2Fbalance-game");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            accessToken: "active-token",
+            termsAgreementRequired: false,
+          }),
+          { status: 201 },
+        ),
+      ),
+    );
+    render(
+      <MemoryRouter initialEntries={["/auth/kakao?code=abc&state=xyz"]}>
+        <Routes>
+          <Route path="/auth/:provider" element={<SocialLoginCallbackPage />} />
+          <Route path="/login" element={<h1>로그인 복귀</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "로그인 복귀" }),
+    ).toBeTruthy();
+    expect(authMocks.refreshAuth).toHaveBeenCalledOnce();
+    expect(readLoginReturnPath()).toBeNull();
+  });
+
   it.each(["kakao", "google"])(
     "%s 신규 가입 콜백이면 온보딩으로 replace 이동한다",
     async (provider) => {
+      rememberLoginReturnPath("?returnTo=%2Fbalance-game");
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(
@@ -78,6 +113,7 @@ describe("SocialLoginCallbackPage", () => {
         "pending-token",
       );
       expect(authMocks.beginOnboarding).toHaveBeenCalledOnce();
+      expect(readLoginReturnPath()).toBe("/balance-game");
       expect(authMocks.refreshAuth).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByRole("button", { name: "뒤로" }));

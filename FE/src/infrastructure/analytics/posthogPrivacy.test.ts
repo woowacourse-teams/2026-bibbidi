@@ -195,3 +195,45 @@ describe("PostHog 개인정보 정제", () => {
     ).toBeNull();
   });
 });
+
+it("밸런스게임 공개 경로와 구조화된 계측 속성은 보존하고 답변·카드 원문은 제거한다", () => {
+  expect(
+    sanitizeAnalyticsUrl(
+      "https://example.com/balance-game?code=secret#private",
+    ),
+  ).toBe("https://example.com/balance-game");
+  const result = sanitizePostHogEvent({
+    uuid: "id",
+    event: "balance_game_task_decision",
+    properties: {
+      game_run_id: "run",
+      question_id: "Q1",
+      question_visit_id: "visit",
+      active_elapsed_ms: 300,
+      card_type: "LUXURY",
+      recommendation_id: "rec",
+      attempt_id: "attempt",
+      catalog_item_id: 19,
+      selected: false,
+      decision_id: "attempt:19",
+      eligible_count: 2,
+      created_count: 1,
+      origin: "balance_game",
+      checklist_item_id: 500,
+      answers: "secret",
+      summary: "secret",
+      title: "secret",
+      imageUrl: "secret",
+      message: "secret",
+    },
+  });
+  expect(JSON.stringify(result)).not.toContain("secret");
+  expect(result?.properties).toMatchObject({
+    game_run_id: "run",
+    card_type: "LUXURY",
+    active_elapsed_ms: 300,
+    selected: false,
+    decision_id: "attempt:19",
+    checklist_item_id: 500,
+  });
+});

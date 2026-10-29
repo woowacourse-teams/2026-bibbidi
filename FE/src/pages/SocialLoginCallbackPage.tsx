@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import {
+  consumeLoginReturnPath,
+  readLoginReturnPath,
+} from "../features/auth/model/loginReturnPath";
+
 import { acceptWebAccessToken, useAuth } from "../features/auth";
 import {
   SocialLoginCallback,
@@ -22,14 +27,23 @@ export function SocialLoginCallbackPage() {
         return;
       }
 
+      const returnPath = consumeLoginReturnPath();
       refreshAuth();
+      if (returnPath)
+        navigate(`/login?${new URLSearchParams({ returnTo: returnPath })}`, {
+          replace: true,
+        });
     },
     [beginOnboarding, navigate, refreshAuth],
   );
 
+  const returnPath = readLoginReturnPath();
+  const loginPath = returnPath
+    ? `/login?${new URLSearchParams({ returnTo: returnPath })}`
+    : "/login";
   return (
     <SocialLoginCallback
-      loginLink={<Link to="/login">로그인으로 돌아가기</Link>}
+      loginLink={<Link to={loginPath}>로그인으로 돌아가기</Link>}
       onSuccess={handleSuccess}
       provider={provider}
       search={search}

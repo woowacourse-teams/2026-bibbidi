@@ -273,7 +273,9 @@ export function useChecklistAppointmentCreation({
         }
 
         if (didSucceed !== false) {
-          analytics.track(createAppointmentCreateEvent(sourceRef.current));
+          analytics.track(
+            createAppointmentCreateEvent(sourceRef.current, checklistItemId),
+          );
           requestControllerRef.current = null;
           resetAndClose();
         } else {

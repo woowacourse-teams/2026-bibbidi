@@ -11,6 +11,7 @@ import {
   ChecklistItemStatusEditSession,
   ChecklistItemTitleEditSession,
 } from "./model/checklistEditing";
+import type { ChecklistItemStatus } from "./model/myChecklist";
 import { ChecklistAudience } from "./model/checklistQuery";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
 
@@ -24,6 +25,7 @@ export function useChecklistItemEditing(
   activeItemId?: number | null,
   onRefreshFailed?: (message: string) => void,
   activeCategoryId?: string | null,
+  activeItemStatus?: ChecklistItemStatus,
 ): ChecklistItemEditingController {
   const [deletionConfirmation, setDeletionConfirmation] = useState<
     number | null
@@ -41,10 +43,15 @@ export function useChecklistItemEditing(
   );
   const { changeFeedback, runRequest, resetFeedback, clearError } = requests;
   const getCategoryId = useCallback(() => activeCategoryId, [activeCategoryId]);
+  const getStatus = useCallback(
+    (itemId: number) =>
+      activeItemId === itemId ? activeItemStatus : undefined,
+    [activeItemId, activeItemStatus],
+  );
   const statusChange = useChecklistItemStatusChange(
     commandRepository,
     requests,
-    { audience, activeItemId, getCategoryId },
+    { audience, activeItemId, getCategoryId, getStatus },
   );
 
   useEffect(() => {
@@ -136,6 +143,13 @@ export function useChecklistItemEditing(
 
       if (result.ok) {
         setDeletionConfirmation(null);
+        analytics.track({
+          name: "checklist_task_delete",
+          parameters: {
+            checklist_item_id: deletionConfirmation,
+            source: "checklist",
+          },
+        });
       }
 
       return result.ok;

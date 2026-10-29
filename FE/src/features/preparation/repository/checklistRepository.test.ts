@@ -103,6 +103,29 @@ function createChecklistRepository(
 }
 
 describe("ChecklistRepository", () => {
+  it("서버가 생성한 실제 ID를 전달하며 관찰자 오류로 저장 성공을 뒤집지 않는다", async () => {
+    const remote = createRemoteDataSource([102, 103]);
+    const repository = createChecklistRepository(
+      createLocalDataSource(),
+      remote,
+    );
+    const onCreated = vi.fn(() => {
+      throw new Error("analytics unavailable");
+    });
+    await expect(
+      repository.addCatalogItemIds(
+        "authenticated",
+        ["102", "103"],
+        undefined,
+        onCreated,
+      ),
+    ).resolves.toEqual(["102", "103"]);
+    expect(onCreated).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: 100, catalogItemId: 102 }),
+      expect.objectContaining({ id: 101, catalogItemId: 103 }),
+    ]);
+  });
+
   it("비로그인 사용자는 로컬 숫자 ID를 카탈로그 모델의 문자열 ID로 변환한다", async () => {
     const dataSource = createLocalDataSource([101, 201]);
     const remoteDataSource = createRemoteDataSource();

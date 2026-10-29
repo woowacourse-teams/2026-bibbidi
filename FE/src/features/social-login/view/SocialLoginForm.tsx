@@ -60,7 +60,11 @@ function SocialProviderIcon({ provider }: { provider: SocialProvider }) {
   );
 }
 
-export function SocialLoginForm() {
+export function SocialLoginForm({
+  onAuthorizationStart,
+}: {
+  onAuthorizationStart?: () => void;
+}) {
   const [socialLoginNotice, setSocialLoginNotice] = useState("");
   const [isSocialRedirecting, setIsSocialRedirecting] = useState(false);
 
@@ -88,7 +92,10 @@ export function SocialLoginForm() {
     analytics.track(createSocialLoginEvent("social_login_start", provider.id));
     setSocialLoginNotice(`${provider.label} 로그인 화면으로 이동하고 있어요.`);
     startSocialAuthorization(provider.id)
-      .then((authorizationUri) => window.location.assign(authorizationUri))
+      .then((authorizationUri) => {
+        onAuthorizationStart?.();
+        window.location.assign(authorizationUri);
+      })
       .catch((error: unknown) => {
         analytics.track(
           createSocialLoginEvent("social_login_start_failed", provider.id, {
