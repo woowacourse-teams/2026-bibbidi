@@ -8,7 +8,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
@@ -28,9 +32,16 @@ public class BalanceGameAiClient {
 
     public BalanceGameAiClient(
             ChatClient.Builder chatClientBuilder,
-            @Value("classpath:prompts/balance-game-system.txt") Resource systemPrompt
+            @Qualifier("balanceGameQwenChatClient") ObjectProvider<ChatClient> qwenClient,
+            @Value("classpath:prompts/balance-game-system.txt") Resource systemPrompt,
+            Environment environment
     ) {
-        this.client = chatClientBuilder.defaultSystem(systemPrompt, StandardCharsets.UTF_8).build();
+        ChatClient accountQwenClient = qwenClient.getIfAvailable();
+        ChatClient.Builder selectedBuilder = chatClientBuilder;
+        if (accountQwenClient != null && environment.acceptsProfiles(Profiles.of("dev"))) {
+            selectedBuilder = accountQwenClient.mutate();
+        }
+        this.client = selectedBuilder.defaultSystem(systemPrompt, StandardCharsets.UTF_8).build();
     }
 
     public WeddingType classify(List<Answer> answers, List<WeddingType> candidates) {

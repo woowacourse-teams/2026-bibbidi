@@ -26,7 +26,9 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mock.env.MockEnvironment;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 class BalanceGameAiClientTest {
@@ -51,7 +53,9 @@ class BalanceGameAiClientTest {
         when(model.getOptions()).thenReturn(BedrockChatOptions.builder().model("default-model").build());
         aiClient = new BalanceGameAiClient(
                 ChatClient.builder(model),
-                new ByteArrayResource("시스템 프롬프트".getBytes(StandardCharsets.UTF_8))
+                mock(ObjectProvider.class),
+                new ByteArrayResource("시스템 프롬프트".getBytes(StandardCharsets.UTF_8)),
+                new MockEnvironment()
         );
     }
 

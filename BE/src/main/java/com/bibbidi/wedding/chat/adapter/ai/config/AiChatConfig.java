@@ -118,7 +118,42 @@ public class AiChatConfig {
             ChecklistServiceAdapter checklistTools,
             AppointmentServiceAdapter appointmentTools
     ) {
-        BedrockProxyChatModel model = BedrockProxyChatModel.builder()
+        BedrockProxyChatModel model = qwenChatModel(
+                accessKey, secretKey, region, maxTokens, properties, connection, observationRegistry);
+        return ChatClient.builder(model)
+                .defaultSystem(systemPrompt.text())
+                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        ToolCallingAdvisor.builder().toolCallingManager(toolCallingManager).build())
+                .build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "bibbidi.ai.chatbot.accounts-enabled", havingValue = "true")
+    ChatClient balanceGameQwenChatClient(
+            @Value("${bibbidi.ai.chatbot.qwen-access-key}") String accessKey,
+            @Value("${bibbidi.ai.chatbot.qwen-secret-key}") String secretKey,
+            @Value("${bibbidi.ai.chatbot.qwen-region}") String region,
+            @Value("${spring.ai.bedrock.converse.chat.max-tokens}") int maxTokens,
+            AiChatProperties properties,
+            BedrockAwsConnectionProperties connection,
+            ObservationRegistry observationRegistry
+    ) {
+        return ChatClient.create(qwenChatModel(
+                accessKey, secretKey, region, maxTokens, properties, connection, observationRegistry));
+    }
+
+    private static BedrockProxyChatModel qwenChatModel(
+            String accessKey,
+            String secretKey,
+            String region,
+            int maxTokens,
+            AiChatProperties properties,
+            BedrockAwsConnectionProperties connection,
+            ObservationRegistry observationRegistry
+    ) {
+        return BedrockProxyChatModel.builder()
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
                 .region(Region.of(region))
                 .timeout(connection.getTimeout())
@@ -128,13 +163,6 @@ public class AiChatConfig {
                 .socketTimeout(connection.getSocketTimeout())
                 .options(BedrockChatOptions.builder().model(properties.qwenModel()).maxTokens(maxTokens).build())
                 .observationRegistry(observationRegistry)
-                .build();
-        return ChatClient.builder(model)
-                .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools, appointmentTools)
-                .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                        ToolCallingAdvisor.builder().toolCallingManager(toolCallingManager).build())
                 .build();
     }
 
