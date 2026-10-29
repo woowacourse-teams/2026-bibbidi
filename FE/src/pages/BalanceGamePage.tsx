@@ -1,5 +1,4 @@
 import { Navigate, useNavigate } from "react-router";
-import { AppLayout } from "../components/app-layout";
 import { Result } from "../components/result";
 import { useAuth } from "../features/auth";
 import { BalanceGameFeature } from "../features/balance-game/BalanceGameFeature";
@@ -10,7 +9,7 @@ export function BalanceGamePage() {
   if (authState.status === "onboardingRequired")
     return <Navigate replace to="/onboarding" />;
   return (
-    <AppLayout scroll="document" className="balance-game-layout">
+    <>
       {authState.status === "authenticated" ? (
         <BalanceGameFeature
           key={authState.user.id}
@@ -38,6 +37,6 @@ export function BalanceGamePage() {
           <p role="status">로그인 상태를 확인하고 있어요.</p>
         </main>
       )}
-    </AppLayout>
+    </>
   );
 }

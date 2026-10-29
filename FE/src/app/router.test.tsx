@@ -4,14 +4,18 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
 import { ChecklistMigrationProvider } from "../features/checklist-migration";
+import { questions, items } from "../features/balance-game/test/fixtures";
 import { preparationCatalogResponseFixture } from "../features/preparation/test/fixtures/preparationCatalogResponse.fixture";
 import { installLegacyWebSessionFetch } from "../test/webAuth";
+import { installMatchMedia } from "../test/matchMedia";
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../shared/responsive";
 import { resolveHomeEntryVariant } from "../infrastructure/analytics";
 import {
   hasWebAccessToken,
@@ -37,6 +41,14 @@ function installFetch(currentUserResponse: Response) {
             status: 200,
           }),
         );
+      }
+
+      if (url === "/api/balance-game/questions") {
+        return Promise.resolve(new Response(JSON.stringify({ questions })));
+      }
+
+      if (url === "/api/balance-game/recommendations") {
+        return Promise.resolve(new Response(JSON.stringify({ items })));
       }
 
       if (url === "/api/checklists/me") {
@@ -97,6 +109,83 @@ afterEach(() => {
 });
 
 describe("appRoutes", () => {
+  it("밸런스게임 로그인 안내에 공통 헤더를 표시하고 로그인 복귀 주소를 유지한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    installFetch(
+      new Response(
+        JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+        { status: 401 },
+      ),
+    );
+    const router = renderRouter(["/balance-game"]);
+
+    await screen.findByRole("button", { name: "로그인하고 시작하기" });
+    const header = screen.getByRole("banner");
+    expect(
+      within(header).getByRole("link", { name: "비비디 홈" }),
+    ).toBeTruthy();
+    expect(within(header).getByRole("link", { name: "로그인" })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
+    expect(
+      screen
+        .getByRole("region", { name: "서비스 화면" })
+        .hasAttribute("data-navigation-dock"),
+    ).toBe(false);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "로그인하고 시작하기" }),
+    );
+    await screen.findByRole("region", { name: "소셜 로그인" });
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toBe("?returnTo=%2Fbalance-game");
+  });
+
+  it.each([false, true])(
+    "밸런스게임 질문과 결과에 공통 헤더를 유지하고 로드맵으로 이동한다 (모바일: %s)",
+    async (isMobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, isMobile);
+      installFetch(new Response(JSON.stringify({ id: 1, nickname: "비비디" })));
+      const router = renderRouter(["/balance-game"]);
+
+      await screen.findByRole("heading", { name: questions[0].question });
+      const header = screen.getByRole("banner");
+      expect(
+        within(header).getByRole("button", { name: "계정 메뉴" }),
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("navigation", { name: "하단 메뉴" }),
+      ).toBeNull();
+      expect(document.querySelectorAll(".bibbidi-app-layout")).toHaveLength(1);
+      fireEvent.click(
+        screen.getByRole("radio", { name: questions[0].options[0].text }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "다음 질문" }));
+      fireEvent.click(screen.getByRole("radio", { name: "아직 잘 모르겠어" }));
+      fireEvent.click(screen.getByRole("button", { name: "추천 할 일 보기" }));
+
+      await screen.findByRole("heading", { name: /우리에게 맞는/ });
+      expect(screen.getByRole("banner")).toBe(header);
+      fireEvent.click(
+        within(header).getByRole("button", { name: "계정 메뉴" }),
+      );
+      expect(screen.getByRole("button", { name: "로그아웃" })).toBeTruthy();
+      fireEvent.click(
+        within(header).getByRole("button", { name: "계정 메뉴" }),
+      );
+      fireEvent.click(within(header).getByRole("link", { name: "로드맵" }));
+
+      await screen.findByRole("main", { name: "준비 목록" });
+      expect(router.state.location.pathname).toBe("/preparation");
+      expect(
+        screen.getByRole("navigation", { name: "하단 메뉴" }),
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("link", { name: /밸런스게임 시작하기/ }),
+      ).toBeNull();
+    },
+  );
+
   it.each([401, 200])(
     "인증 응답 %s에서도 랜딩을 독립 화면으로 표시하고 시작 버튼을 준비 목록으로 연결한다",
     async (status) => {

@@ -32,14 +32,14 @@
 }
 
 @media (width < 768px) {
-  html:has(.service-layout[data-scroll="document"]) {
+  html:has(.service-layout[data-scroll="document"][data-navigation-dock]) {
     scroll-padding-bottom: calc(
       var(--mobile-dock-size) + var(--mobile-dock-offset) +
         var(--layout-margin-mobile)
     );
   }
 
-  .service-layout {
+  .service-layout[data-navigation-dock] {
     --service-bottom-inset: calc(
       var(--mobile-dock-size) + var(--mobile-dock-offset) +
         var(--layout-margin-mobile)

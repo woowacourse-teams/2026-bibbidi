@@ -1,8 +1,3 @@
-.balance-game-layout {
-  background: var(--color-bg-layer-basement);
-  color: var(--color-fg-neutral);
-}
-
 .balance-game {
   width: min(100% - 48px, 640px);
   margin: 0 auto;
