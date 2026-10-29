@@ -52,6 +52,38 @@ afterEach(() => {
 });
 
 describe("PostHog 사용자 여정", () => {
+  it("공개 게임의 익명 행동을 유지하고 로그인 후 저장 행동을 회원으로 연결한다", () => {
+    const { sdk, client } = setup();
+    window.history.replaceState(null, "", "/balance-game");
+    client.setContext({ authState: "guest", pathname: "/balance-game" });
+    client.track({
+      name: "balance_game_question_view",
+      parameters: { game_run_id: "run-1", question_id: "Q1" },
+    });
+    expect(sdk.capture).toHaveBeenCalledWith(
+      "balance_game_question_view",
+      expect.objectContaining({ game_run_id: "run-1", auth_state: "guest" }),
+    );
+    client.setContext({
+      authState: "authenticated",
+      pathname: "/balance-game",
+      userId: 42,
+    });
+    client.track({
+      name: "balance_game_save_success",
+      parameters: { game_run_id: "run-1", created_count: 2 },
+    });
+    expect(sdk.identify).toHaveBeenCalledExactlyOnceWith("bibbidi:user:42");
+    expect(sdk.reset).not.toHaveBeenCalled();
+    expect(sdk.capture).toHaveBeenLastCalledWith(
+      "balance_game_save_success",
+      expect.objectContaining({
+        game_run_id: "run-1",
+        auth_state: "authenticated",
+      }),
+    );
+  });
+
   it("첫 화면 실험군을 읽고 SDK 플래그 노출을 기록하게 한다", async () => {
     const { sdk, client, provider } = setup();
     sdk.onFeatureFlags.mockImplementation((callback) => {

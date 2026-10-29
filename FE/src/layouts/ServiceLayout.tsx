@@ -10,7 +10,11 @@ import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
 import { useIsMobileLayout } from "../shared/responsive";
 
-export function ServiceLayout() {
+export function ServiceLayout({
+  showNavigationDock = true,
+}: {
+  showNavigationDock?: boolean;
+}) {
   const { authState, endAuthentication, refreshAuth } = useAuth();
   const { pathname } = useLocation();
   const isMobile = useIsMobileLayout();
@@ -54,6 +58,7 @@ export function ServiceLayout() {
       data-modal-scope
       data-ai-keyboard-open={(isMobile && aiKeyboardVisible) || undefined}
       data-page-scroll-container
+      data-navigation-dock={showNavigationDock || undefined}
       ref={layoutRef}
       role="region"
       aria-label="서비스 화면"
@@ -92,32 +97,34 @@ export function ServiceLayout() {
         <Outlet />
       </div>
 
-      <div className="service-layout__mobile-dock">
-        {authState.status === "authenticated" ||
-        authState.status === "guest" ? (
-          <AiChatFeature
-            key={aiAudience}
-            feedbackAudienceKey={aiAudience}
-            contextLabel={aiContext}
-            onKeyboardVisibilityChange={setAiKeyboardVisible}
-            isAuthenticated={authState.status === "authenticated"}
-            onAuthenticationRequired={refreshAuth}
-            launcherClassName={
-              isMobile ? "app-bottom-navigation__item" : undefined
-            }
-            renderLauncher={(launcher) => (
-              <>
-                <AppBottomNavigation>
-                  {isMobile ? launcher : null}
-                </AppBottomNavigation>
-                {!isMobile && launcher}
-              </>
-            )}
-          />
-        ) : (
-          <AppBottomNavigation />
-        )}
-      </div>
+      {showNavigationDock && (
+        <div className="service-layout__mobile-dock">
+          {authState.status === "authenticated" ||
+          authState.status === "guest" ? (
+            <AiChatFeature
+              key={aiAudience}
+              feedbackAudienceKey={aiAudience}
+              contextLabel={aiContext}
+              onKeyboardVisibilityChange={setAiKeyboardVisible}
+              isAuthenticated={authState.status === "authenticated"}
+              onAuthenticationRequired={refreshAuth}
+              launcherClassName={
+                isMobile ? "app-bottom-navigation__item" : undefined
+              }
+              renderLauncher={(launcher) => (
+                <>
+                  <AppBottomNavigation>
+                    {isMobile ? launcher : null}
+                  </AppBottomNavigation>
+                  {!isMobile && launcher}
+                </>
+              )}
+            />
+          ) : (
+            <AppBottomNavigation />
+          )}
+        </div>
+      )}
     </AppLayout>
   );
 }

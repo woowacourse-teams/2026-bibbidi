@@ -113,6 +113,10 @@ S3에 없는 경로(`/calendar` 등)는 CloudFront 오류 페이지로 `index.ht
 
 필요하면 CloudFront의 별도 수집 경로를 US ingestion/asset origin으로 프록시한다. POST·OPTIONS, query 전달, 캐시 비활성(수집/flags), 압축/본문 크기, upstream Host/TLS, SDK asset 경로, CORS와 CSP를 검증해야 한다. API 인증 쿠키·Authorization은 upstream에 전달하지 않고 CDN access log에도 쿼리/개인정보를 남기지 않는다. 별도 IaC Issue로 구현하며 장애 시 제품 요청과 분리한다. 프록시도 광고 차단을 완전히 없애지 못하고 명시적 수집 거부를 우회하는 수단으로 사용하지 않는다. [공식 프록시 문서](https://posthog.com/docs/advanced/proxy)
 
+## 밸런스 게임
+
+공개 게임의 문항 시간·유형 카드·추천 선택·실제 할 일 생성과 이후 활용은 [밸런스 게임 측정 연결](./balance-game-analytics.md)을 따른다. GA에는 시작과 신규 생성 성공만 추가하고 상세 이벤트와 실제 할 일 연결은 PostHog에서 분석한다.
+
 ## 대시보드와 QA
 
 - People에서 `bibbidi:user:{id}` 검색 → 세션별 Events → Recordings. 세션 기준으로 소셜 시작/약관 동의/인증 완료, 일정 폼/제출/성공을 각각 분석한다.

@@ -1,11 +1,16 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { LoginPage } from "./LoginPage";
 
 describe("LoginPage", () => {
   it("소셜 로그인 버튼을 표시하고 기존 계정 연동 안내는 표시하지 않는다", () => {
-    render(<LoginPage />);
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "로그인" })).toBeNull();

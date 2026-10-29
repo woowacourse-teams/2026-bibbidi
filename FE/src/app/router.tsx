@@ -7,10 +7,15 @@ import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 
 export const appRoutes: RouteObject[] = [
   {
-    path: "/balance-game",
-    lazy: async () => ({
-      Component: (await import("../pages/BalanceGamePage")).BalanceGamePage,
-    }),
+    element: <ServiceLayout showNavigationDock={false} />,
+    children: [
+      {
+        path: "/balance-game",
+        lazy: async () => ({
+          Component: (await import("../pages/BalanceGamePage")).BalanceGamePage,
+        }),
+      },
+    ],
   },
   {
     path: "/landing",

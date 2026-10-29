@@ -16,12 +16,16 @@ export function createChecklistTaskCreateEvent(
 
 export function createChecklistTaskCompleteEvent(
   categoryId: string,
+  checklistItemId?: number,
 ): AnalyticsEvent {
   return {
     name: "checklist_task_complete",
     parameters: {
       action: "complete",
       category_id: categoryId,
+      ...(checklistItemId === undefined
+        ? {}
+        : { checklist_item_id: checklistItemId }),
     },
   };
 }
@@ -58,12 +62,16 @@ export function createCalendarAppointmentStartEvent(): AnalyticsEvent {
 
 export function createAppointmentCreateEvent(
   source: AppointmentCreationSource,
+  checklistItemId?: number,
 ): AnalyticsEvent {
   return {
     name: "appointment_create",
     parameters: {
       creation_type: "checklist_item",
       source,
+      ...(checklistItemId === undefined
+        ? {}
+        : { checklist_item_id: checklistItemId }),
     },
   };
 }

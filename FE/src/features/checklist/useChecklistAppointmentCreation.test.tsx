@@ -165,7 +165,11 @@ describe("useChecklistAppointmentCreation", () => {
     ).toHaveLength(1);
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "appointment_create",
-      parameters: { creation_type: "checklist_item", source: "checklist" },
+      parameters: {
+        creation_type: "checklist_item",
+        source: "checklist",
+        checklist_item_id: 500,
+      },
     });
   });
 
@@ -228,7 +232,11 @@ describe("useChecklistAppointmentCreation", () => {
 
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "appointment_create",
-      parameters: { creation_type: "checklist_item", source: "calendar" },
+      parameters: {
+        creation_type: "checklist_item",
+        source: "calendar",
+        checklist_item_id: 500,
+      },
     });
   });
 
