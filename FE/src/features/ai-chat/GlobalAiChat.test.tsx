@@ -209,8 +209,11 @@ describe("전역 AI", () => {
       await openChat();
       expect(launcher.getAttribute("aria-expanded")).toBe("true");
       expect(heading.isConnected).toBe(true);
-      expect(pressOutside(heading).defaultPrevented).toBe(false);
-      expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+      // 바깥 누름 감지는 화면 반영 뒤 effect에서 붙으므로 감지될 때까지 다시 누른다.
+      await waitFor(() => {
+        expect(pressOutside(heading).defaultPrevented).toBe(false);
+        expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+      });
       expect(launcher.getAttribute("aria-expanded")).toBe("false");
       expect(nav.querySelector('[aria-expanded="true"]')).toBeNull();
       expect(
