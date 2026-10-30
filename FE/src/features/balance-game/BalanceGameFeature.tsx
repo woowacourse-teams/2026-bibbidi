@@ -77,6 +77,7 @@ export function BalanceGameFeature({
             return true;
           }}
           onAuthenticationRequired={handleAuthenticationRequired}
+          onSaved={() => void navigate("/", { replace: true })}
         />
       )}
     </main>

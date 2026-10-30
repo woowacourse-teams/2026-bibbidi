@@ -28,6 +28,7 @@ export interface BalanceGameRecommendationsOptions {
   initialSelection?: number[];
   onAuthenticationRequired: (selectedIds: number[]) => void;
   onLoginRequired: (selectedIds: number[]) => boolean;
+  onSaved: () => void;
 }
 
 export function useBalanceGameRecommendations({
@@ -39,6 +40,7 @@ export function useBalanceGameRecommendations({
   initialSelection,
   onAuthenticationRequired,
   onLoginRequired,
+  onSaved,
 }: BalanceGameRecommendationsOptions) {
   const checklist = usePreparationChecklistRepository();
   const query = useMyChecklistQueryRepository();
@@ -52,7 +54,6 @@ export function useBalanceGameRecommendations({
   const [saving, setSaving] = useState(false);
   const [loadDuration, setLoadDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
   const pending = useRef<AbortController | null>(null);
   const viewSent = useRef<string | null>(null);
   const recommendationId = resultInstanceId;
@@ -220,15 +221,7 @@ export function useBalanceGameRecommendations({
           saved.addedIds.length,
         request_duration_ms: tracking.duration(request),
       });
-      setAddedIds((current) => [
-        ...new Set([...current, ...saved.confirmedIds]),
-      ]);
-      setSelectedIds((current) =>
-        current.filter((id) => !saved.confirmedIds.includes(id)),
-      );
-      setNotice(
-        `${saved.confirmedIds.length}개의 할 일을 체크리스트에서 확인할 수 있어요.`,
-      );
+      onSaved();
     } catch (cause) {
       if (controller.signal.aborted) return;
       tracking.fail(request, cause);
@@ -255,7 +248,6 @@ export function useBalanceGameRecommendations({
     status,
     saving,
     error,
-    notice,
     select,
     save,
     retry: () => {

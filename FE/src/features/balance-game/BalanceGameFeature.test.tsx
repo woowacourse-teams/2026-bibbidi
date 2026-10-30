@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreparationAuthenticationRequiredError } from "../preparation";
 import { BalanceGameFeature } from "./BalanceGameFeature";
@@ -52,17 +52,30 @@ const loginRequired = vi.fn();
 function renderGame(
   audience: "guest" | "authenticated" = "authenticated",
   strict = false,
+  initialEntries = ["/balance-game"],
 ) {
-  const game = (
-    <MemoryRouter>
-      <BalanceGameFeature
-        audience={audience}
-        onAuthenticationRequired={authRequired}
-        onLoginRequired={loginRequired}
-      />
-    </MemoryRouter>
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/balance-game",
+        element: (
+          <BalanceGameFeature
+            audience={audience}
+            onAuthenticationRequired={authRequired}
+            onLoginRequired={loginRequired}
+          />
+        ),
+      },
+      { path: "/", element: <h1>홈 화면</h1> },
+      { path: "/preparation", element: <h1>로드맵</h1> },
+    ],
+    { initialEntries },
   );
-  return render(strict ? <StrictMode>{game}</StrictMode> : game);
+  const game = <RouterProvider router={router} />;
+  return {
+    ...render(strict ? <StrictMode>{game}</StrictMode> : game),
+    router,
+  };
 }
 async function finishGame() {
   await screen.findByRole("heading", { name: questions[0].question });
@@ -96,7 +109,61 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("공개 밸런스게임과 행동 계측", () => {
-  it("각 카테고리는 미담은 항목부터 3개씩 보이고 펼침·저장 후에도 담은 항목은 맨 아래에 둔다", async () => {
+  it.each([
+    { initialEntries: ["/balance-game"], backPath: "/" },
+    {
+      initialEntries: ["/preparation", "/balance-game"],
+      backPath: "/preparation",
+    },
+  ])(
+    "담기를 완료하면 홈으로 이동하고 뒤로가기로 게임에 복귀하지 않는다 ($initialEntries)",
+    async ({ initialEntries, backPath }) => {
+      const { router } = renderGame("authenticated", false, initialEntries);
+      await finishGame();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "2개 할 일 담기" }),
+      );
+
+      await screen.findByRole("heading", { name: "홈 화면" });
+      expect(router.state.location.pathname).toBe("/");
+      expect(router.state.historyAction).toBe("REPLACE");
+      expect(events("balance_game_save_success")).toHaveLength(1);
+
+      await act(async () => router.navigate(-1));
+      expect(router.state.location.pathname).toBe(backPath);
+      expect(
+        screen.queryByRole("main", { name: "우리 결혼 밸런스게임" }),
+      ).toBeNull();
+      expect(getBalanceGameQuestions).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("담기 요청이 완료되기 전에는 결과 화면을 유지한다", async () => {
+    let resolveSave!: (ids: string[]) => void;
+    mocks.checklist.addCatalogItemIds.mockImplementationOnce(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const { router } = renderGame();
+    await finishGame();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "2개 할 일 담기" }),
+    );
+    await waitFor(() =>
+      expect(mocks.checklist.addCatalogItemIds).toHaveBeenCalledOnce(),
+    );
+    expect(router.state.location.pathname).toBe("/balance-game");
+    expect(screen.queryByRole("heading", { name: "홈 화면" })).toBeNull();
+
+    await act(async () => resolveSave(["22", "161"]));
+    expect(
+      await screen.findByRole("heading", { name: "홈 화면" }),
+    ).toBeTruthy();
+  });
+
+  it("각 카테고리는 미담은 항목부터 3개씩 보이고 펼쳐도 선택을 유지해 저장한다", async () => {
     const weddingTasks = Array.from({ length: 4 }, (_, index) => ({
       id: String(201 + index),
       title: `예식 추천 ${index + 1}`,
@@ -169,19 +236,9 @@ describe("공개 밸런스게임과 행동 계측", () => {
       expect.any(AbortSignal),
       expect.any(Function),
     );
-    fireEvent.click(wedding.getByRole("button", { name: "예식 더보기 (3개)" }));
     expect(
-      wedding
-        .getAllByRole("listitem")
-        .slice(0, 2)
-        .map((item) => item.querySelector("strong")?.textContent),
-    ).toEqual(["예식 추천 1", "예식 추천 3"]);
-    expect(
-      wedding
-        .getAllByRole("listitem")
-        .slice(2)
-        .every((item) => item.textContent?.includes("이미 담음")),
-    ).toBe(true);
+      await screen.findByRole("heading", { name: "홈 화면" }),
+    ).toBeTruthy();
   });
   it("3개 이하인 카테고리는 모든 항목을 표시하고 더보기를 제공하지 않는다", async () => {
     renderGame();
@@ -404,12 +461,13 @@ describe("공개 밸런스게임과 행동 계측", () => {
     mocks.checklist.addCatalogItemIds.mockRejectedValueOnce(
       new TypeError("private-network"),
     );
-    renderGame();
+    const { router } = renderGame();
     await finishGame();
     fireEvent.click(
       await screen.findByRole("button", { name: "2개 할 일 담기" }),
     );
     await screen.findByRole("alert");
+    expect(router.state.location.pathname).toBe("/balance-game");
     expect(events("balance_game_save_success")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "2개 할 일 담기" }));
     await waitFor(() =>

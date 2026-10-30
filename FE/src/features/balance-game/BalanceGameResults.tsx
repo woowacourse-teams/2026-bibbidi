@@ -20,7 +20,6 @@ export function BalanceGameResults(props: BalanceGameRecommendationsOptions) {
     status,
     saving,
     error,
-    notice,
     select,
     save,
     retry,
@@ -101,9 +100,6 @@ export function BalanceGameResults(props: BalanceGameRecommendationsOptions) {
                 />
               ))}
             </div>
-            <p className="balance-game__notice" role="status">
-              {notice}
-            </p>
             {error && (
               <p className="balance-game__error" role="alert">
                 {error}

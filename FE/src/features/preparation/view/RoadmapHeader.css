@@ -1,24 +1,7 @@
 .roadmap-header {
-  padding-bottom: 32px;
-}
-
-.roadmap-header .bibbidi-page-header-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: stretch;
-  justify-content: start;
-  column-gap: 16px;
-}
-
-.roadmap-header .bibbidi-page-header-main {
-  display: block;
-}
-
-.roadmap-header .bibbidi-page-header-actions {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  align-items: stretch;
+  max-width: var(--layout-width-content);
+  margin-inline: auto;
+  padding-bottom: 28px;
 }
 
 .roadmap-header .bibbidi-page-header-description {
@@ -27,6 +10,6 @@
 
 @media (width < 768px) {
   .roadmap-header {
-    padding-bottom: 24px;
+    padding-bottom: 22px;
   }
 }

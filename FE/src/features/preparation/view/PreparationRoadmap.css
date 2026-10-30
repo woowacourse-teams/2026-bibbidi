@@ -59,10 +59,10 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
-  padding: 16px;
+  padding: 15px;
   border: 1px solid var(--color-stroke-neutral-weak);
   border-radius: var(--radius-lg);
   background: var(--color-bg-layer-default);
@@ -76,7 +76,7 @@
 .roadmap-stage-card__header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 .roadmap-stage-card__image {
@@ -84,15 +84,15 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   color: var(--color-fg-neutral);
   font: var(--typography-t4);
 }
 .preparation-roadmap__step-icon {
   display: block;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 .roadmap-stage-card__earned {
@@ -121,7 +121,7 @@
 }
 .roadmap-stage-card h2 {
   margin: 6px 0 0;
-  font: var(--typography-t5-medium);
+  font: var(--typography-t6-medium);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -136,8 +136,8 @@
 }
 .roadmap-stage-card__preview {
   display: grid;
-  gap: 6px;
-  padding-top: 12px;
+  gap: 4px;
+  padding-top: 10px;
   border-top: 1px solid var(--color-stroke-neutral-weak);
 }
 .roadmap-stage-card__preview-label {
@@ -199,10 +199,10 @@
 }
 @media (min-width: 768px) {
   .preparation-roadmap__body > section {
-    margin-top: var(--layout-gutter-desktop);
+    margin-top: 20px;
   }
   .preparation-roadmap__steps {
-    gap: 20px;
+    gap: 18px;
   }
   @container roadmap-body (min-width: 640px) {
     .preparation-roadmap__steps {
@@ -212,7 +212,7 @@
 }
 
 @media (min-width: 768px) {
-  @container roadmap-body (min-width: 1040px) {
+  @container roadmap-body (min-width: 900px) {
     .preparation-roadmap__steps {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
