@@ -1,0 +1,127 @@
+.market-trend {
+  margin: 33px 0 13px;
+  width: 100%;
+}
+.market-trend figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 13px;
+}
+.market-trend figcaption > span {
+  color: #aa822c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.market-trend figcaption > small {
+  color: #a5aab2;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.market-trend svg {
+  display: block;
+  overflow: visible;
+  width: 100%;
+  height: auto;
+}
+.trend-grid line {
+  stroke: #f0f1f3;
+  stroke-width: 1;
+}
+.trend-grid text {
+  fill: #b0b5bd;
+  font-size: 9px;
+}
+.trend-line {
+  stroke: #d6ad50;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.trend-point {
+  fill: #fff;
+  stroke: #d6ad50;
+  stroke-width: 2;
+}
+.trend-point.latest {
+  fill: #f8d778;
+  stroke: #d6ad50;
+}
+.trend-value {
+  fill: #939ba6;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.trend-value.latest {
+  fill: #a67f2d;
+  font-size: 12px;
+  font-weight: 700;
+}
+.trend-year {
+  fill: #a0a7b1;
+  font-size: 10px;
+  font-weight: 400;
+}
+.trend-year.latest {
+  fill: #8c7550;
+  font-weight: 600;
+}
+.market-trend-summary {
+  color: #969da8;
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: right;
+  margin-top: 1px;
+}
+.market-trend-summary strong {
+  font-weight: 650;
+  color: #a68336;
+}
+@media (max-width: 800px) {
+  .market-trend figcaption {
+    gap: 8px;
+  }
+  .market-trend figcaption > span {
+    font-size: 11px;
+  }
+  .market-trend figcaption > small {
+    font-size: 8px;
+  }
+}
+@media (max-width: 560px) {
+  .market-visual {
+    padding-right: 0;
+    min-height: 0;
+    margin-top: 48px;
+    padding-bottom: 0;
+  }
+  .market-visual .source-link {
+    position: static;
+    display: block;
+    font-size: 9px;
+    white-space: normal;
+    margin-top: 12px;
+  }
+  .market-trend {
+    max-width: 360px;
+    margin-top: 27px;
+    margin-bottom: 0;
+  }
+  .market-trend figcaption > span {
+    font-size: 11px;
+  }
+  .market-trend figcaption > small {
+    font-size: 9px;
+  }
+  .market-trend svg {
+    max-height: 205px;
+  }
+  .market-trend-summary {
+    font-size: 10px;
+  }
+  .hero {
+    padding-bottom: 85px;
+  }
+}

@@ -16,7 +16,7 @@
     "format:check": "prettier . --check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "pnpm typecheck && webpack --mode production"
+    "build": "pnpm typecheck && webpack --mode production && node scripts/copy-landing.cjs"
   },
   "dependencies": {
     "@sentry/react": "11.1.0",
