@@ -200,7 +200,7 @@ describe("appRoutes", () => {
   );
 
   it.each([401, 200])(
-    "인증 응답 %s에서도 랜딩을 독립 화면으로 표시하고 시작 버튼을 준비 목록으로 연결한다",
+    "인증 응답 %s에서도 새 랜딩 문서를 독립 화면으로 표시한다",
     async (status) => {
       installFetch(
         new Response(
@@ -220,13 +220,8 @@ describe("appRoutes", () => {
       expect(
         screen.queryByRole("navigation", { name: "주요 메뉴" }),
       ).toBeNull();
-      fireEvent.click(
-        screen.getAllByRole("link", { name: /준비 시작하기/ })[0],
-      );
-      expect(
-        await screen.findByRole("main", { name: "준비 목록" }),
-      ).toBeTruthy();
-      expect(router.state.location.pathname).toBe("/preparation");
+      const frame = screen.getByTitle("비비디 서비스 소개와 사용 예시");
+      expect(frame.getAttribute("src")).toBe("/landing-story/index.html");
     },
   );
 

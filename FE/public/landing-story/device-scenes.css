@@ -1,0 +1,486 @@
+/* Photographic hardware, with real service UI rendered separately on its screen. */
+.device-section {
+  position: relative;
+  overflow-x: clip;
+}
+.conversation-section.device-section {
+  padding: 110px 0 100px;
+  background: linear-gradient(#fffcf4, #fff 26%);
+}
+.device-section .device-demo-space {
+  min-width: 0;
+}
+.device-section .demo-wrap {
+  max-width: none;
+}
+.device-demo {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  background: transparent;
+}
+.device-demo .player-label {
+  background: transparent;
+  border: 0;
+  height: 42px;
+  padding-inline: 1px;
+}
+.device-demo .player-label small {
+  color: #969da7;
+}
+.device-demo .player-controls {
+  border: 0;
+  background: transparent;
+  height: 57px;
+  padding-inline: 0;
+}
+.device-demo .player-controls button {
+  font-size: 11px;
+  padding: 9px 2px;
+}
+.device-demo .player-status {
+  font-size: 11px;
+}
+.device-photo {
+  position: relative;
+  width: 100%;
+  isolation: isolate;
+}
+.device-scene-image {
+  width: 100%;
+  height: auto;
+}
+.device-screen {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  background: #fff;
+}
+.device-screen-ui {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(var(--device-scale, 1));
+  transform-origin: 0 0;
+  background: #fff;
+}
+.monitor-photo {
+  aspect-ratio: 3/2;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.monitor-screen {
+  left: 15.43%;
+  top: 10.16%;
+  width: 69.45%;
+  height: 56.48%;
+  border-radius: 1px;
+}
+.monitor-screen-ui {
+  width: 1200px;
+  height: 650px;
+}
+.monitor-product {
+  position: absolute;
+  inset: 0;
+  background: #f9fafb;
+}
+.monitor-product .service-app-header {
+  height: 65px;
+  padding-inline: 28px;
+  gap: 52px;
+}
+.monitor-product .service-body {
+  padding: 26px 30px;
+  min-height: 585px;
+}
+.monitor-product .roadmap-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 690px;
+  gap: 12px;
+  margin-top: 24px;
+}
+.monitor-product .roadmap-card {
+  padding: 17px 14px 13px;
+}
+.monitor-product .roadmap-card-heading {
+  display: flex;
+  min-height: 46px;
+  gap: 9px;
+}
+.monitor-product .roadmap-card-heading img {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+}
+.monitor-product .roadmap-card h4 {
+  font-size: 14px;
+  line-height: 22px;
+}
+.monitor-product .card-task {
+  display: flex;
+}
+.monitor-product .product-heading h3 {
+  font-size: 26px;
+}
+.monitor-product .category-tabs > span {
+  font-size: 13px;
+  padding: 7px 18px;
+}
+.monitor-screen .chat-ui {
+  position: absolute;
+  top: 18px;
+  right: 17px;
+  width: 414px;
+  height: 614px;
+  border: 1px solid #dcdee3;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 7px 28px #36383d17;
+}
+.monitor-screen .chat-ui-content {
+  padding: 19px;
+}
+.monitor-screen .chat-ui-header {
+  height: 58px;
+  font-size: 20px;
+}
+.monitor-screen .chat-ui-header strong {
+  font-size: 20px;
+}
+.monitor-screen .chat-user p,
+.monitor-screen .chat-assistant > p {
+  font-size: 15px;
+}
+.monitor-screen .chat-task strong {
+  font-size: 14px;
+}
+.monitor-screen .chat-task small {
+  font-size: 11px;
+}
+.monitor-screen .chat-welcome {
+  padding-top: 105px;
+}
+.monitor-screen .chat-welcome h3 {
+  font-size: 20px;
+}
+.monitor-screen .chat-welcome p {
+  font-size: 14px;
+}
+.monitor-screen .chat-composer {
+  margin: 8px 13px 13px;
+  font-size: 12px;
+}
+.monitor-layout {
+  grid-template-columns: 1fr;
+  gap: 45px;
+}
+.monitor-layout .feature-copy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 80px;
+  max-width: none;
+  width: 100%;
+}
+.monitor-layout .feature-copy > .eyebrow {
+  grid-column: 1 / -1;
+}
+.monitor-layout .feature-copy > h2 {
+  grid-column: 1;
+  grid-row: 2 / 6;
+  font-size: 45px;
+  line-height: 1.45;
+}
+.monitor-layout .feature-copy > .section-description {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 0;
+  font-size: 16px;
+}
+.monitor-layout .demo-steps {
+  grid-column: 2;
+  grid-row: 3;
+  margin: 25px 0 22px;
+  gap: 17px;
+}
+.monitor-layout .feature-copy > .text-link {
+  grid-column: 2;
+  grid-row: 4;
+  justify-self: start;
+  font-size: 13px;
+}
+.monitor-layout .feature-copy > .feature-note {
+  grid-column: 2;
+  grid-row: 5;
+}
+.monitor-layout > .device-demo-space {
+  width: 100%;
+}
+.monitor-layout .screen-note {
+  margin-top: 5px;
+}
+.taste-section.device-section {
+  padding: 100px 0;
+  background: #f9fafb;
+}
+.phone-layout {
+  grid-template-columns: 1fr 1fr;
+  gap: 95px;
+}
+.phone-layout .feature-copy {
+  grid-column: 2;
+  grid-row: 1;
+}
+.phone-layout .device-demo-space {
+  grid-column: 1;
+  grid-row: 1;
+  max-width: 510px;
+  min-width: 0;
+}
+.phone-layout .player-label {
+  padding-inline: 3px;
+}
+.phone-photo {
+  aspect-ratio: 2/3;
+  border-radius: 22px;
+  overflow: hidden;
+}
+.phone-screen {
+  left: 24.41%;
+  top: 9.31%;
+  width: 51.46%;
+  height: 74.67%;
+  border-radius: 12% / 5.5%;
+}
+.phone-screen-ui {
+  width: 390px;
+  height: 844px;
+}
+.phone-status-bar {
+  height: 26px;
+  padding: 6px 23px 3px;
+  font-size: 11px;
+  line-height: 17px;
+  display: flex;
+  justify-content: space-between;
+  background: #fff;
+}
+.phone-status-bar strong {
+  font-weight: 650;
+}
+.phone-status-bar span {
+  letter-spacing: 2px;
+  font-size: 10px;
+}
+.phone-screen .game-ui {
+  width: 390px;
+  height: 818px;
+}
+.phone-screen .game-app-header {
+  height: 53px;
+  padding-inline: 20px;
+}
+.phone-screen .game-screen {
+  padding: 22px 18px;
+}
+.phone-screen .game-question {
+  font-size: 25px;
+  line-height: 1.45;
+  min-height: 109px;
+  margin-bottom: 20px;
+}
+.phone-screen .game-options {
+  gap: 12px;
+}
+.phone-screen .game-option {
+  height: 420px;
+}
+.phone-screen .game-option > strong {
+  font-size: 15px;
+  padding: 12px 10px;
+}
+.phone-screen .game-unknown {
+  font-size: 12px;
+  margin-top: 24px;
+}
+.phone-screen .result-screen {
+  padding: 28px 24px;
+}
+.phone-screen .result-screen > img {
+  height: 650px;
+  max-height: none;
+  width: 100%;
+  object-fit: contain;
+}
+.phone-screen .recommendations-screen {
+  padding-top: 37px;
+}
+.phone-screen .recommendations-screen h3 {
+  font-size: 24px;
+}
+.phone-screen .recommendations-screen > p {
+  font-size: 14px;
+}
+.phone-screen .game-task {
+  padding: 19px 15px;
+}
+.phone-screen .game-task strong {
+  font-size: 15px;
+}
+.phone-screen .game-task small {
+  font-size: 11px;
+}
+.phone-screen .game-selection-toolbar {
+  font-size: 13px;
+}
+.phone-screen .game-selection-toolbar small {
+  font-size: 10px;
+}
+.phone-screen .game-save {
+  font-size: 14px;
+  margin-top: 22px;
+}
+.phone-screen .saved-screen {
+  padding-top: 65px;
+}
+.phone-screen .saved-screen h3 {
+  font-size: 27px;
+}
+.phone-screen .saved-task {
+  padding: 24px 0;
+}
+.phone-screen .saved-task strong {
+  font-size: 15px;
+}
+.phone-screen .saved-task small {
+  font-size: 11px;
+}
+.phone-screen .saved-finish {
+  font-size: 13px;
+  margin-top: 38px;
+}
+.phone-home-indicator {
+  height: 4px;
+  width: 110px;
+  background: #36383d;
+  border-radius: 5px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 8px;
+  z-index: 3;
+}
+@media (max-width: 1100px) {
+  .monitor-layout .feature-copy {
+    gap: 0 50px;
+  }
+  .monitor-layout .feature-copy > h2 {
+    font-size: 37px;
+  }
+  .phone-layout {
+    gap: 50px;
+  }
+}
+@media (max-width: 800px) {
+  .conversation-section.device-section {
+    padding: 80px 0 75px;
+  }
+  .monitor-layout .feature-copy {
+    display: block;
+  }
+  .monitor-layout .feature-copy > h2 {
+    font-size: 37px;
+  }
+  .monitor-layout .feature-copy > .section-description {
+    margin-top: 23px;
+    font-size: 16px;
+  }
+  .monitor-layout .demo-steps {
+    margin: 25px 0;
+  }
+  .monitor-layout {
+    gap: 31px;
+  }
+  .monitor-layout .feature-copy {
+    max-width: 570px;
+  }
+  .phone-layout {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+  .phone-layout .feature-copy,
+  .phone-layout .device-demo-space {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .phone-layout .feature-copy {
+    order: 0;
+  }
+  .phone-layout .device-demo-space {
+    order: 1;
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+  }
+  .taste-section.device-section {
+    padding: 78px 0;
+  }
+}
+@media (max-width: 560px) {
+  .conversation-section.device-section {
+    padding: 65px 0;
+  }
+  .monitor-layout .feature-copy > h2 {
+    font-size: 33px;
+  }
+  .monitor-layout .feature-copy > .section-description {
+    font-size: 15px;
+  }
+  .monitor-photo {
+    border-radius: 12px;
+  }
+  .device-demo .player-label {
+    height: 36px;
+    font-size: 9px;
+  }
+  .device-demo .player-label small {
+    font-size: 8px;
+  }
+  .device-demo .player-controls {
+    height: 48px;
+  }
+  .device-demo .player-controls button {
+    font-size: 9px;
+  }
+  .device-demo .player-status {
+    font-size: 9px;
+  }
+  .phone-photo {
+    border-radius: 17px;
+  }
+  .phone-screen {
+    border-radius: 12% / 5.5%;
+  }
+  .taste-section.device-section {
+    padding: 65px 0;
+  }
+  .phone-layout .device-demo-space {
+    max-width: 390px;
+  }
+}
+
+@media (max-width: 560px) {
+  .phone-photo {
+    aspect-ratio: 100/202.5;
+  }
+  .phone-photo .device-scene-image {
+    width: 135%;
+    max-width: none;
+    margin-left: -17.5%;
+  }
+  .phone-screen {
+    left: 15.4535%;
+    width: 69.471%;
+  }
+}
