@@ -86,10 +86,7 @@ public class ModelClassifier {
         if (answer == null || !allowedCriteria.containsKey(answer.value())) {
             return Classification.NONE;
         }
-        if (Classification.NONE.equals(answer.value())) {
-            return Classification.NONE;
-        }
-        return answer.isUnsure(properties.minConfidence()) ? Classification.NONE : answer.value();
+        return answer.value();
     }
 
     private String state(String conversationKey, String userPrompt) {
