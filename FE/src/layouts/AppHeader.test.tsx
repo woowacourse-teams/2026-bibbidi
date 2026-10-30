@@ -152,9 +152,14 @@ describe("AppHeader", () => {
     await waitFor(() =>
       expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy(),
     );
-    document.documentElement.scrollTop = 100;
-    fireEvent.scroll(document);
-    expect(screen.getByRole("button", { name: "로그인" })).toBeTruthy();
+    // 새 스크롤 영역 구독은 화면 반영 뒤 effect에서 붙으므로 구독될 때까지 다시 스크롤한다.
+    await waitFor(() => {
+      document.documentElement.scrollTop = 0;
+      fireEvent.scroll(document);
+      document.documentElement.scrollTop = 100;
+      fireEvent.scroll(document);
+      expect(screen.getByRole("button", { name: "로그인" })).toBeTruthy();
+    });
   });
 
   it("비로그인 사용자에게 로그인 링크를 표시하고 메뉴 버튼은 숨긴다", () => {
