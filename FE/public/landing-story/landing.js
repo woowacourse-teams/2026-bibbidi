@@ -438,12 +438,10 @@
       step = sequence.length - 1;
       remaining = 0;
       render();
-      root
-        .closest("section")
-        .nextElementSibling?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
+      root.closest("section").nextElementSibling?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
     window.addEventListener(
       "scroll",
