@@ -1,3 +1,4 @@
+import { useLoginModal } from "../auth/useLoginModal";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -67,6 +68,7 @@ const roadmapSteps = [
 ];
 
 export function LandingFeature() {
+  const { loginTo, loginState } = useLoginModal();
   const [chatReplay, setChatReplay] = useState(0);
   const {
     rootRef,
@@ -100,7 +102,13 @@ export function LandingFeature() {
             <a className="landing-desktop-only" href="#landing-roadmap">
               준비 로드맵
             </a>
-            <Link className="landing-desktop-only" to="/login">
+            <Link
+              className="landing-desktop-only"
+              to={loginTo}
+              state={loginState}
+              replace={false}
+              preventScrollReset
+            >
               로그인
             </Link>
             <Link className="landing-button" to="/preparation">

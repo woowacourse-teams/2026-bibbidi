@@ -45,7 +45,7 @@ describe("SocialLoginForm", () => {
   it("서비스 설명을 제목으로 표시한다", () => {
     render(<SocialLoginForm />);
 
-    const heading = screen.getByRole("heading", { level: 1 });
+    const heading = screen.getByRole("heading", { level: 2 });
 
     expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서");
     expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();

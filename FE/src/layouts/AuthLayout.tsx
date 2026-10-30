@@ -8,7 +8,6 @@ import "./AuthLayout.css";
 export function AuthLayout() {
   const { authState } = useAuth();
   const { pathname, search } = useLocation();
-  const isLoginPath = pathname === "/login";
   const isOnboardingPath =
     pathname === "/onboarding" || pathname === "/onboarding/account";
 
@@ -21,7 +20,9 @@ export function AuthLayout() {
   }
 
   if (authState.status === "guest" && isOnboardingPath) {
-    return <Navigate replace to="/login" />;
+    return (
+      <Navigate replace to="/" state={{ loginModal: { returnTo: "/" } }} />
+    );
   }
 
   return (
@@ -33,7 +34,7 @@ export function AuthLayout() {
       scroll="document"
       hideScrollBar
     >
-      <main className={`auth-page${isLoginPath ? " auth-page--login" : ""}`}>
+      <main className="auth-page">
         {authState.status === "loading" ||
         authState.status === "synchronizing" ? (
           <p role="status">로그인 상태를 확인하고 있습니다.</p>

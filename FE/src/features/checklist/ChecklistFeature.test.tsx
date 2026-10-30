@@ -427,7 +427,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
-  it("비로그인 사용자에게 CTA와 로그인 안내를 제공하고 기존 로그인 경로로 이동한다", async () => {
+  it("비로그인 사용자에게 CTA와 로그인 안내를 제공하고 현재 화면에 로그인 모달을 요청한다", async () => {
     renderChecklistFeature();
     const addTaskButton = await screen.findByRole("button", {
       name: "할 일 추가",
@@ -456,7 +456,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
     fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
 
-    expect(getCurrentUrl()).toBe("/login");
+    expect(getCurrentUrl()).toBe("/checklist");
   });
 
   it("로그인 안내가 열리면 상세 패널을 포함한 배경 전체를 비활성화한다", async () => {
@@ -557,7 +557,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.click(addScheduleButton);
     dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
     fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
-    expect(getCurrentUrl()).toBe("/login");
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
   });
 
   it("비로그인 모바일 상세에서도 일정 추가 안내와 초점 복원을 제공한다", async () => {

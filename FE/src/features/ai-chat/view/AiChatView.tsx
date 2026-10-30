@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+import { useLoginModal } from "../../auth/useLoginModal";
 import { Fragment, useEffect, useId, useRef } from "react";
 
 import { AiChatFeedback } from "./AiChatFeedback";
@@ -50,6 +52,7 @@ export function AiChatView({
   onComposerBlur?: () => void;
   viewport: ViewportMetrics;
 }) {
+  const { loginTo, loginState } = useLoginModal();
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
@@ -98,9 +101,15 @@ export function AiChatView({
             안내를 드려요.
           </p>
           {!isAuthenticated && (
-            <a className="ai-chat__login" href="/login">
+            <Link
+              className="ai-chat__login"
+              to={loginTo}
+              state={loginState}
+              replace={false}
+              preventScrollReset
+            >
               로그인하기
-            </a>
+            </Link>
           )}
         </div>
       ) : (

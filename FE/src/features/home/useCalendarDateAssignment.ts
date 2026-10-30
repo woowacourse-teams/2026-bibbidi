@@ -76,7 +76,7 @@ export function useCalendarDateAssignment({
     onSaved,
     closeLogin: () => setLoginTask(null),
     loginTo: loginTask
-      ? `/login?returnTo=${encodeURIComponent(`/calendar?dateFor=${loginTask.sourceCatalogItemId}`)}`
+      ? `/calendar?dateFor=${loginTask.sourceCatalogItemId}`
       : undefined,
   };
 }

@@ -1,8 +1,24 @@
 export function getSafeLoginReturnPath(search: string): string | null {
   const returnTo = new URLSearchParams(search).get("returnTo");
-  if (returnTo === "/calendar" || returnTo === "/balance-game") return returnTo;
+  if (!returnTo) return null;
+  const hashStart = returnTo.indexOf("#");
+  const path = hashStart < 0 ? returnTo : returnTo.slice(0, hashStart);
+  const hash = hashStart < 0 ? "" : returnTo.slice(hashStart);
+  if (hash && !/^#[a-zA-Z0-9_-]+$/.test(hash)) return null;
+  if (
+    [
+      "/",
+      "/preparation",
+      "/checklist",
+      "/calendar",
+      "/balance-game",
+      "/landing",
+    ].includes(path)
+  )
+    return returnTo;
+  if (/^\/(?:preparation)?\?categoryId=[1-9]\d*$/.test(path)) return returnTo;
   // Allow only known internal destinations and a positive catalog ID.
-  const match = /^\/calendar\?dateFor=([1-9]\d*)$/.exec(returnTo ?? "");
+  const match = /^\/calendar\?dateFor=([1-9]\d*)$/.exec(path);
   return match && Number.isSafeInteger(Number(match[1])) ? returnTo : null;
 }
 

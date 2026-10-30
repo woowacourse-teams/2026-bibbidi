@@ -1,12 +1,10 @@
-import { Navigate, useNavigate } from "react-router";
+import { useLoginModal } from "../features/auth/useLoginModal";
 import { useAuth } from "../features/auth";
 import { BalanceGameFeature } from "../features/balance-game/BalanceGameFeature";
 
 export function BalanceGamePage() {
   const { authState, refreshAuth } = useAuth();
-  const navigate = useNavigate();
-  if (authState.status === "onboardingRequired")
-    return <Navigate replace to="/onboarding" />;
+  const { openLogin } = useLoginModal();
   return (
     <>
       {authState.status === "authenticated" || authState.status === "guest" ? (
@@ -16,9 +14,7 @@ export function BalanceGamePage() {
           }
           audience={authState.status}
           onAuthenticationRequired={refreshAuth}
-          onLoginRequired={() =>
-            void navigate("/login?returnTo=%2Fbalance-game")
-          }
+          onLoginRequired={openLogin}
         />
       ) : (
         <main className="balance-game">

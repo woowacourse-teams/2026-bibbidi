@@ -5,7 +5,7 @@ import {
   rememberLoginReturnPath,
   readLoginReturnPath,
 } from "../features/auth/model/loginReturnPath";
-import { OnboardingPage } from "./OnboardingPage";
+import { OnboardingModal } from "../features/onboarding/OnboardingModal";
 
 const refreshAuth = vi.hoisted(() => vi.fn());
 vi.mock("../features/auth", () => ({
@@ -32,7 +32,7 @@ it("가입 완료 후 보관한 게임 복귀 주소를 소비해 이동한다",
   render(
     <MemoryRouter initialEntries={["/onboarding"]}>
       <Routes>
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/onboarding" element={<OnboardingModal />} />
         <Route path="/balance-game" element={<h1>게임 복귀</h1>} />
       </Routes>
     </MemoryRouter>,

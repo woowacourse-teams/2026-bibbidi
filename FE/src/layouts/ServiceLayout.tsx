@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { AiChatFeature } from "../features/ai-chat/AiChatFeature";
 import { AppLayout } from "../components/app-layout";
@@ -48,10 +48,6 @@ export function ServiceLayout({
     }
   }, [pathname]);
 
-  if (authState.status === "onboardingRequired") {
-    return <Navigate replace to="/onboarding" />;
-  }
-
   return (
     <AppLayout
       className="service-layout"
@@ -85,7 +81,8 @@ export function ServiceLayout({
                     onLogout: logout.submit,
                     userInitial: authState.user.nickname.charAt(0),
                   }
-                : authState.status === "guest"
+                : authState.status === "guest" ||
+                    authState.status === "onboardingRequired"
                   ? { kind: "guest" }
                   : { kind: "pending" }
             }

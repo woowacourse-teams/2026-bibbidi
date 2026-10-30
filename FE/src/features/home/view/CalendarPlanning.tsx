@@ -1,3 +1,4 @@
+import { useLoginModal } from "../../auth/useLoginModal";
 import { useId, useMemo, useState } from "react";
 import { useCalendarSelection } from "../useCalendarSelection";
 import { useCalendarSticky } from "../useCalendarSticky";
@@ -49,6 +50,7 @@ export function CalendarPlanning({
   recommendations,
   dialogs,
 }: CalendarPlanningProps) {
+  const { loginTo, loginState } = useLoginModal("/calendar");
   const { wrapperRef, calendarRef } = useCalendarSticky();
   const undatedListId = useId();
   const [isUndatedExpanded, setUndatedExpanded] = useState(false);
@@ -113,7 +115,12 @@ export function CalendarPlanning({
               title="날짜를 정할 일"
               right={
                 isGuest && !hasTasks ? (
-                  <CalendarSectionLink to="/login?returnTo=%2Fcalendar">
+                  <CalendarSectionLink
+                    to={loginTo}
+                    state={loginState}
+                    replace={false}
+                    preventScrollReset
+                  >
                     로그인하고 일정 관리하기
                   </CalendarSectionLink>
                 ) : (
