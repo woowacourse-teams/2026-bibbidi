@@ -19,6 +19,9 @@ export function useLoginModal(returnTo?: string) {
       `?${new URLSearchParams({ returnTo: destination })}`,
     ) ??
     getSafeLoginReturnPath(
+      `?${new URLSearchParams({ returnTo: `${location.pathname}${location.hash}` })}`,
+    ) ??
+    getSafeLoginReturnPath(
       `?${new URLSearchParams({ returnTo: location.pathname })}`,
     ) ??
     "/";

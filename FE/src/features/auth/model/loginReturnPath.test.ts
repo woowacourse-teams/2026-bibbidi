@@ -12,6 +12,31 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("loginReturnPath", () => {
+  it.each([
+    "/landing#landing-roadmap",
+    "/preparation?categoryId=20#roadmap-stage-1",
+    "/calendar?dateFor=101#selected-day",
+  ])("허용된 주소 %s의 해시도 OAuth 왕복과 1회 소비에 보존한다", (path) => {
+    const search = `?${new URLSearchParams({ returnTo: path })}`;
+    expect(getSafeLoginReturnPath(search)).toBe(path);
+    rememberLoginReturnPath(search);
+    expect(readLoginReturnPath()).toBe(path);
+    expect(consumeLoginReturnPath()).toBe(path);
+    expect(readLoginReturnPath()).toBeNull();
+  });
+  it.each([
+    "https://evil.example/#landing-roadmap",
+    "//evil.example/#landing-roadmap",
+    "/unknown#landing-roadmap",
+    "/landing#bad/anchor",
+    "/landing#landing-roadmap#extra",
+    "/landing#landing-roadmap\n",
+    "/calendar?dateFor=101&redirect=https://evil.example#selected-day",
+  ])("해시를 붙여도 허용되지 않은 복귀 주소 %s를 거절한다", (path) => {
+    expect(
+      getSafeLoginReturnPath(`?${new URLSearchParams({ returnTo: path })}`),
+    ).toBeNull();
+  });
   it("OAuth 왕복용 복귀 주소는 한 번만 소비하고 30분 후 만료한다", () => {
     vi.useFakeTimers();
     rememberLoginReturnPath("?returnTo=%2Fbalance-game");

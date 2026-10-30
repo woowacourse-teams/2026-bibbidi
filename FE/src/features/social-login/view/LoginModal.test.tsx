@@ -71,6 +71,7 @@ function mount(entry = "/preparation?categoryId=20") {
           { path: "/auth/:provider", Component: SocialLoginCallbackPage },
           { path: "/preparation", Component: Background },
           { path: "/calendar", Component: Background },
+          { path: "/landing", Component: Background },
         ],
       },
     ],
@@ -87,6 +88,34 @@ afterEach(() => {
 });
 
 describe("LoginModal", () => {
+  it.each([
+    ["/landing#landing-roadmap", "/landing#landing-roadmap"],
+    [
+      "/preparation?categoryId=20#roadmap-stage-1",
+      "/preparation?categoryId=20#roadmap-stage-1",
+    ],
+    ["/landing?utm_source=link#landing-roadmap", "/landing#landing-roadmap"],
+  ])(
+    "%s에서 모달 닫기와 인증 시작이 해시를 보존한다",
+    async (entry, returnTo) => {
+      const assign = vi.fn();
+      vi.stubGlobal("location", { assign });
+      const router = mount(entry);
+      const originalHash = router.state.location.hash;
+      fireEvent.click(screen.getByRole("button", { name: "로그인 열기" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "로그인 닫기" }),
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(router.state.location.hash).toBe(originalHash);
+      fireEvent.click(screen.getByRole("button", { name: "로그인 열기" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "카카오로 계속하기" }),
+      );
+      await waitFor(() => expect(assign).toHaveBeenCalledOnce());
+      expect(readLoginReturnPath()).toBe(returnTo);
+    },
+  );
   it("현재 주소의 로그인 링크를 눌러도 닫을 때 배경 화면에 머문다", async () => {
     const router = mount();
     const trigger = screen.getByRole("link", { name: "로그인 링크" });
@@ -196,6 +225,44 @@ function termsFetch(
 }
 
 describe("로그인 모달의 실패와 약관 동의", () => {
+  it.each([false, true])(
+    "약관 필요 여부 %s에서도 OAuth와 가입 완료 후 원래 해시로 복귀한다",
+    async (termsAgreementRequired) => {
+      rememberLoginReturnPath(
+        `?${new URLSearchParams({ returnTo: "/landing#landing-roadmap" })}`,
+      );
+      vi.mocked(completeSocialLogin).mockResolvedValue({
+        accessToken: "session-token",
+        termsAgreementRequired,
+      });
+      if (termsAgreementRequired) termsFetch();
+      const router = mount("/auth/kakao?code=abc&state=xyz");
+      if (termsAgreementRequired) {
+        fireEvent.click(await screen.findByLabelText("전체 동의"));
+        fireEvent.click(
+          screen.getByRole("button", { name: "동의하고 계속하기" }),
+        );
+      }
+      await waitFor(() => expect(auth.status).toBe("loading"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(router.state.location.pathname + router.state.location.hash).toBe(
+        "/landing#landing-roadmap",
+      );
+      expect(readLoginReturnPath()).toBeNull();
+    },
+  );
+
+  it("복귀 주소 없이 복원된 약관 모달도 완료 후 현재 해시를 유지한다", async () => {
+    auth.status = "onboardingRequired";
+    termsFetch();
+    const router = mount("/landing#landing-roadmap");
+    fireEvent.click(await screen.findByLabelText("전체 동의"));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 계속하기" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.pathname + router.state.location.hash).toBe(
+      "/landing#landing-roadmap",
+    );
+  });
   it.each(["cancelled", "network"])(
     "%s 콜백 실패를 복귀 화면의 모달에 표시하고 다시 로그인할 수 있다",
     async (kind) => {

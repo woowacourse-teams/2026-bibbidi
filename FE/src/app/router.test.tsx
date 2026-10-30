@@ -245,78 +245,82 @@ describe("appRoutes", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("가입 미완료 사용자는 현재 화면에서 약관 모달을 열고 개인 API를 호출하지 않는다", async () => {
-    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
-      const url = input.toString();
+  it.each(["/checklist", "/calendar", "/preparation", "/balance-game"])(
+    "가입 미완료 사용자는 %s의 약관 모달에서 개인 API를 호출하지 않는다",
+    async (path) => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementation((input: RequestInfo | URL) => {
+          const url = input.toString();
 
-      if (url === "/api/auth/web/sessions/refresh") {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              accessToken: "pending-token",
-              termsAgreementRequired: true,
-            }),
-            { status: 200 },
-          ),
-        );
-      }
+          if (url === "/api/auth/web/sessions/refresh") {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  accessToken: "pending-token",
+                  termsAgreementRequired: true,
+                }),
+                { status: 200 },
+              ),
+            );
+          }
 
-      if (url === "/api/terms") {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify([
-              {
-                id: 1,
-                code: "service",
-                version: "2026-09",
-                title: "서비스 이용약관",
-                content: "서비스 이용약관 전문",
-                required: true,
-              },
-            ]),
-            { status: 200 },
-          ),
-        );
-      }
+          if (url === "/api/terms") {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify([
+                  {
+                    id: 1,
+                    code: "service",
+                    version: "2026-09",
+                    title: "서비스 이용약관",
+                    content: "서비스 이용약관 전문",
+                    required: true,
+                  },
+                ]),
+                { status: 200 },
+              ),
+            );
+          }
 
-      if (url === "/api/auth/web/sessions/current") {
-        return Promise.resolve(new Response(null, { status: 204 }));
-      }
+          if (url === "/api/auth/web/sessions/current") {
+            return Promise.resolve(new Response(null, { status: 204 }));
+          }
 
-      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const router = renderRouter(["/checklist"]);
+          return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+        });
+      vi.stubGlobal("fetch", fetchMock);
+      const router = renderRouter([path]);
 
-    expect(
-      await screen.findByRole("heading", { name: "가입 마무리" }),
-    ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/checklist");
-    expect(
-      fetchMock.mock.calls.some(
-        ([input]) => input.toString() === "/api/checklists/me",
-      ),
-    ).toBe(false);
+      expect(
+        await screen.findByRole("heading", { name: "가입 마무리" }),
+      ).toBeTruthy();
+      expect(router.state.location.pathname).toBe(path);
+      // The complete app tree is mounted: only session refresh and public terms may load.
+      expect(
+        new Set(fetchMock.mock.calls.map(([input]) => input.toString())),
+      ).toEqual(new Set(["/api/auth/web/sessions/refresh", "/api/terms"]));
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "다른 계정으로 로그인" }),
-    );
+      fireEvent.click(
+        screen.getByRole("button", { name: "다른 계정으로 로그인" }),
+      );
 
-    expect(
-      await screen.findByRole("region", { name: "소셜 로그인" }),
-    ).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/checklist");
-    expect(hasWebAccessToken()).toBe(false);
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/auth/web/sessions/current",
-        expect.objectContaining({
-          credentials: "include",
-          method: "DELETE",
-        }),
-      ),
-    );
-  });
+      expect(
+        await screen.findByRole("region", { name: "소셜 로그인" }),
+      ).toBeTruthy();
+      expect(router.state.location.pathname).toBe(path);
+      expect(hasWebAccessToken()).toBe(false);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/auth/web/sessions/current",
+          expect.objectContaining({
+            credentials: "include",
+            method: "DELETE",
+          }),
+        ),
+      );
+    },
+  );
 
   it("약관 동의 뒤 새 계정 체크리스트를 만들고 홈으로 이동한다", async () => {
     let hasChecklist = false;
