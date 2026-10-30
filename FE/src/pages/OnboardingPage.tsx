@@ -1,33 +1,9 @@
-import { useCallback } from "react";
-import { useNavigate } from "react-router";
-
-import { clearAccountSetupProgress } from "../features/account-setup";
-import { useAuth, useLogout } from "../features/auth";
-import { OnboardingFeature } from "../features/onboarding/OnboardingFeature";
+import { Navigate } from "react-router";
+import { readLoginReturnPath } from "../features/auth/model/loginReturnPath";
 
 export function OnboardingPage() {
-  const navigate = useNavigate();
-  const { endAuthentication, refreshAuth } = useAuth();
-
-  const handleAuthenticationExpired = useCallback(() => {
-    clearAccountSetupProgress();
-    endAuthentication();
-    navigate("/login", { replace: true });
-  }, [endAuthentication, navigate]);
-
-  const handleSuccess = useCallback(() => {
-    refreshAuth();
-    navigate("/onboarding/account", { replace: true });
-  }, [navigate, refreshAuth]);
-  const switchAccount = useLogout({ onSuccess: handleAuthenticationExpired });
-
+  const returnTo = readLoginReturnPath() ?? "/";
   return (
-    <OnboardingFeature
-      isSwitchingAccount={switchAccount.isLoggingOut}
-      onAuthenticationExpired={handleAuthenticationExpired}
-      onSuccess={handleSuccess}
-      onSwitchAccount={switchAccount.submit}
-      switchAccountErrorMessage={switchAccount.errorMessage}
-    />
+    <Navigate replace to={returnTo} state={{ loginModal: { returnTo } }} />
   );
 }

@@ -469,6 +469,34 @@ afterEach(() => {
 });
 
 describe("Checklist 웹 상세 패널", () => {
+  it("모바일 일정 메뉴의 Escape는 메뉴만 닫고 삭제 취소 후 트리거로 복귀한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(
+      <AppointmentManagementHarness
+        repository={createAppointmentCommandRepository()}
+      />,
+    );
+    const detail = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    const trigger = within(detail).getByRole("button", {
+      name: "계약서 검토 일정 더보기",
+    });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(within(detail).getByRole("menuitem", { name: "수정" }), {
+      key: "Escape",
+    });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "웨딩홀 계약" })).toBe(detail);
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.click(trigger);
+    fireEvent.click(within(detail).getByRole("menuitem", { name: "삭제" }));
+    expect(screen.queryByRole("menu")).toBeNull();
+    const confirmation = screen.getByRole("dialog", {
+      name: "이 일정을 삭제할까요?",
+    });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
   it("일정 메뉴는 하나만 열리고 키보드·바깥 클릭·Escape와 포커스 복귀를 지원한다", async () => {
     const view = render(
       <AppointmentManagementHarness
@@ -517,50 +545,62 @@ describe("Checklist 웹 상세 패널", () => {
     await waitFor(() => expect(document.activeElement).toBe(firstTrigger));
   });
 
-  it("수정 화면에 기존 값을 채우고 취소하면 일정 메뉴 버튼으로 초점을 복원한다", async () => {
-    render(
-      <AppointmentManagementHarness
-        repository={createAppointmentCommandRepository()}
-      />,
-    );
-    const trigger = screen.getByRole("button", {
-      name: "계약서 검토 일정 더보기",
-    });
-    fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
+  it.each([false, true])(
+    "수정 화면에 기존 값을 채우고 취소하면 일정 메뉴 버튼으로 초점을 복원한다 (모바일=%s)",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(
+        <AppointmentManagementHarness
+          repository={createAppointmentCommandRepository()}
+        />,
+      );
+      const trigger = screen.getByRole("button", {
+        name: "계약서 검토 일정 더보기",
+      });
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole("menuitem", { name: "수정" }));
 
-    const form = screen.getByRole("complementary", { name: "일정 수정" });
-    expect(
-      (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
-    ).toBe("계약서 검토");
-    expect(
-      (within(form).getByLabelText(/날짜/) as HTMLInputElement).value,
-    ).toBe("2026-09-12");
-    expect(
-      (within(form).getByLabelText("시작 시간") as HTMLInputElement).value,
-    ).toBe("19:00");
-    expect(
-      (within(form).getByLabelText("종료 시간") as HTMLInputElement).value,
-    ).toBe("20:30");
-    expect(
-      (within(form).getByLabelText("장소") as HTMLInputElement).value,
-    ).toBe("온라인");
-    expect(
-      (within(form).getByLabelText("메모") as HTMLTextAreaElement).value,
-    ).toBe("계약 조건 확인");
+      const form = screen.getByRole(mobile ? "dialog" : "complementary", {
+        name: "일정 수정",
+      });
+      expect(
+        (within(form).getByLabelText(/제목/) as HTMLInputElement).value,
+      ).toBe("계약서 검토");
+      expect(
+        within(form).getByRole("button", { name: "날짜 2026-09-12" }),
+      ).toBeTruthy();
+      expect(
+        within(form).getByRole("button", { name: "시작 시간 19:00" }),
+      ).toBeTruthy();
+      expect(
+        within(form).getByRole("button", { name: "종료 시간 20:30" }),
+      ).toBeTruthy();
+      expect(
+        (within(form).getByLabelText("장소") as HTMLInputElement).value,
+      ).toBe("온라인");
+      expect(
+        (within(form).getByLabelText("메모") as HTMLTextAreaElement).value,
+      ).toBe("계약 조건 확인");
 
-    fireEvent.click(within(form).getByRole("button", { name: "취소" }));
-    expect(
-      screen.queryByRole("complementary", { name: "일정 수정" }),
-    ).toBeNull();
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByRole("button", {
-          name: "계약서 검토 일정 더보기",
+      fireEvent.click(
+        within(form).getByRole("button", {
+          name: mobile ? "할 일 상세로 돌아가기" : "취소",
         }),
-      ),
-    );
-  });
+      );
+      expect(
+        screen.queryByRole(mobile ? "dialog" : "complementary", {
+          name: "일정 수정",
+        }),
+      ).toBeNull();
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", {
+            name: "계약서 검토 일정 더보기",
+          }),
+        ),
+      );
+    },
+  );
 
   it("삭제는 확인 버튼 뒤에만 실행하고 실패 시 다이얼로그에서 재시도한다", async () => {
     const repository = createAppointmentCommandRepository();
@@ -624,7 +664,7 @@ describe("Checklist 웹 상세 패널", () => {
     expect(screen.getByRole("dialog")).toBe(dialog);
   });
 
-  it("완료 요청 중 체크 버튼을 비활성화해 중복 변경을 막는다", async () => {
+  it("완료 요청 중 체크박스를 비활성화해 중복 변경을 막는다", async () => {
     let resolveCompletion: () => void = () => undefined;
     const repository = createAppointmentCommandRepository();
     vi.mocked(repository.changeAppointmentCompletion).mockReturnValue(
@@ -633,13 +673,21 @@ describe("Checklist 웹 상세 패널", () => {
       }),
     );
     render(<AppointmentManagementHarness repository={repository} />);
-    const completionButton = screen.getByRole("button", {
+    const completionCheckbox = screen.getByRole("checkbox", {
       name: "계약서 검토 일정 완료",
-    });
+    }) as HTMLInputElement;
 
-    fireEvent.click(completionButton);
-    fireEvent.click(completionButton);
-    expect((completionButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(completionCheckbox);
+    fireEvent.click(completionCheckbox);
+    expect(completionCheckbox.disabled).toBe(true);
+    expect(completionCheckbox.getAttribute("aria-busy")).toBe("true");
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "계약금 입금 일정 미완료로 변경",
+        }) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
     expect(
       (
         screen.getByRole("button", {
@@ -648,9 +696,14 @@ describe("Checklist 웹 상세 패널", () => {
       ).disabled,
     ).toBe(true);
     expect(repository.changeAppointmentCompletion).toHaveBeenCalledOnce();
+    expect(repository.changeAppointmentCompletion).toHaveBeenCalledWith(
+      2,
+      true,
+      expect.any(AbortSignal),
+    );
 
     await act(async () => resolveCompletion());
-    expect((completionButton as HTMLButtonElement).disabled).toBe(false);
+    expect(completionCheckbox.disabled).toBe(false);
   });
 
   it("완료된 일정은 체크 상태와 완료 스타일을 명확히 표시한다", () => {
@@ -660,16 +713,118 @@ describe("Checklist 웹 상세 패널", () => {
       />,
     );
 
-    const completionButton = screen.getByRole("button", {
+    const completionCheckbox = screen.getByRole("checkbox", {
       name: "계약금 입금 일정 미완료로 변경",
-    });
-    const appointment = completionButton.closest("li");
+    }) as HTMLInputElement;
+    const appointment = completionCheckbox.closest("li");
 
-    expect(completionButton.getAttribute("aria-pressed")).toBe("true");
+    expect(completionCheckbox.checked).toBe(true);
     expect(appointment?.classList).toContain(
       "checklist-detail-content__appointment--complete",
     );
   });
+
+  it("미완료로 변경하는 요청이 실패하면 체크 상태를 유지하고 다시 시도할 수 있다", async () => {
+    const repository = createAppointmentCommandRepository();
+    vi.mocked(repository.changeAppointmentCompletion).mockRejectedValueOnce(
+      new AppointmentManagementError("unknown"),
+    );
+    render(<AppointmentManagementHarness repository={repository} />);
+    const completionCheckbox = screen.getByRole("checkbox", {
+      name: "계약금 입금 일정 미완료로 변경",
+    }) as HTMLInputElement;
+
+    fireEvent.click(completionCheckbox);
+
+    expect(repository.changeAppointmentCompletion).toHaveBeenCalledWith(
+      1,
+      false,
+      expect.any(AbortSignal),
+    );
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "일정을 변경하지 못했어요. 다시 시도해 주세요.",
+    );
+    expect(completionCheckbox.checked).toBe(true);
+    expect(completionCheckbox.disabled).toBe(false);
+    fireEvent.click(completionCheckbox);
+    await waitFor(() =>
+      expect(repository.changeAppointmentCompletion).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it("할 일 행에 전체 제목과 기존 일정·상태를 표시하고 상태별로 별도 조작을 만들지 않는다", () => {
+    const query = createChecklistQuery();
+    const title =
+      "예식장 방문 전에 양가 부모님과 함께 확인할 계약 조건과 준비 사항";
+    query.categories[0].items.push({
+      ...query.categories[0].items[0],
+      appointments: [],
+      checklistItemId: 12,
+      id: "checklist-item-12",
+      status: "prev",
+      title,
+    });
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(
+      <Checklist
+        categories={createChecklistViewModel(query)}
+        onBackTaskDetail={vi.fn()}
+        onCloseTaskDetail={vi.fn()}
+        onSelectTask={vi.fn()}
+        selectedTaskId={null}
+      />,
+    );
+
+    const scheduled = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    expect(within(scheduled).getByText("9월 8일")).toBeTruthy();
+    expect(within(scheduled).getByText("진행 중")).toBeTruthy();
+    const completed = screen.getByRole("button", { name: /웨딩홀 투어/ });
+    expect(within(completed).getByText("일정 없음")).toBeTruthy();
+    expect(within(completed).getByText("완료")).toBeTruthy();
+    const pending = screen.getByRole("button", { name: new RegExp(title) });
+    expect(within(pending).getByText(title)).toBeTruthy();
+    expect(within(pending).getByText("예정")).toBeTruthy();
+    expect(within(pending).queryByRole("button")).toBeNull();
+    expect(within(pending).queryByRole("checkbox")).toBeNull();
+  });
+
+  it.each([false, true])(
+    "상세 정보의 카테고리·상태와 선택기를 네이티브 정의 목록으로 표시한다 (모바일=%s)",
+    (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      render(<EditableChecklistHarness />);
+
+      const detail = screen.getByRole(mobile ? "dialog" : "complementary", {
+        name: "청첩장 문구 정하기",
+      });
+      const list = detail.querySelector("dl");
+      expect(list).not.toBeNull();
+      const rows = Array.from(list!.children);
+      expect(rows).toHaveLength(2);
+      rows.forEach((row) => {
+        expect(row.tagName).toBe("DIV");
+        expect(Array.from(row.children).map((child) => child.tagName)).toEqual([
+          "DT",
+          "DD",
+        ]);
+      });
+      expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual([
+        "카테고리",
+        "상태",
+      ]);
+      expect(
+        within(rows[0].lastElementChild as HTMLElement).getByRole("combobox", {
+          name: "카테고리 변경, 현재 예식 준비",
+        }),
+      ).toBeTruthy();
+      expect(
+        within(rows[1].lastElementChild as HTMLElement).getByRole("combobox", {
+          name: "상태 변경, 현재 예정",
+        }),
+      ).toBeTruthy();
+    },
+  );
 
   it("선택한 할 일의 API 기반 상세 정보와 전체 일정을 서버 순서로 표시한다", () => {
     render(<ChecklistHarness />);
@@ -695,16 +850,37 @@ describe("Checklist 웹 상세 패널", () => {
     expect(within(panel).getByText("계약 조건 확인")).toBeTruthy();
     expect(within(panel).getByText("시간 없음 · 장소 없음")).toBeTruthy();
     expect(within(panel).getByText("메모 없음")).toBeTruthy();
-    expect(within(panel).getByLabelText("완료된 일정")).toBeTruthy();
+    const completed = within(panel).getByRole("checkbox", {
+      name: "완료된 일정",
+    }) as HTMLInputElement;
+    const incomplete = within(panel).getByRole("checkbox", {
+      name: "미완료 일정",
+    }) as HTMLInputElement;
+    expect(completed.checked).toBe(true);
+    expect(incomplete.checked).toBe(false);
+    expect(completed.disabled).toBe(true);
+    expect(incomplete.disabled).toBe(true);
+    fireEvent.click(completed);
+    fireEvent.click(incomplete);
+    expect(completed.checked).toBe(true);
+    expect(incomplete.checked).toBe(false);
   });
 
   it("다른 할 일을 선택하면 패널 내용을 교체하고 빈 일정 상태를 표시한다", () => {
     render(<ChecklistHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 투어/ }));
+    const firstTask = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
+    fireEvent.click(firstTask);
+    expect(firstTask.getAttribute("data-selected")).toBe("true");
+    fireEvent.click(completedTask);
+    expect(firstTask.hasAttribute("data-selected")).toBe(false);
+    expect(firstTask.getAttribute("aria-expanded")).toBe("false");
+    expect(completedTask.getAttribute("data-selected")).toBe("true");
+    expect(completedTask.getAttribute("aria-expanded")).toBe("true");
 
     const panel = screen.getByRole("complementary", { name: "웨딩홀 투어" });
+    expect(completedTask.getAttribute("aria-controls")).toBe(panel.id);
     expect(within(panel).getByText("완료")).toBeTruthy();
     expect(
       within(panel).getByRole("heading", { name: "일정 0개" }),
@@ -713,6 +889,12 @@ describe("Checklist 웹 상세 패널", () => {
     expect(
       screen.queryByRole("complementary", { name: "웨딩홀 계약" }),
     ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 상세 닫기" }));
+    expect(completedTask.hasAttribute("data-selected")).toBe(false);
+    expect(completedTask.hasAttribute("aria-controls")).toBe(false);
+    expect(completedTask.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(completedTask);
   });
 
   it("닫기 버튼과 Escape 키로 패널을 닫고 선택한 항목으로 포커스를 돌린다", () => {
@@ -783,15 +965,15 @@ describe("Checklist 웹 상세 패널", () => {
     );
   });
 
-  it("모바일에서는 공통 상세 콘텐츠를 바텀시트로 표시하고 배경 목록과 스크롤을 비활성화한다", () => {
+  it("모바일 상세는 닫기 애니메이션이 끝난 뒤 목록 초점과 배경 스크롤을 복원한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     const { container } = render(
-      <div data-page-scroll-container>
+      <div data-modal-scope data-page-scroll-container>
         <ChecklistHarness />
       </div>,
     );
-
     const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    task.focus();
     fireEvent.click(task);
 
     expect(screen.queryByRole("complementary")).toBeNull();
@@ -799,125 +981,149 @@ describe("Checklist 웹 상세 패널", () => {
     expect(bottomSheet.getAttribute("aria-modal")).toBe("true");
     expect(within(bottomSheet).getByText("예식장")).toBeTruthy();
     expect(within(bottomSheet).getByText("계약 조건 확인")).toBeTruthy();
-    expect(document.activeElement).toBe(
-      within(bottomSheet).getByRole("button", {
-        name: "아래로 밀어 할 일 상세 닫기",
-      }),
-    );
     expect(
-      within(bottomSheet).queryByRole("button", {
-        name: "할 일 상세 닫기",
-      }),
+      within(bottomSheet).getByRole("button", { name: "아래로 밀어 닫기" }),
+    ).toBeTruthy();
+    expect(
+      within(bottomSheet).queryByRole("button", { name: "할 일 상세 닫기" }),
     ).toBeNull();
 
     const background = document.querySelector(".checklist-workspace__main");
     const scrollContainer = container.querySelector<HTMLElement>(
       "[data-page-scroll-container]",
-    );
+    )!;
     expect(background?.getAttribute("aria-hidden")).toBe("true");
     expect(background?.hasAttribute("inert")).toBe(true);
     expect(document.body.style.overflow).toBe("hidden");
-    expect(scrollContainer?.style.overflow).toBe("hidden");
+    expect(scrollContainer.style.overflow).toBe("hidden");
 
+    let finishAnimation!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finishAnimation = resolve;
+    });
+    Object.defineProperty(bottomSheet.firstElementChild, "getAnimations", {
+      value: () => [{ finished }],
+    });
     fireEvent.keyDown(bottomSheet, { key: "Escape" });
-
-    expect(
-      bottomSheet.closest(".checklist-detail-bottom-sheet")?.className,
-    ).toContain("bottom-sheet-dismiss--closing");
+    expect(bottomSheet.dataset.state).toBe("closing");
     expect(screen.getByRole("dialog", { name: "웨딩홀 계약" })).toBe(
       bottomSheet,
     );
     expect(document.body.style.overflow).toBe("hidden");
+    expect(scrollContainer.style.overflow).toBe("hidden");
 
-    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
-
+    await act(async () => finishAnimation());
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
     expect(document.body.style.overflow).toBe("");
-    expect(scrollContainer?.style.overflow).toBe("");
+    expect(scrollContainer.style.overflow).toBe("");
   });
 
-  it("모바일 바텀시트는 스크림과 드래그 핸들로 닫고 짧은 드래그는 복원한다", () => {
+  it("모바일 바텀시트는 짧은 드래그를 복원하고 긴 드래그와 배경 누르기로 닫는다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     render(<ChecklistHarness />);
-
     const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    task.focus();
     fireEvent.click(task);
-    let bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
-    let sheetRoot = bottomSheet.closest(
-      ".checklist-detail-bottom-sheet",
-    ) as HTMLElement;
+    const bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
     const handle = within(bottomSheet).getByRole("button", {
-      name: "아래로 밀어 할 일 상세 닫기",
+      name: "아래로 밀어 닫기",
     });
-    vi.spyOn(bottomSheet, "getBoundingClientRect").mockReturnValue(
-      DOMRect.fromRect({ height: 600 }),
-    );
+    vi.spyOn(
+      bottomSheet.firstElementChild!,
+      "getBoundingClientRect",
+    ).mockReturnValue(DOMRect.fromRect({ height: 600 }));
+    const touch = (clientY: number) => ({
+      identifier: 1,
+      clientX: 100,
+      clientY,
+    });
+    fireEvent.touchStart(handle, { touches: [touch(100)] });
+    fireEvent.touchMove(handle, { touches: [touch(160)] });
+    expect(
+      bottomSheet.style.getPropertyValue("--bottom-sheet-drag-offset"),
+    ).toBe("60px");
+    fireEvent.touchEnd(handle, { touches: [], changedTouches: [touch(160)] });
+    expect(bottomSheet.dataset.state).toBe("open");
+    expect(
+      bottomSheet.style.getPropertyValue("--bottom-sheet-drag-offset"),
+    ).toBe("0px");
 
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      clientY: 100,
-      pointerId: 1,
-      pointerType: "touch",
+    await act(async () => {
+      fireEvent.touchStart(handle, { touches: [touch(100)] });
+      fireEvent.touchMove(handle, { touches: [touch(210)] });
+      fireEvent.touchEnd(handle, { touches: [], changedTouches: [touch(210)] });
     });
-    fireEvent.pointerMove(handle, {
-      clientY: 160,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-    expect(sheetRoot.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
-      "60px",
-    );
-    fireEvent.pointerUp(handle, {
-      clientY: 160,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-
-    expect(sheetRoot.className).not.toContain("bottom-sheet-dismiss--closing");
-    expect(sheetRoot.style.getPropertyValue("--bottom-sheet-drag-offset")).toBe(
-      "0px",
-    );
-
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      clientY: 100,
-      pointerId: 2,
-      pointerType: "touch",
-    });
-    fireEvent.pointerMove(handle, {
-      clientY: 210,
-      pointerId: 2,
-      pointerType: "touch",
-    });
-    fireEvent.pointerUp(handle, {
-      clientY: 210,
-      pointerId: 2,
-      pointerType: "touch",
-    });
-
-    expect(sheetRoot.className).toContain("bottom-sheet-dismiss--closing");
-    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
 
     fireEvent.click(task);
-    bottomSheet = screen.getByRole("dialog", { name: "웨딩홀 계약" });
-    sheetRoot = bottomSheet.closest(
-      ".checklist-detail-bottom-sheet",
-    ) as HTMLElement;
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
-    expect(sheetRoot.className).toContain("bottom-sheet-dismiss--closing");
-    fireEvent.transitionEnd(bottomSheet, { propertyName: "transform" });
+    const reopened = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    await act(async () => {
+      fireEvent.pointerDown(reopened, { isPrimary: true });
+      fireEvent.pointerUp(reopened);
+      fireEvent.click(reopened);
+    });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
     expect(document.activeElement).toBe(task);
   });
 
-  it("모션 감소 설정에서는 모바일 바텀시트를 즉시 닫는다", () => {
+  it.each(["제목", "본문"])(
+    "모바일 상세의 %s도 아래로 끌어 닫을 수 있다",
+    async (area) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+      render(<ChecklistHarness />);
+      fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
+      const detail = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+      const target =
+        area === "제목"
+          ? within(detail).getByRole("heading", { name: "웨딩홀 계약" })
+          : within(detail).getByText("계약 조건 확인");
+      const touch = (clientY: number) => ({
+        identifier: 1,
+        clientX: 100,
+        clientY,
+      });
+      await act(async () => {
+        fireEvent.touchStart(target, { touches: [touch(100)] });
+        fireEvent.touchMove(target, { touches: [touch(240)] });
+        fireEvent.touchEnd(target, {
+          touches: [],
+          changedTouches: [touch(240)],
+        });
+      });
+      expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
+    },
+  );
+
+  it("모바일 상세의 스크롤된 본문과 선택 조작은 드래그 닫기보다 우선한다", () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    render(<EditableChecklistHarness />);
+    const detail = screen.getByRole("dialog");
+    const body = detail.querySelector<HTMLElement>(
+      ".bibbidi-bottom-sheet-body",
+    )!;
+    const touch = (clientY: number) => ({
+      identifier: 1,
+      clientX: 100,
+      clientY,
+    });
+    const pull = (target: HTMLElement) => {
+      fireEvent.touchStart(target, { touches: [touch(100)] });
+      const allowed = fireEvent.touchMove(target, { touches: [touch(240)] });
+      fireEvent.touchEnd(target, { touches: [], changedTouches: [touch(240)] });
+      return allowed;
+    };
+    body.scrollTop = 40;
+    expect(pull(within(detail).getByText("등록된 일정이 없어요."))).toBe(true);
+    body.scrollTop = 0;
+    expect(
+      pull(within(detail).getByRole("combobox", { name: /상태 변경/ })),
+    ).toBe(true);
+    expect(detail.dataset.state).toBe("open");
+  });
+
+  it("모션 감소 설정에서도 모바일 상세를 닫고 목록 초점을 복원한다", async () => {
     vi.stubGlobal(
       "matchMedia",
       vi.fn(
@@ -936,15 +1142,17 @@ describe("Checklist 웹 상세 패널", () => {
       ),
     );
     render(<ChecklistHarness />);
-
-    fireEvent.click(screen.getByRole("button", { name: /웨딩홀 계약/ }));
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
-
+    const task = screen.getByRole("button", { name: /웨딩홀 계약/ });
+    task.focus();
+    fireEvent.click(task);
+    const detail = screen.getByRole("dialog", { name: "웨딩홀 계약" });
+    await act(async () => {
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "아래로 밀어 닫기" }),
+      );
+    });
     expect(screen.queryByRole("dialog", { name: "웨딩홀 계약" })).toBeNull();
+    expect(document.activeElement).toBe(task);
   });
 
   it("모바일 바텀시트에서도 일정이 없으면 공통 빈 상태를 표시한다", () => {
@@ -1015,13 +1223,122 @@ describe("Checklist 목록 표현", () => {
     expect(screen.getByRole("button", { name: "할 일 추가" })).toBeTruthy();
   });
 
-  it("목록 왼쪽 체크 표시 없이 완료 배경과 상태 문구를 유지한다", () => {
-    const { container } = render(<ChecklistHarness />);
+  it("목록 왼쪽 체크 표시 없이 완료 상태를 positive 배지로 표시한다", () => {
+    render(<ChecklistHarness />);
     const completedTask = screen.getByRole("button", { name: /웨딩홀 투어/ });
 
-    expect(container.querySelector(".checklist__completion-mark")).toBeNull();
-    expect(completedTask.closest(".checklist__task--complete")).not.toBeNull();
-    expect(within(completedTask).getByText("완료")).toBeTruthy();
+    expect(within(completedTask).queryByRole("checkbox")).toBeNull();
+    expect(
+      within(completedTask)
+        .getByText("완료")
+        .closest('[data-color="positive"]'),
+    ).not.toBeNull();
+  });
+
+  it("접힌 그룹에서도 이름과 값이 있는 진행률을 펼침 버튼 바깥에 표시한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "계약하기" });
+    const progress = screen.getByRole("progressbar", {
+      name: "계약하기 진행률",
+    });
+    const panel = document.getElementById(
+      trigger.getAttribute("aria-controls")!,
+    );
+    expect(panel?.hidden).toBe(true);
+    expect(progress.getAttribute("aria-valuenow")).toBe("100");
+    expect(progress.getAttribute("aria-valuetext")).toBe("1/1 완료, 100%");
+    expect(trigger.contains(progress)).toBe(false);
+    expect(panel?.contains(progress)).toBe(false);
+    expect(
+      screen
+        .getByRole("progressbar", { name: "상담하기 진행률" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("0");
+
+    fireEvent.click(trigger);
+    expect(panel?.hidden).toBe(false);
+    expect(panel?.getAttribute("aria-labelledby")).toBe(trigger.id);
+  });
+
+  it("방향키와 Home·End로 그룹 제목만 이동하고 펼침 상태를 유지한다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+    const first = screen.getByRole("button", { name: "계약하기" });
+    const last = screen.getByRole("button", { name: "상담하기" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "End" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Home" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(last);
+    expect(first.getAttribute("aria-expanded")).toBe("false");
+    expect(last.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("직접 추가로 열린 그룹을 접을 수 있고 다음 추가 요청에서 다시 펼친다", () => {
+    const query = createGroupedChecklistQuery();
+    query.categories[0].customItems = [
+      {
+        ...query.categories[0].items[1],
+        id: "custom-item",
+        checklistItemId: 30,
+        sourceCatalogItemId: null,
+        title: "직접 추가한 일",
+      },
+    ];
+    const categories = createChecklistViewModel(query);
+    const renderChecklist = (requestId: number) => (
+      <Checklist
+        categories={categories}
+        onBackTaskDetail={vi.fn()}
+        onCloseTaskDetail={vi.fn()}
+        onSelectTask={vi.fn()}
+        revealCustomCategory={{ categoryId: "10", requestId }}
+        selectedTaskId={null}
+      />
+    );
+    const view = render(renderChecklist(1));
+    const custom = screen.getByRole("button", { name: "내가 추가한 일" });
+    expect(custom.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(custom);
+    fireEvent.click(screen.getByRole("button", { name: "계약하기" }));
+    expect(custom.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      screen.getByRole("progressbar", { name: "내가 추가한 일 진행률" }),
+    ).toBeTruthy();
+    view.rerender(renderChecklist(2));
+    expect(custom.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: /직접 추가한 일/ })).toBeTruthy();
+  });
+
+  it("선택한 할 일의 그룹을 접고 상세를 닫으면 첫 그룹 제목으로 초점을 돌린다", () => {
+    render(
+      <ChecklistHarness
+        categories={createChecklistViewModel(createGroupedChecklistQuery())}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /방문 상담/ }));
+    const group = screen.getByRole("button", { name: "상담하기" });
+    group.focus();
+    fireEvent.click(group);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "계약하기" }),
+    );
   });
 
   it("첫 미완료 중분류를 열고 여러 중분류를 동시에 펼치며 대분류를 전환한다", () => {
@@ -1041,19 +1358,19 @@ describe("Checklist 목록 표현", () => {
     expect(completedGroup.getAttribute("aria-expanded")).toBe("false");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
     expect(
-      completedGroup.closest(".checklist__group")?.className,
-    ).not.toContain("checklist__group--expanded");
-    expect(incompleteGroup.closest(".checklist__group")?.className).toContain(
-      "checklist__group--expanded",
-    );
+      completedGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("closed");
+    expect(
+      incompleteGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("open");
     expect(screen.queryByText("빈 단계")).toBeNull();
 
     fireEvent.click(completedGroup);
     expect(completedGroup.getAttribute("aria-expanded")).toBe("true");
     expect(incompleteGroup.getAttribute("aria-expanded")).toBe("true");
-    expect(completedGroup.closest(".checklist__group")?.className).toContain(
-      "checklist__group--expanded",
-    );
+    expect(
+      completedGroup.closest(".checklist__group")?.getAttribute("data-state"),
+    ).toBe("open");
     expect(screen.getByText("계약 완료")).toBeTruthy();
     expect(screen.getByText("방문 상담")).toBeTruthy();
 
@@ -1062,11 +1379,23 @@ describe("Checklist 목록 표현", () => {
       screen.getByRole("complementary", { name: "방문 상담" }),
     ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "스드메 0/1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "스드메 0/1" }));
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
     expect(screen.getByText("드레스 투어")).toBeTruthy();
     expect(screen.queryByText("방문 상담")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "예식장 1/2" }));
+    expect(
+      screen
+        .getByRole("button", { name: "계약하기" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "상담하기" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
   });
 });
 
@@ -1074,25 +1403,23 @@ describe("Checklist 할 일 편집", () => {
   it("직접 작성 항목에만 제목과 카테고리 수정 동작을 노출한다", () => {
     render(<EditableChecklistHarness />);
 
+    expect(screen.getByRole("button", { name: "할 일 더보기" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "할 일 제목 수정" }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
 
+    expect(screen.queryByRole("button", { name: "할 일 더보기" })).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "할 일 제목 수정" }),
+      screen.queryByRole("combobox", { name: /카테고리 변경/ }),
     ).toBeNull();
-    expect(screen.queryByRole("button", { name: /카테고리 변경/ })).toBeNull();
     expect(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     ).toBeTruthy();
     expect(
       within(screen.getByRole("complementary")).getByText("예식 준비"),
@@ -1104,7 +1431,7 @@ describe("Checklist 할 일 편집", () => {
     render(
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
@@ -1113,16 +1440,21 @@ describe("Checklist 할 일 편집", () => {
     const inProgress = screen.getByRole("option", { name: "진행 중" });
     const complete = screen.getByRole("option", { name: "완료" });
     expect(incomplete.getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(incomplete);
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
 
-    fireEvent.keyDown(incomplete, { key: "End" });
-    expect(document.activeElement).toBe(complete);
-    fireEvent.keyDown(complete, { key: "Home" });
-    expect(document.activeElement).toBe(incomplete);
-    fireEvent.keyDown(incomplete, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(inProgress);
-    fireEvent.keyDown(inProgress, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(incomplete);
+    fireEvent.keyDown(trigger, { key: "End" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(complete.id);
+    fireEvent.keyDown(trigger, { key: "Home" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(inProgress.id);
+    fireEvent.keyDown(trigger, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(incomplete.id);
 
     fireEvent.click(incomplete);
     expect(requestStatusChange).not.toHaveBeenCalled();
@@ -1132,12 +1464,12 @@ describe("Checklist 할 일 편집", () => {
 
   it("상태 팝오버는 Escape와 바깥 클릭으로 닫고 트리거로 포커스를 복원한다", async () => {
     render(<EditableChecklistHarness />);
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
     fireEvent.click(trigger);
-    fireEvent.keyDown(screen.getByRole("option", { name: "예정" }), {
+    fireEvent.keyDown(trigger, {
       key: "Escape",
     });
     await waitFor(() => expect(document.activeElement).toBe(trigger));
@@ -1155,10 +1487,10 @@ describe("Checklist 할 일 편집", () => {
     const rectSpy = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
-        if (this.classList.contains("checklist-status-editor__trigger")) {
+        if (this.classList.contains("bibbidi-select-trigger")) {
           return DOMRect.fromRect({ height: 24, width: 64, x: 294, y: 320 });
         }
-        if (this.classList.contains("bottom-sheet-dismiss__dialog")) {
+        if (this.classList.contains("bibbidi-bottom-sheet")) {
           return DOMRect.fromRect({ height: 732, width: 390, x: 0, y: 112 });
         }
         return DOMRect.fromRect();
@@ -1169,15 +1501,15 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
 
     const popover = document.querySelector(
-      ".checklist-status-editor__popover",
+      ".bibbidi-select-list",
     ) as HTMLDivElement;
-    expect(popover.style.left).toBe("178px");
-    expect(popover.style.maxHeight).toBe("482px");
-    expect(popover.style.top).toBe("238px");
+    expect(popover.style.left).toBe("202px");
+    expect(popover.style.maxHeight).toBe("320px");
+    expect(popover.style.top).toBe("352px");
     expect(popover.style.width).toBe("180px");
 
     rectSpy.mockRestore();
@@ -1191,7 +1523,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
 
@@ -1209,7 +1541,7 @@ describe("Checklist 할 일 편집", () => {
     render(
       <EditableChecklistHarness requestStatusChange={requestStatusChange} />,
     );
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "상태 변경, 현재 예정",
     });
 
@@ -1221,8 +1553,10 @@ describe("Checklist 할 일 편집", () => {
     });
     expect(within(dialog).getByText(/함께 완료돼요/)).toBeTruthy();
     expect(requestStatusChange).toHaveBeenCalledWith(500, "done");
-    expect(document.activeElement).toBe(
-      within(dialog).getByRole("button", { name: "취소" }),
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(dialog).getByRole("button", { name: "취소" }),
+      ),
     );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
@@ -1238,7 +1572,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -1247,7 +1581,7 @@ describe("Checklist 할 일 편집", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "함께 완료" }));
 
     expect(
-      await screen.findByRole("button", { name: "상태 변경, 현재 완료" }),
+      await screen.findByRole("combobox", { name: "상태 변경, 현재 완료" }),
     ).toBeTruthy();
     expect(
       screen
@@ -1258,6 +1592,19 @@ describe("Checklist 할 일 편집", () => {
   });
 
   it("완료 변경 중 Escape는 dialog에서 소비하고 활성 요청을 유지한다", async () => {
+    const matchMedia = window.matchMedia;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) =>
+        query === "(prefers-reduced-motion: reduce)"
+          ? {
+              ...matchMedia(MOBILE_LAYOUT_MEDIA_QUERY),
+              media: query,
+              matches: false,
+            }
+          : matchMedia(query),
+      ),
+    );
     let resolveStatusChange: (value: boolean) => void = () => undefined;
     const confirmStatusChange = vi.fn(
       () =>
@@ -1273,7 +1620,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     const dialog = await screen.findByRole("dialog", {
@@ -1307,7 +1654,7 @@ describe("Checklist 할 일 편집", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     fireEvent.click(screen.getByRole("option", { name: "완료" }));
     fireEvent.click(screen.getByRole("button", { name: /준비 목록 항목/ }));
@@ -1324,19 +1671,19 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     expect(screen.getByRole("listbox", { name: "카테고리 선택" })).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "상태 변경, 현재 예정" }),
+      screen.getByRole("combobox", { name: "상태 변경, 현재 예정" }),
     );
     expect(screen.queryByRole("listbox", { name: "카테고리 선택" })).toBeNull();
     expect(screen.getByRole("listbox", { name: "상태 선택" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     expect(screen.queryByRole("listbox", { name: "상태 선택" })).toBeNull();
     expect(screen.getByRole("textbox", { name: "할 일 제목" })).toBeTruthy();
@@ -1345,7 +1692,7 @@ describe("Checklist 할 일 편집", () => {
   it("카테고리 팝오버는 현재 값을 표시하고 키보드·바깥 클릭으로 닫은 뒤 포커스를 복원한다", async () => {
     const changeCategory = vi.fn().mockResolvedValue(true);
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
-    const trigger = screen.getByRole("button", {
+    const trigger = screen.getByRole("combobox", {
       name: "카테고리 변경, 현재 예식 준비",
     });
 
@@ -1353,15 +1700,15 @@ describe("Checklist 할 일 편집", () => {
     const currentOption = screen.getByRole("option", { name: "예식 준비" });
     const nextOption = screen.getByRole("option", { name: "예복 준비" });
     expect(currentOption.getAttribute("aria-selected")).toBe("true");
-    expect(currentOption.getAttribute("tabindex")).toBe("0");
-    expect(nextOption.getAttribute("tabindex")).toBe("-1");
-    expect(document.activeElement).toBe(currentOption);
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(
+      currentOption.id,
+    );
 
-    fireEvent.keyDown(currentOption, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(nextOption);
-    expect(currentOption.getAttribute("tabindex")).toBe("-1");
-    expect(nextOption.getAttribute("tabindex")).toBe("0");
-    fireEvent.keyDown(nextOption, { key: "Escape" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(nextOption.id);
+    fireEvent.keyDown(trigger, { key: "Escape" });
 
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.getByRole("complementary")).toBeTruthy();
@@ -1384,7 +1731,7 @@ describe("Checklist 할 일 편집", () => {
     const rectSpy = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
-        return this.classList.contains("checklist-category-editor__trigger")
+        return this.classList.contains("bibbidi-select-trigger")
           ? DOMRect.fromRect({ height: 32, width: 70, x: 280, y: 700 })
           : DOMRect.fromRect();
       });
@@ -1394,18 +1741,18 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
 
     const popover = document.querySelector(
-      ".checklist-category-editor__popover",
+      ".bibbidi-select-list",
     ) as HTMLDivElement;
-    expect(popover.style.left).toBe("110px");
-    expect(popover.style.maxHeight).toBe("682px");
-    expect(popover.style.top).toBe("454px");
-    expect(popover.style.width).toBe("240px");
+    expect(popover.style.left).toBe("187px");
+    expect(popover.style.maxHeight).toBe("320px");
+    expect(popover.style.bottom).toBe("76px");
+    expect(popover.style.width).toBe("180px");
 
     rectSpy.mockRestore();
     scrollHeightSpy.mockRestore();
@@ -1421,7 +1768,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -1433,7 +1780,7 @@ describe("Checklist 할 일 편집", () => {
     expect(changeCategory).toHaveBeenCalledWith(500, "20");
     expect(
       screen
-        .getByRole("button", { name: "할 일 제목 수정" })
+        .getByRole("button", { name: "할 일 더보기" })
         .hasAttribute("disabled"),
     ).toBe(true);
 
@@ -1443,16 +1790,19 @@ describe("Checklist 할 일 편집", () => {
       screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예복 준비",
       }),
     ).toBeTruthy();
     expect(
       screen
-        .getByRole("button", { name: "할 일 제목 수정" })
+        .getByRole("button", { name: "할 일 더보기" })
         .hasAttribute("disabled"),
     ).toBe(false);
-    const movedCategoryList = document.getElementById("20-legacy-tasks");
+    const movedGroup = screen.getByRole("button", { name: "예복 준비" });
+    const movedCategoryList = document.getElementById(
+      movedGroup.getAttribute("aria-controls")!,
+    );
     expect(movedCategoryList).toBeTruthy();
     expect(
       within(movedCategoryList as HTMLElement).getByRole("button", {
@@ -1470,24 +1820,28 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     const currentOption = screen.getByRole("option", { name: "예식 준비" });
     const nextOption = screen.getByRole("option", { name: "예복 준비" });
 
-    act(() => nextOption.focus());
+    const categoryTrigger = screen.getByRole("combobox", {
+      name: /카테고리 변경/,
+    });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
     fireEvent.click(nextOption);
 
     expect((await screen.findByRole("alert")).textContent).toContain(
       "카테고리를 변경하지 못했습니다.",
     );
     expect(screen.getByRole("listbox")).toBeTruthy();
-    expect(document.activeElement).toBe(nextOption);
-    expect(nextOption.getAttribute("tabindex")).toBe("0");
+    expect(document.activeElement).toBe(categoryTrigger);
+    expect(categoryTrigger.getAttribute("aria-activedescendant")).toBe(
+      nextOption.id,
+    );
     expect(nextOption.getAttribute("aria-selected")).toBe("false");
-    expect(currentOption.getAttribute("tabindex")).toBe("-1");
     expect(currentOption.getAttribute("aria-selected")).toBe("true");
 
     fireEvent.click(nextOption);
@@ -1501,7 +1855,7 @@ describe("Checklist 할 일 편집", () => {
     render(<EditableChecklistHarness changeCategory={changeCategory} />);
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -1530,7 +1884,7 @@ describe("Checklist 할 일 편집", () => {
     );
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     expect(document.activeElement).toBe(input);
@@ -1559,15 +1913,25 @@ describe("Checklist 할 일 편집", () => {
     const changeTitle = vi.fn().mockResolvedValue(true);
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
 
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
-    expect(screen.getByRole("alert").textContent).toContain("입력해주세요");
+    expect(screen.getByRole("alert").textContent).toContain("입력해 주세요");
+    expect(
+      screen.getByRole("textbox", {
+        name: "할 일 제목",
+        description: /입력해 주세요/,
+      }),
+    ).toBe(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
 
     fireEvent.change(input, { target: { value: "가".repeat(51) } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(input.hasAttribute("aria-describedby")).toBe(false);
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "할 일 제목 저장" }));
     expect(screen.getByRole("alert").textContent).toContain("50자 이하");
 
@@ -1576,7 +1940,7 @@ describe("Checklist 할 일 편집", () => {
 
     expect(changeTitle).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+      expect(screen.getByRole("button", { name: "할 일 더보기" })).toBe(
         document.activeElement,
       ),
     );
@@ -1591,7 +1955,7 @@ describe("Checklist 할 일 편집", () => {
     );
     render(<EditableChecklistHarness changeTitle={changeTitle} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "할 일 제목 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "할 일 더보기" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
     fireEvent.change(input, { target: { value: "실패 후 유지할 제목" } });
@@ -1615,7 +1979,7 @@ describe("Checklist 할 일 편집", () => {
     expect(screen.getByRole("complementary")).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "할 일 제목" })).toBeNull();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "할 일 제목 수정" })).toBe(
+      expect(screen.getByRole("button", { name: "할 일 더보기" })).toBe(
         document.activeElement,
       ),
     );
@@ -1629,7 +1993,7 @@ describe("Checklist 할 일 편집", () => {
       name: "청첩장 문구 정하기",
     });
     fireEvent.click(
-      within(detailPage).getByRole("button", { name: "할 일 제목 수정" }),
+      within(detailPage).getByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(
       within(detailPage).getByRole("menuitem", { name: "제목 변경" }),
@@ -1644,12 +2008,12 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
 
     fireEvent.click(
-      within(detailPage).getByRole("button", {
+      within(detailPage).getByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
     fireEvent.keyDown(
-      within(detailPage).getByRole("option", { name: "예식 준비" }),
+      within(detailPage).getByRole("combobox", { name: /카테고리 변경/ }),
       { key: "Escape" },
     );
 
@@ -1659,12 +2023,12 @@ describe("Checklist 할 일 편집", () => {
     ).toBeTruthy();
 
     fireEvent.click(
-      within(detailPage).getByRole("button", {
+      within(detailPage).getByRole("combobox", {
         name: "상태 변경, 현재 예정",
       }),
     );
     fireEvent.keyDown(
-      within(detailPage).getByRole("option", { name: "예정" }),
+      within(detailPage).getByRole("combobox", { name: /상태 변경/ }),
       { key: "Escape" },
     );
 
@@ -1673,4 +2037,15 @@ describe("Checklist 할 일 편집", () => {
       screen.getByRole("dialog", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
+});
+
+it("공통 아이콘 내부를 다시 누르면 할 일 메뉴를 닫는다", () => {
+  render(<EditableChecklistHarness />);
+  const trigger = screen.getByRole("button", { name: "할 일 더보기" });
+  fireEvent.click(trigger);
+  expect(screen.getByRole("menuitem", { name: "제목 변경" })).toBeTruthy();
+  const icon = trigger.querySelector(".bibbidi-icon-button-icon")!;
+  fireEvent.pointerDown(icon);
+  fireEvent.click(icon);
+  expect(screen.queryByRole("menuitem", { name: "제목 변경" })).toBeNull();
 });

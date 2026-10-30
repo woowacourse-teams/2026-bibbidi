@@ -1,266 +1,144 @@
 import { describe, expect, it } from "vitest";
 import {
-  PreparationCatalogModel,
-  PreparationStepProgressModel,
-  PreparationStepStatus,
-} from "../model/preparationRoadmap";
-import {
-  createInitialPreparationRoadmapSelection,
   createPreparationRoadmapViewModel,
-  getInitialSelectedCategoryId,
-  getInitialSelectedStepId,
-  selectPreparationCategory,
+  type RoadmapProgressStatus,
 } from "./createPreparationRoadmapViewModel";
-
-interface StepFixture {
-  id: string;
-  order: number;
+import type { ChecklistQueryModel } from "../../checklist/model/checklistQuery";
+import type { PreparationCatalogModel } from "../model/preparationRoadmap";
+function stagesFor(
+  catalog: PreparationCatalogModel,
+  categoryId: string,
+  checklist?: ChecklistQueryModel,
+) {
+  return createPreparationRoadmapViewModel(catalog, categoryId, {
+    checklist,
+    isGuest: !checklist,
+    progressStatus: "ready",
+  }).stages;
 }
+import { preparationCatalogFixture } from "../test/fixtures/preparationCatalog.fixture";
+import { applyChecklistCatalogItemIds } from "../model/preparationRoadmap";
 
-function createCatalog(steps: StepFixture[]): PreparationCatalogModel {
-  return {
-    categories: [{ id: "wedding-hall", label: "웨딩홀" }],
-    roadmaps: [
-      {
-        categoryId: "wedding-hall",
-        steps: steps.map((step) => ({
-          id: step.id,
-          iconUrl:
-            step.id === "step-1" ? "https://example.com/step-1.png" : undefined,
-          order: step.order,
-          title: `${step.id} 제목`,
-        })),
-      },
-    ],
-    stepDetails: steps.map((step) => ({
-      description: `${step.id} 상세 설명`,
-      stepId: step.id,
-      tasks: [
+describe("로드맵 단계와 내 준비 조합", () => {
+  it("담은 일이 없어도 카탈로그의 모든 단계를 순서대로 유지한다", () => {
+    const model = applyChecklistCatalogItemIds(preparationCatalogFixture, []);
+    const result = stagesFor(model, "wedding-hall");
+    expect(result.map((s) => s.id)).toEqual(["step-1", "step-2", "step-3"]);
+    expect(
+      result.every((s) => s.includedCount === 0 && s.completedCount === 0),
+    ).toBe(true);
+  });
+  it("완료율의 분모는 선택한 항목이고 저장된 제목과 완료 상태를 반영한다", () => {
+    const [stage] = stagesFor(preparationCatalogFixture, "wedding-hall", {
+      categories: [
         {
-          id: `${step.id}-task`,
-          included: false,
-          title: `${step.id} 할 일`,
+          id: "wedding-hall",
+          title: "웨딩홀",
+          items: [
+            {
+              id: "saved-1",
+              checklistItemId: 1,
+              categoryId: "wedding-hall",
+              sourceCatalogItemId: 101,
+              status: "done",
+              title: "수정한 투어",
+              appointments: [],
+            },
+          ],
         },
       ],
-    })),
-  };
-}
-
-function createProgress(
-  entries: [string, PreparationStepStatus][],
-): PreparationStepProgressModel[] {
-  return entries.map(([stepId, status]) => ({ status, stepId }));
-}
-
-function addInvitationRoadmap(model: PreparationCatalogModel) {
-  model.categories.push({ id: "invitation", label: "초대" });
-  model.roadmaps.push({
-    categoryId: "invitation",
-    steps: [
-      {
-        id: "invitation-step-1",
-        order: 1,
-        title: "초대 제목",
-      },
-    ],
+    });
+    expect(stage.tasks).toHaveLength(2);
+    expect(stage.includedCount).toBe(1);
+    expect(stage.completedCount).toBe(1);
+    expect(stage.isComplete).toBe(true);
+    expect(stage.statusLabel).toBe("내 할 일 완료");
+    expect(stage.progress).toBe(1);
+    expect(stage.nextTask?.id).toBe("102");
+    expect(stage.previewLabel).toBe("준비할 일");
+    expect(stage.tasks[0]).toMatchObject({
+      title: "수정한 투어",
+      isComplete: true,
+      isIncluded: true,
+    });
+    expect(stage.tasks[1].isIncluded).toBe(false);
   });
-  model.stepDetails.push({
-    description: "초대 상세 설명",
-    stepId: "invitation-step-1",
-    tasks: [{ id: "invitation-task-1", included: false, title: "초대 할 일" }],
+  it("게스트의 담은 항목을 완료로 계산하지 않는다", () => {
+    const [stage] = stagesFor(preparationCatalogFixture, "wedding-hall");
+    expect(stage.includedCount).toBe(1);
+    expect(stage.completedCount).toBe(0);
   });
-}
-
-const unorderedSteps = [
-  { id: "step-3", order: 3 },
-  { id: "step-1", order: 1 },
-  { id: "step-2", order: 2 },
-];
-
-describe("getInitialSelectedStepId", () => {
-  it("진행 정보가 없으면 첫 번째 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-
-    expect(getInitialSelectedStepId(model, "wedding-hall")).toBe("step-1");
-  });
-
-  it("진행 중 단계가 여러 개면 순서가 가장 빠른 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-    const progress = createProgress([
-      ["step-3", "in-progress"],
-      ["step-2", "in-progress"],
-    ]);
-
-    expect(getInitialSelectedStepId(model, "wedding-hall", progress)).toBe(
-      "step-2",
-    );
-  });
-
-  it("모든 단계가 완료되면 마지막 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-    const progress = createProgress([
-      ["step-1", "complete"],
-      ["step-2", "complete"],
-      ["step-3", "complete"],
-    ]);
-
-    expect(getInitialSelectedStepId(model, "wedding-hall", progress)).toBe(
-      "step-3",
-    );
-  });
-
-  it("완료와 예정만 있으면 첫 번째 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-    const progress = createProgress([
-      ["step-1", "complete"],
-      ["step-2", "upcoming"],
-      ["step-3", "upcoming"],
-    ]);
-
-    expect(getInitialSelectedStepId(model, "wedding-hall", progress)).toBe(
-      "step-1",
-    );
-  });
-
-  it("선택할 단계가 없으면 오류를 발생시킨다", () => {
-    const model = createCatalog([]);
-
-    expect(() => getInitialSelectedStepId(model, "wedding-hall")).toThrow(
-      "준비 로드맵에 선택할 단계가 없습니다.",
-    );
+  it("사용자 작성 항목을 임의의 준비 단계에 넣지 않는다", () => {
+    const stages = stagesFor(preparationCatalogFixture, "wedding-hall", {
+      categories: [
+        {
+          id: "wedding-hall",
+          title: "웨딩홀",
+          items: [
+            {
+              id: "custom",
+              checklistItemId: 1,
+              categoryId: "wedding-hall",
+              sourceCatalogItemId: null,
+              title: "개인 준비",
+              status: "done",
+              appointments: [],
+            },
+          ],
+        },
+      ],
+    });
+    expect(
+      stages.flatMap((s) => s.tasks).some((t) => t.title === "개인 준비"),
+    ).toBe(false);
   });
 });
 
-describe("카테고리 선택", () => {
-  it("표시 순서가 가장 빠른 카테고리를 최초 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-
-    expect(getInitialSelectedCategoryId(model)).toBe("wedding-hall");
-    expect(createInitialPreparationRoadmapSelection(model)).toEqual({
-      categoryId: "wedding-hall",
-      stepId: "step-1",
-    });
+describe("로드맵 표시 정책", () => {
+  it.each(["loading", "error"] as const)(
+    "현황이 %s이면 완료율을 표시하지 않는다",
+    (progressStatus: RoadmapProgressStatus) => {
+      const model = createPreparationRoadmapViewModel(
+        preparationCatalogFixture,
+        "wedding-hall",
+        { isGuest: false, progressStatus },
+      );
+      expect(
+        model.stages.every(
+          (stage) => stage.progress === undefined && !stage.isComplete,
+        ),
+      ).toBe(true);
+      expect(model.stages[0].statusLabel).toBe(
+        progressStatus === "loading" ? "현황 확인 중" : "현황 확인 필요",
+      );
+      expect(model.summary).toContain(
+        progressStatus === "loading" ? "확인 중" : "확인 필요",
+      );
+    },
+  );
+  it("게스트에게 담은 일의 다음 항목을 보여주고 완료율은 표시하지 않는다", () => {
+    const model = createPreparationRoadmapViewModel(
+      preparationCatalogFixture,
+      "wedding-hall",
+      { isGuest: true, progressStatus: "ready" },
+    );
+    expect(model.stages[0].nextTask?.id).toBe("101");
+    expect(model.stages[0].previewLabel).toBe("다음 할 일");
+    expect(model.stages[0].progress).toBeUndefined();
+    expect(model.summary).not.toContain("완료");
   });
-
-  it("카테고리를 변경하면 변경된 로드맵의 첫 단계를 선택한다", () => {
-    const model = createCatalog(unorderedSteps);
-    addInvitationRoadmap(model);
-
-    expect(
-      selectPreparationCategory(
-        model,
-        { categoryId: "wedding-hall", stepId: "step-2" },
-        "invitation",
-      ),
-    ).toEqual({
-      categoryId: "invitation",
-      stepId: "invitation-step-1",
-    });
-  });
-
-  it("같은 카테고리를 다시 선택하면 현재 단계를 유지한다", () => {
-    const model = createCatalog(unorderedSteps);
-    const currentSelection = {
-      categoryId: "wedding-hall",
-      stepId: "step-2",
+  it("단계가 없는 카테고리를 탭에서 제외한다", () => {
+    const catalog = {
+      ...preparationCatalogFixture,
+      categories: [
+        ...preparationCatalogFixture.categories,
+        { id: "empty", label: "빈 카테고리" },
+      ],
     };
-
-    expect(
-      selectPreparationCategory(model, currentSelection, "wedding-hall"),
-    ).toBe(currentSelection);
-  });
-});
-
-describe("createPreparationRoadmapViewModel", () => {
-  it("로드맵 카드와 선택 단계 상세에 필요한 데이터를 구성한다", () => {
-    const model = createCatalog(unorderedSteps);
-
-    const viewModel = createPreparationRoadmapViewModel(
-      model,
-      "wedding-hall",
-      "step-1",
-    );
-
-    expect(viewModel.steps.find((step) => step.id === "step-1")).toEqual({
-      id: "step-1",
-      iconUrl: "https://example.com/step-1.png",
-      isSelected: true,
-      numberLabel: "01",
-      order: 1,
-      title: "step-1 제목",
+    const model = createPreparationRoadmapViewModel(catalog, "wedding-hall", {
+      isGuest: false,
+      progressStatus: "ready",
     });
-    expect(viewModel.selectedStepDetail).toEqual({
-      checklistTasks: [],
-      description: "step-1 상세 설명",
-      detailTasks: [
-        {
-          id: "step-1-task",
-          isEssential: false,
-          title: "step-1 할 일",
-        },
-      ],
-    });
-  });
-
-  it("체크리스트 포함 여부와 필수 여부를 단계 상세 표시 데이터로 변환한다", () => {
-    const model = createCatalog([{ id: "step-1", order: 1 }]);
-    model.stepDetails[0].tasks = [
-      {
-        essential: true,
-        id: "included-essential-task",
-        included: true,
-        title: "체크리스트 필수 할 일",
-      },
-      {
-        essential: false,
-        id: "detail-task",
-        included: false,
-        title: "세부 할 일",
-      },
-    ];
-
-    const viewModel = createPreparationRoadmapViewModel(
-      model,
-      "wedding-hall",
-      "step-1",
-    );
-
-    expect(viewModel.selectedStepDetail.checklistTasks).toEqual([
-      {
-        id: "included-essential-task",
-        isEssential: true,
-        title: "체크리스트 필수 할 일",
-      },
-    ]);
-    expect(
-      [
-        ...viewModel.selectedStepDetail.checklistTasks,
-        ...viewModel.selectedStepDetail.detailTasks,
-      ].map((task) => task.id),
-    ).toEqual(["included-essential-task", "detail-task"]);
-    expect(viewModel.selectedStepDetail.detailTasks).toEqual([
-      {
-        id: "detail-task",
-        isEssential: false,
-        title: "세부 할 일",
-      },
-    ]);
-  });
-
-  it("로드맵이 없는 카테고리를 표시에서 제외한다", () => {
-    const model = createCatalog(unorderedSteps);
-    model.categories.push({ id: "without-roadmap", label: "준비 중" });
-    addInvitationRoadmap(model);
-
-    const viewModel = createPreparationRoadmapViewModel(
-      model,
-      "wedding-hall",
-      "step-1",
-    );
-
-    expect(viewModel.categories.map((category) => category.id)).toEqual([
-      "wedding-hall",
-      "invitation",
-    ]);
+    expect(model.categories.some((item) => item.id === "empty")).toBe(false);
   });
 });

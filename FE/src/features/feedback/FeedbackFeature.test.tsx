@@ -1,3 +1,4 @@
+import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import {
   act,
   fireEvent,
@@ -6,10 +7,23 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { installMatchMedia } from "../../test/matchMedia";
 import { createFeedback } from "./api/createFeedback";
-import { FeedbackFeature } from "./FeedbackFeature";
+import { FeedbackFeature as Feature } from "./FeedbackFeature";
+
+function FeedbackFeature() {
+  return (
+    <Feature
+      renderTrigger={(open, ref) => (
+        <button ref={ref} onClick={open}>
+          의견 보내기
+        </button>
+      )}
+    />
+  );
+}
 
 const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
 
@@ -29,12 +43,14 @@ beforeEach(() => {
   setMobileViewport(false);
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 function setMobileViewport(matches: boolean) {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
       addEventListener: () => undefined,
-      matches: query === "(max-width: 760px)" ? matches : false,
+      matches: query === MOBILE_LAYOUT_MEDIA_QUERY ? matches : false,
       removeEventListener: () => undefined,
     }),
   });
@@ -51,6 +67,65 @@ function getSubmitButton() {
 }
 
 describe("FeedbackFeature", () => {
+  it.each([false, true])(
+    "모바일 여부 %s에서 전송 중 버튼 초점을 유지하고 실패 후 재시도할 수 있다",
+    async (isMobile) => {
+      setMobileViewport(isMobile);
+      let fail!: (error: Error) => void;
+      createFeedbackMock.mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            fail = reject;
+          }),
+      );
+      render(<FeedbackFeature />);
+      openFeedback();
+      fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
+      const submit = getSubmitButton();
+      submit.focus();
+      fireEvent.click(submit);
+      expect(submit.disabled).toBe(false);
+      expect(submit.getAttribute("aria-busy")).toBe("true");
+      expect(document.activeElement).toBe(submit);
+      fireEvent.click(submit);
+      expect(createFeedbackMock).toHaveBeenCalledOnce();
+      await act(async () => fail(new Error("network")));
+      await screen.findByRole("alert");
+      expect(document.activeElement).toBe(submit);
+      expect(submit.disabled).toBe(false);
+      expect(submit.getAttribute("aria-busy")).not.toBe("true");
+    },
+  );
+
+  it.each([false, true])(
+    "모바일 여부 %s에서 닫는 도중 너비가 바뀌어도 퇴장 레이어와 스크롤 잠금을 유지한다",
+    async (isMobile) => {
+      const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, isMobile);
+      render(<FeedbackFeature />);
+      openFeedback();
+      const layer = screen.getByRole("dialog");
+      let finish!: () => void;
+      const finished = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      Object.defineProperty(layer.firstElementChild, "getAnimations", {
+        value: () => [{ finished }],
+      });
+      fireEvent.keyDown(layer, { key: "Escape" });
+      expect(layer.dataset.state).toBe("closing");
+      act(() => media.setMatches(!isMobile));
+      expect(layer.isConnected).toBe(true);
+      expect(screen.getByRole("dialog")).toBe(layer);
+      expect(document.body.style.overflow).toBe("hidden");
+      await act(async () => finish());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.body.style.overflow).toBe("");
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "의견 보내기" }),
+      );
+    },
+  );
+
   it("만족도를 선택하기 전에는 제출할 수 없다", () => {
     render(<FeedbackFeature />);
     openFeedback();
@@ -63,7 +138,9 @@ describe("FeedbackFeature", () => {
     openFeedback();
 
     expect(
-      screen.getByLabelText("의견을 들려주세요").getAttribute("maxlength"),
+      screen
+        .getByLabelText("의견을 들려주세요 (선택)")
+        .getAttribute("maxlength"),
     ).toBe("200");
   });
 
@@ -81,7 +158,7 @@ describe("FeedbackFeature", () => {
     openFeedback();
 
     fireEvent.click(screen.getByRole("button", { name: "아쉬워요" }));
-    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요 (선택)"), {
       target: { value: "조금 아쉬웠어요" },
     });
     fireEvent.click(getSubmitButton());
@@ -110,7 +187,7 @@ describe("FeedbackFeature", () => {
     openFeedback();
 
     fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
-    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요 (선택)"), {
       target: { value: "   " },
     });
     fireEvent.click(getSubmitButton());
@@ -143,7 +220,7 @@ describe("FeedbackFeature", () => {
 
     expect(
       await within(screen.getByRole("dialog")).findByRole("button", {
-        name: "보내는 중...",
+        name: "의견 보내기",
       }),
     ).toBeTruthy();
     expect(
@@ -155,10 +232,10 @@ describe("FeedbackFeature", () => {
         .disabled,
     ).toBe(true);
     expect(
-      (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement)
+      (screen.getByLabelText("의견을 들려주세요 (선택)") as HTMLTextAreaElement)
         .disabled,
     ).toBe(true);
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.click(submitButton);
     expect(createFeedbackMock).toHaveBeenCalledOnce();
@@ -196,7 +273,7 @@ describe("FeedbackFeature", () => {
     openFeedback();
 
     fireEvent.click(screen.getByRole("button", { name: "좋았어요" }));
-    fireEvent.change(screen.getByLabelText("의견을 들려주세요"), {
+    fireEvent.change(screen.getByLabelText("의견을 들려주세요 (선택)"), {
       target: { value: "좋았어요" },
     });
     fireEvent.click(getSubmitButton());
@@ -205,31 +282,32 @@ describe("FeedbackFeature", () => {
       "의견을 보내지 못했어요. 다시 시도해 주세요.",
     );
     expect(
-      (screen.getByLabelText("의견을 들려주세요") as HTMLTextAreaElement).value,
+      (screen.getByLabelText("의견을 들려주세요 (선택)") as HTMLTextAreaElement)
+        .value,
     ).toBe("좋았어요");
     expect(getSubmitButton().disabled).toBe(false);
     expect(analyticsMocks.track).not.toHaveBeenCalled();
   });
 
-  it("Escape 키로 닫고 플로팅 버튼에 포커스를 돌려준다", () => {
+  it("Escape 키로 닫고 메뉴 버튼에 포커스를 돌려준다", async () => {
     render(<FeedbackFeature />);
     openFeedback();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const trigger = screen.getByRole("button", { name: "의견 보내기" });
-    expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("모바일에서는 Bottom Sheet를 열고 닫기 애니메이션 뒤 포커스를 돌려준다", () => {
+  it("모바일에서는 Bottom Sheet를 열고 닫기 애니메이션 뒤 포커스를 돌려준다", async () => {
     setMobileViewport(true);
     render(<FeedbackFeature />);
     openFeedback();
 
     const dialog = screen.getByRole("dialog");
     const dragHandle = within(dialog).getByRole("button", {
-      name: "아래로 밀어 피드백 창 닫기",
+      name: "아래로 밀어 닫기",
     });
 
     expect(dialog.getAttribute("aria-modal")).toBe("true");
@@ -239,17 +317,19 @@ describe("FeedbackFeature", () => {
     ).toBeNull();
     expect(document.body.style.overflow).toBe("hidden");
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "피드백 창 닫기" })[0],
-    );
-
-    expect(dialog.parentElement?.className).toContain(
-      "bottom-sheet-dismiss--closing",
-    );
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    Object.defineProperty(dialog.firstElementChild, "getAnimations", {
+      value: () => [{ finished }],
+    });
+    fireEvent.pointerDown(dialog, { isPrimary: true });
+    fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
+    expect(dialog.dataset.state).toBe("closing");
     expect(screen.getByRole("dialog")).toBeTruthy();
-
-    fireEvent.transitionEnd(dialog, { propertyName: "transform" });
-
+    await act(async () => finish());
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.body.style.overflow).toBe("");
     expect(document.activeElement).toBe(
@@ -257,38 +337,29 @@ describe("FeedbackFeature", () => {
     );
   });
 
-  it("모바일 Bottom Sheet의 핸들을 충분히 아래로 드래그하면 닫는다", () => {
+  it("모바일 Bottom Sheet의 핸들을 충분히 아래로 드래그하면 닫는다", async () => {
     setMobileViewport(true);
     render(<FeedbackFeature />);
     openFeedback();
 
     const dialog = screen.getByRole("dialog");
     const dragHandle = within(dialog).getByRole("button", {
-      name: "아래로 밀어 피드백 창 닫기",
+      name: "아래로 밀어 닫기",
     });
 
-    fireEvent.pointerDown(dragHandle, {
-      button: 0,
-      clientY: 20,
-      pointerId: 1,
-      pointerType: "touch",
+    const touch = (clientY: number) => ({
+      identifier: 1,
+      clientX: 100,
+      clientY,
     });
-    fireEvent.pointerMove(dragHandle, {
-      clientY: 140,
-      pointerId: 1,
-      pointerType: "touch",
+    fireEvent.touchStart(dragHandle, { touches: [touch(20)] });
+    fireEvent.touchMove(dragHandle, { touches: [touch(140)] });
+    fireEvent.touchEnd(dragHandle, {
+      touches: [],
+      changedTouches: [touch(140)],
     });
-    fireEvent.pointerUp(dragHandle, {
-      clientY: 140,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-
-    expect(dialog.parentElement?.className).toContain(
-      "bottom-sheet-dismiss--closing",
-    );
-    fireEvent.transitionEnd(dialog, { propertyName: "transform" });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(dialog.dataset.state).toBe("closing");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("모바일에서 전송 중에는 바텀시트를 닫거나 드래그할 수 없다", async () => {
@@ -307,20 +378,15 @@ describe("FeedbackFeature", () => {
     fireEvent.click(getSubmitButton());
 
     const dialog = screen.getByRole("dialog");
-    const dragHandle = await within(dialog).findByRole("button", {
-      name: "아래로 밀어 피드백 창 닫기",
-    });
-    expect((dragHandle as HTMLButtonElement).disabled).toBe(true);
-
+    expect(
+      within(dialog).queryByRole("button", { name: "아래로 밀어 닫기" }),
+    ).toBeNull();
     fireEvent.keyDown(dialog, { key: "Escape" });
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "피드백 창 닫기" })[0],
-    );
-
+    fireEvent.pointerDown(dialog, { isPrimary: true });
+    fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
     expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(dialog.parentElement?.className).not.toContain(
-      "bottom-sheet-dismiss--closing",
-    );
+    expect(dialog.dataset.state).toBe("open");
 
     resolveRequest?.();
     await screen.findByText("소중한 의견을 보내주셔서 감사해요.");

@@ -28,11 +28,6 @@ describe("SocialLoginForm", () => {
       screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual(["카카오로 계속하기", "구글로 계속하기", "애플로 계속하기"]);
 
-    const accountGuide = screen.getByText(
-      "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
-    );
-    expect(accountGuide.className).toBe("social-login-form__guide-description");
-
     const preview = screen.getByRole("complementary", {
       name: "함께 결혼을 준비하는 예비부부",
     });
@@ -50,7 +45,7 @@ describe("SocialLoginForm", () => {
   it("서비스 설명을 제목으로 표시한다", () => {
     render(<SocialLoginForm />);
 
-    const heading = screen.getByRole("heading", { level: 1 });
+    const heading = screen.getByRole("heading", { level: 2 });
 
     expect(heading.textContent).toBe("모든 결혼 준비를 한 곳에서");
     expect(screen.getByRole("region", { name: "소셜 로그인" })).toBeTruthy();
@@ -69,18 +64,15 @@ describe("SocialLoginForm", () => {
     ).toBe(false);
   });
 
-  it("세 소셜 로그인 버튼과 기존 계정 연동 안내를 표시한다", () => {
+  it("세 소셜 로그인 버튼을 표시하고 기존 계정 연동 안내를 제거한다", () => {
     render(<SocialLoginForm />);
 
     expect(
       screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual(["카카오로 계속하기", "구글로 계속하기", "애플로 계속하기"]);
-    const guide = screen.getByRole("complementary", {
-      name: "기존 계정이 있으신가요?",
-    });
-    expect(guide.textContent).toContain(
-      "소셜 로그인 후 기존 계정과 연동할 수 있어요.",
-    );
+    expect(
+      screen.queryByRole("complementary", { name: "기존 계정이 있으신가요?" }),
+    ).toBeNull();
   });
 
   it("연결되지 않은 애플 로그인은 준비 중 안내만 표시한다", () => {

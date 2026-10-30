@@ -67,12 +67,9 @@ export function createPostHogProvider(
     if (sdk.get_distinct_id()?.startsWith(MEMBER_PREFIX)) reset();
   };
   const isSettled = () =>
-    [
-      "guest",
-      "onboardingRequired",
-      "accountSetupRequired",
-      "authenticated",
-    ].includes(context.authState);
+    ["guest", "onboardingRequired", "authenticated"].includes(
+      context.authState,
+    );
 
   return {
     initialize() {

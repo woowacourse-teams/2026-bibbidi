@@ -93,10 +93,6 @@ function renderServiceLayout(
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
             <Route element={<ServiceLayout />}>{routes}</Route>
-            <Route
-              path="/onboarding/account"
-              element={<div>계정 선택 화면</div>}
-            />
           </Routes>
         </MemoryRouter>
       </ChecklistMigrationProvider>
@@ -105,6 +101,75 @@ function renderServiceLayout(
 }
 
 describe("ServiceLayout", () => {
+  it("모바일은 문서를 스크롤하고 브라우저 당김을 가로채지 않으며 데스크톱은 내부 스크롤을 유지한다", async () => {
+    const media = installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    installLegacyWebSessionFetch(
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+    renderServiceLayout(
+      <Route path="/preparation" element={<p>서비스 본문</p>} />,
+      ["/preparation"],
+    );
+    await screen.findByRole("link", { name: "로그인" });
+    const layout = screen.getByRole("region", { name: "서비스 화면" });
+    expect(layout.getAttribute("data-scroll")).toBe("document");
+    const content = screen.getByText("서비스 본문");
+    const touch = { identifier: 1, clientX: 100, clientY: 100 };
+    fireEvent.touchStart(content, { touches: [touch] });
+    const move = new TouchEvent("touchmove", {
+      bubbles: true,
+      cancelable: true,
+      touches: [{ ...touch, clientY: 260 } as Touch],
+    });
+    fireEvent(content, move);
+    fireEvent.touchEnd(content, { touches: [] });
+    expect(move.defaultPrevented).toBe(false);
+    expect(screen.queryByText("놓아서 새로고침")).toBeNull();
+    expect(screen.queryByText("새로고침 중이에요")).toBeNull();
+    act(() => media.setMatches(false));
+    expect(layout.getAttribute("data-scroll")).toBe("contained");
+    act(() => media.setMatches(true));
+    expect(layout.getAttribute("data-scroll")).toBe("document");
+  });
+
+  it("모바일 서비스 경로가 바뀌면 문서 스크롤을 맨 위로 초기화한다", async () => {
+    installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
+    installLegacyWebSessionFetch(
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
+            { status: 401 },
+          ),
+        ),
+    );
+    renderServiceLayout(
+      <>
+        <Route path="/preparation" element={<p>준비 목록 화면</p>} />
+        <Route path="/calendar" element={<p>캘린더 화면</p>} />
+      </>,
+      ["/preparation"],
+    );
+    await screen.findByRole("link", { name: "로그인" });
+    document.documentElement.scrollTop = 700;
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "하단 메뉴" })).getByRole(
+        "link",
+        { name: "캘린더" },
+      ),
+    );
+    expect(screen.getByText("캘린더 화면")).toBeTruthy();
+    expect(document.documentElement.scrollTop).toBe(0);
+  });
+
   it("모바일에서 중복 로그아웃을 막고 실패 후 재시도해 홈과 guest 상태로 전환한다", async () => {
     installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, true);
     const logoutResolvers: Array<(response: Response) => void> = [];
@@ -114,6 +179,14 @@ describe("ServiceLayout", () => {
       if (url === "/api/users/me") {
         return Promise.resolve(
           new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
             status: 200,
           }),
         );
@@ -190,11 +263,19 @@ describe("ServiceLayout", () => {
       ["/", "/checklist"],
     );
 
-    expect(await screen.findByText("1/1")).toBeTruthy();
+    expect(
+      await screen.findByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     const logoutButton = screen.getByRole("button", { name: "로그아웃" });
-    expect(screen.getByLabelText("현재 사용자 비").nextElementSibling).toBe(
-      logoutButton,
-    );
+    expect(
+      within(screen.getByRole("dialog", { name: "계정 메뉴" })).getByRole(
+        "button",
+        { name: "로그아웃" },
+      ),
+    ).toBe(logoutButton);
     fireEvent.click(logoutButton);
     fireEvent.click(logoutButton);
 
@@ -222,7 +303,7 @@ describe("ServiceLayout", () => {
     );
     expect(screen.queryByText("서버 내부 정보")).toBeNull();
     expect(analyticsMocks.track).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃 다시 시도" }));
     expect(
       fetchMock.mock.calls.filter(
         ([url]) => url === "/api/auth/web/sessions/current",
@@ -239,7 +320,11 @@ describe("ServiceLayout", () => {
     expect(screen.getByTestId("service-location").textContent).toBe("/");
     expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
-    expect(screen.queryByText("1/1")).toBeNull();
+    expect(
+      screen.queryByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeNull();
     expect(analyticsMocks.track).toHaveBeenCalledOnce();
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "logout",
@@ -336,7 +421,7 @@ describe("ServiceLayout", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("서비스 경로가 변경되면 콘텐츠 스크롤을 맨 위로 초기화한다", async () => {
+  it("서비스 경로가 변경되면 AppLayout 스크롤을 맨 위로 초기화한다", async () => {
     installLegacyWebSessionFetch(
       vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
@@ -354,13 +439,24 @@ describe("ServiceLayout", () => {
     );
     await screen.findByText("홈 화면");
     const content = container.querySelector<HTMLElement>(
-      ".service-layout__content",
+      "[data-page-scroll-container]",
     );
 
     expect(content).not.toBeNull();
     if (!content) {
       return;
     }
+
+    expect(content.classList.contains("bibbidi-app-layout")).toBe(true);
+    expect(content.getAttribute("data-scroll")).toBe("contained");
+    expect(content.hasAttribute("data-hide-scroll-bar")).toBe(true);
+    expect(content.getAttribute("data-header-position")).toBe("sticky");
+    const header = content.querySelector(".bibbidi-app-layout-header");
+    expect(header?.parentElement).toBe(content);
+    expect(header?.getAttribute("data-tone")).toBe("fade");
+    expect(
+      content.querySelector(".service-layout__content")?.parentElement,
+    ).toBe(content);
 
     content.scrollTop = 700;
 
@@ -380,6 +476,14 @@ describe("ServiceLayout", () => {
       if (url === "/api/users/me") {
         return Promise.resolve(
           new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture), {
             status: 200,
           }),
         );
@@ -414,8 +518,23 @@ describe("ServiceLayout", () => {
     renderServiceLayout(<Route path="/" element={<div>홈 화면</div>} />);
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
-    expect(await screen.findByText("67%")).toBeTruthy();
-    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 67%")).toBeTruthy();
+    expect(
+      screen.getByText("2/3개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
+    fireEvent.click(screen.getByRole("button", { name: /준비 완료율/ }));
+    const progressDialog = screen.getByRole("region", {
+      name: "카테고리별 준비 현황",
+    });
+    expect(
+      within(progressDialog)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["첫 번째 카테고리2/3개 완료", "두 번째 카테고리0/0개 완료"]);
+
     expect(screen.queryByRole("link", { name: "로그인" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/checklists/me",
@@ -576,10 +695,10 @@ describe("ServiceLayout", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "첫 번째 카테고리 로드맵",
+        name: "첫 번째 카테고리",
       }),
     ).toBeTruthy();
-    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -704,13 +823,14 @@ describe("ServiceLayout", () => {
       name: /체크리스트 항목 10/,
     });
     const content = container.querySelector<HTMLElement>(
-      ".service-layout__content",
+      "[data-page-scroll-container]",
     );
     expect(content).not.toBeNull();
     if (!content) {
       return;
     }
-    content.scrollTop = 320;
+    const scrollRoot = document.documentElement;
+    scrollRoot.scrollTop = 320;
 
     fireEvent.click(taskButton);
 
@@ -723,14 +843,16 @@ describe("ServiceLayout", () => {
     expect(appHeader?.hasAttribute("hidden")).toBe(false);
     expect(appHeader?.hasAttribute("inert")).toBe(false);
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /체크리스트 항목 10/ }),
     ).toBeNull();
     expect(taskButton.isConnected).toBe(true);
     expect(taskButton.closest("[inert]")).not.toBeNull();
-    expect(content.style.overflow).toBe("hidden");
-    expect(content.scrollTop).toBe(320);
+    expect(content.style.overflow).toBe("");
+    expect(scrollRoot.style.overflow).toBe("hidden");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("contain");
+    expect(scrollRoot.scrollTop).toBe(320);
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -743,8 +865,10 @@ describe("ServiceLayout", () => {
     expect(appHeader?.hasAttribute("hidden")).toBe(false);
     expect(screen.getByLabelText("현재 사용자 비")).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(content.style.overflow).toBe("");
+    expect(scrollRoot.style.overflow).toBe("");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("");
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist?taskId=checklist-item-10",
     );
@@ -756,17 +880,18 @@ describe("ServiceLayout", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "체크리스트 항목 10",
     });
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
-    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
+    await act(async () => {
+      fireEvent.pointerDown(detailSheet, { isPrimary: true });
+      fireEvent.pointerUp(detailSheet);
+      fireEvent.click(detailSheet);
+    });
 
     expect(screen.getByTestId("service-location").textContent).toBe(
       "/checklist",
     );
-    expect(content.scrollTop).toBe(320);
+    expect(scrollRoot.scrollTop).toBe(320);
+    expect(scrollRoot.style.overflow).toBe("");
+    expect(scrollRoot.style.overscrollBehaviorY).toBe("");
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -792,7 +917,7 @@ describe("ServiceLayout", () => {
 
     expect(await screen.findByRole("link", { name: "로그인" })).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "의견 보내기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "의견 보내기" })).toBeNull();
     expect(
       container
         .querySelector(".service-layout__content")
@@ -872,26 +997,52 @@ describe("ServiceLayout", () => {
       ["/preparation"],
     );
 
+    fireEvent.click(await screen.findByRole("button", { name: "계정 메뉴" }));
     const headerSummary = await screen.findByRole("region", {
       name: "결혼 준비 현황",
     });
-    expect(await within(headerSummary).findByText("1/1")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "전체 단계" }));
+    expect(
+      await within(headerSummary).findByText("1/1개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
     fireEvent.click(
       await screen.findByRole("button", { name: "01 준비 단계" }),
     );
-    expect(await screen.findByText("체크리스트 항목 10")).toBeTruthy();
+    expect(
+      within(
+        await screen.findByRole("dialog", { name: "01 준비 단계" }),
+      ).getByText("체크리스트 항목 10"),
+    ).toBeTruthy();
     fireEvent.click(
       await screen.findByRole("button", { name: "두 번째 할 일 추가" }),
     );
 
-    expect(await within(headerSummary).findByText("1/2")).toBeTruthy();
+    expect(
+      await within(headerSummary).findByText("1/2개 완료", {
+        selector: ".bibbidi-accordion-description",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "01 준비 단계" })).getByRole(
+        "button",
+        { name: "확인" },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "01 준비 단계" })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "계정 메뉴" }));
     expect(
       within(screen.getByRole("region", { name: "결혼 준비 현황" })).getByText(
-        "50%",
+        "준비 완료율 · 50%",
       ),
     ).toBeTruthy();
-    expect(await screen.findByText("서버가 추가한 두 번째 할 일")).toBeTruthy();
+    expect(
+      await within(screen.getByRole("tabpanel", { name: /1\/2/ })).findByText(
+        "서버가 추가한 두 번째 할 일",
+      ),
+    ).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(
         ([url, init]) => url === "/api/checklists/me" && init?.method === "GET",
@@ -1110,7 +1261,7 @@ describe("ServiceLayout", () => {
     });
 
     expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
-    expect(await screen.findByText("50%")).toBeTruthy();
+    expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);
@@ -1122,45 +1273,72 @@ describe("ServiceLayout", () => {
     ).toBeNull();
   });
 
-  it("체크리스트가 없으면 계정 선택 화면으로 이동한다", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockImplementation((url: string, init?: RequestInit) => {
-        if (url === "/api/users/me") {
-          return Promise.resolve(
-            new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
-              status: 200,
-            }),
-          );
-        }
-
-        if (url === "/api/checklists/me" && init?.method === "GET") {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                errorCode: 303,
-                message: "체크리스트를 찾을 수 없습니다.",
-              }),
-              { status: 404 },
-            ),
-          );
-        }
-
-        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
-      });
+  it("체크리스트가 없으면 자동 생성하고 현재 서비스 화면을 유지한다", async () => {
+    let hasChecklist = false;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/users/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 1, nickname: "비비디" })),
+        );
+      }
+      if (url === "/api/catalog") {
+        return Promise.resolve(
+          new Response(JSON.stringify(preparationCatalogResponseFixture)),
+        );
+      }
+      if (url === "/api/users/me/wedding-date") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ weddingDate: null })),
+        );
+      }
+      if (url === "/api/checklists/me") {
+        return Promise.resolve(
+          hasChecklist
+            ? new Response(JSON.stringify({ id: 1, items: [] }))
+            : new Response(
+                JSON.stringify({
+                  errorCode: 303,
+                  message: "체크리스트를 찾을 수 없습니다.",
+                }),
+                { status: 404 },
+              ),
+        );
+      }
+      if (url === "/api/checklists") {
+        hasChecklist = true;
+        return Promise.resolve(new Response("1", { status: 201 }));
+      }
+      return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+    });
     installLegacyWebSessionFetch(fetchMock);
 
     renderServiceLayout(
-      <Route path="/preparation" element={<PreparationRoadmapFeature />} />,
+      <Route
+        path="/preparation"
+        element={
+          <>
+            <PreparationRoadmapFeature />
+            <LocationDisplay />
+          </>
+        }
+      />,
       ["/preparation"],
     );
 
-    expect(await screen.findByText("계정 선택 화면")).toBeTruthy();
-    const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
-    expect(requestedUrls).not.toContain("/api/checklists");
-    expect(requestedUrls).not.toContain("/api/checklists/me/catalog-items");
+    expect(await screen.findByLabelText("현재 사용자 비")).toBeTruthy();
     expect(
-      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
+      await screen.findByRole("heading", { name: "첫 번째 카테고리" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("service-location").textContent).toBe(
+      "/preparation",
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/checklists"),
     ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/checklists/me/catalog-items",
+      ),
+    ).toHaveLength(0);
   });
 });

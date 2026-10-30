@@ -61,14 +61,75 @@ describe("createChecklistViewModel", () => {
 
     expect(category?.tasks[0]).toMatchObject({
       checklistItemStatus: "continue",
-      isEditable: false,
+      canDelete: true,
+      canEditCategory: false,
+      canEditTitle: false,
       isStatusEditable: true,
     });
     expect(category?.tasks[1]).toMatchObject({
-      isEditable: false,
+      canDelete: false,
+      canEditCategory: false,
+      canEditTitle: false,
       isStatusEditable: false,
     });
   });
+
+  it.each([
+    {
+      sourceCatalogItemId: null,
+      status: "prev" as const,
+      canEdit: true,
+      canDelete: true,
+    },
+    {
+      sourceCatalogItemId: null,
+      status: "continue" as const,
+      canEdit: true,
+      canDelete: true,
+    },
+    {
+      sourceCatalogItemId: null,
+      status: "done" as const,
+      canEdit: true,
+      canDelete: false,
+    },
+    {
+      sourceCatalogItemId: 101,
+      status: "prev" as const,
+      canEdit: false,
+      canDelete: true,
+    },
+    {
+      sourceCatalogItemId: 101,
+      status: "continue" as const,
+      canEdit: false,
+      canDelete: true,
+    },
+    {
+      sourceCatalogItemId: 101,
+      status: "done" as const,
+      canEdit: false,
+      canDelete: false,
+    },
+  ])(
+    "원본=$sourceCatalogItemId 상태=$status에 따라 변경과 삭제 가능 여부를 분리한다",
+    ({ sourceCatalogItemId, status, canEdit, canDelete }) => {
+      const [category] = createChecklistViewModel({
+        categories: [
+          {
+            id: "10",
+            title: "예식 준비",
+            items: [createItem({ sourceCatalogItemId, status })],
+          },
+        ],
+      });
+      expect(category.tasks[0]).toMatchObject({
+        canEditTitle: canEdit,
+        canEditCategory: canEdit,
+        canDelete,
+      });
+    },
+  );
 
   it("명시적인 API 상태를 일정 유무와 관계없이 화면 상태로 변환한다", () => {
     const [category] = createChecklistViewModel({

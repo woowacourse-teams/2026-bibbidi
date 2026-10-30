@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router";
+import type { ReactNode } from "react";
 
 import "./AppBottomNavigation.css";
 import {
@@ -7,7 +8,7 @@ import {
   isAppNavigationItemActive,
 } from "./AppNavigation";
 
-export function AppBottomNavigation() {
+export function AppBottomNavigation({ children }: { children?: ReactNode }) {
   const { pathname } = useLocation();
   return (
     <nav aria-label="하단 메뉴" className="app-bottom-navigation">
@@ -24,6 +25,7 @@ export function AppBottomNavigation() {
           <span>{item.label}</span>
         </Link>
       ))}
+      {children}
     </nav>
   );
 }

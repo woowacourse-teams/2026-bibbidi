@@ -3,14 +3,23 @@ export function installDialogMock() {
     HTMLDialogElement.prototype,
   );
   Object.defineProperties(HTMLDialogElement.prototype, {
+    show: {
+      configurable: true,
+      writable: true,
+      value(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      },
+    },
     showModal: {
       configurable: true,
+      writable: true,
       value(this: HTMLDialogElement) {
         this.setAttribute("open", "");
       },
     },
     close: {
       configurable: true,
+      writable: true,
       value(this: HTMLDialogElement) {
         this.removeAttribute("open");
       },
@@ -18,7 +27,7 @@ export function installDialogMock() {
   });
 
   return () => {
-    for (const method of ["showModal", "close"] as const) {
+    for (const method of ["show", "showModal", "close"] as const) {
       if (descriptors[method])
         Object.defineProperty(
           HTMLDialogElement.prototype,

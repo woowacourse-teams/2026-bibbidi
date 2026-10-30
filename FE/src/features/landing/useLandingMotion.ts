@@ -8,6 +8,15 @@ function clamp(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function getFeatureScrollMetrics(root: HTMLElement, feature: HTMLElement) {
+  const top =
+    root.querySelector(".landing-nav")?.getBoundingClientRect().height ?? 0;
+  return {
+    top,
+    travel: feature.offsetHeight - (window.innerHeight - top),
+  };
+}
+
 export function useLandingMotion() {
   const rootRef = useRef<HTMLDivElement>(null);
   const featureRef = useRef<HTMLElement>(null);
@@ -57,8 +66,7 @@ export function useLandingMotion() {
 
     const render = () => {
       frame = 0;
-      const top = window.innerWidth <= 760 ? 64 : 76;
-      const travel = feature.offsetHeight - (window.innerHeight - top);
+      const { top, travel } = getFeatureScrollMetrics(root, feature);
       if (travel <= 0) return;
       const progress = clamp(
         (top - feature.getBoundingClientRect().top) / Math.max(1, travel),
@@ -141,11 +149,11 @@ export function useLandingMotion() {
 
   function selectStep(index: number) {
     setActiveStep(index);
+    const root = rootRef.current;
     const feature = featureRef.current;
-    if (!feature || motionDisabled) return;
+    if (!root || !feature || motionDisabled) return;
 
-    const top = window.innerWidth <= 760 ? 64 : 76;
-    const travel = feature.offsetHeight - (window.innerHeight - top);
+    const { top, travel } = getFeatureScrollMetrics(root, feature);
     const target =
       feature.getBoundingClientRect().top +
       window.scrollY -

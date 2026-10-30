@@ -11,7 +11,7 @@ vi.mock("../../features/auth", () => ({
 }));
 
 describe("온보딩 페이지 계측", () => {
-  it("StrictMode에서도 약관·계정 선택을 각각 한 번 측정하고 임시 회원 ID를 전달하지 않는다", async () => {
+  it("StrictMode에서도 약관을 한 번 측정하고 인증 동기화 중에는 회원 ID를 전달하지 않는다", async () => {
     const analytics = {
       initialize: vi.fn(),
       setContext: vi.fn(),
@@ -39,17 +39,17 @@ describe("온보딩 페이지 계측", () => {
       }),
     );
     auth.state = {
-      status: "accountSetupRequired",
+      status: "synchronizing",
       user: { id: 999, nickname: "private" },
     };
     await act(async () => {
-      await router.navigate("/onboarding/account");
+      await router.navigate("/onboarding");
     });
     view.rerender(element());
-    expect(analytics.track).toHaveBeenCalledTimes(2);
+    expect(analytics.track).toHaveBeenCalledOnce();
     expect(analytics.setContext).toHaveBeenLastCalledWith({
-      authState: "accountSetupRequired",
-      pathname: "/onboarding/account",
+      authState: "synchronizing",
+      pathname: "/onboarding",
       userId: undefined,
     });
     auth.state = {
@@ -59,7 +59,7 @@ describe("온보딩 페이지 계측", () => {
     view.rerender(element());
     expect(analytics.setContext).toHaveBeenLastCalledWith({
       authState: "authenticated",
-      pathname: "/onboarding/account",
+      pathname: "/onboarding",
       userId: 42,
     });
     expect(JSON.stringify(analytics.track.mock.calls)).not.toContain("secret");

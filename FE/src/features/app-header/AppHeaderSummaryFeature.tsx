@@ -16,19 +16,30 @@ import { AppHeaderSummary } from "./view/AppHeaderSummary";
 
 interface AppHeaderSummaryFeatureProps {
   onAuthenticationRequired: () => void;
+  navigationKey?: string;
 }
 
 export function AppHeaderSummaryFeature({
   onAuthenticationRequired,
+  navigationKey,
 }: AppHeaderSummaryFeatureProps) {
   const summaryRepository = useAppHeaderSummaryRepository();
   const weddingDateRepository = useWeddingDateRepository();
   const checklistRevision = useAppHeaderChecklistRevision();
   const [summary, setSummary] = useState<AppHeaderSummaryModel | null>(null);
+  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
   const weddingDate = useWeddingDate({
     onAuthenticationRequired,
     repository: weddingDateRepository,
   });
+
+  const [previousNavigationKey, setPreviousNavigationKey] =
+    useState(navigationKey);
+  if (previousNavigationKey !== navigationKey) {
+    setPreviousNavigationKey(navigationKey);
+    setIsProgressExpanded(false);
+    weddingDate.closePopover();
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,6 +58,7 @@ export function AppHeaderSummaryFeature({
         }
 
         setSummary(null);
+        setIsProgressExpanded(false);
         if (error instanceof AppHeaderAuthenticationRequiredError) {
           onAuthenticationRequired();
         }
@@ -66,11 +78,19 @@ export function AppHeaderSummaryFeature({
   return (
     <AppHeaderSummary
       isPopoverOpen={weddingDate.isPopoverOpen}
+      isProgressExpanded={isProgressExpanded}
       isSaving={weddingDate.isSaving}
       onClosePopover={weddingDate.closePopover}
-      onOpenPopover={weddingDate.openPopover}
+      onOpenPopover={() => {
+        setIsProgressExpanded(false);
+        weddingDate.openPopover();
+      }}
       onRetryWeddingDate={weddingDate.retryLoad}
       onSaveWeddingDate={weddingDate.save}
+      onProgressExpandedChange={(expanded) => {
+        weddingDate.closePopover();
+        setIsProgressExpanded(expanded);
+      }}
       saveError={weddingDate.saveError}
       viewModel={viewModel}
       weddingDate={weddingDate.currentDate}

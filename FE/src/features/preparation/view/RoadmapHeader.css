@@ -1,0 +1,15 @@
+.roadmap-header {
+  max-width: var(--layout-width-content);
+  margin-inline: auto;
+  padding-bottom: 28px;
+}
+
+.roadmap-header .bibbidi-page-header-description {
+  margin-top: 6px;
+}
+
+@media (width < 768px) {
+  .roadmap-header {
+    padding-bottom: 22px;
+  }
+}

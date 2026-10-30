@@ -10,7 +10,27 @@ const focusableSelector = [
 function getFocusableElements(container: HTMLElement) {
   return Array.from(
     container.querySelectorAll<HTMLElement>(focusableSelector),
-  ).filter((element) => !element.matches(":disabled") && element.tabIndex >= 0);
+  ).filter((element) => {
+    if (
+      element.matches(':disabled, input[type="hidden"]') ||
+      element.tabIndex < 0 ||
+      element.closest("[hidden], [inert]")
+    )
+      return false;
+    const visibility = getComputedStyle(element).visibility;
+    if (visibility === "hidden" || visibility === "collapse") return false;
+    // A child's computed display can remain visible under a display:none parent.
+    for (
+      let ancestor: HTMLElement | null = element;
+      ancestor;
+      ancestor = ancestor.parentElement
+    ) {
+      const style = getComputedStyle(ancestor);
+      if (style.display === "none" || style.contentVisibility === "hidden")
+        return false;
+    }
+    return true;
+  });
 }
 
 interface TabKeyEvent {

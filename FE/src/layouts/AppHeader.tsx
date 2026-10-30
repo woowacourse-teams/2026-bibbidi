@@ -1,17 +1,20 @@
-import { ReactNode } from "react";
-import { Link, NavLink, useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
+import { PageContainer } from "../components/page-container";
+import { LoginIcon } from "../components/icons/ActionIcons";
+import { IconButton } from "../components/icon-button";
+import { useLoginModal } from "../features/auth/useLoginModal";
+import { useCompactHeaderLogin } from "./useCompactHeaderLogin";
 
 import "./AppHeader.css";
 import { HeaderBrandLink } from "./HeaderBrandLink";
+import {
+  AppHeaderAccountMenu,
+  AppHeaderAccountUser,
+} from "./AppHeaderAccountMenu";
 import { appNavigationItems, isAppNavigationItemActive } from "./AppNavigation";
 
-interface AuthenticatedUser {
+interface AuthenticatedUser extends AppHeaderAccountUser {
   kind: "authenticated";
-  isLoggingOut: boolean;
-  logoutErrorMessage: string | null;
-  onLogout: () => void;
-  summary: ReactNode;
-  userInitial: string;
 }
 
 interface GuestUser {
@@ -28,10 +31,16 @@ interface AppHeaderProps {
 
 export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
+  const { loginTo, loginState, openLogin } = useLoginModal();
+  const { ref, compact } = useCompactHeaderLogin();
   return (
-    <header className="app-header">
-      <div className="app-header__inner">
-        <div className="app-header__left">
+    <header className="app-header" data-compact={compact || undefined}>
+      <PageContainer width="wide" className="app-header__inner">
+        <div
+          className="app-header__left"
+          inert={compact}
+          aria-hidden={compact || undefined}
+        >
           <HeaderBrandLink to="/" />
 
           <nav aria-label="주요 메뉴" className="app-header__navigation">
@@ -54,65 +63,49 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        {user.kind === "authenticated" ? (
-          <div className="app-header__right">
-            <div className="app-header__summary">{user.summary}</div>
-            <span
-              aria-label={`현재 사용자 ${user.userInitial}`}
-              className="app-header__user"
+        <div className="app-header__actions" ref={ref}>
+          {user.kind === "authenticated" ? (
+            <AppHeaderAccountMenu navigationKey={pathname} user={user} />
+          ) : user.kind === "guest" ? (
+            <nav aria-label="계정 메뉴" className="app-header__guest-actions">
+              <Link
+                className="app-header__login"
+                to={loginTo}
+                state={loginState}
+                replace={false}
+                preventScrollReset
+                aria-hidden={compact || undefined}
+                inert={compact}
+                tabIndex={compact ? -1 : undefined}
+              >
+                <LoginIcon />
+                <span className="app-header__login-label">로그인</span>
+              </Link>
+              <IconButton
+                className="app-header__login-icon"
+                icon={<LoginIcon />}
+                aria-label="로그인"
+                aria-hidden={!compact || undefined}
+                inert={!compact}
+                tabIndex={compact ? undefined : -1}
+                color="var(--color-fg-neutral-muted)"
+                variant="clear"
+                onClick={openLogin}
+              />
+            </nav>
+          ) : (
+            <div
+              aria-label="로그인 상태 확인 중"
+              className="app-header__auth-pending"
+              role="status"
             >
-              {user.userInitial}
-            </span>
-            <button
-              aria-busy={user.isLoggingOut}
-              aria-describedby={
-                user.logoutErrorMessage ? "app-header-logout-error" : undefined
-              }
-              aria-label="로그아웃"
-              className="app-header__logout"
-              disabled={user.isLoggingOut}
-              onClick={user.onLogout}
-              title="로그아웃"
-              type="button"
-            >
-              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-                <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M8 12h10" />
-              </svg>
-            </button>
-            {user.isLoggingOut ? (
-              <span className="app-header__sr-only" role="status">
-                로그아웃 처리 중
+              <span className="app-header__auth-pending-text">
+                로그인 상태 확인 중
               </span>
-            ) : null}
-            {user.logoutErrorMessage ? (
-              <div className="app-header__logout-error" role="alert">
-                <span id="app-header-logout-error">
-                  {user.logoutErrorMessage}
-                </span>
-                <button onClick={user.onLogout} type="button">
-                  다시 시도
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : user.kind === "guest" ? (
-          <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-            <NavLink className="app-header__login" to="/login">
-              로그인
-            </NavLink>
-          </nav>
-        ) : (
-          <div
-            aria-label="로그인 상태 확인 중"
-            className="app-header__auth-pending"
-            role="status"
-          >
-            <span className="app-header__auth-pending-text">
-              로그인 상태 확인 중
-            </span>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </PageContainer>
     </header>
   );
 }

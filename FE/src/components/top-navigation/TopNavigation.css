@@ -1,0 +1,85 @@
+.bibbidi-top-navigation {
+  position: relative;
+  flex: none;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+}
+.bibbidi-top-navigation[data-sticky] {
+  position: sticky;
+  top: var(--top-navigation-offset, 0px);
+  z-index: 10;
+}
+.bibbidi-top-navigation[data-safe-area] {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.bibbidi-top-navigation[data-divider] {
+  box-shadow: 0 1px 0 var(--color-stroke-neutral-weak);
+}
+.bibbidi-top-navigation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 4px 12px;
+}
+.bibbidi-top-navigation-leading,
+.bibbidi-top-navigation-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: max-content;
+}
+.bibbidi-top-navigation-leading:empty,
+.bibbidi-top-navigation-actions:empty {
+  display: none;
+}
+.bibbidi-top-navigation-main {
+  display: grid;
+  flex: 1;
+  gap: 0;
+  min-width: 0;
+  padding: 0 4px;
+}
+.bibbidi-top-navigation-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: inherit;
+  font: var(--typography-t5-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bibbidi-top-navigation[data-variant="root"] .bibbidi-top-navigation-title {
+  font: var(--typography-t4);
+}
+.bibbidi-top-navigation-subtitle {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bibbidi-top-navigation[data-align="center"] .bibbidi-top-navigation-bar {
+  display: grid;
+  grid-template-columns: var(--top-navigation-side-width) minmax(0, 1fr) var(
+      --top-navigation-side-width
+    );
+}
+.bibbidi-top-navigation[data-align="center"] .bibbidi-top-navigation-leading {
+  display: flex;
+  justify-self: start;
+}
+.bibbidi-top-navigation[data-align="center"] .bibbidi-top-navigation-actions {
+  display: flex;
+  justify-self: end;
+}
+.bibbidi-top-navigation[data-align="center"] .bibbidi-top-navigation-main {
+  text-align: center;
+}

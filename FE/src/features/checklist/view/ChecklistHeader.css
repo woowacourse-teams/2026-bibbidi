@@ -1,0 +1,11 @@
+.checklist-header {
+  max-width: var(--layout-width-content);
+  margin-inline: auto;
+  padding-bottom: 28px;
+}
+
+@media (width < 768px) {
+  .checklist-header {
+    padding-bottom: 22px;
+  }
+}

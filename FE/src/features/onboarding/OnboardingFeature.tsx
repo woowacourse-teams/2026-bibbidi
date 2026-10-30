@@ -4,6 +4,7 @@ import { useOnboardingFlow } from "./useOnboardingFlow";
 import "./OnboardingFeature.css";
 
 interface OnboardingFeatureProps {
+  onBusyChange?: (busy: boolean) => void;
   isSwitchingAccount: boolean;
   onAuthenticationExpired: () => void;
   onSuccess: () => void;
@@ -45,6 +46,7 @@ function SwitchAccountAction({
 }
 
 export function OnboardingFeature({
+  onBusyChange,
   isSwitchingAccount,
   onAuthenticationExpired,
   onSuccess,
@@ -66,6 +68,11 @@ export function OnboardingFeature({
     termsLoadState,
     toggleTermContent,
   } = useOnboardingFlow({ onAuthenticationExpired, onSuccess });
+  useEffect(() => {
+    onBusyChange?.(isSubmitting || isSwitchingAccount);
+    return () => onBusyChange?.(false);
+  }, [isSubmitting, isSwitchingAccount, onBusyChange]);
+
   const agreeAllCheckboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

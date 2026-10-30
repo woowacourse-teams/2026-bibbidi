@@ -1,0 +1,27 @@
+.checklist-form-panel,
+.checklist-form-panel > form {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.checklist-form-panel__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.checklist-form-panel__feedback {
+  margin: 0;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  overflow-wrap: anywhere;
+}
+.checklist-form-panel__feedback[data-error] {
+  color: var(--color-fg-critical);
+}
+.checklist-form-panel__feedback[data-success] {
+  color: var(--color-fg-positive);
+}
+.checklist-form-panel__feedback:focus {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}

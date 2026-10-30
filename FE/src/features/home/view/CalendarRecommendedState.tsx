@@ -1,36 +1,51 @@
-import { Link } from "react-router";
+import { Button } from "../../../components/button";
+import { ListHeader } from "../../../components/list-header";
+import { ListRow } from "../../../components/list-row";
+import { CalendarSectionLink } from "./CalendarSectionLink";
+import "./CalendarList.css";
+
+const defaultMessages = {
+  loading: "추천 할 일을 불러오는 중",
+  error: "추천 대상을 확인하지 못했어요.",
+  empty: "지금 추가할 추천 항목이 없어요.",
+};
 
 export function CalendarRecommendedState({
   status,
-  isChecklistLoading,
+  isChecklistLoading = false,
+  messages = defaultMessages,
   onRetry,
 }: {
   status: "loading" | "error" | "complete";
-  isChecklistLoading: boolean;
+  isChecklistLoading?: boolean;
+  messages?: typeof defaultMessages;
   onRetry: () => void;
 }) {
   return (
     <section
-      className="calendar-planning__card"
+      className="calendar-list-section"
       aria-labelledby="calendar-recommended-title"
     >
-      <header>
-        <h2 id="calendar-recommended-title">추천 할 일</h2>
-        <Link to="/preparation">로드맵 전체 보기 ›</Link>
-      </header>
+      <ListHeader
+        titleId="calendar-recommended-title"
+        title="추천 할 일"
+        right={
+          <CalendarSectionLink to="/preparation">
+            로드맵 전체 보기
+          </CalendarSectionLink>
+        }
+      />
       {status === "loading" || isChecklistLoading ? (
-        <div className="calendar-planning__skeleton">
-          <p role="status">추천 할 일을 불러오는 중</p>
-        </div>
+        <ListRow.Loader type="bar" aria-label={messages.loading} />
       ) : status === "error" ? (
-        <p role="alert">
-          추천 대상을 확인하지 못했어요.{" "}
-          <button type="button" onClick={onRetry}>
+        <div className="calendar-list-feedback" role="alert">
+          <p>{messages.error}</p>
+          <Button size="small" color="dark" variant="weak" onClick={onRetry}>
             다시 시도
-          </button>
-        </p>
+          </Button>
+        </div>
       ) : (
-        <p>지금 추가할 추천 항목이 없어요.</p>
+        <p className="calendar-list-empty">{messages.empty}</p>
       )}
     </section>
   );

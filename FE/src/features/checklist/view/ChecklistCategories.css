@@ -1,0 +1,33 @@
+.checklist-categories {
+  padding: 0;
+}
+
+.checklist-categories__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.checklist-categories__group legend {
+  margin-bottom: 12px;
+  padding: 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6-medium);
+}
+
+.checklist-categories__option {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.checklist-categories__option:has(:checked) {
+  font-weight: var(--font-weight-medium);
+}

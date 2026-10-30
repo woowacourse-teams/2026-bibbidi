@@ -1,0 +1,84 @@
+.bibbidi-time-picker {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+  height: 220px;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t3);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-ui);
+  -webkit-tap-highlight-color: transparent;
+}
+.bibbidi-time-picker *,
+.bibbidi-time-picker *::before {
+  box-sizing: border-box;
+}
+.bibbidi-time-picker-indicator {
+  position: absolute;
+  z-index: -1;
+  inset: 88px 0 auto;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-brand-weak);
+}
+.bibbidi-time-picker-wheel {
+  height: 220px;
+  padding-block: 88px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  border-radius: var(--radius-md);
+  mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent);
+}
+.bibbidi-time-picker-wheel::-webkit-scrollbar {
+  display: none;
+}
+.bibbidi-time-picker-wheel:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: -2px;
+}
+.bibbidi-time-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding-inline: 8px;
+  scroll-snap-align: center;
+  color: var(--color-fg-placeholder);
+  cursor: pointer;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.bibbidi-time-picker-item[aria-selected="true"] {
+  color: var(--color-fg-neutral);
+}
+.bibbidi-time-picker[data-disabled] {
+  opacity: 0.4;
+}
+.bibbidi-time-picker[data-disabled] .bibbidi-time-picker-wheel,
+.bibbidi-time-picker[data-readonly] .bibbidi-time-picker-wheel {
+  overflow-y: hidden;
+  touch-action: auto;
+}
+.bibbidi-time-picker[data-disabled] .bibbidi-time-picker-item {
+  cursor: not-allowed;
+}
+.bibbidi-time-picker[data-readonly] .bibbidi-time-picker-item {
+  cursor: default;
+}
+.bibbidi-time-picker[data-readonly] .bibbidi-time-picker-indicator {
+  background: var(--color-bg-neutral-weak);
+}
+.bibbidi-time-picker[data-readonly]
+  .bibbidi-time-picker-item[aria-selected="true"] {
+  color: var(--color-fg-neutral-muted);
+}

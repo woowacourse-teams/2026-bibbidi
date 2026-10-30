@@ -1,37 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateChecklistProgress, ChecklistTaskModel } from "./checklist";
-
-function createTask(
-  id: string,
-  status: ChecklistTaskModel["status"],
-): ChecklistTaskModel {
-  return {
-    id,
-    title: `할 일 ${id}`,
-    schedule: "일정 없음",
-    status,
-  };
-}
+import { calculateChecklistProgress } from "./checklist";
 
 describe("calculateChecklistProgress", () => {
-  it("할 일이 없으면 진행률을 0으로 계산한다", () => {
-    expect(calculateChecklistProgress([])).toBe(0);
+  it.each([0, -1])("전체 항목이 %i개이면 진행률을 0으로 계산한다", (total) => {
+    expect(calculateChecklistProgress(0, total)).toBe(0);
   });
 
-  it("완료한 할 일의 비율을 반올림해 계산한다", () => {
-    const tasks = [
-      createTask("1", "complete"),
-      createTask("2", "in-progress"),
-      createTask("3", "incomplete"),
-    ];
-
-    expect(calculateChecklistProgress(tasks)).toBe(33);
+  it.each([
+    [1, 3, 33],
+    [2, 3, 67],
+    [2, 2, 100],
+  ])("%i/%i 완료 비율을 %i로 반올림한다", (completed, total, expected) => {
+    expect(calculateChecklistProgress(completed, total)).toBe(expected);
   });
 
-  it("모든 할 일이 완료되면 진행률을 100으로 계산한다", () => {
-    const tasks = [createTask("1", "complete"), createTask("2", "complete")];
-
-    expect(calculateChecklistProgress(tasks)).toBe(100);
+  it.each([
+    [-1, 3, 0],
+    [4, 3, 100],
+  ])("%i/%i 완료율을 %i로 제한한다", (completed, total, expected) => {
+    expect(calculateChecklistProgress(completed, total)).toBe(expected);
   });
 });

@@ -1,0 +1,163 @@
+.bibbidi-accordion {
+  --accordion-padding: 16px;
+  --accordion-title-font: var(--typography-t6-medium);
+  --accordion-body-font: var(--typography-t7);
+  --accordion-icon-size: 20px;
+  --accordion-min-height: 56px;
+  --accordion-open-background: var(--color-bg-brand-weak);
+  --accordion-interaction-background: var(--color-bg-neutral-weak);
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  color: var(--color-fg-neutral);
+  letter-spacing: var(--letter-spacing-ui);
+}
+.bibbidi-accordion[data-highlight="false"] {
+  --accordion-open-background: transparent;
+  --accordion-interaction-background: transparent;
+}
+.bibbidi-accordion[data-size="large"] {
+  --accordion-padding: 20px;
+  --accordion-title-font: var(--typography-t5-medium);
+  --accordion-body-font: var(--typography-t6);
+  --accordion-icon-size: 24px;
+  --accordion-min-height: 64px;
+}
+.bibbidi-accordion-item {
+  min-width: 0;
+  background: var(--color-bg-layer-default);
+  border-bottom: 1px solid var(--color-stroke-neutral-weak);
+}
+.bibbidi-accordion[data-variant="separated"] {
+  gap: 12px;
+}
+.bibbidi-accordion[data-variant="separated"] > .bibbidi-accordion-item {
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+}
+.bibbidi-accordion-heading {
+  margin: 0;
+  font: inherit;
+}
+.bibbidi-accordion-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--accordion-min-height);
+  padding: var(--accordion-padding);
+  border: 0;
+  border-radius: inherit;
+  color: var(--color-fg-neutral);
+  background: transparent;
+  font: var(--accordion-title-font);
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 160ms ease;
+}
+.bibbidi-accordion[data-variant="separated"]
+  > .bibbidi-accordion-item
+  > .bibbidi-accordion-heading
+  > .bibbidi-accordion-trigger {
+  border-radius: 11px;
+}
+.bibbidi-accordion-trigger[aria-expanded="true"] {
+  background: var(--accordion-open-background);
+}
+.bibbidi-accordion-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+.bibbidi-accordion-title,
+.bibbidi-accordion-description {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.bibbidi-accordion-description {
+  color: var(--color-fg-neutral-muted);
+  font: var(--accordion-body-font);
+}
+.bibbidi-accordion-prefix {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+.bibbidi-accordion-prefix > svg,
+.bibbidi-accordion-chevron {
+  width: var(--accordion-icon-size);
+  height: var(--accordion-icon-size);
+}
+.bibbidi-accordion-chevron {
+  flex: 0 0 auto;
+  color: var(--color-fg-neutral-muted);
+  transition: transform 160ms ease;
+}
+.bibbidi-accordion-trigger[aria-expanded="true"] > .bibbidi-accordion-chevron {
+  transform: rotate(180deg);
+}
+.bibbidi-accordion-trigger:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: -3px;
+}
+.bibbidi-accordion-trigger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bibbidi-accordion-trigger:not(:disabled):active {
+  background: var(--accordion-interaction-background);
+}
+.bibbidi-accordion-panel {
+  padding: var(--accordion-padding);
+  color: var(--color-fg-neutral-muted);
+  font: var(--accordion-body-font);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.bibbidi-accordion-panel[hidden] {
+  display: none;
+}
+.bibbidi-accordion-panel > :first-child {
+  margin-top: 0;
+}
+.bibbidi-accordion-panel > :last-child {
+  margin-bottom: 0;
+}
+@media (hover: hover) {
+  .bibbidi-accordion-trigger:not(:disabled):not(:active):hover {
+    background: var(--accordion-interaction-background);
+  }
+  .bibbidi-accordion-trigger[aria-expanded="true"]:not(:disabled):not(
+      :active
+    ):hover {
+    background: var(--accordion-open-background);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bibbidi-accordion-trigger,
+  .bibbidi-accordion-chevron {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .bibbidi-accordion-trigger[aria-expanded="true"] {
+    outline: 1px solid ButtonText;
+    outline-offset: -1px;
+  }
+  .bibbidi-accordion-trigger:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+  .bibbidi-accordion-trigger:disabled {
+    color: GrayText;
+    opacity: 1;
+  }
+}

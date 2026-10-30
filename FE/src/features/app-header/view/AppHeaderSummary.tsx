@@ -1,16 +1,24 @@
 import { useRef } from "react";
 
 import { AppHeaderSummaryViewModel } from "../view-model/createAppHeaderSummaryViewModel";
-import { WeddingDatePopover } from "./WeddingDatePopover";
+import { WeddingDateDialog } from "./WeddingDateDialog";
+import { PreparationProgress } from "./PreparationProgress";
+import { Accordion } from "../../../components/accordion";
+import { IconButton } from "../../../components/icon-button";
+import { RetryIcon } from "../../../components/icons/ActionIcons";
+import { ProgressRing } from "../../../components/progress-ring";
+import { ListRow } from "../../../components/list-row";
 import "./AppHeaderSummary.css";
 
 interface AppHeaderSummaryProps {
   isPopoverOpen: boolean;
+  isProgressExpanded: boolean;
   isSaving: boolean;
   onClosePopover: () => void;
   onOpenPopover: () => void;
   onRetryWeddingDate: () => void;
   onSaveWeddingDate: (date: string) => void;
+  onProgressExpandedChange: (expanded: boolean) => void;
   saveError: string | null;
   viewModel: AppHeaderSummaryViewModel;
   weddingDate: string | null;
@@ -18,70 +26,84 @@ interface AppHeaderSummaryProps {
 
 export function AppHeaderSummary({
   isPopoverOpen,
+  isProgressExpanded,
   isSaving,
   onClosePopover,
   onOpenPopover,
   onRetryWeddingDate,
   onSaveWeddingDate,
+  onProgressExpandedChange,
   saveError,
   viewModel,
   weddingDate,
 }: AppHeaderSummaryProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const isWeddingDateUnset =
-    viewModel.weddingDateStatus === "loaded" && weddingDate === null;
+  const { isWeddingDateUnset } = viewModel;
   const dateDisplay = (
-    <>
-      <span aria-hidden="true" className="app-header-summary__d-day-desktop">
-        <strong>{viewModel.dDayLabel}</strong>
-        <span>· {viewModel.weddingDateLabel}</span>
-      </span>
-      <strong aria-hidden="true" className="app-header-summary__d-day-mobile">
-        {viewModel.mobileDDayLabel}
-      </strong>
-    </>
+    <ListRow.Texts
+      top="결혼 예정일"
+      bottom={
+        viewModel.weddingDateStatus === "error" ? (
+          <span className="app-header-summary__date-error-message">
+            {viewModel.weddingDateDescription}
+          </span>
+        ) : (
+          viewModel.weddingDateDescription
+        )
+      }
+    />
   );
 
   return (
     <section aria-label="결혼 준비 현황" className="app-header-summary">
       <div className="app-header-summary__wedding-date">
         {viewModel.weddingDateStatus === "loaded" ? (
-          <button
+          <ListRow
             aria-expanded={isPopoverOpen}
             aria-haspopup="dialog"
-            aria-label={`${viewModel.dDayLabel}, ${viewModel.weddingDateLabel}. 결혼 예정일 설정`}
-            className={`app-header-summary__d-day app-header-summary__d-day-button${
-              isWeddingDateUnset
-                ? " app-header-summary__d-day-button--unset"
-                : ""
-            }`}
+            aria-label={viewModel.weddingDateAccessibleLabel}
+            className={
+              isWeddingDateUnset ? "app-header-summary__date--unset" : undefined
+            }
+            border="none"
+            horizontalPadding="small"
+            withArrow
+            contents={dateDisplay}
+            right={
+              isWeddingDateUnset ? (
+                <span
+                  className="app-header-summary__date-action"
+                  aria-hidden="true"
+                >
+                  {viewModel.weddingDateActionLabel}
+                </span>
+              ) : undefined
+            }
             onClick={onOpenPopover}
             ref={triggerRef}
-            type="button"
-          >
-            {dateDisplay}
-          </button>
+          />
         ) : (
-          <div
-            aria-label={viewModel.mobileDDayLabel}
-            className="app-header-summary__d-day"
+          <ListRow
+            aria-label={viewModel.weddingDateLabel}
             role="status"
-          >
-            {dateDisplay}
-          </div>
+            border="none"
+            horizontalPadding="small"
+            contents={dateDisplay}
+            right={
+              viewModel.weddingDateStatus === "error" ? (
+                <IconButton
+                  icon={<RetryIcon />}
+                  iconSize={20}
+                  aria-label="결혼 예정일 조회 다시 시도"
+                  title="결혼 예정일 조회 다시 시도"
+                  onClick={onRetryWeddingDate}
+                />
+              ) : undefined
+            }
+          />
         )}
-        {viewModel.weddingDateStatus === "error" ? (
-          <button
-            aria-label="결혼 예정일 조회 다시 시도"
-            className="app-header-summary__retry"
-            onClick={onRetryWeddingDate}
-            type="button"
-          >
-            다시 시도
-          </button>
-        ) : null}
         {isPopoverOpen && viewModel.weddingDateStatus === "loaded" ? (
-          <WeddingDatePopover
+          <WeddingDateDialog
             initialDate={weddingDate}
             isSaving={isSaving}
             onClose={onClosePopover}
@@ -93,28 +115,26 @@ export function AppHeaderSummary({
       </div>
 
       {viewModel.progress ? (
-        <>
-          <span aria-hidden="true" className="app-header-summary__separator" />
-          <div className="app-header-summary__progress">
-            <svg
-              aria-hidden="true"
-              className="app-header-summary__progress-ring"
-              viewBox="0 0 24 24"
-            >
-              <circle cx="12" cy="12" pathLength="100" r="9" />
-              <circle
-                className="app-header-summary__progress-range"
-                cx="12"
-                cy="12"
-                pathLength="100"
-                r="9"
-                strokeDasharray={`${viewModel.progress.percentage} ${100 - viewModel.progress.percentage}`}
-              />
-            </svg>
-            <strong>{viewModel.progress.label}</strong>
-            <span>{viewModel.progress.taskCountLabel}</span>
-          </div>
-        </>
+        <Accordion
+          className="app-header-summary__progress"
+          disabled={isSaving}
+          headingLevel={3}
+          highlight={false}
+          onValueChange={(values) =>
+            onProgressExpandedChange(values.includes("progress"))
+          }
+          size="medium"
+          value={isProgressExpanded ? ["progress"] : []}
+        >
+          <Accordion.Item
+            description={viewModel.progress.taskCountLabel}
+            prefix={<ProgressRing value={viewModel.progress.percentage} />}
+            title={`준비 완료율 · ${viewModel.progress.label}`}
+            value="progress"
+          >
+            <PreparationProgress categories={viewModel.progress.categories} />
+          </Accordion.Item>
+        </Accordion>
       ) : null}
     </section>
   );

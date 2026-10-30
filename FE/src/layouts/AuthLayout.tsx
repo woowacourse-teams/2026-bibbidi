@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
+import { AppLayout } from "../components/app-layout";
 import { getSafeLoginReturnPath, useAuth } from "../features/auth";
 import { BrandHeader } from "./BrandHeader";
 import "./AuthLayout.css";
@@ -7,7 +8,6 @@ import "./AuthLayout.css";
 export function AuthLayout() {
   const { authState } = useAuth();
   const { pathname, search } = useLocation();
-  const isLoginPath = pathname === "/login";
   const isOnboardingPath =
     pathname === "/onboarding" || pathname === "/onboarding/account";
 
@@ -19,22 +19,22 @@ export function AuthLayout() {
     return <Navigate replace to="/onboarding" />;
   }
 
-  if (
-    authState.status === "accountSetupRequired" &&
-    pathname !== "/onboarding/account"
-  ) {
-    return <Navigate replace to="/onboarding/account" />;
-  }
-
   if (authState.status === "guest" && isOnboardingPath) {
-    return <Navigate replace to="/login" />;
+    return (
+      <Navigate replace to="/" state={{ loginModal: { returnTo: "/" } }} />
+    );
   }
 
   return (
-    <div className="auth-layout">
-      <BrandHeader />
-
-      <main className={`auth-page${isLoginPath ? " auth-page--login" : ""}`}>
+    <AppLayout
+      className="auth-layout"
+      header={<BrandHeader />}
+      headerPosition="sticky"
+      headerTone="fade"
+      scroll="document"
+      hideScrollBar
+    >
+      <main className="auth-page">
         {authState.status === "loading" ||
         authState.status === "synchronizing" ? (
           <p role="status">로그인 상태를 확인하고 있습니다.</p>
@@ -42,6 +42,6 @@ export function AuthLayout() {
           <Outlet />
         )}
       </main>
-    </div>
+    </AppLayout>
   );
 }

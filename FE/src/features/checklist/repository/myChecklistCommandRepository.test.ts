@@ -27,6 +27,7 @@ import {
   RemoteAppointmentManagementRequestAbortedError,
 } from "../data-source/remoteAppointmentManagementDataSource";
 import { AppointmentManagementError } from "../model/appointmentManagement";
+import type { MyChecklistModel } from "../model/myChecklist";
 import {
   ChecklistItemChangeError,
   createMyChecklistCommandRepository,
@@ -34,6 +35,7 @@ import {
   MyChecklistCreationError,
 } from "./myChecklistCommandRepository";
 import {
+  createMyChecklistQueryRepository,
   MyChecklistAuthenticationRequiredError,
   MyChecklistLoadError,
   MyChecklistQueryRepository,
@@ -1013,5 +1015,103 @@ describe("MyChecklistCommandRepository", () => {
     ).resolves.toBeUndefined();
     expect(queryRepository.invalidate).toHaveBeenCalledTimes(2);
     expect(dataSource.createChecklist).toHaveBeenCalledOnce();
+  });
+});
+
+describe("MyChecklistCommandRepository.deleteItem", () => {
+  it.each([null, 101])(
+    "삭제 성공 시 항목과 연결 일정을 공통 캐시에서 제거하고 구독자에게 알린다 (원본=%s)",
+    async (sourceCatalogItemId) => {
+      const checklist: MyChecklistModel = {
+        exists: true,
+        items: [
+          {
+            id: 10,
+            categoryId: 1,
+            sourceCatalogItemId,
+            status: "prev",
+            title: "웨딩홀 계약",
+            createdAt: null,
+            appointments: [
+              {
+                id: 2,
+                title: "계약서 검토",
+                date: "2026-10-26",
+                startTime: null,
+                endTime: null,
+                memo: null,
+                place: null,
+                isDone: false,
+              },
+            ],
+          },
+        ],
+      };
+      const remoteGet = vi.fn().mockResolvedValue(checklist);
+      const queryRepository = createMyChecklistQueryRepository({
+        getChecklist: remoteGet,
+      });
+      await queryRepository.getChecklist();
+      const listener = vi.fn();
+      queryRepository.subscribe(listener);
+      const revision = queryRepository.getRevision();
+      const dataSource = createDataSource();
+      dataSource.deleteChecklistItem = vi.fn().mockResolvedValue(undefined);
+      const repository = createMyChecklistCommandRepository(
+        dataSource,
+        queryRepository,
+      );
+      const controller = new AbortController();
+      await repository.deleteItem!(10, controller.signal);
+      expect(dataSource.deleteChecklistItem).toHaveBeenCalledWith(
+        10,
+        controller.signal,
+      );
+      expect(await queryRepository.getChecklist()).toEqual({
+        exists: true,
+        items: [],
+      });
+      expect(queryRepository.getRevision()).toBe(revision + 1);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(remoteGet).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("삭제 API가 실패하면 공통 캐시와 구독 상태를 유지한다", async () => {
+    const checklist: MyChecklistModel = {
+      exists: true,
+      items: [
+        {
+          id: 10,
+          categoryId: 1,
+          sourceCatalogItemId: 101,
+          status: "prev",
+          title: "웨딩홀 계약",
+          createdAt: null,
+          appointments: [],
+        },
+      ],
+    };
+    const queryRepository = createMyChecklistQueryRepository({
+      getChecklist: vi.fn().mockResolvedValue(checklist),
+    });
+    await queryRepository.getChecklist();
+    const listener = vi.fn();
+    queryRepository.subscribe(listener);
+    const revision = queryRepository.getRevision();
+    const dataSource = createDataSource();
+    dataSource.deleteChecklistItem = vi
+      .fn()
+      .mockRejectedValue(new RemoteChecklistItemChangeNetworkError());
+    const repository = createMyChecklistCommandRepository(
+      dataSource,
+      queryRepository,
+    );
+    await expect(repository.deleteItem!(10)).rejects.toBeInstanceOf(
+      ChecklistItemChangeError,
+    );
+    expect(await queryRepository.getChecklist()).toBe(checklist);
+    expect(queryRepository.getRevision()).toBe(revision);
+    expect(listener).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,11 @@
+.app-header-summary__calendar {
+  margin-top: 16px;
+}
+.app-header-summary__selection,
+.app-header-summary__error {
+  margin: 12px 0 0;
+  font: var(--typography-t7);
+}
+.app-header-summary__error {
+  color: var(--color-fg-critical);
+}

@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { localToday } from "../../shared/date/calendarDate";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useAuth } from "../auth";
@@ -9,10 +10,7 @@ import {
 import { createPreparationItemAddEvent } from "../preparation/analytics/preparationAnalytics";
 import { recommendedCatalogItemsRepository } from "./homeDependencies";
 import type { RecommendedCatalogItemsRepository } from "./repository/recommendedCatalogItemsRepository";
-import {
-  createCalendarPlanningModel,
-  getLocalDate,
-} from "./model/calendarPlanning";
+import { createCalendarPlanningModel } from "./model/calendarPlanning";
 import { useCalendarPlanningData } from "./useCalendarPlanningData";
 import { useCalendarDateAssignment } from "./useCalendarDateAssignment";
 import { createRecommendedScheduleViewModel } from "./view-model/createRecommendedScheduleViewModel";
@@ -24,7 +22,7 @@ import { GuestRecommendedTasksFeature } from "./GuestRecommendedTasksFeature";
 import { CalendarDateAssignment } from "./CalendarDateAssignment";
 
 export function HomeScheduleDashboardFeature({
-  getReferenceDate = getLocalDate,
+  getReferenceDate = localToday,
   recommendedRepository = recommendedCatalogItemsRepository,
 }: {
   getReferenceDate?: () => string;
@@ -55,6 +53,7 @@ function CalendarPlanningFeature({
   recommendedRepository: RecommendedCatalogItemsRepository;
   refreshAuth: () => void;
 }) {
+  const calendarHeadingRef = useRef<HTMLElement>(null);
   const { authState } = useAuth();
   const audience =
     authState.status === "authenticated"
@@ -75,13 +74,17 @@ function CalendarPlanningFeature({
     recommendedRepository,
     onAuthenticationRequired: refreshAuth,
   });
-  const { tasks, undated, schedules, addedCatalogItemIds } =
-    createCalendarPlanningModel(
-      checklist.status === "complete" ? checklist.data : undefined,
-    );
+  const { tasks, undated, schedules, addedCatalogItemIds } = useMemo(
+    () =>
+      createCalendarPlanningModel(
+        checklist.status === "complete" ? checklist.data : undefined,
+      ),
+    [checklist],
+  );
   const dateAssignment = useCalendarDateAssignment({
     audience,
-    checklist,
+    checklistStatus: checklist.status,
+    tasks,
     refreshChecklist,
   });
   const onSuccess = useCallback(
@@ -138,7 +141,6 @@ function CalendarPlanningFeature({
       checklist.status !== "loading" &&
       remainingRecommendations.length > 0 ? (
       <RecommendedSchedule
-        compact
         onAddTask={addition.add}
         viewModel={createRecommendedScheduleViewModel(
           { items: remainingRecommendations },
@@ -155,6 +157,7 @@ function CalendarPlanningFeature({
 
   return (
     <CalendarPlanning
+      headingRef={calendarHeadingRef}
       referenceDate={getReferenceDate()}
       schedules={schedules}
       focusDate={dateAssignment.focusDate}
@@ -183,6 +186,7 @@ function CalendarPlanningFeature({
                 title={dateAssignment.selectedTask.title}
                 onClose={dateAssignment.closeDate}
                 onSaved={dateAssignment.onSaved}
+                fallbackFocusRef={calendarHeadingRef}
               />
             )}
           {dateAssignment.loginTo && (

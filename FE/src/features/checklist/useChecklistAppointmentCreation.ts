@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useAppointmentDraft } from "./useAppointmentDraft";
 
 import { analytics } from "../../infrastructure/analytics";
 import {
@@ -11,20 +12,15 @@ import {
 } from "./analytics/checklistAnalytics";
 import { AppointmentCreationError } from "./model/appointmentCreation";
 import {
-  CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH,
-  ChecklistAppointmentFormDraft,
-  ChecklistAppointmentFormErrors,
-  ChecklistAppointmentFormField,
+  ChecklistAppointmentFormController,
+  ChecklistAppointmentDiscardController,
   emptyAppointmentDraft,
   getFirstAppointmentErrorField,
   toLocalDateTime,
   toOptionalAppointmentText,
   validateAppointmentDraft,
-  validateAppointmentEndTime,
 } from "./model/appointmentForm";
 import { MyChecklistRequestAbortedError } from "./repository/myChecklistQueryRepository";
-
-export { CHECKLIST_APPOINTMENT_TEXT_MAX_LENGTH };
 
 export interface ChecklistAppointmentCreationInput {
   checklistItemId: number;
@@ -36,16 +32,11 @@ export interface ChecklistAppointmentCreationInput {
   title: string;
 }
 
-export type ChecklistAppointmentCreationSubmissionState =
-  | { status: "idle" }
-  | { status: "submitting" }
-  | { message: string; retryLabel: string; status: "error" };
-
-export type ChecklistAppointmentCreationDraft = ChecklistAppointmentFormDraft;
-export type ChecklistAppointmentCreationErrors = ChecklistAppointmentFormErrors;
-export type ChecklistAppointmentCreationField = ChecklistAppointmentFormField;
+type ChecklistAppointmentCreationSubmissionState =
+  ChecklistAppointmentFormController["submissionState"];
 
 interface UseChecklistAppointmentCreationOptions {
+  confirmDiscard?: boolean;
   checklistItemId: number | null;
   isAuthenticated: boolean;
   onSubmit?: (
@@ -56,27 +47,13 @@ interface UseChecklistAppointmentCreationOptions {
   sessionIdentity?: string;
 }
 
-export interface ChecklistAppointmentCreationController {
-  canOpen: boolean;
-  canSubmit: boolean;
-  cancel: () => void;
-  changeDate: (date: string) => void;
-  changeEndTime: (endTime: string) => void;
-  changeMemo: (memo: string) => void;
-  changePlace: (place: string) => void;
-  changeStartTime: (startTime: string) => void;
-  changeTitle: (title: string) => void;
-  draft: ChecklistAppointmentCreationDraft;
-  errors: ChecklistAppointmentCreationErrors;
+export interface ChecklistAppointmentCreationController
+  extends
+    ChecklistAppointmentFormController,
+    ChecklistAppointmentDiscardController {
   isOpen: boolean;
+  canOpen: boolean;
   open: (source?: AppointmentCreationSource) => void;
-  submissionState: ChecklistAppointmentCreationSubmissionState;
-  submit: () => Promise<ChecklistAppointmentCreationField | null>;
-  touchDate: () => void;
-  touchEndTime: () => void;
-  touchPlace: () => void;
-  touchStartTime: () => void;
-  touchTitle: () => void;
 }
 
 const emptyDraft = emptyAppointmentDraft;
@@ -86,14 +63,16 @@ const idleSubmissionState: ChecklistAppointmentCreationSubmissionState = {
 };
 
 export function useChecklistAppointmentCreation({
+  confirmDiscard = false,
   checklistItemId,
   isAuthenticated,
   onSubmit,
   onRetryRefresh,
   sessionIdentity,
 }: UseChecklistAppointmentCreationOptions): ChecklistAppointmentCreationController {
-  const [draft, setDraft] = useState(emptyDraft);
-  const [errors, setErrors] = useState<ChecklistAppointmentCreationErrors>({});
+  const { form, setDraft, setErrors } = useAppointmentDraft();
+  const { draft } = form;
+  const [isDiscardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [submissionState, setSubmissionState] =
     useState<ChecklistAppointmentCreationSubmissionState>(idleSubmissionState);
@@ -141,6 +120,7 @@ export function useChecklistAppointmentCreation({
 
       setActiveContextKey(contextKey);
       setDraft(emptyDraft);
+      setDiscardDialogOpen(false);
       setErrors({});
       setIsOpen(false);
       setSubmissionState(idleSubmissionState);
@@ -149,7 +129,7 @@ export function useChecklistAppointmentCreation({
     return () => {
       isActive = false;
     };
-  }, [activeContextKey, contextKey]);
+  }, [activeContextKey, contextKey, setDraft, setErrors]);
 
   useEffect(() => {
     const previousCommand = commandRef.current;
@@ -173,6 +153,7 @@ export function useChecklistAppointmentCreation({
     queueMicrotask(() => {
       if (!isActive) return;
       setDraft(emptyDraft);
+      setDiscardDialogOpen(false);
       setErrors({});
       setSubmissionState(idleSubmissionState);
       setIsOpen(false);
@@ -181,26 +162,10 @@ export function useChecklistAppointmentCreation({
     return () => {
       isActive = false;
     };
-  }, [onSubmit, onRetryRefresh]);
-
-  const replaceError = (
-    field: ChecklistAppointmentCreationField,
-    message?: string,
-  ) => {
-    setErrors((current) => {
-      const next = { ...current };
-
-      if (message) {
-        next[field] = message;
-      } else {
-        delete next[field];
-      }
-
-      return next;
-    });
-  };
+  }, [onSubmit, onRetryRefresh, setDraft, setErrors]);
 
   const resetAndClose = () => {
+    setDiscardDialogOpen(false);
     requestGenerationRef.current += 1;
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
@@ -217,61 +182,25 @@ export function useChecklistAppointmentCreation({
     canSubmit:
       isAuthenticated && checklistItemId !== null && onSubmit !== undefined,
     cancel: () => {
-      if (!submissionInFlightRef.current) {
-        resetAndClose();
-      }
+      if (submissionInFlightRef.current) return;
+      if (
+        confirmDiscard &&
+        !needsRefreshRef.current &&
+        Object.keys(emptyDraft).some(
+          (key) =>
+            draft[key as keyof typeof draft] !==
+            emptyDraft[key as keyof typeof draft],
+        )
+      )
+        setDiscardDialogOpen(true);
+      else resetAndClose();
     },
-    changeDate: (date) => {
-      setDraft((current) => ({ ...current, date }));
-      if (errors.date) {
-        replaceError("date", validateAppointmentDraft({ ...draft, date }).date);
-      }
+    isDiscardDialogOpen: isCurrentContext && isOpen && isDiscardDialogOpen,
+    cancelDiscard: () => setDiscardDialogOpen(false),
+    confirmDiscard: () => {
+      if (!submissionInFlightRef.current) resetAndClose();
     },
-    changeEndTime: (endTime) => {
-      setDraft((current) => ({ ...current, endTime }));
-      if (errors.endTime) {
-        replaceError(
-          "endTime",
-          validateAppointmentEndTime(draft.startTime, endTime),
-        );
-      }
-    },
-    changeMemo: (memo) => setDraft((current) => ({ ...current, memo })),
-    changePlace: (place) => {
-      setDraft((current) => ({ ...current, place }));
-      if (errors.place) {
-        replaceError(
-          "place",
-          validateAppointmentDraft({ ...draft, place }).place,
-        );
-      }
-    },
-    changeStartTime: (startTime) => {
-      setDraft((current) => ({ ...current, startTime }));
-      if (errors.startTime) {
-        replaceError(
-          "startTime",
-          validateAppointmentDraft({ ...draft, startTime }).startTime,
-        );
-      }
-      if (errors.endTime) {
-        replaceError(
-          "endTime",
-          validateAppointmentEndTime(startTime, draft.endTime),
-        );
-      }
-    },
-    changeTitle: (title) => {
-      setDraft((current) => ({ ...current, title }));
-      if (errors.title) {
-        replaceError(
-          "title",
-          validateAppointmentDraft({ ...draft, title }).title,
-        );
-      }
-    },
-    draft,
-    errors,
+    ...form,
     isOpen: isCurrentContext && isOpen,
     open: (source = "checklist") => {
       if (isAuthenticated && checklistItemId !== null) {
@@ -344,7 +273,9 @@ export function useChecklistAppointmentCreation({
         }
 
         if (didSucceed !== false) {
-          analytics.track(createAppointmentCreateEvent(sourceRef.current));
+          analytics.track(
+            createAppointmentCreateEvent(sourceRef.current, checklistItemId),
+          );
           requestControllerRef.current = null;
           resetAndClose();
         } else {
@@ -409,20 +340,5 @@ export function useChecklistAppointmentCreation({
 
       return null;
     },
-    touchDate: () => replaceError("date", validateAppointmentDraft(draft).date),
-    touchEndTime: () =>
-      replaceError(
-        "endTime",
-        validateAppointmentEndTime(draft.startTime, draft.endTime),
-      ),
-    touchPlace: () =>
-      replaceError("place", validateAppointmentDraft(draft).place),
-    touchStartTime: () => {
-      const nextErrors = validateAppointmentDraft(draft);
-      replaceError("startTime", nextErrors.startTime);
-      replaceError("endTime", nextErrors.endTime);
-    },
-    touchTitle: () =>
-      replaceError("title", validateAppointmentDraft(draft).title),
   };
 }

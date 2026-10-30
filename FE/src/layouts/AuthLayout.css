@@ -1,9 +1,7 @@
 .auth-layout {
   display: flex;
   min-width: 320px;
-  min-height: 100dvh;
   flex-direction: column;
-  background: var(--color-bg-layer-basement);
 }
 
 .auth-page {
@@ -13,27 +11,9 @@
   padding: 56px 24px 96px;
 }
 
-.auth-page--login {
-  align-items: stretch;
-  padding-bottom: calc(18px + env(safe-area-inset-bottom));
-  padding-top: 128px;
-}
-
-@media (max-width: 760px) {
+@media (width < 768px) {
   .auth-page {
     align-items: start;
     padding: 42px 24px 48px;
-  }
-
-  .auth-page--login {
-    align-items: stretch;
-    padding-bottom: calc(18px + env(safe-area-inset-bottom));
-    padding-top: clamp(32px, 6dvh, 48px);
-  }
-}
-
-@media (min-width: 744px) {
-  .auth-page--login {
-    padding-top: 128px;
   }
 }

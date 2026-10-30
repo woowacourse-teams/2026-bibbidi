@@ -1,0 +1,78 @@
+.bibbidi-popover {
+  position: fixed;
+  inset: auto;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+  padding: 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  font: var(--typography-t6);
+  letter-spacing: var(--letter-spacing-ui);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  box-shadow: 0 8px 32px
+    color-mix(in srgb, var(--color-palette-ink) 12%, transparent);
+}
+.bibbidi-popover:not(:popover-open) {
+  display: none;
+}
+.bibbidi-popover::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.bibbidi-popover:focus {
+  outline: none;
+}
+.bibbidi-popover:focus-visible {
+  outline: 2px solid var(--color-stroke-focus-ring);
+  outline-offset: -2px;
+}
+.bibbidi-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bibbidi-popover-title {
+  margin: 0;
+  padding-block: 2px;
+  color: var(--color-fg-neutral);
+  font: var(--typography-t5-medium);
+}
+.bibbidi-popover-dismiss {
+  margin: -10px -10px -4px 0;
+}
+.bibbidi-popover-description {
+  margin-top: 8px;
+  color: var(--color-fg-neutral-muted);
+  font: var(--typography-t7);
+  line-height: 1.7;
+}
+.bibbidi-popover-body {
+  margin-top: 16px;
+  font: var(--typography-t6);
+}
+.bibbidi-popover-body > :first-child {
+  margin-top: 0;
+}
+.bibbidi-popover-body > :last-child {
+  margin-bottom: 0;
+}
+.bibbidi-popover-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+@media (forced-colors: active) {
+  .bibbidi-popover {
+    border-color: CanvasText;
+  }
+}

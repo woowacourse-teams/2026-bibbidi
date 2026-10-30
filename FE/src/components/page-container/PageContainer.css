@@ -1,0 +1,16 @@
+.bibbidi-page-container {
+  box-sizing: border-box;
+  width: max(0px, calc(100% - var(--service-page-margin) * 2));
+  max-width: var(--layout-width-content);
+  min-width: 0;
+  margin-inline: auto;
+}
+.bibbidi-page-container[data-width="wide"] {
+  max-width: var(--layout-width-wide);
+}
+.bibbidi-page-container[data-width="focus"] {
+  max-width: var(--layout-width-focus);
+}
+.bibbidi-page-container[data-width="auth"] {
+  max-width: var(--layout-width-auth);
+}

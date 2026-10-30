@@ -1,18 +1,31 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 
-import { useIsMobileLayout } from "../../../shared/responsive";
+import { Result } from "../../../components/result";
+import { useLayerPresence } from "../../../shared/modal/useLayerPresence";
+import {
+  WorkspaceLayout,
+  useWorkspaceLayout,
+} from "../../../components/workspace-layout";
+import {
+  ChecklistCategories,
+  getChecklistCategoryTabId,
+} from "./ChecklistCategories";
+import { ChecklistForeground } from "./ChecklistForeground";
+import { ChecklistHeader } from "./ChecklistHeader";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentCreationController } from "../useChecklistAppointmentCreation";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import { ChecklistTaskCreationController } from "../useChecklistTaskCreation";
 import { ChecklistCategoryViewModel } from "../view-model/createChecklistViewModel";
 import "./Checklist.css";
-import { ChecklistAppointmentCreation } from "./ChecklistAppointmentCreation";
-import { ChecklistModalDialog } from "./ChecklistModalDialog";
+import { ChecklistAppointmentForm } from "./ChecklistAppointmentForm";
 import { ChecklistTaskCreation } from "./ChecklistTaskCreation";
 import { ChecklistTaskDetailBottomSheet } from "./ChecklistTaskDetailBottomSheet";
-import { ChecklistStatusConfirmationDialog } from "./ChecklistStatusConfirmationDialog";
+import { ChecklistConfirmations } from "./ChecklistConfirmations";
+import { createChecklistConfirmationViewModel } from "../view-model/createChecklistConfirmationViewModel";
+import { useChecklistFocusRestoration } from "../useChecklistFocusRestoration";
 import { ChecklistTaskDetailPanel } from "./ChecklistTaskDetailPanel";
+import { ChecklistGroups } from "./ChecklistGroups";
 
 interface ChecklistProps {
   appointmentCreation?: ChecklistAppointmentCreationController;
@@ -24,7 +37,6 @@ interface ChecklistProps {
   onBackTaskDetail: () => void;
   onCancelLoginRequired?: () => void;
   onCloseTaskDetail: () => void;
-  onDismissTaskDetail?: () => void;
   onOpenTaskCreation?: () => void;
   onRequestScheduleCreation?: () => void;
   onSelectTask: (taskId: string) => void;
@@ -33,17 +45,6 @@ interface ChecklistProps {
   revealCustomCategory?: { categoryId: string; requestId: number } | null;
   selectedTaskId: string | null;
   taskCreation?: ChecklistTaskCreationController;
-}
-
-function canRestoreFocus(
-  button: HTMLButtonElement | null,
-): button is HTMLButtonElement {
-  return (
-    button !== null &&
-    button.isConnected &&
-    !button.disabled &&
-    button.closest("[hidden]") === null
-  );
 }
 
 export function Checklist({
@@ -56,7 +57,6 @@ export function Checklist({
   onBackTaskDetail,
   onCancelLoginRequired,
   onCloseTaskDetail,
-  onDismissTaskDetail = onCloseTaskDetail,
   onOpenTaskCreation,
   onRequestScheduleCreation,
   onSelectTask,
@@ -90,32 +90,21 @@ export function Checklist({
   const [dismissedRevealRequestId, setDismissedRevealRequestId] = useState<
     number | null
   >(null);
-  const isMobileLayout = useIsMobileLayout();
-  const fallbackFocusRef = useRef<HTMLButtonElement>(null);
-  const addTaskButtonRef = useRef<HTMLButtonElement>(null);
-  const wasTaskCreationOpenRef = useRef(taskCreation?.isOpen ?? false);
-  const wasAppointmentCreationOpenRef = useRef(
-    appointmentCreation?.isOpen ?? false,
-  );
-  const appointmentCreationTaskIdRef = useRef(
-    appointmentCreation?.isOpen ? selectedTaskId : null,
-  );
-  const wasAppointmentEditingOpenRef = useRef(
-    appointmentManagement?.editing.isOpen ?? false,
-  );
-  const appointmentEditingIdRef = useRef<number | null>(null);
-  const wasDeletionOpenRef = useRef(
-    appointmentManagement?.deletionConfirmation !== null,
-  );
-  const deletionAppointmentIdRef = useRef<number | null>(null);
-  const previousSelectedTaskIdRef = useRef(selectedTaskId);
-  const selectedTaskButtonRef = useRef<HTMLButtonElement | null>(null);
-  const taskButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const selectedTaskContext = categories
     .flatMap((category) =>
       category.tasks.map((task) => ({ categoryTitle: category.title, task })),
     )
     .find(({ task }) => task.id === selectedTaskId);
+  const hasAside = selectedTaskContext !== undefined || !!taskCreation?.isOpen;
+  const { present: foregroundPresent, onExited: completeForegroundExit } =
+    useLayerPresence(hasAside);
+  const { ref: workspaceRef, layout } = useWorkspaceLayout(
+    true,
+    foregroundPresent,
+  );
+  const isMobileLayout = layout.isMobile;
+  const isOverlay =
+    !isMobileLayout && layout.asidePlacement === "overlay" && foregroundPresent;
   const revealedCategoryId =
     revealCustomCategory?.requestId === dismissedRevealRequestId
       ? null
@@ -131,174 +120,43 @@ export function Checklist({
     .find((category) => category.id === revealCustomCategory?.categoryId)
     ?.groups.find((group) => group.isCustom)?.id;
   const tasks = selectedCategory?.tasks ?? [];
+  const expandedGroupValues = (selectedCategory?.groups ?? [])
+    .filter(
+      (group) =>
+        expandedGroupIds.has(group.id) ||
+        (group.id === revealCustomGroupId &&
+          revealCustomCategory?.requestId !== collapsedRevealRequestId),
+    )
+    .map((group) => group.id);
   const completedTaskCount = selectedCategory?.completedCount ?? 0;
   const isTaskCreationOpen = taskCreation?.isOpen ?? false;
   const isAppointmentCreationOpen = appointmentCreation?.isOpen ?? false;
   const isAppointmentEditingOpen =
     appointmentManagement?.editing.isOpen ?? false;
-  const deletionConfirmation =
-    appointmentManagement?.deletionConfirmation ?? null;
-  const isAppointmentDeletionOpen = deletionConfirmation !== null;
-  const appointmentOperationFeedback = appointmentManagement?.operationFeedback;
-  const isAppointmentDeletionPending =
-    deletionConfirmation !== null &&
-    appointmentOperationFeedback?.status === "pending" &&
-    appointmentOperationFeedback.operation === "delete" &&
-    appointmentOperationFeedback.appointmentId ===
-      deletionConfirmation.appointmentId;
-  const appointmentDeletionError =
-    deletionConfirmation !== null &&
-    appointmentOperationFeedback?.status === "error" &&
-    appointmentOperationFeedback.operation === "delete" &&
-    appointmentOperationFeedback.appointmentId ===
-      deletionConfirmation.appointmentId
-      ? appointmentOperationFeedback.errorMessage
-      : undefined;
-  const pendingStatusConfirmation = itemEditing?.statusConfirmation ?? null;
-  const statusConfirmation =
-    pendingStatusConfirmation?.itemId ===
-    selectedTaskContext?.task.checklistItemId
-      ? pendingStatusConfirmation
-      : null;
-  const isStatusConfirmationOpen = statusConfirmation !== null;
-  const isLoginRequiredOpen = loginRequiredReason !== null;
-  const statusFeedback = itemEditing?.changeFeedback;
-  const isStatusChangePending =
-    statusConfirmation !== null &&
-    statusFeedback?.status === "pending" &&
-    statusFeedback.itemId === statusConfirmation.itemId &&
-    statusFeedback.kind === "status";
-  const statusConfirmationError =
-    statusConfirmation !== null &&
-    statusFeedback?.status === "error" &&
-    statusFeedback.itemId === statusConfirmation.itemId &&
-    statusFeedback.kind === "status"
-      ? statusFeedback.errorMessage
-      : undefined;
-  const itemDeletionId = selectedTaskContext?.task.checklistItemId ?? null;
-  const isItemDeletionOpen =
-    itemDeletionId !== null &&
-    itemEditing?.deletionConfirmation === itemDeletionId;
-  const isItemDeletionPending =
-    isItemDeletionOpen &&
-    statusFeedback?.status === "pending" &&
-    statusFeedback.itemId === itemDeletionId &&
-    statusFeedback.kind === "delete";
-  const itemDeletionError =
-    isItemDeletionOpen &&
-    statusFeedback?.status === "error" &&
-    statusFeedback.itemId === itemDeletionId &&
-    statusFeedback.kind === "delete"
-      ? statusFeedback.errorMessage
-      : undefined;
-
-  useEffect(() => {
-    const previousSelectedTaskId = previousSelectedTaskIdRef.current;
-
-    if (previousSelectedTaskId !== null && selectedTaskId === null) {
-      const previousTaskButton =
-        taskButtonRefs.current.get(previousSelectedTaskId) ??
-        selectedTaskButtonRef.current;
-
-      if (canRestoreFocus(previousTaskButton)) {
-        previousTaskButton.focus();
-      } else {
-        (fallbackFocusRef.current ?? addTaskButtonRef.current)?.focus();
-      }
-    }
-
-    selectedTaskButtonRef.current = selectedTaskContext
-      ? (taskButtonRefs.current.get(selectedTaskContext.task.id) ?? null)
-      : null;
-    previousSelectedTaskIdRef.current = selectedTaskId;
-  }, [selectedTaskContext, selectedTaskId]);
-
-  useEffect(() => {
-    if (
-      wasTaskCreationOpenRef.current &&
-      !isTaskCreationOpen &&
-      !selectedTaskContext
-    ) {
-      addTaskButtonRef.current?.focus();
-    }
-
-    wasTaskCreationOpenRef.current = isTaskCreationOpen;
-  }, [isTaskCreationOpen, selectedTaskContext]);
-
-  useEffect(() => {
-    if (
-      !wasAppointmentCreationOpenRef.current &&
-      isAppointmentCreationOpen &&
-      selectedTaskContext
-    ) {
-      appointmentCreationTaskIdRef.current = selectedTaskContext.task.id;
-    }
-
-    if (
-      wasAppointmentCreationOpenRef.current &&
-      !isAppointmentCreationOpen &&
-      selectedTaskContext?.task.id === appointmentCreationTaskIdRef.current
-    ) {
-      document
-        .getElementById(`${selectedTaskContext.task.id}-add-appointment`)
-        ?.focus();
-    }
-
-    if (!isAppointmentCreationOpen) {
-      appointmentCreationTaskIdRef.current = null;
-    }
-
-    wasAppointmentCreationOpenRef.current = isAppointmentCreationOpen;
-  }, [isAppointmentCreationOpen, selectedTaskContext]);
-
-  useEffect(() => {
-    if (
-      !wasAppointmentEditingOpenRef.current &&
-      isAppointmentEditingOpen &&
-      selectedTaskContext
-    ) {
-      appointmentEditingIdRef.current =
-        appointmentManagement?.editingAppointmentId ?? null;
-    }
-
-    if (wasAppointmentEditingOpenRef.current && !isAppointmentEditingOpen) {
-      const appointmentId = appointmentEditingIdRef.current;
-      if (appointmentId !== null) {
-        document
-          .getElementById(`${appointmentId}-appointment-menu-button`)
-          ?.focus();
-      }
-    }
-
-    if (!isAppointmentEditingOpen) {
-      appointmentEditingIdRef.current = null;
-    }
-    wasAppointmentEditingOpenRef.current = isAppointmentEditingOpen;
-  }, [appointmentManagement, isAppointmentEditingOpen, selectedTaskContext]);
-
-  useEffect(() => {
-    if (!wasDeletionOpenRef.current && deletionConfirmation) {
-      deletionAppointmentIdRef.current = deletionConfirmation.appointmentId;
-    }
-
-    if (wasDeletionOpenRef.current && !deletionConfirmation) {
-      const trigger =
-        deletionAppointmentIdRef.current === null
-          ? null
-          : document.getElementById(
-              `${deletionAppointmentIdRef.current}-appointment-menu-button`,
-            );
-      (
-        trigger ??
-        document.getElementById(
-          `${selectedTaskContext?.task.id}-add-appointment`,
-        )
-      )?.focus();
-      deletionAppointmentIdRef.current = null;
-    }
-
-    wasDeletionOpenRef.current = deletionConfirmation !== null;
-  }, [deletionConfirmation, selectedTaskContext]);
+  const isAppointmentDeletionOpen =
+    appointmentManagement?.deletionConfirmation != null;
+  const confirmationViewModel = createChecklistConfirmationViewModel({
+    selectedItemId: selectedTaskContext?.task.checklistItemId ?? null,
+    itemEditing,
+    appointmentManagement,
+  });
+  const {
+    fallbackFocusRef,
+    addTaskButtonRef,
+    taskCreationTriggerRef,
+    registerTaskButton,
+    rememberTaskSelection,
+    skipTaskFocusRestoration,
+  } = useChecklistFocusRestoration({
+    selectedTaskId,
+    activeTaskId: selectedTaskContext?.task.id ?? null,
+    foregroundPresent,
+    isAppointmentCreationOpen,
+    isAppointmentEditingOpen,
+    editingAppointmentId: appointmentManagement?.editingAppointmentId ?? null,
+    deletionAppointmentId:
+      appointmentManagement?.deletionConfirmation?.appointmentId ?? null,
+  });
 
   useEffect(() => {
     if (
@@ -306,14 +164,15 @@ export function Checklist({
       isAppointmentCreationOpen ||
       isAppointmentEditingOpen ||
       isAppointmentDeletionOpen ||
-      isMobileLayout
+      isMobileLayout ||
+      isOverlay
     ) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onDismissTaskDetail();
+        onCloseTaskDetail();
       }
     };
 
@@ -325,24 +184,28 @@ export function Checklist({
     isAppointmentDeletionOpen,
     isAppointmentEditingOpen,
     isMobileLayout,
-    onDismissTaskDetail,
+    isOverlay,
+    onCloseTaskDetail,
     selectedTaskContext,
   ]);
 
-  const toggleGroup = (groupId: string, isExpanded: boolean) => {
+  const changeExpandedGroups = (values: string[]) => {
     setExpandedGroupIds((currentIds) => {
       const nextIds = new Set(currentIds);
-
-      if (isExpanded) {
-        nextIds.delete(groupId);
-      } else {
-        nextIds.add(groupId);
-      }
+      selectedCategory?.groups.forEach((group) => {
+        if (values.includes(group.id)) nextIds.add(group.id);
+        else nextIds.delete(group.id);
+      });
 
       return nextIds;
     });
 
-    if (isExpanded && groupId === revealCustomGroupId && revealCustomCategory) {
+    if (
+      revealCustomGroupId &&
+      revealCustomCategory &&
+      expandedGroupValues.includes(revealCustomGroupId) &&
+      !values.includes(revealCustomGroupId)
+    ) {
       setCollapsedRevealRequestId(revealCustomCategory.requestId);
     }
   };
@@ -352,474 +215,245 @@ export function Checklist({
       return;
     }
 
+    skipTaskFocusRestoration();
     setSelectedCategoryId(categoryId);
     setDismissedRevealRequestId(revealCustomCategory?.requestId ?? null);
     onCloseTaskDetail();
   };
 
   const selectTask = (taskId: string, event: MouseEvent<HTMLButtonElement>) => {
-    selectedTaskButtonRef.current = event.currentTarget;
+    rememberTaskSelection(event.currentTarget);
     onSelectTask(taskId);
   };
 
+  const openTaskCreation = (event: MouseEvent<HTMLButtonElement>) => {
+    taskCreationTriggerRef.current = event.currentTarget;
+    event.currentTarget.focus({ preventScroll: true });
+    onOpenTaskCreation?.();
+  };
+
+  const isForegroundBlocked =
+    loginRequiredReason !== null ||
+    confirmationViewModel.statusChange !== null ||
+    confirmationViewModel.deletions.length > 0 ||
+    !!taskCreation?.isDiscardDialogOpen ||
+    !!appointmentCreation?.isDiscardDialogOpen ||
+    !!appointmentManagement?.editing.isDiscardDialogOpen;
+  const isSubmitting =
+    taskCreation?.submissionState.status === "submitting" ||
+    appointmentCreation?.submissionState.status === "submitting" ||
+    appointmentManagement?.editing.submissionState.status === "submitting";
+  const closeForeground = () => {
+    if (isForegroundBlocked || isSubmitting) return;
+    if (isTaskCreationOpen) taskCreation?.requestClose();
+    else if (isAppointmentCreationOpen) appointmentCreation?.cancel();
+    else if (isAppointmentEditingOpen) appointmentManagement?.editing.cancel();
+    else onCloseTaskDetail();
+  };
   const isMobileForegroundOpen =
-    isMobileLayout && (selectedTaskContext !== undefined || isTaskCreationOpen);
+    (isMobileLayout || isOverlay) && foregroundPresent;
+  const backgroundHidden = isMobileForegroundOpen || isForegroundBlocked;
+  const navigation = (
+    <div
+      aria-hidden={backgroundHidden || undefined}
+      inert={backgroundHidden || undefined}
+    >
+      <ChecklistCategories
+        categories={categories}
+        selectedCategoryId={selectedCategory?.id}
+        controlsId="checklist-category-content"
+        placement={layout.navigationPlacement}
+        onSelect={selectCategory}
+      />
+    </div>
+  );
+  const confirmations = (
+    <ChecklistConfirmations
+      confirmations={confirmationViewModel}
+      loginRequiredReason={loginRequiredReason}
+      onCancelLoginRequired={onCancelLoginRequired}
+      onVisitLogin={onVisitLogin}
+      taskCreationTriggerRef={taskCreationTriggerRef}
+      fallbackFocusRef={addTaskButtonRef}
+    />
+  );
+  const foreground = foregroundPresent ? (
+    <ChecklistForeground
+      open={hasAside}
+      onExited={completeForegroundExit}
+      modal={
+        isOverlay ||
+        (isMobileLayout &&
+          (isTaskCreationOpen ||
+            isAppointmentCreationOpen ||
+            isAppointmentEditingOpen))
+      }
+      overlay={isOverlay}
+      blocked={isForegroundBlocked}
+      pending={isSubmitting}
+      titleId={
+        isTaskCreationOpen
+          ? "checklist-task-creation-title"
+          : isAppointmentCreationOpen || isAppointmentEditingOpen
+            ? "checklist-appointment-creation-title"
+            : `${selectedTaskContext?.task.id}-detail-title`
+      }
+      onClose={closeForeground}
+    >
+      {selectedTaskContext &&
+      !isMobileLayout &&
+      !isTaskCreationOpen &&
+      !isAppointmentCreationOpen &&
+      !isAppointmentEditingOpen ? (
+        <ChecklistTaskDetailPanel
+          modal={isOverlay}
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
+          onClose={onCloseTaskDetail}
+          onRequestScheduleCreation={onRequestScheduleCreation}
+          task={selectedTaskContext.task}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      isMobileLayout &&
+      !isTaskCreationOpen &&
+      !isAppointmentCreationOpen &&
+      !isAppointmentEditingOpen ? (
+        <ChecklistTaskDetailBottomSheet
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={selectedTaskContext.categoryTitle}
+          editing={itemEditing}
+          onClose={onBackTaskDetail}
+          onRequestScheduleCreation={onRequestScheduleCreation}
+          task={selectedTaskContext.task}
+        />
+      ) : null}
+
+      {taskCreation && isTaskCreationOpen ? (
+        <ChecklistTaskCreation
+          modal={isMobileLayout || isOverlay}
+          categories={categories}
+          controller={taskCreation}
+          returnFocusRef={taskCreationTriggerRef}
+          fallbackFocusRef={addTaskButtonRef}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      appointmentCreation &&
+      isAppointmentCreationOpen ? (
+        <ChecklistAppointmentForm
+          modal={isMobileLayout || isOverlay}
+          controller={appointmentCreation}
+          taskTitle={selectedTaskContext.task.title}
+        />
+      ) : null}
+
+      {selectedTaskContext &&
+      appointmentManagement &&
+      isAppointmentEditingOpen ? (
+        <ChecklistAppointmentForm
+          modal={isMobileLayout || isOverlay}
+          controller={appointmentManagement.editing}
+          heading="일정 수정"
+          taskTitle={selectedTaskContext.task.title}
+        />
+      ) : null}
+      {confirmations}
+    </ChecklistForeground>
+  ) : undefined;
 
   return (
-    <div
-      className={`checklist-workspace${
-        isTaskCreationOpen && !isMobileLayout
-          ? " checklist-workspace--add-open"
-          : selectedTaskContext && !isMobileLayout
-            ? " checklist-workspace--detail-open"
-            : ""
-      }`}
-    >
-      <div
-        aria-hidden={
-          isMobileForegroundOpen ||
-          isLoginRequiredOpen ||
-          isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen ||
-          isItemDeletionOpen
-            ? true
-            : undefined
-        }
-        className="checklist-workspace__main"
-        inert={
-          isMobileForegroundOpen ||
-          isLoginRequiredOpen ||
-          isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen ||
-          isItemDeletionOpen
-            ? true
-            : undefined
-        }
+    <>
+      <ChecklistHeader
+        categoryTitle={selectedCategory?.title}
+        taskCount={tasks.length}
+        completedCount={completedTaskCount}
+        isAuthenticated={isAuthenticated}
+        hidden={backgroundHidden}
+        onAddTask={openTaskCreation}
+        addTaskButtonRef={addTaskButtonRef}
+      />
+      <WorkspaceLayout
+        ref={workspaceRef}
+        layout={layout}
+        navigation={navigation}
+        aside={foreground}
+        className="checklist-workspace"
       >
-        <div className="checklist-layout">
-          <nav aria-label="체크리스트 대분류" className="checklist-categories">
-            <ul className="checklist-categories__list">
-              {categories.map((category) => {
-                const isCurrent = category.id === selectedCategory?.id;
-
-                return (
-                  <li key={category.id}>
-                    <button
-                      aria-controls="checklist-category-content"
-                      aria-label={`${category.title} ${category.countLabel}`}
-                      aria-pressed={isCurrent}
-                      className={`checklist-categories__button${
-                        isCurrent
-                          ? " checklist-categories__button--current"
-                          : ""
-                      }`}
-                      onClick={() => selectCategory(category.id)}
-                      type="button"
-                    >
-                      <span>{category.title}</span>
-                      <span className="checklist-categories__count">
-                        {category.countLabel}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
+        <div
+          aria-hidden={backgroundHidden || undefined}
+          className="checklist-workspace__main"
+          inert={backgroundHidden || undefined}
+        >
           <section
-            aria-label="결혼 준비 체크리스트"
+            aria-label={
+              layout.navigationPlacement === "side"
+                ? "결혼 준비 체크리스트"
+                : undefined
+            }
+            aria-labelledby={
+              layout.navigationPlacement === "top" && selectedCategory
+                ? getChecklistCategoryTabId(selectedCategory.id)
+                : undefined
+            }
+            role={layout.navigationPlacement === "top" ? "tabpanel" : undefined}
+            tabIndex={layout.navigationPlacement === "top" ? 0 : undefined}
             className="checklist"
             id="checklist-category-content"
           >
-            <header className="checklist__toolbar">
-              <div className="checklist__summary">
-                <h1>{selectedCategory?.title ?? "체크리스트"}</h1>
-                <p>
-                  {isAuthenticated
-                    ? `전체 ${tasks.length}개 · 완료 ${completedTaskCount}개`
-                    : "로그인하면 체크리스트가 그대로 저장돼요."}
-                </p>
-              </div>
-              <button
-                className="checklist__add-task"
-                onClick={() => {
-                  addTaskButtonRef.current?.focus();
-                  onOpenTaskCreation?.();
-                }}
-                ref={addTaskButtonRef}
-                type="button"
-              >
-                <span aria-hidden="true">＋</span>할 일 추가
-              </button>
-            </header>
-
             {selectedCategory && tasks.length === 0 ? (
-              <section className="checklist__empty">
-                <h2>아직 담은 할 일이 없어요</h2>
-                <p>로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요.</p>
-                <div className="checklist__empty-actions">
-                  <button
-                    className="checklist__empty-primary"
-                    onClick={() => onVisitPreparation?.(selectedCategory.id)}
-                    type="button"
-                  >
-                    로드맵에서 추가
-                  </button>
-                  <button
-                    className="checklist__empty-secondary"
-                    onClick={onOpenTaskCreation}
-                    type="button"
-                  >
-                    직접 추가
-                  </button>
-                </div>
-              </section>
-            ) : (
-              <div className="checklist__groups">
-                {selectedCategory?.groups.map((group, groupIndex) => {
-                  const isExpanded =
-                    expandedGroupIds.has(group.id) ||
-                    (group.id === revealCustomGroupId &&
-                      revealCustomCategory?.requestId !==
-                        collapsedRevealRequestId);
-                  const taskListId = `${group.id}-tasks`;
-
-                  return (
-                    <section
-                      aria-labelledby={`${group.id}-title`}
-                      className={`checklist__group${
-                        isExpanded ? " checklist__group--expanded" : ""
-                      }`}
-                      key={group.id}
+              <Result
+                title="아직 담은 할 일이 없어요"
+                description="로드맵에서 추천 할 일을 고르거나 직접 추가해 보세요."
+                button={
+                  <>
+                    <Result.Button
+                      size="large"
+                      color="primary"
+                      variant="fill"
+                      onClick={() => onVisitPreparation?.(selectedCategory.id)}
+                      type="button"
                     >
-                      <h2 className="checklist__group-heading">
-                        <button
-                          aria-controls={taskListId}
-                          aria-expanded={isExpanded}
-                          aria-label={`${group.numberLabel} ${group.title}, ${group.countLabel}, 진행률 ${group.progressLabel}`}
-                          className="checklist__group-header"
-                          onClick={() => toggleGroup(group.id, isExpanded)}
-                          ref={groupIndex === 0 ? fallbackFocusRef : undefined}
-                          type="button"
-                        >
-                          <span className="checklist__group-copy">
-                            <span className="checklist__group-number">
-                              {group.numberLabel}
-                            </span>
-                            <span className="checklist__group-title-area">
-                              <span
-                                className="checklist__group-title"
-                                id={`${group.id}-title`}
-                              >
-                                {group.title}
-                              </span>
-                              <span className="checklist__group-count">
-                                {group.countLabel}
-                              </span>
-                            </span>
-                          </span>
-
-                          <span className="checklist__progress-area">
-                            <span
-                              aria-label={`${group.title} 진행률`}
-                              aria-valuemax={100}
-                              aria-valuemin={0}
-                              aria-valuenow={group.progress}
-                              className="checklist__progress"
-                              role="progressbar"
-                            >
-                              <span
-                                className="checklist__progress-fill"
-                                style={{ width: `${group.progress}%` }}
-                              />
-                            </span>
-                            <span className="checklist__progress-label">
-                              {group.progressLabel}
-                            </span>
-                            <span
-                              aria-hidden="true"
-                              className={`checklist__disclosure${
-                                isExpanded
-                                  ? " checklist__disclosure--expanded"
-                                  : ""
-                              }`}
-                            >
-                              ›
-                            </span>
-                          </span>
-                        </button>
-                      </h2>
-
-                      <ul
-                        aria-label={`${group.title} 할 일`}
-                        className="checklist__tasks"
-                        hidden={!isExpanded}
-                        id={taskListId}
-                      >
-                        {group.tasks.map((task) => {
-                          const isSelected = selectedTaskId === task.id;
-
-                          return (
-                            <li
-                              className={`checklist__task checklist__task--${task.status}${
-                                isSelected ? " checklist__task--selected" : ""
-                              }`}
-                              key={task.id}
-                            >
-                              <button
-                                aria-controls={
-                                  isMobileLayout
-                                    ? "checklist-task-detail-bottom-sheet"
-                                    : "checklist-task-detail-panel"
-                                }
-                                aria-expanded={isSelected}
-                                className="checklist__task-button"
-                                onClick={(event) => selectTask(task.id, event)}
-                                ref={(button) => {
-                                  if (button) {
-                                    taskButtonRefs.current.set(task.id, button);
-                                  } else {
-                                    taskButtonRefs.current.delete(task.id);
-                                  }
-                                }}
-                                type="button"
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className="checklist__task-marker"
-                                />
-                                <span className="checklist__task-title">
-                                  {task.title}
-                                </span>
-                                <span className="checklist__task-schedule">
-                                  {task.schedule}
-                                </span>
-                                <span className="checklist__task-status">
-                                  {task.statusLabel}
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
+                      로드맵에서 추가
+                    </Result.Button>
+                    <Result.Button
+                      size="large"
+                      color="dark"
+                      variant="weak"
+                      onClick={openTaskCreation}
+                      type="button"
+                    >
+                      직접 추가
+                    </Result.Button>
+                  </>
+                }
+              />
+            ) : (
+              <ChecklistGroups
+                groups={selectedCategory?.groups ?? []}
+                value={expandedGroupValues}
+                onValueChange={changeExpandedGroups}
+                selectedTaskId={selectedTaskId}
+                detailId={
+                  isMobileLayout
+                    ? "checklist-task-detail-bottom-sheet"
+                    : "checklist-task-detail-panel"
+                }
+                firstGroupTriggerRef={fallbackFocusRef}
+                onSelectTask={selectTask}
+                onTaskButtonRef={registerTaskButton}
+              />
             )}
           </section>
         </div>
-      </div>
+      </WorkspaceLayout>
 
-      <div
-        aria-hidden={
-          isLoginRequiredOpen ||
-          isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen
-            ? true
-            : undefined
-        }
-        className="checklist-workspace__foreground"
-        inert={
-          isLoginRequiredOpen ||
-          isStatusConfirmationOpen ||
-          isAppointmentDeletionOpen
-            ? true
-            : undefined
-        }
-      >
-        {selectedTaskContext &&
-        !isMobileLayout &&
-        !isTaskCreationOpen &&
-        !isAppointmentCreationOpen &&
-        !isAppointmentEditingOpen ? (
-          <ChecklistTaskDetailPanel
-            appointmentManagement={appointmentManagement}
-            categories={categories}
-            categoryTitle={selectedTaskContext.categoryTitle}
-            editing={itemEditing}
-            onClose={onDismissTaskDetail}
-            onRequestScheduleCreation={onRequestScheduleCreation}
-            task={selectedTaskContext.task}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        isMobileLayout &&
-        !isTaskCreationOpen &&
-        !isAppointmentCreationOpen &&
-        !isAppointmentEditingOpen ? (
-          <ChecklistTaskDetailBottomSheet
-            appointmentManagement={appointmentManagement}
-            categories={categories}
-            categoryTitle={selectedTaskContext.categoryTitle}
-            editing={itemEditing}
-            onClose={onBackTaskDetail}
-            onRequestScheduleCreation={onRequestScheduleCreation}
-            task={selectedTaskContext.task}
-          />
-        ) : null}
-
-        {taskCreation && isTaskCreationOpen ? (
-          <ChecklistTaskCreation
-            categories={categories}
-            controller={taskCreation}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        appointmentCreation &&
-        isAppointmentCreationOpen ? (
-          <ChecklistAppointmentCreation
-            controller={appointmentCreation}
-            taskTitle={selectedTaskContext.task.title}
-          />
-        ) : null}
-
-        {selectedTaskContext &&
-        appointmentManagement &&
-        isAppointmentEditingOpen ? (
-          <ChecklistAppointmentCreation
-            controller={appointmentManagement.editing}
-            heading="일정 수정"
-            taskTitle={selectedTaskContext.task.title}
-          />
-        ) : null}
-      </div>
-
-      {isLoginRequiredOpen ? (
-        <ChecklistModalDialog
-          actions={
-            <>
-              <button
-                className="checklist-dialog__button checklist-dialog__button--secondary"
-                onClick={onCancelLoginRequired}
-                type="button"
-              >
-                취소
-              </button>
-              <button
-                className="checklist-dialog__button checklist-dialog__button--primary"
-                onClick={onVisitLogin}
-                type="button"
-              >
-                로그인
-              </button>
-            </>
-          }
-          description={
-            loginRequiredReason === "schedule-creation"
-              ? "일정을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
-              : "나만의 할 일을 추가하려면 로그인해 주세요.\n로그인 후 체크리스트에서 계속할 수 있어요."
-          }
-          onBackdropPress={onCancelLoginRequired}
-          onEscape={onCancelLoginRequired}
-          title="로그인이 필요해요"
-        />
-      ) : null}
-
-      {statusConfirmation ? (
-        <ChecklistStatusConfirmationDialog
-          isPending={isStatusChangePending}
-          errorMessage={statusConfirmationError}
-          onCancel={() =>
-            itemEditing?.cancelStatusChange(statusConfirmation.itemId)
-          }
-          onConfirm={() =>
-            void itemEditing?.confirmStatusChange(statusConfirmation.itemId)
-          }
-        />
-      ) : null}
-
-      {deletionConfirmation && appointmentManagement ? (
-        <ChecklistModalDialog
-          actions={
-            <>
-              <button
-                disabled={isAppointmentDeletionPending}
-                onClick={appointmentManagement.cancelDelete}
-                type="button"
-              >
-                취소
-              </button>
-              <button
-                aria-busy={isAppointmentDeletionPending}
-                disabled={isAppointmentDeletionPending}
-                onClick={() => void appointmentManagement.confirmDelete()}
-                type="button"
-              >
-                {isAppointmentDeletionPending ? "삭제 중" : "삭제"}
-              </button>
-            </>
-          }
-          description={
-            <>
-              삭제한 일정은 다시 복구할 수 없어요.
-              {appointmentDeletionError ? (
-                <p role="alert">{appointmentDeletionError}</p>
-              ) : null}
-            </>
-          }
-          onBackdropPress={
-            isAppointmentDeletionPending
-              ? undefined
-              : appointmentManagement.cancelDelete
-          }
-          onEscape={
-            isAppointmentDeletionPending
-              ? undefined
-              : appointmentManagement.cancelDelete
-          }
-          title="이 일정을 삭제할까요?"
-          variant="critical"
-        />
-      ) : null}
-      {isItemDeletionOpen &&
-      itemEditing?.cancelDelete &&
-      itemEditing.confirmDelete ? (
-        <ChecklistModalDialog
-          actions={
-            <>
-              <button
-                disabled={isItemDeletionPending}
-                onClick={() => itemEditing.cancelDelete?.()}
-                type="button"
-              >
-                취소
-              </button>
-              <button
-                aria-busy={isItemDeletionPending}
-                disabled={isItemDeletionPending}
-                onClick={() => void itemEditing.confirmDelete?.()}
-                type="button"
-              >
-                {isItemDeletionPending ? "삭제 중" : "삭제"}
-              </button>
-            </>
-          }
-          description={
-            <>
-              삭제한 할 일과 연결된 일정은 다시 복구할 수 없어요.
-              {itemDeletionError ? (
-                <p role="alert">{itemDeletionError}</p>
-              ) : null}
-            </>
-          }
-          onBackdropPress={
-            isItemDeletionPending
-              ? undefined
-              : () => itemEditing.cancelDelete?.()
-          }
-          onEscape={
-            isItemDeletionPending
-              ? undefined
-              : () => itemEditing.cancelDelete?.()
-          }
-          title="이 할 일을 삭제할까요?"
-          variant="critical"
-        />
-      ) : null}
-    </div>
+      {!foregroundPresent ? confirmations : null}
+    </>
   );
 }

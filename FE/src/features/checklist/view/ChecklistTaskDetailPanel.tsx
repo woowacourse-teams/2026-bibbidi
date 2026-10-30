@@ -1,3 +1,6 @@
+import { Panel } from "../../../components/panel";
+import { IconButton } from "../../../components/icon-button";
+import { CloseIcon } from "../../../components/icons/ActionIcons";
 import { ChecklistItemEditingController } from "../model/checklistEditing";
 import { ChecklistAppointmentManagementController } from "../useChecklistAppointmentManagement";
 import {
@@ -5,10 +8,11 @@ import {
   ChecklistTaskViewModel,
 } from "../view-model/createChecklistViewModel";
 import { ChecklistTaskDetailContent } from "./ChecklistTaskDetailContent";
-import { ChecklistTaskTitleEditor } from "./ChecklistTaskTitleEditor";
+import { ChecklistTaskHeader } from "./ChecklistTaskHeader";
 import "./ChecklistTaskDetailPanel.css";
 
 interface ChecklistTaskDetailPanelProps {
+  modal?: boolean;
   categories: ChecklistCategoryViewModel[];
   categoryTitle: string;
   appointmentManagement?: ChecklistAppointmentManagementController;
@@ -19,6 +23,7 @@ interface ChecklistTaskDetailPanelProps {
 }
 
 export function ChecklistTaskDetailPanel({
+  modal = false,
   appointmentManagement,
   categories,
   categoryTitle,
@@ -29,36 +34,44 @@ export function ChecklistTaskDetailPanel({
 }: ChecklistTaskDetailPanelProps) {
   const titleId = `${task.id}-detail-title`;
 
+  const Container = modal ? "div" : "aside";
   return (
-    <aside
+    <Container
       aria-labelledby={titleId}
       className="checklist-detail-panel"
+      data-presentation={modal ? "overlay" : "docked"}
       id="checklist-task-detail-panel"
     >
-      <header className="checklist-detail-panel__header">
-        <ChecklistTaskTitleEditor
+      <Panel
+        variant={modal ? "edge" : "contained"}
+        header={
+          <Panel.Header
+            heading={
+              <ChecklistTaskHeader
+                editing={editing}
+                task={task}
+                titleId={titleId}
+              />
+            }
+            actions={
+              <IconButton
+                aria-label="할 일 상세 닫기"
+                icon={<CloseIcon />}
+                onClick={onClose}
+              />
+            }
+          />
+        }
+      >
+        <ChecklistTaskDetailContent
+          appointmentManagement={appointmentManagement}
+          categories={categories}
+          categoryTitle={categoryTitle}
           editing={editing}
+          onRequestScheduleCreation={onRequestScheduleCreation}
           task={task}
-          titleId={titleId}
         />
-        <button
-          aria-label="할 일 상세 닫기"
-          className="checklist-detail-panel__close"
-          onClick={onClose}
-          type="button"
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </header>
-
-      <ChecklistTaskDetailContent
-        appointmentManagement={appointmentManagement}
-        categories={categories}
-        categoryTitle={categoryTitle}
-        editing={editing}
-        onRequestScheduleCreation={onRequestScheduleCreation}
-        task={task}
-      />
-    </aside>
+      </Panel>
+    </Container>
   );
 }

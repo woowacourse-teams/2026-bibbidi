@@ -40,11 +40,17 @@ export interface ChecklistRepository {
     audience: PreparationAudience,
     catalogItemIds: string[],
     signal?: AbortSignal,
+    onCreated?: (items: readonly CreatedCatalogItem[]) => void,
   ): Promise<string[]>;
   getCatalogItemIds(
     audience: PreparationAudience,
     signal?: AbortSignal,
   ): Promise<string[]>;
+}
+
+export interface CreatedCatalogItem {
+  id: number;
+  catalogItemId: number;
 }
 
 function toCatalogItemIdNumber(catalogItemId: string): number {
@@ -122,6 +128,7 @@ export function createChecklistRepository(
   const addAuthenticatedCatalogItemIds = async (
     catalogItemIds: number[],
     signal?: AbortSignal,
+    onCreated?: (items: readonly CreatedCatalogItem[]) => void,
   ): Promise<number[]> => {
     await runChecklistCommand(() =>
       checklistCommandRepository.ensureChecklist(signal),
@@ -140,6 +147,12 @@ export function createChecklistRepository(
       checklistQueryRepository.applyAddedItems(
         addedItems.map(toMyChecklistItemModel),
       );
+
+      try {
+        onCreated?.(addedItems);
+      } catch {
+        /* 생성 결과 관찰 실패는 저장 결과를 바꾸지 않는다. */
+      }
 
       return addedItems.map((item) => item.catalogItemId);
     } catch (error) {
@@ -170,6 +183,12 @@ export function createChecklistRepository(
           addedItems.map(toMyChecklistItemModel),
         );
 
+        try {
+          onCreated?.(addedItems);
+        } catch {
+          /* 생성 결과 관찰 실패는 저장 결과를 바꾸지 않는다. */
+        }
+
         return addedItems.map((item) => item.catalogItemId);
       } catch (retryError) {
         return throwCatalogItemAdditionError(retryError);
@@ -178,7 +197,7 @@ export function createChecklistRepository(
   };
 
   return {
-    async addCatalogItemIds(audience, catalogItemIds, signal) {
+    async addCatalogItemIds(audience, catalogItemIds, signal, onCreated) {
       const catalogItemIdNumbers = catalogItemIds.map(toCatalogItemIdNumber);
 
       if (audience === "guest") {
@@ -206,7 +225,11 @@ export function createChecklistRepository(
       }
 
       return (
-        await addAuthenticatedCatalogItemIds(catalogItemIdNumbers, signal)
+        await addAuthenticatedCatalogItemIds(
+          catalogItemIdNumbers,
+          signal,
+          onCreated,
+        )
       ).map(String);
     },
     async getCatalogItemIds(audience, signal) {

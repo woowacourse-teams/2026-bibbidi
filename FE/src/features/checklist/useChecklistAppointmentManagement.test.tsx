@@ -2,24 +2,17 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppointmentManagementError } from "./model/appointmentManagement";
+import { ChecklistAppointmentEditingInput } from "./model/appointmentForm";
 import { MyChecklistCommandRepository } from "./repository/myChecklistCommandRepository";
 import { useChecklistAppointmentManagement } from "./useChecklistAppointmentManagement";
-import { ChecklistAppointmentViewModel } from "./view-model/createChecklistViewModel";
 
-const appointment: ChecklistAppointmentViewModel = {
+const appointment: ChecklistAppointmentEditingInput = {
   date: "2026-09-20",
-  dateLabel: "9월 20일",
-  dayLabel: "20일",
   endTime: "2026-09-20T11:30:00",
   id: 11,
-  isDone: false,
   memo: "견적 확인",
-  memoLabel: "견적 확인",
-  monthLabel: "9월",
   place: "웨딩홀",
-  placeLabel: "웨딩홀",
   startTime: "2026-09-20T10:00:00",
-  timeLabel: "오전 10시–오전 11시 30분",
   title: "웨딩홀 상담",
 };
 
@@ -219,5 +212,51 @@ describe("useChecklistAppointmentManagement", () => {
     expect(requestSignal?.aborted).toBe(true);
     expect(result.current.openMenuAppointmentId).toBeNull();
     expect(result.current.operationFeedback.status).toBe("idle");
+  });
+});
+
+describe("체크리스트 일정 수정 버리기 확인", () => {
+  it("처음 연 값과 비교하고 되돌린 입력은 변경으로 취급하지 않는다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentManagement({
+        audience: "authenticated",
+        checklistItemId: 500,
+        commandRepository: createRepository(),
+        refreshAuth: () => {},
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isOpen).toBe(false);
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.changeMemo("변경한 메모"));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isDiscardDialogOpen).toBe(true);
+    act(() => result.current.editing.cancelDiscard());
+    expect(result.current.editing.draft.memo).toBe("변경한 메모");
+    act(() => result.current.editing.changeMemo(appointment.memo!));
+    act(() => result.current.editing.cancel());
+    expect(result.current.editing.isOpen).toBe(false);
+    expect(result.current.editing.isDiscardDialogOpen).toBe(false);
+  });
+  it("시간을 바꾼 뒤 버리기를 선택하면 수정 세션을 초기화한다", () => {
+    const { result } = renderHook(() =>
+      useChecklistAppointmentManagement({
+        audience: "authenticated",
+        checklistItemId: 500,
+        commandRepository: createRepository(),
+        refreshAuth: () => {},
+        confirmDiscard: true,
+      }),
+    );
+    act(() => result.current.startEditing(appointment));
+    act(() => result.current.editing.changeStartTime("12:00"));
+    act(() => result.current.editing.cancel());
+    act(() => result.current.editing.confirmDiscard());
+    expect(result.current.editing.isOpen).toBe(false);
+    expect(result.current.editing.isDiscardDialogOpen).toBe(false);
+    act(() => result.current.startEditing(appointment));
+    expect(result.current.editing.draft.startTime).toBe("10:00");
   });
 });

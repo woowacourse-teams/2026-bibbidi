@@ -1,12 +1,9 @@
 import { ReactNode, useEffect, useMemo } from "react";
 
-import {
-  AccountSetupCompletionAuthenticationRequiredError,
-  AccountSetupCompletionRequestAbortedError,
-  createAccountSetupCompletionRepository,
-} from "../account-setup";
 import { useAuth } from "../auth";
 import {
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistRequestAbortedError,
   MyChecklistProvider,
   useMyChecklistCommandRepository,
   useMyChecklistQueryRepository,
@@ -29,9 +26,7 @@ export function ChecklistMigrationProvider({
 }: ChecklistMigrationProviderProps) {
   const { authState } = useAuth();
   const sessionKey =
-    authState.status === "authenticated" ||
-    authState.status === "synchronizing" ||
-    authState.status === "accountSetupRequired"
+    authState.status === "authenticated" || authState.status === "synchronizing"
       ? `authenticated:${authState.user.id}`
       : authState.status;
 
@@ -44,19 +39,10 @@ export function ChecklistMigrationProvider({
 }
 
 function PostAuthenticationChecklistCoordinator() {
-  const {
-    authState,
-    completeAuthentication,
-    failAuthentication,
-    refreshAuth,
-    requireAccountSetup,
-  } = useAuth();
+  const { authState, completeAuthentication, failAuthentication, refreshAuth } =
+    useAuth();
   const commandRepository = useMyChecklistCommandRepository();
   const queryRepository = useMyChecklistQueryRepository();
-  const accountSetupCompletionRepository = useMemo(
-    () => createAccountSetupCompletionRepository(queryRepository),
-    [queryRepository],
-  );
   const migrationRepository = useMemo(
     () =>
       createChecklistMigrationRepository(
@@ -82,23 +68,17 @@ function PostAuthenticationChecklistCoordinator() {
     const user = authState.user;
 
     const synchronizeChecklist = async () => {
-      let completion;
+      let checklist;
 
       try {
-        completion = await accountSetupCompletionRepository.getCompletion(
-          controller.signal,
-        );
+        await commandRepository.ensureChecklist(controller.signal);
+        checklist = await queryRepository.getChecklist(controller.signal);
       } catch (error) {
-        if (
-          !isActive ||
-          error instanceof AccountSetupCompletionRequestAbortedError
-        ) {
+        if (!isActive || error instanceof MyChecklistRequestAbortedError) {
           return;
         }
 
-        if (
-          error instanceof AccountSetupCompletionAuthenticationRequiredError
-        ) {
+        if (error instanceof MyChecklistAuthenticationRequiredError) {
           refreshAuth();
           return;
         }
@@ -111,13 +91,8 @@ function PostAuthenticationChecklistCoordinator() {
         return;
       }
 
-      if (completion.status === "required") {
-        requireAccountSetup(user);
-        return;
-      }
-
       try {
-        await migration.migrate(completion.checklist, controller.signal);
+        await migration.migrate(checklist, controller.signal);
 
         if (isActive) {
           completeAuthentication(user);
@@ -147,12 +122,12 @@ function PostAuthenticationChecklistCoordinator() {
     };
   }, [
     authState,
-    accountSetupCompletionRepository,
+    commandRepository,
+    queryRepository,
     completeAuthentication,
     failAuthentication,
     migration,
     refreshAuth,
-    requireAccountSetup,
   ]);
 
   return null;

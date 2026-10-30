@@ -229,7 +229,11 @@ describe("useChecklistItemEditing 상태 변경", () => {
     );
     expect(analyticsMocks.track).toHaveBeenCalledWith({
       name: "checklist_task_complete",
-      parameters: { action: "complete", category_id: "10" },
+      parameters: {
+        action: "complete",
+        category_id: "10",
+        checklist_item_id: 500,
+      },
     });
   });
 
@@ -268,7 +272,20 @@ describe("useChecklistItemEditing 상태 변경", () => {
       expect.any(AbortSignal),
     );
     expect(result.current.statusConfirmation).toBeNull();
-    expect(analyticsMocks.track).toHaveBeenCalledOnce();
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event.name === "checklist_task_complete",
+      ),
+    ).toHaveLength(1);
+    expect(analyticsMocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "checklist_task_status_change",
+        parameters: expect.objectContaining({
+          checklist_item_id: 500,
+          to_status: "done",
+        }),
+      }),
+    );
   });
 
   it("남은 일정 완료 확인을 취소하면 상태 PUT을 호출하지 않는다", async () => {

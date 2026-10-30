@@ -1,0 +1,16 @@
+.app-header-account__actions {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-header-account__status {
+  margin: 0;
+  padding: 8px 20px;
+  font: var(--typography-t7);
+}
+
+.app-header-account__error {
+  color: var(--color-fg-critical);
+  font: var(--typography-t7);
+}

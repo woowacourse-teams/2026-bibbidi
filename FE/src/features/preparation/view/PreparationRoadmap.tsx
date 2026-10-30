@@ -1,32 +1,33 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
-import { EXPAND_MOTION_STYLE } from "../../../shared/motion";
-import { PreparationRoadmapViewModel } from "../view-model/createPreparationRoadmapViewModel";
-import { PreparationStepInlineDetail } from "./PreparationStepInlineDetail";
+import { useEffect, useRef, useState } from "react";
+import { Badge } from "../../../components/badge";
+import { ProgressBar } from "../../../components/progress-bar";
+import { Button } from "../../../components/button";
+import {
+  useExitSnapshot,
+  useLayerPresence,
+} from "../../../shared/modal/useLayerPresence";
 import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
-import { RoadmapStepDisclosure } from "./RoadmapStepDisclosure";
+import { RoadmapStageDetail } from "./RoadmapStageDetail";
+import { RoadmapHeader } from "./RoadmapHeader";
+import { RoadmapGameInvitation } from "./RoadmapGameInvitation";
+import type {
+  PreparationRoadmapViewModel,
+  RoadmapStage,
+} from "../view-model/createPreparationRoadmapViewModel";
 import "./PreparationRoadmap.css";
 
 interface PreparationRoadmapProps {
-  header: ReactNode;
+  categoryId: string;
+  viewModel: PreparationRoadmapViewModel;
+  selectedStepId: string;
+  isGuest: boolean;
+  onRetryProgress: () => void;
   additionErrorMessage: string | null;
   addingCatalogItemIds: readonly string[];
-  canAddTasks: boolean;
   onAddAllTasks: () => void;
-  onCategorySelect: (categoryId: string) => void;
-  onStepSelect: (stepId: string) => void;
-  onTaskAdd: (catalogItemId: string) => void;
-  viewModel: PreparationRoadmapViewModel;
-}
-
-interface PreparationRoadmapStepsProps {
-  additionErrorMessage: string | null;
-  addingCatalogItemIds: readonly string[];
-  canAddTasks: boolean;
-  expandedStepId: string | null;
-  onAddAllTasks: () => void;
-  onStepSelect: (stepId: string) => void;
-  onTaskAdd: (catalogItemId: string) => void;
-  viewModel: PreparationRoadmapViewModel;
+  onCategorySelect: (id: string) => void;
+  onStepSelect: (id: string) => void;
+  onTaskAdd: (id: string) => void;
 }
 
 function PreparationStepIcon({ src }: { src: string }) {
@@ -34,7 +35,6 @@ function PreparationStepIcon({ src }: { src: string }) {
   const [visible, setVisible] = useState(
     () => typeof IntersectionObserver === "undefined",
   );
-
   useEffect(() => {
     if (visible || !imageRef.current) return;
     const observer = new IntersectionObserver(
@@ -49,188 +49,185 @@ function PreparationStepIcon({ src }: { src: string }) {
     observer.observe(imageRef.current);
     return () => observer.disconnect();
   }, [visible]);
-
   return (
     <img
       alt=""
       className="preparation-roadmap__step-icon"
       decoding="async"
       draggable={false}
+      width={48}
       height={48}
+      ref={imageRef}
+      src={visible ? src : undefined}
       onError={(event) => {
         event.currentTarget.hidden = true;
       }}
-      ref={imageRef}
-      src={visible ? src : undefined}
-      width={48}
     />
   );
 }
 
-function PreparationRoadmapSteps({
-  additionErrorMessage,
-  addingCatalogItemIds,
-  canAddTasks,
-  expandedStepId,
-  onAddAllTasks,
-  onStepSelect,
-  onTaskAdd,
-  viewModel,
-}: PreparationRoadmapStepsProps) {
+function StageCard({
+  stage,
+  onOpen,
+}: {
+  stage: RoadmapStage;
+  onOpen: (trigger: HTMLButtonElement) => void;
+}) {
+  const titleId = `roadmap-stage-${stage.id}`;
+  const summaryId = `${titleId}-summary`;
   return (
-    <ol className="preparation-roadmap__steps">
-      {viewModel.steps.map((step) => {
-        const detailId = `preparation-step-detail-${step.id}`;
-        const triggerId = `preparation-step-trigger-${step.id}`;
-        const isExpanded = expandedStepId === step.id && step.isSelected;
-        const stepClassName = [
-          "preparation-roadmap__step",
-          isExpanded ? "preparation-roadmap__step--expanded" : "",
-        ].join(" ");
-
-        return (
-          <li className={stepClassName} key={step.id}>
-            <button
-              aria-controls={isExpanded ? detailId : undefined}
-              aria-expanded={isExpanded}
-              aria-label={`${step.numberLabel} ${step.title}`}
-              aria-pressed={isExpanded}
-              className="preparation-roadmap__step-button"
-              id={triggerId}
-              onClick={() => onStepSelect(step.id)}
-              type="button"
-            >
-              <span className="preparation-roadmap__step-header">
-                <span className="preparation-roadmap__step-number">
-                  {step.numberLabel}
-                </span>
-              </span>
-              <span className="preparation-roadmap__step-title">
-                {step.title}
-              </span>
-              {!isExpanded ? (
-                <span
-                  aria-hidden="true"
-                  className="preparation-roadmap__step-action"
-                >
-                  할 일 고르기 ↓
-                </span>
-              ) : null}
-              {step.iconUrl ? (
-                <PreparationStepIcon key={step.iconUrl} src={step.iconUrl} />
-              ) : null}
-            </button>
-            <RoadmapStepDisclosure expanded={isExpanded}>
-              {isExpanded ? (
-                <PreparationStepInlineDetail
-                  additionErrorMessage={additionErrorMessage}
-                  addingCatalogItemIds={addingCatalogItemIds}
-                  canAddTasks={canAddTasks}
-                  detail={viewModel.selectedStepDetail}
-                  id={detailId}
-                  onAddAllTasks={onAddAllTasks}
-                  onCollapse={() => {
-                    document.getElementById(triggerId)?.focus();
-                    onStepSelect(step.id);
-                  }}
-                  onTaskAdd={onTaskAdd}
-                />
-              ) : null}
-            </RoadmapStepDisclosure>
-          </li>
-        );
-      })}
-    </ol>
+    <li>
+      <article
+        className="roadmap-stage-card"
+        data-complete={stage.isComplete || undefined}
+      >
+        <header className="roadmap-stage-card__header">
+          <span className="roadmap-stage-card__image" aria-hidden="true">
+            {stage.iconUrl ? (
+              <PreparationStepIcon key={stage.iconUrl} src={stage.iconUrl} />
+            ) : (
+              stage.numberLabel
+            )}
+            {stage.isComplete && (
+              <span className="roadmap-stage-card__earned">✓</span>
+            )}
+          </span>
+          <div className="roadmap-stage-card__heading">
+            <div className="roadmap-stage-card__eyebrow">
+              <span>{stage.numberLabel}</span>
+              <Badge color={stage.badgeColor}>{stage.statusLabel}</Badge>
+            </div>
+            <h2 id={titleId}>{stage.title}</h2>
+          </div>
+        </header>
+        <div id={summaryId} className="roadmap-stage-card__progress">
+          <p>{stage.progressLabel}</p>
+          {stage.progress !== undefined && (
+            <ProgressBar
+              progress={stage.progress}
+              size="light"
+              aria-label={`${stage.title} 내 할 일 완료`}
+              aria-valuetext={`${stage.includedCount}개 중 ${stage.completedCount}개 완료`}
+              color={
+                stage.isComplete ? "var(--color-bg-positive-weak)" : undefined
+              }
+            />
+          )}
+        </div>
+        {stage.nextTask && (
+          <div className="roadmap-stage-card__preview">
+            <span className="roadmap-stage-card__preview-label">
+              {stage.previewLabel}
+            </span>
+            <p>{stage.nextTask.title}</p>
+          </div>
+        )}
+        <span className="roadmap-stage-card__footer" aria-hidden="true">
+          할 일 {stage.tasks.length}개 보기 <span>→</span>
+        </span>
+        <button
+          type="button"
+          className="roadmap-stage-card__trigger"
+          aria-describedby={summaryId}
+          aria-label={`${stage.numberLabel} ${stage.title}`}
+          aria-haspopup="dialog"
+          onClick={(event) => onOpen(event.currentTarget)}
+        />
+      </article>
+    </li>
   );
 }
 
 export function PreparationRoadmap({
-  header,
+  categoryId,
+  viewModel,
+  selectedStepId,
+  isGuest,
+  onRetryProgress,
   additionErrorMessage,
   addingCatalogItemIds,
-  canAddTasks,
   onAddAllTasks,
   onCategorySelect,
   onStepSelect,
   onTaskAdd,
-  viewModel,
 }: PreparationRoadmapProps) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [openStepId, setOpenStepId] = useState<string | null>(null);
-  const selectedStepId = viewModel.steps.find((step) => step.isSelected)?.id;
-  const expandedStepId = openStepId === selectedStepId ? openStepId : null;
-
-  const handleCategorySelect = (categoryId: string) => {
-    const changesCategory = viewModel.categories.some(
-      (category) => category.id === categoryId && !category.isCurrent,
-    );
-
-    if (changesCategory) {
-      setOpenStepId(null);
-
-      if (listRef.current) listRef.current.scrollTop = 0;
-    }
-
-    onCategorySelect(categoryId);
+  const [openStage, setOpenStage] = useState<{
+    categoryId: string;
+    stepId: string;
+  } | null>(null);
+  const returnFocusRef = useRef<HTMLButtonElement>(null);
+  const stage =
+    openStage?.categoryId === categoryId && openStage.stepId === selectedStepId
+      ? viewModel.stages.find((item) => item.id === openStage.stepId)
+      : undefined;
+  const detailOpen = stage !== undefined;
+  const { present, onExited } = useLayerPresence(detailOpen);
+  const displayedStage = useExitSnapshot(detailOpen, stage);
+  const pending = addingCatalogItemIds.length > 0;
+  const close = () => {
+    if (!pending) setOpenStage(null);
   };
-
-  const handleStepSelect = (stepId: string) => {
-    const selectedStep = viewModel.steps.find((step) => step.id === stepId);
-
-    if (!selectedStep) {
-      return;
-    }
-
-    if (openStepId === stepId) {
-      setOpenStepId(null);
-      return;
-    }
-    setOpenStepId(stepId);
-    onStepSelect(stepId);
-  };
-
   return (
-    <div className="preparation-roadmap" style={EXPAND_MOTION_STYLE}>
-      <RoadmapCategoryTabs
-        categories={viewModel.categories}
-        selectedCategoryId={
-          viewModel.categories.find((category) => category.isCurrent)?.id
-        }
-        controlsId="preparation-roadmap-content"
-        onCategorySelect={handleCategorySelect}
+    <div className="preparation-roadmap">
+      <RoadmapHeader
+        categoryTitle={viewModel.categoryTitle}
+        summary={viewModel.summary}
       />
-
-      <section
-        aria-labelledby="preparation-roadmap-title"
-        className="preparation-roadmap__workspace"
-        id="preparation-roadmap-content"
-      >
-        {header}
-
-        <div className="preparation-roadmap__content">
-          <div className="preparation-roadmap__main">
-            <div
-              className="preparation-roadmap__grid-wrap"
-              ref={listRef}
-              role="region"
-              aria-label="전체 단계 목록"
-              // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- 목록을 키보드로 스크롤할 수 있도록 포커스를 허용한다.
-              tabIndex={0}
-            >
-              <PreparationRoadmapSteps
-                additionErrorMessage={additionErrorMessage}
-                addingCatalogItemIds={addingCatalogItemIds}
-                canAddTasks={canAddTasks}
-                expandedStepId={expandedStepId}
-                onAddAllTasks={onAddAllTasks}
-                onStepSelect={handleStepSelect}
-                onTaskAdd={onTaskAdd}
-                viewModel={viewModel}
-              />
+      <RoadmapGameInvitation />
+      <div className="preparation-roadmap__body">
+        <RoadmapCategoryTabs
+          categories={viewModel.categories}
+          selectedCategoryId={categoryId}
+          controlsId="preparation-roadmap-content"
+          onCategorySelect={(id) => {
+            setOpenStage(null);
+            onCategorySelect(id);
+          }}
+        />
+        <section
+          id="preparation-roadmap-content"
+          role="tabpanel"
+          aria-labelledby={`roadmap-category-${categoryId}`}
+          tabIndex={0}
+        >
+          {viewModel.progressStatus === "error" && (
+            <div className="roadmap-progress-error" role="alert">
+              <p>내 준비 현황을 불러오지 못했어요.</p>
+              <Button size="small" variant="weak" onClick={onRetryProgress}>
+                현황 다시 불러오기
+              </Button>
             </div>
-          </div>
-        </div>
-      </section>
+          )}
+          <ol className="preparation-roadmap__steps" aria-label="준비 단계">
+            {viewModel.stages.map((item) => (
+              <StageCard
+                key={item.id}
+                stage={item}
+                onOpen={(trigger) => {
+                  returnFocusRef.current = trigger;
+                  setOpenStage({ categoryId, stepId: item.id });
+                  onStepSelect(item.id);
+                }}
+              />
+            ))}
+          </ol>
+        </section>
+      </div>
+      {present && displayedStage && (
+        <RoadmapStageDetail
+          stage={displayedStage}
+          open={detailOpen}
+          onExited={onExited}
+          isGuest={isGuest}
+          onClose={close}
+          pending={pending}
+          addingCatalogItemIds={addingCatalogItemIds}
+          additionErrorMessage={additionErrorMessage}
+          onTaskAdd={onTaskAdd}
+          onAddAllTasks={onAddAllTasks}
+          returnFocusRef={returnFocusRef}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { Link } from "react-router";
-
-import { ChecklistModalDialog } from "../../checklist/view/ChecklistModalDialog";
+import { useLoginModal } from "../../auth/useLoginModal";
+import { Button } from "../../../components/button";
+import { Dialog } from "../../../components/dialog";
 
 export function CalendarLoginDialog({
   onClose,
@@ -9,26 +9,44 @@ export function CalendarLoginDialog({
   onClose: () => void;
   loginTo: string;
 }) {
+  const { openLogin } = useLoginModal(loginTo);
   return (
-    <ChecklistModalDialog
-      title="로그인이 필요해요"
+    <Dialog
+      open
+      onClose={onClose}
+      title={<Dialog.Title>로그인이 필요해요</Dialog.Title>}
       description={
-        "일정을 추가하려면 로그인해 주세요.\n로그인 후 캘린더에서 계속할 수 있어요."
+        <Dialog.Description>
+          일정을 추가하려면 로그인해 주세요.
+          <br />
+          로그인 후 캘린더에서 계속할 수 있어요.
+        </Dialog.Description>
       }
-      onEscape={onClose}
-      onBackdropPress={onClose}
       actions={
         <>
-          <button
-            type="button"
-            className="checklist-dialog__button"
-            onClick={onClose}
-          >
-            취소
-          </button>
-          <Link className="calendar-planning__login-action" to={loginTo}>
-            로그인
-          </Link>
+          <div>
+            <Button
+              size="large"
+              color="dark"
+              variant="weak"
+              display="block"
+              onClick={onClose}
+            >
+              취소
+            </Button>
+          </div>
+          <div>
+            <Button
+              size="large"
+              display="block"
+              onClick={() => {
+                onClose();
+                openLogin();
+              }}
+            >
+              로그인
+            </Button>
+          </div>
         </>
       }
     />

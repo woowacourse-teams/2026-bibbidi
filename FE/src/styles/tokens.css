@@ -1,0 +1,128 @@
+/* Service-owned foundation values adapted from bibbidi-design (2026-10-23).
+   See docs/design-foundations-migration.md for mappings and remaining screen work. */
+/* Typography: Figma 296:43246, revised 2026-10-22.
+   rem sizes follow the user's root size; unitless leading scales with the text. */
+:root {
+  --font-family-ui:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Noto Sans KR", sans-serif;
+  --font-family-brand:
+    "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+  --letter-spacing-ui: 0em;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --font-size-t1: 1.875rem;
+  --font-size-t2: 1.625rem;
+  --font-size-t3: 1.375rem;
+  --font-size-t4: 1.25rem;
+  --font-size-t5: 1.0625rem;
+  --font-size-t6: 0.9375rem;
+  --font-size-t7: 0.8125rem;
+  --font-size-brand: 1.375rem;
+
+  --line-height-t1: calc(40 / 30);
+  --line-height-t2: calc(35 / 26);
+  --line-height-t3: calc(31 / 22);
+  --line-height-t4: calc(29 / 20);
+  --line-height-t5: 1.5;
+  --line-height-t6: 1.5;
+  --line-height-t7: 1.5;
+  --line-height-brand: calc(30 / 22);
+
+  --typography-t1: var(--font-weight-bold)
+    var(--font-size-t1)/var(--line-height-t1) var(--font-family-ui);
+  --typography-t2: var(--font-weight-bold)
+    var(--font-size-t2)/var(--line-height-t2) var(--font-family-ui);
+  --typography-t3: var(--font-weight-bold)
+    var(--font-size-t3)/var(--line-height-t3) var(--font-family-ui);
+  --typography-t4: var(--font-weight-bold)
+    var(--font-size-t4)/var(--line-height-t4) var(--font-family-ui);
+  --typography-t5: var(--font-weight-regular)
+    var(--font-size-t5)/var(--line-height-t5) var(--font-family-ui);
+  --typography-t6: var(--font-weight-regular)
+    var(--font-size-t6)/var(--line-height-t6) var(--font-family-ui);
+  --typography-t7: var(--font-weight-regular)
+    var(--font-size-t7)/var(--line-height-t7) var(--font-family-ui);
+  --typography-t5-medium: var(--font-weight-medium)
+    var(--font-size-t5)/var(--line-height-t5) var(--font-family-ui);
+  --typography-t6-medium: var(--font-weight-medium)
+    var(--font-size-t6)/var(--line-height-t6) var(--font-family-ui);
+  --typography-brand: var(--font-weight-black)
+    var(--font-size-brand)/var(--line-height-brand) var(--font-family-brand);
+}
+
+/* Logo Gold palette and role tokens. Brand/status values: Figma 296:43187.
+   Existing neutral, informative and positive values are retained. */
+:root {
+  --color-palette-gold: #f8d778;
+  --color-palette-gold-pressed: #ebc35a;
+  --color-palette-gold-weak: #fff6dc;
+  --color-palette-ink: #36383d;
+  --color-palette-white: #ffffff;
+  --color-palette-ivory: #f0f0e9;
+  --color-palette-green: #c2d869;
+  --color-palette-orange: #a0440e;
+  --color-palette-red: #c92a20;
+  --color-palette-blue: #217cf9;
+
+  --color-bg-layer-basement: #f9fafb;
+  --color-bg-layer-default: var(--color-palette-white);
+  --color-bg-brand-solid: var(--color-palette-gold);
+  --color-bg-brand-solid-pressed: var(--color-palette-gold-pressed);
+  --color-bg-brand-weak: var(--color-palette-gold-weak);
+  --color-bg-critical-weak: #fdf0f0;
+  --color-bg-informative-weak: #eff6ff;
+  --color-bg-neutral-weak: var(--color-palette-ivory);
+  --color-bg-positive-badge: #eef4d6;
+  --color-bg-positive-subtle: #fbfcf7;
+  --color-bg-positive-weak: var(--color-palette-green);
+
+  --color-fg-neutral: var(--color-palette-ink);
+  --color-fg-neutral-muted: #555d6d;
+  --color-fg-placeholder: #b0b3ba;
+  --color-fg-informative: var(--color-palette-blue);
+  --color-fg-on-brand: var(--color-palette-ink);
+  --color-fg-warning: var(--color-palette-orange);
+  --color-fg-critical: var(--color-palette-red);
+  --color-fg-positive: #435016;
+
+  --color-stroke-neutral: #d5d7db;
+  --color-stroke-neutral-weak: #dcdee3;
+  --color-stroke-brand-solid: var(--color-palette-gold);
+  --color-stroke-brand-weak: var(--color-palette-gold-weak);
+  --color-stroke-neutral-contrast: #1a1c20;
+  --color-stroke-selected: var(--color-palette-ink);
+  --color-stroke-critical-solid: var(--color-palette-red);
+  --color-stroke-focus-ring: #5e98fe;
+}
+
+/* Bibbidi layout guidance: page containers exclude the outer page margin.
+   Breakpoint tokens are reference values; CSS media queries use literal widths. */
+:root {
+  --layout-width-content: 1040px;
+  --layout-width-wide: 1280px;
+  --layout-width-auth: 960px;
+  --layout-width-focus: 480px;
+  --layout-width-login-form: 352px;
+  --layout-width-category: 176px;
+  --layout-width-detail: 400px;
+  --layout-width-main-min: 560px;
+  --layout-breakpoint-md: 768px;
+  --layout-breakpoint-lg: 1280px;
+  --layout-breakpoint-xl: 1440px;
+  --layout-margin-mobile: 16px;
+  --layout-margin-tablet: 24px;
+  --layout-margin-desktop: 32px;
+  --layout-gutter-mobile: 16px;
+  --layout-gutter-desktop: 24px;
+  --layout-columns-mobile: 4;
+  --layout-columns-tablet: 8;
+  --layout-columns-desktop: 12;
+}

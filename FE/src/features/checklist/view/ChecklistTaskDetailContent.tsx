@@ -1,4 +1,15 @@
-import { KeyboardEvent, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
+import { Result } from "../../../components/result";
+import { Button } from "../../../components/button";
+import { Checkbox } from "../../../components/checkbox";
+import { IconButton } from "../../../components/icon-button";
+import {
+  MoreVerticalIcon,
+  PlusIcon,
+} from "../../../components/icons/ActionIcons";
+import { Menu } from "../../../components/menu";
+import { ListRow } from "../../../components/list-row";
+import { ListHeader } from "../../../components/list-header";
 
 import {
   ChecklistCategoryViewModel,
@@ -20,20 +31,39 @@ interface ChecklistTaskDetailContentProps {
   task: ChecklistTaskViewModel;
 }
 
+function ChecklistPropertyRow({
+  label,
+  first = false,
+  children,
+}: {
+  label: string;
+  first?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <ListRow.Description
+      border={first ? "none" : "indented"}
+      horizontalPadding="none"
+      term={label}
+      description={
+        <span className="checklist-detail-content__property-value">
+          {children}
+        </span>
+      }
+    />
+  );
+}
+
 function ChecklistAppointment({
   appointment,
   management,
+  first,
 }: {
+  first: boolean;
   appointment: ChecklistAppointmentViewModel;
   management?: ChecklistAppointmentManagementController;
 }) {
   const menuIsOpen = management?.openMenuAppointmentId === appointment.id;
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const editItemRef = useRef<HTMLButtonElement>(null);
-  const deleteItemRef = useRef<HTMLButtonElement>(null);
-  const shouldRestoreFocusRef = useRef(false);
-  const managementRef = useRef(management);
   const feedback = management?.operationFeedback;
   const isOperationPending = feedback?.status === "pending";
   const isPending =
@@ -45,201 +75,105 @@ function ChecklistAppointment({
       ? feedback.errorMessage
       : undefined;
 
-  useEffect(() => {
-    managementRef.current = management;
-  }, [management]);
-
-  useEffect(() => {
-    if (!menuIsOpen) {
-      if (shouldRestoreFocusRef.current) {
-        shouldRestoreFocusRef.current = false;
-        triggerRef.current?.focus();
-      }
-      return;
-    }
-
-    editItemRef.current?.focus();
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !menuRef.current?.contains(event.target) &&
-        event.target !== triggerRef.current
-      ) {
-        shouldRestoreFocusRef.current = true;
-        managementRef.current?.closeMenu();
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [menuIsOpen]);
-
-  const closeMenu = () => {
-    shouldRestoreFocusRef.current = true;
-    management?.closeMenu();
-  };
-
-  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeMenu();
-      return;
-    }
-
-    const items = [editItemRef.current, deleteItemRef.current].filter(
-      (item): item is HTMLButtonElement => item !== null,
-    );
-    const currentIndex = items.indexOf(
-      document.activeElement as HTMLButtonElement,
-    );
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowDown") {
-      nextIndex = (Math.max(0, currentIndex) + 1) % items.length;
-    } else if (event.key === "ArrowUp") {
-      nextIndex = (currentIndex <= 0 ? items.length : currentIndex) - 1;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = items.length - 1;
-    }
-
-    if (nextIndex !== null) {
-      event.preventDefault();
-      items[nextIndex]?.focus();
-    }
-  };
-
   return (
     <li
-      className={`checklist-detail-content__appointment${
+      className={
         appointment.isDone
-          ? " checklist-detail-content__appointment--complete"
-          : ""
-      }`}
+          ? "checklist-detail-content__appointment--complete"
+          : undefined
+      }
     >
-      {management ? (
-        <button
-          aria-busy={isPending ? true : undefined}
-          aria-label={
-            appointment.isDone
-              ? `${appointment.title} 일정 미완료로 변경`
-              : `${appointment.title} 일정 완료`
-          }
-          aria-pressed={appointment.isDone}
-          className="checklist-detail-content__appointment-check"
-          disabled={isOperationPending}
-          onClick={() =>
-            void management.changeCompletion(
-              appointment.id,
-              !appointment.isDone,
-            )
-          }
-          type="button"
-        >
-          <span aria-hidden="true">{appointment.isDone ? "✓" : ""}</span>
-        </button>
-      ) : (
-        <span
-          aria-label={appointment.isDone ? "완료된 일정" : "미완료 일정"}
-          className={`checklist-detail-content__appointment-check${
-            appointment.isDone
-              ? " checklist-detail-content__appointment-check--complete"
-              : ""
-          }`}
-        >
-          {appointment.isDone ? "✓" : ""}
-        </span>
-      )}
-
-      <span className="checklist-detail-content__appointment-main">
-        <time
-          aria-label={appointment.dateLabel}
-          className="checklist-detail-content__appointment-date"
-          dateTime={appointment.date}
-        >
-          <span>{appointment.monthLabel}</span>
-          <strong>{appointment.dayLabel}</strong>
-        </time>
-
-        <span className="checklist-detail-content__appointment-body">
-          <strong className="checklist-detail-content__appointment-title">
-            {appointment.title}
-          </strong>
-          <span className="checklist-detail-content__appointment-meta">
-            {appointment.timeLabel} · {appointment.placeLabel}
-          </span>
-          <span className="checklist-detail-content__appointment-memo">
-            {appointment.memoLabel}
-          </span>
-          {completionError ? (
-            <span
-              className="checklist-detail-content__appointment-error"
-              role="alert"
-            >
-              {completionError}
-            </span>
-          ) : null}
-        </span>
-      </span>
-
-      {management ? (
-        <span className="checklist-detail-content__appointment-menu-root">
-          <button
-            aria-controls={`${appointment.id}-appointment-menu`}
-            aria-expanded={menuIsOpen}
-            aria-haspopup="menu"
-            aria-label={`${appointment.title} 일정 더보기`}
-            className="checklist-detail-content__appointment-more"
-            disabled={isOperationPending}
-            id={`${appointment.id}-appointment-menu-button`}
-            onClick={() => management.toggleMenu(appointment.id)}
-            ref={triggerRef}
-            type="button"
-          >
-            <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="5" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="12" cy="19" r="1.6" />
-            </svg>
-          </button>
-          {menuIsOpen ? (
-            <div
-              className="checklist-detail-content__appointment-menu"
-              id={`${appointment.id}-appointment-menu`}
-              onKeyDown={handleMenuKeyDown}
-              ref={menuRef}
-              role="menu"
-              tabIndex={-1}
-            >
-              <button
-                onClick={() => {
-                  shouldRestoreFocusRef.current = false;
-                  management.startEditing(appointment);
-                }}
-                ref={editItemRef}
-                role="menuitem"
-                type="button"
+      <ListRow
+        border={first ? "none" : "indented"}
+        horizontalPadding="none"
+        left={
+          <span className="checklist-detail-content__appointment-leading">
+            <Checkbox.Circle
+              aria-busy={isPending ? true : undefined}
+              aria-label={
+                management
+                  ? appointment.isDone
+                    ? `${appointment.title} 일정 미완료로 변경`
+                    : `${appointment.title} 일정 완료`
+                  : appointment.isDone
+                    ? "완료된 일정"
+                    : "미완료 일정"
+              }
+              checked={appointment.isDone}
+              disabled={!management || isOperationPending}
+              onCheckedChange={(checked) =>
+                void management?.changeCompletion(appointment.id, checked)
+              }
+            />
+            <ListRow.Asset size="medium">
+              <time
+                aria-label={appointment.dateLabel}
+                className="checklist-detail-content__appointment-date"
+                dateTime={appointment.date}
               >
+                <span>{appointment.monthLabel}</span>
+                <strong>{appointment.dayLabel}</strong>
+              </time>
+            </ListRow.Asset>
+          </span>
+        }
+        contents={
+          <ListRow.Texts
+            top={
+              <span className="checklist-detail-content__appointment-title">
+                {appointment.title}
+              </span>
+            }
+            middle={`${appointment.timeLabel} · ${appointment.placeLabel}`}
+            bottom={
+              <>
+                {appointment.memoLabel}
+                {completionError ? (
+                  <span
+                    className="checklist-detail-content__appointment-error"
+                    role="alert"
+                  >
+                    {completionError}
+                  </span>
+                ) : null}
+              </>
+            }
+          />
+        }
+        right={
+          management ? (
+            <Menu
+              aria-label={`${appointment.title} 일정 메뉴`}
+              placement="bottom-end"
+              width={160}
+              open={menuIsOpen}
+              onOpenChange={(open) => {
+                if (open) management.toggleMenu(appointment.id);
+                else management.closeMenu();
+              }}
+              trigger={
+                <IconButton
+                  icon={<MoreVerticalIcon />}
+                  iconSize={20}
+                  aria-label={`${appointment.title} 일정 더보기`}
+                  disabled={isOperationPending}
+                  id={`${appointment.id}-appointment-menu-button`}
+                />
+              }
+            >
+              <Menu.Item onSelect={() => management.startEditing(appointment)}>
                 수정
-              </button>
-              <button
-                className="checklist-detail-content__appointment-menu-delete"
-                onClick={() => {
-                  shouldRestoreFocusRef.current = false;
-                  management.requestDelete(appointment.id);
-                }}
-                ref={deleteItemRef}
-                role="menuitem"
-                type="button"
+              </Menu.Item>
+              <Menu.Item
+                tone="critical"
+                onSelect={() => management.requestDelete(appointment.id)}
               >
                 삭제
-              </button>
-            </div>
-          ) : null}
-        </span>
-      ) : null}
+              </Menu.Item>
+            </Menu>
+          ) : null
+        }
+      />
     </li>
   );
 }
@@ -255,57 +189,59 @@ export function ChecklistTaskDetailContent({
   return (
     <div className="checklist-detail-content">
       <section aria-labelledby={`${task.id}-information-title`}>
-        <h3 id={`${task.id}-information-title`}>할 일 정보</h3>
+        <ListHeader
+          title="할 일 정보"
+          titleId={`${task.id}-information-title`}
+          headingLevel={3}
+          horizontalPadding="none"
+        />
         <dl className="checklist-detail-content__properties">
-          <div>
-            <dt>카테고리</dt>
-            <dd className="checklist-detail-content__category-value">
-              <ChecklistTaskCategoryEditor
-                categories={categories}
-                categoryTitle={categoryTitle}
-                editing={editing}
-                task={task}
-              />
-            </dd>
-          </div>
-          <div>
-            <dt>상태</dt>
-            <dd>
-              <ChecklistTaskStatusEditor editing={editing} task={task} />
-            </dd>
-          </div>
+          <ChecklistPropertyRow label="카테고리" first>
+            <ChecklistTaskCategoryEditor
+              categories={categories}
+              categoryTitle={categoryTitle}
+              editing={editing}
+              task={task}
+            />
+          </ChecklistPropertyRow>
+          <ChecklistPropertyRow label="상태">
+            <ChecklistTaskStatusEditor editing={editing} task={task} />
+          </ChecklistPropertyRow>
         </dl>
       </section>
 
       <section aria-labelledby={`${task.id}-appointments-title`}>
-        <div className="checklist-detail-content__appointments-header">
-          <h3 id={`${task.id}-appointments-title`}>
-            일정 {task.appointments.length}개
-          </h3>
-          {onRequestScheduleCreation ? (
-            <button
-              className="checklist-detail-content__add-appointment"
-              id={`${task.id}-add-appointment`}
-              onClick={(event) => {
-                event.currentTarget.focus();
-                onRequestScheduleCreation();
-              }}
-              type="button"
-            >
-              <span aria-hidden="true">＋</span>
-              일정 추가
-            </button>
-          ) : null}
-        </div>
+        <ListHeader
+          title={`일정 ${task.appointments.length}개`}
+          titleId={`${task.id}-appointments-title`}
+          headingLevel={3}
+          horizontalPadding="none"
+          right={
+            onRequestScheduleCreation ? (
+              <Button
+                size="small"
+                variant="weak"
+                id={`${task.id}-add-appointment`}
+                onClick={(event) => {
+                  event.currentTarget.focus();
+                  onRequestScheduleCreation();
+                }}
+                type="button"
+              >
+                <PlusIcon size={16} />
+                일정 추가
+              </Button>
+            ) : null
+          }
+        />
         {task.appointments.length === 0 ? (
-          <p className="checklist-detail-content__empty">
-            등록된 일정이 없어요.
-          </p>
+          <Result headingLevel={4} title="등록된 일정이 없어요." />
         ) : (
           <ul className="checklist-detail-content__appointments">
-            {task.appointments.map((appointment) => (
+            {task.appointments.map((appointment, index) => (
               <ChecklistAppointment
                 appointment={appointment}
+                first={index === 0}
                 key={appointment.id}
                 management={appointmentManagement}
               />

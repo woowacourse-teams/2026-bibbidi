@@ -13,6 +13,58 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 import { installMatchMedia } from "../../test/matchMedia";
+import { dateLabel, localToday } from "../../shared/date/calendarDate";
+
+function chooseCategory(select: HTMLElement, value: string) {
+  fireEvent.click(select);
+  const native = select.parentElement!.querySelector("select")!;
+  const label = Array.from(native.options).find(
+    (option) => option.value === value,
+  )!.textContent!;
+  fireEvent.click(screen.getByRole("option", { name: label }));
+}
+
+function chooseAppointmentDate(form: HTMLElement, value: string) {
+  fireEvent.click(within(form).getByRole("button", { name: /^날짜 / }));
+  const panel = screen.getByRole("dialog", { name: "날짜 선택" });
+  const [year, month] = localToday().split("-").map(Number);
+  const [targetYear, targetMonth] = value.split("-").map(Number);
+  const distance = (targetYear - year) * 12 + targetMonth - month;
+  for (let step = 0; step < Math.abs(distance); step++)
+    fireEvent.click(
+      within(panel).getByRole("button", {
+        name: distance < 0 ? "이전 달" : "다음 달",
+      }),
+    );
+  fireEvent.click(
+    within(panel).getByRole("gridcell", { name: dateLabel(value) }),
+  );
+  fireEvent.click(within(panel).getByRole("button", { name: "확인" }));
+}
+
+function chooseAppointmentTime(
+  form: HTMLElement,
+  label: string,
+  value: string,
+) {
+  fireEvent.click(
+    within(form).getByRole("button", { name: new RegExp(`^${label} `) }),
+  );
+  const panel = screen.getByRole("dialog", { name: `${label} 선택` });
+  const [hour, minute] = value.split(":").map(Number);
+  for (const [column, option] of [
+    ["오전·오후", hour < 12 ? "오전" : "오후"],
+    ["시", String(hour % 12 || 12)],
+    ["분", String(minute).padStart(2, "0")],
+  ])
+    fireEvent.click(
+      within(within(panel).getByRole("listbox", { name: column })).getByRole(
+        "option",
+        { name: option },
+      ),
+    );
+  fireEvent.click(within(panel).getByRole("button", { name: "확인" }));
+}
 
 const authMocks = vi.hoisted(() => ({
   authState: { status: "guest" } as
@@ -29,6 +81,7 @@ const repositoryMocks = vi.hoisted(() => {
   const changeItemStatus = vi.fn();
   const changeItemTitle = vi.fn();
   const createCustomItem = vi.fn();
+  const deleteItem = vi.fn();
   const getChecklist = vi.fn();
   const hasRemainingAppointments = vi.fn();
   const cacheGetChecklist = vi.fn();
@@ -40,6 +93,7 @@ const repositoryMocks = vi.hoisted(() => {
     changeItemStatus,
     changeItemTitle,
     createCustomItem,
+    deleteItem,
     checklistRevision: 0,
     publishRevision() {
       this.checklistRevision += 1;
@@ -51,6 +105,7 @@ const repositoryMocks = vi.hoisted(() => {
       changeItemStatus,
       changeItemTitle,
       createCustomItem,
+      deleteItem,
       ensureChecklist: vi.fn(),
       hasRemainingAppointments,
       createAppointment: vi.fn(),
@@ -204,13 +259,12 @@ function getCurrentUrl() {
   return screen.getByTestId("current-url").textContent;
 }
 
-function closeMobileTaskDetail(dialog: HTMLElement) {
-  fireEvent.click(
-    document.querySelector(
-      ".checklist-detail-bottom-sheet__scrim",
-    ) as HTMLButtonElement,
-  );
-  fireEvent.transitionEnd(dialog, { propertyName: "transform" });
+async function closeMobileTaskDetail(dialog: HTMLElement) {
+  await act(async () => {
+    fireEvent.pointerDown(dialog, { isPrimary: true });
+    fireEvent.pointerUp(dialog);
+    fireEvent.click(dialog);
+  });
 }
 
 beforeEach(() => {
@@ -225,6 +279,8 @@ beforeEach(() => {
   repositoryMocks.changeItemTitle.mockResolvedValue(undefined);
   repositoryMocks.createCustomItem.mockReset();
   repositoryMocks.createCustomItem.mockResolvedValue(undefined);
+  repositoryMocks.deleteItem.mockReset();
+  repositoryMocks.deleteItem.mockResolvedValue(undefined);
   repositoryMocks.command.createAppointment.mockReset();
   repositoryMocks.command.createAppointment.mockResolvedValue(undefined);
   repositoryMocks.cacheGetChecklist.mockReset();
@@ -251,9 +307,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     renderChecklistFeature();
 
-    expect(screen.getByRole("status").textContent).toBe(
-      "체크리스트를 불러오고 있어요.",
-    );
+    const loadingStatus = screen.getByRole("status");
+    expect(loadingStatus.closest('[aria-busy="true"]')).toBeNull();
+    expect(loadingStatus.textContent).toBe("체크리스트를 불러오고 있어요.");
     expect(repositoryMocks.getChecklist).not.toHaveBeenCalled();
   });
 
@@ -295,9 +351,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
         name: "청첩장 문구 정하기",
       }),
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "할 일 제목 수정" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "할 일 더보기" })).toBeNull();
   });
 
   it("로그인 audience의 서버 항목과 직접 작성 항목을 서버 순서로 표시한다", async () => {
@@ -373,7 +427,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
-  it("비로그인 사용자에게 CTA와 로그인 안내를 제공하고 기존 로그인 경로로 이동한다", async () => {
+  it("비로그인 사용자에게 CTA와 로그인 안내를 제공하고 현재 화면에 로그인 모달을 요청한다", async () => {
     renderChecklistFeature();
     const addTaskButton = await screen.findByRole("button", {
       name: "할 일 추가",
@@ -402,7 +456,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
     fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
 
-    expect(getCurrentUrl()).toBe("/login");
+    expect(getCurrentUrl()).toBe("/checklist");
   });
 
   it("로그인 안내가 열리면 상세 패널을 포함한 배경 전체를 비활성화한다", async () => {
@@ -489,11 +543,13 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     fireEvent.click(addScheduleButton);
     const backdrop = document.querySelector<HTMLElement>(
-      ".checklist-dialog__backdrop",
+      ".bibbidi-dialog[open]",
     );
     expect(backdrop).not.toBeNull();
     if (backdrop) {
-      fireEvent.mouseDown(backdrop);
+      fireEvent.pointerDown(backdrop, { isPrimary: true });
+      fireEvent.pointerUp(backdrop);
+      fireEvent.click(backdrop);
     }
     expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(addScheduleButton));
@@ -501,7 +557,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.click(addScheduleButton);
     dialog = screen.getByRole("dialog", { name: "로그인이 필요해요" });
     fireEvent.click(within(dialog).getByRole("button", { name: "로그인" }));
-    expect(getCurrentUrl()).toBe("/login");
+    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
   });
 
   it("비로그인 모바일 상세에서도 일정 추가 안내와 초점 복원을 제공한다", async () => {
@@ -614,15 +670,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(creationPanel).getByLabelText(/제목/), {
       target: { value: " 웨딩홀 상담 " },
     });
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
-    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
-      target: { value: "10:00" },
-    });
-    fireEvent.change(within(creationPanel).getByLabelText("종료 시간"), {
-      target: { value: "11:30" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
+    chooseAppointmentTime(creationPanel, "시작 시간", "10:00");
+    chooseAppointmentTime(creationPanel, "종료 시간", "11:30");
     fireEvent.change(within(creationPanel).getByLabelText(/장소/), {
       target: { value: " 웨딩홀 " },
     });
@@ -694,9 +744,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "웨딩홀 상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
@@ -710,8 +758,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     });
     expect(within(updatedDetail).getByText("일정 1개")).toBeTruthy();
     expect(
-      document.querySelector(".checklist__task-schedule")?.textContent,
-    ).toBe("9월 20일");
+      within(
+        screen.getByRole("button", { name: /청첩장 문구 정하기/ }),
+      ).getByText("9월 20일"),
+    ).toBeTruthy();
     await waitFor(() =>
       expect(
         within(updatedDetail).getByRole("button", { name: "일정 추가" }),
@@ -751,9 +801,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
     expect(within(form).getByRole("alert").textContent).toBe(
@@ -778,9 +826,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(form).getByLabelText(/제목/), {
       target: { value: "상담" },
     });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
     expect(within(form).getByRole("alert").textContent).toBe(
@@ -808,9 +854,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const form = screen.getByRole("complementary", { name: "일정 추가" });
     const titleInput = within(form).getByLabelText(/제목/) as HTMLInputElement;
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(within(form).getByLabelText(/날짜/), {
-      target: { value: "2026-09-20" },
-    });
+    chooseAppointmentDate(form, "2026-09-20");
     fireEvent.click(within(form).getByRole("button", { name: "저장" }));
     await within(form).findByText(
       "일정은 저장됐어요. 목록을 다시 불러와 주세요.",
@@ -851,7 +895,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const titleInput = within(creationPanel).getByRole("textbox", {
       name: /제목/,
     });
-    const dateInput = within(creationPanel).getByLabelText(/날짜/);
+    const dateInput = within(creationPanel).getByRole("button", {
+      name: /^날짜 /,
+    });
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -860,18 +906,26 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       within(creationPanel).getByText("일정 제목을 입력해 주세요.");
     const dateError = within(creationPanel).getByText("날짜를 선택해 주세요.");
     expect(titleInput.getAttribute("aria-invalid")).toBe("true");
-    expect(titleInput.getAttribute("aria-describedby")).toBe(titleError.id);
-    expect(dateInput.getAttribute("aria-invalid")).toBe("true");
-    expect(dateInput.getAttribute("aria-describedby")).toBe(dateError.id);
+    expect(
+      document.getElementById(titleInput.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe(titleError.textContent);
+
+    expect(
+      within(creationPanel).getByRole("button", {
+        name: /^날짜 /,
+        description: `필수 항목입니다. ${dateError.textContent}`,
+      }),
+    ).toBe(dateInput);
     expect(document.activeElement).toBe(titleInput);
 
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(dateInput, { target: { value: "2026-09-01" } });
-    fireEvent.change(within(creationPanel).getByLabelText("시작 시간"), {
-      target: { value: "18:00" },
+    chooseAppointmentDate(creationPanel, "2026-09-01");
+    chooseAppointmentTime(creationPanel, "시작 시간", "18:00");
+    const endTimeInput = within(creationPanel).getByRole("button", {
+      name: /^종료 시간 /,
     });
-    const endTimeInput = within(creationPanel).getByLabelText("종료 시간");
-    fireEvent.change(endTimeInput, { target: { value: "17:00" } });
+    chooseAppointmentTime(creationPanel, "종료 시간", "17:00");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -879,7 +933,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const timeError = within(creationPanel).getByText(
       "종료 시간은 시작 시간보다 빠를 수 없어요.",
     );
-    expect(endTimeInput.getAttribute("aria-describedby")).toBe(timeError.id);
+    expect(
+      document.getElementById(endTimeInput.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe(timeError.textContent);
     await waitFor(() => expect(document.activeElement).toBe(endTimeInput));
   });
 
@@ -918,9 +975,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
         target: { value: "상담" },
       },
     );
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -977,9 +1032,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       name: /제목/,
     });
     fireEvent.change(titleInput, { target: { value: "상담" } });
-    fireEvent.change(within(creationPanel).getByLabelText(/날짜/), {
-      target: { value: "2026-09-01" },
-    });
+    chooseAppointmentDate(creationPanel, "2026-09-01");
     fireEvent.click(
       within(creationPanel).getByRole("button", { name: "저장" }),
     );
@@ -1016,6 +1069,10 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
       target: { value: "버릴 일정" },
     });
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    const discard = screen.getByRole("dialog", {
+      name: "작성 중인 내용을 닫을까요?",
+    });
+    fireEvent.click(within(discard).getByRole("button", { name: "나가기" }));
 
     const restoredButton = screen.getByRole("button", { name: "일정 추가" });
     await waitFor(() => expect(restoredButton).toBe(document.activeElement));
@@ -1142,12 +1199,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(
       within(panel).getByRole("combobox", { name: /카테고리/ }),
     ).toBeTruthy();
-    expect(
-      within(panel).getByRole("option", { name: "예식 준비" }),
-    ).toBeTruthy();
-    expect(
-      within(panel).getByRole("option", { name: "예복 준비" }),
-    ).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("combobox", { name: /카테고리/ }));
+    expect(screen.getByRole("option", { name: "예식 준비" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "예복 준비" })).toBeTruthy();
     expect(repositoryMocks.getChecklist).toHaveBeenCalledOnce();
   });
 
@@ -1175,9 +1229,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "  청첩장 문구 확정  " },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "20" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "20");
 
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
@@ -1231,8 +1283,8 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(repositoryMocks.getChecklist).toHaveBeenCalledTimes(2);
     expect(
       screen
-        .getByRole("button", { name: "예복 준비 0/1" })
-        .getAttribute("aria-pressed"),
+        .getByRole("tab", { name: "예복 준비 0/1" })
+        .getAttribute("aria-selected"),
     ).toBe("true");
     expect(
       screen
@@ -1248,9 +1300,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     expect(
       (within(reopenedPanel).getByRole("textbox") as HTMLInputElement).value,
     ).toBe("");
-    expect(
-      (within(reopenedPanel).getByRole("combobox") as HTMLSelectElement).value,
-    ).toBe("");
+    expect(within(reopenedPanel).getByRole("combobox").textContent).toContain(
+      "카테고리를 선택해 주세요",
+    );
   });
 
   it("생성 실패 시 작성값과 패널을 유지하고 오류를 지운 뒤 재시도한다", async () => {
@@ -1274,9 +1326,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     const panel = screen.getByRole("complementary", { name: "할 일 추가" });
     const title = within(panel).getByRole("textbox");
     fireEvent.change(title, { target: { value: "작성값 유지" } });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "20" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "20");
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
     expect((await within(panel).findByRole("alert")).textContent).toBe(
@@ -1312,9 +1362,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "인증 후 유지" },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "10");
     fireEvent.click(within(panel).getByRole("button", { name: "추가" }));
 
     await waitFor(() => expect(authMocks.refreshAuth).toHaveBeenCalledOnce());
@@ -1350,9 +1398,7 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
     fireEvent.change(within(panel).getByRole("textbox"), {
       target: { value: "첫 사용자 작성값" },
     });
-    fireEvent.change(within(panel).getByRole("combobox"), {
-      target: { value: "10" },
-    });
+    chooseCategory(within(panel).getByRole("combobox"), "10");
 
     authMocks.authState = {
       status: "authenticated",
@@ -1367,7 +1413,9 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "할 일 추가" }));
     expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByRole("combobox").textContent).toContain(
+      "카테고리를 선택해 주세요",
+    );
   });
 
   it("추가 화면과 상세 패널을 URL에서 상호 배타적으로 전환한다", async () => {
@@ -1410,49 +1458,6 @@ describe("ChecklistFeature 인증 상태별 조회", () => {
 });
 
 describe("ChecklistFeature 상세 URL 선택", () => {
-  it("로드맵에서 열고 다른 할 일을 선택한 상세도 Escape로 로드맵에 복귀한다", async () => {
-    const checklist = createChecklist("첫 번째 할 일");
-    checklist.categories[0]!.items.push({
-      ...checklist.categories[0]!.items[0]!,
-      id: "catalog-item-102",
-      sourceCatalogItemId: 102,
-      title: "두 번째 할 일",
-    });
-    repositoryMocks.getChecklist.mockResolvedValue(checklist);
-    renderChecklistFeature([
-      "/preparation?categoryId=10",
-      {
-        pathname: "/checklist",
-        search: "?taskId=catalog-item-101",
-        state: { checklistDetailDepth: 1, checklistDetailSource: "roadmap" },
-      },
-    ]);
-    await screen.findByRole("complementary", { name: "첫 번째 할 일" });
-    fireEvent.click(screen.getByRole("button", { name: /두 번째 할 일/ }));
-    expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-102");
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() =>
-      expect(getCurrentUrl()).toBe("/preparation?categoryId=10"),
-    );
-  });
-
-  it("로드맵에서 연 상세에서 체크리스트 카테고리를 바꾸면 체크리스트에 머문다", async () => {
-    renderChecklistFeature([
-      "/preparation",
-      {
-        pathname: "/checklist",
-        search: "?taskId=catalog-item-101",
-        state: { checklistDetailDepth: 1, checklistDetailSource: "roadmap" },
-      },
-    ]);
-    await screen.findByRole("complementary", { name: "로컬 체크리스트 항목" });
-    fireEvent.click(
-      screen.getByRole("button", { name: "두 번째 카테고리 0/0" }),
-    );
-    expect(getCurrentUrl()).toBe("/checklist");
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
   it("할 일 클릭과 닫기·Escape를 URL에 반영하고 다른 query와 포커스를 유지한다", async () => {
     const checklist = createChecklist("URL 인코딩 할 일");
     checklist.categories[0]!.items[0]!.id = "task-한글";
@@ -1552,18 +1557,20 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
-    fireEvent.click(
-      document.querySelector(
-        ".checklist-detail-bottom-sheet__scrim",
-      ) as HTMLButtonElement,
-    );
+    let finishAnimation!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finishAnimation = resolve;
+    });
+    Object.defineProperty(detailSheet.firstElementChild, "getAnimations", {
+      value: () => [{ finished }],
+    });
+    fireEvent.pointerDown(detailSheet, { isPrimary: true });
+    fireEvent.pointerUp(detailSheet);
+    fireEvent.click(detailSheet);
 
     expect(getCurrentUrl()).toBe("/checklist?taskId=catalog-item-101");
-    expect(
-      detailSheet.closest(".checklist-detail-bottom-sheet")?.className,
-    ).toContain("bottom-sheet-dismiss--closing");
-
-    fireEvent.transitionEnd(detailSheet, { propertyName: "transform" });
+    expect(detailSheet.dataset.state).toBe("closing");
+    await act(async () => finishAnimation());
 
     expect(getCurrentUrl()).toBe("/checklist");
 
@@ -1582,7 +1589,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailPage = await screen.findByRole("dialog", {
       name: "로컬 체크리스트 항목",
     });
-    closeMobileTaskDetail(detailPage);
+    await closeMobileTaskDetail(detailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(
@@ -1621,7 +1628,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
       name: "할 일 상세",
     });
     expect(within(errorDetailPage).getByRole("alert")).toBeTruthy();
-    closeMobileTaskDetail(errorDetailPage);
+    await closeMobileTaskDetail(errorDetailPage);
 
     expect(getCurrentUrl()).toBe("/checklist?filter=remaining");
     expect(screen.queryByRole("dialog", { name: "할 일 상세" })).toBeNull();
@@ -1791,7 +1798,7 @@ describe("ChecklistFeature 상세 URL 선택", () => {
     const detailSheet = screen.getByRole("dialog", {
       name: "청첩장 문구 정하기",
     });
-    closeMobileTaskDetail(detailSheet);
+    await closeMobileTaskDetail(detailSheet);
 
     expect(getCurrentUrl()).toBe("/calendar");
   });
@@ -1955,6 +1962,19 @@ describe("ChecklistFeature 조회 상태와 요청 수명", () => {
     expect(screen.getByRole("heading", { name: "빈 카테고리" })).toBeTruthy();
     expect(screen.queryByText("표시할 체크리스트가 없어요.")).toBeNull();
 
+    const directAddButton = screen.getByRole("button", { name: "직접 추가" });
+    fireEvent.click(directAddButton);
+    const loginDialog = screen.getByRole("dialog", {
+      name: "로그인이 필요해요",
+    });
+    fireEvent.keyDown(
+      within(loginDialog).getByRole("button", { name: "취소" }),
+      {
+        key: "Escape",
+      },
+    );
+    await waitFor(() => expect(document.activeElement).toBe(directAddButton));
+
     fireEvent.click(screen.getByRole("button", { name: "로드맵에서 추가" }));
     expect(getCurrentUrl()).toBe("/?categoryId=10");
   });
@@ -2106,9 +2126,9 @@ describe("ChecklistFeature 대분류와 중분류 UI", () => {
     });
     expect(
       within(categoryNavigation)
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["첫 번째 카테고리0/1", "두 번째 카테고리0/0"]);
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["첫 번째 카테고리", "두 번째 카테고리"]);
     const groupButton = screen
       .getAllByRole("button", { name: /첫 번째 카테고리/ })
       .find((button) => button.hasAttribute("aria-expanded"));
@@ -2146,7 +2166,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -2175,7 +2195,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "카테고리 변경, 현재 예식 준비",
       }),
     );
@@ -2207,7 +2227,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+      await screen.findByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
@@ -2239,7 +2259,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
 
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("combobox", {
         name: "상태 변경, 현재 예정",
       }),
     );
@@ -2272,7 +2292,7 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     ]);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "할 일 제목 수정" }),
+      await screen.findByRole("button", { name: "할 일 더보기" }),
     );
     fireEvent.click(screen.getByRole("menuitem", { name: "제목 변경" }));
     const input = screen.getByRole("textbox", { name: "할 일 제목" });
@@ -2298,6 +2318,149 @@ describe("ChecklistFeature 할 일 편집 조정", () => {
     );
     expect(
       screen.getByRole("complementary", { name: /제목 수정/ }),
+    ).toBeTruthy();
+  });
+});
+
+describe("ChecklistFeature 할 일 메뉴", () => {
+  beforeEach(() => {
+    authMocks.authState = {
+      status: "authenticated",
+      user: { id: 1, nickname: "bibbidi" },
+    };
+  });
+
+  it.each([false, true])(
+    "로드맵 할 일에는 삭제만 표시하고 취소하면 더보기로 복귀한다 (모바일=%s)",
+    async (mobile) => {
+      installMatchMedia(MOBILE_LAYOUT_MEDIA_QUERY, mobile);
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId = 101;
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+      const trigger = await screen.findByRole("button", {
+        name: "할 일 더보기",
+      });
+      fireEvent.click(trigger);
+      expect(screen.queryByRole("menuitem", { name: "제목 변경" })).toBeNull();
+      expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+      expect(
+        screen.queryByRole("combobox", { name: /카테고리 변경/ }),
+      ).toBeNull();
+      fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+      const dialog = screen.getByRole("dialog", {
+        name: "이 할 일을 삭제할까요?",
+      });
+      expect(dialog.textContent).toContain(
+        "삭제한 할 일과 연결된 일정은 다시 복구할 수 없어요.",
+      );
+      fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(repositoryMocks.deleteItem).not.toHaveBeenCalled();
+      expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([null, 101])(
+    "직접 생성과 로드맵 항목을 같은 삭제 명령으로 제거하고 목록·진행률·URL을 갱신한다 (원본=%s)",
+    async (sourceCatalogItemId) => {
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId =
+        sourceCatalogItemId;
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      repositoryMocks.deleteItem.mockImplementation(async () => {
+        repositoryMocks.getChecklist.mockResolvedValue({
+          categories: checklist.categories.map((category) => ({
+            ...category,
+            items: [],
+          })),
+        });
+        repositoryMocks.publishRevision();
+      });
+      renderChecklistFeature([
+        "/checklist?filter=remaining&taskId=checklist-item-500",
+      ]);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "할 일 더보기" }),
+      );
+      expect(
+        screen.queryByRole("menuitem", { name: "제목 변경" }) !== null,
+      ).toBe(sourceCatalogItemId === null);
+      fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+      const dialog = screen.getByRole("dialog", {
+        name: "이 할 일을 삭제할까요?",
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+      await waitFor(() =>
+        expect(repositoryMocks.deleteItem).toHaveBeenCalledWith(
+          500,
+          expect.any(AbortSignal),
+        ),
+      );
+      expect(await screen.findByText("아직 담은 할 일이 없어요")).toBeTruthy();
+      await waitFor(() =>
+        expect(getCurrentUrl()).toBe("/checklist?filter=remaining"),
+      );
+      expect(screen.getByText("전체 0개 · 완료 0개")).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("complementary")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /청첩장 문구 정하기/ }),
+      ).toBeNull();
+      expect(repositoryMocks.changeItemTitle).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([null, 101])(
+    "완료된 항목에는 삭제를 표시하지 않고 직접 생성 항목의 제목 변경은 유지한다 (원본=%s)",
+    async (sourceCatalogItemId) => {
+      const checklist = createAuthenticatedChecklist();
+      checklist.categories[0].items[0].sourceCatalogItemId =
+        sourceCatalogItemId;
+      checklist.categories[0].items[0].status = "done";
+      repositoryMocks.getChecklist.mockResolvedValue(checklist);
+      renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+      await screen.findByRole("complementary", { name: "청첩장 문구 정하기" });
+      const trigger = screen.queryByRole("button", { name: "할 일 더보기" });
+      if (sourceCatalogItemId === null) {
+        fireEvent.click(trigger!);
+        expect(
+          screen.getByRole("menuitem", { name: "제목 변경" }),
+        ).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "삭제" })).toBeNull();
+      } else {
+        expect(trigger).toBeNull();
+      }
+      expect(repositoryMocks.deleteItem).not.toHaveBeenCalled();
+    },
+  );
+
+  it("로드맵 항목 삭제에 실패하면 확인창과 항목을 유지하고 재시도할 수 있다", async () => {
+    const checklist = createAuthenticatedChecklist();
+    checklist.categories[0].items[0].sourceCatalogItemId = 101;
+    repositoryMocks.getChecklist.mockResolvedValue(checklist);
+    repositoryMocks.deleteItem.mockRejectedValueOnce(
+      new ChecklistItemChangeError("unknown", "할 일을 삭제하지 못했습니다."),
+    );
+    renderChecklistFeature(["/checklist?taskId=checklist-item-500"]);
+    const trigger = await screen.findByRole("button", { name: "할 일 더보기" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: "삭제" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "이 할 일을 삭제할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "할 일을 삭제하지 못했습니다.",
+    );
+    expect(getCurrentUrl()).toBe("/checklist?taskId=checklist-item-500");
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+    await waitFor(() =>
+      expect(repositoryMocks.deleteItem).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByRole("complementary", { name: "청첩장 문구 정하기" }),
     ).toBeTruthy();
   });
 });

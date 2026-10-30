@@ -1,44 +1,16 @@
-import { useCallback } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
+import { readLoginReturnPath } from "../features/auth/model/loginReturnPath";
 
-import {
-  beginAccountSetupProgress,
-  clearAccountSetupProgress,
-} from "../features/account-setup";
-import { acceptWebAccessToken, useAuth } from "../features/auth";
-import {
-  SocialLoginCallback,
-  type SocialLoginSession,
-} from "../features/social-login";
-
+/** Strip provider credentials from the URL before showing the result in the modal. */
 export function SocialLoginCallbackPage() {
   const { provider = "" } = useParams();
   const { search } = useLocation();
-  const navigate = useNavigate();
-  const { beginOnboarding, refreshAuth } = useAuth();
-  const handleSuccess = useCallback(
-    (session: SocialLoginSession) => {
-      acceptWebAccessToken(session.accessToken);
-
-      if (session.termsAgreementRequired) {
-        beginAccountSetupProgress();
-        beginOnboarding();
-        navigate("/onboarding", { replace: true });
-        return;
-      }
-
-      clearAccountSetupProgress();
-      refreshAuth();
-    },
-    [beginOnboarding, navigate, refreshAuth],
-  );
-
+  const returnTo = readLoginReturnPath() ?? "/";
   return (
-    <SocialLoginCallback
-      loginLink={<Link to="/login">로그인으로 돌아가기</Link>}
-      onSuccess={handleSuccess}
-      provider={provider}
-      search={search}
+    <Navigate
+      replace
+      to={returnTo}
+      state={{ loginModal: { returnTo, callback: { provider, search } } }}
     />
   );
 }

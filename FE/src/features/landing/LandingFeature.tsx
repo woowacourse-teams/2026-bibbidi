@@ -1,3 +1,4 @@
+import { useLoginModal } from "../auth/useLoginModal";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -11,7 +12,7 @@ import "./Landing.css";
 
 const features = [
   {
-    label: "AI 챗",
+    label: "AI",
     title: ["궁금한 것부터,", "편하게 물어보세요."],
     description: [
       "무엇부터 해야 할지 모르겠다면,",
@@ -67,6 +68,7 @@ const roadmapSteps = [
 ];
 
 export function LandingFeature() {
+  const { loginTo, loginState } = useLoginModal();
   const [chatReplay, setChatReplay] = useState(0);
   const {
     rootRef,
@@ -100,7 +102,13 @@ export function LandingFeature() {
             <a className="landing-desktop-only" href="#landing-roadmap">
               준비 로드맵
             </a>
-            <Link className="landing-desktop-only" to="/login">
+            <Link
+              className="landing-desktop-only"
+              to={loginTo}
+              state={loginState}
+              replace={false}
+              preventScrollReset
+            >
               로그인
             </Link>
             <Link className="landing-button" to="/preparation">

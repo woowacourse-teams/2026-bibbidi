@@ -33,6 +33,7 @@ function receive(conversationId?: string) {
     onConversation: vi.fn(),
     onDelta: vi.fn(),
     onRecommendations: vi.fn(),
+    onRefresh: vi.fn(),
   };
   const controller = new AbortController();
   const promise = streamAiChat(
@@ -55,6 +56,69 @@ afterEach(() => {
 });
 
 describe("AI 채팅 SSE 통신", () => {
+  it.each([false, true])(
+    "쓰기 갱신은 답변 실패(%s)와 상관없이 한 번 전달한다",
+    async (failed) => {
+      const refresh = "event: refresh\ndata: {}\n\n";
+      const end = failed
+        ? 'event: failure\ndata: {"errorCode":901,"message":"failed"}\n\n'
+        : delta("완료") + done;
+      fetchMock.mockResolvedValue(
+        response([encoder.encode(conversation + refresh + refresh + end)]),
+      );
+      const { receiver, promise } = receive();
+      if (failed) await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
+      else await promise;
+      expect(receiver.onRefresh).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("추천 뒤 refresh를 처리하고 done까지 정상 수신한다", async () => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          conversation +
+            delta("추천") +
+            'event: component\ndata: {"catalogItemIds":[101]}\n\n' +
+            "event: refresh\ndata: {}\n\n" +
+            done,
+        ),
+      ]),
+    );
+    const { receiver, promise } = receive();
+    await promise;
+    expect(receiver.onRefresh).toHaveBeenCalledOnce();
+    expect(receiver.onRecommendations).toHaveBeenCalledWith(["101"]);
+  });
+
+  it("갱신 신호가 없는 답변은 조회를 요청하지 않는다", async () => {
+    fetchMock.mockResolvedValue(
+      response([encoder.encode(conversation + delta("조회") + done)]),
+    );
+    const { receiver, promise } = receive();
+    await promise;
+    expect(receiver.onRefresh).not.toHaveBeenCalled();
+  });
+
+  it.each(["[]", "null", '{"unexpected":true}'])(
+    "잘못된 refresh 본문 %s는 거절한다",
+    async (data) => {
+      fetchMock.mockResolvedValue(
+        response([
+          encoder.encode(
+            conversation +
+              `event: refresh\ndata: ${data}\n\n` +
+              delta("답변") +
+              done,
+          ),
+        ]),
+      );
+      const { receiver, promise } = receive();
+      await expect(promise).rejects.toBeInstanceOf(AiChatApiError);
+      expect(receiver.onRefresh).not.toHaveBeenCalled();
+    },
+  );
+
   it("바이트 단위로 나뉜 추천 ID를 서버 순서대로 중복 제거해 전달한다", async () => {
     const bytes = encoder.encode(
       conversation +
@@ -263,7 +327,67 @@ describe("AI 채팅 SSE 통신", () => {
     expect(receiver.onDelta).not.toHaveBeenCalled();
   });
 
-  it.each([400, 401, 403, 500])(
+  it.each([901, 902, 999, 401])(
+    "failure의 오류 코드 %s를 HTTP 상태와 분리해 전달한다",
+    async (errorCode) => {
+      fetchMock.mockResolvedValue(
+        response([
+          encoder.encode(
+            conversation +
+              delta("중간 답변") +
+              `event: failure\ndata: ${JSON.stringify({ errorCode, message: "secret upstream error" })}\n\n` +
+              done,
+          ),
+        ]),
+      );
+      const { receiver, promise } = receive();
+      await expect(promise).rejects.toMatchObject({
+        errorCode,
+        status: undefined,
+        authenticationRequired: false,
+        capacityExceeded: errorCode === 902,
+        message: "AI 답변을 끝까지 받지 못했습니다.",
+      });
+      expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith("중간 답변");
+      expect(fetchMock).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("대화 시작 전에 도착한 한도 초과도 구분한다", async () => {
+    fetchMock.mockResolvedValue(
+      response([
+        encoder.encode(
+          'event: failure\ndata: {"errorCode":902,"message":"secret upstream error"}\n\n',
+        ),
+      ]),
+    );
+    await expect(receive().promise).rejects.toMatchObject({
+      errorCode: 902,
+      capacityExceeded: true,
+    });
+  });
+
+  it.each([
+    '{"message":"secret upstream error"}',
+    '{"errorCode":"902","message":"secret upstream error"}',
+    '{"errorCode":902.5,"message":"secret upstream error"}',
+    '{"errorCode":902}',
+    '{"errorCode":902,"message":null}',
+    "null",
+    "[]",
+    "invalid-json",
+  ])("구형·잘못된 failure 데이터 %s는 공통 오류로 처리한다", async (data) => {
+    fetchMock.mockResolvedValue(
+      response([encoder.encode(`event: failure\ndata: ${data}\n\n`)]),
+    );
+    await expect(receive().promise).rejects.toMatchObject({
+      errorCode: undefined,
+      capacityExceeded: false,
+      message: "AI 답변을 끝까지 받지 못했습니다.",
+    });
+  });
+
+  it.each([400, 401, 403, 500, 503])(
     "HTTP %s를 안전한 오류로 전달한다",
     async (status) => {
       fetchMock.mockResolvedValue(new Response("secret response", { status }));
@@ -323,7 +447,53 @@ describe("AI 채팅 SSE 통신", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("전체 제한 시간이 지나면 수신을 끝내고 재요청하지 않는다", async () => {
+  it.each(["done", "failure"])(
+    "60초 시점에 도착한 %s 이벤트를 처리하고 타이머를 정리한다",
+    async (terminalEvent) => {
+      vi.useFakeTimers();
+      let source!: ReadableStreamDefaultController<Uint8Array>;
+      const cancel = vi.fn();
+      fetchMock.mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              source = controller;
+              controller.enqueue(encoder.encode(conversation));
+            },
+            cancel,
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      );
+      const { receiver, promise } = receive();
+      const settled = vi.fn();
+      const completion = promise.then(
+        () => settled("done"),
+        () => settled("failure"),
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(settled).not.toHaveBeenCalled();
+      expect(cancel).not.toHaveBeenCalled();
+      source.enqueue(
+        encoder.encode(
+          delta("늦게 도착한 답변") +
+            (terminalEvent === "done"
+              ? done
+              : 'event: failure\ndata: {"errorCode":901,"message":"공개 실패 안내"}\n\n'),
+        ),
+      );
+      await completion;
+      expect(settled).toHaveBeenCalledExactlyOnceWith(terminalEvent);
+      expect(receiver.onDelta).toHaveBeenCalledExactlyOnceWith(
+        "늦게 도착한 답변",
+      );
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("75초까지 완료·실패 이벤트가 없으면 수신을 끝내고 재요청하지 않는다", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
     fetchMock.mockResolvedValue(
@@ -333,7 +503,9 @@ describe("AI 채팅 SSE 통신", () => {
     );
     const { promise } = receive();
     const rejection = expect(promise).rejects.toBeInstanceOf(AiChatApiError);
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(74_999);
+    expect(cancel).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     await rejection;
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledOnce();

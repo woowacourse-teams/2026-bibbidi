@@ -1,7 +1,5 @@
 import { RoadmapWorkspace } from "./RoadmapWorkspace";
 import { AllPreparationStepsFeature } from "./AllPreparationStepsFeature";
-import { GuestPersonalRoadmap } from "./view/GuestPersonalRoadmap";
-import { createGuestPersonalRoadmapViewModel } from "./view-model/createGuestPersonalRoadmapViewModel";
 
 export function PreparationRoadmapFeature({
   initialCategoryId,
@@ -11,33 +9,10 @@ export function PreparationRoadmapFeature({
   return (
     <RoadmapWorkspace
       initialCategoryId={initialCategoryId}
-      renderCatalogRoadmap={({
-        categoryId,
-        onCategorySelect,
-        viewSwitcher,
-        view,
-        onShowAll,
-      }) => (
+      renderCatalogRoadmap={({ categoryId, onCategorySelect }) => (
         <AllPreparationStepsFeature
           initialCategoryId={categoryId}
           onCategoryChange={onCategorySelect}
-          viewSwitcher={viewSwitcher}
-          renderRoadmap={
-            view === "personal"
-              ? ({ catalog, categories, onCategorySelect }) => (
-                  <GuestPersonalRoadmap
-                    categories={categories}
-                    onCategorySelect={onCategorySelect}
-                    roadmap={createGuestPersonalRoadmapViewModel(
-                      catalog,
-                      categories.find((category) => category.isCurrent)?.id,
-                    )}
-                    viewSwitcher={viewSwitcher}
-                    onShowAll={onShowAll}
-                  />
-                )
-              : undefined
-          }
         />
       )}
     />

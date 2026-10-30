@@ -1,0 +1,61 @@
+.bibbidi-app-layout {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-bg-layer-basement);
+  color: var(--color-fg-neutral);
+}
+.bibbidi-app-layout[data-scroll="contained"] {
+  height: 100vh;
+  height: 100dvh;
+  overflow: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block-start: var(--app-layout-header-height, 0px);
+}
+/* Hide only the active page scroller; nested panels retain their own scrollbars. */
+.bibbidi-app-layout[data-scroll="contained"][data-hide-scroll-bar],
+html:has(.bibbidi-app-layout[data-scroll="document"][data-hide-scroll-bar]) {
+  scrollbar-width: none;
+}
+.bibbidi-app-layout[data-scroll="contained"][data-hide-scroll-bar]::-webkit-scrollbar,
+html:has(
+    .bibbidi-app-layout[data-scroll="document"][data-hide-scroll-bar]
+  )::-webkit-scrollbar {
+  display: none;
+}
+.bibbidi-app-layout-header {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  background: var(--color-bg-layer-basement);
+}
+.bibbidi-app-layout[data-header-position="sticky"]
+  > .bibbidi-app-layout-header {
+  position: sticky;
+  top: 0;
+}
+.bibbidi-app-layout-header[data-tone="fade"] {
+  pointer-events: none;
+  padding-bottom: var(--layout-gutter-desktop);
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg-layer-basement) calc(100% - var(--layout-gutter-desktop)),
+    transparent 100%
+  );
+}
+.bibbidi-app-layout-header[data-tone="fade"] > * {
+  pointer-events: auto;
+}
+/* Only document scrolling needs target margins; contained scrolling uses padding.
+   Keep this scoped to the app's page content, excluding the header itself. */
+.bibbidi-app-layout[data-scroll="document"][data-header-position="sticky"]
+  > :not(.bibbidi-app-layout-header)
+  :where([id], a[href], button, input, select, textarea, [tabindex]),
+.bibbidi-app-layout[data-scroll="document"][data-header-position="sticky"]
+  > :where([id]):not(.bibbidi-app-layout-header) {
+  scroll-margin-block-start: var(--app-layout-header-height, 0px);
+}

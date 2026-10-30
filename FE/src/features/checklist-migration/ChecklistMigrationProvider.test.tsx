@@ -196,35 +196,137 @@ describe("ChecklistMigrationProvider", () => {
     );
   });
 
-  it("체크리스트가 없으면 계정 설정 필요 상태로 전환한다", async () => {
+  it.each([[[]], [[101]]])(
+    "체크리스트가 없으면 자동 생성하고 비로그인 준비 항목 %j를 이전한다",
+    async (catalogItemIds) => {
+      const storage = createStorage(catalogItemIds);
+      vi.stubGlobal("localStorage", storage);
+      let hasChecklist = false;
+      let hasAddedItem = false;
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/users/me") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ id: 1, nickname: "bibbidi" })),
+          );
+        }
+
+        if (url === "/api/checklists/me") {
+          return Promise.resolve(
+            hasChecklist
+              ? new Response(
+                  JSON.stringify({
+                    id: 1,
+                    items: hasAddedItem ? [createChecklistItem(10, 101)] : [],
+                  }),
+                )
+              : new Response(
+                  JSON.stringify({
+                    errorCode: 303,
+                    message: "체크리스트가 없습니다.",
+                  }),
+                  {
+                    status: 404,
+                  },
+                ),
+          );
+        }
+
+        if (url === "/api/checklists") {
+          hasChecklist = true;
+          return Promise.resolve(new Response("1", { status: 201 }));
+        }
+
+        if (url === "/api/checklists/me/catalog-items") {
+          hasAddedItem = true;
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    catalogItemId: 101,
+                    categoryId: 10,
+                    createdAt: "2026-09-23T09:00:00",
+                    id: 10,
+                    status: "prev",
+                    title: "추가된 할 일",
+                  },
+                ],
+              }),
+              { status: 201 },
+            ),
+          );
+        }
+
+        return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
+      });
+      installLegacyWebSessionFetch(fetchMock);
+
+      renderProviders(<AuthStateProbe />, true);
+
+      expect(await screen.findByText("authenticated:bibbidi")).toBeTruthy();
+      expect(
+        fetchMock.mock.calls.filter(([url]) => url === "/api/checklists"),
+      ).toHaveLength(1);
+      expect(hasAddedItem).toBe(catalogItemIds.length > 0);
+      expect(storage.getSerializedValue()).toBeNull();
+    },
+  );
+
+  it("자동 생성에 실패하면 로컬 항목을 보존하고 다시 시도할 수 있다", async () => {
+    const storage = createStorage([101]);
+    vi.stubGlobal("localStorage", storage);
+    let hasChecklist = false;
+    let shouldFailCreation = true;
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
         return Promise.resolve(
-          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
-            status: 200,
-          }),
+          new Response(JSON.stringify({ id: 1, nickname: "bibbidi" })),
         );
       }
-
       if (url === "/api/checklists/me") {
         return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              errorCode: 303,
-              message: "체크리스트가 없습니다.",
-            }),
-            { status: 404 },
-          ),
+          hasChecklist
+            ? new Response(
+                JSON.stringify({
+                  id: 1,
+                  items: [createChecklistItem(10, 101)],
+                }),
+              )
+            : new Response(
+                JSON.stringify({
+                  errorCode: 303,
+                  message: "체크리스트가 없습니다.",
+                }),
+                { status: 404 },
+              ),
         );
       }
-
+      if (url === "/api/checklists") {
+        if (shouldFailCreation) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ errorCode: 901, message: "서버 오류" }),
+              { status: 500 },
+            ),
+          );
+        }
+        hasChecklist = true;
+        return Promise.resolve(new Response("1", { status: 201 }));
+      }
       return Promise.reject(new Error(`예상하지 못한 요청: ${url}`));
     });
     installLegacyWebSessionFetch(fetchMock);
-
     renderProviders(<AuthStateProbe />);
 
-    expect(await screen.findByText("accountSetupRequired")).toBeTruthy();
+    expect(
+      await screen.findByText("로그인 상태를 확인하지 못했습니다."),
+    ).toBeTruthy();
+    expect(storage.getSerializedValue()).not.toBeNull();
+    shouldFailCreation = false;
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("authenticated:bibbidi")).toBeTruthy();
+    expect(storage.getSerializedValue()).toBeNull();
   });
 
   it("준비 항목 이전 실패 후에도 로그인 상태를 유지하고 로컬 ID를 보존한다", async () => {

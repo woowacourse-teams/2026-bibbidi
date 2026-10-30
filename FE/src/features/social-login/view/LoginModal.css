@@ -1,0 +1,19 @@
+.login-modal .bibbidi-dialog-surface {
+  max-width: 440px;
+}
+
+.login-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.login-modal .bibbidi-dialog-body {
+  padding-bottom: 28px;
+}
+
+.login-modal .bibbidi-dialog-actions {
+  display: none;
+}

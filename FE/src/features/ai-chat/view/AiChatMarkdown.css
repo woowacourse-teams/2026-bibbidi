@@ -4,16 +4,15 @@
 
 .ai-chat__markdown :is(h1, h2, h3, h4, h5, h6) {
   margin: 20px 0 8px;
-  font-size: 16px;
-  line-height: 1.5;
+  font: var(--typography-t5-medium);
 }
 
 .ai-chat__markdown h1 {
-  font-size: 20px;
+  font: var(--typography-t4);
 }
 
 .ai-chat__markdown h2 {
-  font-size: 18px;
+  font: var(--typography-t5-medium);
 }
 
 .ai-chat__markdown :is(ul, ol) {
@@ -48,7 +47,8 @@
   padding: 2px 4px;
   border-radius: 4px;
   background: var(--color-bg-layer-basement);
-  font-size: 0.9em;
+  font-size: var(--font-size-t6);
+  line-height: var(--line-height-t6);
 }
 
 .ai-chat__markdown pre {

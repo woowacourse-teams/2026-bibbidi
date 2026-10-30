@@ -1,0 +1,15 @@
+.bibbidi-progress-ring {
+  flex: none;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.bibbidi-progress-ring circle {
+  fill: none;
+  stroke: var(--color-stroke-neutral-weak);
+  stroke-width: 4;
+}
+
+.bibbidi-progress-ring .bibbidi-progress-ring-range {
+  stroke: var(--color-stroke-brand-solid);
+}

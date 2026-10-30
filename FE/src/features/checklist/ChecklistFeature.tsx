@@ -1,3 +1,4 @@
+import { useLoginModal } from "../auth/useLoginModal";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
@@ -171,6 +172,7 @@ export function ChecklistFeature({
   const checklistRevision = useChecklistRevision();
   const location = useLocation();
   const navigate = useNavigate();
+  const { openLogin } = useLoginModal();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get("taskId");
   const shouldOpenAppointment = searchParams.get("addAppointment") === "true";
@@ -194,12 +196,43 @@ export function ChecklistFeature({
     },
     [audience, setRequestState],
   );
-  const selectedTaskCategoryId =
+  const selectedTask =
     requestState.status === "success"
       ? requestState.checklist.categories
           .flatMap(getChecklistCategoryItems)
-          .find((item) => item.id === selectedTaskId)?.categoryId
-      : null;
+          .find((item) => item.id === selectedTaskId)
+      : undefined;
+  const selectedTaskCategoryId = selectedTask?.categoryId;
+  const viewedTaskRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedTaskId === null) {
+      viewedTaskRef.current = null;
+      return;
+    }
+    if (
+      audience !== "authenticated" ||
+      requestState.status !== "success" ||
+      requestState.sessionIdentity !== sessionIdentity
+    )
+      return;
+    const task = requestState.checklist.categories
+      .flatMap(getChecklistCategoryItems)
+      .find((item) => item.id === selectedTaskId);
+    if (!task?.checklistItemId) return;
+    const key = `${sessionIdentity}:${task.checklistItemId}`;
+    if (viewedTaskRef.current === key) return;
+    viewedTaskRef.current = key;
+    analytics.track({
+      name: "checklist_task_view",
+      parameters: {
+        checklist_item_id: task.checklistItemId,
+        source: "checklist",
+        ...(task.sourceCatalogItemId === null
+          ? {}
+          : { catalog_item_id: task.sourceCatalogItemId }),
+      },
+    });
+  }, [audience, requestState, selectedTaskId, sessionIdentity]);
   const itemEditing = useChecklistItemEditing(
     checklistCommandRepository,
     refreshAuth,
@@ -207,6 +240,7 @@ export function ChecklistFeature({
     selectedChecklistItemId,
     handleRefreshFailed,
     selectedTaskCategoryId,
+    selectedTask?.status,
   );
   const taskCreationCommand = useChecklistTaskCreationCommand(
     checklistCommandRepository,
@@ -284,6 +318,7 @@ export function ChecklistFeature({
       ? selectedChecklistItemId
       : null;
   const appointmentCreation = useChecklistAppointmentCreation({
+    confirmDiscard: true,
     checklistItemId: appointmentCreationChecklistItemId,
     isAuthenticated: audience === "authenticated",
     onSubmit: onSubmitAppointment ?? submitAppointment,
@@ -291,6 +326,7 @@ export function ChecklistFeature({
     sessionIdentity,
   });
   const appointmentManagement = useChecklistAppointmentManagement({
+    confirmDiscard: true,
     audience,
     checklistItemId: appointmentManagementChecklistItemId,
     commandRepository: checklistCommandRepository,
@@ -433,18 +469,6 @@ export function ChecklistFeature({
       updateTaskSelection(null, { replace: true });
     }
   }, [location.state, navigate, selectedTaskId, updateTaskSelection]);
-  const dismissTaskDetail = useCallback(() => {
-    const state = location.state;
-    if (
-      state !== null &&
-      typeof state === "object" &&
-      Reflect.get(state, "checklistDetailSource") === "roadmap"
-    ) {
-      backFromTaskDetail();
-    } else {
-      closeTaskDetail();
-    }
-  }, [backFromTaskDetail, closeTaskDetail, location.state]);
   const selectTask = useCallback(
     (taskId: string) => {
       if (taskId !== selectedTaskId || isTaskCreationOpen) {
@@ -631,7 +655,6 @@ export function ChecklistFeature({
       onBackTaskDetail={backFromTaskDetail}
       onCancelLoginRequired={() => setLoginRequiredReason(null)}
       onCloseTaskDetail={closeTaskDetail}
-      onDismissTaskDetail={dismissTaskDetail}
       onOpenTaskCreation={() => {
         if (audience === "authenticated") {
           taskCreation.open();
@@ -646,7 +669,7 @@ export function ChecklistFeature({
       }}
       onVisitLogin={() => {
         setLoginRequiredReason(null);
-        navigate("/login");
+        openLogin();
       }}
       selectedTaskId={selectedTaskId}
       revealCustomCategory={revealCustomCategory}
