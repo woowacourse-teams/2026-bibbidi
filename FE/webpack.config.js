@@ -164,6 +164,7 @@ module.exports = (_environment, arguments_) => {
     },
 
     devServer: {
+      static: { directory: path.resolve(__dirname, "public") },
       port: 3000,
       hot: true,
       open: true,
