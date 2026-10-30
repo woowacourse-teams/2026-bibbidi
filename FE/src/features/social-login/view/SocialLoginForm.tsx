@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import loginCouplePreview from "../../../assets/login-couple-preview.png";
 import { analytics } from "../../../infrastructure/analytics";
@@ -65,18 +65,22 @@ export function SocialLoginForm({
 }: {
   onAuthorizationStart?: () => void;
 }) {
+  const mountedRef = useRef(false);
   const [socialLoginNotice, setSocialLoginNotice] = useState("");
   const [isSocialRedirecting, setIsSocialRedirecting] = useState(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     const resetSocialRedirectState = () => {
       setIsSocialRedirecting(false);
       setSocialLoginNotice("");
     };
 
     window.addEventListener("pageshow", resetSocialRedirectState);
-    return () =>
+    return () => {
+      mountedRef.current = false;
       window.removeEventListener("pageshow", resetSocialRedirectState);
+    };
   }, []);
 
   const handleSocialLogin = (provider: {
@@ -93,10 +97,12 @@ export function SocialLoginForm({
     setSocialLoginNotice(`${provider.label} 로그인 화면으로 이동하고 있어요.`);
     startSocialAuthorization(provider.id)
       .then((authorizationUri) => {
+        if (!mountedRef.current) return;
         onAuthorizationStart?.();
         window.location.assign(authorizationUri);
       })
       .catch((error: unknown) => {
+        if (!mountedRef.current) return;
         analytics.track(
           createSocialLoginEvent("social_login_start_failed", provider.id, {
             failure_kind: socialLoginFailureKind(error),
@@ -112,11 +118,11 @@ export function SocialLoginForm({
   return (
     <section aria-label="소셜 로그인" className="social-login-form">
       <header className="social-login-form__intro">
-        <h1 className="social-login-form__headline">
+        <h2 className="social-login-form__headline">
           <span className="social-login-form__tagline">
             모든 결혼 준비를 한 곳에서
           </span>
-        </h1>
+        </h2>
       </header>
 
       <aside

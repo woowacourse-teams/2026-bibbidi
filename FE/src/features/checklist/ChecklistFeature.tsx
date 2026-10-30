@@ -1,3 +1,4 @@
+import { useLoginModal } from "../auth/useLoginModal";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
@@ -171,6 +172,7 @@ export function ChecklistFeature({
   const checklistRevision = useChecklistRevision();
   const location = useLocation();
   const navigate = useNavigate();
+  const { openLogin } = useLoginModal();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get("taskId");
   const shouldOpenAppointment = searchParams.get("addAppointment") === "true";
@@ -667,7 +669,7 @@ export function ChecklistFeature({
       }}
       onVisitLogin={() => {
         setLoginRequiredReason(null);
-        navigate("/login");
+        openLogin();
       }}
       selectedTaskId={selectedTaskId}
       revealCustomCategory={revealCustomCategory}

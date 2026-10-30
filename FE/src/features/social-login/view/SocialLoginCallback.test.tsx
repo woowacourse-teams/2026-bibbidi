@@ -106,9 +106,7 @@ describe("SocialLoginCallback", () => {
     renderCallback("kakao", "?code=abc&state=xyz");
 
     expect(
-      await screen.findByText(
-        "가입을 시작했어요. 약관 동의 화면은 준비 중이에요.",
-      ),
+      await screen.findByText("서비스 이용을 위해 약관에 동의해 주세요."),
     ).toBeTruthy();
   });
 

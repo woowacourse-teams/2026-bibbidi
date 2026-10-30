@@ -286,7 +286,7 @@ describe("calendar planning", () => {
       within(undated)
         .getByRole("link", { name: "로그인하고 일정 관리하기" })
         .getAttribute("href"),
-    ).toBe("/login?returnTo=%2Fcalendar");
+    ).toBe("/calendar");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(recommended.getRecommendedCatalogItems).not.toHaveBeenCalled();
     expect(screen.queryByText("다가오는 일정")).toBeNull();
@@ -329,9 +329,8 @@ describe("calendar planning", () => {
     fireEvent.click(within(undated).getByRole("button", { name: "일정 추가" }));
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("button", { name: "취소" })).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
-    ).toContain("dateFor%3D101");
+    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
   it("로그인 복귀에서 선택한 항목의 기존 일정 폼을 연다", async () => {
     checklist.categories[0].items = [task(1, 101)];

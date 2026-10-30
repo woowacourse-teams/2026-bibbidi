@@ -791,7 +791,7 @@ describe("전역 AI", () => {
     await openChat();
     expect(
       screen.getByRole("link", { name: "로그인하기" }).getAttribute("href"),
-    ).toBe("/login");
+    ).toBe("/calendar");
     expect(screen.queryByRole("log")).toBeNull();
     expect(mocks.stream).not.toHaveBeenCalled();
   });

@@ -42,7 +42,7 @@ describe("loginReturnPath", () => {
     expect(getSafeLoginReturnPath("?returnTo=https%3A%2F%2Fevil.example")).toBe(
       null,
     );
-    expect(getSafeLoginReturnPath("?returnTo=%2Fchecklist")).toBe(null);
+    expect(getSafeLoginReturnPath("?returnTo=%2Fchecklist")).toBe("/checklist");
     expect(getSafeLoginReturnPath("?returnTo=%2F%2Fevil.example")).toBe(null);
     expect(getSafeLoginReturnPath("")).toBe(null);
   });

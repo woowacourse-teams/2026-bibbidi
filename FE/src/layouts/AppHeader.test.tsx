@@ -100,7 +100,9 @@ describe("AppHeader", () => {
         screen.queryByRole("navigation", { name: "주요 메뉴" }),
       ).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "로그인" }));
-      expect(screen.getByLabelText("현재 주소").textContent).toBe("/login");
+      expect(screen.getByLabelText("현재 주소").textContent).toBe(
+        "/preparation",
+      );
       root.scrollTop = 0;
       fireEvent.scroll(target);
       expect(screen.getByRole("link", { name: "로그인" })).toBeTruthy();
@@ -162,7 +164,7 @@ describe("AppHeader", () => {
     expect(screen.getByRole("navigation", { name: "계정 메뉴" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "로그인" }).getAttribute("href"),
-    ).toBe("/login");
+    ).toBe("/");
     expect(screen.queryByRole("link", { name: "회원가입" })).toBeNull();
     expect(screen.queryByRole("navigation", { name: "하단 메뉴" })).toBeNull();
   });

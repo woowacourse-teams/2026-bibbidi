@@ -1,7 +1,8 @@
-import { Link, NavLink, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 import { PageContainer } from "../components/page-container";
 import { LoginIcon } from "../components/icons/ActionIcons";
 import { IconButton } from "../components/icon-button";
+import { useLoginModal } from "../features/auth/useLoginModal";
 import { useCompactHeaderLogin } from "./useCompactHeaderLogin";
 
 import "./AppHeader.css";
@@ -30,7 +31,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
+  const { loginTo, loginState, openLogin } = useLoginModal();
   const { ref, compact } = useCompactHeaderLogin();
   return (
     <header className="app-header" data-compact={compact || undefined}>
@@ -67,16 +68,19 @@ export function AppHeader({ user }: AppHeaderProps) {
             <AppHeaderAccountMenu navigationKey={pathname} user={user} />
           ) : user.kind === "guest" ? (
             <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-              <NavLink
+              <Link
                 className="app-header__login"
-                to="/login"
+                to={loginTo}
+                state={loginState}
+                replace={false}
+                preventScrollReset
                 aria-hidden={compact || undefined}
                 inert={compact}
                 tabIndex={compact ? -1 : undefined}
               >
                 <LoginIcon />
                 <span className="app-header__login-label">로그인</span>
-              </NavLink>
+              </Link>
               <IconButton
                 className="app-header__login-icon"
                 icon={<LoginIcon />}
@@ -86,7 +90,7 @@ export function AppHeader({ user }: AppHeaderProps) {
                 tabIndex={compact ? undefined : -1}
                 color="var(--color-fg-neutral-muted)"
                 variant="clear"
-                onClick={() => void navigate("/login")}
+                onClick={openLogin}
               />
             </nav>
           ) : (

@@ -1,4 +1,4 @@
-import { useHref, useLinkClickHandler } from "react-router";
+import { useLoginModal } from "../../auth/useLoginModal";
 import { Button } from "../../../components/button";
 import { Dialog } from "../../../components/dialog";
 
@@ -9,8 +9,7 @@ export function CalendarLoginDialog({
   onClose: () => void;
   loginTo: string;
 }) {
-  const href = useHref(loginTo);
-  const navigate = useLinkClickHandler<HTMLAnchorElement>(loginTo);
+  const { openLogin } = useLoginModal(loginTo);
   return (
     <Dialog
       open
@@ -37,14 +36,16 @@ export function CalendarLoginDialog({
             </Button>
           </div>
           <div>
-            <Button.Link
+            <Button
               size="large"
               display="block"
-              href={href}
-              onClick={navigate}
+              onClick={() => {
+                onClose();
+                openLogin();
+              }}
             >
               로그인
-            </Button.Link>
+            </Button>
           </div>
         </>
       }

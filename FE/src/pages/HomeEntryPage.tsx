@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Navigate, useSearchParams } from "react-router";
+import { Navigate, useLocation, useSearchParams } from "react-router";
 
 import { useAuth } from "../features/auth";
 import { HomeEntryPageViewContext } from "../app/analytics/AppPageViewTracker";
@@ -11,6 +11,7 @@ import { PreparationCatalogPage } from "./PreparationCatalogPage";
 
 export function HomeEntryPage() {
   const { authState } = useAuth();
+  const { state } = useLocation();
   const [searchParams] = useSearchParams();
   const [variant, setVariant] = useState<HomeEntryVariant | null>(null);
   const hasCategoryLink = searchParams.has("categoryId");
@@ -55,7 +56,7 @@ export function HomeEntryPage() {
     return <PreparationCatalogPage />;
   }
   if (variant === "test") {
-    return <Navigate replace to="/calendar" />;
+    return <Navigate replace to="/calendar" state={state} />;
   }
   return <main aria-label="첫 화면 준비 중" role="status" />;
 }

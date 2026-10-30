@@ -439,7 +439,7 @@ describe("실제 AI 채팅", () => {
         (await screen.findByRole("link", { name: "로그인하기" })).getAttribute(
           "href",
         ),
-      ).toBe("/login");
+      ).toBe("/");
       expect(screen.queryByRole("log")).toBeNull();
       expect(screen.getByRole<HTMLTextAreaElement>("textbox").disabled).toBe(
         true,

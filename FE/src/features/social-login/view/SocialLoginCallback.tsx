@@ -44,6 +44,13 @@ export function SocialLoginCallback({
   );
   // 인가 코드는 한 번만 쓸 수 있어 개발 모드에서 effect가 두 번 돌아도 한 번만 보낸다.
   const hasRequestedRef = useRef(false);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (hasRequestedRef.current) {
@@ -63,6 +70,7 @@ export function SocialLoginCallback({
 
     completeSocialLogin(provider, params.code, params.state)
       .then((session) => {
+        if (!mountedRef.current) return;
         analytics.track(
           createSocialLoginEvent("social_login_callback_complete", provider, {
             terms_required: session.termsAgreementRequired,
@@ -75,6 +83,7 @@ export function SocialLoginCallback({
         });
       })
       .catch((error: unknown) => {
+        if (!mountedRef.current) return;
         analytics.track(
           createSocialLoginEvent("social_login_callback_failed", provider, {
             failure_kind: socialLoginFailureKind(error),
@@ -113,7 +122,7 @@ export function SocialLoginCallback({
     <div className="social-login-callback">
       <p className="social-login-callback__message" role="status">
         {callbackState.termsAgreementRequired
-          ? "가입을 시작했어요. 약관 동의 화면은 준비 중이에요."
+          ? "서비스 이용을 위해 약관에 동의해 주세요."
           : "로그인했어요."}
       </p>
       {loginLink}
