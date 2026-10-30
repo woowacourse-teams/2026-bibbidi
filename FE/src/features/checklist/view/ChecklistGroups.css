@@ -3,7 +3,7 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 12px;
+  gap: 10px;
   color: var(--color-fg-neutral);
   letter-spacing: var(--letter-spacing-ui);
 }
@@ -33,10 +33,10 @@
     20px;
   box-sizing: border-box;
   width: 100%;
-  min-height: 80px;
+  min-height: 72px;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border: 0;
   border-radius: 11px;
   background: transparent;

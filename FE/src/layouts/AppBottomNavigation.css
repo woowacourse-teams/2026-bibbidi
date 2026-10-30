@@ -9,9 +9,16 @@
     height: 100%;
     flex: 1;
     overflow: hidden;
-    border: 1px solid var(--color-stroke-neutral-weak);
+    border: 1px solid
+      color-mix(in srgb, var(--color-stroke-neutral-weak) 55%, transparent);
     border-radius: 999px;
-    background: var(--color-bg-layer-default);
+    background: color-mix(
+      in srgb,
+      var(--color-bg-layer-default) 45%,
+      transparent
+    );
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
 
   .app-bottom-navigation__item {
@@ -51,7 +58,11 @@
     )
     .app-bottom-navigation__item[aria-current="page"],
   .app-bottom-navigation__item[aria-expanded="true"] {
-    background: var(--color-bg-neutral-weak);
+    background: color-mix(
+      in srgb,
+      var(--color-bg-neutral-weak) 65%,
+      transparent
+    );
     color: var(--color-fg-brand);
   }
 

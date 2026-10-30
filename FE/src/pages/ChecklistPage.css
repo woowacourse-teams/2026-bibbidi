@@ -1,4 +1,6 @@
 .checklist-page {
+  --layout-width-content: 1000px;
+  --layout-width-wide: var(--layout-width-content);
   display: flex;
   min-height: 100%;
   min-width: 0;
@@ -9,5 +11,5 @@
 
 .checklist-page__content {
   width: 100%;
-  padding-block: 24px 32px;
+  padding-block: 20px 28px;
 }

@@ -276,11 +276,6 @@
   font: var(--typography-t7);
 }
 
-.balance-game__notice {
-  color: var(--color-fg-positive);
-  font: var(--typography-t6);
-}
-
 .balance-game__error {
   color: var(--color-fg-critical);
   font: var(--typography-t6);

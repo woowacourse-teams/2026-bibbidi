@@ -9,6 +9,7 @@ import {
 import { RoadmapCategoryTabs } from "./RoadmapCategoryTabs";
 import { RoadmapStageDetail } from "./RoadmapStageDetail";
 import { RoadmapHeader } from "./RoadmapHeader";
+import { RoadmapGameInvitation } from "./RoadmapGameInvitation";
 import type {
   PreparationRoadmapViewModel,
   RoadmapStage,
@@ -172,6 +173,7 @@ export function PreparationRoadmap({
         categoryTitle={viewModel.categoryTitle}
         summary={viewModel.summary}
       />
+      <RoadmapGameInvitation />
       <div className="preparation-roadmap__body">
         <RoadmapCategoryTabs
           categories={viewModel.categories}
