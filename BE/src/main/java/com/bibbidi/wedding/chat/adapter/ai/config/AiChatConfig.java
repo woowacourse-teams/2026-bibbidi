@@ -172,6 +172,7 @@ public class AiChatConfig {
     ChatClient lunaChatClient(
             @Value("${bibbidi.ai.chatbot.luna-api-key}") String apiKey,
             @Value("${bibbidi.ai.chatbot.luna-model}") String model,
+            ObservationRegistry observationRegistry,
             ChatMemory chatMemory,
             SystemPrompt systemPrompt,
             CatalogServiceAdapter catalogTools,
@@ -187,6 +188,7 @@ public class AiChatConfig {
                         .outputSchema(schema)
                         .strict(true)
                         .build())
+                .observationRegistry(observationRegistry)
                 .build();
         return ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt.text())
