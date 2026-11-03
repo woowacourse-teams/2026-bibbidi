@@ -43,15 +43,15 @@ interface Target {
   onResponse?(context: Context, response: RefinedResponse<'text'>): void;
 }
 
-function dateAfter(days: number): string {
+export function dateAfter(days: number): string {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function appointmentBody(date: string) {
+export function appointmentBody(date: string) {
   return { title: '부하 테스트 일정', date, startTime: `${date}T10:00:00`, endTime: `${date}T11:00:00`, place: '부하 테스트 장소', memo: 'k6' };
 }
 
-function spec(name: string, path: string, expected: readonly number[], body?: unknown, rawBody = false): RequestSpec {
+export function spec(name: string, path: string, expected: readonly number[], body?: unknown, rawBody = false): RequestSpec {
   return { name, method: name.slice(0, name.indexOf(' ')) as RequestSpec['method'], path, body, expected, rawBody };
 }
 
