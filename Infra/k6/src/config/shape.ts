@@ -131,10 +131,8 @@ export class SaturationLadder {
   }
 }
 
-// 운영 최대 요청량의 배수. ×50이 설계 상한 1,000명 근처이고, 먼저 막히는 곳을 찾으려고 그 위까지 올린다.
 export const USAGE_LEVELS = [10, 50, 100, 200, 400] as const;
 
-// 엔드포인트마다 시나리오가 따로라 VU를 호출 비율대로 나눈다. 전체 VU가 부하 발생기 메모리를 넘지 않게 하기 위해서다.
 export class UsageLadder extends SaturationLadder {
   constructor(peakRequestsPerSecond: number = USAGE.peakRequestsPerSecond) {
     super(peakRequestsPerSecond, USAGE_LEVELS);

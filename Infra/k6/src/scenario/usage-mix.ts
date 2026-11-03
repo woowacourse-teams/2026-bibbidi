@@ -11,7 +11,6 @@ export interface UsageData extends EndpointData {
 interface Visit {
   data: UsageData;
   iteration: number;
-  // 시드 사용자 번호(0부터)
   user: number;
 }
 
@@ -19,16 +18,11 @@ type Caller = 'seeded' | 'guest' | 'fresh';
 
 interface UsageEndpoint {
   name: string;
-  // 운영 nginx 접근 로그의 호출 수(2026-10-20~11-03, 봇·OPTIONS 제외). 이 값의 비율대로 요청을 보낸다.
-  // 시험에서 재현하는 응답만 센다. 성공과 비로그인 401이다. 집계에서 뺀 응답은 Infra/k6/README.md의 Q6 절에 있다.
   calls: number;
   caller?: Caller;
-  // 보낼 요청이 없으면(리프레시 토큰 소진) null이다.
   request(visit: Visit): RequestSpec | null;
 }
 
-// AI 채팅·밸런스게임(부하 환경에 콘텐츠와 실제 모델이 없다), OIDC(외부 제공자), 약관 동의는 뺐다. 로그의 약 12%다.
-// 비로그인 401은 실제 트래픽의 큰 몫이라 따로 둔다. 이름에 guest를 붙여 지표를 나눈다.
 export const USAGE_ENDPOINTS: readonly UsageEndpoint[] = [
   { name: 'GET /api/catalog', calls: 1318, request: () => spec('GET /api/catalog', '/api/catalog', [200]) },
   {
@@ -42,7 +36,6 @@ export const USAGE_ENDPOINTS: readonly UsageEndpoint[] = [
   { name: 'GET /api/users/me', calls: 96, request: () => spec('GET /api/users/me', '/api/users/me', [200]) },
   { name: 'GET /api/users/me/wedding-date', calls: 87, request: () => spec('GET /api/users/me/wedding-date', '/api/users/me/wedding-date', [200, 404]) },
   {
-    // 시드가 담아 둔 항목 뒤 번호부터 골라 중복(409)을 피한다.
     name: 'POST /api/checklists/me/catalog-items',
     calls: 83,
     request: ({ data, iteration, user }) =>
@@ -54,7 +47,6 @@ export const USAGE_ENDPOINTS: readonly UsageEndpoint[] = [
       ),
   },
   {
-    // 쿠키를 만들 수 없어 웹 대신 같은 서비스를 타는 앱 경로로 보낸다. 토큰은 한 번만 쓸 수 있다.
     name: 'POST /api/auth/native/sessions/refresh',
     calls: 69,
     caller: 'guest',
@@ -69,7 +61,6 @@ export const USAGE_ENDPOINTS: readonly UsageEndpoint[] = [
     request: () => spec('GET /api/checklists/me/recommended-catalog-items', '/api/checklists/me/recommended-catalog-items?limit=4', [200]),
   },
   {
-    // 상태는 본문 전체가 값이다(JSON 따옴표 없음).
     name: 'PUT /api/checklist-items/{id}/status',
     calls: 19,
     request: ({ iteration, user }) =>
@@ -107,7 +98,6 @@ export function shareOf(endpoint: UsageEndpoint): number {
 }
 
 export class UsageRunner {
-  // k6는 VU마다 자바스크립트 런타임이 따로라 이 값은 VU 하나의 것이다. 서명 비용이 요청마다 들지 않게 사용자별로 재사용한다.
   private readonly tokensByUser = new Map<number, string>();
 
   constructor(
@@ -141,7 +131,6 @@ export class UsageRunner {
   }
 }
 
-// 시나리오 이름이자 엔드포인트 번호.
 export function usageScenarioName(index: number): string {
   return `u${String(index).padStart(2, '0')}`;
 }
