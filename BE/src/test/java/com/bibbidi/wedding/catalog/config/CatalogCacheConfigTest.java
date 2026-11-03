@@ -32,10 +32,17 @@ class CatalogCacheConfigTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0s", "-1s"})
-    @DisplayName("0 이하의 TTL은 시작 시 거부한다")
-    void shouldRejectNonPositiveTtl(String ttl) {
+    @ValueSource(strings = {"0s", "-1s", "61s", "2m"})
+    @DisplayName("0 이하이거나 1분을 넘는 TTL은 시작 시 거부한다")
+    void shouldRejectTtlOutOfRange(String ttl) {
         runner.withPropertyValues("bibbidi.catalog.cache.ttl=" + ttl)
                 .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    @DisplayName("TTL은 1분까지 허용한다")
+    void shouldAcceptOneMinuteTtl() {
+        runner.withPropertyValues("bibbidi.catalog.cache.ttl=1m")
+                .run(context -> assertThat(context).hasNotFailed());
     }
 }
