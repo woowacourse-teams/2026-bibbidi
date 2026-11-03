@@ -641,6 +641,34 @@ describe("appRoutes", () => {
     },
   );
 
+  it.each([false, true])(
+    "로그인 여부 %s에서 AI 챗 주소에 직접 접근한다",
+    async (authenticated) => {
+      installFetch(
+        authenticated
+          ? new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {
+              status: 200,
+            })
+          : new Response(
+              JSON.stringify({
+                errorCode: 201,
+                message: "로그인이 필요합니다.",
+              }),
+              { status: 401 },
+            ),
+      );
+      const router = renderRouter(["/ai-chat"]);
+      expect(await screen.findByRole("main", { name: "AI 챗" })).toBeTruthy();
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLTextAreaElement>("textbox").disabled).toBe(
+          !authenticated,
+        ),
+      );
+      expect(router.state.location.pathname).toBe("/ai-chat");
+      expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull();
+    },
+  );
+
   it("인증 사용자가 캘린더에서 월간 캘린더를 본다", async () => {
     installFetch(
       new Response(JSON.stringify({ id: 1, nickname: "bibbidi" }), {

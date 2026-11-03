@@ -1,114 +1,92 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useLocation } from "react-router";
-import { useIsMobileLayout } from "../../shared/responsive";
-import type { AiChatSession } from "./AiChatSession";
-import "./view/AiChat.css";
+import { useLayoutEffect, useState } from "react";
+import { useLinkClickHandler } from "react-router";
 
-export function AiChatFeature({
-  isAuthenticated,
-  feedbackAudienceKey = "authenticated",
-  onAuthenticationRequired,
-  contextLabel,
-  launcherLabel = "AI",
-  launcherClassName,
-  renderLauncher,
-  onKeyboardVisibilityChange,
-}: {
-  isAuthenticated: boolean;
-  feedbackAudienceKey?: string;
-  onAuthenticationRequired: () => void;
-  contextLabel?: string;
-  launcherLabel?: string;
-  launcherClassName?: string;
-  renderLauncher?: (launcher: ReactNode) => ReactNode;
-  onKeyboardVisibilityChange?: (visible: boolean) => void;
-}) {
+import { PageContainer } from "../../components/page-container";
+import { Button } from "../../components/button";
+import { useIsMobileLayout } from "../../shared/responsive";
+import { useViewportMetrics, viewportStyles } from "../../shared/viewport";
+import { useAiChatSession } from "./AiChatSession";
+import { useAiChatKeyboard } from "./hooks/useAiChatKeyboard";
+import { getAiChatFeedbackAnchor } from "./model/aiChatFeedback";
+import { AiChatView } from "./view/AiChatView";
+import "./view/AiChat.css";
+import "./view/AiChatPage.css";
+
+export function AiChatFeature() {
+  const session = useAiChatSession();
   const isMobile = useIsMobileLayout();
-  const { key: navigationKey } = useLocation();
-  const [openState, setOpenState] = useState({ navigationKey, isOpen: false });
-  const isOpen =
-    openState.isOpen &&
-    (!isMobile || openState.navigationKey === navigationKey);
-  if (openState.navigationKey !== navigationKey) {
-    setOpenState({ navigationKey, isOpen: !isMobile && openState.isOpen });
-  }
-  const [hasOpened, setHasOpened] = useState(false);
-  const [Session, setSession] = useState<typeof AiChatSession | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const returnFocusRef = useRef<HTMLButtonElement>(null);
-  const loading = hasOpened && !Session && !loadFailed;
-  useEffect(() => {
-    if (!hasOpened || Session) return;
-    let cancelled = false;
-    import("./AiChatSession").then(
-      (module) => {
-        if (!cancelled) setSession(() => module.AiChatSession);
-      },
-      () => {
-        if (!cancelled) setLoadFailed(true);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [hasOpened, Session, loadAttempt]);
-  const launcher = (
-    <button
-      type="button"
-      className={["ai-chat-launcher", launcherClassName]
-        .filter(Boolean)
-        .join(" ")}
-      aria-haspopup="dialog"
-      aria-expanded={isOpen}
-      aria-label={loadFailed ? `${launcherLabel} 다시 시도` : launcherLabel}
-      aria-busy={loading}
-      disabled={loading}
-      onClick={() => {
-        if (loadFailed) {
-          setLoadFailed(false);
-          setLoadAttempt((attempt) => attempt + 1);
-        }
-        setHasOpened(true);
-        setOpenState({
-          navigationKey,
-          isOpen: isMobile || !isOpen || loadFailed,
-        });
-      }}
-      ref={returnFocusRef}
-    >
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M20 11.5a8 8 0 0 1-8 8H8l-5 2v-6a8 8 0 1 1 17-4Z" />
-        <path d="M8 10h8M8 14h5" />
-      </svg>
-      <span>{loadFailed ? "다시 시도" : launcherLabel}</span>
-    </button>
-  );
+  const [editing, setEditing] = useState(false);
+  const viewport = useViewportMetrics(true);
+  const keyboardOpen = useAiChatKeyboard(viewport, isMobile && editing);
+  const { onKeyboardVisibilityChange } = session;
+  useLayoutEffect(() => {
+    onKeyboardVisibilityChange?.(keyboardOpen);
+    return () => onKeyboardVisibilityChange?.(false);
+  }, [keyboardOpen, onKeyboardVisibilityChange]);
+
+  const { isAuthenticated, addedTask, checklistRefresh } = session;
+  const addedTaskTarget = addedTask?.taskId
+    ? `/checklist?taskId=${encodeURIComponent(addedTask.taskId)}`
+    : "/checklist";
+  const navigateToAddedTask =
+    useLinkClickHandler<HTMLAnchorElement>(addedTaskTarget);
   return (
-    <div className="ai-chat-feature">
-      {renderLauncher ? renderLauncher(launcher) : launcher}
-      {loading && (
-        <span className="ai-chat__sr-only" role="status">
-          채팅을 불러오고 있어요.
-        </span>
-      )}
-      {loadFailed && (
-        <span className="ai-chat__sr-only" role="alert">
-          채팅을 불러오지 못했어요. {launcherLabel} 다시 시도를 선택해 주세요.
-        </span>
-      )}
-      {Session && (
-        <Session
-          feedbackAudienceKey={feedbackAudienceKey}
-          contextLabel={contextLabel}
-          onKeyboardVisibilityChange={onKeyboardVisibilityChange}
+    <main
+      className="ai-chat-page"
+      aria-label="AI 챗"
+      data-keyboard-open={keyboardOpen || undefined}
+      style={viewportStyles(viewport, "ai-page")}
+    >
+      <PageContainer width="content" className="ai-chat-page__content">
+        <h1 className="ai-chat__sr-only">AI 챗</h1>
+        <AiChatView
+          active
+          viewport={viewport}
           isAuthenticated={isAuthenticated}
-          isOpen={isOpen}
-          onAuthenticationRequired={onAuthenticationRequired}
-          onClose={() => setOpenState({ navigationKey, isOpen: false })}
-          returnFocusRef={returnFocusRef}
+          feedbackAudienceKey={session.feedbackAudienceKey}
+          feedbackAfterMessageId={getAiChatFeedbackAnchor(session.messages)}
+          draft={isAuthenticated ? session.draft : ""}
+          messages={isAuthenticated ? session.messages : []}
+          errorMessage={session.errorMessage}
+          isPending={session.isPending}
+          recommendations={session.recommendations}
+          onDraftChange={(text) => {
+            if (isAuthenticated) session.setDraft(text);
+          }}
+          onSend={(text) => {
+            if (isAuthenticated) session.send(text);
+          }}
+          onRetry={session.retry}
+          onComposerFocus={() => setEditing(true)}
+          onComposerBlur={() => setEditing(false)}
         />
-      )}
-    </div>
+        {checklistRefresh.error && (
+          <div className="ai-chat-page__result">
+            <p role="alert">{checklistRefresh.error}</p>
+            <Button
+              size="small"
+              variant="weak"
+              loading={checklistRefresh.refreshing}
+              onClick={checklistRefresh.refresh}
+            >
+              체크리스트 다시 불러오기
+            </Button>
+          </div>
+        )}
+        {addedTask && (
+          <div className="ai-chat-page__result">
+            <p role="status">{addedTask.title}</p>
+            <Button.Link
+              size="small"
+              variant="weak"
+              href={addedTaskTarget}
+              onClick={navigateToAddedTask}
+            >
+              추가한 일 보기
+            </Button.Link>
+          </div>
+        )}
+      </PageContainer>
+    </main>
   );
 }

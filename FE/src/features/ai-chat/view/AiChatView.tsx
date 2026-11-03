@@ -1,9 +1,8 @@
-import { Link } from "react-router";
+import { useHref, useLinkClickHandler } from "react-router";
 import { useLoginModal } from "../../auth/useLoginModal";
-import { Fragment, useEffect, useId, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useId, useRef } from "react";
 
 import { AiChatFeedback } from "./AiChatFeedback";
-import bibbidiLogo from "../../../assets/bibbidi-logo.webp";
 import {
   ChatMessage,
   MAX_CHAT_MESSAGE_LENGTH,
@@ -30,7 +29,6 @@ export function AiChatView({
   onSend,
   onRetry,
   recommendations,
-  compact = false,
   onComposerFocus,
   onComposerBlur,
   viewport,
@@ -47,19 +45,23 @@ export function AiChatView({
   onSend: (text: string) => void;
   onRetry: () => void;
   recommendations: RecommendationController;
-  compact?: boolean;
   onComposerFocus?: () => void;
   onComposerBlur?: () => void;
   viewport: ViewportMetrics;
 }) {
   const { loginTo, loginState } = useLoginModal();
+  const loginHref = useHref(loginTo);
+  const navigateToLogin = useLinkClickHandler<HTMLAnchorElement>(loginTo, {
+    state: loginState,
+    preventScrollReset: true,
+  });
+  const inputId = useId();
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef<number | undefined>(undefined);
   const lastMessages = useRef(messages);
   const lastCatalogStatus = useRef(recommendations.catalogStatus);
   const composing = useRef(false);
-  const inputId = useId();
   useEffect(() => {
     if (!active) return;
     const log = logRef.current;
@@ -87,34 +89,21 @@ export function AiChatView({
     }
   }, [active, viewport]);
 
+  useLayoutEffect(() => {
+    const input = composerRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+  }, [draft, isAuthenticated, viewport.layoutWidth]);
+
   return (
-    <div className="ai-chat">
+    <div className="ai-chat" data-empty={messages.length === 0 || undefined}>
       {messages.length === 0 ? (
-        <div className="ai-chat__welcome" hidden={compact}>
-          <span aria-hidden="true" className="ai-chat__brand-mark">
-            <img alt="" draggable={false} src={bibbidiLogo} />
-          </span>
+        <div className="ai-chat__welcome">
           <h2>어떤 준비를 도와드릴까요?</h2>
-          <p>
-            궁금한 준비를 말해주시면 나에게 맞는
-            <br />
-            안내를 드려요.
-          </p>
-          {!isAuthenticated && (
-            <Link
-              className="ai-chat__login"
-              to={loginTo}
-              state={loginState}
-              replace={false}
-              preventScrollReset
-            >
-              로그인하기
-            </Link>
-          )}
         </div>
       ) : (
         <div
-          hidden={compact}
           aria-label="AI와 나눈 대화"
           aria-busy={isPending}
           aria-live="polite"
@@ -184,84 +173,62 @@ export function AiChatView({
         </div>
       )}
       {isPending ? (
-        <p className="ai-chat__status" role="status" hidden={compact}>
+        <p className="ai-chat__status" role="status">
           답변을 작성하고 있어요.
         </p>
       ) : null}
       {errorMessage ? (
-        <div className="ai-chat__error" role="alert" hidden={compact}>
+        <div className="ai-chat__error" role="alert">
           <p>{errorMessage}</p>
           <Button size="small" variant="weak" onClick={onRetry}>
             다시 시도
           </Button>
         </div>
       ) : null}
-      {compact && !isAuthenticated && (
-        <button
-          className="ai-chat__composer-preview"
-          data-ai-composer-preview
-          type="button"
-          onClick={onComposerFocus}
+      <div className="ai-chat__composer-area">
+        <form
+          className="ai-chat__composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!composing.current) onSend(draft);
+          }}
         >
-          로그인 후 AI와 대화할 수 있어요
-        </button>
-      )}
-      <form
-        hidden={compact && !isAuthenticated}
-        className="ai-chat__composer"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!composing.current) onSend(draft);
-        }}
-      >
-        <label className="ai-chat__sr-only" htmlFor={inputId}>
-          AI에게 보낼 메시지
-        </label>
-        <textarea
-          ref={composerRef}
-          disabled={!isAuthenticated}
-          onFocus={onComposerFocus}
-          onBlur={onComposerBlur}
-          id={inputId}
-          maxLength={MAX_CHAT_MESSAGE_LENGTH}
-          onChange={(event) => onDraftChange(event.target.value)}
-          onCompositionEnd={() => {
-            composing.current = false;
-          }}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !composing.current &&
-              !event.nativeEvent.isComposing &&
-              event.nativeEvent.keyCode !== 229
-            ) {
-              event.preventDefault();
-              onSend(draft);
+          <label className="ai-chat__sr-only" htmlFor={inputId}>
+            AI에게 보낼 메시지
+          </label>
+          <textarea
+            id={inputId}
+            className="ai-chat__input"
+            ref={composerRef}
+            disabled={!isAuthenticated}
+            onFocus={onComposerFocus}
+            onBlur={onComposerBlur}
+            maxLength={MAX_CHAT_MESSAGE_LENGTH}
+            onChange={(event) => onDraftChange(event.target.value)}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            placeholder={
+              isAuthenticated
+                ? "궁금한 준비를 이야기해요"
+                : "로그인 후 AI와 대화할 수 있어요"
             }
-          }}
-          placeholder={
-            isAuthenticated
-              ? "궁금한 준비를 이야기해요"
-              : "로그인 후 AI와 대화할 수 있어요"
-          }
-          rows={compact ? 1 : 2}
-          value={draft}
-        />
-        <div className="ai-chat__send">
+            rows={1}
+            value={draft}
+          />
           <IconButton
             aria-label="메시지 전송"
-            disabled={
-              !isAuthenticated || isPending || !isValidChatMessage(draft)
-            }
-            type="submit"
             variant="fill"
             color="var(--color-fg-on-brand)"
             bgColor="var(--color-bg-brand-solid)"
             iconSize={20}
+            disabled={
+              !isAuthenticated || isPending || !isValidChatMessage(draft)
+            }
+            type="submit"
             icon={
               <svg
                 aria-hidden="true"
@@ -276,8 +243,18 @@ export function AiChatView({
               </svg>
             }
           />
-        </div>
-      </form>
+        </form>
+        {!isAuthenticated && (
+          <div className="ai-chat__login-prompt">
+            <a href={loginHref} onClick={navigateToLogin}>
+              로그인하기
+            </a>
+          </div>
+        )}
+        <p className="ai-chat__notice">
+          AI의 답변은 참고용이에요. 중요한 내용은 한 번 더 확인해요.
+        </p>
+      </div>
     </div>
   );
 }

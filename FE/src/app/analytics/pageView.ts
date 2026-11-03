@@ -1,6 +1,7 @@
 import type { AnalyticsEvent } from "../../infrastructure/analytics";
 
 const PAGE_DEFINITIONS = {
+  "/ai-chat": { pageTitle: "AI 챗", screenName: "ai_chat" },
   "/balance-game": {
     pageTitle: "우리 결혼 밸런스게임",
     screenName: "balance_game",
