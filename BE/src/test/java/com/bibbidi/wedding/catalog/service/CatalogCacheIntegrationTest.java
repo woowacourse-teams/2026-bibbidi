@@ -9,10 +9,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.config.CatalogCacheConfig;
-import com.bibbidi.wedding.catalog.config.CatalogCacheProperties;
 import com.bibbidi.wedding.catalog.controller.CatalogController;
 import com.bibbidi.wedding.catalog.controller.dto.CatalogResponse;
 import com.bibbidi.wedding.catalog.domain.Catalog;
@@ -23,17 +21,9 @@ import com.bibbidi.wedding.catalog.repository.CatalogMapper;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Ticker;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.sql.DataSource;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -50,7 +40,6 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -58,8 +47,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:catalog-cache-test;IGNORECASE=TRUE",
-        "spring.jpa.properties.hibernate.generate_statistics=true",
-        "bibbidi.catalog.cache.ttl=1m"
+        "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 @ActiveProfiles("test")
 @Sql("/fixtures/catalog-fixture.sql")
@@ -79,9 +67,6 @@ class CatalogCacheIntegrationTest {
     private CaffeineCacheManager catalogCacheManager;
 
     @Autowired
-    private CatalogCacheProperties properties;
-
-    @Autowired
     private MeterRegistry registry;
 
     @Autowired
@@ -89,9 +74,6 @@ class CatalogCacheIntegrationTest {
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
-
-    @MockitoBean(name = "catalogCacheTicker")
-    private Ticker ticker;
 
     @MockitoSpyBean
     private CatalogRepository catalogRepository;
@@ -105,12 +87,8 @@ class CatalogCacheIntegrationTest {
     @MockitoSpyBean
     private DataSource dataSource;
 
-    private final AtomicLong nanos = new AtomicLong();
-
     @BeforeEach
     void resetCacheAndObservations() {
-        nanos.set(0);
-        when(ticker.read()).thenAnswer(ignored -> nanos.get());
         cache().invalidateAll();
         cache().cleanUp();
         statistics().clear();
@@ -145,69 +123,20 @@ class CatalogCacheIntegrationTest {
     }
 
     @Test
-    @DisplayName("같은 인스턴스의 동시 첫 요청이 카탈로그를 한 번만 로드한다")
-    void shouldCoalesceConcurrentFirstRequests() throws Exception {
-        int callers = 8;
-        CountDownLatch ready = new CountDownLatch(callers);
-        CountDownLatch start = new CountDownLatch(1);
-        CountDownLatch requesting = new CountDownLatch(callers);
-        CountDownLatch loading = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            loading.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return invocation.callRealMethod();
-        }).when(catalogRepository).findCatalog();
-
-        try (var executor = Executors.newFixedThreadPool(callers)) {
-            List<Future<Catalog>> results = new ArrayList<>();
-            for (int i = 0; i < callers; i++) {
-                results.add(executor.submit(() -> {
-                    ready.countDown();
-                    assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
-                    requesting.countDown();
-                    return catalogService.find();
-                }));
-            }
-            try {
-                assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-                start.countDown();
-                assertThat(requesting.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThat(loading.await(10, TimeUnit.SECONDS)).isTrue();
-            } finally {
-                start.countDown();
-                release.countDown();
-            }
-            Catalog first = results.getFirst().get(10, TimeUnit.SECONDS);
-            for (Future<Catalog> result : results) {
-                assertThat(result.get(10, TimeUnit.SECONDS)).isSameAs(first);
-            }
-        }
-
-        verify(catalogRepository).findCatalog();
-        verify(catalogMapper).toDomain(any(), any(), any());
-        assertThat(statistics().getTransactionCount()).isEqualTo(1);
-        verify(dataSource).getConnection();
-        assertThat(statistics().getPrepareStatementCount()).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("적중해도 쓰기 기준 만료 시각은 연장되지 않고 만료 후 변경 데이터를 읽는다")
-    void shouldReloadChangedDataAfterWriteExpiry() {
-        assertThat(properties.ttl()).isEqualTo(Duration.ofMinutes(1));
+    @DisplayName("시간이 지나도 저장한 값을 유지하고 캐시가 비면 변경 데이터를 읽는다")
+    void shouldKeepValueUntilCacheIsCleared() {
         Catalog first = catalogService.find();
         jdbcTemplate.update("UPDATE categories SET name = '변경된 웨딩홀' WHERE id = 2");
-        nanos.set(properties.ttl().minusNanos(1).toNanos());
 
         assertThat(catalogService.find()).isSameAs(first);
-        assertThat(first.categories().getFirst().name()).isEqualTo("웨딩홀");
-        nanos.incrementAndGet();
-        Catalog refreshed = catalogService.find();
+        assertThat(cache().policy().expireAfterWrite()).isEmpty();
+        assertThat(cache().policy().expireAfterAccess()).isEmpty();
 
-        assertThat(refreshed).isNotSameAs(first);
-        assertThat(refreshed.categories().getFirst().name()).isEqualTo("변경된 웨딩홀");
+        cache().invalidateAll();
+
+        Catalog reloaded = catalogService.find();
+        assertThat(reloaded.categories().getFirst().name()).isEqualTo("변경된 웨딩홀");
         verify(catalogRepository, times(2)).findCatalog();
-        verify(catalogMapper, times(2)).toDomain(any(), any(), any());
     }
 
     @Test

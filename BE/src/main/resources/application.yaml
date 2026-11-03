@@ -50,9 +50,6 @@ server:
       enabled: true
 
 bibbidi:
-  catalog:
-    cache:
-      ttl: ${CATALOG_CACHE_TTL:1m}
   sse:
     response-timeout-seconds: 60
   balance-game:
