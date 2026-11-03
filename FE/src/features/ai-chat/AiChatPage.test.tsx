@@ -161,6 +161,7 @@ describe("AI 챗 독립 탭", () => {
       expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
       navigateTab("AI 챗", mobile);
       expect(await screen.findByRole("main", { name: "AI 챗" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "비비디 홈" })).toBeTruthy();
       expect(
         screen.getByRole("status", { name: "현재 주소" }).textContent,
       ).toBe("/ai-chat");

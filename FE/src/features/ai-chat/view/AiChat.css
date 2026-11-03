@@ -9,7 +9,7 @@
 
 .ai-chat[data-empty] {
   justify-content: center;
-  padding-bottom: clamp(24px, 8vh, 80px);
+  padding-top: clamp(24px, 6dvh, 48px);
 }
 
 .ai-chat :is(a, [role="log"]):focus-visible {
@@ -184,10 +184,6 @@
 @media (width < 768px) {
   .ai-chat {
     gap: var(--layout-gutter-mobile);
-  }
-
-  .ai-chat[data-empty] {
-    padding-bottom: 24px;
   }
 
   .ai-chat__welcome h2 {

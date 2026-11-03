@@ -57,11 +57,10 @@ export function ServiceLayout({
       scroll={isMobile && !isAiChat ? "document" : "contained"}
       hideScrollBar
       headerPosition="sticky"
-      headerTone={isAiChat ? "solid" : "fade"}
+      headerTone="fade"
       header={
         <div className="service-layout__header">
           <AppHeader
-            mobileTitle={isAiChat ? "AI 챗" : undefined}
             user={
               authState.status === "authenticated"
                 ? {

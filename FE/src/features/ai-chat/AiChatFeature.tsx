@@ -38,7 +38,7 @@ export function AiChatFeature() {
       style={viewportStyles(viewport, "ai-page")}
     >
       <PageContainer width="content" className="ai-chat-page__content">
-        {!isMobile && <h1 className="ai-chat__sr-only">AI 챗</h1>}
+        <h1 className="ai-chat__sr-only">AI 챗</h1>
         <AiChatView
           active
           viewport={viewport}

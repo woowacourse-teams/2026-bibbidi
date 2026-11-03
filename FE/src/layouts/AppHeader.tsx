@@ -1,6 +1,4 @@
 import { Link, useLocation } from "react-router";
-import { TopNavigation } from "../components/top-navigation";
-import { useIsMobileLayout } from "../shared/responsive";
 import { PageContainer } from "../components/page-container";
 import { LoginIcon } from "../components/icons/ActionIcons";
 import { IconButton } from "../components/icon-button";
@@ -29,16 +27,12 @@ interface PendingUser {
 
 interface AppHeaderProps {
   user: AuthenticatedUser | GuestUser | PendingUser;
-  mobileTitle?: string;
 }
 
-export function AppHeader({ user, mobileTitle }: AppHeaderProps) {
+export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   const { loginTo, loginState, openLogin } = useLoginModal();
-  const { ref, compact: compactHeader } = useCompactHeaderLogin();
-  const isMobile = useIsMobileLayout();
-  const showMobileTitle = isMobile && Boolean(mobileTitle);
-  const compact = !showMobileTitle && compactHeader;
+  const { ref, compact } = useCompactHeaderLogin();
   const actions = (
     <div className="app-header__actions" ref={ref}>
       {user.kind === "authenticated" ? (
@@ -83,17 +77,6 @@ export function AppHeader({ user, mobileTitle }: AppHeaderProps) {
       )}
     </div>
   );
-  if (showMobileTitle) {
-    return (
-      <TopNavigation
-        title={mobileTitle}
-        variant="root"
-        sticky={false}
-        safeArea
-        actions={actions}
-      />
-    );
-  }
   return (
     <header className="app-header" data-compact={compact || undefined}>
       <PageContainer width="wide" className="app-header__inner">
