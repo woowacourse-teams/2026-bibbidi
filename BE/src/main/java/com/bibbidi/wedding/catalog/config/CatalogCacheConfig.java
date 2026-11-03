@@ -12,7 +12,6 @@ import org.springframework.core.Ordered;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(CatalogCacheProperties.class)
-// 적중 시 트랜잭션을 열지 않도록 캐시 advice를 먼저 실행한다.
 @EnableCaching(order = Ordered.LOWEST_PRECEDENCE - 1)
 public class CatalogCacheConfig {
 
