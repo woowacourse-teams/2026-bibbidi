@@ -131,7 +131,7 @@ export class SaturationLadder {
   }
 }
 
-export const USAGE_LEVELS = [10, 50, 100, 200, 400] as const;
+export const USAGE_LEVELS = [10, 50, 100, 200, 400, 600] as const;
 
 export class UsageLadder extends SaturationLadder {
   constructor(peakRequestsPerSecond: number = USAGE.peakRequestsPerSecond) {
