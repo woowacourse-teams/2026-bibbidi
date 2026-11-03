@@ -20,6 +20,7 @@ type Caller = 'seeded' | 'guest' | 'fresh';
 interface UsageEndpoint {
   name: string;
   // 운영 nginx 접근 로그의 호출 수(2026-10-20~11-03, 봇·OPTIONS 제외). 이 값의 비율대로 요청을 보낸다.
+  // 시험에서 재현하는 응답만 센다. 성공과 비로그인 401이다. 집계에서 뺀 응답은 Infra/k6/README.md의 Q6 절에 있다.
   calls: number;
   caller?: Caller;
   // 보낼 요청이 없으면(리프레시 토큰 소진) null이다.
