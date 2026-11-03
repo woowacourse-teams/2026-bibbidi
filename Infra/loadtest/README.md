@@ -17,7 +17,7 @@ git tag k6/loadtest/<스크립트>/<회차> <커밋>
 git push origin k6/loadtest/<스크립트>/<회차>
 ```
 
-- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `surge-test`(Q1 홍보일 급증), `saturation-test`(Q2 먼저 포화되는 자원), `ai-isolation-test`(Q3 AI 격리), `ai-throttle-test`(Q4 한도 초과), `worst-case-test`(Q5 모든 엔드포인트 동시 사용 최악 시험) 중 하나. 각 스크립트의 목적, 흐름, 판정 기준은 [`Infra/k6/README.md`](../k6/README.md)에 있다. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
+- `<스크립트>`: `smoke-test`, `smoke-ai-test`, `ttft-ai-test`, `surge-test`(Q1 홍보일 급증), `saturation-test`(Q2 먼저 포화되는 자원), `ai-isolation-test`(Q3 AI 격리), `ai-throttle-test`(Q4 한도 초과), `worst-case-test`(Q5 모든 엔드포인트 동시 사용 최악 시험), `usage-mix-test`(Q6 운영 호출 비율 단계 시험) 중 하나. 각 스크립트의 목적, 흐름, 판정 기준은 [`Infra/k6/README.md`](../k6/README.md)에 있다. 새 스크립트는 `load-test.yml`의 `plan` 잡 정규식에 추가한다.
 - `<회차>`: 소문자·숫자·하이픈 24자 이내. 회차마다 새 스택을 만들므로 같은 이름의 스택이 있으면 `create`가 실패한다.
 - 템플릿과 compose·nginx 파일, 시드는 태그가 가리키는 커밋 기준이다. 백엔드 이미지는 그 커밋까지 `BE/`를 마지막으로 바꾼 커밋의 CD 이미지다. CD는 `BE/**` 등이 바뀐 커밋에서만 이미지를 만들기 때문에 `Infra/`만 바꾼 커밋에도 태그를 달 수 있다. 그 이미지가 없으면(CD가 아직 안 끝났거나 취소됨) `create`가 20분을 기다리지 않고 바로 실패한다.
 
@@ -105,7 +105,7 @@ JWT 비밀값, DB 비밀번호, SSH 키는 `create`가 실행마다 만든다. J
 
 ## 알려진 한계
 
-- DB와 부하 발생기의 자원 지표는 수집하지 않는다. 앱 EC2의 컨테이너 지표만 Alloy로 보낸다.
+- 부하 발생기의 자원 지표는 수집하지 않는다. 앱 EC2의 컨테이너 지표만 Alloy로 보낸다. DB는 CPU 누적값과 쿼리 누적값을 15초마다 파일로 남겨 아티팩트 `db-metrics.tsv`로 보관한다([`db-metrics.sh`](../k6/sql/db-metrics.sh)).
 - MySQL 운영 값(버전·설정)은 이 저장소에서 확인되지 않아 템플릿 기본값(`mysql:8.0`, 기본 설정)이다. 회차 전에 운영 값과 맞춘다.
 - 환경이 테스트 직후 지워지므로 같은 환경에서 스크립트를 여러 번 돌리거나 인스턴스에 들어가 값을 고칠 수 없다. 실패 원인 조사는 잡 로그와 아티팩트로만 한다.
 - 같은 워크플로의 실행은 동시성 그룹(`load-test`)으로 한 번에 하나씩 돈다. 대기 중인 실행이 여러 개면 GitHub는 가장 최근 것만 남긴다.
