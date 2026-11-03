@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 부하 테스트 중 MySQL EC2의 CPU 누적값(/proc/stat)과 쿼리 누적값(SHOW GLOBAL STATUS)을 15초마다 남긴다.
-# 모니터링 서버로 DB 지표를 보내지 않아서 회차 아티팩트로 보관한다. 값은 누적이라 두 시각의 차이로 읽는다.
 host=${LOADTEST_DB_SSH_HOST:-loadtest-db}
 
 usage() {
