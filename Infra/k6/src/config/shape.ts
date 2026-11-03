@@ -1,7 +1,7 @@
 import exec from 'k6/execution';
 import type { Scenario } from 'k6/options';
 import { numberFromEnv } from '../common/environment.ts';
-import { PEAK, SHAPE, VUS } from './targets.ts';
+import { PEAK, SHAPE, USAGE, VUS } from './targets.ts';
 
 export type TagProvider = () => Record<string, string>;
 export type Stage = { duration: string; target: number };
@@ -20,14 +20,19 @@ function perMinute(sessionsPerSecond: number, share: number): number {
   return Math.max(1, Math.round(sessionsPerSecond * 60 * share));
 }
 
-function arrival(stages: Stage[], startRate: number, flow: string): Scenario {
+function arrival(
+  stages: Stage[],
+  startRate: number,
+  flow: string,
+  vus: { preAllocated: number; max: number } = VUS,
+): Scenario {
   return {
     executor: 'ramping-arrival-rate',
     exec: flow,
     startRate,
     timeUnit: '1m',
-    preAllocatedVUs: VUS.preAllocated,
-    maxVUs: VUS.max,
+    preAllocatedVUs: vus.preAllocated,
+    maxVUs: vus.max,
     stages,
   };
 }
@@ -85,10 +90,13 @@ export const LADDER_HOLD_SECONDS = numberFromEnv('LADDER_HOLD_SECONDS', 120);
 
 // 홍보일 피크 × 1 → 2 → 5 → 10으로 올리는 단계. 단계마다 상승 구간과 유지 구간이 있다.
 export class SaturationLadder {
-  constructor(private readonly peakSessionsPerSecond: number = PEAK.sessionsPerSecond) {}
+  constructor(
+    protected readonly peakSessionsPerSecond: number = PEAK.sessionsPerSecond,
+    private readonly levels: readonly number[] = LADDER_LEVELS,
+  ) {}
 
   get totalSeconds(): number {
-    return LADDER_LEVELS.length * (LADDER_RAMP_SECONDS + LADDER_HOLD_SECONDS);
+    return this.levels.length * (LADDER_RAMP_SECONDS + LADDER_HOLD_SECONDS);
   }
 
   holdStartSeconds(index: number): number {
@@ -97,9 +105,9 @@ export class SaturationLadder {
 
   tagsAt(seconds: number): Record<string, string> {
     const slot = LADDER_RAMP_SECONDS + LADDER_HOLD_SECONDS;
-    const index = Math.min(Math.floor(seconds / slot), LADDER_LEVELS.length - 1);
+    const index = Math.min(Math.floor(seconds / slot), this.levels.length - 1);
     const kind = seconds - index * slot < LADDER_RAMP_SECONDS ? 'ramp' : 'hold';
-    return { stage: kind, level: `x${LADDER_LEVELS[index]}` };
+    return { stage: kind, level: `x${this.levels[index]}` };
   }
 
   tags(): TagProvider {
@@ -110,12 +118,34 @@ export class SaturationLadder {
   }
 
   scenario(flow: string, share: number): Scenario {
-    const rates = LADDER_LEVELS.map((level) => perMinute(this.peakSessionsPerSecond * level, share));
+    const rates = this.levels.map((level) => perMinute(this.peakSessionsPerSecond * level, share));
     const stages = rates.flatMap((rate) => [
       { duration: `${LADDER_RAMP_SECONDS}s`, target: rate },
       { duration: `${LADDER_HOLD_SECONDS}s`, target: rate },
     ]);
-    return arrival(stages, rates[0], flow);
+    return arrival(stages, rates[0], flow, this.vus(share));
+  }
+
+  protected vus(_share: number): { preAllocated: number; max: number } {
+    return VUS;
+  }
+}
+
+// 운영 최대 요청량의 배수. ×50이 설계 상한 1,000명 근처이고, 먼저 막히는 곳을 찾으려고 그 위까지 올린다.
+export const USAGE_LEVELS = [10, 50, 100, 200, 400] as const;
+
+// 엔드포인트마다 시나리오가 따로라 VU를 호출 비율대로 나눈다. 전체 VU가 부하 발생기 메모리를 넘지 않게 하기 위해서다.
+export class UsageLadder extends SaturationLadder {
+  constructor(peakRequestsPerSecond: number = USAGE.peakRequestsPerSecond) {
+    super(peakRequestsPerSecond, USAGE_LEVELS);
+  }
+
+  protected vus(share: number): { preAllocated: number; max: number } {
+    const requestsPerSecond = (level: number) => this.peakSessionsPerSecond * level * share;
+    return {
+      preAllocated: Math.max(1, Math.ceil(requestsPerSecond(USAGE_LEVELS[0]) * USAGE.vuSecondsPerRequest)),
+      max: Math.max(2, Math.ceil(requestsPerSecond(USAGE_LEVELS[USAGE_LEVELS.length - 1]) * USAGE.vuSecondsPerRequest)),
+    };
   }
 }
 

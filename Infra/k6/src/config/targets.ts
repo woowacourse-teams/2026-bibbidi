@@ -91,3 +91,10 @@ export const WORST_CASE = {
   // 앞 엔드포인트의 느린 응답이 다음 구간에 섞이지 않게 두는 간격(초).
   gapSeconds: numberFromEnv('WORST_CASE_GAP_SECONDS', 15),
 };
+
+// 운영 호출 비율 시험. 피크는 운영 Prometheus의 최근 30일(2026-11-03 기준) 1분 최대 요청량인 초당 약 1.5건이다.
+export const USAGE = {
+  peakRequestsPerSecond: numberFromEnv('USAGE_PEAK_RPS', 1.5),
+  // 응답이 이 시간(초)일 때 요청량을 유지할 만큼 VU를 둔다. 더 늦어지면 dropped_iterations로 남는다.
+  vuSecondsPerRequest: numberFromEnv('USAGE_VU_SECONDS', 1.3),
+};
