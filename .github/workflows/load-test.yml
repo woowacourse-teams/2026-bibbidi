@@ -29,7 +29,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test|worst-case-test)/([a-z0-9-]{1,24})$ ]]; then
+          if [[ ! "$REF_NAME" =~ ^k6/loadtest/(smoke-test|smoke-ai-test|ttft-ai-test|surge-test|saturation-test|ai-isolation-test|ai-throttle-test|worst-case-test|usage-mix-test)/([a-z0-9-]{1,24})$ ]]; then
             echo "::error::태그 형식이 k6/loadtest/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
             exit 1
           fi
@@ -270,6 +270,7 @@ jobs:
               --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
           }
           generator_id="$(output LoadGeneratorInstanceId)"
+          db_id="$(output DbInstanceId)"
           base_url="$(output BaseUrl)"
           jwt_secret="$(aws ssm get-parameter --name "$prefix/jwt-secret" --with-decryption --query Parameter.Value --output text)"
           ingest_token="$(printf '%s\n' "$ALLOY_ENV_CONTENT" \
@@ -287,6 +288,14 @@ jobs:
           cat > ~/.ssh/config <<CONFIG
           Host loadtest
             HostName $generator_id
+            User ubuntu
+            IdentityFile ~/.ssh/loadtest_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ProxyCommand aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p
+          Host loadtest-db
+            HostName $db_id
             User ubuntu
             IdentityFile ~/.ssh/loadtest_key
             StrictHostKeyChecking no
@@ -318,6 +327,9 @@ jobs:
           ssh loadtest 'rm -rf ~/k6-run && mkdir -p ~/k6-run/Infra ~/k6-run/k6-report && umask 077 && cat > ~/k6-run/.env' < "$RUNNER_TEMP/k6.env"
           scp -r Infra/k6 loadtest:'~/k6-run/Infra/'
 
+      - name: DB 지표 수집 시작
+        run: bash Infra/k6/sql/db-metrics.sh start || echo "::warning::DB 지표 수집을 시작하지 못했습니다."
+
       - name: k6 실행
         run: |
           set +e
@@ -335,6 +347,7 @@ jobs:
         run: |
           mkdir -p "$REPORT_DIR"
           scp -r loadtest:'~/k6-run/k6-report/.' "$REPORT_DIR/" || echo "가져올 보고서가 없습니다."
+          bash Infra/k6/sql/db-metrics.sh stop "$REPORT_DIR/db-metrics.tsv" || echo "가져올 DB 지표가 없습니다."
 
       - name: 잡 요약에 판정표 남기기
         if: always()
