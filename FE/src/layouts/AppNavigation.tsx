@@ -17,6 +17,12 @@ export const appNavigationItems = [
     showInDesktopHeader: true,
     to: "/calendar",
   },
+  {
+    icon: "chat",
+    label: "AI 챗",
+    showInDesktopHeader: true,
+    to: "/ai-chat",
+  },
 ] as const;
 
 export type AppNavigationIconName = (typeof appNavigationItems)[number]["icon"];
@@ -43,6 +49,13 @@ export function AppNavigationIcon({ icon }: { icon: AppNavigationIconName }) {
       return (
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path d="m4 7 2 2 4-4M12 7h8M4 14l2 2 4-4M12 14h8" />
+        </svg>
+      );
+    case "chat":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M20 11.5a8 8 0 0 1-8 8H8l-5 2v-6a8 8 0 1 1 17-4Z" />
+          <path d="M8 10h8M8 14h5" />
         </svg>
       );
     default: {

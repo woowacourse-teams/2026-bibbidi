@@ -11,6 +11,8 @@ describe("normalizePagePath", () => {
     ["/calendar", "/calendar"],
     ["/calendar/", "/calendar"],
     ["/checklist", "/checklist"],
+    ["/ai-chat", "/ai-chat"],
+    ["/ai-chat/", "/ai-chat"],
     ["/login", "/login"],
   ] as const)(
     "허용된 경로 %s를 화면 경로로 정규화한다",

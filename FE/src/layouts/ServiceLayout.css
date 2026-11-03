@@ -12,6 +12,14 @@
   padding-bottom: var(--service-bottom-inset);
 }
 
+.service-layout[data-ai-chat] {
+  overflow: hidden;
+}
+
+.service-layout[data-ai-chat] .service-layout__content {
+  min-height: 0;
+}
+
 .service-layout__header {
   display: contents;
 }
@@ -74,6 +82,10 @@
         var(--layout-margin-mobile)
     );
     scroll-padding-bottom: var(--service-bottom-inset);
+  }
+
+  .service-layout[data-ai-keyboard-open] {
+    --service-bottom-inset: 12px;
   }
 
   .service-layout[data-ai-keyboard-open] .service-layout__mobile-dock {

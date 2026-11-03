@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router";
+import { TopNavigation } from "../components/top-navigation";
+import { useIsMobileLayout } from "../shared/responsive";
 import { PageContainer } from "../components/page-container";
 import { LoginIcon } from "../components/icons/ActionIcons";
 import { IconButton } from "../components/icon-button";
@@ -27,12 +29,71 @@ interface PendingUser {
 
 interface AppHeaderProps {
   user: AuthenticatedUser | GuestUser | PendingUser;
+  mobileTitle?: string;
 }
 
-export function AppHeader({ user }: AppHeaderProps) {
+export function AppHeader({ user, mobileTitle }: AppHeaderProps) {
   const { pathname } = useLocation();
   const { loginTo, loginState, openLogin } = useLoginModal();
-  const { ref, compact } = useCompactHeaderLogin();
+  const { ref, compact: compactHeader } = useCompactHeaderLogin();
+  const isMobile = useIsMobileLayout();
+  const showMobileTitle = isMobile && Boolean(mobileTitle);
+  const compact = !showMobileTitle && compactHeader;
+  const actions = (
+    <div className="app-header__actions" ref={ref}>
+      {user.kind === "authenticated" ? (
+        <AppHeaderAccountMenu navigationKey={pathname} user={user} />
+      ) : user.kind === "guest" ? (
+        <nav aria-label="계정 메뉴" className="app-header__guest-actions">
+          <Link
+            className="app-header__login"
+            to={loginTo}
+            state={loginState}
+            replace={false}
+            preventScrollReset
+            aria-hidden={compact || undefined}
+            inert={compact}
+            tabIndex={compact ? -1 : undefined}
+          >
+            <LoginIcon />
+            <span className="app-header__login-label">로그인</span>
+          </Link>
+          <IconButton
+            className="app-header__login-icon"
+            icon={<LoginIcon />}
+            aria-label="로그인"
+            aria-hidden={!compact || undefined}
+            inert={!compact}
+            tabIndex={compact ? undefined : -1}
+            color="var(--color-fg-neutral-muted)"
+            variant="clear"
+            onClick={openLogin}
+          />
+        </nav>
+      ) : (
+        <div
+          aria-label="로그인 상태 확인 중"
+          className="app-header__auth-pending"
+          role="status"
+        >
+          <span className="app-header__auth-pending-text">
+            로그인 상태 확인 중
+          </span>
+        </div>
+      )}
+    </div>
+  );
+  if (showMobileTitle) {
+    return (
+      <TopNavigation
+        title={mobileTitle}
+        variant="root"
+        sticky={false}
+        safeArea
+        actions={actions}
+      />
+    );
+  }
   return (
     <header className="app-header" data-compact={compact || undefined}>
       <PageContainer width="wide" className="app-header__inner">
@@ -63,48 +124,7 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        <div className="app-header__actions" ref={ref}>
-          {user.kind === "authenticated" ? (
-            <AppHeaderAccountMenu navigationKey={pathname} user={user} />
-          ) : user.kind === "guest" ? (
-            <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-              <Link
-                className="app-header__login"
-                to={loginTo}
-                state={loginState}
-                replace={false}
-                preventScrollReset
-                aria-hidden={compact || undefined}
-                inert={compact}
-                tabIndex={compact ? -1 : undefined}
-              >
-                <LoginIcon />
-                <span className="app-header__login-label">로그인</span>
-              </Link>
-              <IconButton
-                className="app-header__login-icon"
-                icon={<LoginIcon />}
-                aria-label="로그인"
-                aria-hidden={!compact || undefined}
-                inert={!compact}
-                tabIndex={compact ? undefined : -1}
-                color="var(--color-fg-neutral-muted)"
-                variant="clear"
-                onClick={openLogin}
-              />
-            </nav>
-          ) : (
-            <div
-              aria-label="로그인 상태 확인 중"
-              className="app-header__auth-pending"
-              role="status"
-            >
-              <span className="app-header__auth-pending-text">
-                로그인 상태 확인 중
-              </span>
-            </div>
-          )}
-        </div>
+        {actions}
       </PageContainer>
     </header>
   );

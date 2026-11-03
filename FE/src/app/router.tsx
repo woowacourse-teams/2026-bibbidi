@@ -34,6 +34,12 @@ const pageRoutes: RouteObject[] = [
     Component: ServiceLayout,
     children: [
       {
+        path: "/ai-chat",
+        lazy: async () => ({
+          Component: (await import("../pages/AiChatPage")).AiChatPage,
+        }),
+      },
+      {
         path: "/",
         Component: HomeEntryPage,
       },
