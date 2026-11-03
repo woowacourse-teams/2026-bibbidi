@@ -29,11 +29,11 @@
 
 .ai-chat__markdown input[type="checkbox"] {
   margin-right: 6px;
-  accent-color: var(--color-fg-brand);
+  accent-color: var(--color-bg-brand-solid);
 }
 
 .ai-chat__markdown a {
-  color: var(--color-fg-brand);
+  color: var(--color-fg-informative);
   text-underline-offset: 3px;
 }
 
@@ -46,7 +46,7 @@
 .ai-chat__markdown code {
   padding: 2px 4px;
   border-radius: 4px;
-  background: var(--color-bg-layer-basement);
+  background: var(--color-bg-neutral-weak);
   font-size: var(--font-size-t6);
   line-height: var(--line-height-t6);
 }
@@ -56,7 +56,7 @@
   padding: 12px;
   overflow-x: auto;
   border-radius: 8px;
-  background: var(--color-bg-layer-basement);
+  background: var(--color-bg-neutral-weak);
   white-space: pre;
   overflow-wrap: normal;
 }
@@ -85,7 +85,7 @@
 }
 
 .ai-chat__markdown th {
-  background: var(--color-bg-layer-basement);
+  background: var(--color-bg-neutral-weak);
 }
 
 .ai-chat__markdown > :first-child {

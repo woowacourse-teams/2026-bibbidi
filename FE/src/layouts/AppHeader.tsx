@@ -33,6 +33,50 @@ export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   const { loginTo, loginState, openLogin } = useLoginModal();
   const { ref, compact } = useCompactHeaderLogin();
+  const actions = (
+    <div className="app-header__actions" ref={ref}>
+      {user.kind === "authenticated" ? (
+        <AppHeaderAccountMenu navigationKey={pathname} user={user} />
+      ) : user.kind === "guest" ? (
+        <nav aria-label="계정 메뉴" className="app-header__guest-actions">
+          <Link
+            className="app-header__login"
+            to={loginTo}
+            state={loginState}
+            replace={false}
+            preventScrollReset
+            aria-hidden={compact || undefined}
+            inert={compact}
+            tabIndex={compact ? -1 : undefined}
+          >
+            <LoginIcon />
+            <span className="app-header__login-label">로그인</span>
+          </Link>
+          <IconButton
+            className="app-header__login-icon"
+            icon={<LoginIcon />}
+            aria-label="로그인"
+            aria-hidden={!compact || undefined}
+            inert={!compact}
+            tabIndex={compact ? undefined : -1}
+            color="var(--color-fg-neutral-muted)"
+            variant="clear"
+            onClick={openLogin}
+          />
+        </nav>
+      ) : (
+        <div
+          aria-label="로그인 상태 확인 중"
+          className="app-header__auth-pending"
+          role="status"
+        >
+          <span className="app-header__auth-pending-text">
+            로그인 상태 확인 중
+          </span>
+        </div>
+      )}
+    </div>
+  );
   return (
     <header className="app-header" data-compact={compact || undefined}>
       <PageContainer width="wide" className="app-header__inner">
@@ -63,48 +107,7 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        <div className="app-header__actions" ref={ref}>
-          {user.kind === "authenticated" ? (
-            <AppHeaderAccountMenu navigationKey={pathname} user={user} />
-          ) : user.kind === "guest" ? (
-            <nav aria-label="계정 메뉴" className="app-header__guest-actions">
-              <Link
-                className="app-header__login"
-                to={loginTo}
-                state={loginState}
-                replace={false}
-                preventScrollReset
-                aria-hidden={compact || undefined}
-                inert={compact}
-                tabIndex={compact ? -1 : undefined}
-              >
-                <LoginIcon />
-                <span className="app-header__login-label">로그인</span>
-              </Link>
-              <IconButton
-                className="app-header__login-icon"
-                icon={<LoginIcon />}
-                aria-label="로그인"
-                aria-hidden={!compact || undefined}
-                inert={!compact}
-                tabIndex={compact ? undefined : -1}
-                color="var(--color-fg-neutral-muted)"
-                variant="clear"
-                onClick={openLogin}
-              />
-            </nav>
-          ) : (
-            <div
-              aria-label="로그인 상태 확인 중"
-              className="app-header__auth-pending"
-              role="status"
-            >
-              <span className="app-header__auth-pending-text">
-                로그인 상태 확인 중
-              </span>
-            </div>
-          )}
-        </div>
+        {actions}
       </PageContainer>
     </header>
   );

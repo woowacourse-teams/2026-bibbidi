@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
-import { AiChatFeature } from "../features/ai-chat/AiChatFeature";
+import { AiChatSessionProvider } from "../features/ai-chat/AiChatSession";
 import { AppLayout } from "../components/app-layout";
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth, useLogout } from "../features/auth";
@@ -18,14 +18,8 @@ export function ServiceLayout({
   const { authState, endAuthentication, refreshAuth } = useAuth();
   const { pathname } = useLocation();
   const isMobile = useIsMobileLayout();
+  const isAiChat = pathname === "/ai-chat";
   const [aiKeyboardVisible, setAiKeyboardVisible] = useState(false);
-  const aiContext = pathname.startsWith("/preparation")
-    ? "로드맵"
-    : pathname.startsWith("/checklist")
-      ? "체크리스트"
-      : pathname.startsWith("/calendar")
-        ? "캘린더"
-        : "홈";
   const aiAudience =
     authState.status === "authenticated"
       ? `authenticated:${authState.user.id}`
@@ -51,6 +45,7 @@ export function ServiceLayout({
   return (
     <AppLayout
       className="service-layout"
+      data-ai-chat={isAiChat || undefined}
       data-modal-scope
       data-ai-keyboard-open={(isMobile && aiKeyboardVisible) || undefined}
       data-page-scroll-container
@@ -59,7 +54,7 @@ export function ServiceLayout({
       role="region"
       aria-label="서비스 화면"
       tabIndex={0}
-      scroll={isMobile ? "document" : "contained"}
+      scroll={isMobile && !isAiChat ? "document" : "contained"}
       hideScrollBar
       headerPosition="sticky"
       headerTone="fade"
@@ -90,36 +85,21 @@ export function ServiceLayout({
         </div>
       }
     >
-      <div className="service-layout__content">
-        <Outlet />
-      </div>
+      <AiChatSessionProvider
+        key={aiAudience}
+        feedbackAudienceKey={aiAudience}
+        isAuthenticated={authState.status === "authenticated"}
+        onAuthenticationRequired={refreshAuth}
+        onKeyboardVisibilityChange={setAiKeyboardVisible}
+      >
+        <div className="service-layout__content">
+          <Outlet />
+        </div>
+      </AiChatSessionProvider>
 
       {showNavigationDock && (
         <div className="service-layout__mobile-dock">
-          {authState.status === "authenticated" ||
-          authState.status === "guest" ? (
-            <AiChatFeature
-              key={aiAudience}
-              feedbackAudienceKey={aiAudience}
-              contextLabel={aiContext}
-              onKeyboardVisibilityChange={setAiKeyboardVisible}
-              isAuthenticated={authState.status === "authenticated"}
-              onAuthenticationRequired={refreshAuth}
-              launcherClassName={
-                isMobile ? "app-bottom-navigation__item" : undefined
-              }
-              renderLauncher={(launcher) => (
-                <>
-                  <AppBottomNavigation>
-                    {isMobile ? launcher : null}
-                  </AppBottomNavigation>
-                  {!isMobile && launcher}
-                </>
-              )}
-            />
-          ) : (
-            <AppBottomNavigation />
-          )}
+          <AppBottomNavigation />
         </div>
       )}
     </AppLayout>

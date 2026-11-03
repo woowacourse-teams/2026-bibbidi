@@ -316,7 +316,9 @@ describe("공개 밸런스게임과 행동 계측", () => {
     fireEvent.click(image);
     expect(screen.queryByText(result.summary)).toBeNull();
     expect(getBalanceGameResult).toHaveBeenCalledOnce();
-    expect(events("balance_game_card_view")).toHaveLength(1);
+    await waitFor(() =>
+      expect(events("balance_game_card_view")).toHaveLength(1),
+    );
   });
   it("결과 이미지를 불러오지 못해도 추천 할 일을 담을 수 있다", async () => {
     renderGame();
@@ -398,7 +400,9 @@ describe("공개 밸런스게임과 행동 계측", () => {
     expect(submits[0].parameters.attempt_id).not.toBe(
       submits[1].parameters.attempt_id,
     );
-    expect(events("balance_game_card_view")).toHaveLength(1);
+    await waitFor(() =>
+      expect(events("balance_game_card_view")).toHaveLength(1),
+    );
   });
   it("StrictMode에서도 첫 문항·카드·추천 노출을 중복 기록하지 않고 기본 선택은 조작으로 세지 않는다", async () => {
     renderGame("guest", true);

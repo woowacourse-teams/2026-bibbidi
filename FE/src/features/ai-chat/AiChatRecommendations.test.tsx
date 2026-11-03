@@ -12,6 +12,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect, useState } from "react";
 
 import { AiChatFeature } from "./AiChatFeature";
+import { AiChatSessionProvider } from "./AiChatSession";
+
+function ChatTab() {
+  const [visible, setVisible] = useState(true);
+  return (
+    <>
+      <button type="button" onClick={() => setVisible(false)}>
+        다른 탭
+      </button>
+      <button type="button" onClick={() => setVisible(true)}>
+        AI 챗
+      </button>
+      {visible && <AiChatFeature />}
+    </>
+  );
+}
 import type { streamAiChat } from "./api/streamAiChat";
 import {
   MyChecklistProvider,
@@ -59,10 +75,13 @@ function chat(observe = false) {
   return (
     <MemoryRouter>
       <MyChecklistProvider sessionKey="recommendation-test">
-        <AiChatFeature
+        <AiChatSessionProvider
+          feedbackAudienceKey="recommendation-test"
           isAuthenticated
           onAuthenticationRequired={authRequired}
-        />
+        >
+          <ChatTab />
+        </AiChatSessionProvider>
         {observe ? <ChecklistObserver /> : null}
       </MyChecklistProvider>
     </MemoryRouter>
@@ -70,7 +89,6 @@ function chat(observe = false) {
 }
 function renderChat(ui: Parameters<typeof render>[0]) {
   const result = render(ui);
-  fireEvent.click(screen.getByRole("button", { name: "AI" }));
   return result;
 }
 async function send() {
@@ -196,11 +214,11 @@ describe("AI 추천 목록 연결", () => {
     await send();
     await screen.findByRole("checkbox", { name: "웨딩홀 투어" });
     fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI 채팅 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 탭" }));
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "AI 채팅" })).toBeNull(),
+      expect(screen.queryByRole("main", { name: "AI 챗" })).toBeNull(),
     );
-    fireEvent.click(screen.getByRole("button", { name: "AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 챗" }));
     expect(screen.getByRole("button", { name: "추천 다시 보기" })).toBeTruthy();
     await send();
     await screen.findByRole("checkbox", { name: "웨딩홀 투어" });
@@ -230,28 +248,21 @@ describe("AI 추천 목록 연결", () => {
     expect(mocks.catalog).toHaveBeenCalledOnce();
   });
 
-  it("닫힌 모바일에서 늦게 도착한 추천은 다시 열 때 보여주고 읽던 스크롤을 보존한다", async () => {
+  it("다른 탭에서 도착한 추천은 AI 챗으로 돌아왔을 때 표시한다", async () => {
     mockMobileDialog();
-    mockChatScrollHeight();
     const finishCatalog = pendingCatalog();
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send();
     await screen.findByText("추천 할 일을 불러오고 있어요.");
-    const log = screen.getByRole("log");
-    expect(log.scrollTop).toBe(600);
-    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 탭" }));
     await finishCatalog();
-    expect(log.scrollTop).toBe(600);
-    act(() => screen.getByRole("textbox").focus());
-    expect(log.scrollTop).toBe(1000);
-    log.scrollTop = 250;
-    fireEvent.scroll(log);
-    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
-    log.scrollTop = 0;
-    fireEvent.scroll(log);
-    act(() => screen.getByRole("textbox").focus());
-    expect(log.scrollTop).toBe(250);
+    expect(screen.queryByRole("main", { name: "AI 챗" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "AI 챗" }));
+    expect(
+      await screen.findByRole("checkbox", { name: "웨딩홀 투어" }),
+    ).toBeTruthy();
+    expect(mocks.catalog).toHaveBeenCalledOnce();
+    expect(mocks.stream).toHaveBeenCalledOnce();
   });
 
   it("완료 후 서버 순서로 목록을 표시하고 알 수 없는 ID를 제외한다", async () => {
@@ -535,17 +546,16 @@ describe("AI 추천 목록 연결", () => {
     await act(async () => finish(json({ items: [addedItem] })));
   });
 
-  it("모바일 접기와 PC 전환에도 복수 선택을 유지한다", async () => {
+  it("탭을 오가고 PC로 전환해도 복수 선택을 유지한다", async () => {
     const media = mockMobileDialog();
     renderChat(chat());
-    fireEvent.click(screen.getByRole("button", { name: "AI" }));
     await send();
     fireEvent.click(
       await screen.findByRole("checkbox", { name: "웨딩홀 투어" }),
     );
     fireEvent.click(task("예식 형태 결정"));
-    fireEvent.click(screen.getByRole("button", { name: "AI 대화 접기" }));
-    act(() => screen.getByRole("textbox").focus());
+    fireEvent.click(screen.getByRole("button", { name: "다른 탭" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI 챗" }));
     expect(task("웨딩홀 투어").checked).toBe(true);
     act(() => media.setMatches(false));
     expect(task("예식 형태 결정").checked).toBe(true);
