@@ -3,6 +3,7 @@
 .kotlin/
 **/build/
 local.properties
+iosApp/config/Endpoints.local.xcconfig
 
 # Xcode local state and build output
 DerivedData/
