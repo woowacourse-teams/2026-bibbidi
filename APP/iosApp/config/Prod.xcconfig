@@ -1,0 +1,7 @@
+// iOS production environment.
+#include "Endpoints.local.xcconfig"
+BIBBIDI_ENVIRONMENT = prod
+BIBBIDI_APP_ID = com.bobbidi.bibbidi
+BIBBIDI_APP_NAME = 비비디
+BIBBIDI_API_HOST = $(APP_PROD_API_HOST)
+BIBBIDI_WEB_HOST = $(APP_PROD_WEB_HOST)

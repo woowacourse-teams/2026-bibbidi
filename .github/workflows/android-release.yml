@@ -1,16 +1,83 @@
-# KMP 전환 중에는 릴리스 배포를 실행하지 않습니다.
-# #240에서 기존 android-release Environment Secrets를 새 Gradle 모듈에 연결합니다.
-name: Android Release AAB (paused during KMP migration)
+name: Android Release AAB
 
 on:
+  push:
+    branches: [release-app]
+    paths:
+      - APP/**
+      - .github/workflows/android-release.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release-paused:
-    if: ${{ false }}
-    runs-on: ubuntu-latest
+  release:
+    if: github.ref == 'refs/heads/release-app'
+    runs-on: ubuntu-24.04
+    environment: android-release
+    timeout-minutes: 25
     steps:
-      - run: echo "Release signing will be restored in issue 240."
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install Android SDK packages
+        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-36' 'build-tools;36.0.0'"
+      - name: Restore upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/bibbidi-upload.jks"
+          echo "ANDROID_KEYSTORE_PATH=$ANDROID_KEYSTORE_PATH" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          names = ("ANDROID_KEYSTORE_BASE64", "ANDROID_STORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD")
+          if any(not os.environ.get(name) for name in names):
+              raise SystemExit("Android upload signing secrets are required")
+          try:
+              data = base64.b64decode("".join(os.environ["ANDROID_KEYSTORE_BASE64"].split()), validate=True)
+          except ValueError:
+              raise SystemExit("Upload keystore must be valid base64") from None
+          path = Path(os.environ["ANDROID_KEYSTORE_PATH"])
+          path.touch(mode=0o600)
+          path.write_bytes(data)
+          PY
+      - name: Build signed production bundle
+        working-directory: APP
+        env:
+          APP_DEV_API_HOST: ${{ secrets.APP_DEV_API_HOST }}
+          APP_DEV_WEB_HOST: ${{ secrets.APP_DEV_WEB_HOST }}
+          APP_PROD_API_HOST: ${{ secrets.APP_PROD_API_HOST }}
+          APP_PROD_WEB_HOST: ${{ secrets.APP_PROD_WEB_HOST }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon --no-configuration-cache :androidApp:bundleProdRelease
+      - name: Verify bundle signature
+        run: |
+          verification=$(jarsigner -verify APP/androidApp/build/outputs/bundle/prodRelease/androidApp-prod-release.aab)
+          echo "$verification" | grep -q 'jar verified\.'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bibbidi-prod-release-aab
+          path: APP/androidApp/build/outputs/bundle/prodRelease/androidApp-prod-release.aab
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove upload keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/bibbidi-upload.jks"

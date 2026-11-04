@@ -16,6 +16,13 @@ on:
 permissions:
   contents: read
 
+# Public build checks use test-only hosts and never receive real endpoint secrets.
+env:
+  APP_DEV_API_HOST: dev-api.example.invalid
+  APP_DEV_WEB_HOST: dev-web.example.invalid
+  APP_PROD_API_HOST: api.example.invalid
+  APP_PROD_WEB_HOST: web.example.invalid
+
 concurrency:
   group: app-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -32,9 +39,9 @@ jobs:
           - name: Shared tests
             tasks: ':shared:testAndroidHostTest'
           - name: Android tests
-            tasks: ':androidApp:testDebugUnitTest'
+            tasks: ':androidApp:testDevDebugUnitTest :androidApp:testProdReleaseUnitTest'
           - name: Android build
-            tasks: ':androidApp:assembleDebug'
+            tasks: ':androidApp:assembleDevDebug :androidApp:assembleDevRelease :androidApp:assembleProdRelease'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -97,14 +104,28 @@ jobs:
         if: matrix.check == 'tests'
         working-directory: APP
         run: ./gradlew --no-daemon --stacktrace :shared:iosSimulatorArm64Test
+      - name: Prepare iOS test endpoints
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          names = ("APP_DEV_API_HOST", "APP_DEV_WEB_HOST", "APP_PROD_API_HOST", "APP_PROD_WEB_HOST")
+          path = Path("APP/iosApp/config/Endpoints.local.xcconfig")
+          path.write_text("".join(f"{name} = {os.environ[name]}\n" for name in names))
+          PY
       - name: Build iOS Simulator app
         if: matrix.check == 'build'
-        run: >-
-          xcodebuild -project APP/iosApp/iosApp.xcodeproj
-          -scheme Bibbidi -configuration Debug -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          -derivedDataPath APP/iosApp/build/DerivedData
-          CODE_SIGNING_ALLOWED=NO build
+        run: |
+          for configuration in Debug DevRelease Release; do
+            scheme='Bibbidi Dev'
+            if [ "$configuration" = Release ]; then scheme=Bibbidi; fi
+            xcodebuild -project APP/iosApp/iosApp.xcodeproj \
+              -scheme "$scheme" -configuration "$configuration" -sdk iphonesimulator \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath "APP/iosApp/build/$configuration" \
+              CODE_SIGNING_ALLOWED=NO build
+          done
       - name: Prepare UI test Simulator
         if: matrix.check == 'tests' && env.RUN_IOS_UI_TESTS == 'true'
         timeout-minutes: 5
@@ -117,7 +138,7 @@ jobs:
         timeout-minutes: 15
         run: >-
           xcodebuild -project APP/iosApp/iosApp.xcodeproj
-          -scheme Bibbidi -configuration Debug
+          -scheme 'Bibbidi Dev' -configuration Debug
           -destination "platform=iOS Simulator,id=$UI_TEST_SIMULATOR_ID"
           -derivedDataPath APP/iosApp/build/DerivedData
           -resultBundlePath APP/iosApp/build/TestResults.xcresult

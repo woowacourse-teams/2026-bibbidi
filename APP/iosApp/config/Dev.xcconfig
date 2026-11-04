@@ -1,0 +1,8 @@
+// iOS development environment.
+#include "Endpoints.local.xcconfig"
+BIBBIDI_ENVIRONMENT = dev
+BIBBIDI_APP_ID = com.bobbidi.bibbidi.dev
+BIBBIDI_APP_NAME = 비비디 개발
+BIBBIDI_API_HOST = $(APP_DEV_API_HOST)
+BIBBIDI_WEB_HOST = $(APP_DEV_WEB_HOST)
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) BIBBIDI_DEV
