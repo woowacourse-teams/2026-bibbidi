@@ -1,0 +1,120 @@
+name: 비비디 AI 리뷰 사전 검사
+
+on:
+  pull_request:
+    types:
+      - opened
+      - ready_for_review
+      - synchronize
+      - reopened
+      - edited
+    branches:
+      - dev-be
+      - dev-fe
+      - dev-app
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".claude/**"
+      - ".agents/**"
+      - ".codex/**"
+      - ".codex-bin/**"
+      - ".tmp-bin/**"
+      - ".devlog/**"
+      - ".devlogger.json"
+      - "**/pnpm-lock.yaml"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+      - "**/*.lock"
+      - "**/gradle.lockfile"
+      - "**/build/**"
+      - "**/dist/**"
+      - "**/out/**"
+      - "**/node_modules/**"
+      - "**/.gradle/**"
+      - "**/src/test/resources/**"
+      - "**/__snapshots__/**"
+      - "**/*.snap"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "**/*.jpeg"
+      - "**/*.gif"
+      - "**/*.webp"
+      - "**/*.ico"
+      - "**/*.svg"
+      - "**/*.pdf"
+      - "**/*.zip"
+      - "**/*.jar"
+      - "**/*.woff"
+      - "**/*.woff2"
+      - "**/*.ttf"
+      - "**/*.eot"
+      - "**/*.mp4"
+      - "**/*.mov"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-review-pre-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  precheck:
+    name: 리뷰 대상인지 사전 검사
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: PR 코드 체크아웃
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Node.js 버전을 24.19.0으로 설정
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: 리뷰 봇 코드가 바뀌었는지 확인
+        id: harness
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          files=$(gh api "repos/$REPOSITORY/pulls/$PULL_NUMBER/files" --paginate --jq '.[].filename')
+          count=$(printf '%s\n' "$files" | grep -c '^\.github/ai-review/' || true)
+          if [ "$count" -gt 0 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: pnpm 버전을 11.20.0으로 설정
+        if: steps.harness.outputs.changed == 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+
+      - name: 리뷰 봇 의존성 설치
+        if: steps.harness.outputs.changed == 'true'
+        run: pnpm --dir .github/ai-review install --frozen-lockfile
+
+      - name: 리뷰 봇 TypeScript 타입 검사
+        if: steps.harness.outputs.changed == 'true'
+        run: pnpm exec tsc -p .github/ai-review/tsconfig.json
+
+      - name: 사전 검사 실행
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_REPOSITORY: ${{ github.repository }}
+          REVIEW_PULL_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node --experimental-strip-types .github/ai-review/pre/cli.ts
